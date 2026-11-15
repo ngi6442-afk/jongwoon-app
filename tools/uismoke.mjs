@@ -15565,11 +15565,11 @@ try {
     const FT = ['`isTestMember`', '`hrTestToggle`', '`leaveLate`', '`leaveEndNote`', '`contractPlan`', '`hwpxTokDiff`', '`_lib/learnallow2.js`', '`LA2.injectFilter`', '`learnhw`', '`tpl_sha`', '`_lib/rnote.js`', '`rnote_put`', '`RULES_VER`', '`bot_text`', '`ROWMAP`', '원장 C165', '제4조① 단서 **4호**', '비교 불가', '연구전담요원 PM만'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = ['<b>승인 대기가 하루를 넘으면</b>', '<b>시험 계정 표식</b>', '<li><b>연구노트</b> (2026-11 v480)', '<b>계약 서류 학습 — 한글 양식</b> (2026-11 v480)'];
-    const ok = /기준: v480 \(2026-11-15\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 13 && gate.length === 3 && scr.length === 10 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 480 /* v481: 기준 줄·sw = 이 판 이상 */ && ftv.length > 0 && mF.length === 0 && cb.length === 13 && gate.length === 3 && scr.length === 10 && !cb.some((l) => /\(PM/.test(l))
       && d.ft.indexOf('단서 5호') < 0 && d.ft.indexOf('§4①5호') < 0
       && MAN.every((s) => d.man.indexOf(s) > 0) && !/test_acct|hwpx_tok|learnhw|rnote_|bot_text|tpl_sha/.test(MAN.map((s) => cut(d.man, s, '\n')).join(' '))
       && d.cl.indexOf('**P1 판9·16·18·21(v480') > 0 && d.cl.indexOf('`LA2.injectFilter`') > 0
-      && /SHELL_CACHE = 'jw-shell-v480'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 480;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r480 = chk480(D480);
@@ -15580,6 +15580,32 @@ try {
   T('v480 문서·판 번호(정확 검사): FEATURES 기준 v480 (2026-11-15)·v480 절·옛 "5호" 0 · TESTLIST v480 칸 13(화면·운영 확인 10 · 게이트 [x] 3) · MANUAL 휴가 지연·시험 계정·연구노트·한글 양식 학습(내부 이름 0) · CLAUDE.md 줄 · sw jw-shell-v480 · 결함 사본 ' + M480.length + '개 = 모두 ✗',
     r480.ok && M480.every((v) => v === false), JSON.stringify({ r: r480.info, mut: M480 }));
 } catch (e) { console.log('  (v480 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v481(65 연구노트 작은 고침 5건 — 원장 C174): 실행 검사는 위 'C174'·'P1 판21' 블록 · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '481 이상'으로 풀 것
+try {
+  const rd481 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D481 = { ft: rd481('FEATURES.md'), tl: rd481('TESTLIST.md'), sw: rd481('sw.js'), man: rd481('MANUAL.html'), cl: rd481('CLAUDE.md') };
+  const chk481 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v481 (11/15)', '\n### '), tlv = cut(d.tl, '\n## v481 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
+    const FT = ['원장 C174', '`member:`', '`stampWarn`', '`recentDocs`', '`unread`', '`rnoteFresh`', '**확정 뒤 7일까지만**', '**`RULES_FP`**', '`RNOTE_RULES_FP`', '앱을 먼저 올리고'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v481 \(2026-11-15\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 3 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf('초안이 없을 때는 확정 뒤 7일 동안 카드에 남습니다(2026-11 v481)') > 0 && d.man.indexOf('언제든 다시 받을 수 있습니다') < 0
+      && !/RULES_FP|unread|rnote_/.test(cut(d.man, '초안이 없을 때는 확정 뒤 7일', '\n'))
+      && d.cl.indexOf('**연구노트 작은 고침(v481') > 0 && d.cl.indexOf('`RULES_FP`') > 0
+      && /SHELL_CACHE = 'jw-shell-v481'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length } };
+  };
+  const r481 = chk481(D481);
+  const mu481 = (k, f) => chk481(Object.assign({}, D481, { [k]: f(D481[k]) })).ok;
+  const M481 = [mu481('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v480 (')), mu481('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v480'")),
+    mu481('ft', (s) => s.split('`rnoteFresh`').join('rnoteFresh')), mu481('man', (s) => s.replace('초안이 없을 때는 확정 뒤 7일 동안', '언제든 다시 받을 수 있습니다')),
+    mu481('cl', (s) => s.replace('**연구노트 작은 고침(v481', '연구노트 작은 고침('))];
+  T('v481 문서·판 번호(정확 검사): FEATURES 기준 v481 (2026-11-15)·v481 절(5건 이름) · TESTLIST v481 칸 4(운영 확인 1 · 게이트 [x] 3) · MANUAL 확정본 7일 안내(옛 "언제든" 0·내부 이름 0) · CLAUDE.md 줄 · sw jw-shell-v481 · 결함 사본 ' + M481.length + '개 = 모두 ✗',
+    r481.ok && M481.every((v) => v === false), JSON.stringify({ r: r481.info, mut: M481 }));
+} catch (e) { console.log('  (v481 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

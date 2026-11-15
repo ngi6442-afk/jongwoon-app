@@ -1362,3 +1362,9 @@
 - [x] (AI) `servertest` 'P1 판9'(레이더 서버·시험 계정 제외·조문 글·결함 사본) · 'P1 판16'(칸 비교·틀 없는 칸 비교 불가·무작위 편집·추천·주입 잠금·워커·결함 사본) · 'P1 판21'(받기·재검사·있는 달 먼저·규칙 판·확정은 PM만·결함 사본) — ✓ AI 11/15
 - [x] (AI) `uismoke` 'P1 판9'(지연·안내 줄·시험 계정 묶음·휴가 줄 남김·결함 사본) · 'P1 판16'(생성 경로·콘솔 줄) · 'P1 판21'(카드·여러 달·PM만·고침 실패) · v479 문서 검사를 이 판 이상으로 풀고 v480 문서·판 번호 정확 검사 — ✓ AI 11/15
 - [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · 원본 읽기 검사 4종(stmtread a·b·c·d) 전부 통과 + node --check(함수·_lib·sw) · appdata `rnote.py --selftest` — 숫자는 커밋 메시지
+
+## v481 — 연구노트 작은 고침 5건(원장 C174 — 흔적 경고·한 달 실패 분리·확정본 카드 7일·거르기 표 내용 지문, 운영 데이터 변경 없음)
+- [ ] (AI 운영 확인 — C174 ⑤) 12/1~3 첫 자동 초안 때 받기 거절(표 내용 다름) 없이 저장 — 원장 C173과 같이 확인
+- [x] (AI) `servertest` 'C174 ⑤'(지문 다름·없음 400 · 표 한 낱말 = 지문 바뀜) · 'C174 ②'(1~3일 묻기·이미 있음·저장 흔적 경고) · 'C174 ③'(한 달 못 읽음 = 그 달만 · 목록 실패 503) · 'P1 판21 ⑨' 결함 사본 38개 — ✓ AI 11/15
+- [x] (AI) `uismoke` 'C174 ③④'(8일 지난 확정본 숨김·하루 지난 것 보임·못 읽은 달 한 줄·못 읽은 달만 카드) · 'P1 판21 ④' 결함 사본 22개 · v480 문서 검사를 이 판 이상으로 풀고 v481 문서·판 번호 정확 검사 — ✓ AI 11/15
+- [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · 원본 읽기 검사 4종(stmtread a·b·c·d) 전부 통과 + node --check(함수·_lib·sw) · appdata `rnote.py --selftest` — 숫자는 커밋 메시지
