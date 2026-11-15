@@ -10784,9 +10784,12 @@ function J91a(x) { return JSON.stringify(x); }
     // E 같은 판 이름·다른 내용 = 꺼짐(SHA_CHANGED) · sha 없는 옛 스위치는 종전대로 켜짐
     seed13(BG13()); await c({ action: 'veh_bg_set', bg_ver: 'veh-t1', base: 0 }, tokA);
     mem.gw_data['bg:veh:law:v1'] = BG13({ sha: '0123456789abcdef' }); const e1 = await c({ action: 'veh_bg_get' }, tV13);
-    seed13(BG13(), { bg_ver: 'veh-t1' }); const e2 = await c({ action: 'veh_bg_get' }, tV13);
-    P.E = e1.body.on === false && e1.body.why === 'SHA_CHANGED' && e2.body.on === true;
-    I.E = [e1.body.why, e2.body.on];
+    const fE = JSON.parse(flag13()), e3 = await c({ action: 'veh_bg_set', bg_ver: 'veh-t1', base: fE.updated_at }, tokA), fE2 = JSON.parse(flag13()), e4 = await c({ action: 'veh_bg_get' }, tV13);   // 검토 11/15: 같은 판 다시 승격 한 번
+    const e5 = await c({ action: 'veh_bg_set', bg_ver: 'veh-t1', base: fE2.updated_at }, tokA), auE = aud13();
+    seed13(BG13(), { bg_ver: 'veh-t1' }); const e2 = await c({ action: 'veh_bg_get' }, tV13), e6 = await c({ action: 'veh_bg_set', bg_ver: 'veh-t1', base: 0 }, tokA);
+    P.E = e1.body.on === false && e1.body.why === 'SHA_CHANGED' && e2.body.on === true && e3.code === 200 && e3.body.re_sha === true && fE2.bg_sha === '0123456789abcdef' && fE2.prev.bg_sha === 'abcdef0123456789' && e4.body.on === true
+      && e5.code === 400 && e5.body.error_code === 'NO_CHANGE' && e6.code === 400 && e6.body.error_code === 'NO_CHANGE' && auE.length === 2 && /sha abcdef0123456789→0123456789abcdef \(같은 판 내용 바뀜 — 다시 승격\)$/.test(auE[1].ev[0].t);
+    I.E = [e1.body.why, e2.body.on, e3.code, e3.body.re_sha, fE2.bg_sha, e4.body.on, e5.body.error_code, e6.body.error_code, auE.map((x) => x.ev[0].t)];
     // F 읽기 실패 = 503(빈 값으로 보지 않음) · 쓰기 0
     seed13(BG13()); blobsMock.hooks.failGet = (k) => k === 'settings:veh';
     let f = []; try { f = [await c({ action: 'veh_bg_set', bg_ver: 'veh-t1', base: 0 }, tokA), await c({ action: 'veh_bg_pm_get' }, tokA)]; } finally { blobsMock.hooks.failGet = null; }
@@ -10811,7 +10814,7 @@ function J91a(x) { return JSON.stringify(x); }
     T('P1 판13 ② 콘솔 요약(veh_bg_pm_get): 판·sha·행 3(실측 2·확인 필요 1·주기 2)·묶음 2·규칙 1·가장 늦은 확인일·확인 필요 목록(id·제목·이유) · 행 값은 안 내림 · 근거 없음 = bg null · 꼴 틀림 = bad_bg', R13.P.B, JSON.stringify(R13.I.B));
     T('P1 판13 ③ 값 검사: 모르는 칸 400 BAD_FIELD · 판 이름 꼴 400 BAD_VALUE 2 · base 없음 400 NEED_BASE · 올라온 판과 다른 ver 409 BG_MISSING · 그대로 400 NO_CHANGE · base 낡음 409 VEH_BG_STALE · 꼴 틀린 근거 표 409 BG_MISSING · 쓰기·감사 0', R13.P.C, JSON.stringify(R13.I.C));
     T('P1 판13 ④ 승격·해제: 승격 = settings:veh {bg_ver·bg_sha = 판 sha·prev 1판(앞 값 그대로)·updated_by PM·다른 칸 보존} → veh_bg_get on true(행 3) · 해제("") = bg_ver·bg_sha 비움·prev = 승격 판 → on false NOT_PROMOTED · 감사 2줄(col vehicles · 차량근거 · 미승격→판 · sha / 판→미승격(해제))', R13.P.D, JSON.stringify(R13.I.D));
-    T('P1 판13 ⑤ 승격 뒤 같은 판 이름으로 내용이 바뀌어 올라옴 = veh_bg_get on false SHA_CHANGED · sha 없는 옛 스위치(판27 시험 꼴) = 종전대로 on', R13.P.E, JSON.stringify(R13.I.E));
+    T('P1 판13 ⑤ 승격 뒤 같은 판 이름으로 내용이 바뀌어 올라옴 = veh_bg_get on false SHA_CHANGED → 같은 판 veh_bg_set 한 번 = 새 sha로 다시 승격(re_sha · prev 옛 sha · 감사 "sha 옛→새 (같은 판 내용 바뀜 — 다시 승격)") → on · 그 뒤 같은 판 = 400 NO_CHANGE · sha 없는 옛 스위치(판27 시험 꼴) = 종전대로 on·같은 판 NO_CHANGE', R13.P.E, JSON.stringify(R13.I.E));
     T('P1 판13 ⑥ 읽기 실패: 스위치 못 읽음 = veh_bg_set·veh_bg_pm_get 503 FLAG_READ_FAILED · 근거 표 못 읽음 = veh_bg_set 503 BG_READ_FAILED · 쓰기·감사 0', R13.P.F, JSON.stringify(R13.I.F));
     T('P1 판13 ⑦ PM 콘솔 길: pmcon_decide kind vehbg(R2 · 줄 vehbg:<판>) = PM 아닌 관리자 403 · 등급 R1 400 BAD_GRADE · 바꾸는 판과 줄이 다르면 400 BAD_ROW(쓰기 0) · PM [ㄱ] = 같은 handleVehBgSet로 승격(updated_by PM)·누른 기록 1줄(applied)·차량근거 감사 1줄', R13.P.G, JSON.stringify(R13.I.G));
     const MUT13 = [
@@ -10827,6 +10830,9 @@ function J91a(x) { return JSON.stringify(x); }
       ["  try { au = (await appendAudit({ ts: now, by: c.member.name, bid: c.member.id, col: 'vehicles',", "  try { au = (await (async () => false)({ ts: now, by: c.member.name, bid: c.member.id, col: 'vehicles',"],
       ["  const hold = rows.filter(function (r) { return r.grade !== '실측'; })", "  const hold = rows.filter(function (r) { return false; })"],
       ["async function handleVehBgPmGet(event, d, R) {\n  const g = await pmconGate(event, R, false); if (g.res) return g.res;", "async function handleVehBgPmGet(event, d, R) {\n  const g = { isPm: true };"],
+      ["  const reSha = !!(v && v === before && cur.bg_sha && cur.bg_sha !== s.bg.sha);", '  const reSha = false;'],
+      ["  if (v === before && !reSha) return jr(400,", '  if (v === before) return jr(400,'],
+      ["  if (v === before && !reSha) return jr(400,", '  if (false) return jr(400,'],
     ];
     const kill = [];
     for (const [from, to] of MUT13) {

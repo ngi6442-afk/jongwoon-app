@@ -2016,16 +2016,17 @@ async function handleVehBgSet(event, d, R) {
   if (!s.ok) return jr(503, { status: 'ERROR', error_code: s.code, request_id: R });
   const cur = s.flag, before = typeof cur.bg_ver === 'string' ? cur.bg_ver : '';
   if (Number(d.base) !== (Number(cur.updated_at) || 0)) return jr(409, { status: 'CONFLICT', error_code: 'VEH_BG_STALE', request_id: R });
-  if (v === before) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
   if (v && !(vehBgOk(s.bg) && s.bg.ver === v)) return jr(409, { status: 'CONFLICT', error_code: 'BG_MISSING', request_id: R });   // 올라온 판과 같은 ver 만 승격
+  const reSha = !!(v && v === before && cur.bg_sha && cur.bg_sha !== s.bg.sha);   // 검토 11/15: 같은 판 이름·다른 내용(SHA_CHANGED) = 한 번에 다시 승격(새 sha 기록)
+  if (v === before && !reSha) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
   const now = Date.now();
   const doc = Object.assign({}, cur, { schema: 1, bg_ver: v, bg_sha: v ? s.bg.sha : '', prev: { bg_ver: before, bg_sha: typeof cur.bg_sha === 'string' ? cur.bg_sha : '', updated_at: Number(cur.updated_at) || 0, updated_by: String(cur.updated_by || '') },
     updated_by: c.member.id, updated_at: Math.max(now, (Number(cur.updated_at) || 0) + 1) });
   const w = await blobSet(st, VEH_BG_KEYS.flag, doc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   let au = false;
-  try { au = (await appendAudit({ ts: now, by: c.member.name, bid: c.member.id, col: 'vehicles', ev: [{ op: '차량근거', id: '', t: '차량 법령 근거 ' + (before || '미승격') + '→' + (v || '미승격(해제)') + (v ? ' · sha ' + s.bg.sha : '') }] })) !== false; } catch (e) { au = false; }
-  return jr(200, { status: 'OK', bg_ver: v, prev: before, updated_at: doc.updated_at, audit: au, request_id: R });
+  try { au = (await appendAudit({ ts: now, by: c.member.name, bid: c.member.id, col: 'vehicles', ev: [{ op: '차량근거', id: '', t: '차량 법령 근거 ' + (before || '미승격') + '→' + (v || '미승격(해제)') + (v ? ' · sha ' + (reSha ? cur.bg_sha + '→' : '') + s.bg.sha : '') + (reSha ? ' (같은 판 내용 바뀜 — 다시 승격)' : '') }] })) !== false; } catch (e) { au = false; }
+  return jr(200, { status: 'OK', bg_ver: v, prev: before, re_sha: reSha, updated_at: doc.updated_at, audit: au, request_id: R });
 }
 // P1 판27 검토: 차량 저장(save vehicles)이 서버 줄의 검사 갱신 기록을 지우지 않게 — 들어온 줄과 서버 줄의 insp_log 합집합(앱 mergeVeh와 같은 규칙 · vehDueGuard 바로 다음에 부름)
 function vehLogUnion(a, b) {
