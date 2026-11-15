@@ -14321,6 +14321,7 @@
   }
   var contractsPending=false;   // 저장 디바운스(1.4s) 사이 재로드가 편집을 덮지 않게 — bids/quotes와 동일 패턴
   var CON_APPR_REJECT_MSG = "계약 저장이 거절됐습니다 — 결재(계약 단계·청구 검수)가 끝나지 않은 단계를 완료로 바꾸었거나, 결재함에서 승인되지 않은 상신을 승인으로 적은 변경이 들어 있습니다.\n서버에 저장된 값으로 다시 불러옵니다. 이 저장에 같이 고친 내용이 있으면 다시 입력해 주세요.\n결재 대상 단계는 단계 카드의 [상신] → 결재함 승인으로 넘어갑니다.";   // P1 판24-③
+  var CON_SAVE_FAIL_MSG = "계약이 서버에 저장되지 않았습니다(서버 오류) — 서버에 저장된 값으로 다시 불러옵니다. 방금 고친 내용은 잠시 뒤 다시 입력해 주세요.";   // P1 판24-③ 검토 B9
   function scheduleContractSave(){ contractsPending=true; if(contractSaveTimer) clearTimeout(contractSaveTimer); contractSaveTimer=setTimeout(doSaveContracts, 1400); }
   function mergeContracts(local, remote){
     var byId={}; (local||[]).forEach(function(c){ if(c&&c.id) byId[c.id]=c; });
@@ -14337,6 +14338,8 @@
       if(resp.status===409||resp.status===422){ return fetch(CONTRACT_API,{headers:ghHeaders()}).then(function(r){return r.status===404?null:r.json();}).then(function(j){ if(j){ var up={}; try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} contracts=mergeContracts(contracts, up.items||[]); contractSha=j.sha; } return doSaveContracts(); }); }
       // P1 판24-③: 서버가 결재 없는 단계 완료·결재함에 없는 승인·상신 사본 바뀜을 거절(400 CON_APPR_REQUIRED) — 조용히 넘기지 않고 알린 뒤 서버 값으로 다시 읽는다(이 저장에 같이 들어간 다른 고침도 서버에 없음)
       if(resp.status===400){ return resp.json().then(function(json){ var ec=(json&&json.error_code)||""; contractSha=json&&json.content&&json.content.sha; contractsPending=false; if(ec==="CON_APPR_REQUIRED"){ alert(CON_APPR_REJECT_MSG); loadContracts(); } }); }
+      // P1 판24-③ 검토(11/15 B9): 서버 오류(5xx — 결재함 못 읽음 APPROVALS_READ_FAILED 포함)도 조용히 넘기지 않는다(종전: 저장 대기 표시만 풀려 결재한 기기엔 '진행됨'으로 보이고 서버엔 없음)
+      if(resp.status>=500){ return resp.json().catch(function(){ return {}; }).then(function(json){ contractsPending=false; alert(CON_SAVE_FAIL_MSG + (json && json.error_code ? " (" + json.error_code + ")" : "")); loadContracts(); }); }
       return resp.json().then(function(json){ contractSha=json.content&&json.content.sha; contractsPending=false; });
     }).catch(function(){});
   }
@@ -14918,7 +14921,8 @@
         var subNote = cbxSubApply(it, c), notes = [it.note, subNote].filter(Boolean).join(" ");
         var where = it.scope === "top" ? ((csTitle(c) || c.client || c.label || "") + " · ") : "";
         it.note = "";
-        it.msg = (it.startMsg ? it.startMsg + " " : "") + it.name + " → " + where + cbxLabel(c, it.tgt) + " · " + (CDOC_KIND_LABEL[it.kind] || it.kind) + " v" + item.ver + lm + (notes ? ". " + notes : "");
+        it.msg = (it.startMsg ? it.startMsg + " " : "") + it.name + " → " + where + cbxLabel(c, it.tgt) + " · " + (CDOC_KIND_LABEL[it.kind] || it.kind) + " v" + item.ver + lm + (notes ? ". " + notes : "")
+          + (b.pii_raised ? " · 같은 파일이 이 계약 서류함에 개인정보 등급 " + Number(b.pii_raised) + "(으)로 이미 있어 등급 " + Number(b.pii_raised) + "(으)로 넣었습니다(낮추기는 관리자만)." : "");   // P1 판24-② 검토 B6
         renderContracts(); cbxRenderTop();
       });
     }).catch(function(){ cbxFail(it, '"' + it.name + '" 넣기 실패(네트워크)', "place"); });

@@ -21,6 +21,8 @@ const LOCK_MS = 15 * 60 * 1000;           // 잠금 시간(15분)
 // P1 판24-② (보안 재감사 ⑦ — 재현됨): 잠금 칸 이름은 아이디·이름 조회와 같은 정리(cleanText = NFC·폭 없는 문자 4종 제거·앞뒤 공백 → 소문자)로 만든다.
 //   종전(trim·소문자만)엔 아이디 사이에 폭 없는 문자를 끼운 변형마다 잠금 칸이 따로 생겨 5회·15분 잠금을 비켜 가면서, 조회(normUid·nameKey)는 같은 계정으로 갔다. 평범한 입력은 종전과 같은 칸
 function lockKey(name) { return `lock:${cleanText(name).toLowerCase()}`; }
+// P1 판24-② 검토(11/15 B7): 회원 id 칸 — 접두어가 'lock:'과 달라 입력 칸(월 점검 '잠금' 집계 lock:)과 섞이지 않음
+function memberLockKey(id) { return 'lockm:' + String(id); }
 // 관리자는 8자 이상 비밀번호, 직원은 4자리+ 숫자 PIN
 function validSecret(s, isAdmin) { s = String(s || '').trim(); return isAdmin ? s.length >= 8 : /^\d{4,}$/.test(s); }
 function deviceKey(id) { return `device:${id}`; }
@@ -188,10 +190,12 @@ async function handleLogin(st, d, R, event) {
   if (lk.ok && lk.data && lk.data.until && lk.data.until > now) {
     return jr(429, { status: 'LOCKED', error_code: 'TOO_MANY_ATTEMPTS', retry_after: Math.ceil((lk.data.until - now) / 1000), request_id: R });
   }
+  let mlk = null;   // P1 판24-② 검토(11/15 B7): 찾은 회원 id 기준 잠금 칸(lockm:<id>) — 아이디 칸·이름 칸으로 따로 세던 것을 한 계정 15분 5회로
   async function fail() {
     const fails = (lk.ok && lk.data && lk.data.fails ? lk.data.fails : 0) + 1;
     const rec = fails >= LOCK_THRESHOLD ? { fails: 0, until: now + LOCK_MS } : { fails: fails };
     await blobSet(st, lockKey(name), rec);
+    if (mlk) { const mf = (mlk.r.ok && mlk.r.data && mlk.r.data.fails ? mlk.r.data.fails : 0) + 1; await blobSet(st, mlk.key, mf >= LOCK_THRESHOLD ? { fails: 0, until: now + LOCK_MS } : { fails: mf }); }
     // Blobs엔 원자적 증가가 없어 병렬 대량 시도가 잠금 카운터를 우회한다 — 실패마다 고정 지연으로 완전탐색 비용을 올림
     await new Promise(function (r) { setTimeout(r, 600); });
     return GEN();
@@ -216,6 +220,9 @@ async function handleLogin(st, d, R, event) {
   const mr = await blobGet(st, memberKey(idx.data));
   if (!mr.ok) return jr(500, { status: 'ERROR', error_code: mr.code, request_id: R });
   if (!mr.data || mr.data.del === 1 || retired(mr.data)) return fail();
+  // 회원 칸 잠금(B7) — 다른 입력(아이디·이름)으로 이미 잠긴 계정이면 맞는 PIN이어도 429. 칸을 못 읽으면 입력 칸 기준만(종전)
+  { const mk = memberLockKey(mr.data.id), mr2 = await blobGet(st, mk); mlk = { key: mk, r: mr2 };
+    if (mr2.ok && mr2.data && mr2.data.until && mr2.data.until > now) return jr(429, { status: 'LOCKED', error_code: 'TOO_MANY_ATTEMPTS', retry_after: Math.ceil((mr2.data.until - now) / 1000), request_id: R }); }
   // 이름 로그인은 이사 기간(ALLOW_NAME_LOGIN) 동안 **아이디 보유자에게도 열어 둔다.**
   // 종전엔 아이디가 있으면 이름 경로를 막았는데(v245), 아이디를 잊는 순간 본인도 관리자도
   // 풀 수 없는 잠금이 됐다(2026-08-11 PM 실사고 — 개발자가 1명이라 대신 풀어줄 사람도 없음).
@@ -224,6 +231,7 @@ async function handleLogin(st, d, R, event) {
   // 대신 로그인 성공 시 본인 아이디를 돌려줘 다음부터 아이디를 쓰도록 안내한다(아래 uid_hint).
   if (!verifySecret(pin, mr.data.pin_salt, mr.data.pin_hash)) return fail();
   if (lk.ok && lk.data) await blobSet(st, lockKey(name), null);  // 성공 → 잠금 해제
+  if (mlk && mlk.r.ok && mlk.r.data) await blobSet(st, mlk.key, null);   // B7 회원 칸도
   // 구 색인으로 들어온 경우 정리키 색인을 추가로 심어 다음부터는 타이핑으로도 바로 찾히게 한다(자가 치유).
   if (healName) { try { await blobSet(st, nameKey(healName), idx.data); } catch (e) {} }
   const deviceStatus = await registerDevice(st, event, mr.data);

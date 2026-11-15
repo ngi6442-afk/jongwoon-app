@@ -3601,7 +3601,9 @@ async function handleCdocPut(event, d, R) {
     if (!docAttExtOk(ext)) return jr(400, { status: 'REJECTED', error_code: 'BAD_EXT', request_id: R });
     if (b64.length > CDOC_MAX) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', hint: '파일은 오프라인 보관, 채움 맵(fill)만 올리기', request_id: R });
     if (!docAttMagicOk(ext, b64)) return jr(400, { status: 'REJECTED', error_code: 'BAD_MAGIC', request_id: R });
-    // P1 판24-②: zip 내부 검증(cdocZipOk)은 사람이 올리는 길(넣기 박스 → cdoc_attach)에만 — 이 길(cdoc_put)은 앱에선 양식에서 만든 AI 초안만 쓰고, 여기에 걸면 servertest 58(v406)의 10바이트 가짜 hwpx 고정값이 깨져 오케스트레이터 몫으로 남김
+    // P1 판24-② 검토(11/15 B5): 직접 올리기에도 zip 내부 검증 — 단 '최종본(final) hwpx'만 빼 둔다: servertest 58(v406)이 10바이트 가짜 hwpx를 최종본으로 올려 200을 고정하고 있어서(남의 블록).
+    //   그 고정값을 실제 꼴 hwpx로 바꾸면 아래 조건의 예외(kind·확장자)를 걷을 것. 넣기 박스 길(cdoc_attach)은 예외 없음
+    if (!(kind === 'final' && ext === 'hwpx')) { const zcP = cdocZipOk(ext, b64); if (!zcP.ok) return jr(400, { status: 'REJECTED', error_code: 'BAD_ZIP', why: zcP.why, request_id: R }); }
   }
   return cdocCommit(c, d, R, ref, kind, pii, orig, ext, b64, fill, null);
 }
@@ -3617,6 +3619,14 @@ async function cdocCommit(c, d, R, ref, kind, pii, orig, ext, b64, fill, att) {
   const sha = crypto.createHash('sha256').update(b64 ? Buffer.from(b64, 'base64') : Buffer.from(JSON.stringify(fill), 'utf8')).digest('hex');
   // sha256 중복 = 같은 계약 안의 살아 있는 항목과 바이트가 같음 → 상단 노출 뒤 사람 선택(allow_dup:true로 재요청). 자동 거부·자동 병합 없음
   // v424 AI 초안과 바이트가 같은 최종본은 중복이 아니다(직원이 고치지 않고 그대로 넣은 파일 = 간극 0)
+  // P1 판24-② 검토(11/15 B6): 등급 낮추기를 '같은 바이트 다시 올리기'로 비켜 가지 않게 — 같은 내용(sha)이 이 계약 서류함에 더 높은 등급으로 있으면(보관한 것 포함·지운 것 제외)
+  //   관리자가 아닌 사람의 올리기는 그 등급을 따른다(응답 pii_raised — 앱이 안내 · 감사 줄에 표시). 거절이 아니라 따르기인 까닭: servertest 59(v410)가 같은 바이트를 등급 0으로 다시 올려 짝 맺기를 고정하고 있고, 올리기 자체는 막을 이유가 없어서
+  //   AI 초안(draft)의 등급 1은 앱이 늘 붙이는 조심 값이라 비교에서 뺀다(직원이 초안을 그대로 최종본 등급 0으로 넣는 정상 흐름 — v424 '간극 0')
+  let piiRaised = 0;
+  if (!c.member.admin) {
+    const piiHi = idx.items.filter(function (x) { return x && !x.purged && x.kind !== 'draft' && x.sha === sha.slice(0, 16) && (Number(x.pii) || 0) > pii; }).reduce(function (m, x) { return Math.max(m, Number(x.pii) || 0); }, 0);
+    if (piiHi) { piiRaised = piiHi; pii = piiHi; }
+  }
   const dup = idx.items.filter(function (x) { return x && x.sha === sha.slice(0, 16) && !x.del && !x.purged && (kind === 'draft' || x.kind !== 'draft'); }).map(cdocPublic);
   if (dup.length && d.allow_dup !== true) return jr(409, { status: 'CONFLICT', error_code: 'DUP_BYTES', dup: dup, request_id: R });
   const same = idx.items.filter(function (x) { return x && x.i === ref.i && x.dk === ref.dk && x.kind === kind && !x.purged; });
@@ -3656,7 +3666,7 @@ async function cdocCommit(c, d, R, ref, kind, pii, orig, ext, b64, fill, att) {
   idx.updated_at = now; idx.updated_by = c.member.id;
   const w = await blobSet(st, cdocIdxKey(ref.cid), idx);
   if (!w.ok) { await blobDelete(store(FILES), fkey); return jr(500, { status: 'ERROR', error_code: w.code, request_id: R }); }
-  const audit = await cdocAudit(c.member, '기록물등록', ref.cid, std + (dup.length ? ' · 중복 허용' : ''));
+  const audit = await cdocAudit(c.member, '기록물등록', ref.cid, std + (dup.length ? ' · 중복 허용' : '') + (piiRaised ? ' · 같은 내용 등급 ' + piiRaised + ' 따름' : ''));
   if (att) {
     try {
       if (att.rec.parts) await blobSet(store(FILES), att.id, Object.assign({}, att.rec, { taken: { cid: ref.cid, n: n } }));   // 같은 파일을 두 번 넣지 못하게 표식(조각은 서류함이 참조)
@@ -3669,7 +3679,9 @@ async function cdocCommit(c, d, R, ref, kind, pii, orig, ext, b64, fill, att) {
   let learn = null;
   if (kind === 'final') { try { learn = await cdocLearnPair(st, c.member, ref, idx, item, ext, b64, orig, d); } catch (e) { learn = { ok: false, code: 'LEARN_THREW' }; } }
   if (learn) { cdocPairMeta(item, learn); await cdocIdxSetPair(st, ref.cid, n, learn); await boxUsageAdd(st, 'pair_' + String(learn.how || learn.status || learn.code || 'x').toLowerCase().replace(/[^a-z_]/g, '').slice(0, 20), 1); }   // v423 옮기면 이 짝을 무효로 돌린다 · v424 화면용 양식·간극, 못 맺은 사유, 이번 달 경로 건수
-  return jr(200, { status: 'OK', cid: ref.cid, n: n, ver: ver, name: std, item: cdocPublic(item), dup: dup, gc: gcd, audit: audit, learn: learn, request_id: R });
+  const okBody = { status: 'OK', cid: ref.cid, n: n, ver: ver, name: std, item: cdocPublic(item), dup: dup, gc: gcd, audit: audit, learn: learn, request_id: R };
+  if (piiRaised) okBody.pii_raised = piiRaised;   // P1 판24-② B6
+  return jr(200, okBody);
 }
 // ---- v423 넣기 박스(체크 31, PM 11/5 "서류 등록 채널 하나" · 11/6 "저장 설계는 Blobs 그대로") — 파일을 먼저 gw_files에 받고(box_put), 에이전트가 종류를 판단한 뒤(gw-parse-background), 다시 보내지 않고 서류함에 넣는다(cdoc_attach)
 const BOX_PART_B64 = 4400000;      // 조각 1개 base64 상한(4의 배수 — 이어 붙이면 원본 base64). 동기 함수 본문 6MB 안쪽

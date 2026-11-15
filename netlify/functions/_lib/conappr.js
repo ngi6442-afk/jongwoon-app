@@ -7,7 +7,9 @@
 //   ① 단계가 이번 저장에서 새로 '끝남(done)'이 됐고 그 단계가 결재 대상이면(앱 csApprKindOf와 같은 판정 · 시나리오 계약만) → 그 단계 ref의 결재함 항목이 '승인'이어야 한다
 //   ② 단계의 상신 기록(appr)이 이번 저장에서 새로 '승인'이 됐으면(직전 서버 값이 같은 상신 번호로 승인이 아님) → 같은 결재함 항목이 '승인'이어야 한다
 //   ③ 같은 상신 번호(appr.cid)인데 상신 때 사본(appr.snap — 변경 금액·종료일)이 바뀌었으면 거절(승인 뒤·대기 중에 금액을 바꿔치기 하는 길 — 재상신은 새 번호)
-//   결재함 항목 대조 = ref 'con:<계약 id>|<줄 key>|<단계 번호>' · 상신 번호가 있으면 항목 cid 같음 · 종류가 정해진 단계면 항목 종류 같음 · 상태 '승인'
+//   결재함 항목 대조 = ref 'con:<계약 id>|<줄 key>|<단계 번호>' · 상신 번호(cid) 같음(번호 없는 승인은 대조 불가 — 앱은 v384부터 늘 붙임) · 단계 고유 종류와 항목 종류 같음 · 상태 '승인'
+//   검토(11/15) 반영: 직전에 번호가 있던 상신의 번호를 비우거나 빼면 바뀐 것으로 봄 · 사본 비교는 번호를 비운 것도 같은 상신으로 · 승인 표시 종류 = 단계 고유 종류(앱이 보낸 appr.kind 아님) ·
+//   그 자리 단계의 정체(이름·aid·ak·aw)가 직전과 다르면 직전 단계 없음으로 대조
 // 결재 대상 판정은 앱(index.html csApprKind·csApprKindOf·csChgAmtChanged)과 같은 식이다 — uismoke 'P1 판24-③'이 같은 표본으로 두 벌을 대조한다. 바꾸면 두 곳 동시에.
 const CON_APPR_KINDS = [[/청구|입금/, '청구 검수'], [/계약서/, '계약 단계']];   // 앱 CON_APPR_KINDS와 같은 표
 function apprKind(name) { for (let i = 0; i < CON_APPR_KINDS.length; i++) { if (CON_APPR_KINDS[i][0].test(name || '')) return CON_APPR_KINDS[i][1]; } return ''; }
@@ -24,11 +26,16 @@ function apprKindOf(c, s) {
 }
 function snapKey(a) { const v = a && a.snap; if (!v || typeof v !== 'object') return ''; return JSON.stringify([String(v.chg_amt == null ? '' : v.chg_amt), String(v.chg_end == null ? '' : v.chg_end)]); }
 function isObj(x) { return !!x && typeof x === 'object' && !Array.isArray(x); }
-// 결재함에서 이 단계의 '승인' 항목 찾기
+// 단계가 가진 결재 종류(입력 칸 값과 무관 — 그 단계의 정체) — 신설 단계는 ak, 그 밖은 이름 판정. 승인 표시 대조는 앱이 appr에 적어 보낸 종류가 아니라 이것으로(검토 11/15 B2)
+function ownKind(s) { if (!isObj(s)) return ''; return s.aid ? String(s.ak || '') : apprKind(s.name); }
+// 그 자리 단계의 정체 — 이름·신설 id·종류·변경계약 표식이 직전과 다르면 다른 단계로 본다(검토 B3: 끝난 단계 이름을 '계약서…'로 바꿔 결재 없이 끝난 것처럼 보이던 길)
+function stageId(s) { return JSON.stringify([String(s.name == null ? '' : s.name), String(s.aid || ''), String(s.ak || ''), String(s.aw || '')]); }
+// 결재함에서 이 단계의 '승인' 항목 찾기 — 상신 번호(cid)가 없으면 대조 불가(검토 A1: 빈 번호가 같은 ref의 아무 승인이나 받던 길) · 종류가 정해진 단계는 항목 종류 같음
 function approvedItem(apItems, ref, appr, kind) {
   const cid = appr && appr.cid ? String(appr.cid) : '';
+  if (!cid) return null;
   return (apItems || []).find(function (it) {
-    return it && it.ref === ref && it.status === '승인' && (!cid || it.cid === cid) && (!kind || it.kind === kind);
+    return it && it.ref === ref && it.status === '승인' && it.cid === cid && (!kind || it.kind === kind);
   }) || null;
 }
 // 이번 저장이 결재함 대조를 해야 하는가(결재함을 읽을지) — check()와 같은 조건의 '후보'만 센다(결재함 읽기를 아끼려고)
@@ -44,12 +51,16 @@ function scan(oldItems, newItems) {
       const op = (o && Array.isArray(o.pipes)) ? o.pipes.find(function (q) { return isObj(q) && q.key === p.key; }) : null;
       p.stages.forEach(function (s, i) {
         if (!isObj(s)) return;
-        const os = (op && Array.isArray(op.stages) && isObj(op.stages[i])) ? op.stages[i] : null;
+        const os0 = (op && Array.isArray(op.stages) && isObj(op.stages[i])) ? op.stages[i] : null;
+        const os = (os0 && stageId(os0) === stageId(s)) ? os0 : null;   // 정체가 바뀐 자리 = 직전 단계 없음으로(새로 끝남·새 승인으로 대조)
         const ref = 'con:' + c.id + '|' + p.key + '|' + i, a = isObj(s.appr) ? s.appr : null, oa = (os && isObj(os.appr)) ? os.appr : null;
-        const kind = scen ? apprKindOf(c, s) : '';
-        if (s.status === 'done' && !(os && os.status === 'done') && kind) rows.push({ why: 'STAGE_DONE', ref: ref, appr: a, kind: kind, cid: String(c.id), pipe: String(p.key || ''), i: i });
-        if (a && a.status === '승인' && !(oa && oa.status === '승인' && String(oa.cid || '') === String(a.cid || ''))) rows.push({ why: 'APPR_CLAIM', ref: ref, appr: a, kind: kind || String(a.kind || ''), cid: String(c.id), pipe: String(p.key || ''), i: i });
-        if (a && oa && a.cid && String(oa.cid || '') === String(a.cid) && snapKey(oa) !== snapKey(a)) rows.push({ why: 'SNAP_CHANGED', ref: ref, appr: a, kind: '', cid: String(c.id), pipe: String(p.key || ''), i: i, hard: true });
+        const kind = scen ? apprKindOf(c, s) : '', own = ownKind(s), at = { cid: String(c.id), pipe: String(p.key || ''), i: i };
+        const aCid = a ? String(a.cid || '') : '', oCid = oa ? String(oa.cid || '') : '';
+        if (s.status === 'done' && !(os && os.status === 'done') && kind) rows.push(Object.assign({ why: 'STAGE_DONE', ref: ref, appr: a, kind: kind }, at));
+        // 승인 표시: 직전과 같은 상신 번호로 이미 승인이었으면 그대로 · 직전에 번호가 있었는데 비우거나 뺐으면 바뀜(검토 A1) · 단계 고유 종류가 없으면 승인될 수 없는 단계(늘 거절)
+        if (a && a.status === '승인' && !(oa && oa.status === '승인' && aCid === oCid)) rows.push(Object.assign({ why: 'APPR_CLAIM', ref: ref, appr: a, kind: own, hard: !own }, at));
+        // 사본: 같은 상신(번호 같음 — 새 번호가 비었으면 직전 상신과 같은 것으로 봄)인데 금액·종료일 사본이 다르면 거절(재상신은 새 번호)
+        if (a && oa && (aCid === oCid || !aCid) && snapKey(oa) !== snapKey(a)) rows.push(Object.assign({ why: 'SNAP_CHANGED', ref: ref, appr: a, kind: '', hard: true }, at));
       });
     });
   });
@@ -63,4 +74,4 @@ function judge(rows, apItems) {
   });
   return out;
 }
-module.exports = { CON_APPR_KINDS, apprKind, apprKindOf, chgAmtMoved, chgTermMoved, scan, judge, approvedItem };
+module.exports = { CON_APPR_KINDS, apprKind, apprKindOf, ownKind, chgAmtMoved, chgTermMoved, scan, judge, approvedItem };

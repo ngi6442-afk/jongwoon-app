@@ -10985,7 +10985,7 @@ function J91a(x) { return JSON.stringify(x); }
       const c = callB24(mod), P = {}, I = {};
       mem.gw_users['member:ulk24'] = { id: 'ulk24', name: '잠금24', uid: 'lock24id', admin: false, perms: {}, pin_salt: pinB24.salt, pin_hash: pinB24.hash }; mem.gw_users['uid:lock24id'] = 'ulk24';
       mem.gw_users['member:uok24'] = { id: 'uok24', name: '다른24', uid: 'other24id', admin: false, perms: {}, pin_salt: pinB24.salt, pin_hash: pinB24.hash }; mem.gw_users['uid:other24id'] = 'uok24';
-      const clr = () => Object.keys(mem.gw_users).filter((k) => k.indexOf('lock:') === 0).forEach((k) => delete mem.gw_users[k]);
+      const clr = () => Object.keys(mem.gw_users).filter((k) => k.indexOf('lock:') === 0 || k.indexOf('lockm:') === 0).forEach((k) => delete mem.gw_users[k]);
       clr(); mem.gw_users['lock:lock24id'] = { fails: 0, until: Date.now() + 15 * 60000 };
       const vars = ['lock24id', 'LOCK24ID', '  lock24id ', 'lock​24id', 'lock‌24id', 'lock24‍id', '﻿lock24id', 'Lo​ck24ID'];
       const rs = []; for (const v of vars) rs.push((await c({ action: 'login', uid: v, pin: '7391' })).code);
@@ -11001,11 +11001,26 @@ function J91a(x) { return JSON.stringify(x); }
       const s1 = await c({ action: 'login', uid: 'LOCK​24ID', pin: '7391' });
       P.ok = s1.code === 200 && !mem.gw_users['lock:lock24id'];   // 허용: 잠기지 않았으면 변형 입력도 같은 계정으로 들어가고 그 칸을 비움
       I.ok = [s1.code, JSON.stringify(mem.gw_users['lock:lock24id'] || null)];
-      clr();
+      // 검토 B7: 회원 id 칸(lockm:) — 아이디로 4번 틀린 계정을 이름으로 1번 더 틀리면 잠김 → 맞는 PIN이어도 아이디·이름 둘 다 429 · 다른 계정은 그대로 200
+      clr(); delete mem.gw_users['lockm:ulk24']; mem.gw_users['name:잠금24'] = 'ulk24';
+      mem.gw_users['lockm:ulk24'] = { fails: 4 };
+      const n1 = await c({ action: 'login', name: '잠금24', pin: '0000' });
+      const n2 = await c({ action: 'login', uid: 'lock24id', pin: '7391' }), n3 = await c({ action: 'login', name: '잠금24', pin: '7391' }), n4 = await c({ action: 'login', uid: 'other24id', pin: '7391' });
+      P.member = n1.code === 401 && !!(mem.gw_users['lockm:ulk24'] || {}).until && n2.code === 429 && n3.code === 429 && n4.code === 200;
+      I.member = [n1.code, n2.code, n3.code, n4.code];
+      // 호환: 옛 입력 칸 기록(fails 3)은 계속 셈(틀리면 4 · 잠기지 않음) · 옛 잠김(until) 그대로 429 · 정상 로그인은 회원 칸을 만들지 않음 · 성공이 남은 회원 칸도 비움
+      clr(); delete mem.gw_users['lockm:ulk24']; mem.gw_users['lock:lock24id'] = { fails: 3 };
+      const h1 = await c({ action: 'login', uid: 'lock24id', pin: '0000' }); const hv = JSON.stringify(mem.gw_users['lock:lock24id'] || null);
+      mem.gw_users['lock:other24id'] = { fails: 0, until: Date.now() + 60000 }; const h2 = await c({ action: 'login', uid: 'other24id', pin: '7391' });
+      delete mem.gw_users['lock:other24id']; const h3 = await c({ action: 'login', uid: 'other24id', pin: '7391' });
+      mem.gw_users['lockm:ulk24'] = { fails: 2 }; const h4 = await c({ action: 'login', uid: 'lock24id', pin: '7391' });
+      P.compat = h1.code === 401 && hv === '{"fails":4}' && h2.code === 429 && h3.code === 200 && !mem.gw_users['lockm:uok24'] && h4.code === 200 && !mem.gw_users['lockm:ulk24'] && !mem.gw_users['lock:lock24id'];
+      I.compat = [h1.code, hv, h2.code, h3.code, h4.code];
+      clr(); delete mem.gw_users['lockm:ulk24']; delete mem.gw_users['name:잠금24'];
       return { ok: Object.values(P).every((v) => v === true), info: { P, I } };
     };
     const L0 = await chkLock(require(FAUTH24));
-    T('P1 판24-② ① 로그인 잠금 키 = 아이디 조회와 같은 정리: 잠긴 아이디의 대문자·앞뒤 공백·폭 없는 문자(200B·200C·200D·FEFF) 변형 8개 = 전부 429 · 잠기지 않은 다른 아이디 = 200 · 폭 없는 문자 변형으로 틀려도 같은 칸에 쌓여 5번째에 잠김(따로 생긴 칸 0) · 맞는 PIN이면 변형 입력도 200·잠금 칸 비움', L0.ok, JSON.stringify(L0.info));
+    T('P1 판24-② ① 로그인 잠금 키 = 아이디 조회와 같은 정리: 잠긴 아이디의 대문자·앞뒤 공백·폭 없는 문자(200B·200C·200D·FEFF) 변형 8개 = 전부 429 · 잠기지 않은 다른 아이디 = 200 · 폭 없는 문자 변형으로 틀려도 같은 칸에 쌓여 5번째에 잠김(따로 생긴 칸 0) · 맞는 PIN이면 변형 입력도 200·잠금 칸 비움 · (검토 B7) 회원 칸: 아이디로 4번 + 이름으로 1번 틀리면 잠김 → 맞는 PIN도 아이디·이름 429 · 다른 계정 200 · 호환: 옛 입력 칸 fails 3 → 4(계속 셈)·옛 잠김 429·정상 로그인은 회원 칸 안 만듦·성공이 회원 칸 비움', L0.ok, JSON.stringify(L0.info));
     // ② 서류함: 보관·현재본 = 열람 등급 검사 / 등급 낮추기 = 관리자만
     const CW24 = { id: 'ucw24', name: '공무24', admin: false, perms: { con: 'do' }, dept: '운영부' }, CM24 = { id: 'ucm24', name: '관리부24', admin: false, perms: { con: 'do' }, dept: '관리부' };
     const tCW24 = issueSession(CW24).token, tCM24 = issueSession(CM24).token;
@@ -11060,25 +11075,31 @@ function J91a(x) { return JSON.stringify(x); }
         tail.push(z, lc);
       }
       const eo = Buffer.alloc(22); eo.writeUInt32LE(0x06054b50, 0); eo.writeUInt16LE(o.z64 ? 0xFFFF : ents.length, 8); eo.writeUInt16LE(o.z64 ? 0xFFFF : ents.length, 10); eo.writeUInt32LE(o.z64 ? 0xFFFFFFFF : cd.length, 12); eo.writeUInt32LE(o.z64 ? 0xFFFFFFFF : off, 16);
-      return Buffer.concat(parts.concat([cd], tail, [eo]));
+      const cm = o.comment ? Buffer.from(o.comment) : Buffer.alloc(0); eo.writeUInt16LE(cm.length, 20);   // 검토 B10: 주석(가짜 끝 서명을 품을 수 있음)
+      return Buffer.concat(parts.concat([cd], tail, [eo, cm]));
     };
     const CT24 = { name: '[Content_Types].xml', data: '<Types/>' };
     const ZOK24 = { docx: zip24([CT24, { name: 'word/document.xml', data: '<w:document/>' }]), xlsx: zip24([CT24, { name: 'xl/workbook.xml', data: '<workbook/>' }]), pptx: zip24([CT24, { name: 'ppt/presentation.xml', data: '<p/>' }]),
-      hwpx: zip24([{ name: 'mimetype', data: 'application/hwp+zip' }, { name: 'Contents/section0.xml', data: '<s/>' }]), docx64: zip24([CT24, { name: 'Word/Document.xml', data: '<w/>' }], { z64: true }) };
+      hwpx: zip24([{ name: 'mimetype', data: 'application/hwp+zip' }, { name: 'Contents/section0.xml', data: '<s/>' }]), docx64: zip24([CT24, { name: 'Word/Document.xml', data: '<w/>' }], { z64: true }),
+      // 검토 B10 — 유효한데 종전 검사가 거절하던 꼴 3: 주석 안 가짜 끝 서명 · 본문 이름이 다른 docx(word/document2.xml) · 역슬래시 경로
+      fakeSigComment: zip24([CT24, { name: 'word/document.xml', data: '<w/>' }], { comment: Buffer.concat([Buffer.from('note '), Buffer.from([0x50, 0x4B, 0x05, 0x06]), Buffer.alloc(18, 0x01)]) }),
+      doc2: zip24([CT24, { name: 'word/document2.xml', data: '<w/>' }, { name: 'word/_rels/document2.xml.rels', data: '<r/>' }]), backslash: zip24([CT24, { name: 'word\\document.xml', data: '<w/>' }]) };
     const ZBAD24 = { fake: Buffer.from([0x50, 0x4B, 0x03, 0x04, 0x14, 0x00, 0x63, 0x64, 0x6F, 0x63]), nodir: Buffer.concat([Buffer.from([0x50, 0x4B, 0x03, 0x04]), Buffer.alloc(200, 0x41)]), xlsAsDocx: ZOK24.xlsx,
       macro: zip24([CT24, { name: 'xl/workbook.xml', data: '<w/>' }, { name: 'xl/vbaProject.bin', data: 'x' }]), badCd: zip24([CT24, { name: 'word/document.xml', data: '<w/>' }], { badCd: true }),
-      badLho: zip24([CT24, { name: 'word/document.xml', data: '<w/>' }], { badLho: true }), many: zip24(Array.from({ length: 2001 }, (_, i) => ({ name: 'f' + i, data: '' }))), nomime: zip24([{ name: 'Contents/section0.xml', data: '<s/>' }]) };
+      badLho: zip24([CT24, { name: 'word/document.xml', data: '<w/>' }], { badLho: true }), many: zip24(Array.from({ length: 2001 }, (_, i) => ({ name: 'f' + i, data: '' }))), nomime: zip24([{ name: 'Contents/section0.xml', data: '<s/>' }]),
+      wordNoXml: zip24([CT24, { name: 'word/media/a.png', data: 'x' }]), noCt: zip24([{ name: 'word/document.xml', data: '<w/>' }]), macroBs: zip24([CT24, { name: 'word/document.xml', data: '<w/>' }, { name: 'word\\vbaProject.bin', data: 'x' }]) };
     const chkZip = (DDm) => {
       const P = {}, I = {};
-      const ok = ['docx', 'xlsx', 'pptx', 'hwpx'].map((e) => DDm.zipCheck(e, ZOK24[e]).ok).concat([DDm.zipCheck('docx', ZOK24.docx64).ok, DDm.zipCheck('pdf', ZBAD24.fake).ok]);
-      P.allow = ok.every((x) => x === true);   // 네 형식 최소 꼴 · zip64 끝 · 대소문자 다른 필수 항목 · 검사 대상 아닌 형식
-      const bad = [['docx', 'fake'], ['docx', 'nodir'], ['docx', 'xlsAsDocx'], ['xlsx', 'macro'], ['docx', 'badCd'], ['docx', 'badLho'], ['docx', 'many'], ['hwpx', 'nomime']].map(([e, k]) => DDm.zipCheck(e, ZBAD24[k]).why || 'OK');
-      P.deny = bad.join(',') === 'SHORT,NO_DIR,NOT_DOCX,MACRO,BAD_DIR,BAD_ENTRY,TOO_MANY,NOT_HWPX';
+      const ok = ['docx', 'xlsx', 'pptx', 'hwpx'].map((e) => DDm.zipCheck(e, ZOK24[e]).ok).concat([DDm.zipCheck('docx', ZOK24.docx64).ok, DDm.zipCheck('pdf', ZBAD24.fake).ok],
+        ['fakeSigComment', 'doc2', 'backslash'].map((k) => DDm.zipCheck('docx', ZOK24[k]).ok));
+      P.allow = ok.every((x) => x === true);   // 네 형식 최소 꼴 · zip64 끝 · 대소문자 다른 필수 항목 · 검사 대상 아닌 형식 · (B10) 주석 안 가짜 끝 서명·본문 이름 다른 docx·역슬래시 경로
+      const bad = [['docx', 'fake'], ['docx', 'nodir'], ['docx', 'xlsAsDocx'], ['xlsx', 'macro'], ['docx', 'badCd'], ['docx', 'badLho'], ['docx', 'many'], ['hwpx', 'nomime'], ['docx', 'wordNoXml'], ['docx', 'noCt'], ['docx', 'macroBs']].map(([e, k]) => DDm.zipCheck(e, ZBAD24[k]).why || 'OK');
+      P.deny = bad.join(',') === 'SHORT,NO_DIR,NOT_DOCX,MACRO,BAD_DIR,BAD_ENTRY,TOO_MANY,NOT_HWPX,NOT_DOCX,NOT_DOCX,MACRO';
       I.ok = ok; I.bad = bad;
       return { ok: P.allow && P.deny, info: { P, I } };
     };
     const Z0 = chkZip(require(FDD24));
-    T('P1 판24-② ③-1 zip 내부 검증(목록만 — 풀지 않음): 허용 = docx·xlsx·pptx·hwpx 최소 꼴·zip64 끝·필수 항목 대소문자 다름·검사 대상 아닌 형식(pdf) · 거절 = 10바이트 가짜(SHORT)·목록 없음(NO_DIR)·xlsx를 docx로(NOT_DOCX)·매크로 vbaProject.bin(MACRO)·목록 서명 깨짐(BAD_DIR)·로컬 헤더 위치 틀림(BAD_ENTRY)·항목 2001개(TOO_MANY)·mimetype 없는 hwpx(NOT_HWPX)', Z0.ok, JSON.stringify(Z0.info));
+    T('P1 판24-② ③-1 zip 내부 검증(목록만 — 풀지 않음): 허용 = docx·xlsx·pptx·hwpx 최소 꼴·zip64 끝·필수 항목 대소문자 다름·검사 대상 아닌 형식(pdf) · 거절 = 10바이트 가짜(SHORT)·목록 없음(NO_DIR)·xlsx를 docx로(NOT_DOCX)·매크로 vbaProject.bin(MACRO)·목록 서명 깨짐(BAD_DIR)·로컬 헤더 위치 틀림(BAD_ENTRY)·항목 2001개(TOO_MANY)·mimetype 없는 hwpx(NOT_HWPX) · (검토 B10) 허용 = 주석 안 가짜 끝 서명·본문 word/document2.xml·역슬래시 경로 · 거절 = word/ 아래 xml 없음·[Content_Types] 없음·역슬래시 매크로', Z0.ok, JSON.stringify(Z0.info));
     const chkAttach = async (mod) => {
       const c = callB24(mod), P = {}, I = {};
       seedCdoc();
@@ -11091,6 +11112,31 @@ function J91a(x) { return JSON.stringify(x); }
       I.r = [b1.code, b1.body.why, b2.code, b2.body.why, g1.code, g1.body.error_code, g2.code, g2.body.error_code, g3.code, g3.body.error_code, IX().length];
       return { ok: P.deny && P.allow, info: { P, I } };
     };
+    // 검토 B5·B6: 직접 올리기(cdoc_put) zip 검증(최종본 hwpx만 servertest 58 고정값 때문에 뺌) · 같은 바이트를 더 낮은 등급으로 다시 올리기 = 관리자만
+    const chkPut = async (mod) => {
+      const c = callB24(mod), P = {}, I = {};
+      seedCdoc();
+      const put = (o, tok) => c(Object.assign({ action: 'cdoc_put', cid: 'k24', i: 5, doc_key: 'e', kind: 'received' }, o), tok || tCW24, 'dev1');
+      const z1 = await put({ name: '가짜.docx', data: ZBAD24.nodir.toString('base64') }), z2 = await put({ name: '가짜.xlsx', kind: 'final', data: ZBAD24.macro.toString('base64') });
+      const z3 = await put({ name: '정상.docx', data: ZOK24.docx.toString('base64') }), z4 = await put({ name: '빈틈.hwpx', kind: 'final', data: ZBAD24.fake.toString('base64') });
+      P.zip = z1.code === 400 && z1.body.error_code === 'BAD_ZIP' && z2.code === 400 && z2.body.why === 'MACRO' && z3.code === 200 && z4.code === 200;   // z4 = 남긴 범위(최종본 hwpx — servertest 58)
+      I.zip = [z1.code, z1.body.why, z2.code, z2.body.why, z3.code, z4.code];
+      const pdf = Buffer.from('%PDF-1.4 같은 바이트 24').toString('base64');
+      const g1 = await put({ name: 'a.pdf', data: pdf, pii: 1 }), g2 = await put({ name: 'b.pdf', data: pdf, pii: 0, allow_dup: true }), g3 = await put({ name: 'c.pdf', data: pdf, pii: 1, allow_dup: true });
+      await c({ action: 'cdoc_del', cid: 'k24', n: g1.body.n }, tCW24, 'dev1'); await c({ action: 'cdoc_del', cid: 'k24', n: g3.body.n }, tCW24, 'dev1');   // 등급 1 두 판을 다 보관해도
+
+      const g4 = await put({ name: 'd.pdf', kind: 'final', data: pdf, pii: 0, allow_dup: true }), g5 = await put({ name: 'e.pdf', data: pdf, pii: 0, allow_dup: true }, tokA);
+      const dr = Buffer.from('%PDF-1.4 초안 그대로 24').toString('base64');
+      const h1 = await put({ name: '초안.pdf', kind: 'draft', doc_key: 'gen.x', data: dr, pii: 1 }), h2 = await put({ name: '최종.pdf', kind: 'final', data: dr, pii: 0 });
+      const pOf = (r) => r.body && r.body.item ? r.body.item.pii : null;
+      P.lower = g1.code === 200 && g2.code === 200 && g2.body.pii_raised === 1 && pOf(g2) === 1 && g3.code === 200 && !g3.body.pii_raised && g4.code === 200 && g4.body.pii_raised === 1 && pOf(g4) === 1
+        && g5.code === 200 && !g5.body.pii_raised && pOf(g5) === 0 && h1.code === 200 && h2.code === 200 && !h2.body.pii_raised && pOf(h2) === 0
+        && auditMock.logs.some((l) => l.ev && l.ev[0] && /같은 내용 등급 1 따름/.test(l.ev[0].t || ''));
+      I.lower = [g1.code, g2.code, g2.body.pii_raised, pOf(g2), g3.code, g4.code, pOf(g4), g5.code, pOf(g5), h1.code, h1.body.error_code, h2.code, pOf(h2)];
+      return { ok: P.zip && P.lower, info: { P, I } };
+    };
+    const U0 = await chkPut(gwd);
+    T('P1 판24-② ③-3 직접 올리기(cdoc_put) — zip 검증: 앞 4바이트만 PK인 docx(받은 서류)·매크로 xlsx(최종본) = 400 BAD_ZIP · 정상 docx 200 · 최종본 hwpx 가짜 = 200(남긴 범위 — servertest 58 고정값) · 등급(B6): 같은 바이트가 등급 1로 있으면 직원이 등급 0으로 다시 올려도 등급 1로 들어감(200·pii_raised 1·감사 "같은 내용 등급 1 따름")·보관한 뒤에도 따름 · 같은 등급 그대로 · 관리자는 고른 등급 0 · AI 초안(등급 1) 바이트를 최종본 등급 0으로 = 등급 0 그대로(정상 흐름)', U0.ok, JSON.stringify(U0.info));
     const A0 = await chkAttach(gwd);
     T('P1 판24-② ③-2 넣기 박스 → 서류함(cdoc_attach): 앞 4바이트만 PK인 docx = 400 BAD_ZIP(NO_DIR)·매크로 든 xlsx = 400 BAD_ZIP(MACRO)·색인 그대로 · 허용 = 정상 docx·hwpx·pdf 200(색인 +3)', A0.ok, JSON.stringify(A0.info));
     // ④ 체크 감사 줄 = 바뀐 항목 키(값 없음)
@@ -11122,12 +11168,13 @@ function J91a(x) { return JSON.stringify(x); }
     const svFk24 = process.env.GW_GALLERY_FEED_KEY; process.env.GW_GALLERY_FEED_KEY = 'feed-key-24';
     const gfc = async (key) => { const s = (await gf24.handler({ httpMethod: 'GET', queryStringParameters: key === null ? {} : { key }, headers: {} })).statusCode; return s === 403 ? 403 : 'pass'; };
     const kg = [await gfc('feed-key-25'), await gfc('feed'), await gfc(null), await gfc('feed-key-24')];
+    process.env.GW_GALLERY_FEED_KEY = ' feed-key-24\n'; kg.push(await gfc('feed-key-24'));   // 검토 B8: 비밀값 앞뒤 공백도 걷음
     process.env.GW_GALLERY_FEED_KEY = ''; kg.push(await gfc(''));
     process.env.GW_GALLERY_FEED_KEY = svFk24 || '';
     const srcAB = fsB24.readFileSync(join(FN, 'gw-allbaro.js'), 'utf8'), srcGF = fsB24.readFileSync(join(FN, 'gw-gallery-feed.js'), 'utf8');
     const statK = !/timingSafeEqual/.test(srcAB) && !/timingSafeEqual/.test(srcGF) && /require\('\.\/_lib\/keymatch'\)/.test(srcAB) && /require\('\.\/_lib\/keymatch'\)/.test(srcGF) && !/process\.env\.BIDS_INGEST_KEY/.test(srcAB);
-    T('P1 판24-② ⑤ 봇 키 비교 공용(_lib/keymatch): 운반일지 숨김 내보내기 = 같은 길이 다른 키·짧은 키·빈 키 401 · 맞는 키·앞뒤 공백·머리 키 = 키 통과 · 갤러리 피드 = 다른 키·짧은 키·키 없음·env 비움 403 · 맞는 키 = 키 통과 · 두 파일 자기 timingSafeEqual 0·allbaro env 직접 읽기 0(공용 모듈만)',
-      kb.join(',') === '401,401,401,pass,pass,pass' && kg.join(',') === '403,403,403,pass,403' && statK, JSON.stringify({ kb, kg, statK }));
+    T('P1 판24-② ⑤ 봇 키 비교 공용(_lib/keymatch): 운반일지 숨김 내보내기 = 같은 길이 다른 키·짧은 키·빈 키 401 · 맞는 키·앞뒤 공백·머리 키 = 키 통과 · 갤러리 피드 = 다른 키·짧은 키·키 없음·env 비움 403 · 맞는 키·(B8) 비밀값 앞뒤 공백 = 키 통과 · 두 파일 자기 timingSafeEqual 0·allbaro env 직접 읽기 0(공용 모듈만)',
+      kb.join(',') === '401,401,401,pass,pass,pass' && kg.join(',') === '403,403,403,pass,pass,403' && statK, JSON.stringify({ kb, kg, statK }));
     // ⑥ 알림함 링 1000
     const PU24 = (() => { const rp = require.resolve(join(FN, '_lib/push.js')); const saved = require.cache[rp]; delete require.cache[rp]; try { return require(rp); } finally { require.cache[rp] = saved; } })();
     delete mem.gw_data['push:log'];
@@ -11142,9 +11189,16 @@ function J91a(x) { return JSON.stringify(x); }
       ['data', "  if (piiNew < (Number(it.pii) || 0) && !c.member.admin) return jr(403,", "  if (false) return jr(403,", chkCdoc],
       ['data', "  const zcA = cdocZipOk(ext, b64); if (!zcA.ok) return jr(400,", "  const zcA = cdocZipOk(ext, b64); if (false) return jr(400,", chkAttach],
       ['data', "      const ckd = chkRecDiff(prevDoc, doc);\n", "      const ckd = { n: 0, f: {} };\n", chkAud],
-      ['dd', "  for (const m of must) if (!names[m]) return { ok: false, why: 'NOT_' + ext.toUpperCase() };", '', chkZip],
-      ['dd', "    if (ext !== 'hwpx' && /(^|\\/)vbaproject\\.bin$/i.test(name)) return { ok: false, why: 'MACRO' };", '', chkZip],
+      ['dd', "  for (const m of must) if (!keys.some(function (k) { return m.test(k); })) return { ok: false, why: 'NOT_' + ext.toUpperCase() };", '', chkZip],
+      ['dd', "    if (ext !== 'hwpx' && /(^|\\/)vbaproject\\.bin$/.test(nm)) return { ok: false, why: 'MACRO' };", '', chkZip],
       ['dd', "    if (!(lho >= 0 && lho + 30 <= buf.length) || buf.readUInt32LE(lho) !== 0x04034b50) return { ok: false, why: 'BAD_ENTRY' };", '', chkZip],
+      ['dd', '    if (p + 22 + buf.readUInt16LE(p + 20) === buf.length) { eocd = p; break; }', '    { eocd = p; break; }', chkZip],   // B10 주석 안 가짜 끝 서명
+      ['dd', "    const nm = name.replace(/\\\\/g, '/').toLowerCase();", '    const nm = name.toLowerCase();', chkZip],   // B10 역슬래시
+      ['dd', "docx: [/^\\[content_types\\]\\.xml$/, /^word\\/[^/]+\\.xml$/]", "docx: [/^\\[content_types\\]\\.xml$/, /^word\\/document\\.xml$/]", chkZip],   // B10 본문 이름
+      ['data', "    if (!(kind === 'final' && ext === 'hwpx')) { const zcP = cdocZipOk(ext, b64); if (!zcP.ok) return jr(400,", "    if (false) { const zcP = cdocZipOk(ext, b64); if (!zcP.ok) return jr(400,", chkPut],   // B5
+      ['data', '    if (piiHi) { piiRaised = piiHi; pii = piiHi; }', '    if (false) { piiRaised = piiHi; pii = piiHi; }', chkPut],   // B6
+      ['auth', "    if (mr2.ok && mr2.data && mr2.data.until && mr2.data.until > now) return jr(429,", '    if (false) return jr(429,', chkLock],   // B7 회원 칸 확인
+      ['auth', '    if (mlk) { const mf =', '    if (false) { const mf =', chkLock],   // B7 회원 칸 셈
     ];
     const kill24 = [];
     for (const [w, from, to, fn] of MUT24) {
@@ -11156,7 +11210,7 @@ function J91a(x) { return JSON.stringify(x); }
       } catch (e) { k = 'err ' + e.message; }
       if (k !== true) kill24.push(w + ':' + from.trim().slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k));
     }
-    T('P1 판24-② ⑦ 결함 사본 ' + MUT24.length + '개(잠금 키 옛 정리 · 보관·현재 등급 검사 걷음 · 등급 낮추기 검사 걷음 · zip 검사 결과 무시 · 체크 감사 키 비움 · 필수 항목·매크로·로컬 헤더 검사 걷음) = 모두 ✗', kill24.length === 0, kill24.join(' | '));
+    T('P1 판24-② ⑦ 결함 사본 ' + MUT24.length + '개(잠금 키 옛 정리 · 보관·현재 등급 검사 걷음 · 등급 낮추기 검사 걷음 · zip 검사 결과 무시 · 체크 감사 키 비움 · 필수 항목·매크로·로컬 헤더 검사 걷음 · 검토: 끝 서명 주석 길이 대조·역슬래시·본문 이름 document.xml 고정·직접 올리기 zip 걷음·같은 바이트 낮은 등급 걷음·회원 칸 확인·회원 칸 셈 걷음) = 모두 ✗', kill24.length === 0, kill24.join(' | '));
   } catch (e) { T('P1 판24-② 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
   finally { resetB24(); }
 }
@@ -11179,10 +11233,26 @@ function J91a(x) { return JSON.stringify(x); }
   const AP = (o) => Object.assign({ id: 'ap' + Math.random().toString(16).slice(2, 10), kind: '계약 단계', title: 't', ref: 'con:k3|main|1', cid: 'c1', status: '승인', by: { id: 'ucwc24', name: '공무C24' }, created: '2026-11-15T00:00:00Z' }, o || {});
   const seedC = (items, aps) => { mem.gw_users['member:ucwc24'] = CWC; mem.gw_data['col:contracts'] = { schema: 1, items, updated_at: 21 }; mem.gw_data['col:approvals'] = { schema: 1, items: aps || [], updated_at: 5 }; };
   const cp = (x) => JSON.parse(JSON.stringify(x));
-  const conSave = (c, items) => c({ action: 'save', collection: 'contracts', base: 21, doc: { schema: 1, items } }, tCWC, 'dev1');
+  const conSave = (c, items, tok) => c({ action: 'save', collection: 'contracts', base: 21, doc: { schema: 1, items } }, tok || tCWC, tok ? undefined : 'dev1');
   const chkCon = async (mod) => {
     const c = callC24(mod), D = {}, A = {};
-    const run = async (items0, aps, edit) => { seedC(items0, aps); const nd = cp(items0); edit(nd); const r = await conSave(c, nd); return { code: r.code, ec: r.body.error_code || '', rows: r.body.rows || [], saved: mem.gw_data['col:contracts'] }; };
+    const run = async (items0, aps, edit, tok) => { seedC(items0, aps); const nd = cp(items0); edit(nd); const r = await conSave(c, nd, tok); return { code: r.code, ec: r.body.error_code || '', rows: r.body.rows || [], saved: mem.gw_data['col:contracts'] }; };
+    const SNAP0 = { chg_amt: 1500, chg_end: '2027-03-31' };
+    const K3A = (ap) => { const k = K3(); k.pipes[1].stages[0].appr = Object.assign({ cid: 'cA', kind: '계약 단계', status: '승인', snap: cp(SNAP0) }, ap || {}); k.pipes[1].stages[0].status = 'done'; k.pipes[1].cur = 1; return k; };   // 승인·반영된 변경 1차
+    const APA = () => [AP({ ref: 'con:k3|chg|0', cid: 'cA' })];
+    // 검토 A1: 승인 뒤 상신 번호를 빼거나 비우고 사본을 고침 · 번호만 뺌 · 대기 중 번호 빼고 사본 고침 / 옛 번호 없는 승인 새로 적기
+    D.cidDel = await run([K3A()], APA(), (n) => { const a = n[0].pipes[1].stages[0].appr; delete a.cid; a.snap.chg_amt = 99999; });
+    D.cidEmpty = await run([K3A()], APA(), (n) => { const a = n[0].pipes[1].stages[0].appr; a.cid = ''; a.snap.chg_amt = 99999; });
+    D.cidOnly = await run([K3A()], APA(), (n) => { delete n[0].pipes[1].stages[0].appr.cid; });
+    D.cidPend = await run([K3A({ status: '대기' })], [], (n) => { const a = n[0].pipes[1].stages[0].appr; delete a.cid; a.snap.chg_amt = 99999; });
+    D.noCid = await run([K3()], [AP({ cid: undefined })], (n) => { const s = n[0].pipes[0].stages[1]; s.appr = { kind: '계약 단계', status: '승인', at: '2026-11-15T00:00:00Z' }; s.status = 'done'; });
+    // 검토 B2: 그 단계 ref를 단 '일반' 카드 승인 → 금액 칸 그대로(결재 대상 아님)·사본만 큰 금액
+    D.kindBypass = await run([K3()], [AP({ ref: 'con:k3|chg|0', cid: 'cG', kind: '일반' })], (n) => { const s = n[0].pipes[1].stages[0]; s.vals = {}; s.appr = { cid: 'cG', kind: '일반', status: '승인', snap: { chg_amt: 99999, chg_end: '2030-12-31' } }; s.status = 'done'; n[0].pipes[1].cur = 1; });
+    // 검토 B3: 끝난 단계(착공) 이름을 '계약서 보완'으로 바꿈
+    { const k = K3(); k.pipes[0].stages[2].status = 'done'; D.rename = await run([k], [], (n) => { n[0].pipes[0].stages[2].name = '계약서 보완'; }); }
+    // 검토 B4: 사본 종료일만 바꿈 · 관리자 저장도 대조
+    D.endOnly = await run([K3A()], APA(), (n) => { n[0].pipes[1].stages[0].appr.snap.chg_end = '2030-12-31'; });
+    D.admin = await run([K3()], [], (n) => { n[0].pipes[0].stages[1].status = 'done'; }, tokA);
     // 거절
     D.done = await run([K3()], [], (n) => { n[0].pipes[0].stages[1].status = 'done'; n[0].pipes[0].cur = 2; });
     D.claim = await run([K3()], [], (n) => { n[0].pipes[1].stages[0].appr = { cid: 'cX', kind: '계약 단계', status: '승인', snap: { chg_amt: 1500, chg_end: '2027-03-31' } }; });
@@ -11214,7 +11284,9 @@ function J91a(x) { return JSON.stringify(x); }
     A.selfDec = await run([K3()], [AP({ self_decided: true, chain: [{ decision: '전결' }] })], (n) => { const s = n[0].pipes[0].stages[1]; s.appr = { cid: 'c1', kind: '계약 단계', status: '승인' }; s.status = 'done'; });
     A.resub = await run([K3()], [AP({ cid: 'cR', status: '반려' })], (n) => { n[0].pipes[0].stages[1].appr = { cid: 'cR2', kind: '계약 단계', status: '대기' }; });
     A.rejSave = await run([K3()], [AP({ cid: 'cR', status: '반려' })], (n) => { n[0].pipes[0].stages[1].appr = { cid: 'cR', kind: '계약 단계', status: '반려', reason: '서류 보완' }; });
-    A.noCid = await run([K3()], [AP({ cid: undefined })], (n) => { const s = n[0].pipes[0].stages[1]; s.appr = { kind: '계약 단계', status: '승인', at: '2026-11-15T00:00:00Z' }; s.status = 'done'; });
+    A.renameOpen = await run([K3()], [], (n) => { n[0].pipes[0].stages[2].name = '착공(변경)'; });   // 끝나지 않은 단계 이름 고침
+    { const k = K3(); k.pipes[0].stages[1].appr = { kind: '계약 단계', status: '승인' }; k.pipes[0].stages[1].status = 'done'; k.pipes[0].cur = 2;   // 번호 없는 옛 승인이 서버에 이미 있음 → 그대로 다시 저장
+      A.legacyNoCid = await run([k], [], (n) => { n[0].memo = '옛 승인 그대로'; }); }
     { const k = K3(); k.pipes[1].stages[0].appr = { cid: 'cA', kind: '계약 단계', status: '승인', snap: { chg_amt: 1500, chg_end: '2027-03-31' } }; k.pipes[1].stages[0].status = 'done'; k.pipes[1].cur = 1;
       A.chgApplied = await run([K3()], [AP({ ref: 'con:k3|chg|0', cid: 'cA' })], (n) => { n[0].pipes[1] = cp(k.pipes[1]); });   // 승인된 변경계약 반영(판10 유효 금액·종료일 = 승인 사본)
       A.resave = await run([k], [], (n) => { n[0].memo = '같은 승인본 다시 저장'; }); }
@@ -11226,10 +11298,10 @@ function J91a(x) { return JSON.stringify(x); }
     const au0 = auditMock.logs.length;
     const R0 = await chkCon(gwd);
     const auLines = auditMock.logs.slice(au0).filter((l) => l.col === 'contracts' && l.ev && l.ev[0] && l.ev[0].op === '결재 없는 단계 거절');
-    const auOk = auLines.length === 9 && /^계약 저장 거절 1건\(결재 없이 완료 1 · 결재함에 없는 승인 0 · 상신 사본 바뀜 0\)$/.test(auLines[0].ev[0].t) && auLines[0].ev[0].id === 'k3|main|1' && !/계약서|견적/.test(JSON.stringify(auLines));
-    T('P1 판24-③ ① 계약 단계 결재 서버 강제 — 거절(400 CON_APPR_REQUIRED·서버 문서 그대로): 결재 없이 계약서 단계 완료 · 결재함에 없는 승인 표시(변경계약) · 변경 금액 바뀐 변경계약 대기 중 완료 · 결재함 항목 대기인데 승인 표시 · 다른 상신 번호의 승인 · 종류 다른 승인 항목 · 승인 뒤 상신 사본(금액) 바꿔치기 · 새 계약에 결재 단계 완료로 · 직전 문서 못 읽음(빈 문서로 보고 대조) / 결재함 못 읽음 = 500 APPROVALS_READ_FAILED · 거절 이유 표식(STAGE_DONE·APPR_CLAIM·SNAP_CHANGED)·자리 k3|main|1 · 감사 "결재 없는 단계 거절" 9줄(자리만 — 단계 이름 없음)',
+    const auOk = auLines.length === 18 && auLines.some((l) => /^계약 저장 거절 1건\(결재 없이 완료 1 · 결재함에 없는 승인 0 · 상신 사본 바뀜 0\)$/.test(l.ev[0].t) && l.ev[0].id === 'k3|main|1') && auLines[0].by === '공무C24' && auLines.some((l) => l.bid === 'uadmin') && !/계약서|견적|착공/.test(JSON.stringify(auLines));
+    T('P1 판24-③ ① 계약 단계 결재 서버 강제 — 거절(400 CON_APPR_REQUIRED·서버 문서 그대로): 결재 없이 계약서 단계 완료 · 결재함에 없는 승인 표시(변경계약) · 변경 금액 바뀐 변경계약 대기 중 완료 · 결재함 항목 대기인데 승인 표시 · 다른 상신 번호의 승인 · 종류 다른 승인 항목 · 승인 뒤 상신 사본(금액) 바꿔치기 · 새 계약에 결재 단계 완료로 · 직전 문서 못 읽음(빈 문서로 보고 대조) / 결재함 못 읽음 = 500 APPROVALS_READ_FAILED · 거절 이유 표식(STAGE_DONE·APPR_CLAIM·SNAP_CHANGED)·자리 k3|main|1 · (검토 A1) 승인 뒤 상신 번호 빼기·비우기 + 사본 고침·번호만 빼기·대기 중 번호 빼고 사본 고침·번호 없는 새 승인 · (B2) 단계 ref를 단 \'일반\' 카드로 금액 칸 그대로·사본만 큰 금액 · (B3) 끝난 단계 이름을 \'계약서…\'로 · (B4) 사본 종료일만 바꿈·관리자 저장도 거절 · 감사 "결재 없는 단계 거절" 18줄(자리만 — 단계 이름 없음)',
       R0.ok && auOk, JSON.stringify({ info: R0.info, au: auLines.length, t: auLines[0] && auLines[0].ev[0].t }));
-    T('P1 판24-③ ② 허용(200 — 정상 흐름이 하나도 막히지 않음): 상신 → 결재함 승인 → 단계 완료·다음 단계 열림 · 상신(대기·사본) 저장 · 금액·기간 그대로인 변경계약 결재 없이 완료 · 시나리오 없는 옛 계약의 계약서 단계 완료 · 결재 단계 건너뜀 · 서버에 이미 있던 어긋남은 다른 칸 고침에 통과 · 청구 검수 승인 → 청구 완료 · PM 전결 승인 · 반려 뒤 재상신(새 번호 대기)·반려 표시 저장 · 상신 번호 없는 옛 상신(ref로 대조) · 승인된 변경계약 반영·같은 승인본 다시 저장 · 결재 대상 아닌 단계 손질',
+    T('P1 판24-③ ② 허용(200 — 정상 흐름이 하나도 막히지 않음): 상신 → 결재함 승인 → 단계 완료·다음 단계 열림 · 상신(대기·사본) 저장 · 금액·기간 그대로인 변경계약 결재 없이 완료 · 시나리오 없는 옛 계약의 계약서 단계 완료 · 결재 단계 건너뜀 · 서버에 이미 있던 어긋남은 다른 칸 고침에 통과 · 청구 검수 승인 → 청구 완료 · PM 전결 승인 · 반려 뒤 재상신(새 번호 대기)·반려 표시 저장 · 승인된 변경계약 반영·같은 승인본 다시 저장 · 결재 대상 아닌 단계 손질 · 끝나지 않은 단계 이름 고침 · 서버에 이미 있던 번호 없는 옛 승인 그대로 다시 저장',
       R0.ok, JSON.stringify(R0.info.A));
     // ③ 결함 사본 — gw-data 관문 걷음 / _lib/conappr 판정 한 곳씩
     const RP = require.resolve(FCA), savedCA = require.cache[RP];
@@ -11240,14 +11312,20 @@ function J91a(x) { return JSON.stringify(x); }
     const MUTC = [
       ['data', '    const caRows = CONAPPR.scan(oldItems, doc.items);', '    const caRows = [];'],
       ['data', "      if (!rdCa.ok) return jr(500, { status: 'ERROR', error_code: 'APPROVALS_READ_FAILED', request_id: R });\n", "      if (!rdCa.ok) rdCa.doc = { items: [] };\n"],
-      ['ca', ' && (!cid || it.cid === cid) &&', ' &&'],
       ['ca', ' && (!kind || it.kind === kind);', ';'],
       ['ca', "return it && it.ref === ref && it.status === '승인' &&", 'return it && it.ref === ref &&'],
-      ['ca', "        if (a && oa && a.cid && String(oa.cid || '') === String(a.cid) && snapKey(oa) !== snapKey(a)) rows.push(", '        if (false) rows.push('],
+      ['ca', "        if (a && oa && (aCid === oCid || !aCid) && snapKey(oa) !== snapKey(a)) rows.push(", '        if (false) rows.push('],
       ['ca', "  return (s.aw === 'amt' && !(chgAmtMoved(c, s) || chgTermMoved(s))) ? '' : String(s.ak);", '  return String(s.ak);'],
       ['ca', 'scen = !!(c.scen || (o && o.scen));', 'scen = true;'],
       ['ca', "if (s.status === 'done' && !(os && os.status === 'done') && kind)", "if (s.status === 'done' && kind)"],
-      ['ca', "if (a && a.status === '승인' && !(oa && oa.status === '승인' && String(oa.cid || '') === String(a.cid || '')))", 'if (false)'],
+      ['ca', "if (a && a.status === '승인' && !(oa && oa.status === '승인' && aCid === oCid))", 'if (false)'],
+      // 검토 A1·B2·B3·B4
+      ['ca', '  if (!cid) return null;\n  return (apItems || []).find(function (it) {\n    return it && it.ref === ref && it.status === \'승인\' && it.cid === cid &&', '  return (apItems || []).find(function (it) {\n    return it && it.ref === ref && it.status === \'승인\' && (!cid || it.cid === cid) &&'],
+      ['ca', '(aCid === oCid || !aCid) && snapKey', 'aCid && aCid === oCid && snapKey'],
+      ['ca', "why: 'APPR_CLAIM', ref: ref, appr: a, kind: own, hard: !own }", "why: 'APPR_CLAIM', ref: ref, appr: a, kind: String(a.kind || ''), hard: false }"],
+      ['ca', 'const os = (os0 && stageId(os0) === stageId(s)) ? os0 : null;', 'const os = os0;'],
+      ['ca', ", String(v.chg_end == null ? '' : v.chg_end)]);", ']);'],
+      ['data', "  if (col === 'contracts') {\n    const caRows", "  if (col === 'contracts' && !c.member.admin) {\n    const caRows"],
     ];
     const killC = [];
     for (const [w, from, to] of MUTC) {
@@ -11255,7 +11333,7 @@ function J91a(x) { return JSON.stringify(x); }
       try { resetC24(); const r = w === 'data' ? await withCA(SCA, mutC24(SDATAC, from, to)) : await withCA(mutC24(SCA, from, to), SDATAC); k = !r.ok; } catch (e) { k = 'err ' + e.message; }
       if (k !== true) killC.push(w + ':' + from.trim().slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k));
     }
-    T('P1 판24-③ ③ 결함 사본 ' + MUTC.length + '개(저장 관문 걷음·결재함 못 읽음 통과 · 상신 번호 대조·종류 대조·승인 상태 대조 걷음·사본 바뀜 검사 걷음·금액 그대로 변경계약도 결재 요구·옛 계약도 결재 요구·기존 어긋남도 거절·승인 표시 검사 걷음) = 모두 ✗', killC.length === 0, killC.join(' | '));
+    T('P1 판24-③ ③ 결함 사본 ' + MUTC.length + '개(저장 관문 걷음·결재함 못 읽음 통과 · 종류 대조·승인 상태 대조 걷음·사본 바뀜 검사 걷음·금액 그대로 변경계약도 결재 요구·옛 계약도 결재 요구·기존 어긋남도 거절·승인 표시 검사 걷음 · 검토: 빈 상신 번호 통과·번호 비운 사본 비교 걷음·승인 표시 종류를 앱 값으로·단계 정체 대조 걷음·사본 비교에서 종료일 뺌·관리자 저장 면제) = 모두 ✗', killC.length === 0, killC.join(' | '));
   } catch (e) { T('P1 판24-③ 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
   finally { resetC24(); }
 }

@@ -15917,26 +15917,28 @@ try {
     const a = await runMarkP24(H, 403, 'PII2_FORBIDDEN'), b = await runMarkP24(H, 500, 'X'), c = await runMarkP24(H, 200, '');
     return a.alerts.length === 1 && /열람 권한이 없는 개인정보 등급 파일이라 보관·현재본 지정을 할 수 없습니다/.test(a.alerts[0]) && b.alerts.length === 1 && /^처리 실패 \(X\)$/.test(b.alerts[0]) && c.alerts.length === 0 && c.toasts === 1;
   };
-  const wiresP24 = (H) => H.indexOf('b.error_code === "PII_LOWER_ADMIN_ONLY" ? "개인정보 등급을 낮추는 것은 관리자만 할 수 있습니다') > 0 && H.indexOf('(b.error_code === "BAD_ZIP" ? " — 확장자는 문서 파일인데 속 구조가 그 형식이 아닙니다') > 0;
+  const wiresP24 = (H) => H.indexOf('b.error_code === "PII_LOWER_ADMIN_ONLY" ? "개인정보 등급을 낮추는 것은 관리자만 할 수 있습니다') > 0 && H.indexOf('(b.error_code === "BAD_ZIP" ? " — 확장자는 문서 파일인데 속 구조가 그 형식이 아닙니다') > 0
+    && H.indexOf('(b.pii_raised ? " · 같은 파일이 이 계약 서류함에 개인정보 등급 "') > 0;   // 검토 B6 같은 바이트 낮은 등급 — 서버가 높은 등급을 따르고 안내
   const okM = await chkMarkP24(html), okW = wiresP24(html);
   const mutP24 = (from, to) => { if (html.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); return html.replace(from, () => to); };
-  const kP24 = [!(await chkMarkP24(mutP24('alert((ecM === "PII2_FORBIDDEN" || ecM === "PII_FORBIDDEN") ?', 'alert(false ?'))), !wiresP24(mutP24('b.error_code === "PII_LOWER_ADMIN_ONLY" ?', 'false ?')), !wiresP24(mutP24('(b.error_code === "BAD_ZIP" ?', '(false ?'))];
+  const kP24 = [!(await chkMarkP24(mutP24('alert((ecM === "PII2_FORBIDDEN" || ecM === "PII_FORBIDDEN") ?', 'alert(false ?'))), !wiresP24(mutP24('cbxFail(it, b.error_code === "PII_LOWER_ADMIN_ONLY" ?', 'cbxFail(it, false ?')), !wiresP24(mutP24('(b.error_code === "BAD_ZIP" ?', '(false ?'))];
   T('P1 판24-② 화면: 서류함 [보관]·[현재로]가 서버 등급 거절(PII2_FORBIDDEN)을 받으면 "열람 권한이 없는 개인정보 등급 파일…" 알림 1번(실행 — 실제 csCdocMark) · 다른 실패는 종전 "처리 실패 (코드)" · 성공은 알림 0 · [옮기기] 등급 낮추기 거절(PII_LOWER_ADMIN_ONLY)·넣기 BAD_ZIP은 사람 말 안내 · 결함 사본 3개 = 모두 ✗',
     okM && okW && kP24.every((v) => v === true), JSON.stringify({ okM, okW, kP24 }));
   // ③-1 계약 저장 거절(400 CON_APPR_REQUIRED) = 알림 1번 + 서버 값 다시 읽기(실행 — 실제 doSaveContracts) · 다른 400·200 = 알림 0·다시 읽기 0(종전)
   const msgP24 = (html.match(/  var CON_APPR_REJECT_MSG = "[^"\n]*";/) || [''])[0];
   const runSaveP24 = async (H, st, code) => {
     const env = { alerts: [], loads: 0 };
-    const f = new Function('ENV', [(H.match(/  var CON_APPR_REJECT_MSG = "[^"\n]*";/) || [''])[0], 'var contracts = [{ id: "k" }], contractSha = "s", contractsPending = true, CONTRACT_API = "x";',
+    const f = new Function('ENV', [(H.match(/  var CON_APPR_REJECT_MSG = "[^"\n]*";/) || [''])[0], (H.match(/  var CON_SAVE_FAIL_MSG = "[^"\n]*";/) || [''])[0], 'var contracts = [{ id: "k" }], contractSha = "s", contractsPending = true, CONTRACT_API = "x";',
       'function getToken(){ return "t"; } function ghHeaders(){ return {}; } function b64EncodeUnicode(s){ return s; } function b64DecodeUnicode(s){ return s; } function mergeContracts(a){ return a; } function alert(m){ ENV.alerts.push(String(m)); } function loadContracts(){ ENV.loads++; }',
       'function fetch(){ return Promise.resolve({ status: ' + st + ', ok: ' + (st === 200) + ', json: function(){ return Promise.resolve({ error_code: "' + code + '", content: { sha: "gw" } }); } }); }',
       fnP24(H, 'doSaveContracts'), 'return function(){ doSaveContracts(); return function(){ return contractsPending; }; };'].join('\n'))(env);
     const pend = f(); for (let i = 0; i < 5; i++) await tickP24(); env.pending = pend(); return env;
   };
   const chkSaveP24 = async (H) => {
-    const a = await runSaveP24(H, 400, 'CON_APPR_REQUIRED'), b = await runSaveP24(H, 400, 'OTHER'), c = await runSaveP24(H, 200, '');
+    const a = await runSaveP24(H, 400, 'CON_APPR_REQUIRED'), b = await runSaveP24(H, 400, 'OTHER'), c = await runSaveP24(H, 200, ''), d = await runSaveP24(H, 500, 'APPROVALS_READ_FAILED'), e = await runSaveP24(H, 502, '');
     return msgP24.length > 60 && a.alerts.length === 1 && /계약 저장이 거절됐습니다/.test(a.alerts[0]) && /다시 불러옵니다/.test(a.alerts[0]) && a.loads === 1 && a.pending === false
-      && b.alerts.length === 0 && b.loads === 0 && b.pending === false && c.alerts.length === 0 && c.loads === 0 && c.pending === false;
+      && b.alerts.length === 0 && b.loads === 0 && b.pending === false && c.alerts.length === 0 && c.loads === 0 && c.pending === false
+      && d.alerts.length === 1 && /저장되지 않았습니다/.test(d.alerts[0]) && /APPROVALS_READ_FAILED/.test(d.alerts[0]) && d.loads === 1 && d.pending === false && e.alerts.length === 1 && e.loads === 1;   // 검토 B9 5xx
   };
   const okS = await chkSaveP24(html);
   // ③-2 결재 대상 판정 두 벌(앱 csApprKindOf ↔ 서버 _lib/conappr apprKindOf) — 같은 표본 같은 결과
@@ -15953,8 +15955,9 @@ try {
   const par = parP24(appKindP24(html));
   const mutS = (from, to) => { if (html.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); return html.replace(from, () => to); };
   const kS = [!(await chkSaveP24(mutS('if(ec==="CON_APPR_REQUIRED"){ alert(CON_APPR_REJECT_MSG); loadContracts(); }', ''))),
+    !(await chkSaveP24(mutS('if(resp.status>=500){', 'if(false){'))),
     parP24(appKindP24(mutS('  var CON_APPR_KINDS = [[/청구|입금/, "청구 검수"], [/계약서/, "계약 단계"]];', '  var CON_APPR_KINDS = [[/청구/, "청구 검수"], [/계약/, "계약 단계"]];'))).diff > 0];
-  T('P1 판24-③ 화면: 계약 저장 400 CON_APPR_REQUIRED = "계약 저장이 거절됐습니다 … 다시 불러옵니다" 알림 1번 + 서버 값 다시 읽기 1번(실행 — 실제 doSaveContracts) · 다른 400·200 = 알림 0·다시 읽기 0(종전) · 결재 대상 판정 두 벌(앱 csApprKindOf = 서버 _lib/conappr apprKindOf, 표본 ' + SP24.length + ' · 다름 0 · 결재 대상 ≥ 8) · 결함 사본 2개(거절 알림 걷음·앱 판정표만 바꿈) = 모두 ✗',
+  T('P1 판24-③ 화면: 계약 저장 400 CON_APPR_REQUIRED = "계약 저장이 거절됐습니다 … 다시 불러옵니다" 알림 1번 + 서버 값 다시 읽기 1번(실행 — 실제 doSaveContracts) · (검토 B9) 서버 오류 500 APPROVALS_READ_FAILED·502 = "저장되지 않았습니다 … 다시 불러옵니다" 알림 1번 + 다시 읽기 · 다른 400·200 = 알림 0·다시 읽기 0(종전) · 결재 대상 판정 두 벌(앱 csApprKindOf = 서버 _lib/conappr apprKindOf, 표본 ' + SP24.length + ' · 다름 0 · 결재 대상 ≥ 8) · 결함 사본 3개(거절 알림 걷음·5xx 알림 걷음·앱 판정표만 바꿈) = 모두 ✗',
     okS && par.diff === 0 && par.hits >= 8 && kS.every((v) => v === true), JSON.stringify({ okS, par, kS }));
 } catch (e) { console.log('  (P1 판24 검사 생략 — ' + e.message + ')'); fails++; }
 

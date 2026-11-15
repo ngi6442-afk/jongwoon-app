@@ -66,16 +66,23 @@ function zipEntries(buf, want) {
   return out;
 }
 // P1 판24-② (보안 재감사 ④ 'zip 내부 검증' — 재현됨: 앞 4바이트가 PK면 아무 바이트나 docx로 받았다): 서류함에 넣는 zip 계열(docx·xlsx·pptx·hwpx)의 목록(중앙 디렉터리)을 읽어
-//   ① 목록 끝(EOCD — zip64면 zip64 끝)과 목록 줄 서명·로컬 헤더 서명이 맞는가 ② 항목 수 ≤ ZIP_ENTRIES_MAX ③ 그 형식의 필수 항목이 있는가(docx word/document.xml · xlsx xl/workbook.xml ·
-//   pptx ppt/presentation.xml · 셋 다 [Content_Types].xml · hwpx mimetype) ④ 매크로(vbaProject.bin — docm·xlsm을 이름만 바꾼 파일)가 없는가. 압축은 풀지 않는다(v456 풀기 상한 zipBudget과 겹치지 않음 — 그쪽은 판독·짝 비교 때).
+//   ① 목록 끝(EOCD — zip64면 zip64 끝)과 목록 줄 서명·로컬 헤더 서명이 맞는가 ② 항목 수 ≤ ZIP_ENTRIES_MAX ③ 그 형식의 필수 항목이 있는가(docx word/ · xlsx xl/ ·
+//   pptx ppt/ 바로 아래 xml 하나 이상 · 셋 다 [Content_Types].xml · hwpx mimetype) ④ 매크로(vbaProject.bin — docm·xlsm을 이름만 바꾼 파일)가 없는가. 압축은 풀지 않는다(v456 풀기 상한 zipBudget과 겹치지 않음 — 그쪽은 판독·짝 비교 때).
 //   반환 { ok:true } | { ok:false, why } — why는 짧은 영문 표식(파일 이름·내용 없음). 형식이 이 넷이 아니면 늘 ok(검사 대상 아님)
-const ZIP_MUST = { docx: ['[content_types].xml', 'word/document.xml'], xlsx: ['[content_types].xml', 'xl/workbook.xml'], pptx: ['[content_types].xml', 'ppt/presentation.xml'], hwpx: ['mimetype'] };
+// 검토(11/15 B10): 필수 = [Content_Types].xml + 그 형식 폴더 바로 아래 본문 xml 하나 이상(word/document2.xml처럼 이름이 다른 유효한 본문도 받음) · 이름의 역슬래시는 '/'로 ·
+//   끝 서명(EOCD)은 '주석 길이가 파일 끝과 맞는 것'을 먼저(주석 안의 가짜 끝 서명을 집지 않게), 맞는 게 없으면 뒤에서 첫 서명
+const ZIP_MUST = { docx: [/^\[content_types\]\.xml$/, /^word\/[^/]+\.xml$/], xlsx: [/^\[content_types\]\.xml$/, /^xl\/[^/]+\.xml$/], pptx: [/^\[content_types\]\.xml$/, /^ppt\/[^/]+\.xml$/], hwpx: [/^mimetype$/] };
 function zipCheck(ext, buf) {
   const must = Object.prototype.hasOwnProperty.call(ZIP_MUST, ext) ? ZIP_MUST[ext] : null;
   if (!must) return { ok: true };
   if (!Buffer.isBuffer(buf) || buf.length < 22) return { ok: false, why: 'SHORT' };
-  let eocd = -1;
-  for (let p = buf.length - 22; p >= Math.max(0, buf.length - 65557); p--) { if (buf.readUInt32LE(p) === 0x06054b50) { eocd = p; break; } }
+  let eocd = -1, eocd0 = -1;
+  for (let p = buf.length - 22; p >= Math.max(0, buf.length - 65557); p--) {
+    if (buf.readUInt32LE(p) !== 0x06054b50) continue;
+    if (eocd0 < 0) eocd0 = p;
+    if (p + 22 + buf.readUInt16LE(p + 20) === buf.length) { eocd = p; break; }
+  }
+  if (eocd < 0) eocd = eocd0;
   if (eocd < 0) return { ok: false, why: 'NO_DIR' };
   let total = buf.readUInt16LE(eocd + 10), cdOff = buf.readUInt32LE(eocd + 16);
   if (total === 0xFFFF || cdOff === 0xFFFFFFFF) {   // zip64 — 끝 위치표(locator)가 가리키는 zip64 끝에서 항목 수·목록 위치를 읽는다(일부 문서 도구는 작은 파일도 zip64로 쓴다)
@@ -104,11 +111,13 @@ function zipCheck(ext, buf) {
       }
     }
     if (!(lho >= 0 && lho + 30 <= buf.length) || buf.readUInt32LE(lho) !== 0x04034b50) return { ok: false, why: 'BAD_ENTRY' };
-    names[name.toLowerCase()] = 1;
-    if (ext !== 'hwpx' && /(^|\/)vbaproject\.bin$/i.test(name)) return { ok: false, why: 'MACRO' };
+    const nm = name.replace(/\\/g, '/').toLowerCase();
+    names[nm] = 1;
+    if (ext !== 'hwpx' && /(^|\/)vbaproject\.bin$/.test(nm)) return { ok: false, why: 'MACRO' };
     p += 46 + nl + el + cl;
   }
-  for (const m of must) if (!names[m]) return { ok: false, why: 'NOT_' + ext.toUpperCase() };
+  const keys = Object.keys(names);
+  for (const m of must) if (!keys.some(function (k) { return m.test(k); })) return { ok: false, why: 'NOT_' + ext.toUpperCase() };
   return { ok: true };
 }
 function xmlUnesc(s) {

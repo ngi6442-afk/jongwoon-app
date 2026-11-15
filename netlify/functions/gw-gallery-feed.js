@@ -70,8 +70,8 @@ function detectImageExt(buf) {
   return null;
 }
 
-// P1 판24-② (보안 재감사 ② 비교 방식 통일): 공용 _lib/keymatch keyMatch — 키 미설정이면 닫힘(기본 개방 금지)·길이 다르면 거부·같으면 상수시간(종전과 같음) · 받은 값 앞뒤 공백은 걷음(다른 봇 경로와 같게)
-function keyOk(qs) { return keyMatch((qs && qs.key) || '', String(process.env.GW_GALLERY_FEED_KEY || '')); }
+// P1 판24-② (보안 재감사 ② 비교 방식 통일): 공용 _lib/keymatch keyMatch — 키 미설정이면 닫힘(기본 개방 금지)·길이 다르면 거부·같으면 상수시간(종전과 같음) · 받은 값·비밀값 둘 다 앞뒤 공백을 걷음(검토 B8 — 올바로 봇 키와 같게)
+function keyOk(qs) { return keyMatch((qs && qs.key) || '', String(process.env.GW_GALLERY_FEED_KEY || '').trim()); }
 
 // 게시 완료 + 블로그 주소가 있는 기록만. 삭제분(del=1)은 제외.
 async function postedRecords() {
