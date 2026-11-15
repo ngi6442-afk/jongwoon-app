@@ -15607,5 +15607,124 @@ try {
     r481.ok && M481.every((v) => v === false), JSON.stringify({ r: r481.info, mut: M481 }));
 } catch (e) { console.log('  (v481 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ---- P1 판13 차량 법령 근거 승격(원장 T476·T451 · 착수설명서 판13 · 11/20 카드 ②) — 근거 행 day_max·차이 안내·규모 기본 목록(@veh-law) + PM 콘솔 줄(pmconRowsVehBg)·상태 카드(vehBgCardRender·vehBgOff) ----
+//   ① 배선(정적) ② @veh-law 실행(실제 구간 · 시험 근거 행 — 가짜 값) ③ 콘솔 줄·카드 실행(실제 renderPmcon·pmconChecksRender·pmconAct·pmconOpenCard + 이 판 함수, 가짜 화면·가짜 gwCall) ④ 결함 사본(index.html 한 곳을 바꿔 메모리에서 다시 돌림) = 모두 ✗
+try {
+  const f13 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('중괄호 짝: ' + name); };
+  const s13 = (src, re) => { const m = src.match(re); if (!m) throw new Error('문장 없음: ' + re); return m[0]; };
+  const gwd13 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8');
+  const PUSH13 = 'PMCON_KINDS.push({ kind: "vehbg", label: "차량 근거 승격", grade: "R2", get: "veh_bg_pm_get", card: "pmconChk-vehbg", revert: "이 화면 \'차량 법령 근거\' 카드 [승격 해제] 1클릭", rows: pmconRowsVehBg });';
+  const SIZE13 = ['경형 승용', '소형 승용', '중형 승용', '대형 승용', '경형 승합', '소형 승합', '중형 승합', '대형 승합', '경형 화물', '소형 화물', '중형 화물', '대형 화물', '경형 특수', '소형 특수', '중형 특수', '대형 특수', '피견인', '건설기계'];
+  const wire13 = (src, gw) => src.split(PUSH13).length === 2 && src.indexOf(PUSH13) > src.indexOf('var PMCON_KINDS = [') && src.split('PMCON_CHECKS.push({ id: "vehbg", title: "차량 법령 근거", render: vehBgCardRender });').length === 2
+    && /\n  PMCON_CHECKS\.push\(\{ id: "mchk", title: "월 점검", render: mchkRender \}\);\n  function pmconOpenCard\(id\)\{/.test(src)
+    && /PMCON_KINDS\.vehbg = \{ label: '차량 근거 승격', grade: 'R2', fn: handleVehBgSet, args: \{ bg_ver: 's' \}, row: function \(a\) \{ return 'vehbg:' \+ a\.bg_ver; \} \};/.test(gw)
+    && gw.indexOf('PMCON_KINDS.vehbg') > gw.indexOf('const PMCON_KINDS = {') && ['veh_bg_pm_get', 'veh_bg_set'].every((a) => new RegExp("if \\(d && d\\.action === '" + a + "'\\) return await handleVehBg\\w+\\(event, d, R\\);").test(gw))
+    && /async function handleVehBgSet\(event, d, R\) \{\n  const g = await pmconGate\(event, R, true\);/.test(gw) && /async function handleVehBgPmGet\(event, d, R\) \{\n  const g = await pmconGate\(event, R, false\);/.test(gw)
+    && JSON.stringify(JSON.parse('[' + (s13(src, /var VEH_SIZE_DEF = \[[^\]]*\];/).match(/\[([^\]]*)\]/) || ['', ''])[1] + ']')) === JSON.stringify(SIZE13);
+  // ② @veh-law 실행 — 시험 근거 행(가짜 값): day_max 28 · first_adj_days −1
+  const ROWS13 = [{ id: 't13.a', grade: '실측', cites: [{ law: '시험법', art: '별표 1' }], cls: 'car', biz: ['사업용'], size: ['대형 화물'], every_m: 6, first_adj_days: -1, day_max: 28 },
+    { id: 't13.b', grade: '확인 필요', cites: [{ law: '시험법' }], cls: 'car', size: ['피견인'], every_m: 24, day_max: 28 }];
+  const run13 = (src) => {
+    const blk = src.slice(src.indexOf('// @veh-law-start'), src.indexOf('// @veh-law-end'));
+    const pre = [f13(src, 'esc'), f13(src, 'isDate'), f13(src, 'isGreyState'), 'var VEH_COLS = [];', 'function todayStr(){ return "2026-11-15"; } function myId(){ return "u1"; } function renderVehicles(){} function gwCall(){ return { then: function(){ return { catch: function(){} }; } }; } function findVeh(){ return null; } function liveVehicles(){ return []; }'].join('\n');
+    const a = new Function('document', pre + '\n' + blk + '\nreturn { VEH_LAW: VEH_LAW, calc: vehLawCalc, badge: vehLawBadge, ok: vehLawRowOk, sizes: vehSizeOpts, tag: vehLawTag };')({ getElementById: () => null });
+    const V = (o) => Object.assign({ state: '운행', biz: '사업용', size: '대형 화물' }, o);
+    const sh = (r) => r ? [r.st, r.date || '', r.diff === undefined ? '' : String(r.diff), r.why || r.rule || ''].join('/') : 'null';
+    const R = {};
+    R.calc = [sh(a.calc(V({ reg_date: '2019-03-28', insp_due: '2026-09-27' }), ROWS13, '2026-11-15')), sh(a.calc(V({ reg_date: '2019-03-29', insp_due: '2026-09-28' }), ROWS13, '2026-11-15')),
+      sh(a.calc(V({ reg_date: '2019-01-31', insp_due: '2026-07-30' }), ROWS13, '2026-11-15')), sh(a.calc(V({ size: '피견인', reg_date: '2016-02-01' }), ROWS13, '2026-11-15'))].join(',');
+    const rD = a.calc(V({ reg_date: '2019-01-31' }), ROWS13, '2026-11-15');
+    R.dayBadge = ['cell', 'det', 'modal'].map((m) => a.badge(rD, m).replace(/ title="[^"]*"/, '')).join('\n');
+    R.tag = a.tag(rD);
+    const tt = (r) => (a.badge(r, 'cell').match(/title="([^"]*)"/) || ['', ''])[1];
+    R.note = /기간 밖 수검·연장·유예·이전등록이 있었으면 넣은 날짜가 맞을 수 있음$/.test(tt(a.calc(V({ reg_date: '2019-03-10', insp_due: '2026-10-20' }), ROWS13, '2026-11-15')))
+      && !/기간 밖 수검/.test(tt(a.calc(V({ reg_date: '2019-03-10', insp_due: '2026-09-09' }), ROWS13, '2026-11-15'))) && !/기간 밖 수검/.test(tt(a.calc(V({ reg_date: '2019-03-10' }), ROWS13, '2026-11-15')));
+    const base = ROWS13[0];
+    R.rowOk = [a.ok(base), a.ok(Object.assign({}, base, { day_max: 0 })), a.ok(Object.assign({}, base, { day_max: 32 })), a.ok(Object.assign({}, base, { day_max: 28.5 })), a.ok(Object.assign({}, base, { day_max: null })), a.ok(ROWS13[1])].join(',');
+    R.sizes = JSON.stringify(a.sizes()) === JSON.stringify(SIZE13);
+    Object.assign(a.VEH_LAW, { on: true, ver: 'v', rows: [base], attr: { size: ['대형 화물', '건설기계'] } });
+    R.sizesOn = a.sizes().join(',') === '대형 화물,건설기계';
+    return R;
+  };
+  const EXP13 = { calc: 'ok/2026-09-27/0/t13.a,none///day,none///day,none///rule',
+    dayBadge: ['<span class="vl-b pre">기준 없음 — 월말 등록</span>', '<span class="vl-b pre">법정 검사 제안 <b>기준 없음</b> — 최초등록일이 29일 이후(월말)라 법정 계산 확인 필요</span>', '<span class="vl-b pre">법정 제안: 기준 없음 — 월말 등록(계산 확인 필요)</span>'].join('\n'),
+    tag: '기준 없음', note: true, rowOk: 'true,false,false,false,true,false', sizes: true, sizesOn: true };
+  const ok13b = (R) => Object.keys(EXP13).every((k) => JSON.stringify(R[k]) === JSON.stringify(EXP13[k]));
+  // ③ 콘솔 줄·카드 실행 — 콘솔 줄 종류는 이 판 한 줄만(판29 표는 비워 둠)
+  const BG13 = { ver: 'veh-v1-20261115', sha: 'f9704a7435491472', n: 67, n_sil: 62, n_cyc: 52, n_chk: 5, groups: 7, n_rules: 8, checked: '2026-11-15', status: 'draft',
+    hold: [{ id: 'car.trailer', t: '피견인', why: '신조 여부 칸 없음' }, { id: 'ref.jiip', t: '지입', why: '법률 자문 확인 필요' }] };
+  const runC13 = async (src, o) => {
+    const els = {}, calls = [], toasts = [];
+    const mk = (id) => ({ id, innerHTML: '', textContent: '', style: {}, children: [], _h: {}, _cls: {}, addEventListener(ev, f) { this._h[ev] = f; }, scrollIntoView() { o.scrolled = id; }, classList: { toggle() {}, contains() { return false; } } });
+    const doc = { getElementById: (id) => (els[id] || (els[id] = mk(id))), querySelectorAll: () => [] };
+    const gw = (fn, body) => { calls.push(JSON.parse(JSON.stringify(body))); const r = (o.res || {})[body.action]; return Promise.resolve(typeof r === 'function' ? r(body) : (r || { status: 500, body: { error_code: 'X' } })); };
+    const api = new Function('document', 'gwCall', '__toast', '__o', [
+      'function todayStr(){ return "2026-11-20"; } function memberName(id){ return ""; } function apprToastShow(m){ __toast.push(m); } function switchTab(n){ __o.sw = n; }',
+      'var confirm = function(){ return __o.confirm !== false; }, prompt = function(){ return ""; }, alert = function(m){ __toast.push("alert:" + m); }, setTimeout = function(){};',
+      f13(src, 'esc'), 'var PMCON_KINDS = [];', s13(src, /var PMCON_PLAN = \{[^\n]+\};/), 'var PMCON_CHECKS = [];', s13(src, /var PMCON_CHOICE_TXT = \{[^}]+\};/), s13(src, /var pmconState = null, pmconBusy = false, pmconSeq = 0, pmconLogAll = false;/),
+      ...['pmconMd', 'pmconPlan', 'pmconDueTxt', 'renderPmcon', 'pmconLogRender', 'pmconChecksRender', 'pmconChecksSync', 'pmconOpenCard', 'pmconAct'].map((n) => f13(src, n)),
+      src.slice(src.indexOf('  // ---- P1 판13 차량 법령 근거 승격('), src.indexOf('PMCON_CHECKS.push({ id: "vehbg"')) + 'PMCON_CHECKS.push({ id: "vehbg", title: "차량 법령 근거", render: vehBgCardRender });',
+      'return { render: renderPmcon, act: pmconAct, open: pmconOpenCard, rows: pmconRowsVehBg, due: pmconDueTxt, kinds: PMCON_KINDS };'].join('\n'))(doc, gw, toasts, o);
+    if (o.render !== false) { api.render(); for (let i = 0; i < 6; i++) await new Promise((r) => setTimeout(r, 0)); }
+    return { els, calls, toasts, api, o };
+  };
+  const LOG13 = (cw) => ({ status: 200, body: { log: [], total: 0, folded: { n: 0 }, marks: {}, updated_at: 9, can_write: cw } });
+  const PMG13 = (flag, bg, extra) => ({ status: 200, body: Object.assign({ status: 'OK', flag: Object.assign({ bg_ver: '', bg_sha: '', updated_at: 0, updated_by: '', prev: null }, flag || {}), bg: bg, bad_bg: false, on: false, can_write: true }, extra || {}) });
+  const chkC13 = async (src) => {
+    const R = {};
+    const a = await runC13(src, { res: { pmcon_get: LOG13(true), veh_bg_pm_get: PMG13({}, BG13) } });
+    const h = a.els.pmconRows.innerHTML, vis = h.replace(/<[^>]+>/g, ' ').replace(/&#39;/g, "'");
+    R.row = /data-pc-row="vehbg:veh-v1-20261115"/.test(h) && /<span class="g r2">R2<\/span><span>차량 법령 근거를 승격할까요\? \(확인 필요 5건 표시\)<\/span>/.test(h) && /추천 <b>승격<\/b>/.test(h)
+      && vis.indexOf('무응답이면 그대로(미승격 — 지금의 30일 전 지시만 유지)') > 0 && vis.indexOf("되돌리기 이 화면 '차량 법령 근거' 카드 [승격 해제] 1클릭") > 0 && vis.indexOf("승격하면 차량 표에 '법정 검사 제안' 열이 뜨고") > 0
+      && /title="피견인 — 신조 여부 칸 없음 \/ 지입 — 법률 자문 확인 필요"/.test(h) && (h.match(/data-pc-act="(ok|hold|default)" data-pc-id="vehbg:veh-v1-20261115"/g) || []).length === 3
+      && /data-pc-open="pmconChk-vehbg"/.test(h);
+    const card = a.els['pmconChk-vehbg'];
+    R.card = card.style.display === '' && /<b>미승격<\/b> — 지금의 30일 전 지시만 유지/.test(card.innerHTML) && /올라온 판 veh-v1-20261115 · 67행\(실측 62 · 확인 필요 5\)/.test(card.innerHTML) && /확인 필요\(제안 안 냄\): 피견인/.test(card.innerHTML) && card.innerHTML.indexOf('승격 해제') < 0;
+    a.api.act('ok', 'vehbg:veh-v1-20261115'); await new Promise((r) => setTimeout(r, 0));
+    const b = a.calls.filter((x) => x.action === 'pmcon_decide')[0] || {};
+    R.ok = b.kind === 'vehbg' && b.row === 'vehbg:veh-v1-20261115' && b.grade === 'R2' && b.choice === 'ok' && JSON.stringify(b.args) === '{"bg_ver":"veh-v1-20261115"}' && b.set_base === 0 && b.base === 9;
+    a.api.open('pmconChk-vehbg'); R.open = a.o.scrolled === 'pmconChk-vehbg' && a.o.sw === undefined;
+    // 근거 표 없음 = 줄 없음('정할 것 없음'에 이름)·카드 숨김 · 승격본과 같은 판 = 줄 없음 · 다른 판 승격 중 = '새 판' 줄
+    const n = await runC13(src, { res: { pmcon_get: LOG13(true), veh_bg_pm_get: PMG13({}, null) } });
+    R.none = n.els.pmconRows.innerHTML.indexOf('data-pc-row="vehbg:') < 0 && n.els.pmconRows.innerHTML.indexOf('정할 것 없음: 차량 근거 승격') > 0 && n.els['pmconChk-vehbg'].style.display === 'none';
+    const same = await runC13(src, { res: { pmcon_get: LOG13(true), veh_bg_pm_get: PMG13({ bg_ver: 'veh-v1-20261115', bg_sha: 'f9704a7435491472', updated_at: 500, prev: { bg_ver: '', updated_at: 0 } }, BG13, { on: true }) } });
+    const sc = same.els['pmconChk-vehbg'];
+    R.same = same.els.pmconRows.innerHTML.indexOf('data-pc-row="vehbg:') < 0 && /<b>승격됨<\/b> — 판 veh-v1-20261115 · 차량 표 '법정 검사 제안' 켜짐/.test(sc.innerHTML) && /직전 값: 미승격/.test(sc.innerHTML) && /id="vehBgOffBtn"/.test(sc.innerHTML);
+    same.els.vehBgOffBtn._h.click(); await new Promise((r) => setTimeout(r, 0));
+    const off = same.calls.filter((x) => x.action === 'veh_bg_set');
+    R.off = off.length === 1 && JSON.stringify(off[0]) === '{"action":"veh_bg_set","bg_ver":"","base":500}';
+    const nw = await runC13(src, { res: { pmcon_get: LOG13(true), veh_bg_pm_get: PMG13({ bg_ver: 'veh-v1-20261101', updated_at: 400 }, BG13) } });
+    R.newVer = /차량 법령 근거 새 판\(veh-v1-20261115\)을 승격할까요\? \(확인 필요 5건 표시\)/.test(nw.els.pmconRows.innerHTML) && /올라온 판과 달라 제안 꺼짐/.test(nw.els['pmconChk-vehbg'].innerHTML);
+    const np = await runC13(src, { res: { pmcon_get: LOG13(false), veh_bg_pm_get: PMG13({ bg_ver: 'veh-v1-20261115', updated_at: 500 }, BG13, { on: true, can_write: false }) } });
+    R.nonPm = np.els['pmconChk-vehbg'].innerHTML.indexOf('vehBgOffBtn') < 0 && /해제하실 분: PM/.test(np.els['pmconChk-vehbg'].innerHTML);
+    const bad = await runC13(src, { res: { pmcon_get: LOG13(true), veh_bg_pm_get: { status: 503, body: { error_code: 'FLAG_READ_FAILED' } } } });
+    R.fail = bad.els.pmconRows.innerHTML.indexOf('불러오지 못함: 차량 근거 승격') > 0 && /불러오지 못했습니다 \(FLAG_READ_FAILED\)/.test(bad.els['pmconChk-vehbg'].innerHTML);
+    const bb = await runC13(src, { res: { pmcon_get: LOG13(true), veh_bg_pm_get: PMG13({}, null, { bad_bg: true }) } });
+    R.badBg = bb.els['pmconChk-vehbg'].style.display === '' && /올라온 근거 표 꼴이 틀림 — 제안 꺼짐/.test(bb.els['pmconChk-vehbg'].innerHTML);
+    return R;
+  };
+  const ok13c = (R) => Object.keys(R).every((k) => R[k] === true);
+  const all13 = async (src) => { let b = {}, c = {}; try { b = run13(src); } catch (e) { b = { x: String(e.message) }; } try { c = await chkC13(src); } catch (e) { c = { x: String(e.message) }; } return { w: wire13(src, gwd13), b, c, ok: wire13(src, gwd13) && ok13b(b) && ok13c(c) }; };
+  const real13 = await all13(html);
+  const sm13 = (from, to) => { if (html.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); return html.replace(from, () => to); };
+  const MUT13 = [
+    ['      if (r.day_max != null && +v.reg_date.slice(8, 10) > r.day_max) return { st: "none", why: "day", day: r.day_max };', ''],
+    [' && (r.day_max == null || vehLawInt(r.day_max, 1, 31)));', ');'],
+    ['(r.st === "ok" && r.diff ? " · 제안은', '(r.st === "ok" ? " · 제안은'],
+    ['"대형 특수", "피견인", "건설기계"];', '"대형 특수", "건설기계"];'],
+    ['args: { bg_ver: String(s.ver) }, def: "keep",', 'args: { bg_ver: String(s.ver) }, def: "rec",'],
+    ['    if (!s || !s.ver || f.bg_ver === s.ver || !/^[A-Za-z0-9_.-]{2,40}$/.test(String(s.ver))) return [];', '    if (!s || !s.ver || !/^[A-Za-z0-9_.-]{2,40}$/.test(String(s.ver))) return [];'],
+    ['      if (!s && !f.bg_ver && !b.bad_bg){ el.innerHTML = ""; hide(true); return; }', ''],
+    ["      var act = (b.can_write && f.bg_ver) ?", "      var act = (f.bg_ver) ?"],
+    ['    gwCall("gw-data", { action: "veh_bg_set", bg_ver: "", base: Number(f.updated_at) || 0 })', '    gwCall("gw-data", { action: "veh_bg_set", bg_ver: "" })'],
+    ['    if (/^pmconChk-/.test(String(id))){ var ce = document.getElementById(id); if (ce && ce.scrollIntoView) ce.scrollIntoView({ block: "start" }); return; }', ''],
+    [' (확인 필요 " + n + "건 표시)"', '"'],
+  ];
+  const kill13 = [];
+  for (const [from, to] of MUT13) { let r; try { r = await all13(sm13(from, to)); } catch (e) { r = { ok: false }; } if (r.ok) kill13.push(from.trim().slice(0, 60)); }
+  T('P1 판13 차량 법령 근거 승격: ① 배선(콘솔 줄 종류는 판29 표 밖 PMCON_KINDS.push 한 줄 + 서버 PMCON_KINDS.vehbg 짝(R2·handleVehBgSet) · 카드 PMCON_CHECKS.push · 월 점검 줄 바로 다음 pmconOpenCard 그대로 · veh_bg_pm_get(관리자 읽기)·veh_bg_set(PM 쓰기) 디스패치 · 규모 기본 18개 = 차종·규모) · ② @veh-law: 근거 행 day_max 28 → 29일 이후 등록 = 기준 없음(월말 등록 — 칩·펼침·창 글) · 28일 등록 = 제안 · 확인 필요 행 = 쓰지 않음 · day_max 꼴(1~31 정수)·차이가 있을 때만 "기간 밖 수검·연장·유예·이전등록" 안내 · 승격 뒤 규모 = 근거 표 attr · ③ 콘솔: R2 "차량 법령 근거를 승격할까요? (확인 필요 5건 표시)"·추천 승격·무응답 = 그대로(미승격 — 30일 전 지시만)·되돌리기 = 이 화면 카드·확인 필요 이유는 풍선 글 · [ㄱ] = pmcon_decide(vehbg·R2·args bg_ver·set_base) · [카드 열기] = 콘솔 안 카드로(권한관리로 안 감) · 근거 표 없음 = 줄 없음(정할 것 없음에 이름)·카드 숨김 · 승격본 = 줄 없음·카드 승격됨·직전 값·[승격 해제] = veh_bg_set(빈 판 · base) · 다른 판 승격 중 = 새 판 줄·카드 "제안 꺼짐" · PM 아님 = 해제 단추 없음 · 조회 실패·꼴 틀림 = 안내 · 결함 사본 ' + MUT13.length + '개 = 모두 ✗',
+    real13.ok && kill13.length === 0, JSON.stringify({ w: real13.w, b: real13.b, c: real13.c, 안깨짐: kill13 }));
+} catch (e) { console.log('  (P1 판13 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

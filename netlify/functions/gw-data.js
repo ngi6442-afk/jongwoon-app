@@ -1970,7 +1970,62 @@ async function vehBgState(st) {
   const ver = flag && typeof flag.bg_ver === 'string' ? flag.bg_ver : '';
   if (!vehBgOk(bg)) return { on: false, why: bg ? 'BAD_BG' : 'NO_BG' };
   if (!ver || ver !== bg.ver) return { on: false, why: 'NOT_PROMOTED' };
+  if (flag.bg_sha && flag.bg_sha !== bg.sha) return { on: false, why: 'SHA_CHANGED' };   // P1 판13: 승격한 뒤 같은 판 이름으로 내용이 바뀌어 올라오면 끔(승격 때 sha 기록 — 판27 시험 스위치처럼 sha 없는 스위치는 종전대로)
   return { on: true, bg: bg };
+}
+// ---- P1 판13(원장 T476·T451 · 착수설명서 판13 · 11/20 카드 ②) 차량 법령 근거 승격 스위치 settings:veh.bg_ver 쓰는 길 + PM 콘솔 읽기 ----
+//   veh_bg_set = 계약 handleConProcBgSet 과 같은 방식: 올라온 근거 표(bg:veh:law:v1)의 ver 와 같을 때만 승격 · '' = 해제 · 직전 값 prev 1판 · 감사 1줄 · 낙관락(base = 스위치 updated_at, 늘 필요)
+//     권한 = pmconGate 쓰기(로그인 → 기기 승인 → 관리자 → PM — 명부 못 읽으면 503) · 본문 칸은 bg_ver·base 만(그 밖 = 400 BAD_FIELD) · 스위치·근거 표를 못 읽으면 503(빈 값으로 보지 않음)
+//     승격 때 그 판 sha 를 bg_sha 로 같이 적는다 → vehBgState 가 같은 ver 다른 내용을 끔(SHA_CHANGED). 해제는 bg_sha 도 비움.
+//   veh_bg_pm_get = pmconGate 읽기(관리자) — 스위치(승격 판·직전 값)와 올라온 판 요약(행 수·실측·확인 필요 목록)만. 행 값(주기)은 내리지 않음(그건 승격본만 veh_bg_get).
+function vehBgSum(bg) {
+  if (!vehBgOk(bg)) return null;
+  const rows = bg.rows.filter(function (r) { return r && typeof r === 'object' && !Array.isArray(r); });
+  const txt = function (v, n) { return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, n); };
+  const hold = rows.filter(function (r) { return r.grade !== '실측'; }).map(function (r) { return { id: txt(r.id, 60), t: txt(r.title, 80), why: txt(r.hold_why || r.note, 200) }; });
+  let chk = '';
+  rows.forEach(function (r) { const c = typeof r.checked === 'string' ? r.checked : ''; if (/^\d{4}-\d{2}-\d{2}$/.test(c) && c > chk) chk = c; });
+  return { ver: bg.ver, sha: bg.sha, n: rows.length, n_sil: rows.filter(function (r) { return r.grade === '실측'; }).length, n_cyc: rows.filter(function (r) { return r.cls === 'car' || r.cls === 'ceq'; }).length,
+    n_chk: hold.length, hold: hold.slice(0, 40), checked: chk, groups: Array.isArray(bg.groups) ? bg.groups.length : 0, n_rules: Array.isArray(bg.rules) ? bg.rules.length : 0, status: txt(bg.status, 20) };
+}
+async function vehBgReadBoth(st) {   // { ok, flag, bg } — 없음 = null · 읽기 실패 = ok false(그 위에 판단하지 않음)
+  const rf = await blobGet(st, VEH_BG_KEYS.flag);
+  if (!rf.ok && rf.code !== 'NOT_FOUND') return { ok: false, code: 'FLAG_READ_FAILED' };
+  const f = rf.ok ? rf.data : null;
+  if (f != null && (typeof f !== 'object' || Array.isArray(f))) return { ok: false, code: 'FLAG_BAD_DOC' };
+  const rb = await blobGet(st, VEH_BG_KEYS.bg);
+  if (!rb.ok && rb.code !== 'NOT_FOUND') return { ok: false, code: 'BG_READ_FAILED' };
+  return { ok: true, flag: f || {}, bg: rb.ok ? (rb.data == null ? null : rb.data) : null };
+}
+async function handleVehBgPmGet(event, d, R) {
+  const g = await pmconGate(event, R, false); if (g.res) return g.res;
+  const s = await vehBgReadBoth(store(DATA));
+  if (!s.ok) return jr(503, { status: 'ERROR', error_code: s.code, request_id: R });
+  const f = s.flag, pv = f.prev && typeof f.prev === 'object' ? f.prev : null;
+  return jr(200, { status: 'OK', flag: { bg_ver: typeof f.bg_ver === 'string' ? f.bg_ver : '', bg_sha: typeof f.bg_sha === 'string' ? f.bg_sha : '', updated_at: Number(f.updated_at) || 0, updated_by: String(f.updated_by || ''),
+    prev: pv ? { bg_ver: String(pv.bg_ver || ''), updated_at: Number(pv.updated_at) || 0 } : null }, bg: vehBgSum(s.bg), bad_bg: !!(s.bg && !vehBgOk(s.bg)), on: (await vehBgState(store(DATA))).on === true, can_write: g.isPm, request_id: R });
+}
+async function handleVehBgSet(event, d, R) {
+  const g = await pmconGate(event, R, true); if (g.res) return g.res; const c = g.c;
+  if (Object.keys(d || {}).some(function (k) { return k !== 'action' && k !== 'bg_ver' && k !== 'base'; })) return jr(400, { status: 'REJECTED', error_code: 'BAD_FIELD', request_id: R });
+  const v = d.bg_ver;
+  if (typeof v !== 'string' || (v && !/^[A-Za-z0-9_.-]{2,40}$/.test(v))) return jr(400, { status: 'REJECTED', error_code: 'BAD_VALUE', request_id: R });
+  if (typeof d.base !== 'number' || !isFinite(d.base)) return jr(400, { status: 'REJECTED', error_code: 'NEED_BASE', request_id: R });
+  const st = store(DATA);
+  const s = await vehBgReadBoth(st);
+  if (!s.ok) return jr(503, { status: 'ERROR', error_code: s.code, request_id: R });
+  const cur = s.flag, before = typeof cur.bg_ver === 'string' ? cur.bg_ver : '';
+  if (Number(d.base) !== (Number(cur.updated_at) || 0)) return jr(409, { status: 'CONFLICT', error_code: 'VEH_BG_STALE', request_id: R });
+  if (v === before) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
+  if (v && !(vehBgOk(s.bg) && s.bg.ver === v)) return jr(409, { status: 'CONFLICT', error_code: 'BG_MISSING', request_id: R });   // 올라온 판과 같은 ver 만 승격
+  const now = Date.now();
+  const doc = Object.assign({}, cur, { schema: 1, bg_ver: v, bg_sha: v ? s.bg.sha : '', prev: { bg_ver: before, bg_sha: typeof cur.bg_sha === 'string' ? cur.bg_sha : '', updated_at: Number(cur.updated_at) || 0, updated_by: String(cur.updated_by || '') },
+    updated_by: c.member.id, updated_at: Math.max(now, (Number(cur.updated_at) || 0) + 1) });
+  const w = await blobSet(st, VEH_BG_KEYS.flag, doc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  let au = false;
+  try { au = (await appendAudit({ ts: now, by: c.member.name, bid: c.member.id, col: 'vehicles', ev: [{ op: '차량근거', id: '', t: '차량 법령 근거 ' + (before || '미승격') + '→' + (v || '미승격(해제)') + (v ? ' · sha ' + s.bg.sha : '') }] })) !== false; } catch (e) { au = false; }
+  return jr(200, { status: 'OK', bg_ver: v, prev: before, updated_at: doc.updated_at, audit: au, request_id: R });
 }
 // P1 판27 검토: 차량 저장(save vehicles)이 서버 줄의 검사 갱신 기록을 지우지 않게 — 들어온 줄과 서버 줄의 insp_log 합집합(앱 mergeVeh와 같은 규칙 · vehDueGuard 바로 다음에 부름)
 function vehLogUnion(a, b) {
@@ -5602,6 +5657,7 @@ const PMCON_KINDS = {   // 줄 종류 → 등급(서버 표 — 보낸 등급이
   brief: { label: '브리핑 설정', grade: 'R1', fn: handleBriefSet, args: { field: 'on', value: 'b' }, row: function (a) { return 'brief:' + (a.value ? 'on' : 'off'); } },
   bg: { label: '근거 승격', grade: 'R2', fn: handleConProcBgSet, args: { bg_ver: 's' }, row: function (a) { return 'bg:' + a.bg_ver; } },
 };
+PMCON_KINDS.vehbg = { label: '차량 근거 승격', grade: 'R2', fn: handleVehBgSet, args: { bg_ver: 's' }, row: function (a) { return 'vehbg:' + a.bg_ver; } };   // P1 판13 차량 법령 근거(11/20 카드 ②) — 위 표 밖 한 줄(판29 표·검사는 그대로 · 앱 PMCON_KINDS.push 와 짝)
 const PMCON_CHOICES = { ok: 'ㄱ', 'default': '기본값', hold: '보류', reopen: '다시 열기' };
 const PMCON_ROW = /^[a-z]{2,10}:[0-9A-Za-z_.:-]{0,80}$/;
 const PMCON_DATE = /^20\d{2}-\d{2}-\d{2}$/;
@@ -5821,6 +5877,8 @@ async function handlerInner(event) {
     if (d && d.action === 'save') return await handleSave(event, d, R);
     if (d && d.action === 'veh_due_set') return await handleVehDueSet(event, d, R);   // P1 판2 차량 지시 완료 창 새 만기일(차량 한 줄 한 칸)
     if (d && d.action === 'veh_bg_get') return await handleVehBgGet(event, d, R);   // P1 판27 차량 법령 근거(승격본만 — 아니면 on false)
+    if (d && d.action === 'veh_bg_pm_get') return await handleVehBgPmGet(event, d, R);   // P1 판13 차량 근거 승격 상태·올라온 판 요약(PM 콘솔 — 관리자 읽기)
+    if (d && d.action === 'veh_bg_set') return await handleVehBgSet(event, d, R);   // P1 판13 차량 근거 승격·해제(settings:veh.bg_ver — PM만)
     if (d && d.action === 'lic_month_get') return await handleLicMonthGet(event, d, R);   // P1 판28 인허가 '이번 달' 탭 읽기(승격본 자동 회차 행·내가 누를 수 있는 행)
     if (d && d.action === 'lic_duty_set') return await handleLicDutySet(event, d, R);   // P1 판28 '이번 달' 단추 네 가지(완료·기한 정정·해당 없음·기준일) + 관리자 해당 없음 되돌리기
     if (d && d.action === 'lic_recheck_get') return await handleLicRecheckGet(event, d, R);   // P1 판7 법령 개정 감지 목록(의무 대장 '근거 재확인 필요' 표시 재료 — 읽기만)

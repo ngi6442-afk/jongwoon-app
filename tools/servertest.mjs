@@ -10728,4 +10728,114 @@ function J91a(x) { return JSON.stringify(x); }
   finally { reset21(); const s = JSON.parse(snap21); mem.gw_users = s.u; mem.gw_data = s.d; require.cache[rp21] = keep21; }
 }
 
+{ // ---- P1 판13 차량 법령 근거 승격 스위치 — veh_bg_set(PM 쓰기 · ver 같을 때만 · '' = 해제 · prev 1판 · 감사 1줄 · 낙관락) · veh_bg_pm_get(관리자 읽기 — 요약만) · 콘솔 pmcon_decide kind vehbg · vehBgState sha 대조.
+  //   근거 표는 시험 값(가짜). 결함 사본(gw-data 한 곳을 바꿔 메모리에서 컴파일 — 파일은 쓰지 않음)에서는 실패해야 한다.
+  const fs13 = require('fs'), Mod13 = require('module');
+  const FILE13 = join(FN, 'gw-data.js'), SRC13 = fs13.readFileSync(FILE13, 'utf8');
+  const load13 = (src) => { const m = new Mod13(FILE13); m.filename = FILE13; m.paths = Mod13._nodeModulePaths(dirname(FILE13)); m._compile(src, FILE13); return m.exports; };
+  const mut13 = (from, to) => { if (SRC13.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return SRC13.replace(from, () => to); };
+  const cl13 = (mod) => async (body, tok, dev) => { const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+  const snap13 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  const MN13 = { id: 'u13n', name: '관리부13', role: '관리자', admin: true, perms: {} }, MV13 = { id: 'u13v', name: '보기13', admin: false, perms: { veh: 'view' } };
+  const tN13 = issueSession(MN13).token, tV13 = issueSession(MV13).token;
+  const BG13 = (o) => Object.assign({ schema: 1, ver: 'veh-t1', sha: 'abcdef0123456789', status: 'draft', groups: [{ id: 'g1' }, { id: 'g2' }], rules: [{ id: 'r1' }],
+    rows: [{ id: 't.car.a', title: '시험 행', grade: '실측', cites: [{ law: '시험' }], cls: 'car', every_m: 12, checked: '2026-11-15' }, { id: 't.car.h', title: '보류 행', grade: '확인 필요', hold_why: '시험 보류 이유', cls: 'car', every_m: 24, checked: '2026-11-14' }, { id: 't.ref', title: '참고', grade: '실측', kind: 'ref', checked: '2026-11-15' }] }, o || {});
+  const seed13 = (bg, flag) => { const s = JSON.parse(snap13); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null;
+    Object.assign(mem.gw_users, { 'member:u13n': JSON.parse(JSON.stringify(MN13)), 'member:u13v': MV13, 'device:dev1': { status: 'approved' } });
+    for (const k of ['bg:veh:law:v1', 'settings:veh', 'status:decide']) delete mem.gw_data[k];
+    if (bg !== undefined) mem.gw_data['bg:veh:law:v1'] = bg; if (flag !== undefined) mem.gw_data['settings:veh'] = flag; auditMock.logs.length = 0; };
+  const aud13 = () => auditMock.logs.filter((l) => l.col === 'vehicles' && l.ev && l.ev[0] && l.ev[0].op === '차량근거');
+  const flag13 = () => JSON.stringify(mem.gw_data['settings:veh'] === undefined ? null : mem.gw_data['settings:veh']);
+  const chk13 = async (c) => {
+    const P = {}, I = {};
+    // A 권한 — 읽기 = 관리자(PM 아니어도) · 쓰기 = PM만 · 거절이면 스위치·감사 그대로
+    seed13(BG13());
+    const a = [await c({ action: 'veh_bg_pm_get' }, null), await c({ action: 'veh_bg_set', bg_ver: 'veh-t1', base: 0 }, null), await c({ action: 'veh_bg_pm_get' }, tokW, 'dev1'), await c({ action: 'veh_bg_set', bg_ver: 'veh-t1', base: 0 }, tokW, 'dev1'),
+      await c({ action: 'veh_bg_pm_get' }, tN13), await c({ action: 'veh_bg_set', bg_ver: 'veh-t1', base: 0 }, tN13), await c({ action: 'veh_bg_pm_get' }, tokA)];
+    P.A = a[0].code === 401 && a[1].code === 401 && a[2].code === 403 && a[2].body.error_code === 'ADMIN_ONLY' && a[3].code === 403 && a[4].code === 200 && a[4].body.can_write === false
+      && a[5].code === 403 && a[5].body.error_code === 'PM_ONLY' && a[6].code === 200 && a[6].body.can_write === true && flag13() === 'null' && aud13().length === 0;
+    I.A = a.map((r) => r.code + ':' + (r.body.error_code || r.body.can_write));
+    // B 요약 — 행 값(주기)은 내리지 않음 · 확인 필요 목록 · 근거 없음 = bg null · 꼴 틀림 = bad_bg
+    const s = a[6].body.bg || {};
+    P.B = s.ver === 'veh-t1' && s.sha === 'abcdef0123456789' && s.n === 3 && s.n_sil === 2 && s.n_chk === 1 && s.n_cyc === 2 && s.groups === 2 && s.n_rules === 1 && s.checked === '2026-11-15'
+      && JSON.stringify(s.hold) === '[{"id":"t.car.h","t":"보류 행","why":"시험 보류 이유"}]' && !('rows' in s) && a[6].body.on === false && a[6].body.flag.bg_ver === '';
+    seed13(); const b1 = await c({ action: 'veh_bg_pm_get' }, tokA); seed13({ schema: 1, ver: 'x', rows: 'no', sha: 'abcdef0123456789' }); const b2 = await c({ action: 'veh_bg_pm_get' }, tokA);
+    P.B = P.B && b1.code === 200 && b1.body.bg === null && b1.body.bad_bg === false && b2.code === 200 && b2.body.bg === null && b2.body.bad_bg === true;
+    I.B = { s, b1: b1.body.bg, b2: b2.body.bad_bg };
+    // C 값 검사 — 400·409 · 쓰기 0
+    seed13(BG13());
+    const v = [await c({ action: 'veh_bg_set', bg_ver: 'veh-t1', base: 0, x: 1 }, tokA), await c({ action: 'veh_bg_set', bg_ver: 1, base: 0 }, tokA), await c({ action: 'veh_bg_set', bg_ver: 'a b', base: 0 }, tokA),
+      await c({ action: 'veh_bg_set', bg_ver: 'veh-t1' }, tokA), await c({ action: 'veh_bg_set', bg_ver: 'veh-t2', base: 0 }, tokA), await c({ action: 'veh_bg_set', bg_ver: '', base: 0 }, tokA), await c({ action: 'veh_bg_set', bg_ver: 'veh-t1', base: 5 }, tokA)];
+    P.C = v.map((r) => r.code + ':' + r.body.error_code).join(',') === '400:BAD_FIELD,400:BAD_VALUE,400:BAD_VALUE,400:NEED_BASE,409:BG_MISSING,400:NO_CHANGE,409:VEH_BG_STALE' && flag13() === 'null' && aud13().length === 0;
+    seed13({ schema: 1, ver: 'veh-t1', rows: 'no', sha: 'abcdef0123456789' }); const v8 = await c({ action: 'veh_bg_set', bg_ver: 'veh-t1', base: 0 }, tokA);
+    P.C = P.C && v8.code === 409 && v8.body.error_code === 'BG_MISSING';
+    I.C = v.map((r) => r.code + ':' + r.body.error_code).concat([v8.code]);
+    // D 승격 → 앱 읽기 켜짐 · 해제 → 꺼짐 · prev 1판 · 감사 · sha 기록
+    seed13(BG13(), { bg_ver: '', updated_at: 100, updated_by: 'x', other: 'keep' });
+    const d1 = await c({ action: 'veh_bg_set', bg_ver: 'veh-t1', base: 100 }, tokA); const f1 = JSON.parse(flag13());
+    const g1 = await c({ action: 'veh_bg_get' }, tV13), p1 = await c({ action: 'veh_bg_pm_get' }, tokA);
+    const d2 = await c({ action: 'veh_bg_set', bg_ver: '', base: f1.updated_at }, tokA); const f2 = JSON.parse(flag13()); const g2 = await c({ action: 'veh_bg_get' }, tV13);
+    const au = aud13();
+    P.D = d1.code === 200 && d1.body.bg_ver === 'veh-t1' && d1.body.prev === '' && f1.bg_ver === 'veh-t1' && f1.bg_sha === 'abcdef0123456789' && f1.updated_by === 'uadmin' && f1.updated_at > 100 && f1.other === 'keep'
+      && JSON.stringify(f1.prev) === '{"bg_ver":"","bg_sha":"","updated_at":100,"updated_by":"x"}' && g1.body.on === true && g1.body.ver === 'veh-t1' && (g1.body.rows || []).length === 3 && p1.body.on === true && p1.body.flag.prev.bg_ver === ''
+      && d2.code === 200 && f2.bg_ver === '' && f2.bg_sha === '' && f2.prev.bg_ver === 'veh-t1' && f2.prev.bg_sha === 'abcdef0123456789' && g2.body.on === false && g2.body.why === 'NOT_PROMOTED'
+      && au.length === 2 && au[0].bid === 'uadmin' && /^차량 법령 근거 미승격→veh-t1 · sha abcdef0123456789$/.test(au[0].ev[0].t) && au[1].ev[0].t === '차량 법령 근거 veh-t1→미승격(해제)';
+    I.D = { d1: d1.code, f1, g1: g1.body.on, d2: d2.code, g2: g2.body.why, au: au.map((x) => x.ev[0].t) };
+    // E 같은 판 이름·다른 내용 = 꺼짐(SHA_CHANGED) · sha 없는 옛 스위치는 종전대로 켜짐
+    seed13(BG13()); await c({ action: 'veh_bg_set', bg_ver: 'veh-t1', base: 0 }, tokA);
+    mem.gw_data['bg:veh:law:v1'] = BG13({ sha: '0123456789abcdef' }); const e1 = await c({ action: 'veh_bg_get' }, tV13);
+    seed13(BG13(), { bg_ver: 'veh-t1' }); const e2 = await c({ action: 'veh_bg_get' }, tV13);
+    P.E = e1.body.on === false && e1.body.why === 'SHA_CHANGED' && e2.body.on === true;
+    I.E = [e1.body.why, e2.body.on];
+    // F 읽기 실패 = 503(빈 값으로 보지 않음) · 쓰기 0
+    seed13(BG13()); blobsMock.hooks.failGet = (k) => k === 'settings:veh';
+    let f = []; try { f = [await c({ action: 'veh_bg_set', bg_ver: 'veh-t1', base: 0 }, tokA), await c({ action: 'veh_bg_pm_get' }, tokA)]; } finally { blobsMock.hooks.failGet = null; }
+    blobsMock.hooks.failGet = (k) => k === 'bg:veh:law:v1';
+    try { f.push(await c({ action: 'veh_bg_set', bg_ver: 'veh-t1', base: 0 }, tokA)); } finally { blobsMock.hooks.failGet = null; }
+    P.F = f.map((r) => r.code + ':' + r.body.error_code).join(',') === '503:FLAG_READ_FAILED,503:FLAG_READ_FAILED,503:BG_READ_FAILED' && flag13() === 'null' && aud13().length === 0;
+    I.F = f.map((r) => r.code + ':' + r.body.error_code);
+    // G 콘솔 — pmcon_decide kind vehbg(R2) → 같은 핸들러 · 누른 기록 1줄 · 등급·줄 틀림 거절 · PM 아님 거절
+    seed13(BG13());
+    const body = (o) => Object.assign({ action: 'pmcon_decide', kind: 'vehbg', row: 'vehbg:veh-t1', choice: 'ok', grade: 'R2', due: '', q: '차량 법령 근거를 승격할까요?', rec: '승격', args: { bg_ver: 'veh-t1' }, set_base: 0, base: 0 }, o || {});
+    const gN = await c(body(), tN13), gG = await c(body({ grade: 'R1' }), tokA), gR = await c(body({ row: 'vehbg:veh-t2' }), tokA);
+    const okNone = flag13() === 'null';
+    const gO = await c(body(), tokA); const fl = JSON.parse(flag13()), dec = mem.gw_data['status:decide'] || { log: [] };
+    P.G = gN.code === 403 && gN.body.error_code === 'PM_ONLY' && gG.code === 400 && gG.body.error_code === 'BAD_GRADE' && gR.code === 400 && gR.body.error_code === 'BAD_ROW' && okNone
+      && gO.code === 200 && gO.body.applied === true && fl.bg_ver === 'veh-t1' && fl.updated_by === 'uadmin' && dec.log.length === 1 && dec.log[0].kind === 'vehbg' && dec.log[0].row === 'vehbg:veh-t1' && dec.log[0].applied === true && aud13().length === 1;
+    I.G = [gN.code, gG.body.error_code, gR.body.error_code, gO.code, gO.body.applied, fl.bg_ver, dec.log.length];
+    return { P, I };
+  };
+  try {
+    const R13 = await chk13(cl13(gwd));
+    T('P1 판13 ① 권한: veh_bg_pm_get 비로그인 401 · 직원 403 ADMIN_ONLY · PM 아닌 관리자 200(can_write false) · PM 200(can_write true) · veh_bg_set 비로그인 401 · 직원 403 · PM 아닌 관리자 403 PM_ONLY · 스위치·감사 0', R13.P.A, JSON.stringify(R13.I.A));
+    T('P1 판13 ② 콘솔 요약(veh_bg_pm_get): 판·sha·행 3(실측 2·확인 필요 1·주기 2)·묶음 2·규칙 1·가장 늦은 확인일·확인 필요 목록(id·제목·이유) · 행 값은 안 내림 · 근거 없음 = bg null · 꼴 틀림 = bad_bg', R13.P.B, JSON.stringify(R13.I.B));
+    T('P1 판13 ③ 값 검사: 모르는 칸 400 BAD_FIELD · 판 이름 꼴 400 BAD_VALUE 2 · base 없음 400 NEED_BASE · 올라온 판과 다른 ver 409 BG_MISSING · 그대로 400 NO_CHANGE · base 낡음 409 VEH_BG_STALE · 꼴 틀린 근거 표 409 BG_MISSING · 쓰기·감사 0', R13.P.C, JSON.stringify(R13.I.C));
+    T('P1 판13 ④ 승격·해제: 승격 = settings:veh {bg_ver·bg_sha = 판 sha·prev 1판(앞 값 그대로)·updated_by PM·다른 칸 보존} → veh_bg_get on true(행 3) · 해제("") = bg_ver·bg_sha 비움·prev = 승격 판 → on false NOT_PROMOTED · 감사 2줄(col vehicles · 차량근거 · 미승격→판 · sha / 판→미승격(해제))', R13.P.D, JSON.stringify(R13.I.D));
+    T('P1 판13 ⑤ 승격 뒤 같은 판 이름으로 내용이 바뀌어 올라옴 = veh_bg_get on false SHA_CHANGED · sha 없는 옛 스위치(판27 시험 꼴) = 종전대로 on', R13.P.E, JSON.stringify(R13.I.E));
+    T('P1 판13 ⑥ 읽기 실패: 스위치 못 읽음 = veh_bg_set·veh_bg_pm_get 503 FLAG_READ_FAILED · 근거 표 못 읽음 = veh_bg_set 503 BG_READ_FAILED · 쓰기·감사 0', R13.P.F, JSON.stringify(R13.I.F));
+    T('P1 판13 ⑦ PM 콘솔 길: pmcon_decide kind vehbg(R2 · 줄 vehbg:<판>) = PM 아닌 관리자 403 · 등급 R1 400 BAD_GRADE · 바꾸는 판과 줄이 다르면 400 BAD_ROW(쓰기 0) · PM [ㄱ] = 같은 handleVehBgSet로 승격(updated_by PM)·누른 기록 1줄(applied)·차량근거 감사 1줄', R13.P.G, JSON.stringify(R13.I.G));
+    const MUT13 = [
+      ["  if (v && !(vehBgOk(s.bg) && s.bg.ver === v)) return jr(409, { status: 'CONFLICT', error_code: 'BG_MISSING', request_id: R });", ''],
+      ["async function handleVehBgSet(event, d, R) {\n  const g = await pmconGate(event, R, true);", "async function handleVehBgSet(event, d, R) {\n  const g = await pmconGate(event, R, false);"],
+      ["  if (Number(d.base) !== (Number(cur.updated_at) || 0)) return jr(409,", '  if (false) return jr(409,'],
+      ["  if (flag.bg_sha && flag.bg_sha !== bg.sha) return { on: false, why: 'SHA_CHANGED' };", ''],
+      ["bg_sha: v ? s.bg.sha : '', prev:", "bg_sha: '', prev:"],
+      ["prev: { bg_ver: before, bg_sha: typeof cur.bg_sha === 'string' ? cur.bg_sha : '', updated_at: Number(cur.updated_at) || 0, updated_by: String(cur.updated_by || '') },", ''],
+      ["  if (Object.keys(d || {}).some(function (k) { return k !== 'action' && k !== 'bg_ver' && k !== 'base'; })) return jr(400,", '  if (false) return jr(400,'],
+      ["PMCON_KINDS.vehbg = { label: '차량 근거 승격', grade: 'R2',", "PMCON_KINDS.vehbg = { label: '차량 근거 승격', grade: 'R1',"],
+      ["  if (!rf.ok && rf.code !== 'NOT_FOUND') return { ok: false, code: 'FLAG_READ_FAILED' };", ''],
+      ["  try { au = (await appendAudit({ ts: now, by: c.member.name, bid: c.member.id, col: 'vehicles',", "  try { au = (await (async () => false)({ ts: now, by: c.member.name, bid: c.member.id, col: 'vehicles',"],
+      ["  const hold = rows.filter(function (r) { return r.grade !== '실측'; })", "  const hold = rows.filter(function (r) { return false; })"],
+      ["async function handleVehBgPmGet(event, d, R) {\n  const g = await pmconGate(event, R, false); if (g.res) return g.res;", "async function handleVehBgPmGet(event, d, R) {\n  const g = { isPm: true };"],
+    ];
+    const kill = [];
+    for (const [from, to] of MUT13) {
+      let r; try { r = await chk13(cl13(load13(mut13(from, to)))); } catch (e) { r = { P: { x: false } }; }
+      if (Object.values(r.P).every((x) => x === true)) kill.push(from.trim().slice(0, 70) + ' 안 깨짐');
+    }
+    T('P1 판13 ⑧ 결함 사본 ' + MUT13.length + '개(ver 대조 뺌·PM 검사 읽기로·낙관락 뺌·sha 대조 뺌·sha 안 적음·prev 안 적음·모르는 칸 통과·콘솔 등급 R1·읽기 실패를 없음으로·감사 뺌·확인 필요 목록 비움·읽기 관문 뺌) = 모두 ✗', kill.length === 0, kill.join(' / '));
+  } catch (e) { T('P1 판13 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+  finally { const s = JSON.parse(snap13); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);
