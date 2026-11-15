@@ -10995,7 +10995,7 @@ try {
       wkLoaded: o.wkLoaded !== false, eduLoaded: o.eduLoaded !== false, asbLoaded: o.asbLoaded !== false, noThen: !!o.noThen, pendA: null, pendW: null, wkEduSt: o.wkEduSt === undefined ? 'ok' : o.wkEduSt, tab: o.tab || 'con' };
     const SRC = [PRE51].concat(VARS51.map((h) => V.line47(src, h)), REAL51.map((n) => V.fn47(src, n)), [V.blk47(src, '// @asb-doc-start', '// @asb-doc-end'),
       'return { docOf: asbDocOf, medOf: asbMedOf, latest: asbMedLatest, until: asbMedUntil, months: asbMedMonths, orgTxt: asbMedOrgTxt, base: asbDocBase, people: asbDocPeople, site: asbDocSite, lines: siteDocLines, table: siteDocTable, act: siteDocAct,'
-      + ' conLine: asbDocConLine, conSt: function(){ return asbDocConSt; }, setEduSt: function(v){ wkEduSt = v; }, addMonths: asbAddMonths, pick: asbMedPick, setAsbLoaded: function(v){ asbLoaded = v; }, setWkLoaded: function(v){ wkLoaded = v; }, wkBase: wkDocBase, wkMiss: wkDocMissing, exDate: wkExamDate, exMiss: wkExamMissing, st: function(){ return wkEduSt; }, rule: ASB_MED_RULE, kinds: ASB_DOC_KINDS };']).join('\n');
+      + ' conLine: asbDocConLine, conSt: function(){ return asbDocConSt; }, setEduSt: function(v){ wkEduSt = v; }, addMonths: asbAddMonths, pick: asbMedPick, setAsbLoaded: function(v){ asbLoaded = v; }, setWkLoaded: function(v){ wkLoaded = v; }, wkBase: wkDocBase, wkMiss: wkDocMissing, wkNote: wkDocBaseNote, wkAsbEnsure: wkDocAsbEnsure, exDate: wkExamDate, exMiss: wkExamMissing, st: function(){ return wkEduSt; }, rule: ASB_MED_RULE, kinds: ASB_DOC_KINDS };']).join('\n');
     const api = new Function('ENV', SRC)(env);
     return { api, env };
   };
@@ -11182,6 +11182,32 @@ try {
     && X8.api.wkBase(X8.env.contracts[0]) === '2026-11-25' && X8.api.wkBase(X8.env.contracts[1]) === '2026-11-12' && X8.api.wkBase(X8.env.contracts[2]) === '2026-11-12' && X8.api.wkBase(null) === '2026-11-12'
     && X8.api.exMiss(W8(['w1', 'w5'])) === '③ 건강진단 기록이 없는 사람 1명 — 빈칸(안전 › 체크에서 확인)' && xg8 > 0 && xg8b > xg8 && xg8b - xg8 < 120 && /d=asbMedLatest\("worker", w\.id\);/.test(V.fn47(html, 'wkExamDate')),
     JSON.stringify({ miss8, base: [X8.api.wkBase(X8.env.contracts[0]), X8.api.wkBase(X8.env.contracts[1])], ex: X8.api.exDate(W8(['w7'])[0]) }));
+
+  // ⑧-2 (v479 — 11/15 시험 화면에서 찾음): 계약 탭만 본 세션은 현장 대장을 안 읽은 상태라 [생성] 확인요망의 검진 만료 기준일이 말없이 오늘로 떨어졌다(착수일 전에 만료되는 검진을 놓침).
+  //   석면해체계획서를 고를 때·[생성] 때 대장을 한 번 읽고(겹쳐 부르지 않음 · 실패하면 다음에 다시), 못 읽은 채면 '기준일을 오늘로 봤습니다' 한 줄을 붙인다 · 현장 권한이 없으면 읽지 않고 그 까닭을 적는다
+  const chk79 = (src) => {
+    const c1 = { id: 'c1', site_id: 's1' }, mk = (o) => mkS51(Object.assign({ src, contracts: [c1, { id: 'c2' }] }, o || {})), two = (X) => X.env.workers.slice(0, 2), nLoad = (X) => X.env.log.filter((l) => l.indexOf('loadAsb') === 0).length;
+    const Xa = mk({ asbLoaded: false }), n1 = Xa.api.wkNote(two(Xa), c1), n1b = Xa.api.wkNote(two(Xa), c1), la = nLoad(Xa); Xa.api.setAsbLoaded(true); Xa.env.pendA[0](true); const n2 = Xa.api.wkNote(two(Xa), c1), b2 = Xa.api.wkBase(c1);
+    const Xf = mk({ asbLoaded: false }); Xf.api.wkAsbEnsure(); Xf.env.pendA[0](false); Xf.api.wkAsbEnsure(); const lf = nLoad(Xf);
+    const Xr = mk({ asbLoaded: false }); Xr.api.wkAsbEnsure(); Xr.env.pendA[1](); Xr.api.wkAsbEnsure(); const lr = nLoad(Xr);
+    const Xx = mk({ asbLoaded: false, user: U51.X }), nx = Xx.api.wkNote(two(Xx), c1), lx = nLoad(Xx);
+    const Xn = mk({ asbLoaded: false, user: U51.N }), Xe = mk({ asbLoaded: false, eduLoaded: false }), Xl = mk({}), Xq = mk({ asbLoaded: false }), Xt = mk({ asbLoaded: false, noThen: true });
+    const quiet = [Xq.api.wkNote(two(Xq), { id: 'c2' }), Xq.api.wkNote(two(Xq), null), Xq.api.wkNote([], c1), Xn.api.wkNote(two(Xn), c1), Xe.api.wkNote(two(Xe), c1), Xl.api.wkNote(two(Xl), c1)];
+    Xl.api.wkAsbEnsure(); Xt.api.wkAsbEnsure(); Xt.api.wkAsbEnsure();
+    const sA = src.indexOf('    if(k==="asb_plan") wkEduEnsure();'), sB = src.indexOf('    if(k==="asb_plan") wkDocAsbEnsure();'), sC = src.indexOf('wkDocMissing(exWs, wkDocBase(findProc(xgCtx.id))).forEach(function(x){ missing.push(x); });'), sD = src.indexOf('var exBn=wkDocBaseNote(exWs, findProc(xgCtx.id)); if(exBn) missing.push(exBn);');
+    const N1 = '검진 만료 기준일을 오늘로 봤습니다 — 연결된 석면 현장 대장을 아직 못 읽음(잠시 뒤 다시 [생성]하면 착수일 기준으로 봅니다)';
+    const ok = n1 === N1 && n1b === N1 && la === 1 && n2 === '' && b2 === '2026-11-25' && lf === 2 && lr === 2
+      && nx === '검진 만료 기준일을 오늘로 봤습니다 — 현장 권한이 없어 연결된 석면 현장의 착수일을 읽지 못함(착수일이 뒤면 안전 › 현장 칸에서 확인)' && lx === 0
+      && quiet.every((q) => q === '') && nLoad(Xq) === 0 && nLoad(Xl) === 0 && nLoad(Xt) === 2
+      && sA > 0 && sB > sA && sB - sA < 400 && sC > 0 && sD > sC && sD - sC < 400;
+    return { ok, info: { n1, la, n2, b2, lf, lr, nx, lx, quiet, st: [sA > 0, sB - sA, sD - sC] } };
+  };
+  const r79 = chk79(html), run79 = (a, b) => { try { return chk79(mut51(a, b)).ok; } catch (e) { return false; } };
+  const m79 = [run79('!c || !c.site_id || asbLoaded) return "";', '!c || !c.site_id) return "";'), run79('if (asbLoaded || wkDocAsbWait || !canSee("site")) return;', 'if (asbLoaded || !canSee("site")) return;'),
+    run79('p.then(function(){ wkDocAsbWait = false; }, function(){ wkDocAsbWait = false; });', 'p.then(function(){ wkDocAsbWait = false; });'), run79('    if(k==="asb_plan") wkDocAsbEnsure();', '    ;'),
+    run79('var exBn=wkDocBaseNote(exWs, findProc(xgCtx.id)); if(exBn) missing.push(exBn);', ''), run79('    if (!canSee("site")) return "검진 만료 기준일을 오늘로 봤습니다 — 현장 권한이 없어', '    if (false) return "검진 만료 기준일을 오늘로 봤습니다 — 현장 권한이 없어')];
+  T('v479 석면해체계획서 [생성] 기준일(실행 — 실제 @asb-doc): 현장 대장을 안 읽은 세션 = 대장 읽기를 한 번만 걸고 "검진 만료 기준일을 오늘로 봤습니다 — … 아직 못 읽음" 한 줄 · 읽힌 뒤 = 줄 없음·기준일 = 착수일 2026-11-25 · 읽기 실패·거절 뒤에는 다시 읽음 · 현장 권한 없음 = 읽지 않고 까닭 한 줄 · 연결 현장 없음·고른 사람 없음·안전 권한 없음·기록 못 읽음·대장 읽힘 = 줄 없음 · 서류를 고를 때·[생성] 길 배선(정적) · 결함 사본 ' + m79.length + '개(읽힌 뒤에도 줄·겹쳐 읽기·거절 뒤 멈춤·고를 때 안 읽음·[생성]에 줄 없음·권한 없이 읽기) = 모두 ✗',
+    r79.ok && m79.every((v) => v === false), JSON.stringify({ r: r79.info, mut: m79 }));
 
   // ⑨ 계약 탭 '노동부 신고' 단계 줄 — 연결 석면 현장(종결 아님)의 같은 셈 · 현장 권한 없음·연결 없음·종결·철거 = 줄 없음 · 안전 권한 없음 = 안내 한 줄 · 기록을 못 읽었으면 한 번 읽고(읽히면 계약 탭 다시 그림 — 실패면 다시 그리지 않음)
   const chk9_51 = (src) => {
@@ -15090,8 +15116,8 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
     const GATE = ['uismoke', 'servertest', 'stmtread_a_check', 'stmtread_b_check', 'stmtread_c_check', 'stmtread_d_check'];
     const mF = ['`buildPrompt(vendor, ym, invOnly)`', '`INV_MASK`', '`invOnly`', '`ONLY_INVOICE`', '덕천'].filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v478 \(2026-11-15\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length >= 3 && !cb.some((l) => /\(PM/.test(l))
-      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && /SHELL_CACHE = 'jw-shell-v478'/.test(d.sw)
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 478 /* v479: 기준 줄·sw = 이 판 이상 */ && ftv.length > 0 && mF.length === 0 && cb.length >= 3 && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 478
       && d.mn.indexOf('계산서뿐인 원본') > 0 && d.mn.indexOf('계산서 쪽만 있는 스캔은 첨부로만 남습니다') < 0 && !/invOnly|INV_MASK/.test(d.mn);
     return { ok, info: { mF, cb: cb.length, gate: gate.length } };
   };
@@ -15100,6 +15126,27 @@ try {
   T('v478 문서·판 번호(정확 검사): FEATURES 기준 v478 (2026-11-15)·v478 절(함수·덕천) · TESTLIST v478 게이트 [x]·PM 칸 0 · MANUAL 계산서뿐인 원본(옛 문장 0·내부 이름 0) · sw jw-shell-v478 · 결함 사본 ' + MD78.length + '개 = 모두 ✗',
     rD78.ok && MD78.every((v) => v === false), JSON.stringify({ r: rD78.info, mut: MD78 }));
 } catch (e) { console.log('  (v478 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v479(안전 — 석면해체계획서 [생성] 검진 만료 기준일: 현장 대장을 안 읽은 세션에서 말없이 오늘로 떨어지던 것, 11/15 시험 화면에서 찾음): 실행 검사는 v479(⑧-2) · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '479 이상'으로 풀 것
+try {
+  const rd79 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D79 = { ft: rd79('FEATURES.md'), tl: rd79('TESTLIST.md'), sw: rd79('sw.js'), mn: rd79('MANUAL.html') };
+  const chkD79 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v479 (11/15)', '\n### '), tlv = cut(d.tl, '\n## v479 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
+    const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check'];
+    const mF = ['`wkDocAsbEnsure`', '`wkDocBaseNote`', '`wkDocBase`', '착수일', '서버 변경 없음'].filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v479 \(2026-11-15\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length >= 3 && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && /SHELL_CACHE = 'jw-shell-v479'/.test(d.sw)
+      && d.mn.indexOf('현장 대장을 아직 읽지 못했으면') > 0 && !/wkDocBaseNote|wkDocAsbEnsure/.test(d.mn);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length } };
+  };
+  const rD79 = chkD79(D79), muD79 = (k, f) => chkD79(Object.assign({}, D79, { [k]: f(D79[k]) })).ok;
+  const MD79 = [muD79('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v478 (')), muD79('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v478'")), muD79('mn', (s) => s.replace('현장 대장을 아직 읽지 못했으면', '')), muD79('ft', (s) => s.split('`wkDocBaseNote`').join('wkDocBaseNote'))];
+  T('v479 문서·판 번호(정확 검사): FEATURES 기준 v479 (2026-11-15)·v479 절(함수·착수일) · TESTLIST v479 게이트 [x] 12종·PM 칸 0 · MANUAL 기준일 안내(내부 이름 0) · sw jw-shell-v479 · 결함 사본 ' + MD79.length + '개 = 모두 ✗',
+    rD79.ok && MD79.every((v) => v === false), JSON.stringify({ r: rD79.info, mut: MD79 }));
+} catch (e) { console.log('  (v479 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

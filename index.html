@@ -13660,6 +13660,7 @@
     document.getElementById("xgMoneyFields").style.display = (k==="asb_plan"||k==="waste_report") ? "none" : "";
     document.getElementById("xgAsbFields").style.display = (k==="asb_plan") ? "" : "none";
     if(k==="asb_plan") wkEduEnsure();   // v442 검토: ③ 건강진단(안전 권한 — wkExamDate)용 교육·검진 기록을 이 서류를 고를 때만·세션에 한 번
+    if(k==="asb_plan") wkDocAsbEnsure();   // 검진 만료 기준일(연결된 석면 현장 착수일 — wkDocBase)용 현장 대장: 계약 탭만 본 세션은 대장을 안 읽은 상태라 이 서류를 고를 때 읽는다
     document.getElementById("xgWasteWrap").style.display = (k==="waste_report") ? "" : "none";
     document.getElementById("xgRateWrap").style.display = (k==="bid_rate") ? "" : "none";
     document.getElementById("xgQualWrap").style.display = (k==="qual_packet") ? "" : "none";
@@ -14268,6 +14269,7 @@
           wkEduEnsure();   // v442 검토: 교육·검진 기록을 못 읽었으면 지금 다시 읽기 시작(확인요망은 '아직 못 읽어 빈칸' — 잠시 뒤 다시 [생성])
           var exM=wkExamMissing(exWs); if(exM) missing.push(exM);
           wkDocMissing(exWs, wkDocBase(findProc(xgCtx.id))).forEach(function(x){ missing.push(x); });   // v451 고른 투입 인력의 검진 만료·특별교육·건설 기초(노동부 신고 서류 3종 — @asb-doc 한 판정)
+          var exBn=wkDocBaseNote(exWs, findProc(xgCtx.id)); if(exBn) missing.push(exBn);   // 현장 대장을 못 읽어 기준일을 오늘로 본 경우를 말해 준다(종전엔 말없이 오늘 — 착수일 전에 만료되는 검진을 놓침)
         }
       }
       if(missing.length && !confirm("⚠ 확인요망 — 원문(계약서·조사서·대장)에서 찾지 못한 값:\n· "+missing.join("\n· ")+"\n\n빈칸(수기 기입)으로 두고 생성할까요?\n(값을 아신다면 취소 후 입력하거나, 해당 서류를 계약의 넣기 박스에 넣으면 자동으로 채워집니다)")) return;
@@ -18081,6 +18083,22 @@
   // 석면해체계획서 생성 창 [생성] 확인요망 줄(③ 건강진단 '기록 없음' 줄 wkExamMissing 다음) — 고른 투입 인력의 검진 만료·특별교육·건설 기초(안전 권한 + 기록을 읽었을 때만 · 없으면 빈 배열)
   //   기준일 = 그 계약에 연결된 석면 현장의 기준일(없으면 오늘)
   function wkDocBase(c){ var r = (c && c.site_id) ? findAsb(String(c.site_id)) : null; return (r && r.del !== 1 && asbDocBase(r)) || todayStr(); }
+  // 기준일용 현장 대장 읽기 — 계약에 석면 현장이 연결돼 있어도 계약 탭만 본 세션은 대장(asb)이 비어 wkDocBase가 오늘로 떨어진다.
+  //   석면해체계획서를 고를 때·[생성] 때 한 번 읽기 시작(현장 권한이 있을 때만 — loadAsb가 권한을 본다) · 읽는 중 겹쳐 부르지 않음
+  var wkDocAsbWait = false;
+  function wkDocAsbEnsure(){
+    var p;
+    if (asbLoaded || wkDocAsbWait || !canSee("site")) return;
+    p = loadAsb();
+    if (p && p.then){ wkDocAsbWait = true; p.then(function(){ wkDocAsbWait = false; }, function(){ wkDocAsbWait = false; }); }
+  }
+  // [생성] 확인요망 한 줄 — 연결된 현장이 있는데 대장을 못 읽어 기준일을 오늘로 본 경우(고른 사람·안전 권한·기록 읽음일 때만 = wkDocMissing이 판정하는 때)
+  function wkDocBaseNote(ws, c){
+    if (!ws || !ws.length || !canSee("safety") || !eduLoaded || !c || !c.site_id || asbLoaded) return "";
+    if (!canSee("site")) return "검진 만료 기준일을 오늘로 봤습니다 — 현장 권한이 없어 연결된 석면 현장의 착수일을 읽지 못함(착수일이 뒤면 안전 › 현장 칸에서 확인)";
+    wkDocAsbEnsure();
+    return "검진 만료 기준일을 오늘로 봤습니다 — 연결된 석면 현장 대장을 아직 못 읽음(잠시 뒤 다시 [생성]하면 착수일 기준으로 봅니다)";
+  }
   function wkDocMissing(ws, base){
     var out = [], ex = [], ns = [], nb = [];
     if (!ws || !ws.length || !canSee("safety") || !eduLoaded) return out;
