@@ -16001,6 +16001,32 @@ try {
     (() => { const H2 = mutS('      delete s.appr; if (typeof apprToastShow === "function") apprToastShow(CON_APPR_OLD_MSG); return true;', '      return true;'); return runTakeP24(H2, 'amt', undefined).gone === false; })()];
   T('P1 판24-③ 3차 재검토 화면: 배포 전 대기 줄(사본 없음) → 서버 400 SNAP_REQUIRED = 큐에서 뺌·단계 미전송(csApprDropped)·알림 "…새로 고친 뒤 단계 카드에서 다시 상신" · 409 CID_TAKEN = 큐에서 뺌·안내 · 승인 카드 사본 없음·다름 = 반영 안 함·상신 기록 지움(다시 상신 가능)·안내 1번 · 사본 같음·금액 아닌 단계 = 종전대로 반영(실행 — 실제 apprFlushCreates·csApprTake) · 결함 사본 2개 = 모두 ✗',
     flOk && tkOk && kOld.every((v) => v === true), JSON.stringify({ fl1: { left: fl1.left, d: fl1.dropped, a: fl1.alerts }, fl2: fl2.alerts, tk1, tk2, tk3, tk4, kOld }));
+  // ③-5 4차: 결재한 기기의 즉시 반영(csApprOnDecided — 실행): 카드 사본 = 단계 사본 → 반영(csApprApply)·즉시 저장 · 카드 사본 없음 → 반영 안 함·상신 기록 지움·안내·즉시 저장
+  const runDecP24 = async (H, itSnap) => {
+    const env = { applied: 0, saved: 0, toasts: [] };
+    const f = new Function('ENV', [(H.match(/  var CON_APPR_OLD_MSG = "[^"\n]*";/) || [''])[0],
+      'var C = { id: "k", pipes: [{ key: "chg", cur: 0, stages: [{ name: "변경계약", aw: "amt", status: "open", appr: { cid: "c1", status: "대기", snap: { chg_amt: 1500, chg_end: "2027-03-31" } } }] }] };',
+      'function findProc(){ return C; } function csFetchServerContract(){ return Promise.resolve(null); } function csSyncFromServer(){ return false; } function csApprApply(){ ENV.applied++; } function csSaveNow(){ ENV.saved++; } function renderContracts(){} function myName(){ return "관리자"; } function todayStr(){ return "2026-11-15"; } function apprToastShow(m){ ENV.toasts.push(String(m)); }',
+      fnP24(H, 'csApprTake'), fnP24(H, 'csApprOnDecided'), 'return function(snap){ csApprOnDecided({ id: "ap1", ref: "con:k|chg|0", status: "승인", decided_at: "2026-11-15", snap: snap }); return C; };'].join('\n'))(env);
+    const C = f(itSnap); for (let i = 0; i < 4; i++) await tickP24();
+    return { applied: env.applied, saved: env.saved, toasts: env.toasts.length, apprGone: !C.pipes[0].stages[0].appr };
+  };
+  const dc1 = await runDecP24(html, { chg_amt: '1500', chg_end: '2027-03-31' }), dc2 = await runDecP24(html, undefined);
+  const dcOk = dc1.applied === 1 && dc1.saved === 1 && dc1.toasts === 0 && !dc1.apprGone && dc2.applied === 0 && dc2.saved === 1 && dc2.toasts === 1 && dc2.apprGone;
+  const dcMut = await runDecP24(mutS('decided_at: it.decided_at || todayStr(), snap: it.snap })){', 'decided_at: it.decided_at || todayStr() })){'), { chg_amt: '1500', chg_end: '2027-03-31' });
+  T('P1 판24-③ 4차 화면: 결재한 기기의 즉시 반영(실행 — 실제 csApprOnDecided → csApprTake) = 카드 사본이 단계 사본과 같으면 반영·즉시 저장 1번 · 카드 사본 없음 = 반영 안 함·상신 기록 지움·안내 1번·즉시 저장 1번 · 결함 사본(카드 사본을 안 넘김 = 정상 승인도 반영 안 됨) ✗',
+    dcOk && dcMut.applied === 0, JSON.stringify({ dc1, dc2, dcMut }));
+  // ③-6 앱 스크립트 전체 문법(검사 이름 고정 — 다음 판도 이 검사에 걸림): index.html 인라인 <script>(src 없는 것) 전부를 node:vm Script로 파싱만(실행 안 함) — 함수 조각만 떼어 돌리는 검사가 놓친 54e5eea 사고(주석이 if 본문·닫는 괄호를 삼킴)
+  const vmP24 = createRequire(import.meta.url)('vm');
+  const synP24 = (H) => { const errs = []; const re = /<script(\s[^>]*)?>([\s\S]*?)<\/script>/gi; let m, n = 0;
+    while ((m = re.exec(H))) { if (/\ssrc\s*=/.test(m[1] || '')) continue; n++; const line0 = H.slice(0, m.index).split('\n').length; try { new vmP24.Script(m[2], { filename: 'index.html#' + n, lineOffset: line0 - 1 }); } catch (e) { errs.push(n + ':' + String(e.message).slice(0, 80)); } }
+    return { n, errs }; };
+  const syn = synP24(html);
+  const fnStart = html.indexOf('  function csApprRef('), fnEnd = html.indexOf('}', fnStart);
+  const synMut = synP24(html.slice(0, fnEnd) + html.slice(fnEnd + 1));   // 결함 사본: 임의 함수(csApprRef)의 닫는 괄호 하나를 지움
+  const synMut2 = synP24(html.replace('snap: it.snap })){ c.updated = todayStr(); csSaveNow(); renderContracts(); }   // 3차 재검토', 'snap: it.snap })){   // 3차 재검토 c.updated = todayStr(); csSaveNow(); renderContracts(); }'));   // 결함 사본: 54e5eea 꼴 그대로
+  T('P1 판24 앱 스크립트 전체 문법: index.html 인라인 스크립트 ' + syn.n + '개 전부 node:vm 파싱 오류 0(실행 안 함) · 결함 사본 2개(함수 닫는 괄호 하나 지움 · 54e5eea 꼴 주석이 본문을 삼킴) = 오류로 잡힘',
+    syn.n >= 1 && syn.errs.length === 0 && synMut.errs.length > 0 && synMut2.errs.length > 0, JSON.stringify({ syn, mut: synMut.errs.slice(0, 2), mut2: synMut2.errs.slice(0, 2) }));
   T('P1 판24-③ 화면: 계약 저장 400 CON_APPR_REQUIRED = "계약 저장이 거절됐습니다 … 다시 불러옵니다" 알림 1번 + 서버 값 다시 읽기 1번(실행 — 실제 doSaveContracts) · (검토 B9) 서버 오류 500 APPROVALS_READ_FAILED·502 = "저장되지 않았습니다 … 다시 불러옵니다" 알림 1번 + 다시 읽기 · 다른 400·200 = 알림 0·다시 읽기 0(종전) · 결재 대상 판정 두 벌(앱 csApprKindOf = 서버 _lib/conappr apprKindOf, 표본 ' + SP24.length + ' · 다름 0 · 결재 대상 ≥ 8) · 결함 사본 3개(거절 알림 걷음·5xx 알림 걷음·앱 판정표만 바꿈) = 모두 ✗',
     okS && par.diff === 0 && par.hits >= 8 && kS.every((v) => v === true), JSON.stringify({ okS, par, kS }));
 } catch (e) { console.log('  (P1 판24 검사 생략 — ' + e.message + ')'); fails++; }

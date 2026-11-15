@@ -86,7 +86,11 @@ function scan(oldItems, newItems) {
       op.stages.forEach(function (os, i) {
         if (!(isObj(os) && os.aw === 'amt' && os.status === 'done' && isObj(os.appr) && os.appr.status === '승인' && isObj(os.appr.snap))) return;
         const s = (p && Array.isArray(p.stages)) ? p.stages[i] : null;
-        if (!isObj(s) || s.status === 'skipped' || stageId(s) !== stageId(os)) rows.push({ why: 'APPR_REVOKED', ref: 'con:' + id + '|' + op.key + '|' + i, appr: null, kind: '', hard: true, cid: id, pipe: String(op.key || ''), i: i });
+        // 4차(11/15): 지우지 않고 '끄는' 꼴(상태를 열림·대기로 · 상신 기록 지움 · 상신 상태를 반려 등으로 · 번호·사본 바꿈)도 같은 거절 — 끝난 단계를 되돌리는 화면은 앱에 없다.
+        //   예외(release): 직전 승인의 결재함 카드에 사본이 없거나 단계 사본과 다르면(옛 화면 카드 — 반영될 수 없는 승인) 상신 기록을 지워 다시 상신하는 길은 연다(judge가 카드를 직접 확인)
+        const sa = isObj(s) && isObj(s.appr) ? s.appr : null;
+        const kept = isObj(s) && stageId(s) === stageId(os) && s.status === 'done' && !!sa && sa.status === '승인' && String(sa.cid || '') === String(os.appr.cid || '') && snapKey(sa) === snapKey(os.appr);
+        if (!kept) rows.push({ why: 'APPR_REVOKED', ref: 'con:' + id + '|' + op.key + '|' + i, appr: os.appr, kind: '', release: true, cid: id, pipe: String(op.key || ''), i: i });
       });
     });
   });
@@ -112,6 +116,12 @@ function origChanged(oldItems, newItems) {
 function judge(rows, apItems) {
   const out = [];
   rows.forEach(function (r) {
+    if (r.release) {   // 4차: 승인된 차수 끄기 — 직전 승인이 결재함 카드 사본과 묶여 있으면 거절, 카드가 없거나 사본이 없거나 다르면(반영될 수 없던 승인) 허용
+      const cid = r.appr && r.appr.cid ? String(r.appr.cid) : '';
+      const card = cid ? (apItems || []).find(function (x) { return x && x.ref === r.ref && x.cid === cid && x.status === '승인'; }) : null;
+      if (card && isObj(card.snap) && snapKey(card) === snapKey(r.appr)) out.push({ cid: r.cid, pipe: r.pipe, i: r.i, why: r.why });
+      return;
+    }
     const it = r.hard ? null : approvedItem(apItems, r.ref, r.appr, r.kind);
     const ok = !!it && (!r.bind || (isObj(it.snap) && snapKey(it) === snapKey(r.appr)));   // 재검토 A: 사본 묶음 — 결재함 항목 사본(서버가 상신 때 받은 값)과 같아야
     if (!ok) out.push({ cid: r.cid, pipe: r.pipe, i: r.i, why: r.why });

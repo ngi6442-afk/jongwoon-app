@@ -15884,7 +15884,7 @@
       if (sc) csSyncFromServer(c, sc);
       var p = (c.pipes || []).filter(function(q){ return q.key === cp[1]; })[0], i = Number(cp[2]);
       if (!p || !p.stages[i] || !p.stages[i].appr){ if (typeof apprToastShow === "function") apprToastShow("계약 단계에 상신 기록이 없습니다 — 계약 탭 단계·서류 탭에서 동기화됩니다"); return; }
-      if (csApprTake(c, p, i, { id: it.id, status: it.status, reason: it.reason, decided_by: it.decided_by || { name: myName() }, decided_at: it.decided_at || todayStr(), snap: it.snap })){   // 3차 재검토: 카드 사본도 넘김(csApprTake 대조) c.updated = todayStr(); csSaveNow(); renderContracts(); }
+      if (csApprTake(c, p, i, { id: it.id, status: it.status, reason: it.reason, decided_by: it.decided_by || { name: myName() }, decided_at: it.decided_at || todayStr(), snap: it.snap })){ c.updated = todayStr(); csSaveNow(); renderContracts(); }   // 3차 재검토: 카드 사본도 넘김(csApprTake 대조)
     }).catch(function(){});
   }
   // 승인된 단계를 진행 — 지시를 승인 완료로 닫고 advanceProc(다음 단계 생성·청구면 기성 등록). 지시가 없으면 단계만 진행(청구면 기성 연동은 같게)
