@@ -15591,11 +15591,11 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
     const FT = ['원장 C174', '`member:`', '`stampWarn`', '`recentDocs`', '`unread`', '`rnoteFresh`', '**확정 뒤 7일까지만**', '**`RULES_FP`**', '`RNOTE_RULES_FP`', '앱을 먼저 올리고'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v481 \(2026-11-15\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 3 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 481 /* v482: 기준 줄·sw = 이 판 이상 */ && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 3 && !cb.some((l) => /\(PM/.test(l))
       && d.man.indexOf('초안이 없을 때는 확정 뒤 7일 동안 카드에 남습니다(2026-11 v481)') > 0 && d.man.indexOf('언제든 다시 받을 수 있습니다') < 0
       && !/RULES_FP|unread|rnote_/.test(cut(d.man, '초안이 없을 때는 확정 뒤 7일', '\n'))
       && d.cl.indexOf('**연구노트 작은 고침(v481') > 0 && d.cl.indexOf('`RULES_FP`') > 0
-      && /SHELL_CACHE = 'jw-shell-v481'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 481;
     return { ok, info: { mF, cb: cb.length, gate: gate.length } };
   };
   const r481 = chk481(D481);
@@ -15873,6 +15873,33 @@ try {
   }
   T('P1 판14 ④ 결함 사본 ' + MUT14.length + '개(승격 검사 걷음·해제 버튼 늘 보임·읽기 전 숨김 걷음(실패 때 옛 줄 남음)·늦은 응답 검사 걷음·같은 판이어도 줄·무응답 기본 승격·인사 탭 진입 호출 걷음·카드 없는 줄 [카드 열기]) = 모두 ✗', kill14.length === 0, kill14.join(' | '));
 } catch (e) { console.log('  (P1 판14 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v482(Phase 1 법령 근거 묶음 판8 적재·13·14·15 — PM 11/15 14:40 "ㄱ"): 실행 검사는 위 'P1 판13'·'P1 판14' 블록 · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '482 이상'으로 풀 것
+try {
+  const rd482 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D482 = { ft: rd482('FEATURES.md'), tl: rd482('TESTLIST.md'), sw: rd482('sw.js'), man: rd482('MANUAL.html'), cl: rd482('CLAUDE.md') };
+  const chk482 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v482 (11/15)', '\n### '), tlv = cut(d.tl, '\n## v482 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ['`veh_bg_set`', '`veh_bg_pm_get`', '`vehBgState`', '`day_max`', '`VEH_SIZE_DEF`', 'SHA_CHANGED', '`hr_bg_set`', '`hr_bg_get`', '`hrBgState`', '`hrLawPromoted`', '`bg:lic:law:v1`', '`bg:koita:law:v1`', '#### 판13', '#### 판14', '원장 C176', '이 표를 읽는 앱·서버 코드는 없다', '무응답 = 미승격'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = ["규모 = 등록증 '차종' 칸 그대로", '<li>(2026-11 v482) 제안은 <b>모든 회차를 검사 기간 안에 받았다고 보고 센 날</b>', '<li><b>차량 법령 근거</b> (2026-11 v482)', '<li><b>인사 법령 근거</b> (2026-11 v482)'];
+    const ok = /기준: v482 \(2026-11-15\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 17 && gate.length === 3 && scr.length === 14 && !cb.some((l) => /\(PM/.test(l))
+      && MAN.every((s) => d.man.indexOf(s) > 0) && !/bg:|settings:|bg_ver|bg_sha|veh_bg|hr_bg|SHA_CHANGED/.test(MAN.map((s) => cut(d.man, s, '\n')).join(' '))
+      && d.cl.indexOf('**P1 법령 근거 묶음(v482') > 0 && d.cl.indexOf('`hrBgState`') > 0
+      && /SHELL_CACHE = 'jw-shell-v482'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r482 = chk482(D482);
+  const mu482 = (k, f) => chk482(Object.assign({}, D482, { [k]: f(D482[k]) })).ok;
+  const M482 = [mu482('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v481 (')), mu482('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v481'")),
+    mu482('ft', (s) => s.split('`hrBgState`').join('hrBgState')), mu482('ft', (s) => s.replace('이 표를 읽는 앱·서버 코드는 없다', '이 표를 읽는다')),
+    mu482('man', (s) => s.replace('<li><b>인사 법령 근거</b> (2026-11 v482)', '<li>인사 법령 근거')), mu482('cl', (s) => s.replace('**P1 법령 근거 묶음(v482', 'P1 법령 근거 묶음(')),
+    mu482('tl', (s) => s.replace('\n- [x] (AI 운영 확인 — 판15)', '\n- (AI 운영 확인 — 판15)'))];
+  T('v482 문서·판 번호(정확 검사): FEATURES 기준 v482 (2026-11-15)·v482 절(판8·13·14·15) · TESTLIST v482 칸 17(화면·운영 확인 14 · 게이트 [x] 3) · MANUAL 차량 속성·제안 안내·콘솔 두 줄(내부 이름 0) · CLAUDE.md 줄 · sw jw-shell-v482 · 결함 사본 ' + M482.length + '개 = 모두 ✗',
+    r482.ok && M482.every((v) => v === false), JSON.stringify({ r: r482.info, mut: M482 }));
+} catch (e) { console.log('  (v482 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
