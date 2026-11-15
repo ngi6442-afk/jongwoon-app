@@ -15,6 +15,7 @@
 // 첨부 id를 직접 받지 않고 index가 내준 목록 안에 있을 때만 내준다(다른 첨부 열람 통로가 되지 않게).
 const crypto = require('crypto');
 const { setupBlobContext, store, blobGet } = require('./_lib/blobs');
+const { keyMatch } = require('./_lib/keymatch');   // P1 판24-② 비밀키 비교 공용
 
 const DATA = 'gw_data';
 const FILES = 'gw_files';
@@ -69,14 +70,8 @@ function detectImageExt(buf) {
   return null;
 }
 
-function keyOk(qs) {
-  const want = String(process.env.GW_GALLERY_FEED_KEY || '');
-  if (!want) return false;                              // 키 미설정이면 아예 닫는다(기본 개방 금지)
-  const got = String((qs && qs.key) || '');
-  const a = Buffer.from(got); const b = Buffer.from(want);
-  if (a.length !== b.length) return false;
-  try { return crypto.timingSafeEqual(a, b); } catch { return false; }
-}
+// P1 판24-② (보안 재감사 ② 비교 방식 통일): 공용 _lib/keymatch keyMatch — 키 미설정이면 닫힘(기본 개방 금지)·길이 다르면 거부·같으면 상수시간(종전과 같음) · 받은 값 앞뒤 공백은 걷음(다른 봇 경로와 같게)
+function keyOk(qs) { return keyMatch((qs && qs.key) || '', String(process.env.GW_GALLERY_FEED_KEY || '')); }
 
 // 게시 완료 + 블로그 주소가 있는 기록만. 삭제분(del=1)은 제외.
 async function postedRecords() {

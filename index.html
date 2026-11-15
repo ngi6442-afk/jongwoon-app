@@ -14575,7 +14575,7 @@
     var c = findProc(cid); if (!c || !canDo("con")) return;
     if (mode === "del" && !confirm("이 판을 보관함으로 옮길까요?\n(바이트는 남고, 영구 삭제는 관리자가 30일 뒤에만 할 수 있습니다)")) return;
     cbxSerial(function(){ return gwCall("gw-data", { action: mode === "del" ? "cdoc_del" : (mode === "cur" ? "cdoc_cur" : "cdoc_restore"), cid: cid, n: n }); }).then(function(res){
-      if (res.status !== 200){ alert("처리 실패 (" + ((res.body && res.body.error_code) || res.status) + ")"); return; }
+      if (res.status !== 200){ var ecM = (res.body && res.body.error_code) || res.status; alert((ecM === "PII2_FORBIDDEN" || ecM === "PII_FORBIDDEN") ? "열람 권한이 없는 개인정보 등급 파일이라 보관·현재본 지정을 할 수 없습니다 — 관리자에게 요청해 주세요. (" + ecM + ")" : "처리 실패 (" + ecM + ")"); return; }   // P1 판24-② 서버가 못 읽는 등급 파일의 보관·현재 바꾸기를 막음
       if (mode === "del"){ var eD = CDOC[c.id]; if (eD) eD.items.forEach(function(x){ if (x.n === n) x.del = Date.now(); }); csDocAutoSync(c); }   // 체크는 지금 정리하고 색인은 다시 읽는다
       cdocLoad(c, true);   // 현재 포인터·보관 표식은 서버 색인이 원본 — 다시 읽는다
       apprToastShow(mode === "del" ? "보관함으로 옮김" : (mode === "cur" ? "현재본 지정" : "복구됨"));
@@ -14897,7 +14897,7 @@
           return;
         }
         if (res && res.status === 404 && b.error_code === "NO_CONTRACT" && tries < 10){ setTimeout(function(){ cbxPlace(it, allowDup, tries + 1); }, 1500); return; }   // 새 계약 저장이 아직 안 끝남
-        if (!res || res.status !== 200 || !b.item){ cbxFail(it, '"' + it.name + '" 넣기 실패(' + (b.error_code || (res && res.status) || "네트워크") + ")", "place"); return; }
+        if (!res || res.status !== 200 || !b.item){ cbxFail(it, '"' + it.name + '" 넣기 실패(' + (b.error_code || (res && res.status) || "네트워크") + ")" + (b.error_code === "BAD_ZIP" ? " — 확장자는 문서 파일인데 속 구조가 그 형식이 아닙니다(깨졌거나 이름만 바꾼 파일). 원본 프로그램에서 다시 저장해 넣어 주세요." : ""), "place"); return; }   // P1 판24-② zip 내부 검증
         var e = CDOC[c.id] || (CDOC[c.id] = { items: [], at: 0, busy: false, err: "", loaded: true }), item = b.item;
         e.items.forEach(function(x){ if (x.i === item.i && x.dk === item.dk && x.kind === item.kind) x.cur = 0; });
         (b.gc || []).forEach(function(n){ e.items.forEach(function(x){ if (x.n === n) x.gc = 1; }); });
@@ -15021,7 +15021,7 @@
     cbxSerial(function(){ return gwCall("gw-data", mvBody); }).then(function(res){
       var b = (res && res.body) || {};
       if (res && res.status === 400 && b.error_code === "NO_CHANGE"){ it.st = "done"; it.msg = it.name + " → 자리가 같아 그대로 두었습니다."; cbxRedraw(it.scope); return; }
-      if (!res || res.status !== 200){ cbxFail(it, "옮기기 실패(" + (b.error_code || (res && res.status) || "네트워크") + ")", "move"); return; }
+      if (!res || res.status !== 200){ cbxFail(it, b.error_code === "PII_LOWER_ADMIN_ONLY" ? "개인정보 등급을 낮추는 것은 관리자만 할 수 있습니다 — 등급을 그대로 두고 옮기거나 관리자에게 요청해 주세요. (PII_LOWER_ADMIN_ONLY)" : "옮기기 실패(" + (b.error_code || (res && res.status) || "네트워크") + ")", "move"); return; }   // P1 판24-② 등급 낮추기 = 관리자만(서버)
       it.st = "done"; it.fromLabel = to; it.msg = it.name + " → " + to + " · " + (CDOC_KIND_LABEL[it.kind] || it.kind) + "(으)로 옮겼습니다." + cbxLearnMsg(b.learn);
       if (b.item){ var eM = CDOC[c.id]; if (eM) eM.items = eM.items.map(function(x){ return x.n === b.item.n ? b.item : x; }); csDocAutoSync(c); }
       cdocLoad(c, true); cbxRedraw(it.scope);

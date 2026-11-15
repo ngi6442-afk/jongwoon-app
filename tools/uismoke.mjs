@@ -15901,5 +15901,29 @@ try {
     r482.ok && M482.every((v) => v === false), JSON.stringify({ r: r482.info, mut: M482 }));
 } catch (e) { console.log('  (v482 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ── P1 판24 재감사 수리(②·③) — 서버 거절이 화면에 '알림'으로 보이는가(조용히 넘기지 않음). 서버 판정 자체는 servertest 'P1 판24' 블록
+try {
+  const fnP24 = (src, name) => { const i = src.indexOf('  function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  const tickP24 = () => new Promise((r) => setTimeout(r, 0));
+  // ② 서류함 보관·현재로 거절(PII2_FORBIDDEN) = 사람 말 알림 · 다른 실패는 종전 문구 · 성공은 알림 없음
+  const runMarkP24 = async (H, st, code) => {
+    const env = { alerts: [], toasts: 0 };
+    const f = new Function('ENV', ['var CDOC = {};', 'function findProc(){ return { id: "k" }; } function canDo(){ return true; } function confirm(){ return true; } function alert(m){ ENV.alerts.push(String(m)); }',
+      'function cbxSerial(fn){ return fn(); } function gwCall(){ return Promise.resolve({ status: ' + st + ', body: { error_code: "' + code + '" } }); } function csDocAutoSync(){} function cdocLoad(){} function apprToastShow(){ ENV.toasts++; }',
+      fnP24(H, 'csCdocMark'), 'return csCdocMark;'].join('\n'))(env);
+    f('k', 1, 'del'); for (let i = 0; i < 4; i++) await tickP24(); return env;
+  };
+  const chkMarkP24 = async (H) => {
+    const a = await runMarkP24(H, 403, 'PII2_FORBIDDEN'), b = await runMarkP24(H, 500, 'X'), c = await runMarkP24(H, 200, '');
+    return a.alerts.length === 1 && /열람 권한이 없는 개인정보 등급 파일이라 보관·현재본 지정을 할 수 없습니다/.test(a.alerts[0]) && b.alerts.length === 1 && /^처리 실패 \(X\)$/.test(b.alerts[0]) && c.alerts.length === 0 && c.toasts === 1;
+  };
+  const wiresP24 = (H) => H.indexOf('b.error_code === "PII_LOWER_ADMIN_ONLY" ? "개인정보 등급을 낮추는 것은 관리자만 할 수 있습니다') > 0 && H.indexOf('(b.error_code === "BAD_ZIP" ? " — 확장자는 문서 파일인데 속 구조가 그 형식이 아닙니다') > 0;
+  const okM = await chkMarkP24(html), okW = wiresP24(html);
+  const mutP24 = (from, to) => { if (html.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); return html.replace(from, () => to); };
+  const kP24 = [!(await chkMarkP24(mutP24('alert((ecM === "PII2_FORBIDDEN" || ecM === "PII_FORBIDDEN") ?', 'alert(false ?'))), !wiresP24(mutP24('b.error_code === "PII_LOWER_ADMIN_ONLY" ?', 'false ?')), !wiresP24(mutP24('(b.error_code === "BAD_ZIP" ?', '(false ?'))];
+  T('P1 판24-② 화면: 서류함 [보관]·[현재로]가 서버 등급 거절(PII2_FORBIDDEN)을 받으면 "열람 권한이 없는 개인정보 등급 파일…" 알림 1번(실행 — 실제 csCdocMark) · 다른 실패는 종전 "처리 실패 (코드)" · 성공은 알림 0 · [옮기기] 등급 낮추기 거절(PII_LOWER_ADMIN_ONLY)·넣기 BAD_ZIP은 사람 말 안내 · 결함 사본 3개 = 모두 ✗',
+    okM && okW && kP24.every((v) => v === true), JSON.stringify({ okM, okW, kP24 }));
+} catch (e) { console.log('  (P1 판24 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

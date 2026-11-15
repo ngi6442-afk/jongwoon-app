@@ -8,6 +8,9 @@ const tier = require('./tier');   // 관리자 등급(v321) — tierCtx(bossIds�
 
 const DATA = 'gw_data';
 const USERS = 'gw_users';
+// P1 판24-② (보안 재감사 ⑤ — 재현됨: 100건 링 = 운영 11/14 백업 실측 11.8일 · 하루 8.5건 · 한 줄 292바이트 · 문서 29KB): 1000건으로 — 지금 속도로 약 4개월(118일) · 문서 약 0.3MB
+//   (넷리파이 함수 요청·응답 6MB의 1/20 — 알림함 화면 push_log는 종전대로 끝 50건만 내보냄). 발신자(by)가 링에서 밀려나기 전에 분기 점검이 볼 수 있게. 그보다 옛 줄은 자료 저장소 일일 백업 스냅샷(git 이력)에 남는다
+const PUSH_LOG_MAX = 1000;
 
 async function getKeys() {
   const r = await blobGet(store(DATA), 'push:keys');
@@ -89,7 +92,7 @@ async function sendTo(memberIds, payload, opts) {
     } else filterOff = true;   // 명부 미가용 — 거르지 않고 보낸다(퇴사자 1건이 새는 것보다 회사 전체가 무음이 되는 쪽이 나쁘다)
   }
   // 알림함(push:log) — 폰 팝업이 지나가면 다시 볼 곳이 없다는 PM 지적(2026-08-20).
-  // 발송 전에 남기고(구독이 없어도 이력은 남게), 이력 실패가 발송을 막지 않는다. 최근 100건 링.
+  // 발송 전에 남기고(구독이 없어도 이력은 남게), 이력 실패가 발송을 막지 않는다. 최근 PUSH_LOG_MAX건 링(P1 판24-②: 100 → 1000).
   try {
     const lr = await blobGet(store(DATA), 'push:log');
     const ldoc = (lr.ok && lr.data && Array.isArray(lr.data.items)) ? lr.data : { schema: 1, items: [] };
@@ -99,7 +102,7 @@ async function sendTo(memberIds, payload, opts) {
     if (filterOff) ent.filter_unavailable = true;   // 회원 명부를 못 읽어 필터를 건너뛴 발송(감지 — 조용히 지나가지 않게)
     if (opts && opts.by) ent.by = String(opts.by).slice(0, 40);   // 발신자(push_send는 임의 제목·본문을 실을 수 있다 — 최소한 누가 쐈는지는 남는다)
     ldoc.items.push(ent);
-    if (ldoc.items.length > 100) ldoc.items = ldoc.items.slice(-100);
+    if (ldoc.items.length > PUSH_LOG_MAX) ldoc.items = ldoc.items.slice(-PUSH_LOG_MAX);
     await blobSet(store(DATA), 'push:log', ldoc);
   } catch (e) {}
   if (opts && opts.logOnly === true) return { sent: 0, removed: 0, skipped: skipped };
@@ -149,4 +152,4 @@ async function pmIds() { return (await tierCtx()).pmIds; }
 // ①·② 1단계 결재 요청 수신자 — tier pm이 없으면(1인 관리자=대표뿐 등) 관리자 전원 폴백(교착 방지 — PM 큐 게이트도 pm 0명이면 관리자 전원에게 열린다, 종전 유지)
 async function pmOrAdminIds() { const p = await pmIds(); return p.length ? p : await adminIds(); }
 
-module.exports = { getKeys, getSubs, saveSubs, readSubs, sendTo, loadMembers, tierCtx, activeIdSet, adminIds, bossIds, bossOrAdminIds, pmIds, pmOrAdminIds };
+module.exports = { PUSH_LOG_MAX, getKeys, getSubs, saveSubs, readSubs, sendTo, loadMembers, tierCtx, activeIdSet, adminIds, bossIds, bossOrAdminIds, pmIds, pmOrAdminIds };

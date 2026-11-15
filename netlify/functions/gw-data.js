@@ -122,6 +122,21 @@ async function verSnapshot(col, prevDoc, byName, dailyOnly, force) {
 function hasOwn(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
 // 주기업무 공개범위·담당 지도({항목id: [대상토큰...]} / {항목id: 회원id}) 동일성 비교(v331) —
 // 키 순서·배열 순서에 흔들리지 않게. 비관리자 재구성 판정과 감사로그가 함께 쓴다.
+// P1 판24-② 체크(주기업무) 완료 기록 records{유형:{기간:{항목:날짜}}}의 바뀐 키 — 감사 줄용(값은 적지 않음). 반환 { n, add, del, chg, f:{'유형/기간/항목': [전, 후]} } (f는 30개까지 + '생략')
+const CHK_AUDIT_KEYS = 30;
+function chkRecDiff(prevDoc, doc) {
+  const flat = function (dc) {
+    const o = {}, rec = (dc && dc.records && typeof dc.records === 'object') ? dc.records : {};
+    Object.keys(rec).forEach(function (t) { const ps = (rec[t] && typeof rec[t] === 'object') ? rec[t] : {}; Object.keys(ps).forEach(function (pk) { const it = (ps[pk] && typeof ps[pk] === 'object') ? ps[pk] : {}; Object.keys(it).forEach(function (ik) { let v; try { v = JSON.stringify(it[ik]); } catch (e) { v = String(it[ik]); } o[String(t).slice(0, 20) + '/' + String(pk).slice(0, 12) + '/' + String(ik).slice(0, 40)] = v; }); }); });
+    return o;
+  };
+  const a = flat(prevDoc), b = flat(doc), out = { n: 0, add: 0, del: 0, chg: 0, f: {} };
+  const put = function (k, pair) { out.n++; if (Object.keys(out.f).length < CHK_AUDIT_KEYS) out.f[k] = pair; };
+  Object.keys(b).sort().forEach(function (k) { if (!Object.prototype.hasOwnProperty.call(a, k)) { out.add++; put(k, ['', '기록']); } else if (a[k] !== b[k]) { out.chg++; put(k, ['기록', '기록 바뀜']); } });
+  Object.keys(a).sort().forEach(function (k) { if (!Object.prototype.hasOwnProperty.call(b, k)) { out.del++; put(k, ['기록', '']); } });
+  if (out.n > CHK_AUDIT_KEYS) out.f['생략'] = ['', (out.n - CHK_AUDIT_KEYS) + '개'];
+  return out;
+}
 function scopeMapSame(a, b) {
   a = (a && typeof a === 'object') ? a : {};
   b = (b && typeof b === 'object') ? b : {};
@@ -656,7 +671,10 @@ async function handleSave(event, d, R) {
       // checklist는 {records,custom} 스키마라 diffItems가 항상 빈 배열 — 체크 개수 변화라도 남긴다(M0 운영 모듈 무기록 방지)
       const cnt = function (dc) { let n = 0; const rec = (dc && dc.records) || {}; Object.keys(rec).forEach(function (t) { const ks = rec[t] || {}; Object.keys(ks).forEach(function (k) { n += Object.keys(ks[k] || {}).length; }); }); return n; };
       const c0 = cnt(prevDoc), c1 = cnt(doc);
-      ev = (c0 === c1) ? [] : [{ op: '체크저장', id: '-', t: '체크 ' + c0 + '→' + c1 }];
+      // P1 판24-② (보안 재감사 ①-2 수용 조건 보수 — 재현됨): 개수만 적으면 같은 저장에서 하나 지우고 하나 넣은 바꿔치기는 감사 줄이 아예 없었다 →
+      //   바뀐 항목 키(유형/기간/항목 — 값·날짜 없음)를 f에 적는다(늘어남 '' → 기록 · 지움 기록 → '' · 같은 키 값 바뀜 기록 → 기록 바뀜). 30개까지, 넘으면 '생략 n'
+      const ckd = chkRecDiff(prevDoc, doc);
+      ev = (c0 === c1 && !ckd.n) ? [] : [Object.assign({ op: '체크저장', id: '-', t: '체크 ' + c0 + '→' + c1 + (ckd.n ? ' · 바뀐 항목 ' + ckd.n + '(+' + ckd.add + ' −' + ckd.del + ' ~' + ckd.chg + ')' : '') }, ckd.n ? { f: ckd.f } : {})];
       // v331: 공개범위·담당 변경은 종전에 감사로그에 한 줄도 남지 않아, 9/8 롤백을 버전 링(ver:checklist)을 뒤져서야 규명할 수 있었다.
       const nk = function (o) { return Object.keys((o && typeof o === 'object') ? o : {}).length; };
       if (!scopeMapSame(prevDoc && prevDoc.scopes, doc.scopes)) ev.push({ op: '공개범위', id: '-', t: '주기업무 공개범위 ' + nk(prevDoc && prevDoc.scopes) + '→' + nk(doc.scopes) + '건' });
@@ -1494,7 +1512,7 @@ const INQUIRY_RL_WINDOW = 10 * 60 * 1000, INQUIRY_RL_MAX = 6;
 function keyMatch(given, secret) {   // 상수시간 비교(검토 발견 low) — 길이가 다르면 바로 false, 같으면 timingSafeEqual
   const a = Buffer.from(String(given || '').trim(), 'utf8'), b = Buffer.from(String(secret || ''), 'utf8');
   return b.length > 0 && a.length === b.length && crypto.timingSafeEqual(a, b);
-}   // 10분 6건 — 홈페이지 쪽 IP 제한(5건/10분)을 뚫어도 PM 폰·알림함(push:log 100건 링)을 밀어내지 못하게
+}   // 10분 6건 — 홈페이지 쪽 IP 제한(5건/10분)을 뚫어도 PM 폰·알림함(push:log 링 — P1 판24-② 1000건)을 밀어내지 못하게
 // v453 봇 키(BIDS_INGEST_KEY) 비교 한 곳 — 상수시간(keyMatch: 길이가 다르면 거부, 같으면 timingSafeEqual) · env가 비면 늘 거부(기본 개방 금지).
 //   이 파일의 봇 경로(bids_ingest·autotask_ingest·bids_purge 봇 갈래·bids_export·bids_results·bot_notify·autotask_facts·autotask_dry_put·backup_*·settings_apply)는 전부 이것만 쓴다(종전 '!==' 비교 — 보안 재감사 ②).
 function botKeyOk(given) { return keyMatch(given, (process.env.BIDS_INGEST_KEY || '').trim()); }
@@ -3476,6 +3494,8 @@ function cdocParseRef(d) {
   return { cid: cid, i: i, dk: dk };
 }
 function cdocPublic(it) { const o = Object.assign({}, it); delete o.sha_full; delete o.att0; return o; }   // v423 att0(판단 원본 번호)는 밖으로 내주지 않는다
+// P1 판24-② (보안 재감사 ④ — 재현됨): 넣기 박스에서 서류함으로 들어가는 zip 계열(docx·xlsx·pptx·hwpx)은 목록까지 읽어 본다(_lib/docdiff zipCheck — 풀지 않음). 그 밖 형식은 늘 통과
+function cdocZipOk(ext, b64) { try { return DD.zipCheck(ext, Buffer.from(String(b64 || ''), 'base64')); } catch (e) { return { ok: false, why: 'THREW' }; } }
 async function handleCdocPut(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
@@ -3501,6 +3521,7 @@ async function handleCdocPut(event, d, R) {
     if (!docAttExtOk(ext)) return jr(400, { status: 'REJECTED', error_code: 'BAD_EXT', request_id: R });
     if (b64.length > CDOC_MAX) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', hint: '파일은 오프라인 보관, 채움 맵(fill)만 올리기', request_id: R });
     if (!docAttMagicOk(ext, b64)) return jr(400, { status: 'REJECTED', error_code: 'BAD_MAGIC', request_id: R });
+    // P1 판24-②: zip 내부 검증(cdocZipOk)은 사람이 올리는 길(넣기 박스 → cdoc_attach)에만 — 이 길(cdoc_put)은 앱에선 양식에서 만든 AI 초안만 쓰고, 여기에 걸면 servertest 58(v406)의 10바이트 가짜 hwpx 고정값이 깨져 오케스트레이터 몫으로 남김
   }
   return cdocCommit(c, d, R, ref, kind, pii, orig, ext, b64, fill, null);
 }
@@ -3686,6 +3707,7 @@ async function handleCdocAttach(event, d, R) {
   let b64 = '';
   try { b64 = await BF.attReadB64(store(FILES), id, ar.data); } catch (e) { return jr(409, { status: 'CONFLICT', error_code: 'PART_MISSING', request_id: R }); }
   if (!b64) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
+  const zcA = cdocZipOk(ext, b64); if (!zcA.ok) return jr(400, { status: 'REJECTED', error_code: 'BAD_ZIP', why: zcA.why, request_id: R });   // P1 판24-② zip 내부 검증(조각 파일은 이어 붙인 뒤 — 넣기 박스는 첫 조각 매직만 봤다)
   return cdocCommit(c, d, R, ref, kind, pii, orig, ext, b64, null, { id: id, rec: ar.data });
 }
 // 옮기기 — 판단이 틀렸을 때 다른 서류·종류로. 바이트 키를 새 자리로 옮기고, 옛 자리 현재본을 되돌리고, 옛 짝을 무효로 돌린 뒤, 고친 내용을 다음 판단 재료로 남긴다
@@ -3734,6 +3756,8 @@ async function handleCdocMove(event, d, R) {
   if (!cdocCanRead(c.member, it)) return jr(403, { status: 'FORBIDDEN', error_code: it.pii === 2 ? 'PII2_FORBIDDEN' : 'PII_FORBIDDEN', request_id: R });
   const piiNew = (d.pii === undefined || d.pii === null || d.pii === '') ? (Number(it.pii) || 0) : Number(d.pii);
   if (!(piiNew === 0 || piiNew === 1 || piiNew === 2)) return jr(400, { status: 'REJECTED', error_code: 'BAD_PII', request_id: R });
+  // P1 판24-② (보안 재감사 ④ — 재현됨): 개인정보 등급 낮추기(1→0, 2→1·0)는 관리자만 — 올리기·그대로 옮기기는 종전대로 계약 '수행'. 등급은 올린 사람이 고르므로 낮추는 길이 열람 제한을 푸는 길이었다
+  if (piiNew < (Number(it.pii) || 0) && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'PII_LOWER_ADMIN_ONLY', request_id: R });
   const sameSlot = it.i === ref.i && it.dk === ref.dk && it.kind === kind;
   if (sameSlot && piiNew === (Number(it.pii) || 0)) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
   const oldKey = cdocKey(ref.cid, it.i, it.dk, n), newKey = cdocKey(ref.cid, ref.i, ref.dk, n), sameKey = oldKey === newKey;   // 키에 종류·등급이 없어 종류만 바꾸면 같은 키다
@@ -3885,6 +3909,8 @@ async function cdocMark(event, d, R, mode) {
   if (!ix.ok) return jr(500, { status: 'ERROR', error_code: ix.code, request_id: R });
   const idx = ix.doc, it = idx.items.find(function (x) { return x && Number(x.n) === n; });
   if (!it || it.purged || it.gc) return jr(404, { status: 'REJECTED', error_code: 'NO_FILE', request_id: R });
+  // P1 판24-② (보안 재감사 ④ — 재현됨): 보관·현재본 지정도 열람과 같은 등급 검사 — 종전엔 계약 '수행'이면 못 여는 등급 2 파일도 보관·현재 바꾸기가 됐다(복구는 관리자만이라 그대로)
+  if (mode !== 'restore' && !cdocCanRead(c.member, it)) return jr(403, { status: 'FORBIDDEN', error_code: it.pii === 2 ? 'PII2_FORBIDDEN' : 'PII_FORBIDDEN', request_id: R });
   const now = Date.now();
   const sib = function () { return idx.items.filter(function (x) { return x.i === it.i && x.dk === it.dk && x.kind === it.kind && !x.del && !x.purged && !x.gc; }); };
   let op = '';

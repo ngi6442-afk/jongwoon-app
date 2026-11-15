@@ -18,7 +18,9 @@ const USERS = 'gw_users';
 const MODULES = ['tasks', 'veh', 'rec', 'lic', 'site', 'check', 'con', 'cli', 'doc', 'wk', 'quote', 'promo', 'safety', 'hw', 'stmt'];   // 29 판② stmt=월말명세서(gw-data 컬렉션 없음 — 강제는 gw-stmt stmtPerm, 기본 숨김) · wk(일용직) 누락으로 cleanPerms가 매 저장마다 버려 숨김·수행 설정이 불가능했음(프런트 레지스트리와 일치 필수 — uismoke v430이 앱 MODULES와 순서까지 대조). quote=견적서·promo=홍보·safety=안전 › 교육·검진(v430)·hw=화관법(v431 메뉴 56 4-1 등록 — gw-data 컬렉션 없음 · v434 4-2부터 앱 탭 숨김·gw-hwakwan 폐기물 제출 수행 검사), 넷 다 기본 숨김 — 명시 부여만
 const LOCK_THRESHOLD = 5;                 // 연속 실패 허용 횟수
 const LOCK_MS = 15 * 60 * 1000;           // 잠금 시간(15분)
-function lockKey(name) { return `lock:${String(name).trim().toLowerCase()}`; }
+// P1 판24-② (보안 재감사 ⑦ — 재현됨): 잠금 칸 이름은 아이디·이름 조회와 같은 정리(cleanText = NFC·폭 없는 문자 4종 제거·앞뒤 공백 → 소문자)로 만든다.
+//   종전(trim·소문자만)엔 아이디 사이에 폭 없는 문자를 끼운 변형마다 잠금 칸이 따로 생겨 5회·15분 잠금을 비켜 가면서, 조회(normUid·nameKey)는 같은 계정으로 갔다. 평범한 입력은 종전과 같은 칸
+function lockKey(name) { return `lock:${cleanText(name).toLowerCase()}`; }
 // 관리자는 8자 이상 비밀번호, 직원은 4자리+ 숫자 PIN
 function validSecret(s, isAdmin) { s = String(s || '').trim(); return isAdmin ? s.length >= 8 : /^\d{4,}$/.test(s); }
 function deviceKey(id) { return `device:${id}`; }
@@ -180,7 +182,7 @@ async function handleLogin(st, d, R, event) {
   if (!ident || !pin) return GEN();
   // v453 검토: '/'·'%'·'#'·'?'·제어문자 등이 섞인 입력(오타 포함)은 어떤 회원 색인과도 맞을 수 없다 — blobGet이 STORAGE_BAD_KEY로 500을 내던 것을 401로(PIN 검사 전 · 잠금 카운터 키도 못 씀)
   if (badBlobKey(lockKey(ident)) || badBlobKey(nameKey(ident)) || badBlobKey(nameKeyRaw(ident))) return GEN();
-  const name = ident;   // 잠금 카운터 키는 입력값 기준(아래 lockKey에서 사용)
+  const name = ident;   // 잠금 카운터 키는 입력값을 조회와 같은 정리로(lockKey — P1 판24-②)
   const now = Date.now();
   const lk = await blobGet(st, lockKey(name));
   if (lk.ok && lk.data && lk.data.until && lk.data.until > now) {

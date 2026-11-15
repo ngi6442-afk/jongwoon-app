@@ -65,6 +65,52 @@ function zipEntries(buf, want) {
   }
   return out;
 }
+// P1 판24-② (보안 재감사 ④ 'zip 내부 검증' — 재현됨: 앞 4바이트가 PK면 아무 바이트나 docx로 받았다): 서류함에 넣는 zip 계열(docx·xlsx·pptx·hwpx)의 목록(중앙 디렉터리)을 읽어
+//   ① 목록 끝(EOCD — zip64면 zip64 끝)과 목록 줄 서명·로컬 헤더 서명이 맞는가 ② 항목 수 ≤ ZIP_ENTRIES_MAX ③ 그 형식의 필수 항목이 있는가(docx word/document.xml · xlsx xl/workbook.xml ·
+//   pptx ppt/presentation.xml · 셋 다 [Content_Types].xml · hwpx mimetype) ④ 매크로(vbaProject.bin — docm·xlsm을 이름만 바꾼 파일)가 없는가. 압축은 풀지 않는다(v456 풀기 상한 zipBudget과 겹치지 않음 — 그쪽은 판독·짝 비교 때).
+//   반환 { ok:true } | { ok:false, why } — why는 짧은 영문 표식(파일 이름·내용 없음). 형식이 이 넷이 아니면 늘 ok(검사 대상 아님)
+const ZIP_MUST = { docx: ['[content_types].xml', 'word/document.xml'], xlsx: ['[content_types].xml', 'xl/workbook.xml'], pptx: ['[content_types].xml', 'ppt/presentation.xml'], hwpx: ['mimetype'] };
+function zipCheck(ext, buf) {
+  const must = Object.prototype.hasOwnProperty.call(ZIP_MUST, ext) ? ZIP_MUST[ext] : null;
+  if (!must) return { ok: true };
+  if (!Buffer.isBuffer(buf) || buf.length < 22) return { ok: false, why: 'SHORT' };
+  let eocd = -1;
+  for (let p = buf.length - 22; p >= Math.max(0, buf.length - 65557); p--) { if (buf.readUInt32LE(p) === 0x06054b50) { eocd = p; break; } }
+  if (eocd < 0) return { ok: false, why: 'NO_DIR' };
+  let total = buf.readUInt16LE(eocd + 10), cdOff = buf.readUInt32LE(eocd + 16);
+  if (total === 0xFFFF || cdOff === 0xFFFFFFFF) {   // zip64 — 끝 위치표(locator)가 가리키는 zip64 끝에서 항목 수·목록 위치를 읽는다(일부 문서 도구는 작은 파일도 zip64로 쓴다)
+    const loc = eocd - 20;
+    if (loc < 0 || buf.readUInt32LE(loc) !== 0x07064b50) return { ok: false, why: 'BAD_ZIP64' };
+    const z = Number(buf.readBigUInt64LE(loc + 8));
+    if (!(z >= 0 && z + 56 <= buf.length) || buf.readUInt32LE(z) !== 0x06064b50) return { ok: false, why: 'BAD_ZIP64' };
+    total = Number(buf.readBigUInt64LE(z + 32)); cdOff = Number(buf.readBigUInt64LE(z + 48));
+  }
+  if (!(total >= 1)) return { ok: false, why: 'EMPTY' };
+  if (total > ZIP_ENTRIES_MAX) return { ok: false, why: 'TOO_MANY' };
+  const names = {};
+  let p = cdOff;
+  for (let i = 0; i < total; i++) {
+    if (!(p >= 0 && p + 46 <= buf.length) || buf.readUInt32LE(p) !== 0x02014b50) return { ok: false, why: 'BAD_DIR' };
+    const nl = buf.readUInt16LE(p + 28), el = buf.readUInt16LE(p + 30), cl = buf.readUInt16LE(p + 32);
+    let lho = buf.readUInt32LE(p + 42);
+    if (p + 46 + nl > buf.length) return { ok: false, why: 'BAD_DIR' };
+    const name = buf.slice(p + 46, p + 46 + nl).toString('utf8');
+    if (lho === 0xFFFFFFFF) {   // zip64 확장 칸(머리 0x0001)의 로컬 헤더 위치 — 크기 칸이 0xFFFFFFFF면 그 앞 8바이트씩
+      let q = p + 46 + nl, end = q + el; lho = -1;
+      while (q + 4 <= end && end <= buf.length) {
+        const id = buf.readUInt16LE(q), sz = buf.readUInt16LE(q + 2);
+        if (id === 0x0001) { let o = q + 4; if (buf.readUInt32LE(p + 24) === 0xFFFFFFFF) o += 8; if (buf.readUInt32LE(p + 20) === 0xFFFFFFFF) o += 8; if (o + 8 <= q + 4 + sz) lho = Number(buf.readBigUInt64LE(o)); break; }
+        q += 4 + sz;
+      }
+    }
+    if (!(lho >= 0 && lho + 30 <= buf.length) || buf.readUInt32LE(lho) !== 0x04034b50) return { ok: false, why: 'BAD_ENTRY' };
+    names[name.toLowerCase()] = 1;
+    if (ext !== 'hwpx' && /(^|\/)vbaproject\.bin$/i.test(name)) return { ok: false, why: 'MACRO' };
+    p += 46 + nl + el + cl;
+  }
+  for (const m of must) if (!names[m]) return { ok: false, why: 'NOT_' + ext.toUpperCase() };
+  return { ok: true };
+}
 function xmlUnesc(s) {
   return String(s || '').replace(/&#x([0-9a-fA-F]+);/g, function (m, h) { return String.fromCodePoint(parseInt(h, 16)); }).replace(/&#(\d+);/g, function (m, d) { return String.fromCodePoint(parseInt(d, 10)); })
     .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
@@ -526,4 +572,4 @@ function cellRows(edits, finalBuf, allowRefs) {
   });
   return { ok: true, rows: rows, hidden_changed: hidden_changed.slice(0, 100), hidden_same_n: hidden_same };
 }
-module.exports = { ZIP_ENTRY_MAX, ZIP_TOTAL_MAX, ZIP_ENTRIES_MAX, XLSX_CELLS_MAX, zipBudget, zipEntries, xlsxCells, xlsxCellDiff, xlsxFileDiff, docxParas, docxParaDiff, hwpxParas, hwpxParaDiff, hwpxParaItems, hwpxTokDiff, hwpxTokRows, tplFinger, TOK_PARA_CAP, matchScore, genMarkOf, genMarkParse, listDiff, gapScore, refRC, inMergedNonAnchor, splitRef, cellRows, flattenEdits };
+module.exports = { ZIP_ENTRY_MAX, ZIP_TOTAL_MAX, ZIP_ENTRIES_MAX, XLSX_CELLS_MAX, zipBudget, zipEntries, zipCheck, xlsxCells, xlsxCellDiff, xlsxFileDiff, docxParas, docxParaDiff, hwpxParas, hwpxParaDiff, hwpxParaItems, hwpxTokDiff, hwpxTokRows, tplFinger, TOK_PARA_CAP, matchScore, genMarkOf, genMarkParse, listDiff, gapScore, refRC, inMergedNonAnchor, splitRef, cellRows, flattenEdits };

@@ -11,6 +11,7 @@ const crypto = require('crypto');
 const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { issueSession, verifyToken, bearer } = require('./_lib/session');
 const { appendAudit } = require('./_lib/audit');
+const { botKeyOk } = require('./_lib/keymatch');   // P1 판24-② 봇 키 비교 공용(gw-cron-kick·gw-lawwatch와 같은 모듈)
 const AB = require('./_lib/allbaro');   // v351: 노선표는 접근자로(AB.routes()·AB.routesVer()) — 추가 노선이 합쳐지면 값이 바뀐다
 const { normName, normItem, mergeMonthCounts, rematchDoc, dayMinus } = AB;   // 노선표(양식 줄)·노선표 해시(v327) + 이름·품목 정규화(learnKey를 라이브러리 매칭과 같은 기준으로) + 월 합산(혁신②) + 일자 문서 재판정(v327)
 
@@ -132,15 +133,11 @@ const LEARN_DEPT = '운영부';
 function canLearn(member) { return !!(member && member.id && (member.admin || String(member.dept || '') === LEARN_DEPT)); }
 // 봇 공유 시크릿 검증(v323 후속, PM 9/7 ㄱ "앱에서 숨긴 노선은 엑셀에서도 빠져야 한다") — appdata logsheet 워크플로가 세션 없이 부른다.
 // 키 = BIDS_INGEST_KEY(gw-data ingest·gw-cron-kick·gw-lawwatch와 같은 시크릿). 헤더 x-ingest-key 또는 body.key(gw-lawwatch와 같은 두 통로).
-// 비교 = 길이 확인 + crypto.timingSafeEqual(gw-gallery-feed keyOk와 같은 상수 시간 방식). env 미설정이면 닫힘(기본 개방 금지).
+// 비교 = 공용 _lib/keymatch botKeyOk(길이 확인 + 상수시간 비교). env 미설정이면 닫힘(기본 개방 금지).
+// P1 판24-② (보안 재감사 ② '봇 키 비교 keyMatch로 통일'): 이 파일만 따로 두던 같은 규칙의 비교를 공용 _lib/keymatch botKeyOk로(받는 통로 둘·결과는 종전과 같음 — env 비면 닫힘·앞뒤 공백 걷음·길이 다르면 거부·같으면 상수시간)
 function ingestKeyOk(event, d) {
-  const want = (process.env.BIDS_INGEST_KEY || '').trim();
-  if (!want) return false;
   const h = (event && event.headers) || {};
-  const got = String(h['x-ingest-key'] || h['X-Ingest-Key'] || (d && d.key) || '').trim();
-  const a = Buffer.from(got), b = Buffer.from(want);
-  if (a.length !== b.length) return false;
-  try { return crypto.timingSafeEqual(a, b); } catch (e) { return false; }
+  return botKeyOk(String(h['x-ingest-key'] || h['X-Ingest-Key'] || (d && d.key) || ''));
 }
 
 // 미매칭 '건수' 합. aggregate의 unmatched=[{from,to,item,n}] — n이 비면 1건으로 센다(과소집계 방지).

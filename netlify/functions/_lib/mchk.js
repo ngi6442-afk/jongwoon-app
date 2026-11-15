@@ -275,7 +275,7 @@ function judge(period, nowMs, m) {
     out.push(item('backup', st, lines, nn));
   });
   // 9 경보 수 — 기준 없음(숫자만 — 카드에 줄로 안 나옴). 재료: 그달 봇 경보 수(noteAlert) · 세기 시작(mchk:alerts:since) 뒤 문서 없는 달 = 0건 ·
-  //   첫 달은 'n일부터 셈' · 세기 전 달은 알림함(최근 100건 고리)이 그달을 덮으면 ⚠ 제목 수, 아니면 센 만큼만 '세기 전'으로 적는다. 확인 못 함은 기록을 못 읽었을 때만.
+  //   첫 달은 'n일부터 셈' · 세기 전 달은 알림함(최근 고리 — push.js PUSH_LOG_MAX)이 그달을 덮으면 ⚠ 제목 수, 아니면 센 만큼만 '세기 전'으로 적는다. 확인 못 함은 기록을 못 읽었을 때만.
   guard('alerts', function () {
     const ad = m.alertDoc, asn = m.alertSince;
     const pl = m.pushLog;
@@ -288,7 +288,7 @@ function judge(period, nowMs, m) {
       out.push(item('alerts', 'none', ['경보 ' + n + '건' + (from > 1 ? '(' + from + '일부터 셈)' : '')], { alerts: n, src: 'count', from: from }));
     }
     else if (plCovers) out.push(item('alerts', 'none', ['경보 ' + plCount + '건(알림함 기준)'], { alerts: plCount, src: 'push_log' }));
-    else out.push(item('alerts', 'none', ['경보 세기 전 — 알림함 최근 100건 중 ' + (plCount === null ? '?' : plCount) + '건'], { alerts: null, src: 'partial', partial: plCount }));
+    else out.push(item('alerts', 'none', ['경보 세기 전 — 알림함 남은 기록 중 ' + (plCount === null ? '?' : plCount) + '건'], { alerts: null, src: 'partial', partial: plCount }));   // P1 판24-② 링이 1000건으로 늘어 '최근 100건' 글을 걷음
   });
   return out;
 }
