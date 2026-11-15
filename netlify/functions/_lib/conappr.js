@@ -96,6 +96,35 @@ function scan(oldItems, newItems) {
   });
   return rows;
 }
+// 5차(11/15 — 원천): 낡은 사본 이월 — 다른 기기에서 승인·반영이 끝난 변경계약 차수를, 그 전에 화면을 연 기기가 '같은 상신 번호 · 같은 사본 · 승인 전 상태(대기·보류·미전송)'로
+//   다시 보내면(같은 날 409 병합에서 로컬 계약이 통째로 이김 · 옛 판 캐시 앱 · base 없는 저장) 거절하지 않고 그 단계만 서버 값(상태·완료일·상신 기록)으로 되돌려 둔다 —
+//   그 계약의 다른 칸·그 단계의 다른 칸(서류·입력 칸)은 들어온 값. 차량 만기일 보호(vehDueGuard)와 같은 꼴. 서버 값이 그대로 남으므로 이 길로 얻는 것은 없다(유효 금액 불변).
+//   그 밖의 끄기(상신 기록 지움·반려로·번호·사본 다름·승인 표시는 그대로인데 상태만 열림 등)는 scan의 APPR_REVOKED 그대로. 반환 [{cid, pipe, i}] — newItems를 고쳐 씀
+const STALE_PRE = { '대기': 1, '보류': 1, '미전송': 1 };
+function carryStale(oldItems, newItems) {
+  const oldBy = {}, out = [];
+  (Array.isArray(oldItems) ? oldItems : []).forEach(function (o) { if (o && o.id != null) oldBy[String(o.id)] = o; });
+  (Array.isArray(newItems) ? newItems : []).forEach(function (c) {
+    if (!isObj(c) || c.id == null || c.del === 1) return;
+    const o = oldBy[String(c.id)]; if (!isObj(o) || !Array.isArray(o.pipes) || !Array.isArray(c.pipes)) return;
+    o.pipes.forEach(function (op) {
+      if (!isObj(op) || !Array.isArray(op.stages)) return;
+      const p = c.pipes.find(function (q) { return isObj(q) && q.key === op.key; });
+      if (!p || !Array.isArray(p.stages)) return;
+      op.stages.forEach(function (os, i) {
+        if (!(isObj(os) && os.aw === 'amt' && os.status === 'done' && isObj(os.appr) && os.appr.status === '승인' && isObj(os.appr.snap) && os.appr.cid)) return;
+        const s = p.stages[i], sa = isObj(s) && isObj(s.appr) ? s.appr : null;
+        if (!sa || stageId(s) !== stageId(os) || !STALE_PRE[sa.status] || String(sa.cid || '') !== String(os.appr.cid) || snapKey(sa) !== snapKey(os.appr)) return;
+        const kept = Object.assign({}, s, { status: os.status, appr: JSON.parse(JSON.stringify(os.appr)) });
+        if (os.done_at !== undefined) kept.done_at = os.done_at; else delete kept.done_at;
+        p.stages[i] = kept;
+        p.cur = Math.max(Number(p.cur) || 0, Number(op.cur) || 0);
+        out.push({ cid: String(c.id), pipe: String(op.key || ''), i: i });
+      });
+    });
+  });
+  return out;
+}
 // 3차 재검토 B1(덧대기 — 막지 않음): 승인된 변경계약 차수가 있는 계약에서 원계약 금액·준공일 칸(contract_info.amount·d3)이 바뀐 계약 — 감사 줄용(값 없음). 반환 [{cid, f:['amount'|'d3']}]
 function origChanged(oldItems, newItems) {
   const oldBy = {}, out = [];
@@ -128,4 +157,4 @@ function judge(rows, apItems) {
   });
   return out;
 }
-module.exports = { CON_APPR_KINDS, apprKind, apprKindOf, ownKind, chgAmtMoved, chgTermMoved, scan, judge, approvedItem, origChanged };
+module.exports = { CON_APPR_KINDS, apprKind, apprKindOf, ownKind, chgAmtMoved, chgTermMoved, scan, judge, approvedItem, origChanged, carryStale };

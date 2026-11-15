@@ -681,8 +681,10 @@ async function handleSave(event, d, R) {
   // P1 판24-③ (원장 C095 · 옛 T424 — 재현됨): 계약 단계 결재 서버 강제 — 이번 저장에서 새로 '끝남'이 된 결재 대상 단계·새로 '승인'이 적힌 상신·같은 상신 번호의 사본 바뀜만 본다(_lib/conappr.js).
   //   직전 서버 문서에 이미 있는 어긋남은 그대로 통과(운영 11/14 백업 실측 0건) · 결재함 '승인' 항목이 있으면 통과 · 거절은 저장 통째(400 CON_APPR_REQUIRED — 앱은 알림 뒤 서버 값을 다시 읽음).
   //   직전 문서를 못 읽었으면 빈 문서로 보고 센다(더 닫힌 쪽 — 결재된 단계는 결재함 항목으로 통과). 결재함을 못 읽으면 500(통과시키지 않음)
+  let conKept = [];   // P1 판24 5차: 낡은 사본에서 서버 승인 값으로 되돌려 둔 변경계약 단계(응답 con_kept · 감사 줄)
   let conOrig = [];   // 3차 재검토 B1(덧대기): 승인된 변경계약이 있는 계약의 원계약 금액·준공일 칸 바뀜 — 감사 줄만(값 없음 · 막지 않음)
   if (col === 'contracts') {
+    try { conKept = CONAPPR.carryStale(oldItems, doc.items); } catch (e) { conKept = []; }   // 5차: 낡은 사본의 승인 차수 이월(거절하지 않음 — 그 단계만 서버 값)
     try { conOrig = CONAPPR.origChanged(oldItems, doc.items); } catch (e) { conOrig = []; }
     const caRows = CONAPPR.scan(oldItems, doc.items);   // 직전을 못 읽었으면 oldItems = [](위 읽기) — 모든 결재 대상 끝남·승인을 결재함과 대조
     if (caRows.length) {
@@ -692,7 +694,9 @@ async function handleSave(event, d, R) {
       if (caBad.length) {
         const caN = function (w) { return caBad.filter(function (x) { return x.why === w; }).length; };
         try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'contracts', ev: [{ op: '결재 없는 단계 거절', id: caBad.map(function (x) { return x.cid + '|' + x.pipe + '|' + x.i; }).join(',').slice(0, 200), t: '계약 저장 거절 ' + caBad.length + '건(결재 없이 완료 ' + caN('STAGE_DONE') + ' · 결재함에 없는 승인 ' + caN('APPR_CLAIM') + ' · 상신 사본 바뀜 ' + caN('SNAP_CHANGED') + ')' }] }); } catch (e) {}
-        return jr(400, { status: 'REJECTED', error_code: 'CON_APPR_REQUIRED', n: caBad.length, rows: caBad.slice(0, 20), request_id: R });
+        // 5차 B: 거절이 전부 '승인된 변경계약 되돌리기'(APPR_REVOKED)면 그 까닭의 코드(앱이 맞는 안내 글을 고름) — 그 밖은 종전 코드
+        const caCode = caBad.every(function (x) { return x.why === 'APPR_REVOKED'; }) ? 'CON_APPR_REVOKED' : 'CON_APPR_REQUIRED';
+        return jr(400, { status: 'REJECTED', error_code: caCode, n: caBad.length, rows: caBad.slice(0, 20), request_id: R });
       }
     }
   }
@@ -721,6 +725,7 @@ async function handleSave(event, d, R) {
     if (recDelKept) ev.push({ op: '삭제 보호', id: '-', t: '비관리자 저장이 처리된(입금·발행·검수) 기성 ' + recDelKept + '건을 지우려 해 서버가 원본을 남겼습니다(v464 — 지우기는 관리자만)' });
     if (obPurged) ev.push({ op: '정리', id: '', t: '부동산 정리 ' + obPurged + '건(마감 ' + BIDS_KEEP_DAYS + '일 경과 신규·패스 — 저장 때)' });   // v444
     if (vehDueKept) ev.push({ op: '만기일 보호', id: '-', t: '낡은 사본이 지시 완료 창 만기일 ' + vehDueKept + '칸을 바꾸기 전 날짜로 되돌리려 해 서버 값을 지켰습니다 — 그 사람의 앱 화면이 낡은 사본입니다' });   // P1 판2 검토(S1)
+    if (conKept.length) ev.push({ op: '낡은 사본의 승인 차수 이월', id: conKept.slice(0, 10).map(function (x) { return x.cid + '|' + x.pipe + '|' + x.i; }).join(',').slice(0, 200), t: '승인된 변경계약 ' + conKept.length + '차수를 승인 전 사본(같은 상신 번호·같은 사본)으로 보낸 저장 — 그 단계는 서버 승인 값을 지키고 나머지 고침은 저장(그 사람의 앱 화면이 낡은 사본입니다)' });   // P1 판24 5차
     conOrig.slice(0, 20).forEach(function (x) { ev.push({ op: '원계약 칸 바뀜', id: x.cid, t: '승인된 변경계약이 있는 계약의 원계약 ' + x.f.map(function (k) { return k === 'amount' ? '금액' : '준공일'; }).join('·') + ' 칸이 바뀜(값은 적지 않음 — 유효 금액·종료일은 승인된 변경계약 값)' }); });   // P1 판24-③ 3차 재검토 B1
     if (ev.length) await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: col, ev: ev });
   } catch (e) {}
@@ -749,6 +754,7 @@ async function handleSave(event, d, R) {
   const okOut = { status: 'OK', updated_at: doc.updated_at, request_id: R };
   if (regWarn) okOut.register_warn = regWarn;
   if (licKept.length) okOut.lic_kept = licKept;
+  if (conKept.length) okOut.con_kept = conKept;   // P1 판24 5차: 앱이 그 계약을 서버 값으로 다시 읽음
   return jr(200, okOut);
 }
 

@@ -15928,9 +15928,9 @@ try {
   const msgP24 = (html.match(/  var CON_APPR_REJECT_MSG = "[^"\n]*";/) || [''])[0];
   const runSaveP24 = async (H, st, code) => {
     const env = { alerts: [], loads: 0 };
-    const f = new Function('ENV', [(H.match(/  var CON_APPR_REJECT_MSG = "[^"\n]*";/) || [''])[0], (H.match(/  var CON_SAVE_FAIL_MSG = "[^"\n]*";/) || [''])[0], 'var contracts = [{ id: "k" }], contractSha = "s", contractsPending = true, CONTRACT_API = "x";',
+    const f = new Function('ENV', [(H.match(/  var CON_APPR_REJECT_MSG = "[^"\n]*";/) || [''])[0], (H.match(/  var CON_SAVE_FAIL_MSG = "[^"\n]*";/) || [''])[0], (H.match(/  var CON_APPR_REVOKED_MSG = "[^"\n]*";/) || [''])[0], 'var contracts = [{ id: "k" }], contractSha = "s", contractsPending = true, CONTRACT_API = "x";',
       'function getToken(){ return "t"; } function ghHeaders(){ return {}; } function b64EncodeUnicode(s){ return s; } function b64DecodeUnicode(s){ return s; } function mergeContracts(a){ return a; } function alert(m){ ENV.alerts.push(String(m)); } function loadContracts(){ ENV.loads++; }',
-      'function fetch(){ return Promise.resolve({ status: ' + st + ', ok: ' + (st === 200) + ', json: function(){ return Promise.resolve({ error_code: "' + code + '", content: { sha: "gw" } }); } }); }',
+      'function fetch(){ return Promise.resolve({ status: ' + st + ', ok: ' + (st === 200) + ', json: function(){ return Promise.resolve({ error_code: "' + code + '", content: { sha: "gw" }' + (code === 'KEPT' ? ', con_kept: [{ cid: "k", pipe: "chg", i: 0 }]' : '') + ' }); } }); }',
       fnP24(H, 'doSaveContracts'), 'return function(){ doSaveContracts(); return function(){ return contractsPending; }; };'].join('\n'))(env);
     const pend = f(); for (let i = 0; i < 5; i++) await tickP24(); env.pending = pend(); return env;
   };
@@ -15938,7 +15938,9 @@ try {
     const a = await runSaveP24(H, 400, 'CON_APPR_REQUIRED'), b = await runSaveP24(H, 400, 'OTHER'), c = await runSaveP24(H, 200, ''), d = await runSaveP24(H, 500, 'APPROVALS_READ_FAILED'), e = await runSaveP24(H, 502, '');
     return msgP24.length > 60 && a.alerts.length === 1 && /계약 저장이 거절됐습니다/.test(a.alerts[0]) && /다시 불러옵니다/.test(a.alerts[0]) && a.loads === 1 && a.pending === false
       && b.alerts.length === 0 && b.loads === 0 && b.pending === false && c.alerts.length === 0 && c.loads === 0 && c.pending === false
-      && d.alerts.length === 1 && /저장되지 않았습니다/.test(d.alerts[0]) && /APPROVALS_READ_FAILED/.test(d.alerts[0]) && d.loads === 1 && d.pending === false && e.alerts.length === 1 && e.loads === 1;   // 검토 B9 5xx
+      && d.alerts.length === 1 && /저장되지 않았습니다/.test(d.alerts[0]) && /APPROVALS_READ_FAILED/.test(d.alerts[0]) && d.loads === 1 && d.pending === false && e.alerts.length === 1 && e.loads === 1   // 검토 B9 5xx
+      && (await (async () => { const g = await runSaveP24(H, 400, 'CON_APPR_REVOKED'), k = await runSaveP24(H, 200, 'KEPT');   // 5차: 되돌리기 거절 = 맞는 글 · 이월 응답 = 알림 없이 다시 읽기
+        return g.alerts.length === 1 && /이미 승인된 변경계약은 되돌릴 수 없습니다/.test(g.alerts[0]) && g.loads === 1 && k.alerts.length === 0 && k.loads === 1 && k.pending === false; })());
   };
   const okS = await chkSaveP24(html);
   // ③-2 결재 대상 판정 두 벌(앱 csApprKindOf ↔ 서버 _lib/conappr apprKindOf) — 같은 표본 같은 결과
@@ -15954,8 +15956,10 @@ try {
   const parP24 = (fnApp) => { const st = (x) => typeof x[0] === 'string' || x[0] === null ? { name: x[0] } : x[0]; const res = SP24.map((x) => [fnApp(x[1] || C1, st(x)), CAP24.apprKindOf(x[1] || C1, st(x))]); return { diff: res.filter((r) => r[0] !== r[1]).length, hits: res.filter((r) => r[1]).length }; };
   const par = parP24(appKindP24(html));
   const mutS = (from, to) => { if (html.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); return html.replace(from, () => to); };
-  const kS = [!(await chkSaveP24(mutS('if(ec==="CON_APPR_REQUIRED"){ alert(CON_APPR_REJECT_MSG); loadContracts(); }', ''))),
+  const kS = [!(await chkSaveP24(mutS('if(ec==="CON_APPR_REQUIRED"){ alert(CON_APPR_REJECT_MSG); loadContracts(); }', 'if(false){ }'))),
     !(await chkSaveP24(mutS('if(resp.status>=500){', 'if(false){'))),
+    !(await chkSaveP24(mutS(' else if(ec==="CON_APPR_REVOKED"){ alert(CON_APPR_REVOKED_MSG); loadContracts(); }', ''))),   // 5차 B
+    !(await chkSaveP24(mutS('if(json&&json.con_kept&&json.con_kept.length) loadContracts();', ''))),   // 5차 이월 응답 뒤 다시 읽기
     parP24(appKindP24(mutS('  var CON_APPR_KINDS = [[/청구|입금/, "청구 검수"], [/계약서/, "계약 단계"]];', '  var CON_APPR_KINDS = [[/청구/, "청구 검수"], [/계약/, "계약 단계"]];'))).diff > 0];
   // ③-3 재검토: 상신 때 같은 사본이 결재함 카드(approval_create snap)와 단계(appr.snap)에 · 결재 카드에 '승인하면 반영되는 값' 줄 = 그 사본(실행 — 실제 csApprSubmit·apprFlushCreates·apprSnapLine)
   const runSubP24 = async (H) => {
@@ -16027,7 +16031,7 @@ try {
   const synMut2 = synP24(html.replace('snap: it.snap })){ c.updated = todayStr(); csSaveNow(); renderContracts(); }   // 3차 재검토', 'snap: it.snap })){   // 3차 재검토 c.updated = todayStr(); csSaveNow(); renderContracts(); }'));   // 결함 사본: 54e5eea 꼴 그대로
   T('P1 판24 앱 스크립트 전체 문법: index.html 인라인 스크립트 ' + syn.n + '개 전부 node:vm 파싱 오류 0(실행 안 함) · 결함 사본 2개(함수 닫는 괄호 하나 지움 · 54e5eea 꼴 주석이 본문을 삼킴) = 오류로 잡힘',
     syn.n >= 1 && syn.errs.length === 0 && synMut.errs.length > 0 && synMut2.errs.length > 0, JSON.stringify({ syn, mut: synMut.errs.slice(0, 2), mut2: synMut2.errs.slice(0, 2) }));
-  T('P1 판24-③ 화면: 계약 저장 400 CON_APPR_REQUIRED = "계약 저장이 거절됐습니다 … 다시 불러옵니다" 알림 1번 + 서버 값 다시 읽기 1번(실행 — 실제 doSaveContracts) · (검토 B9) 서버 오류 500 APPROVALS_READ_FAILED·502 = "저장되지 않았습니다 … 다시 불러옵니다" 알림 1번 + 다시 읽기 · 다른 400·200 = 알림 0·다시 읽기 0(종전) · 결재 대상 판정 두 벌(앱 csApprKindOf = 서버 _lib/conappr apprKindOf, 표본 ' + SP24.length + ' · 다름 0 · 결재 대상 ≥ 8) · 결함 사본 3개(거절 알림 걷음·5xx 알림 걷음·앱 판정표만 바꿈) = 모두 ✗',
+  T('P1 판24-③ 화면: 계약 저장 400 CON_APPR_REQUIRED = "계약 저장이 거절됐습니다 … 다시 불러옵니다" 알림 1번 + 서버 값 다시 읽기 1번(실행 — 실제 doSaveContracts) · (검토 B9) 서버 오류 500 APPROVALS_READ_FAILED·502 = "저장되지 않았습니다 … 다시 불러옵니다" 알림 1번 + 다시 읽기 · 다른 400·200 = 알림 0·다시 읽기 0(종전) · 결재 대상 판정 두 벌(앱 csApprKindOf = 서버 _lib/conappr apprKindOf, 표본 ' + SP24.length + ' · 다름 0 · 결재 대상 ≥ 8) · (5차) 400 CON_APPR_REVOKED = "이미 승인된 변경계약은 되돌릴 수 없습니다 …" 알림 + 다시 읽기 · 200 con_kept(서버가 승인 차수를 지킴) = 알림 없이 다시 읽기 · 결함 사본 5개(거절 알림 걷음·5xx 알림 걷음·되돌리기 글 걷음·이월 뒤 다시 읽기 걷음·앱 판정표만 바꿈) = 모두 ✗',
     okS && par.diff === 0 && par.hits >= 8 && kS.every((v) => v === true), JSON.stringify({ okS, par, kS }));
 } catch (e) { console.log('  (P1 판24 검사 생략 — ' + e.message + ')'); fails++; }
 

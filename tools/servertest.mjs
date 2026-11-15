@@ -11304,9 +11304,9 @@ function J91a(x) { return JSON.stringify(x); }
     D.offOpen = await run([K3A()], APS(), (n) => { C0(n).status = 'open'; n[0].pipes[1].cur = 0; });
     D.offApprDel = await run([K3A()], APS(), (n) => { delete C0(n).appr; });
     D.offReject = await run([K3A()], APS(), (n) => { C0(n).appr.status = '반려'; });
-    D.devStale = await run([K3A()], APS(), (n) => { C0(n).appr.status = '대기'; C0(n).status = 'open'; n[0].pipes[1].cur = 0; });
+    D.staleDiffSnap = await run([K3A()], APS(), (n) => { C0(n).appr = { cid: 'cA', kind: '계약 단계', status: '대기', snap: { chg_amt: 99999, chg_end: '2027-03-31' } }; C0(n).status = 'open'; n[0].pipes[1].cur = 0; });   // 5차: 낡은 사본처럼 꾸몄지만 사본이 다름 = 이월 아님(거절)
     // 3차: 승인 차수 지움·자리 바꿈(이름 바꿈)은 첫 저장부터 400(APPR_REVOKED) · 4차: 상신 기록 지움·다른 번호 대기로 끄기도 첫 저장부터 400
-    const seqOk = Object.keys(SQ).every((k) => SQ[k].code === 400 && SQ[k].ec === 'CON_APPR_REQUIRED' && SQ[k].codes.slice(0, -1).every((x) => x === 200 || (x === 400 && /stageDelReadd|renameBack|three|apprDelReadd|cidSwapBack/.test(k))) && (() => { const a = SQ[k].saved.items[0].pipes[1].stages.map((s) => s.appr && s.appr.snap && String(s.appr.snap.chg_amt)); return a.indexOf('99999') < 0 && a.indexOf('2000') < 0; })());
+    const seqOk = Object.keys(SQ).every((k) => SQ[k].code === 400 && /^CON_APPR_(REQUIRED|REVOKED)$/.test(SQ[k].ec) && SQ[k].codes.slice(0, -1).every((x) => x === 200 || (x === 400 && /stageDelReadd|renameBack|three|apprDelReadd|cidSwapBack/.test(k))) && (() => { const a = SQ[k].saved.items[0].pipes[1].stages.map((s) => s.appr && s.appr.snap && String(s.appr.snap.chg_amt)); return a.indexOf('99999') < 0 && a.indexOf('2000') < 0; })());
     // 거절
     D.done = await run([K3()], [], (n) => { n[0].pipes[0].stages[1].status = 'done'; n[0].pipes[0].cur = 2; });
     D.claim = await run([K3()], [], (n) => { n[0].pipes[1].stages[0].appr = { cid: 'cX', kind: '계약 단계', status: '승인', snap: { chg_amt: 1500, chg_end: '2027-03-31' } }; });
@@ -11322,7 +11322,9 @@ function J91a(x) { return JSON.stringify(x); }
     blobsMock.hooks.failGet = (k) => k === 'col:approvals';
     D.apFail = await run([K3()], [], (n) => { n[0].pipes[0].stages[1].status = 'done'; });
     blobsMock.hooks.failGet = null; delete D.__fg;
-    const den = Object.keys(D).filter((k) => k !== 'apFail').every((k) => D[k].code === 400 && D[k].ec === 'CON_APPR_REQUIRED' && D[k].saved.updated_at === 21) && D.apFail.code === 500 && D.apFail.ec === 'APPROVALS_READ_FAILED' && D.apFail.saved.updated_at === 21;
+    // 5차 B: 거절이 전부 승인된 변경계약 되돌리기면 CON_APPR_REVOKED(앱 안내 글이 다름) · 그 밖은 CON_APPR_REQUIRED
+    const REVOKED_ONLY = ['revokeDel', 'revokeSkip', 'revokeSwap', 'revokeAdmin', 'offOpen', 'offApprDel', 'offReject'];
+    const den = Object.keys(D).filter((k) => k !== 'apFail').every((k) => D[k].code === 400 && D[k].ec === (REVOKED_ONLY.indexOf(k) >= 0 ? 'CON_APPR_REVOKED' : 'CON_APPR_REQUIRED') && D[k].saved.updated_at === 21) && D.apFail.code === 500 && D.apFail.ec === 'APPROVALS_READ_FAILED' && D.apFail.saved.updated_at === 21;
     const why = { done: D.done.rows.map((r) => r.why).join(), claim: D.claim.rows.map((r) => r.why).join(), snap: D.snap.rows.map((r) => r.why).join(), rowKey: D.done.rows[0] && (D.done.rows[0].cid + '|' + D.done.rows[0].pipe + '|' + D.done.rows[0].i) };
     const whyOk = why.done === 'STAGE_DONE' && why.claim === 'APPR_CLAIM,SNAP_UNBOUND' && why.snap === 'SNAP_CHANGED,SNAP_UNBOUND' && why.rowKey === 'k3|main|1';   // 재검토: 변경계약 승인 사본은 결재함 묶음(SNAP_UNBOUND)도 함께
     // 허용
@@ -11354,6 +11356,32 @@ function J91a(x) { return JSON.stringify(x); }
     A.devFieldEdit = await run([K3A()], APS(), (n) => { C0(n).vals = { chg_amt: 1700, chg_end: '2027-05-31' }; });   // 승인 뒤 입력 칸만 고침(사본·유효 값 그대로)
     // 4차: 반영될 수 없던 승인(결재함 카드에 사본 없음·사본 다름)은 상신 기록을 지워 다시 상신하는 길이 열려 있음
     A.releaseLegacy = await run([K3A()], APA(), (n) => { delete C0(n).appr; C0(n).status = 'open'; n[0].pipes[1].cur = 0; });
+    // 5차: 낡은 사본 이월 — 승인·반영 뒤 그 전에 연 기기가 같은 번호·같은 사본의 '대기' 사본으로 다른 칸을 고쳐 저장 = 200 · 그 단계는 서버 승인 값 · 고침은 남음 · 응답 con_kept · 감사 1줄
+    const staleEdit = (n) => { C0(n).appr = { cid: 'cA', kind: '계약 단계', status: '대기', snap: { chg_amt: 1500, chg_end: '2027-03-31' } }; C0(n).status = 'open'; n[0].pipes[1].cur = 0; n[0].work_log = [{ id: 'w1', date: '2026-11-15', note: '작업 현황' }]; };
+    { const au0 = auditMock.logs.length; seedC([K3A()], APS()); const nd = cp(mem.gw_data['col:contracts'].items); staleEdit(nd);
+      const r = await c({ action: 'save', collection: 'contracts', base: 21, doc: { schema: 1, items: nd } }, tCWC, 'dev1'); const sv = mem.gw_data['col:contracts'].items[0], s0 = sv.pipes[1].stages[0];
+      A.staleCarry = { code: r.code, ec: r.body.error_code || '', ok: r.code === 200 && Array.isArray(r.body.con_kept) && r.body.con_kept.length === 1 && s0.status === 'done' && s0.appr.status === '승인' && String(s0.appr.snap.chg_amt) === '1500' && sv.pipes[1].cur === 1 && (sv.work_log || []).length === 1
+        && auditMock.logs.slice(au0).some((l) => l.col === 'contracts' && l.ev.some((e) => e.op === '낡은 사본의 승인 차수 이월' && e.id === 'k3|chg|0')) };
+      // 옛 판 캐시 앱(base 없음)도 같은 규칙
+      seedC([K3A()], APS()); const nd2 = cp(mem.gw_data['col:contracts'].items); staleEdit(nd2);
+      const r2 = await c({ action: 'save', collection: 'contracts', doc: { schema: 1, items: nd2 } }, tCWC, 'dev1');
+      A.staleNoBase = { code: r2.code, ec: r2.body.error_code || '', ok: r2.code === 200 && mem.gw_data['col:contracts'].items[0].pipes[1].stages[0].appr.status === '승인' && (mem.gw_data['col:contracts'].items[0].work_log || []).length === 1 }; }
+    // 5차 재현: 상신한 기기(대기 사본)가 그날 다른 칸을 고치는 사이 결재한 기기가 승인·반영 → 상신한 기기 저장 409 STALE_BASE → 앱 mergeContracts 병합 → 다시 저장 = 200(고침 남음·승인 그대로)
+    { const fsR = require('fs'), H = fsR.readFileSync(join(ROOT, 'index.html'), 'utf8');
+      const fnX = (name) => { const i = H.indexOf('  function ' + name + '('); let d = 0, st = false; for (let j = i; j < H.length; j++) { const ch = H[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return H.slice(i, j + 1); } } return ''; };
+      const merge = new Function([fnX('mTime'), fnX('mergeDel'), fnX('csKeepApproved'), fnX('mergeContracts'), 'return mergeContracts;'].join('\n'))();
+      const pre = K3(); pre.pipes[1].stages[0].appr = { cid: 'cA', kind: '계약 단계', status: '대기', snap: { chg_amt: 1500, chg_end: '2027-03-31' } };
+      seedC([pre], APS()); const local = cp(mem.gw_data['col:contracts'].items), base0 = mem.gw_data['col:contracts'].updated_at;
+      local[0].work_log = [{ id: 'w2', date: '2026-11-15', note: '상신한 기기 고침' }]; local[0].updated = '2026-11-15';
+      const apv = cp(mem.gw_data['col:contracts'].items); const as = apv[0].pipes[1].stages[0]; as.appr.status = '승인'; as.status = 'done'; apv[0].pipes[1].cur = 1; apv[0].updated = '2026-11-15';
+      const ra = await c({ action: 'save', collection: 'contracts', base: base0, doc: { schema: 1, items: apv } }, tokA);   // 결재한 기기 반영
+      const rb1 = await c({ action: 'save', collection: 'contracts', base: base0, doc: { schema: 1, items: local } }, tCWC, 'dev1');   // 낡은 base = 409
+      const local0 = cp(local), merged = merge(local, cp(mem.gw_data['col:contracts'].items));   // 앱 병합은 로컬 객체를 고쳐 쓰므로(결과로 바꿔 끼움) 대조용 사본을 먼저
+      const rb2 = await c({ action: 'save', collection: 'contracts', base: mem.gw_data['col:contracts'].updated_at, doc: { schema: 1, items: merged } }, tCWC, 'dev1');
+      const sv = mem.gw_data['col:contracts'].items[0];
+      const mergedNoKeep = new Function([fnX('mTime'), fnX('mergeDel'), 'function csKeepApproved(){}', fnX('mergeContracts'), 'return mergeContracts;'].join('\n'))()(local0, cp(mem.gw_data['col:contracts'].items));
+      A.repro = { code: rb2.code, ec: rb2.body.error_code || '', ok: ra.code === 200 && rb1.code === 409 && rb2.code === 200 && sv.pipes[1].stages[0].status === 'done' && sv.pipes[1].stages[0].appr.status === '승인' && (sv.work_log || []).some((w) => w.id === 'w2')
+        && merged[0].pipes[1].stages[0].appr.status === '승인' && mergedNoKeep[0].pipes[1].stages[0].appr.status === '대기', info: [ra.code, rb1.code, rb2.code, rb2.body.con_kept ? 'kept' : '-'] }; }
     A.releaseDiff = await run([K3A()], [AP({ ref: 'con:k3|chg|0', cid: 'cA', snap: { chg_amt: '1700', chg_end: '2027-03-31' } })], (n) => { delete C0(n).appr; C0(n).status = 'open'; n[0].pipes[1].cur = 0; });
     A.resaveBound = await run([K3A()], APS(), (n) => { n[0].memo = '묶인 승인본 그대로'; });
     { const au0 = auditMock.logs.length;   // 3차 재검토 B1(덧대기): 원계약 금액 칸 고침은 막지 않고 감사 줄 1개(값 없음)
@@ -11386,18 +11414,18 @@ function J91a(x) { return JSON.stringify(x); }
     const e4 = await conE(99999), e5 = await conE(1500);
     E2E = { e1: e1.code, e2: e2.code + ':' + !!e2.body.dedup, snapAfterCreate, snapAfterDecide, e3: e3.code + ':' + (e3.body.decided || e3.body.error_code), e4, e5 };
     const e2eOk = e1.code === 200 && e2.code === 200 && e2.body.dedup === true && snapAfterCreate === '{"chg_amt":"1500","chg_end":"2027-03-31"}' && snapAfterDecide === snapAfterCreate && e3.code === 200 && e3.body.decided === '승인' && e4 === 400 && e5 === 200 && snapReqOk && e2b.code === 200 && e2b.body.dedup === true;
-    const alw = Object.keys(A).every((k) => A[k].code === 200) && A.origEdit.au === 1;
+    const alw = Object.keys(A).every((k) => A[k].code === 200 && A[k].ok !== false) && A.origEdit.au === 1;
     return { ok: den && whyOk && alw && seqOk && e2eOk, seqOk, e2eOk, nRej: Object.keys(D).filter((k) => k !== 'apFail' && D[k].code === 400).length + Object.keys(SQ).reduce((n, k) => n + SQ[k].codes.filter((x) => x === 400).length, 0) + (e4 === 400 ? 1 : 0),
-      info: { D: Object.fromEntries(Object.entries(D).map(([k, v]) => [k, v.code + ':' + v.ec])), why, A: Object.fromEntries(Object.entries(A).map(([k, v]) => [k, v.code + ':' + v.ec])), SQ: Object.fromEntries(Object.entries(SQ).map(([k, v]) => [k, v.codes.join('/')])), E2E, E2E3, origAu: A.origEdit.au } };
+      info: { D: Object.fromEntries(Object.entries(D).map(([k, v]) => [k, v.code + ':' + v.ec])), why, A: Object.fromEntries(Object.entries(A).map(([k, v]) => [k, v.code + ':' + v.ec])), SQ: Object.fromEntries(Object.entries(SQ).map(([k, v]) => [k, v.codes.join('/')])), E2E, E2E3, origAu: A.origEdit.au, notOk: Object.keys(A).filter((k) => A[k].ok === false), repro: A.repro && A.repro.info, flags: { den, whyOk, seqOk, e2eOk } } };
   };
   try {
     const au0 = auditMock.logs.length;
     const R0 = await chkCon(gwd);
     const auLines = auditMock.logs.slice(au0).filter((l) => l.col === 'contracts' && l.ev && l.ev[0] && l.ev[0].op === '결재 없는 단계 거절');
-    const auOk = auLines.length === R0.nRej && R0.nRej === 44 && auLines.some((l) => /^계약 저장 거절 1건\(결재 없이 완료 1 · 결재함에 없는 승인 0 · 상신 사본 바뀜 0\)$/.test(l.ev[0].t) && l.ev[0].id === 'k3|main|1') && auLines[0].by === '공무C24' && auLines.some((l) => l.bid === 'uadmin') && !/계약서|견적|착공/.test(JSON.stringify(auLines));
-    T('P1 판24-③ ① 계약 단계 결재 서버 강제 — 거절(400 CON_APPR_REQUIRED·서버 문서 그대로): 결재 없이 계약서 단계 완료 · 결재함에 없는 승인 표시(변경계약) · 변경 금액 바뀐 변경계약 대기 중 완료 · 결재함 항목 대기인데 승인 표시 · 다른 상신 번호의 승인 · 종류 다른 승인 항목 · 승인 뒤 상신 사본(금액) 바꿔치기 · 새 계약에 결재 단계 완료로 · 직전 문서 못 읽음(빈 문서로 보고 대조) / 결재함 못 읽음 = 500 APPROVALS_READ_FAILED · 거절 이유 표식(STAGE_DONE·APPR_CLAIM·SNAP_CHANGED)·자리 k3|main|1 · (검토 A1) 승인 뒤 상신 번호 빼기·비우기 + 사본 고침·번호만 빼기·대기 중 번호 빼고 사본 고침·번호 없는 새 승인 · (B2) 단계 ref를 단 \'일반\' 카드로 금액 칸 그대로·사본만 큰 금액 · (B3) 끝난 단계 이름을 \'계약서…\'로 · (B4) 사본 종료일만 바꿈·관리자 저장도 거절 · (재검토 A — 결재함 항목 사본 묶음) 승인된 변경 1차 금액 사본 바꾸기: 이름 뒤 공백·전각 공백(한 번) · 상신 기록 지움 → 다시 넣음 · 다른 번호 대기 → 원래 번호 · 단계 지움 → 다시 넣음 · 이름 바꿈 → 되돌림 · 세 번 나눠 · 반려 뒤 옛 승인 번호 다시 씀 · 1차 승인 항목을 2차에 끌어 씀 · 사본 없는 옛 항목 지웠다 다시 넣음 = 마지막 저장만 400(앞 저장 200)·저장된 사본에 바꾼 금액 0 · 서버 끝까지: 직원 상신 사본 → 같은 번호 재전송 사본 그대로 → 관리자 승인 사본 그대로 → 사본 바꾼 계약 저장 400 · 계약서 단계에 \'일반\' 카드 승인 표시 · (3차) 승인된 변경 1차 지움·건너뜀·다른 단계로·관리자 줄 지움 = 400 · 사본 없는 변경계약 상신 400 SNAP_REQUIRED(카드 안 생김)·본 줄 aw amt도·계약서 상신은 200 · 남의 번호·다른 대상 409 CID_TAKEN · 결정 요청에 사본 실어도 카드 사본 그대로 · (4차) 승인 차수 끄기: 상태 열림·상신 기록 지움·반려로·낡은 대기 사본 = 400 · 승인 뒤 같은 번호 재전송은 카드 사본 그대로 · 감사 "결재 없는 단계 거절" 44줄(자리만 — 단계 이름 없음)',
+    const auOk = auLines.length === R0.nRej && R0.nRej >= 40 && auLines.some((l) => /^계약 저장 거절 1건\(결재 없이 완료 1 · 결재함에 없는 승인 0 · 상신 사본 바뀜 0\)$/.test(l.ev[0].t) && l.ev[0].id === 'k3|main|1') && auLines[0].by === '공무C24' && auLines.some((l) => l.bid === 'uadmin') && !/계약서|견적|착공/.test(JSON.stringify(auLines));
+    T('P1 판24-③ ① 계약 단계 결재 서버 강제 — 거절(400 CON_APPR_REQUIRED·서버 문서 그대로): 결재 없이 계약서 단계 완료 · 결재함에 없는 승인 표시(변경계약) · 변경 금액 바뀐 변경계약 대기 중 완료 · 결재함 항목 대기인데 승인 표시 · 다른 상신 번호의 승인 · 종류 다른 승인 항목 · 승인 뒤 상신 사본(금액) 바꿔치기 · 새 계약에 결재 단계 완료로 · 직전 문서 못 읽음(빈 문서로 보고 대조) / 결재함 못 읽음 = 500 APPROVALS_READ_FAILED · 거절 이유 표식(STAGE_DONE·APPR_CLAIM·SNAP_CHANGED)·자리 k3|main|1 · (검토 A1) 승인 뒤 상신 번호 빼기·비우기 + 사본 고침·번호만 빼기·대기 중 번호 빼고 사본 고침·번호 없는 새 승인 · (B2) 단계 ref를 단 \'일반\' 카드로 금액 칸 그대로·사본만 큰 금액 · (B3) 끝난 단계 이름을 \'계약서…\'로 · (B4) 사본 종료일만 바꿈·관리자 저장도 거절 · (재검토 A — 결재함 항목 사본 묶음) 승인된 변경 1차 금액 사본 바꾸기: 이름 뒤 공백·전각 공백(한 번) · 상신 기록 지움 → 다시 넣음 · 다른 번호 대기 → 원래 번호 · 단계 지움 → 다시 넣음 · 이름 바꿈 → 되돌림 · 세 번 나눠 · 반려 뒤 옛 승인 번호 다시 씀 · 1차 승인 항목을 2차에 끌어 씀 · 사본 없는 옛 항목 지웠다 다시 넣음 = 마지막 저장만 400(앞 저장 200)·저장된 사본에 바꾼 금액 0 · 서버 끝까지: 직원 상신 사본 → 같은 번호 재전송 사본 그대로 → 관리자 승인 사본 그대로 → 사본 바꾼 계약 저장 400 · 계약서 단계에 \'일반\' 카드 승인 표시 · (3차) 승인된 변경 1차 지움·건너뜀·다른 단계로·관리자 줄 지움 = 400 · 사본 없는 변경계약 상신 400 SNAP_REQUIRED(카드 안 생김)·본 줄 aw amt도·계약서 상신은 200 · 남의 번호·다른 대상 409 CID_TAKEN · 결정 요청에 사본 실어도 카드 사본 그대로 · (4차) 승인 차수 끄기: 상태 열림·상신 기록 지움·반려로·낡은 대기 사본 = 400 · 승인 뒤 같은 번호 재전송은 카드 사본 그대로 · (5차) 낡은 사본처럼 꾸몄지만 사본이 다름 = 거절 · 되돌리기만인 거절 = CON_APPR_REVOKED · 감사 "결재 없는 단계 거절" 줄 수 = 거절 수(자리만 — 단계 이름 없음)',
       R0.ok && auOk, JSON.stringify({ info: R0.info, au: auLines.length, t: auLines[0] && auLines[0].ev[0].t }));
-    T('P1 판24-③ ② 허용(200 — 정상 흐름이 하나도 막히지 않음): 상신 → 결재함 승인 → 단계 완료·다음 단계 열림 · 상신(대기·사본) 저장 · 금액·기간 그대로인 변경계약 결재 없이 완료 · 시나리오 없는 옛 계약의 계약서 단계 완료 · 결재 단계 건너뜀 · 서버에 이미 있던 어긋남은 다른 칸 고침에 통과 · 청구 검수 승인 → 청구 완료 · PM 전결 승인 · 반려 뒤 재상신(새 번호 대기)·반려 표시 저장 · 승인된 변경계약 반영·같은 승인본 다시 저장 · 결재 대상 아닌 단계 손질 · 끝나지 않은 단계 이름 고침 · 서버에 이미 있던 번호 없는 옛 승인 그대로 다시 저장 · (재검토) 반려 뒤 금액 고쳐 재상신 → 승인 · 2차 변경계약 · 승인 뒤 입력 칸만 고침 · 사본 묶인 승인본 그대로 다시 저장 · (4차) 반영될 수 없던 승인(카드 사본 없음·다름)은 상신 기록 지우고 다시 상신 가능 · (3차) 원계약 금액 칸 고침 = 200 + 감사 "원계약 칸 바뀜" 1줄(값 없음) · 계약 삭제 200',
+    T('P1 판24-③ ② 허용(200 — 정상 흐름이 하나도 막히지 않음): 상신 → 결재함 승인 → 단계 완료·다음 단계 열림 · 상신(대기·사본) 저장 · 금액·기간 그대로인 변경계약 결재 없이 완료 · 시나리오 없는 옛 계약의 계약서 단계 완료 · 결재 단계 건너뜀 · 서버에 이미 있던 어긋남은 다른 칸 고침에 통과 · 청구 검수 승인 → 청구 완료 · PM 전결 승인 · 반려 뒤 재상신(새 번호 대기)·반려 표시 저장 · 승인된 변경계약 반영·같은 승인본 다시 저장 · 결재 대상 아닌 단계 손질 · 끝나지 않은 단계 이름 고침 · 서버에 이미 있던 번호 없는 옛 승인 그대로 다시 저장 · (재검토) 반려 뒤 금액 고쳐 재상신 → 승인 · 2차 변경계약 · 승인 뒤 입력 칸만 고침 · 사본 묶인 승인본 그대로 다시 저장 · (4차) 반영될 수 없던 승인(카드 사본 없음·다름)은 상신 기록 지우고 다시 상신 가능 · (5차) 낡은 기기의 같은 번호·같은 사본 대기 사본 = 이월 200(그 단계 서버 승인 값·다른 칸 고침 남음·con_kept·감사) · base 없는 옛 판 저장도 · 재현 409 → 앱 mergeContracts 병합 → 200(고침 남음·승인 그대로 — 병합이 승인 차수를 서버 쪽으로) · (3차) 원계약 금액 칸 고침 = 200 + 감사 "원계약 칸 바뀜" 1줄(값 없음) · 계약 삭제 200',
       R0.ok, JSON.stringify(R0.info.A));
     // ③ 결함 사본 — gw-data 관문 걷음 / _lib/conappr 판정 한 곳씩
     const RP = require.resolve(FCA), savedCA = require.cache[RP];
@@ -11421,7 +11449,11 @@ function J91a(x) { return JSON.stringify(x); }
       ['ca', "why: 'APPR_CLAIM', ref: ref, appr: a, kind: own, hard: !own }", "why: 'APPR_CLAIM', ref: ref, appr: a, kind: String(a.kind || ''), hard: false }"],
       ['ca', 'const os = (os0 && stageId(os0) === stageId(s)) ? os0 : null;', 'const os = os0;'],
       ['ca', ", String(v.chg_end == null ? '' : v.chg_end)]);", ']);'],
-      ['data', "  if (col === 'contracts') {\n    try { conOrig", "  if (col === 'contracts' && !c.member.admin) {\n    try { conOrig"],
+      ['data', "  if (col === 'contracts') {\n    try { conKept", "  if (col === 'contracts' && !c.member.admin) {\n    try { conKept"],
+      // 5차
+      ['data', '    try { conKept = CONAPPR.carryStale(oldItems, doc.items); } catch (e) { conKept = []; }', ''],   // 이월 걷음 = 낡은 기기 고침 사라짐
+      ['ca', " || String(sa.cid || '') !== String(os.appr.cid) || snapKey(sa) !== snapKey(os.appr)) return;", " || String(sa.cid || '') !== String(os.appr.cid)) return;"],   // 이월 조건에서 사본 대조 걷음
+      ['data', "const caCode = caBad.every(function (x) { return x.why === 'APPR_REVOKED'; }) ? 'CON_APPR_REVOKED' : 'CON_APPR_REQUIRED';", "const caCode = 'CON_APPR_REQUIRED';"],   // B 되돌리기 거절 글 코드
       // 재검토 A: 결재함 항목 사본 묶음
       ['ca', '    const ok = !!it && (!r.bind || (isObj(it.snap) && snapKey(it) === snapKey(r.appr)));', '    const ok = !!it;'],
       ['ca', '(isObj(it.snap) && snapKey(it) === snapKey(r.appr))', '(!isObj(it.snap) || snapKey(it) === snapKey(r.appr))'],
@@ -11445,7 +11477,7 @@ function J91a(x) { return JSON.stringify(x); }
       try { resetC24(); const r = w === 'data' ? await withCA(SCA, mutC24(SDATAC, from, to)) : await withCA(mutC24(SCA, from, to), SDATAC); k = !r.ok; } catch (e) { k = 'err ' + e.message; }
       if (k !== true) killC.push(w + ':' + from.trim().slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k));
     }
-    T('P1 판24-③ ③ 결함 사본 ' + MUTC.length + '개(저장 관문 걷음·결재함 못 읽음 통과 · 종류 대조·승인 상태 대조 걷음·사본 바뀜 검사 걷음·금액 그대로 변경계약도 결재 요구·옛 계약도 결재 요구·기존 어긋남도 거절·승인 표시 검사 걷음 · 검토: 빈 상신 번호 통과·번호 비운 사본 비교 걷음·승인 표시 종류를 앱 값으로·단계 정체 대조 걷음·사본 비교에서 종료일 뺌·관리자 저장 면제 · 재검토: 사본 묶음 걷음·사본 없는 옛 항목 통과·묶음 줄 안 만듦·직전 같음을 승인만으로·결재함 카드에 사본 안 적음 · 3차: 사본 없는 상신 받음·본 줄 변경계약 못 봄·남의 번호 흡수·승인 때 카드 사본 덮음·승인 차수 지움/건너뜀 통과) = 모두 ✗', killC.length === 0, killC.join(' | '));
+    T('P1 판24-③ ③ 결함 사본 ' + MUTC.length + '개(저장 관문 걷음·결재함 못 읽음 통과 · 종류 대조·승인 상태 대조 걷음·사본 바뀜 검사 걷음·금액 그대로 변경계약도 결재 요구·옛 계약도 결재 요구·기존 어긋남도 거절·승인 표시 검사 걷음 · 검토: 빈 상신 번호 통과·번호 비운 사본 비교 걷음·승인 표시 종류를 앱 값으로·단계 정체 대조 걷음·사본 비교에서 종료일 뺌·관리자 저장 면제 · 재검토: 사본 묶음 걷음·사본 없는 옛 항목 통과·묶음 줄 안 만듦·직전 같음을 승인만으로·결재함 카드에 사본 안 적음 · 3차: 사본 없는 상신 받음·본 줄 변경계약 못 봄·남의 번호 흡수·승인 때 카드 사본 덮음·승인 차수 지움/건너뜀 통과 · 4차·5차: 끄기·release·재전송 사본 덮기·이월 걷음·이월 사본 대조 걷음·되돌리기 거절 코드) = 모두 ✗', killC.length === 0, killC.join(' | '));
   } catch (e) { T('P1 판24-③ 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
   finally { resetC24(); }
 }
