@@ -2059,11 +2059,11 @@ try {
   const srv24 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8'), ask24 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'ask.js'), 'utf8'), ds24 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'docscope.js'), 'utf8'), dd24 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'docdiff.js'), 'utf8'), pb24 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-parse-background.js'), 'utf8'), lw24 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-learn-background.js'), 'utf8'), sw24 = readFileSync(join(ROOT, 'sw.js'), 'utf8');
   T('v424 물어보기: 문서 도구가 docVisible을 거침 · 판정 한 곳(_lib/docscope.js, gw-data는 가져다 씀) · sw ≥ 424', /DS\.docVisible\(member, d, ds\)/.test(ask24) && /function docVisible\(m, it, settings\)/.test(ds24) && !/function docVisible\(/.test(srv24) && /require\('\.\/_lib\/docscope'\)/.test(srv24) && Number((sw24.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 424);
   const dl24 = [...html.matchAll(/downloadBlob\(([^\n]{0,60})/g)].map((m) => m[1]).filter((x) => !/^"(?:차량목록|전체백업|실적목록|세무)/.test(x) && !/^r2\.body\.file/.test(x) && !/^res\.body\.name/.test(x) && !/^name, /.test(x) && !/^name\+"_안전 패킷/.test(x) && !/^name, blob\)\{/.test(x));
-  T('v424 생성 경로: 양식으로 만든 파일은 전부 xgOut을 거침(직접 내려받기 없음) · 생성 12경로', dl24.length === 0 && (html.match(/xgOut\(/g) || []).length >= 13 && ['"qual_packet"', '"contract_pledge"', '"seal_reg"', '"bond_waiver"', '"labor_exempt"', '"settle_doc"', '"adv_pay"', '"bid_rate"', 'qtKey'].every((k) => html.indexOf('xgOut(c, ' + k) > 0), JSON.stringify(dl24));
+  T('v424 생성 경로: 양식으로 만든 파일은 전부 xgOut을 거침(직접 내려받기 없음) · 생성 12경로', dl24.length === 0 && (html.match(/xgOut\(|xgHwpxGen\(c, /g) || []).length >= 13 && /function xgHwpxGen\([^)]*\)\{[\s\S]{0,300}?return xgOut\(c, kind, name, blob,/.test(html) && ['"qual_packet"', '"contract_pledge"', '"seal_reg"', '"bond_waiver"', '"labor_exempt"', '"settle_doc"', '"adv_pay"', '"bid_rate"', 'qtKey'].every((k) => html.indexOf('xgOut(c, ' + k) > 0 || html.indexOf('xgHwpxGen(c, ' + k) > 0), JSON.stringify(dl24));   // P1 판16: 한글 양식은 xgHwpxGen(학습 칸 → xgOut) 한 곳을 거침
   T('v426 착공계 주민번호: 창 문구에 "양식 기본값" 없음 · 비우면 확인요망 · 서버가 주민번호 꼴 양식을 거부 · 앱이 쉬운 말로 알림 · 백업 흔적 통로', html.indexOf('양식 기본값 유지') < 0 && html.indexOf('현장대리인 주민등록번호(양식에 넣어 두지 않습니다') > 0 && /BJ\.rrnScan\(Buffer\.from\(b64, 'base64'\)\)/.test(gwd) && html.indexOf('tplCode === "TPL_HAS_RRN"') > 0 && /action === 'backup_stamp'/.test(gwd));
   T('v425 최종본 연결: 넣기가 초안 없으면 xgDraftMake 먼저(내려받기·값 저장·확인창 없음) · 창과 같은 토큰 함수 · 파일이 들어오면 단계 체크 · 사람이 쓰는 창은 안 건드림', /prep = xgDraftMake\(c, tpl\)/.test(html) && /o = \{ noDownload: true, noBack: true, wait: true, late: true \}/.test(html) && /var cdT=xgConTok\(c\)/.test(html) && /var qtT=xgQuoteTok\(\)/.test(html) && /var adT=xgAdvTok\(\)/.test(html) && /dd\.st = "done"; dd\.auto = 1/.test(html) && /back\.classList\.contains\("show"\)\) \|\| xgLateOn/.test(html));
   T('v424 표식: 앱 번호 형식 = 서버 번호 형식 · 서버 사본은 주민번호 가림(genStoreCopy) · 착공계는 칸 비운 사본(xgNoRrn)', dd24.indexOf('JWG1\\\\.[A-Za-z0-9_-]{1,40}\\\\.[a-z0-9_]{1,30}\\\\.[a-z0-9]{6,16}') > 0 && html.indexOf('JWG1\\.[A-Za-z0-9_-]{1,40}\\.[a-z0-9_]{1,30}\\.[a-z0-9]{6,16}') > 0 && html.indexOf('genStoreCopy(b, kind === "work_start")') > 0 && html.indexOf('fillXlsxTemplate(o.tpl, xgNoPerson(edits, cells))') > 0);
-  T('v424 짝: 표식 → 이름 → 내용 일치율 순 · hwpx 문단 비교 · 모델은 칸 비교만 · 워커 가드 · 판단 표식(모델 호출 없음)', /how = byMark \? 'mark' : ''/.test(srv24) && /DD\.matchScore\(/.test(srv24) && /DD\.hwpxParaDiff\(db, fb\)/.test(srv24) && /kind === 'xlsx_cell' && learnAllowed/.test(srv24) && /NO_CELL_MAP/.test(lw24) && /BJ\.markJudge\(/.test(pb24));
+  T('v424 짝: 표식 → 이름 → 내용 일치율 순 · hwpx 문단 비교 · 모델은 칸 비교만 · 워커 가드 · 판단 표식(모델 호출 없음)', /how = byMark \? 'mark' : ''/.test(srv24) && /DD\.matchScore\(/.test(srv24) && /DD\.hwpxParaDiff\(db, fb\)/.test(srv24) && /\(kind === 'xlsx_cell' \|\| kind === 'hwpx_tok'\) && learnAllowed/.test(srv24) && /NO_CELL_MAP/.test(lw24) && /BJ\.markJudge\(/.test(pb24));
   T('v424 단계 칸 값: 생성 창이 xgAuto로 읽음 · 종류를 바꾸면 사람이 안 고친 칸만 · 새로 친 값은 빈 칸에 저장(xgSaveBack) · AI↔직원 줄이 서류 탭에', html.indexOf('xgAutoApply(c, document.getElementById("xgKind").value, true)') > 0 && html.indexOf('xgAutoApply(c0, $("xgKind").value, false)') > 0 && html.indexOf('if (!o.noBack) xgSaveBack(c);') > 0 && html.indexOf('var L = cdocGenLine(c, tpl, fm.G)') > 0 && html.indexOf('return h + cdocGenHtml(c, fm.shown);') > 0);   // v427 AI↔직원 줄은 서류 줄 안 · 줄에 없는 양식만 아래 칸
 } catch (e) { console.log('  (v424 검사 생략 — ' + e.message + ')'); fails++; }
 
@@ -13350,9 +13350,9 @@ try {
     /<button class="tab-btn perm-hidden" data-tab="progress" id="tabProgressBtn">진척도<\/button>\n\s*<button class="tab-btn perm-hidden" data-tab="pmcon" id="tabPmconBtn">PM 콘솔 <span class="tab-badge hide" id="pmconTabBadge">0<\/span><\/button>/.test(html)
     && /var pcBtn = document\.getElementById\("tabPmconBtn"\);\s*if \(pcBtn\) pcBtn\.classList\.toggle\("perm-hidden", !adminUser\);/.test(apP) && apP.indexOf('if (currentTab === "pmcon" && !adminUser) switchTab("dash");') > 0
     && swP.indexOf('document.getElementById("view-pmcon").classList.toggle("active", name === "pmcon");') > 0 && swP.indexOf('if (name === "pmcon") renderPmcon();') > 0
-    && kindsP.map((k) => k.kind).join(',') === 'assign,notify,doneif,autotask,learn,brief,bg' && kindsP.map((k) => k.label).join('/') === '배정표/알림 설정/완료 판정/자동 지시 규칙/계약 학습/브리핑 설정/근거 승격'
-    && kindsP.map((k) => k.grade).join('') === 'R1R1R1R1R2R1R2' && kindsP.every((k) => disp(k.get) && permSecP.indexOf('id="' + k.card + '"') >= 0 || (k.card === 'doneifRow' && html.indexOf('id="doneifRow"') > 0 && disp(k.get)))
-    && svKindsP.map((k) => k.kind).join(',') === kindsP.map((k) => k.kind).join(',') && svKindsP.every((k, i) => k.label === kindsP[i].label && k.grade === kindsP[i].grade && k.fn === FN_OF_GET[kindsP[i].get])
+    && kindsP.map((k) => k.kind).join(',') === 'assign,notify,doneif,autotask,learn,learnhw,brief,bg' && kindsP.map((k) => k.label).join('/') === '배정표/알림 설정/완료 판정/자동 지시 규칙/계약 학습/계약 학습(한글 양식)/브리핑 설정/근거 승격'   // P1 판16: 계약 학습(한글 양식) 줄 더함(R2 · 조회는 계약 학습과 같은 응답 · 저장은 handleLearnAllow2Set → handleLearnSettingsSet)
+    && kindsP.map((k) => k.grade).join('') === 'R1R1R1R1R2R2R1R2' && kindsP.every((k) => disp(k.get) && permSecP.indexOf('id="' + k.card + '"') >= 0 || (k.card === 'doneifRow' && html.indexOf('id="doneifRow"') > 0 && disp(k.get)))
+    && svKindsP.map((k) => k.kind).join(',') === kindsP.map((k) => k.kind).join(',') && svKindsP.every((k, i) => k.label === kindsP[i].label && k.grade === kindsP[i].grade && k.fn === (kindsP[i].kind === 'learnhw' ? 'handleLearnAllow2Set' : FN_OF_GET[kindsP[i].get]))
     && disp('pmcon_get') && disp('pmcon_decide') && /var AUDIT_COL_LABEL = \{[^}]*progress:"진척도", pmcon:"PM 콘솔",/.test(html),
     JSON.stringify({ kinds: kindsP.map((k) => k.kind + ':' + k.get), sv: svKindsP.map((k) => k.kind + ':' + k.fn) }));
   // ② 실행 — 가짜 화면
@@ -13366,7 +13366,8 @@ try {
       'var confirm = function(){ return __o.confirm !== false; }, prompt = function(){ return __o.prompt === undefined ? "노무사 회신 뒤" : __o.prompt; }, alert = function(m){ __toast.push("alert:" + m); }, setTimeout = function(){};',
       fnP('esc'), stP(/var ASSIGN_PREFIX_ORDER = \[[^\]]+\];/), stP(/var ASSIGN_PREFIX_TXT = \{[^}]+\};/), stP(/var NOTIFY_EVENT_ORDER = \[[^\]]+\];/), stP(/var AUTO_RULE_ORDER = \[[^\]]+\];/),
       KINDS_P, stP(/var PMCON_PLAN = \{[^\n]+\};/), stP(/var PMCON_CHECKS = \[\];/), stP(/var PMCON_CHOICE_TXT = \{[^}]+\};/), stP(/var pmconState = null, pmconBusy = false, pmconSeq = 0, pmconLogAll = false;/),
-      ...['pmconMd', 'pmconPlan', 'pmconRowsAssign', 'pmconRowsNotify', 'pmconRowsDoneif', 'pmconRowsAutotask', 'pmconRowsLearn', 'pmconRowsBrief', 'pmconRowsBg', 'pmconDueTxt', 'renderPmcon', 'pmconLogRender', 'pmconChecksRender', 'pmconOpenCard', 'pmconAct'].map(fnP),
+      ...['pmconMd', 'pmconPlan', 'pmconRowsAssign', 'pmconRowsNotify', 'pmconRowsDoneif', 'pmconRowsAutotask', 'pmconRowsLearn', 'pmconRowsLearnHw', 'pmconRowsBrief', 'pmconRowsBg', 'pmconDueTxt', 'renderPmcon', 'pmconLogRender', 'pmconChecksRender', 'pmconOpenCard', 'pmconAct'].map(fnP),
+      'function genLabel(k){ return ({ quote_env: "견적서(환경)", quote_con: "견적서(건설)", contract_pledge: "계약이행서약서", seal_reg: "사용인감계", bond_waiver: "채권포기각서", adv_pay: "선금지급신청 세트", qual_packet: "적격심사 패킷", settle_doc: "준공 정산합의서" })[k] || k; }',
       'if (__o.checks) PMCON_CHECKS = __o.checks;',
       'return { render: renderPmcon, act: pmconAct, st: function(){ return pmconState; } };'].join('\n'))(doc, gw, toasts, o);
     api.render(); for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
@@ -13437,7 +13438,7 @@ try {
     JSON.stringify({ b1, b2: b2.choice, b3: [b3.choice, b3.def_is_rec], b4: [b4.def_is_rec, b4.args] }));
   // ④ 기존 카드 그대로(함수 해시 — 판29 착수 전 v460 387b98e와 같음) + renderPermMgmt 카드 호출 그대로
   const HASH29 = { renderPermMgmt: '9634640c8096104c', renderAssignCard: '0224820afb855ba0', assignSet: 'c4dd84fd50465303', renderNotifyCard: '732f47e42cc4be01', renderDoneifRow: '2b5840e3d2b0ce80', doneifSet: '154d942b3f411d9f', notifySet: '2bef31b5c054b599',
-    renderBriefCard: '593629d27006f18d', briefSet: 'e495abde62818c48', renderAutoRulesCard: '485ac6738f31e203', autoRulesSet: '52839ac6fbfb1105', renderConLearnCard: '3c2765291ce8e16f', renderConProcCard: 'a268c635c59e1787', conProcBgSet: 'd487c1839cb6ce91' };
+    renderBriefCard: '593629d27006f18d', briefSet: 'e495abde62818c48', renderAutoRulesCard: '485ac6738f31e203', autoRulesSet: '52839ac6fbfb1105', renderConLearnCard: '41d94b8e8b5223b5' /* P1 판16: 한글 양식 칸 비교(hwpx_tok) 상태 글·안내 한 문장만 바뀜(v460 '3c2765291ce8e16f') */, renderConProcCard: 'a268c635c59e1787', conProcBgSet: 'd487c1839cb6ce91' };
   const shaP = (s) => createHash('sha256').update(s).digest('hex').slice(0, 16);
   const hBadP = Object.keys(HASH29).filter((n) => shaP(fnP(n).replace(/^function [\w$]+/, '').replace(/\r\n/g, '\n')) !== HASH29[n]);
   T('P1 판29 ④ 기존 카드 그대로: 권한관리 카드 7종 그리기·저장 함수 ' + Object.keys(HASH29).length + '개 해시 = 판29 착수 전(v460) · 권한관리 화면 카드 자리 7개 그대로(assignCard·notifyCard·autoRulesCard·briefCard·conProcCard·conLearnCard + 완료 판정 줄 doneifRow) — 콘솔은 그 위의 목록(설정 편집기 새로 없음)',
@@ -15288,6 +15289,62 @@ try {
   T('P1 판9 ④ 시험 계정을 인사 집계에서 뺌(실행 — 실제 drawHrRoster·renderLeaves·approvalInboxItems·famAnnualRows): 인사 명부 줄·부서 수(운영부 2)·총 인원 "총 4명 (재직 3 · 퇴사 1) · 시험 계정 1명 제외"(없으면 꼬리 없음) · 저장 뒤 되열기 대상이 시험 계정이면 안 엶 · 관리자 휴가 목록·"n건 대기"·결재 대기함에서 시험 계정 신청 빠짐(시험 계정 본인 화면은 본인 신청 그대로) · 가족친화 연차 소진율 줄·전사 합계·조기퇴근 표·대상 고르기 · 화면 글 내부 키 이름 0 · 결함 사본 ' + M9d.length + '개 = 모두 ✗',
     r9d.ok && M9d.every((v) => v === false), JSON.stringify({ r: r9d.info, mut: M9d }));
 } catch (e) { console.log('  (P1 판9 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- P1 판16(원장 T396) 계약 학습 2차 — 한글 양식 주입(빈 칸만)·생성 한 곳·PM 콘솔 줄 learnhw·학습 카드 상태 글 (서버 실행은 servertest P1 판16) ----
+try {
+  const f16 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  const sm16 = (src, a, b) => { if (src.split(a).length !== 2) throw new Error('결함 심을 자리 없음: ' + a.slice(0, 40)); return src.replace(a, () => b); };
+  const safe16 = (f) => { try { return f(); } catch (e) { return { ok: false, threw: true, err: e.message }; } };
+  // ① 주입 = 빈 칸만(실행 — 실제 xgMergeLearnedTok)
+  const chkM16 = (h) => {
+    const M = new Function(f16(h, 'xgMergeLearnedTok') + '\nreturn xgMergeLearnedTok;')();
+    const tok = { 단위: '', 성상: '고상', 구분: '  ', 금액: null };
+    const r = M(tok, { 단위: '톤', 성상: '액상', 구분: '운반', 없는칸: 'x', 금액: '1,000' });
+    const ok = r.tokens.단위 === '톤' && r.tokens.성상 === '고상' && r.tokens.구분 === '운반' && !('없는칸' in r.tokens) && r.tokens.금액 === '1,000' && r.learned.join() === '단위,구분,금액' && tok.단위 === '' && JSON.stringify(M({ a: 'x' }, {})) === '{"tokens":{"a":"x"},"learned":[]}';
+    return { ok, info: r };
+  };
+  const r16a = chkM16(html);
+  const m16a = [sm16(html, '      if (!has(out, k) || String(out[k] == null ? "" : out[k]).trim() !== "") return;', '      if (!has(out, k)) return;'), sm16(html, '      if (!has(out, k) || String(out[k] == null ? "" : out[k]).trim() !== "") return;', '      if (String(out[k] == null ? "" : out[k]).trim() !== "") return;'), sm16(html, '    Object.keys(tokens || {}).forEach(function(k){ out[k] = tokens[k]; });\n    Object.keys(dfl', '    out = tokens;\n    Object.keys(dfl')].map((h) => safe16(() => chkM16(h)).ok);
+  T('P1 판16 ① 한글 양식 학습 칸 주입(실행 — 실제 xgMergeLearnedTok): 빈 칸("" · 띄어쓰기만 · null)에만 넣음 · 채운 칸(성상 고상) 그대로 · 양식에 없는 칸 무시 · 넣은 칸 이름 기록 · 원래 토큰 객체 안 고침 · 결함 사본 ' + m16a.length + '개 = 모두 ✗',
+    r16a.ok && m16a.every((v) => v === false), JSON.stringify({ r: r16a.info, mut: m16a }));
+  // ② 정적 — 한글 양식 생성은 xgHwpxGen 한 곳(학습 칸 → fillHwpxTemplate → xgOut) · 주입 조회 = learn_defaults_get · 초안 메타 fill.learned(채움 맵 없이) · 학습 카드 hwpx_tok = 간극만(허용 전)
+  const st16 = (h) => {
+    const G = f16(h, 'xgHwpxGen'), A = f16(h, 'xgApplyLearnedTok'), C = f16(h, 'csCdocDraft'), L = f16(h, 'renderConLearnCard'), D = f16(h, 'xgDraftMake');
+    const sites = ['xgHwpxGen(c, "qual_packet", res.body.data, qTokens, null,', 'xgHwpxGen(c, "contract_pledge", r1.body.data, pledgeTokens, cdT.raw,', 'xgHwpxGen(c, "seal_reg", r2.body.data, sealTokens, null,', 'xgHwpxGen(c, "bond_waiver", r3.body.data, waiverTokens, null,', 'xgHwpxGen(c, "adv_pay", ra.body.data, adTokens, null,', 'xgHwpxGen(c, qtKey, rq.body.data, qtTokens, null,'];
+    return /return xgApplyLearnedTok\(kind, tokens\)\.then\(function\(al\)\{\s*return fillHwpxTemplate\(b64, al\.tokens, raw\)\.then\(function\(blob\)\{ return xgOut\(c, kind, name, blob, Object\.assign\(\{\}, o \|\| \{\}, \{ learned: al\.learned \}\)\); \}\);/.test(G)
+      && /action: "learn_defaults_get", tpl: cdocSan\(kind, 30\)/.test(A) && /return xgMergeLearnedTok\(tokens,/.test(A) && /if \(typeof gwCall !== "function" \|\| !canDo\("con"\)\) return Promise\.resolve\(\{ tokens: tokens, learned: \[\] \}\);/.test(A)
+      && sites.every((s) => h.indexOf(s) > 0) && !/fillHwpxTemplate\((?:r1|r2|r3|ra|rq)\.body\.data/.test(h) && !/fillHwpxTemplate\(res\.body\.data, qTokens\)/.test(h)
+      && /var hwL = function\(tok, raw\)\{ return xgHwpxGen\(c, tpl, res\.body\.data, tok, raw \|\| null, name, o\); \};/.test(D) && (D.match(/return hwL\(/g) || []).length === 3 && /if \(ext === "\.hwpx"\) return hw\(xgSafetyVals\(\)\.tokens\);/.test(D)
+      && /else if \(file && learned && learned\.length\) body\.fill = \{ tpl: kind, at: todayStr\(\), learned: learned \};/.test(C)
+      && /\(p\.kind === "xlsx_cell" \|\| p\.kind === "hwpx_tok"\) \? "간극만\(허용 전\)"/.test(L) && L.indexOf('한글(hwpx) 양식은 앱이 채운 칸') > 0;
+  };
+  const m16b = [sm16(html, 'xgHwpxGen(c, "seal_reg", r2.body.data, sealTokens, null,', 'xgHwpxGen(c, "seal_reg", r2.body.data, {}, null,'), sm16(html, '(p.kind === "xlsx_cell" || p.kind === "hwpx_tok") ? "간극만(허용 전)"', 'p.kind === "xlsx_cell" ? "간극만(허용 전)"'),
+    sm16(html, '      else if (file && learned && learned.length) body.fill = { tpl: kind, at: todayStr(), learned: learned };', ''), sm16(html, 'if (kind === "adv_pay") return hwL(xgAdvTok().tokens);', 'if (kind === "adv_pay") return hw(xgAdvTok().tokens);')].map((h) => safe16(() => st16(h)));
+  T('P1 판16 ② 정적: 한글 양식 생성 6경로(적격심사·서약서·인감계·채권포기각서·선금·견적) + 자동 초안(계약서류·견적·선금 3)이 xgHwpxGen 한 곳(학습 칸 → fillHwpxTemplate → xgOut) · 안전 hwpx는 종전(주입 없음) · 주입 조회 learn_defaults_get(계약 처리 권한만) · 초안 메타 fill.learned · 학습 카드 hwpx_tok = 간극만(허용 전)·안내 글 · 결함 사본 ' + m16b.length + '개 = 모두 ✗',
+    st16(html) && m16b.every((v) => v === false), JSON.stringify({ st: st16(html), mut: m16b }));
+  // ③ PM 콘솔 줄(실행 — 실제 pmconRowsLearnHw) · 무응답 적용일 · 같은 조회 한 번
+  const LBL16 = { quote_env: '견적서(환경)', quote_con: '견적서(건설)', contract_pledge: '계약이행서약서', seal_reg: '사용인감계', bond_waiver: '채권포기각서', adv_pay: '선금지급신청 세트', qual_packet: '적격심사 패킷', settle_doc: '준공 정산합의서' };
+  const REC16 = { ver: '20261115', tpls: { qual_packet: { rec: [] }, contract_pledge: { rec: ['업체명'] }, seal_reg: { rec: ['업체명'] }, bond_waiver: { rec: ['업체명'] }, quote_env: { rec: ['부가세구분', '성상', '구분', '단위'] }, quote_con: { rec: ['부가세구분', '성상', '구분', '단위'] }, adv_pay: { rec: ['상호'] }, settle_doc: { rec: [], no_inject: true } }, dropped: { money: 46, date: 21, case: 19, pii: 22 } };
+  const chkR16 = (h) => {
+    const R = new Function('LBL', 'function genLabel(k){ return LBL[k] || k; }\n' + f16(h, 'pmconRowsLearnHw') + '\nreturn pmconRowsLearnHw;')(LBL16);
+    const allRec = {}; Object.keys(REC16.tpls).forEach((t) => { if (REC16.tpls[t].rec.length) allRec[t] = REC16.tpls[t].rec.slice().reverse(); });
+    const a = R({ settings: { contract: { on: true, allow: { asb_plan: ['C7'], quote_env: ['단위'] } }, updated_at: 77 }, lessons: { quote_env: { pairs: 2 }, adv_pay: { pairs: 1 }, asb_plan: { pairs: 9 } }, rec2: REC16 });
+    const b = R({ settings: { contract: { on: true, allow: Object.assign({ asb_plan: ['C7'] }, allRec) }, updated_at: 78 }, rec2: REC16 });
+    const c = R({ settings: { contract: { on: false, allow: {} } } }), d = R({ settings: { contract: { on: false, allow: {} }, updated_at: 5 }, rec2: REC16 });
+    const r = a[0] || {}, w = r.why || '';
+    const ok = a.length === 1 && r.id === 'learnhw:on' && r.q === '한글 양식 서류도 학습 허용 칸에 넣을까요?' && r.recTxt === '추천 6양식 12칸' && r.def === 'rec' && JSON.stringify(r.args) === '{"on":true}' && r.setBase === 77
+      && w.indexOf('견적서(환경) 4칸(부가세구분·성상·구분·단위)') >= 0 && w.indexOf('선금지급신청 세트 1칸(상호)') >= 0 && w.indexOf('뺀 칸: 금액·요율 46 · 날짜 21 · 건마다 다른 값 19 · 개인정보·연락처·계좌 22') >= 0 && w.indexOf('추천 칸 없음: 적격심사 패킷·준공 정산합의서') >= 0 && w.indexOf('표본 3건') >= 0
+      && !/quote_|settle_doc|qual_packet|adv_pay|contract_pledge/.test(w + r.q + r.recTxt) && w.indexOf('켜야 배웁니다') < 0
+      && b.length === 0 && c.length === 0 && d.length === 1 && d[0].why.indexOf('계약 학습이 꺼져 있어 켜야 배웁니다') > 0;
+    return { ok, info: { a: a.map((x) => x.id), b: b.length, c: c.length, w } };
+  };
+  const r16c = chkR16(html);
+  const m16c = [sm16(html, '    if (rec.every(function(t){ return same(al[t], R2.tpls[t].rec); })) return [];\n', ''), sm16(html, '    tk.forEach(function(t){ n += Number((les[t] || {}).pairs) || 0; });', ''), sm16(html, '추천 칸 없음: " + none.join("·")', '추천 칸 없음: " + tk.join("·")'), sm16(html, 'var parts = rec.map(function(t){ return genLabel(t) + " "', 'var parts = rec.map(function(t){ return t + " "')].map((h) => safe16(() => chkR16(h)).ok);
+  const plan16 = /var PMCON_PLAN = \{[^\n]*learnhw: \{ due: "2026-11-22", def: "rec",/.test(html) && /var once = \{\};[^\n]*\n\s*var calls = \[soft\(gwCall\("gw-data", \{ action: "pmcon_get" \}\)\)\]\.concat\(PMCON_KINDS\.map\(function\(k\)\{ return once\[k\.get\] \|\| \(once\[k\.get\] = soft\(gwCall\("gw-data", \{ action: k\.get \}\)\)\); \}\)\);/.test(html)
+    && /\{ kind: "learnhw", label: "계약 학습\(한글 양식\)", grade: "R2", get: "learn_pairs_get", card: "conLearnCard",/.test(html);
+  T('P1 판16 ③ PM 콘솔 줄(실행 — 실제 pmconRowsLearnHw): 추천이 허용 사전에 다 안 들어 있으면 R2 한 줄 "한글 양식 서류도 학습 허용 칸에 넣을까요?" · 추천 6양식 12칸 · 양식 이름표(내부 키 0)·칸 이름·뺀 칸 수 · 추천 칸 없는 양식 · 표본 n건(그 양식 짝 수) · 다 들어 있으면/추천 없음 = 줄 없음 · 꺼져 있으면 안내 · 무응답 적용일 11/22 = 추천값 · 같은 조회(learn_pairs_get) 한 번 · 결함 사본 ' + m16c.length + '개 = 모두 ✗',
+    r16c.ok && plan16 && m16c.every((v) => v === false), JSON.stringify({ r: r16c.info, plan: plan16, mut: m16c }));
+} catch (e) { console.log('  (P1 판16 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

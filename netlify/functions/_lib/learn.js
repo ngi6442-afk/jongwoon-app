@@ -199,9 +199,10 @@ function buildContractPrompt(o) {
   if (!rules.length) L.push('(없음 — 첫 학습)');
   rules.forEach(function (r) { L.push('- ' + r.id + ' · ' + r.scope + ' · ' + r.n + ' · ' + (r.field || '-') + ' · ' + r.text + (r.value ? ' (값: ' + r.value + ')' : '')); });
   L.push('');
-  L.push('[양식] ' + String(o.tpl || ''));
+  const tok = o.unit === 'tok';   // P1 판16 한글(hwpx) 양식 — 칸 = 양식의 채움 칸 이름(셀 좌표 자리에 칸 이름). xlsx 글은 종전 그대로
+  L.push('[양식] ' + String(o.tpl || '') + (tok ? ' — 한글(hwpx) 양식: 칸은 셀 좌표 대신 양식의 채움 칸 이름입니다(field_default의 field에 칸 이름을 그대로 씁니다)' : ''));
   L.push('');
-  L.push('[값이 보이는 칸 — 허용 사전 안] (셀 · 앱 초안 값 · 직원 최종본 값)');
+  L.push('[값이 보이는 칸 — 허용 사전 안] (' + (tok ? '칸 이름' : '셀') + ' · 앱 초안 값 · 직원 최종본 값)');
   const vis = (Array.isArray(o.rows) ? o.rows : []).filter(function (r) { return r && r.visible; });
   if (!vis.length) L.push('(없음)');
   vis.forEach(function (r) { L.push('- ' + r.ref + ' · ' + JSON.stringify(String(r.draft === undefined || r.draft === null ? '' : r.draft)) + ' · ' + JSON.stringify(String(r.final === undefined || r.final === null ? '' : r.final))); });

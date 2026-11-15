@@ -3151,6 +3151,7 @@ const LN = require('./_lib/learn');
 const DD = require('./_lib/docdiff');
 const BF = require('./_lib/boxfile');   // v423 넣기 박스 조각
 const BJ = require('./_lib/boxjudge');   // v424 검토 파일명 제외를 입구와 같은 기준으로
+const LA2 = require('./_lib/learnallow2');   // P1 판16 허용 칸 추천 2차(한글 양식·정산합의서) · 주입 잠금
 const LEARN_KEY = LN.TYPES.contract.settings_key;
 const LEARN_ALLOW_MAX = 200;   // 양식당 허용 칸 상한
 async function learnSettings(st) {
@@ -3163,7 +3164,7 @@ function learnAllowed(s, tpl) { const a = s.contract.allow[tpl]; return s.contra
 function learnDiffPublic(diff) {
   if (!diff) return null;
   const o = {};
-  ['ok', 'code', 'kind', 'compared', 'changed', 'uncomparable', 'blank_both', 'ratio', 'n_draft', 'n_final', 'same', 'added', 'removed', 'outside_changed', 'refs_outside'].forEach(function (k) { if (diff[k] !== undefined) o[k] = diff[k]; });
+  ['ok', 'code', 'kind', 'compared', 'changed', 'uncomparable', 'blank_both', 'ratio', 'n_draft', 'n_final', 'same', 'added', 'removed', 'outside_changed', 'refs_outside', 'tok_code'].forEach(function (k) { if (diff[k] !== undefined) o[k] = diff[k]; });
   o.refs_changed = Array.isArray(diff.refs_changed) ? diff.refs_changed : [];
   o.refs_uncomparable = Array.isArray(diff.refs_uncomparable) ? diff.refs_uncomparable : [];
   return o;
@@ -3254,10 +3255,16 @@ async function cdocLearnPair(st, member, ref, idx, item, ext, b64, orig, d) {
       if (db && pick.ext === 'xlsx' && diff.ok) { const o = DD.xlsxFileDiff(db, fb, fillFlat.map(function (e) { return e[0]; }).concat(blanked)); if (o.ok) { diff.outside_changed = o.changed; diff.refs_outside = o.refs_changed.slice(0, 100); } }   // AI가 안 채운 칸을 직원이 얼마나 채웠나(간극 값에는 안 넣는다)
     } else if (db && pick.ext === 'xlsx') { diff = DD.xlsxFileDiff(db, fb, blanked); kind = 'xlsx_file'; }
   } else if (fb && db && ext === 'docx' && pick.ext === 'docx') { diff = DD.docxParaDiff(db, fb); kind = 'docx_para'; }
-  else if (fb && db && ext === 'hwpx' && pick.ext === 'hwpx') { diff = DD.hwpxParaDiff(db, fb); kind = 'hwpx_para'; }
+  else if (fb && db && ext === 'hwpx' && pick.ext === 'hwpx') {
+    // P1 판16(T396): 한글 양식은 빈 양식(tpl:<양식>)의 {{칸}} 틀로 칸 단위 비교 먼저 — 양식이 바뀌었거나 칸을 못 찾으면 종전 문단 비교(까닭 tok_code)
+    let tk = null;
+    try { const tr = await blobGet(files, 'tpl:' + tpl); tk = (tr.ok && tr.data && tr.data.data) ? DD.hwpxTokDiff(Buffer.from(String(tr.data.data), 'base64'), db, fb) : { ok: false, code: tr.ok ? 'NO_TPL' : (tr.code === 'NOT_FOUND' ? 'NO_TPL' : 'TPL_READ_FAILED') }; } catch (e) { tk = { ok: false, code: 'TOK_THREW' }; }
+    if (tk && tk.ok) { diff = tk; kind = 'hwpx_tok'; }
+    else { diff = DD.hwpxParaDiff(db, fb); kind = 'hwpx_para'; if (diff && tk && tk.code) diff.tok_code = String(tk.code).slice(0, 30); }
+  }
   const gap = DD.gapScore(diff, null, 0);
   const s = await learnSettings(st);
-  const status = (kind === 'xlsx_cell' && learnAllowed(s, tpl)) ? 'pending' : 'done_nomodel';   // 모델 학습은 칸 비교만(허용 사전이 칸 단위) — 문단 비교는 간극만
+  const status = ((kind === 'xlsx_cell' || kind === 'hwpx_tok') && learnAllowed(s, tpl)) ? 'pending' : 'done_nomodel';   // 모델 학습은 칸 비교만(허용 사전이 칸 단위 — 한글 양식은 칸 = {{칸 이름}}) — 문단 비교는 간극만
   const id = LN.newPairId('contract', ref.cid + ':' + item.n);
   const pair = Object.assign({ id: id, tpl: tpl, draft_n: pick.n, draft_i: pick.i, kind: kind, how: how, status: status, diff: learnDiffPublic(diff), gap: gap }, base);
   if (match !== null) pair.match = match;
@@ -3341,7 +3348,7 @@ async function handleLearnDefaultsGet(event, d, R) {
   const st = store(DATA); const s = await learnSettings(st);
   if (!learnAllowed(s, tpl)) return jr(200, { status: 'OK', tpl: tpl, defaults: {}, on: false, request_id: R });
   const r = await blobGet(st, LN.TYPES.contract.lessons_key(tpl));
-  const defaults = LN.fieldDefaults(r.ok ? r.data : null, s.contract.allow[tpl]);
+  const defaults = LA2.injectFilter(tpl, LN.fieldDefaults(r.ok ? r.data : null, s.contract.allow[tpl]));   // P1 판16: 정산합의서 = 주입 없음 · 한글 양식 = 돈·날짜·건마다 다른 값·개인정보 칸은 허용 사전에 있어도 뺌
   return jr(200, { status: 'OK', tpl: tpl, defaults: defaults, on: true, request_id: R });
 }
 const LEARN_LIST_MAX = 60;
@@ -3363,7 +3370,18 @@ async function handleLearnPairsGet(event, d, R) {
   for (const t of Object.keys(tpls)) { const r = await blobGet(st, LN.TYPES.contract.lessons_key(t)); const L = LN.normLessons(r.ok ? r.data : null); lessons[t] = { off: L.off, rules_n: L.rules.length, pairs: L.stats.pairs, calls: L.stats.calls, gap: LN.gapSummary(L), sunset: L.sunset || null, baseline: L.baseline || null }; }   // v412 일몰·기준선
   const s = await learnSettings(st);
   let usage = null; try { const ur = await blobGet(st, 'usage:box:' + LN.ymOf(Date.now())); if (ur.ok && ur.data) usage = ur.data; } catch (e) {}   // 이번 달 짝 경로(표식·이름·내용·단계·못 찾음) — 표식이 실제로 살아남는지 본다
-  return jr(200, { status: 'OK', pairs: pairs, total: allKeys.length, lessons: lessons, settings: s, usage: usage, request_id: R });
+  return jr(200, { status: 'OK', pairs: pairs, total: allKeys.length, lessons: lessons, settings: s, usage: usage, rec2: LA2.card(), request_id: R });   // rec2 = P1 판16 추천(PM 콘솔 줄)
+}
+// P1 판16(원장 T396) 허용 사전 2차 — 추천 양식(LA2.rec)의 허용 칸을 넣거나(on) 뺀다(off). 저장은 기존 learn_settings_set 핸들러 그대로(관리자·칸 검사·상한·낙관락 base·prev·감사).
+//   PM 콘솔 줄 learnhw:on/off에서만 부른다(직접 액션 없음). 다른 양식(1차 xlsx)의 허용 칸은 그대로 둔다. 허용 사전을 못 읽으면 쓰지 않는다(빈 사전 위에 덮지 않게).
+async function handleLearnAllow2Set(event, d, R) {
+  const st = store(DATA);
+  const r0 = await blobGet(st, LEARN_KEY);
+  if (!r0.ok && r0.code !== 'NOT_FOUND') return jr(503, { status: 'ERROR', error_code: 'LEARN_READ_FAILED', request_id: R });
+  if (typeof d.on !== 'boolean') return jr(400, { status: 'REJECTED', error_code: 'BAD_VALUE', request_id: R });
+  const cur = await learnSettings(st), next = Object.assign({}, cur.contract.allow), rec = LA2.rec();
+  Object.keys(rec).forEach(function (t) { if (d.on) next[t] = rec[t].slice(); else delete next[t]; });
+  return handleLearnSettingsSet(event, { allow: next, base: d.base }, R);
 }
 async function cdocAudit(member, op, cid, t) {
   try { const r = await appendAudit({ ts: Date.now(), by: member.name, bid: member.id, col: 'contracts', ev: [{ op: op, id: cid, t: String(t || '').slice(0, 80) }] }); return r !== false; } catch (e) { return false; }
@@ -5577,6 +5595,7 @@ const PMCON_KINDS = {   // 줄 종류 → 등급(서버 표 — 보낸 등급이
   doneif: { label: '완료 판정', grade: 'R1', fn: handleDoneifSet, args: { on: 'b' }, row: function (a) { return 'doneif:' + (a.on ? 'on' : 'off'); } },
   autotask: { label: '자동 지시 규칙', grade: 'R1', fn: handleAutotaskSet, args: { rule: 's', mode: 's' }, row: function (a) { return 'autotask:' + a.rule + ':' + a.mode; } },
   learn: { label: '계약 학습', grade: 'R2', fn: handleLearnSettingsSet, args: { on: 'b' }, row: function (a) { return 'learn:' + (a.on ? 'on' : 'off'); } },
+  learnhw: { label: '계약 학습(한글 양식)', grade: 'R2', fn: handleLearnAllow2Set, args: { on: 'b' }, row: function (a) { return 'learnhw:' + (a.on ? 'on' : 'off'); } },   // P1 판16 허용 칸 추천 2차
   brief: { label: '브리핑 설정', grade: 'R1', fn: handleBriefSet, args: { field: 'on', value: 'b' }, row: function (a) { return 'brief:' + (a.value ? 'on' : 'off'); } },
   bg: { label: '근거 승격', grade: 'R2', fn: handleConProcBgSet, args: { bg_ver: 's' }, row: function (a) { return 'bg:' + a.bg_ver; } },
 };

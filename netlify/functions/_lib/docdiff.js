@@ -241,6 +241,162 @@ function hwpxParaDiff(draftBuf, finalBuf) {
   if (!A || !B) return { ok: false, code: 'NO_SECTION', kind: 'hwpx_para', compared: 0, changed: 0, uncomparable: 0 };
   return paraDiff(A, B, 'hwpx_para');
 }
+// ---- hwpx 칸(토큰) 비교(P1 판16 · 원장 T396 — 계약 학습 2차) ----
+// 앱은 hwpx 양식 글자 안의 {{칸 이름}}을 값으로 바꿔 초안을 만든다(index.html fillHwpxTemplate — 칸이 든 문단만 고치고 문단 수는 그대로).
+// 서버에 남은 빈 양식(tpl:<양식>) · 초안 · 최종본 세 파일의 문단을 읽어
+//   ① 양식 문단 ↔ 초안 문단(같은 차례)으로 초안의 칸 값을 되읽고 — 문단 수가 다르거나 칸 없는 문단이 1할 넘게 다르면 양식이 초안 때와 다름(TPL_CHANGED, 칸 비교 전체 불가)
+//   ② 초안 ↔ 최종본 문단을 LCS로 맞춘다 — 그대로 남은 문단의 칸은 '안 바뀜'. 맞지 않은 칸 문단은 앞뒤로 맞은 문단 사이 구간에서 찾는다:
+//      구간의 안 맞은 문단 수가 양쪽 같으면 같은 차례끼리, 다르면 양식 글자 틀(칸 앞뒤 글자 2자↑)이 맞는 첫 문단. 찾은 문단에서 틀 글자 사이를 칸 값으로 읽는다.
+// 비교 불가(칸 단위): 글상자 안 칸 · 틀 글자 없이 칸만 있는 문단을 구간에서 하나로 못 정함 · 두 칸이 글자 없이 붙음 · 틀을 못 찾음(문단을 고쳐 씀·지움·표 구조 변경) · 같은 칸이 문단마다 다른 값.
+// 띄어쓰기만 다른 것은 같은 값으로 본다(normS와 같은 뜻). 반환에는 칸 이름·횟수만(값 없음) — 값은 hwpxTokRows(허용 칸만)가 워커에만 준다.
+// 외부 npm 없음(내장 zlib만 — 이 파일 머리말). 문단 수 상한 TOK_PARA_CAP(LCS 표 Uint16 — 1500×1500 = 4.5MB).
+const TOK_PARA_CAP = 1500, TOK_PARA_LEN = 2000, TOK_PER_PARA = 12;
+const TOK_RE = /\{\{([^{}]{1,40})\}\}/g;
+const MEMO_HWPXI = new WeakMap();
+// 문단마다 {s: 글자(normS), box: 글상자 안인가} — 빈 문단도 넣는다(빈 칸 값만 든 문단이 빠지면 양식과 차례가 어긋난다). hwpxParas와 같은 읽기 + 글상자(hp:drawText) 표시.
+function hwpxParaItems(buf) { return memoBuf(MEMO_HWPXI, buf, hwpxParaItemsRaw); }
+function hwpxParaItemsRaw(buf) {
+  const z = zipEntries(buf, /^Contents\/section\d+\.xml$/i);
+  const num = function (n) { return Number((/section(\d+)\.xml$/i.exec(n) || [0, 0])[1]); };
+  const names = Object.keys(z).sort(function (a, b) { return num(a) - num(b); });
+  if (!names.length) return null;
+  const out = [];
+  for (const n of names) {
+    if (!z[n]) return null;   // 풀지 못한 구역이 있으면 차례를 믿을 수 없다
+    const xml = z[n].toString('utf8'), stack = []; let box = 0;
+    const re = /<hp:p\b[^>]*?(\/?)>|<\/hp:p>|<hp:drawText\b[^>]*?(\/?)>|<\/hp:drawText>|<hp:t\b[^>]*\/>|<hp:t\b[^>]*>([\s\S]*?)<\/hp:t>/g; let m;
+    while ((m = re.exec(xml))) {
+      const tok = m[0];
+      if (tok === '</hp:p>') { if (stack.length) { const x = stack.pop(); out.push({ s: normS(xmlUnesc(x.t)), box: x.box }); } }
+      else if (tok === '</hp:drawText>') { if (box > 0) box--; }
+      else if (tok.indexOf('<hp:drawText') === 0) { if (m[2] !== '/') box++; }
+      else if (tok.indexOf('<hp:p') === 0) { if (m[1] !== '/') stack.push({ t: '', box: box > 0 }); else out.push({ s: '', box: box > 0 }); }
+      else if (m[3] !== undefined && stack.length) stack[stack.length - 1].t += m[3].replace(/<hp:(?:tab|fwSpace|nbSpace|lineBreak)\b[^>]*\/?>/g, ' ').replace(/<[^>]+>/g, '');
+    }
+    if (out.length > TOK_PARA_CAP * 4) break;
+  }
+  return out;
+}
+function stripWs(s) { return String(s || '').replace(/\s+/g, ''); }
+// 양식 문단 글자 → {lits:[칸 앞·사이·뒤 글자], toks:[칸 이름]} (칸 없으면 null)
+function tokSplit(s) {
+  const lits = [], toks = []; let last = 0, m; TOK_RE.lastIndex = 0;
+  while ((m = TOK_RE.exec(s))) { lits.push(s.slice(last, m.index)); toks.push(m[1].trim()); last = m.index + m[0].length; }
+  if (!toks.length) return null;
+  lits.push(s.slice(last));
+  return { lits: lits, toks: toks };
+}
+// 틀 글자로 문단에서 칸 값 읽기(앞에서부터 가장 짧게 — 정규식 되짚기 없음). 맞지 않으면 null. 값은 원문 띄어쓰기를 살려 앞뒤만 다듬는다.
+function tokRead(sp, text) {
+  const o = String(text || ''), pos = []; let st = '';
+  for (let i = 0; i < o.length; i++) { if (!/\s/.test(o[i])) { st += o[i]; pos.push(i); } }
+  const L = sp.lits.map(stripWs), k = L.length - 1;
+  if (st.indexOf(L[0]) !== 0) return null;
+  let p = L[0].length; const vals = [];
+  for (let j = 1; j <= k; j++) {
+    let q;
+    if (j === k) { if (st.length - L[k].length < p || st.slice(st.length - L[k].length) !== L[k]) return null; q = st.length - L[k].length; }
+    else { if (!L[j]) return null; q = st.indexOf(L[j], p); if (q < 0) return null; }
+    vals.push(q > p ? o.slice(pos[p], pos[q - 1] + 1).trim() : '');
+    p = q + L[j].length;
+  }
+  return vals;
+}
+// LCS 짝(차례 유지) — a·b는 띄어쓰기 지운 글자 배열. 반환 ma[i] = 맞은 b 차례(없으면 -1)
+function lcsPairs(a, b) {
+  const n = a.length, m = b.length, W = m + 1, t = new Uint16Array((n + 1) * W);
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) t[i * W + j] = a[i] === b[j] ? t[(i + 1) * W + j + 1] + 1 : Math.max(t[(i + 1) * W + j], t[i * W + j + 1]);
+  const ma = new Array(n).fill(-1); let i = 0, j = 0;
+  while (i < n && j < m) { if (a[i] === b[j]) { ma[i] = j; i++; j++; } else if (t[(i + 1) * W + j] >= t[i * W + j + 1]) i++; else j++; }
+  return ma;
+}
+// 핵심 — 칸마다 {name, st: same|changed|unc|blank, d(초안 값), f(최종 값)}. 값은 호출부가 밖으로 내보내지 않는다.
+function hwpxTokCore(tplBuf, draftBuf, finalBuf) {
+  const T = hwpxParaItems(tplBuf), D = hwpxParaItems(draftBuf), F = hwpxParaItems(finalBuf);
+  if (!T || !D || !F) return { ok: false, code: 'NO_SECTION' };
+  if (T.length > TOK_PARA_CAP || D.length > TOK_PARA_CAP || F.length > TOK_PARA_CAP) return { ok: false, code: 'TOO_MANY_PARAS' };
+  const sp = T.map(function (x) { return x.s.length <= TOK_PARA_LEN ? tokSplit(x.s) : null; });
+  if (!sp.some(Boolean)) return { ok: false, code: 'NO_TOKENS' };
+  if (T.length !== D.length) return { ok: false, code: 'TPL_CHANGED' };
+  // ① 양식이 초안 때와 같은가 — 칸 없는 문단 9할 이상 같음 · 칸 문단 절반 이상 틀이 맞음
+  let plain = 0, plainSame = 0, tokP = 0, tokOk = 0; const dv = new Array(T.length).fill(null);
+  for (let i = 0; i < T.length; i++) {
+    if (!sp[i]) { plain++; if (stripWs(T[i].s) === stripWs(D[i].s)) plainSame++; continue; }
+    tokP++; dv[i] = tokRead(sp[i], D[i].s); if (dv[i]) tokOk++;
+  }
+  if ((plain && plainSame / plain < 0.9) || tokOk * 2 < tokP) return { ok: false, code: 'TPL_CHANGED' };
+  // ② 초안 ↔ 최종본 맞추기
+  const a = D.map(function (x) { return stripWs(x.s); }), b = F.map(function (x) { return stripWs(x.s); });
+  const ma = lcsPairs(a, b), lcsF = {}, usedF = {};   // lcsF = LCS로 맞은 최종 문단 · usedF = 이 돌기에서 칸 문단으로 집은 최종 문단
+  for (let i = 0; i < ma.length; i++) if (ma[i] >= 0) lcsF[ma[i]] = 1;
+  const occ = {};   // 칸 이름 → [{st, d, f}]
+  const put = function (nm, st, d, f) { (occ[nm] = occ[nm] || []).push({ st: st, d: d, f: f }); };
+  for (let i = 0; i < T.length; i++) {
+    const s0 = sp[i]; if (!s0) continue;
+    const unc = function () { s0.toks.forEach(function (nm, k) { put(nm, 'unc', dv[i] ? dv[i][k] : '', ''); }); };
+    const adj = s0.lits.slice(1, -1).some(function (l) { return !stripWs(l); });   // 칸 둘이 글자 없이 붙음
+    if (T[i].box || D[i].box || !dv[i] || adj || s0.toks.length > TOK_PER_PARA) { unc(); continue; }
+    let fv = null;   // 같은 칸이 여러 번 나오면 초안 값이 모두 같아야 한다(아래 모음에서 검사)
+    if (ma[i] >= 0) { if (F[ma[i]].box) { unc(); continue; } fv = dv[i].slice(); }
+    else {
+      let lo = -1, hi = F.length, ilo = -1, ihi = T.length;
+      for (let x = i - 1; x >= 0; x--) if (ma[x] >= 0) { lo = ma[x]; ilo = x; break; }
+      for (let x = i + 1; x < ma.length; x++) if (ma[x] >= 0) { hi = ma[x]; ihi = x; break; }
+      const candF = [], gapD = [];
+      for (let y = lo + 1; y < hi; y++) if (!lcsF[y]) candF.push(y);
+      for (let x = ilo + 1; x < ihi; x++) if (ma[x] < 0) gapD.push(x);
+      let pick = -1;
+      if (candF.length === gapD.length) pick = candF[gapD.indexOf(i)];   // 구간 안 문단 수가 같다 = 같은 차례끼리(고친 문단)
+      else if (stripWs(s0.lits.join('')).length >= 2) { for (const y of candF) { if (!usedF[y] && tokRead(s0, F[y].s)) { pick = y; break; } } }
+      if (pick === undefined || pick < 0 || usedF[pick] || F[pick].box) { unc(); continue; }
+      fv = tokRead(s0, F[pick].s);
+      if (!fv) { unc(); continue; }
+      usedF[pick] = 1;
+    }
+    s0.toks.forEach(function (nm, k) {
+      const d = dv[i][k], f = fv[k];
+      put(nm, stripWs(d) === stripWs(f) ? (stripWs(d) === '' ? 'blank' : 'same') : 'changed', d, f);
+    });
+  }
+  const toks = Object.keys(occ).map(function (nm) {
+    const L = occ[nm], ds = {}; L.forEach(function (o) { if (o.st !== 'unc') ds[stripWs(o.d)] = 1; });
+    if (Object.keys(ds).length > 1) return { name: nm, st: 'unc', d: '', f: '' };   // 같은 칸이 문단마다 다른 값 = 되읽기를 믿을 수 없다
+    const ch = L.filter(function (o) { return o.st === 'changed'; })[0];
+    if (ch) return { name: nm, st: 'changed', d: ch.d, f: ch.f };
+    const sm = L.filter(function (o) { return o.st === 'same'; })[0];
+    if (sm) return { name: nm, st: 'same', d: sm.d, f: sm.f };
+    const bl = L.filter(function (o) { return o.st === 'blank'; })[0];
+    if (bl) return { name: nm, st: 'blank', d: '', f: '' };
+    return { name: nm, st: 'unc', d: L[0].d, f: '' };
+  });
+  return { ok: true, toks: toks };
+}
+function hwpxTokDiff(tplBuf, draftBuf, finalBuf) {
+  let c; try { c = hwpxTokCore(tplBuf, draftBuf, finalBuf); } catch (e) { c = { ok: false, code: 'TOK_THREW' }; }
+  if (!c.ok) return { ok: false, code: c.code, kind: 'hwpx_tok', compared: 0, changed: 0, uncomparable: 0, refs_changed: [], refs_uncomparable: [] };
+  let compared = 0, changed = 0, unc = 0, blank = 0; const rc = [], ru = [];
+  c.toks.forEach(function (t) {
+    if (t.st === 'unc') { unc++; ru.push(t.name); return; }
+    if (t.st === 'blank') { blank++; return; }
+    compared++; if (t.st === 'changed') { changed++; rc.push(t.name); }
+  });
+  if (!compared && !blank) return { ok: false, code: 'NO_TOKEN_MATCH', kind: 'hwpx_tok', compared: 0, changed: 0, uncomparable: unc, refs_changed: [], refs_uncomparable: ru.slice(0, 100) };
+  return { ok: true, kind: 'hwpx_tok', compared: compared, changed: changed, uncomparable: unc, blank_both: blank, ratio: compared ? Math.round(1000 * changed / compared) / 1000 : null, refs_changed: rc.slice(0, 200), refs_uncomparable: ru.slice(0, 100) };
+}
+// 허용 칸의 (초안 값, 최종 값) 짝 — cellRows와 같은 꼴(워커가 모델에 보낼 행). 허용 밖 칸은 바뀜 여부만(값 없음). 비교 불가 칸은 빠진다.
+function hwpxTokRows(tplBuf, draftBuf, finalBuf, allowToks) {
+  const A = {}; (Array.isArray(allowToks) ? allowToks : []).forEach(function (r) { A[String(r).trim()] = 1; });
+  let c; try { c = hwpxTokCore(tplBuf, draftBuf, finalBuf); } catch (e) { c = { ok: false, code: 'TOK_THREW' }; }
+  if (!c.ok) return { ok: false, code: c.code, rows: [], hidden_changed: [], hidden_same_n: 0 };
+  const rows = [], hidden_changed = []; let hidden_same = 0;
+  c.toks.forEach(function (t) {
+    if (t.st === 'unc') return;
+    const same = t.st !== 'changed';
+    if (A[t.name]) rows.push({ ref: t.name, draft: normS(t.d).slice(0, 120), final: normS(t.f).slice(0, 120), visible: true, same: same });
+    else if (!same) hidden_changed.push(t.name); else hidden_same++;
+  });
+  return { ok: true, rows: rows, hidden_changed: hidden_changed.slice(0, 100), hidden_same_n: hidden_same };
+}
 // ---- xlsx 파일 대 파일(v424) ---- 채움 맵이 없는 초안(안전 패킷·낙찰률 내역서)과, AI가 안 채운 칸을 직원이 얼마나 고쳤는지. 수식 칸은 계산값이 따라 바뀌므로 비교하지 않는다. 좌표·횟수만 돌려준다.
 function xlsxFileDiff(draftBuf, finalBuf, skipRefs) {
   const dx = xlsxCells(draftBuf), fx = xlsxCells(finalBuf);
@@ -343,4 +499,4 @@ function cellRows(edits, finalBuf, allowRefs) {
   });
   return { ok: true, rows: rows, hidden_changed: hidden_changed.slice(0, 100), hidden_same_n: hidden_same };
 }
-module.exports = { ZIP_ENTRY_MAX, ZIP_TOTAL_MAX, ZIP_ENTRIES_MAX, XLSX_CELLS_MAX, zipBudget, zipEntries, xlsxCells, xlsxCellDiff, xlsxFileDiff, docxParas, docxParaDiff, hwpxParas, hwpxParaDiff, matchScore, genMarkOf, genMarkParse, listDiff, gapScore, refRC, inMergedNonAnchor, splitRef, cellRows, flattenEdits };
+module.exports = { ZIP_ENTRY_MAX, ZIP_TOTAL_MAX, ZIP_ENTRIES_MAX, XLSX_CELLS_MAX, zipBudget, zipEntries, xlsxCells, xlsxCellDiff, xlsxFileDiff, docxParas, docxParaDiff, hwpxParas, hwpxParaDiff, hwpxParaItems, hwpxTokDiff, hwpxTokRows, TOK_PARA_CAP, matchScore, genMarkOf, genMarkParse, listDiff, gapScore, refRC, inMergedNonAnchor, splitRef, cellRows, flattenEdits };

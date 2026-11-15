@@ -10205,4 +10205,164 @@ function J91a(x) { return JSON.stringify(x); }
   } catch (e) { T('P1 판9 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
 }
 
-console.log(fail ?'\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);
+{ // ---- P1 판16(원장 T396) 계약 학습 2차 — 한글 양식 칸(토큰) 비교 · 허용 칸 추천(_lib/learnallow2) · PM 콘솔 줄 learnhw · 주입 잠금 · 워커 hwpx_tok ----
+  //   결함을 심은 docdiff·gw-data 사본(메모리에서 컴파일 — 파일은 쓰지 않음)에서는 실패해야 한다.
+  const fs16 = require('fs'), Mod16 = require('module');
+  const snap16 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data, f: mem.gw_files || {} });
+  const reset16 = () => { const s = JSON.parse(snap16); mem.gw_users = s.u; mem.gw_data = s.d; mem.gw_files = s.f; blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; };
+  const realFetch16 = global.fetch, savedKey16 = process.env.GW_ANTHROPIC_KEY;
+  try {
+    const FDD = join(FN, '_lib', 'docdiff.js'), SDD = fs16.readFileSync(FDD, 'utf8'), FGD = join(FN, 'gw-data.js'), SGD = fs16.readFileSync(FGD, 'utf8');
+    const load16 = (file, src) => { const m = new Mod16(file); m.filename = file; m.paths = Mod16._nodeModulePaths(dirname(file)); m._compile(src, file); return m.exports; };
+    const mut16 = (src, from, to) => { if (src.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return src.replace(from, () => to); };
+    const DD = require(FDD), LA2 = require(join(FN, '_lib', 'learnallow2.js')), LN = require(join(FN, '_lib', 'learn.js'));
+    const crcT = (() => { const t = new Int32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[n] = c; } return t; })();
+    const crc32 = (b) => { let c = -1; for (let i = 0; i < b.length; i++) c = crcT[(c ^ b[i]) & 0xFF] ^ (c >>> 8); return (c ^ -1) >>> 0; };
+    const mkZip = (entries) => { const locals = [], cds = []; let off = 0; for (const [name, text] of entries) { const nb = Buffer.from(name), db = Buffer.from(text), crc = crc32(db); const lh = Buffer.alloc(30); lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt32LE(crc, 14); lh.writeUInt32LE(db.length, 18); lh.writeUInt32LE(db.length, 22); lh.writeUInt16LE(nb.length, 26); const cd = Buffer.alloc(46); cd.writeUInt32LE(0x02014b50, 0); cd.writeUInt16LE(20, 4); cd.writeUInt16LE(20, 6); cd.writeUInt32LE(crc, 16); cd.writeUInt32LE(db.length, 20); cd.writeUInt32LE(db.length, 24); cd.writeUInt16LE(nb.length, 28); cd.writeUInt32LE(off, 42); locals.push(lh, nb, db); cds.push(cd, nb); off += 30 + nb.length + db.length; } const cdb = Buffer.concat(cds), eocd = Buffer.alloc(22); eocd.writeUInt32LE(0x06054b50, 0); eocd.writeUInt16LE(entries.length, 8); eocd.writeUInt16LE(entries.length, 10); eocd.writeUInt32LE(cdb.length, 12); eocd.writeUInt32LE(off, 16); return Buffer.concat([...locals, cdb, eocd]); };
+    // 문단 = 글자 또는 {box: 글자}(글상자 — 바깥 문단 안 hp:drawText 속 문단)
+    const pX = (s) => '<hp:p><hp:run><hp:t>' + String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</hp:t></hp:run></hp:p>';
+    const hwpx16 = (paras) => mkZip([['mimetype', 'application/hwp+zip'], ['Contents/section0.xml', '<hs:sec>' + paras.map((p) => typeof p === 'string' ? pX(p) : '<hp:p><hp:run><hp:rect><hp:drawText><hp:subList>' + pX(p.box) + '</hp:subList></hp:drawText></hp:rect></hp:run></hp:p>').join('') + '</hs:sec>']]);
+    const TPL16 = ['견 적 서', '견적번호: {{견적번호}}', '수신: {{수신처}} 귀하', '용역명: {{용역명}}', '{{금액한글}}', '단위: {{단위}} · 성상: {{성상}}', '구분 {{구분}}', '부가세 {{부가세구분}}', { box: '비고 {{품명}}' }, '{{단가}}{{수량}}', '위와 같이 견적합니다.'];
+    const V16 = { 견적번호: 'Q-01', 수신처: '포항시', 용역명: '준설 용역', 금액한글: '일금 백만원', 단위: '톤', 성상: '', 구분: '운반', 부가세구분: '(부가세 별도)', 품명: '슬러지', 단가: '1,000', 수량: '5' };
+    const fillP = (p, v) => { const f = (s) => s.replace(/\{\{([^{}]+)\}\}/g, (m, k) => (k in v ? v[k] : m)); return typeof p === 'string' ? f(p) : { box: f(p.box) }; };
+    const DRAFT16 = TPL16.map((p) => fillP(p, V16));
+    const tplB = hwpx16(TPL16), drB = hwpx16(DRAFT16);
+    // 최종본 ① 수신처·금액한글·단위·성상 고침 + 끝에 문단 하나 더함
+    const FIN1 = DRAFT16.slice(); FIN1[2] = '수신: 포항시청 귀하'; FIN1[4] = '일금 이백만원'; FIN1[5] = '단위: ton · 성상: 고상'; FIN1.push('특기사항 없음');
+    // 최종본 ② 금액한글 문단을 지움(구간 문단 수가 달라짐 — 틀 없는 칸은 비교 불가 · 틀 있는 단위 문단은 찾아 읽음) + 수신처 고침
+    const FIN2 = DRAFT16.slice(); FIN2[2] = '수신: 포항시청 귀하'; FIN2.splice(4, 1); FIN2[4] = '단위: 톤 · 성상: 고상';
+    const chkDD = (D) => {
+      const d1 = D.hwpxTokDiff(tplB, drB, hwpx16(FIN1)), d2 = D.hwpxTokDiff(tplB, drB, hwpx16(FIN2)), d3 = D.hwpxTokDiff(tplB, drB, drB);
+      const dT = D.hwpxTokDiff(hwpx16(['머리 글'].concat(TPL16)), drB, hwpx16(FIN1));
+      const r1 = D.hwpxTokRows(tplB, drB, hwpx16(FIN1), ['단위', '성상', '구분', '부가세구분']);
+      const s1 = JSON.stringify(d1) + JSON.stringify(d2);
+      const ok = d1.ok && d1.kind === 'hwpx_tok' && d1.compared === 8 && d1.changed === 4 && d1.uncomparable === 3 && d1.ratio === 0.5 && d1.refs_changed.slice().sort().join() === ['금액한글', '단위', '성상', '수신처'].sort().join() && d1.refs_uncomparable.slice().sort().join() === ['단가', '수량', '품명'].sort().join()
+        && d2.ok && d2.changed === 2 && d2.refs_changed.slice().sort().join() === ['성상', '수신처'].sort().join() && d2.refs_uncomparable.indexOf('금액한글') >= 0 && d2.compared === 7
+        && d3.ok && d3.changed === 0 && d3.blank_both === 1 && d3.compared === 7
+        && !dT.ok && dT.code === 'TPL_CHANGED'
+        && s1.indexOf('포항') < 0 && s1.indexOf('이백만원') < 0 && s1.indexOf('ton') < 0
+        && r1.ok && r1.rows.map((r) => r.ref).sort().join() === ['구분', '단위', '부가세구분', '성상'].sort().join() && r1.rows.some((r) => r.ref === '단위' && r.draft === '톤' && r.final === 'ton' && !r.same)
+        && r1.hidden_changed.slice().sort().join() === ['금액한글', '수신처'].sort().join() && JSON.stringify(r1).indexOf('포항시청') < 0 && JSON.stringify(r1).indexOf('이백만원') < 0
+        && D.hwpxTokDiff(hwpx16(['칸 없는 양식']), hwpx16(['칸 없는 양식']), hwpx16(['칸 없는 양식'])).code === 'NO_TOKENS';
+      return { ok, info: { d1: [d1.compared, d1.changed, d1.uncomparable, d1.refs_changed, d1.refs_uncomparable], d2: [d2.ok, d2.compared, d2.changed, d2.refs_changed, d2.refs_uncomparable], d3: [d3.compared, d3.blank_both], dT: dT.code, r1: r1.rows && r1.rows.map((r) => r.ref) } };
+    };
+    const rDD = chkDD(DD);
+    T('P1 판16 ① docdiff 한글 양식 칸 비교: 양식 {{칸}} 틀로 초안 값 되읽기 · 고친 문단 = 같은 차례끼리(수신처·금액한글·단위·성상 바뀜 4/8) · 글상자 칸·글자 없이 붙은 칸 = 비교 불가 3 · 문단을 지워 구간 수가 다르면 틀 없는 칸 비교 불가·틀 있는 칸은 찾아 읽음 · 그대로면 바뀜 0·빈칸↔빈칸 분모 밖 · 양식 문단 수가 다르면 TPL_CHANGED · 칸 없는 양식 NO_TOKENS · 반환에 값 없음 · hwpxTokRows = 허용 칸만 값(단위 톤→ton)·허용 밖은 칸 이름만',
+      rDD.ok, JSON.stringify(rDD.info));
+    const MDD = [
+      ["    if (T[i].box || D[i].box || !dv[i] || adj || s0.toks.length > TOK_PER_PARA) { unc(); continue; }", "    if (!dv[i] || adj || s0.toks.length > TOK_PER_PARA) { unc(); continue; }", '    if (ma[i] >= 0) { if (F[ma[i]].box) { unc(); continue; } fv = dv[i].slice(); }', '    if (ma[i] >= 0) { fv = dv[i].slice(); }'],   // 글상자 두 겹 다 걷음
+      ['      if (candF.length === gapD.length) pick = candF[gapD.indexOf(i)];', '      if (false) pick = candF[gapD.indexOf(i)];'],
+      ["    const adj = s0.lits.slice(1, -1).some(function (l) { return !stripWs(l); });", '    const adj = false;', '    else { if (!L[j]) return null; q = st.indexOf(L[j], p); if (q < 0) return null; }', '    else { q = st.indexOf(L[j], p); if (q < 0) return null; }'],   // 붙은 칸 두 겹 다 걷음
+      ["  if (T.length !== D.length) return { ok: false, code: 'TPL_CHANGED' };", ''],
+      ["      put(nm, stripWs(d) === stripWs(f) ? (stripWs(d) === '' ? 'blank' : 'same') : 'changed', d, f);", "      put(nm, stripWs(d) === stripWs(f) ? 'same' : 'changed', d, f);"],
+      ["    if (A[t.name]) rows.push(", "    if (true) rows.push("]].map(([a, b, c, d]) => { try { let s = mut16(SDD, a, b); if (c) s = mut16(s, c, d); return chkDD(load16(FDD, s)).ok; } catch (e) { return 'err ' + e.message; } });
+    T('P1 판16 ① 결함 사본 ' + MDD.length + '개(글상자 걷음·같은 차례 짝 걷음·붙은 칸 검사 걷음·양식 바뀜 검사 걷음·빈칸↔빈칸 걷음·허용 밖 값 노출) = 모두 ✗', MDD.every((v) => v === false), JSON.stringify(MDD));
+
+    // ② 추천값 — 앱의 토큰 만드는 곳과 칸 목록 대조(드리프트) · 추천 고정 · 정산합의서 전부 돈 칸
+    const html16 = fs16.readFileSync(join(ROOT, 'index.html'), 'utf8');
+    const fnS = (name) => { const i = html16.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음 ' + name); let d = 0, st = false; for (let j = i; j < html16.length; j++) { const ch = html16[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html16.slice(i, j + 1); } } return ''; };
+    const keysIn = (s) => [...s.matchAll(/"([^"\s]+)":/g)].map((m) => m[1]);
+    const cut16 = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = b ? s.indexOf(b, i + a.length) : s.length; return s.slice(i + a.length, j < 0 ? s.length : j); };
+    const ct = fnS('xgConTok'), adv = fnS('xgAdvTok'), qt = fnS('xgQuoteTok'), qp = cut16(html16, 'var qTokens={', '};');
+    const APP16 = { contract_pledge: keysIn(cut16(ct, 'pledge:{', 'seal:{')), seal_reg: keysIn(cut16(ct, 'seal:{', 'waiver:{')), bond_waiver: keysIn(cut16(ct, 'waiver:{', 'raw:')), adv_pay: keysIn(cut16(adv, 'tokens:{', null)), quote_env: keysIn(cut16(qt, 'tokens:{', null)), quote_con: keysIn(cut16(qt, 'tokens:{', null)), qual_packet: keysIn(qp) };
+    const drift = Object.keys(LA2.TOKENS).filter((t) => JSON.stringify((APP16[t] || []).slice().sort()) !== JSON.stringify(LA2.TOKENS[t].slice().sort()));
+    const st16 = [...cut16(html16, 'var XST_ITEMS=[', '];').matchAll(/\["\w+","[^"]+",(?:true|false),"(F\d+)"\]/g)].map((m) => m[1]);   // 앱 정산 채움 칸(F열)
+    const settleApp = st16.concat(/stEdits\.push\(\['L26', sr\.profitRate, 'n'\]\)/.test(html16) ? ['L26'] : []).map((r) => '원가계산서 (정산)!' + r);
+    const REC = LA2.rec(), CARD = LA2.card();
+    const recOk = JSON.stringify(REC) === JSON.stringify({ contract_pledge: ['업체명'], seal_reg: ['업체명'], bond_waiver: ['업체명'], quote_env: ['부가세구분', '성상', '구분', '단위'], quote_con: ['부가세구분', '성상', '구분', '단위'], adv_pay: ['상호'] })
+      && !REC.qual_packet && !REC.settle_doc && CARD.tpls.settle_doc.rec.length === 0 && CARD.tpls.settle_doc.drop.money === 8 && CARD.tpls.qual_packet.rec.length === 0
+      && JSON.stringify(settleApp.slice().sort()) === JSON.stringify(LA2.SETTLE_CELLS.slice().sort())
+      && ['금액', '보증금률', '적용요율', '점수계', '계약일', '보증기간', '수신처', '공고번호', '품명', '주소', '연락처', '계좌번호', '대표자', '담당자', '사업자번호', '예금종류'].every((n) => LA2.why(n))
+      && ['업체명', '상호', '단위', '성상', '구분', '부가세구분'].every((n) => !LA2.why(n))
+      && CARD.dropped.money + CARD.dropped.date + CARD.dropped.case + CARD.dropped.pii === Object.keys(LA2.TOKENS).reduce((s, t) => s + LA2.TOKENS[t].length, 0) - 12 + 8;
+    T('P1 판16 ② 허용 칸 추천(_lib/learnallow2): 칸 목록 = 앱 토큰 만드는 곳(xgConTok 3종·xgAdvTok·xgQuoteTok·적격심사 qTokens — 드리프트 ' + drift.length + ') · 추천 6양식 12칸(업체명·상호·견적 부가세구분·성상·구분·단위) · 적격심사 0 · 정산합의서 = 앱 채움 칸(F열 7 + L26)과 같은 8칸 전부 돈 칸·추천 0 · 금액·요율·점수·날짜·수신처·번호·품명·주소·연락처·계좌·대표자·담당자·사업자번호 = 뺌',
+      drift.length === 0 && recOk, JSON.stringify({ drift, REC, settleApp, dropped: CARD.dropped }));
+
+    // ③ e2e — 짝(hwpx_tok · 값 없음) · PM 콘솔 learnhw:on(기존 핸들러·상한·낙관락) · 허용 뒤 pending · 양식 바뀜 = 문단 비교 + 까닭
+    const b16 = (x) => Buffer.from(x).toString('base64');
+    const CW16 = { id: 'ucon16', name: '공무직원16', admin: false, perms: { con: 'do' }, dept: '운영부' };
+    const run16 = async (mod) => {
+      reset16();
+      const cl = async (body, tok) => { const r = await mod.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tok, 'x-device-id': 'dev1' }, body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+      mem.gw_users['member:ucon16'] = CW16; mem.gw_users['device:dev1'] = { status: 'approved' }; const tk = issueSession(CW16).token;
+      mem.gw_data['col:contracts'] = { schema: 1, items: [{ id: 'c16', title: '견적 계약', scen: 'dredge:pub', stages: [] }], updated_at: 1 };
+      mem.gw_data['map:contract:v1'] = { schema: 1, scen: { 'dredge:pub': [{ i: 0, name: '견적', co: 'env' }] } };
+      mem.gw_data['settings:learn'] = { schema: 1, contract: { on: true, allow: { asb_plan: ['C7'] } }, updated_at: 1000, updated_by: 'x' };
+      mem.gw_files = mem.gw_files || {}; mem.gw_files['tpl:quote_env'] = { name: '견적서.hwpx', data: b16(tplB), by: 'x', ts: 1 };
+      const o = {};
+      let r = await cl({ action: 'cdoc_put', cid: 'c16', i: 0, doc_key: 'gen.quote_env', kind: 'draft', pii: 1, name: '견적서(환경).hwpx', data: b16(drB) }, tk); o.d = r.code;
+      r = await cl({ action: 'cdoc_put', cid: 'c16', i: 0, doc_key: 'main.작성-0', kind: 'final', name: '견적서_고침.hwpx', data: b16(hwpx16(FIN1)), pii: 1, pair_tpl: 'quote_env' }, tk);
+      const L1 = (r.body && r.body.learn) || {}, p1 = L1.id ? mem.gw_data['learn:contract:in:' + L1.id] : null;
+      o.p1 = L1.ok && L1.kind === 'hwpx_tok' && L1.status === 'done_nomodel' && L1.changed === 4 && L1.compared === 8 && p1 && JSON.stringify(p1).indexOf('포항시청') < 0 && JSON.stringify(p1).indexOf('이백만원') < 0;
+      // 콘솔
+      const lp = await cl({ action: 'learn_pairs_get' }, tokA); o.rec2 = lp.code === 200 && lp.body.rec2 && JSON.stringify(lp.body.rec2.tpls.quote_env.rec) === '["부가세구분","성상","구분","단위"]';
+      const g0 = await cl({ action: 'pmcon_get' }, tokA);
+      const body = (x) => Object.assign({ action: 'pmcon_decide', kind: 'learnhw', row: 'learnhw:on', choice: 'ok', grade: 'R2', due: '2026-11-22', q: '한글 양식 서류도 학습 허용 칸에 넣을까요?', rec: '추천 6양식 12칸', args: { on: true }, set_base: 1000, base: g0.body.updated_at }, x || {});
+      const stale = await cl(body({ set_base: 999 }), tokA); o.stale = stale.code === 409 && JSON.stringify(mem.gw_data['settings:learn'].contract.allow) === '{"asb_plan":["C7"]}';
+      const wk = await cl(body(), tW16()); o.notPm = wk.code === 403;
+      const ok1 = await cl(body(), tokA); const al = mem.gw_data['settings:learn'].contract.allow;
+      o.applied = ok1.code === 200 && ok1.body.applied === true && JSON.stringify(al.asb_plan) === '["C7"]' && Object.keys(al).length === 7 && JSON.stringify(al.quote_env) === '["부가세구분","성상","구분","단위"]' && !al.qual_packet && !al.settle_doc
+        && mem.gw_data['settings:learn'].prev && auditMock.logs.some((e) => e.ev && e.ev[0] && e.ev[0].op === '학습설정') && mem.gw_data['status:decide'].log.slice(-1)[0].row === 'learnhw:on';
+      r = await cl({ action: 'cdoc_put', cid: 'c16', i: 0, doc_key: 'main.작성-0', kind: 'final', name: '견적서_고침2.hwpx', data: b16(hwpx16(FIN2)), pii: 1, pair_tpl: 'quote_env', allow_dup: true }, tk);
+      o.pending = r.body.learn && r.body.learn.kind === 'hwpx_tok' && r.body.learn.status === 'pending'; o.pid = r.body.learn && r.body.learn.id;
+      // 주입 잠금 — 허용 사전에 돈 칸(금액)을 손으로 넣어도 한글 양식 기본값에서 빠짐 · 정산합의서 = 주입 없음
+      mem.gw_data['settings:learn'].contract.allow.quote_env = ['단위', '금액']; mem.gw_data['settings:learn'].contract.allow.settle_doc = ['원가계산서 (정산)!F14'];
+      mem.gw_data['lessons:contract:quote_env'] = { rules: [{ id: 'r1', text: '단위는 톤', scope: 'field_default', field: '단위', value: '톤', n: 2 }, { id: 'r2', text: '금액', scope: 'field_default', field: '금액', value: '1,000', n: 3 }] };
+      mem.gw_data['lessons:contract:settle_doc'] = { rules: [{ id: 'r3', text: 'F14', scope: 'field_default', field: '원가계산서 (정산)!F14', value: '5000', n: 4 }] };
+      const i1 = await cl({ action: 'learn_defaults_get', tpl: 'quote_env' }, tk), i2 = await cl({ action: 'learn_defaults_get', tpl: 'settle_doc' }, tk);
+      o.inject = i1.code === 200 && JSON.stringify(i1.body.defaults) === '{"단위":"톤"}' && i2.code === 200 && JSON.stringify(i2.body.defaults) === '{}';
+      // 끄기(off) = 추천 양식 키만 뺌
+      const g1 = await cl({ action: 'pmcon_get' }, tokA);
+      const off = await cl(body({ row: 'learnhw:off', args: { on: false }, set_base: mem.gw_data['settings:learn'].updated_at, base: g1.body.updated_at }), tokA);
+      const al2 = mem.gw_data['settings:learn'].contract.allow;
+      o.off = off.code === 200 && Object.keys(al2).sort().join() === 'asb_plan,settle_doc';
+      // 양식을 갈아 끼움 → 문단 비교 + tok_code
+      mem.gw_files['tpl:quote_env'] = { name: '새 견적서.hwpx', data: b16(hwpx16(['새 머리'].concat(TPL16))), by: 'x', ts: 2 };
+      r = await cl({ action: 'cdoc_put', cid: 'c16', i: 0, doc_key: 'main.작성-0', kind: 'final', name: '견적서_고침3.hwpx', data: b16(hwpx16(FIN1)), pii: 1, pair_tpl: 'quote_env', allow_dup: true }, tk);
+      const p3 = r.body.learn && r.body.learn.id ? mem.gw_data['learn:contract:in:' + r.body.learn.id] : null;
+      o.tplChg = r.body.learn && r.body.learn.kind === 'hwpx_para' && p3 && p3.diff && p3.diff.tok_code === 'TPL_CHANGED';
+      mem.gw_files['tpl:quote_env'] = { name: '견적서.hwpx', data: b16(tplB), by: 'x', ts: 3 };
+      o.ok = o.d === 200 && o.p1 && o.rec2 && o.stale && o.notPm && o.applied && o.pending && o.inject && o.off && o.tplChg;
+      return o;
+    };
+    const tW16 = () => { mem.gw_users['member:u16a'] = { id: 'u16a', name: '관리부16', role: '관리자', admin: true, perms: {} }; return issueSession(mem.gw_users['member:u16a']).token; };
+    const R16 = await run16(gwd);
+    T('P1 판16 ③ e2e: 한글 견적서 최종본 = 칸 비교 짝(hwpx_tok · 바뀜 4/8 · 짝 블롭에 값 없음 · 허용 전 done_nomodel) · learn_pairs_get rec2 · PM 콘솔 learnhw:on = 기존 learn_settings_set 길(낡은 set_base 409·PM 아닌 관리자 403·1차 asb_plan 그대로 + 추천 6양식·감사 학습설정·누른 기록) · 그 뒤 최종본 pending · 주입 잠금(한글 양식 돈 칸 금액 뺌·정산합의서 {}) · learnhw:off = 추천 양식 키만 뺌 · 양식을 갈아 끼우면 문단 비교 + tok_code TPL_CHANGED',
+      R16.ok, JSON.stringify(R16));
+    // ④ 워커 — 허용 칸만 값 · 칸 이름 프롬프트 · 규칙 field = 칸 이름
+    reset16();
+    const R16w = await (async () => {
+      const r0 = await run16(gwd); if (!r0.pid) return { r0 };
+      // run16 끝에서 끄기까지 했으니 다시 켬(워커가 허용 사전을 읽는다)
+      mem.gw_data['settings:learn'].contract.allow.quote_env = LA2.rec().quote_env; delete mem.gw_data['lessons:contract:quote_env'];
+      mem.gw_data['learn:contract:in:' + r0.pid].status = 'pending';
+      const worker = require(join(FN, 'gw-learn-background.js'));
+      process.env.GW_ANTHROPIC_KEY = 'test-anthropic-key-0016';
+      const api = [];
+      global.fetch = async (url, opt) => { const b = JSON.parse(opt.body || '{}'); api.push((b.messages && b.messages[0] && b.messages[0].content[0].text) || '');
+        const text = JSON.stringify({ summary: '성상을 채웠다', changes: [{ kind: 'field_default', what: '성상' }], rules: [{ text: '성상 칸은 고상', scope: 'field_default', n: 2, keep_id: '', field: '성상', value: '고상' }, { text: '수신처는 시청', scope: 'field_default', n: 2, keep_id: '', field: '수신처', value: '포항시청' }] });
+        return { ok: true, status: 200, text: async () => JSON.stringify({ model: b.model, stop_reason: 'end_turn', usage: { input_tokens: 100, output_tokens: 20 }, content: [{ type: 'text', text }] }) }; };
+      await worker.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + issueSession({ id: '__promoai__', role: 'system' }).token }, body: JSON.stringify({ pair_id: r0.pid }) }, {});
+      const P = mem.gw_data['learn:contract:in:' + r0.pid], L = mem.gw_data['lessons:contract:quote_env'], u = api[0] || '';
+      return { st: P.status, code: P.code, calls: api.length, vis: P.visible_n, hid: P.hidden_changed_n, unitLine: /한글\(hwpx\) 양식/.test(u) && /\(칸 이름 · 앱 초안 값/.test(u), val: u.indexOf('"고상"') > 0, leak: u.indexOf('포항시청') >= 0, rules: L && L.rules.map((x) => x.field) };
+    })();
+    T('P1 판16 ④ 학습 워커 hwpx_tok: 허용 칸(부가세구분·성상·구분·단위)만 값이 프롬프트에(성상 "고상") · 허용 밖 수신처는 칸 이름만(포항시청 미노출) · 한글 양식 단위 글 · 모델 규칙 중 허용 밖 칸(수신처) field_default 버림 → 성상 1',
+      R16w.st === 'done' && R16w.calls === 1 && R16w.vis === 4 && R16w.hid === 1 && R16w.unitLine && R16w.val && !R16w.leak && JSON.stringify(R16w.rules) === '["성상"]', JSON.stringify(R16w));
+    const xPrompt = LN.buildContractPrompt({ tpl: 'asb_plan', rules: [], rows: [], hidden_changed: [], hidden_same_n: 0 }).user;
+    T('P1 판16 ④ xlsx 프롬프트 글 그대로(칸 이름 글은 한글 양식만)', xPrompt.indexOf('[값이 보이는 칸 — 허용 사전 안] (셀 · 앱 초안 값 · 직원 최종본 값)') > 0 && xPrompt.indexOf('한글(hwpx)') < 0 && /\n\[양식\] asb_plan\n/.test(xPrompt));
+    // ⑤ gw-data 결함 사본
+    const MGD = [
+      ["  const status = ((kind === 'xlsx_cell' || kind === 'hwpx_tok') && learnAllowed(s, tpl))", "  const status = ((kind === 'xlsx_cell') && learnAllowed(s, tpl))"],
+      ['  const defaults = LA2.injectFilter(tpl, LN.fieldDefaults(', '  const defaults = (function (t, x) { return x; })(tpl, LN.fieldDefaults('],
+      ["    if (tk && tk.ok) { diff = tk; kind = 'hwpx_tok'; }", "    if (false) { diff = tk; kind = 'hwpx_tok'; }"],
+      ["  Object.keys(rec).forEach(function (t) { if (d.on) next[t] = rec[t].slice(); else delete next[t]; });", "  const next2 = {}; Object.keys(rec).forEach(function (t) { if (d.on) next2[t] = rec[t].slice(); }); Object.keys(next).forEach(function (k) { delete next[k]; }); Object.assign(next, next2);"],
+      ["  return handleLearnSettingsSet(event, { allow: next, base: d.base }, R);", "  return handleLearnSettingsSet(event, { allow: next }, R);"],
+      ["'outside_changed', 'refs_outside', 'tok_code'].forEach", "'outside_changed', 'refs_outside'].forEach"]];
+    const kGD = [];
+    for (const [a, b] of MGD) { let v; try { v = (await run16(load16(FGD, mut16(SGD, a, b)))).ok; } catch (e) { v = 'err ' + e.message; } kGD.push(v); }
+    T('P1 판16 ⑤ 결함 사본 ' + MGD.length + '개(한글 양식 칸 짝 pending 걷음·주입 잠금 걷음·칸 비교 걷음·1차 허용 칸 날림·낙관락 base 걷음·까닭 tok_code 걷음) = 모두 ✗', kGD.every((v) => v === false), JSON.stringify(kGD));
+  } catch (e) { T('P1 판16 검사 실행', false, String(e && e.stack || e).slice(0, 500)); }
+  finally { reset16(); global.fetch = realFetch16; process.env.GW_ANTHROPIC_KEY = savedKey16; }
+}
+
+console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);
