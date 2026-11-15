@@ -7944,7 +7944,7 @@ try {
     '**병합은 이 기기에서 고친 줄만**', '`wkDirty`', '`wkMarkDirty`', '**현장 대장을 아직 못 읽음**', '`wkAsbOk`', '`#wkAsbNote`', "'1년 내 —'", "'확인 중' 41.9", "'…' 9.2", '53.8', '**로그인 창 \'전환\' = 대장도 읽음**', '`renderWorkers(); loadAsb();`',
     '**수정 창 안내 줄 `#wkExamMoved`**', '`applySafetyPerms`', '**해체계획서 ③ 교육 기록 읽기**', '`wkEduEnsure`', '`wkEduSt`', '앞 12명', "'아직 읽지 못해 빈칸'", '문서 서술만:', '범위 밖(받아들임', 'C063'];
   const CL_REV42 = ['검토 반영(11/11): **병합은 이 기기에서 고친 줄만**', '`wkDirty`', '`wkMarkDirty`', '`WK_NO_ADD_MSG`', '`#swNoWkNote`', '`swEmptyText`', '`wkAsbOk`', '`#wkAsbNote`', '`renderWorkers(); loadAsb();`', '`#wkExamMoved`', '`wkEduEnsure`', '`wkEduSt`'];
-  const cb24 = tl24.split(/\r?\n/).filter((l) => /^- \[ \] \(AI 시험 화면 대상 — 검토 반영\(11\/11\)/.test(l)), gate24 = tl24.split(/\r?\n/).filter((l) => /^- \[x\] \(AI\) `uismoke`\(/.test(l));
+  const cb24 = tl24.split(/\r?\n/).filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상 — 검토 반영\(11\/11\)/.test(l)), /* 11/15: 시험 서버 확인 뒤 닫은 칸도 셈 */ gate24 = tl24.split(/\r?\n/).filter((l) => /^- \[x\] \(AI\) `uismoke`\(/.test(l));
   const man14_24 = (() => { const i = man24.indexOf('<h2 id="s14">'), j = man24.indexOf('<h2 id="s15">'); return i < 0 || j < i ? '' : man24.slice(i, j); })();
   const liSw24 = (/<li><span class="btn">근로자 추가<\/span>로 참여 근로자를 넣습니다\.[^\n]*<\/li>/.exec(man24) || [''])[0];
   const la24 = fn42(html, 'loadAsb');
