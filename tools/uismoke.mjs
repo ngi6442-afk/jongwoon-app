@@ -15441,16 +15441,22 @@ try {
   const TXT21 = '# 연구개발전담부서 연구노트 — 2026-10 (자동 초안)\n- 10-14 · 앱 1ca49a8 · v385 운반일지 <엑셀> & "화면"\n';
   const DOC21 = (over) => Object.assign({ period: '2026-10', status: 'draft', text: TXT21, meta: META21, created_at: new Date(2026, 10, 1, 8, 31).getTime(), updated_at: 1793500000000, confirmed: null }, over || {});
   const CONF21 = DOC21({ status: 'confirmed', confirmed: { ts: new Date(2026, 10, 2, 9, 0).getTime(), by: 'u21pm', name: '가짜요원', edited: true } });
-  const RES21 = (d, cw) => ({ rnote_get: { status: 200, body: { status: 'OK', period: '2026-10', doc: d, can_write: cw !== false } } });
-  const dr = await run21({ res: RES21(DOC21()) }), ro = await run21({ res: RES21(DOC21(), false) }), cf = await run21({ res: RES21(CONF21) }), nu = await run21({ res: RES21(null) });
+  const RES21 = (d, cw, ex) => ({ rnote_get: { status: 200, body: { status: 'OK', period: '2026-10', doc: d, latest: (ex && ex.latest) || null, months: (ex && ex.months) || [], can_write: cw !== false } } });
+  const LRES21 = () => RES21(null, true, { latest: CONF21 });   // 검토 ③: 초안 없음 + 최근 확정본(서버 latest)
+  const CONF09 = Object.assign({}, CONF21, { period: '2026-09' });
+  const MRES21 = () => RES21(DOC21(), true, { latest: CONF09, months: [{ period: '2026-09', status: 'confirmed' }, { period: '2026-10', status: 'draft' }, { period: '2026-11', status: 'draft' }] });
+  const muOk = async (H) => { const r = await run21({ res: MRES21() }, H); const v = r.vis(); const b = r.card._btn.find((x) => x.a === 'downlast'); if (b) b.h();
+    return v.indexOf('연구노트 10월 초안 — 확인해 주세요') >= 0 && v.indexOf('확정 안 된 초안이 더 있습니다: 11월 — 이 달을 확정하면 다음 달이 나옵니다') >= 0 && v.indexOf('최근 확정본: 9월 — 다시 받을 수 있습니다') >= 0
+      && r.card._btn.map((x) => x.a).join() === 'ack,edit,view,downlast' && v.indexOf('9월 확정본 받기') >= 0 && r.dl.length === 1 && r.dl[0].n === '연구노트_2026-09_확정.md' && r.calls.every((c) => c.action === 'rnote_get'); };
+  const dr = await run21({ res: RES21(DOC21()) }), ro = await run21({ res: RES21(DOC21(), false) }), cf = await run21({ res: LRES21() }), nu = await run21({ res: RES21(null) });
   const er = await run21({ res: { rnote_get: { status: 503, body: { error_code: 'RNOTE_READ_FAILED' } } } }), ne = await run21({ res: { rnote_get: 'net' } });
   const bt = (r) => r.card._btn.map((b) => b.a).join();
-  T('P1 판21 ② 카드(실행): 초안 = "연구노트 10월 초안 — 확인해 주세요" · 과제별 건수·자동 커밋 뺀 수 · 재료 저장소 · 빠진 저장소와 까닭 · 가린 것 · [확인]·[고침]·[글 보기](글은 접혀 있음) · 쓸 수 없는 사람 = "확인하실 분" 안내·[글 보기]만 · 확정본 = "연구노트 10월 확정본"·"확인함 · 11-02 가짜요원 · 고친 글로 확정"·[.md 내려받기]·[글 보기] · 문서 없는 달 = 카드·묶음 제목 숨김 · 불러오기 실패·네트워크 = 빨간 안내(숨기지 않음)',
+  T('P1 판21 ② 카드(실행): 초안 = "연구노트 10월 초안 — 확인해 주세요" · 과제별 건수·자동 커밋 뺀 수 · 재료 저장소 · 빠진 저장소와 까닭 · 가린 것 · [확인]·[고침]·[글 보기](글은 접혀 있음) · 쓸 수 없는 사람(PM 아님) = "확인하실 분: 연구전담요원(PM)" 안내·[글 보기]만 · 확정 안 된 초안 여러 달 = 가장 오래된 달 카드 + "확정 안 된 초안이 더 있습니다: 11월" 한 줄 + "최근 확정본: 9월"·[9월 확정본 받기](서버 안 부르고 내려받기) · 초안 없음 = 최근 확정본 카드 = "연구노트 10월 확정본"·"확인함 · 11-02 가짜요원 · 고친 글로 확정"·[.md 내려받기]·[글 보기] · 문서 없는 달 = 카드·묶음 제목 숨김 · 불러오기 실패·네트워크 = 빨간 안내(숨기지 않음)',
     dr.card.style.display === '' && dr.wrap.style.display === '' && dr.vis().indexOf('연구노트 10월 초안 — 확인해 주세요') >= 0 && dr.vis().indexOf('과제1 0건 · 과제2 3건 · 과제3 65건 (자동 커밋 211건은 뺌)') >= 0
     && dr.vis().indexOf('재료: 앱 저장소 40건 · 수집기 저장소 24건 (커밋 이력)') >= 0 && dr.vis().indexOf('빠진 저장소: 문서 저장소(비공개 — 새 키 없이 읽을 수 없음)') >= 0 && dr.vis().indexOf('가린 것: 직원 이름 1') >= 0
-    && bt(dr) === 'ack,edit,view' && dr.els.rnotePre && dr.els.rnotePre.style.display === 'none' && bt(ro) === 'view' && ro.vis().indexOf('확인하실 분: 연구전담요원') >= 0
+    && bt(dr) === 'ack,edit,view' && dr.els.rnotePre && dr.els.rnotePre.style.display === 'none' && bt(ro) === 'view' && ro.vis().indexOf('확인하실 분: 연구전담요원(PM)') >= 0
     && cf.vis().indexOf('연구노트 10월 확정본') >= 0 && cf.vis().indexOf('확인함 · 11-02 가짜요원 · 고친 글로 확정') >= 0 && bt(cf) === 'down,view'
-    && nu.card.style.display === 'none' && nu.wrap.style.display === 'none' && er.card.style.display === '' && er.vis().indexOf('연구노트 초안을 불러오지 못했습니다 (RNOTE_READ_FAILED)') >= 0 && ne.vis().indexOf('네트워크') >= 0,
+    && (await muOk(html)) && nu.card.style.display === 'none' && nu.wrap.style.display === 'none' && er.card.style.display === '' && er.vis().indexOf('연구노트 초안을 불러오지 못했습니다 (RNOTE_READ_FAILED)') >= 0 && ne.vis().indexOf('네트워크') >= 0,
     JSON.stringify({ v: dr.vis().slice(0, 260), b: [bt(dr), bt(ro), bt(cf)], nu: nu.wrap.style.display }));
   // ③ 누름
   const tick = async () => { for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0)); };
@@ -15466,9 +15472,10 @@ try {
     const emp = await run21({ res: Object.assign(RES21(DOC21()), { rnote_save: OK21 }) }, H); click(emp, 'edit'); emp.els.rnoteEdit.value = '   '; click(emp, 'editok'); await tick();
     const back = await run21({ res: RES21(DOC21()) }, H); click(back, 'edit'); const inEdit = /id="rnoteEdit"/.test(back.card.innerHTML); click(back, 'editno');
     const vw = await run21({ res: RES21(DOC21()) }, H); click(vw, 'view'); const shown = vw.els.rnotePre.style.display;
-    const dn = await run21({ res: RES21(CONF21) }, H); click(dn, 'down');
+    const dn = await run21({ res: LRES21() }, H); click(dn, 'down');
+    const e5 = await run21({ res: Object.assign(RES21(DOC21()), { rnote_save: { status: 500, body: { error_code: 'RNOTE_WRITE_FAILED' } } }) }, H); click(e5, 'edit'); e5.els.rnoteEdit.value = TXT21 + '- 지키는 줄\n'; click(e5, 'editok'); await tick();
     const sv = (r) => r.calls.filter((c) => c.action === 'rnote_save');
-    return { ack, can, stl, ed, same, emp, back, vw, dn, taOrig, inEdit, shown, sv };
+    return { ack, can, stl, ed, same, emp, back, vw, dn, e5, taOrig, inEdit, shown, sv };
   };
   const chk21p = (p) => {
     const a = p.sv(p.ack), e = p.sv(p.ed), s = p.sv(p.same);
@@ -15477,10 +15484,11 @@ try {
       && p.sv(p.can).length === 0 && p.can.dl.length === 0 && p.stl.log.some((x) => x.indexOf('toast:연구노트가 방금 바뀌었습니다') === 0) && p.stl.dl.length === 0
       && p.taOrig === TXT21 && e.length === 1 && e[0].text === TXT21 + '- 요원이 고친 줄\n' && e[0].base === 1793500000000 && p.ed.dl.length === 1 && p.ed.dl[0].t.indexOf('요원이 고친 줄') > 0
       && s.length === 1 && !('text' in s[0]) && p.sv(p.emp).length === 0 && p.emp.log.some((x) => x === 'alert:글이 비어 있습니다.')
-      && p.inEdit && !/id="rnoteEdit"/.test(p.back.card.innerHTML) && /data-rnote="ack"/.test(p.back.card.innerHTML) && p.shown === '' && p.dn.dl.length === 1 && p.sv(p.dn).length === 0;
+      && p.inEdit && !/id="rnoteEdit"/.test(p.back.card.innerHTML) && /data-rnote="ack"/.test(p.back.card.innerHTML) && p.shown === '' && p.dn.dl.length === 1 && p.sv(p.dn).length === 0
+      && p.sv(p.e5).length === 1 && p.e5.log.indexOf('renderPmcon') < 0 && p.e5.log.some((x) => x.indexOf('alert:연구노트 확정 실패 (RNOTE_WRITE_FAILED) — 쓴 글은 그대로') === 0) && /id="rnoteEdit"/.test(p.e5.card.innerHTML) && p.e5.els.rnoteEdit.value.indexOf('지키는 줄') > 0 && p.e5.dl.length === 0;
   };
   const p21 = await press({});
-  T('P1 판21 ③ 누름: [확인] = rnote_save 하나(달 2026-10·base = 문서 updated_at·글 없음) → 안내 + 확정본 "연구노트_2026-10_확정.md"(글 + "요원 확정: 이름" 꼬리·markdown) 내려받기 + 콘솔 다시 그림 · 확인 창 취소 = 서버 안 부름 · 409 = "방금 바뀌었습니다"·내려받기 없음 · [고침] = 글이 든 입력 칸 → 고친 글로 rnote_save(글·base) → 고친 확정본 내려받기 · 안 고치고 확정 = 글 없이 · 빈 글 = 알림·서버 안 부름 · [취소] = 카드로 돌아감 · [글 보기] = 펼침 · 확정본 [.md 내려받기] = 서버 안 부르고 내려받기',
+  T('P1 판21 ③ 누름: [확인] = rnote_save 하나(달 2026-10·base = 문서 updated_at·글 없음) → 안내 + 확정본 "연구노트_2026-10_확정.md"(글 + "요원 확정: 이름" 꼬리·markdown) 내려받기 + 콘솔 다시 그림 · 확인 창 취소 = 서버 안 부름 · 409 = "방금 바뀌었습니다"·내려받기 없음 · [고침] = 글이 든 입력 칸 → 고친 글로 rnote_save(글·base) → 고친 확정본 내려받기 · 안 고치고 확정 = 글 없이 · 빈 글 = 알림·서버 안 부름 · [취소] = 카드로 돌아감 · [글 보기] = 펼침 · 확정본 [.md 내려받기] = 서버 안 부르고 내려받기 · [고침] 저장이 500 = 알림만·다시 그리지 않음 — 고친 글이 입력 칸에 남음(검토 ⑤)',
     chk21p(p21), JSON.stringify({ ack: p21.sv(p21.ack), ed: p21.sv(p21.ed), same: p21.sv(p21.same), dl: p21.ack.dl.map((x) => x.n), log: p21.stl.log, ta: p21.taOrig && p21.taOrig.slice(0, 30) }));
   // ④ 결함 사본
   const MUT21 = [
@@ -15496,6 +15504,12 @@ try {
     ['border-radius:8px;">\' + esc(doc.text || "") + \'</pre>\'', 'border-radius:8px;">\' + (doc.text || "") + \'</pre>\''],
     ['    if (!doc || doc.status !== "confirmed") return;\n', ''],
     ['var tail = "\\n\\n---\\n- 요원 확정: " + (cf.name || "")', 'var tail = "\\n\\n---\\n- 확정: "'],
+    ['alert("연구노트 확정 실패 (" + (code || res.status) + ") — 쓴 글은 그대로 두었습니다. 잠시 뒤 다시 눌러 주세요.");', 'alert("연구노트 확정 실패 (" + (code || res.status) + ") — 쓴 글은 그대로 두었습니다. 잠시 뒤 다시 눌러 주세요."); renderPmcon();'],
+    ['if (!done && others.length) li.push(', 'if (false && others.length) li.push('],
+    ['if (lt) li.push("최근 확정본: "', 'if (false) li.push("최근 확정본: "'],
+    ['        if (a === "downlast"){ rnoteDownload(ex && ex.latest); return; }\n', ''],
+    ['var latest = res.body.latest || null, doc = res.body.doc || latest;', 'var latest = res.body.latest || null, doc = res.body.doc;'],
+    ['.filter(function(x){ return x && x.status !== "confirmed" && x.period !== doc.period; })', '.filter(function(x){ return x && x.period !== doc.period; })'],
   ];
   const EVIL21 = DOC21({ text: '<img src=x onerror=1> & "q"', meta: Object.assign({}, META21, { missing: [{ label: '문서<b>저장소</b>', why: 'x' }] }) });
   const evilOk = async (H) => { const r = await run21({ res: RES21(EVIL21) }, H); return r.card.innerHTML.indexOf('<img') < 0 && r.card.innerHTML.indexOf('&lt;img') >= 0 && r.card.innerHTML.indexOf('<b>저장소</b>') < 0; };
@@ -15507,13 +15521,13 @@ try {
     const Hx = html.replace(from, () => to);
     let broken = false;
     try {
-      const a = await run21({ res: RES21(DOC21(), false) }, Hx), b = await run21({ res: RES21(null) }, Hx), c = await run21({ res: RES21(CONF21) }, Hx);
+      const a = await run21({ res: RES21(DOC21(), false) }, Hx), b = await run21({ res: RES21(null) }, Hx), c = await run21({ res: LRES21() }, Hx);
       const p = await press({}, Hx);
-      broken = !(bt(a) === 'view' && b.wrap.style.display === 'none' && bt(c) === 'down,view' && chk21p(p) && (await evilOk(Hx)) && (await dlGuard(Hx)));
+      broken = !(bt(a) === 'view' && b.wrap.style.display === 'none' && bt(c) === 'down,view' && chk21p(p) && (await evilOk(Hx)) && (await dlGuard(Hx)) && (await muOk(Hx)));
     } catch (err) { broken = true; }
     if (!broken) kill21.push(from.slice(0, 60) + ' 안 깨짐');
   }
-  T('P1 판21 ④ 결함 사본 ' + MUT21.length + '개(숨을 때 묶음 안 셈 · base 없이 확정 · 늘 글 실음 · 확인 창 건너뜀 · 확정 뒤 내려받기 없음 · 쓸 수 없는데 [확인] · 확정본에 [확인] · 빈 글 막음 걷음 · 줄 이스케이프 걷음 · 글 보기 이스케이프 걷음 · 초안도 내려받기 · 확정자 꼬리 바꿈) 전부 깨짐 · 이스케이프(꺾쇠·따옴표) 기준 통과',
+  T('P1 판21 ④ 결함 사본 ' + MUT21.length + '개(숨을 때 묶음 안 셈 · base 없이 확정 · 늘 글 실음 · 확인 창 건너뜀 · 확정 뒤 내려받기 없음 · 쓸 수 없는데 [확인] · 확정본에 [확인] · 빈 글 막음 걷음 · 줄 이스케이프 걷음 · 글 보기 이스케이프 걷음 · 초안도 내려받기 · 확정자 꼬리 바꿈 · 검토 11/15: 실패 때 다시 그림 · 다른 달 초안 줄 · 최근 확정본 줄 · 최근 확정본 받기 · 초안 없을 때 확정본 카드 · 확정된 달도 초안으로 셈) 전부 깨짐 · 이스케이프(꺾쇠·따옴표) 기준 통과',
     evil0 && dlg0 && kill21.length === 0, JSON.stringify({ evil0, dlg0, kill21 }));
   // ⑤ 화면 글 — 내부 키 이름·밑줄 이름·상태 글자 0 · 초안 카드에 입력 칸 0(고침 때만 글 칸 1)
   const leak21 = (dr.vis() + ' ' + cf.vis()).replace(TXT21.replace(/<[^>]+>/g, ' '), ' ').match(/\b[a-z]+_[a-z_]+\b|\brnote\b|\b(?:draft|confirmed|bot)\b/g) || [];

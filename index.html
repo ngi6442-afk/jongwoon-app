@@ -32205,7 +32205,7 @@ function dutyStage(nx){
     var n = 0; Array.prototype.forEach.call(host.children || [], function(el){ if (!(el.style && el.style.display === "none")) n++; });
     wrap.style.display = n ? "" : "none";
   }
-  // ---- P1 판21 KOITA 연구노트 월 자동 초안 카드(착수설명서 판21 · 원장 T759·C099) — 서버 rnote_get 하나(지난달 문서). 만드는 쪽 = appdata 봇(매월 1~3일, 직원명·거래처·금액을 가린 초안).
+  // ---- P1 판21 KOITA 연구노트 월 자동 초안 카드(착수설명서 판21 · 원장 T759·C099) — 서버 rnote_get 하나(최근 12달 목록·가장 오래된 확정 전 초안·최근 확정본). 만드는 쪽 = appdata 봇(매월 1~3일, 직원명·거래처·금액을 가린 초안).
   //   초안 = [확인](그대로 확정) · [고침](글을 고쳐 확정) · [글 보기] — 확정은 rnote_save 하나(달·base · 고침이면 고친 글), 확정되면 확정본 .md를 내려받는다(downloadBlob — 요원이 연구노트 폴더에 보관).
   //   확정본 = 한 줄(누가·언제·고친 글인지) + [.md 내려받기]·[글 보기] · 문서가 없으면 카드 없음(pmconChecksSync) · 새 푸시 없음. 봇 원본 글은 서버가 따로 남긴다(판33 학습 짝 — 화면에는 내리지 않음).
   var rnoteBusy = false;
@@ -32221,17 +32221,25 @@ function dutyStage(nx){
     li.push(kt.length ? "가린 것: " + kt.join(" · ") : "가린 것: 없음");
     return li;
   }
-  function rnoteCardHtml(doc, canWrite){
+  //   검토 11/15 ③: 서버가 최근 12달 목록(months)·가장 오래된 확정 전 초안(doc)·가장 최근 확정본(latest)을 함께 내린다 — 카드는 확정 안 된 초안을 오래된 달부터 1장씩,
+  //   다른 달 초안이 더 있으면 한 줄로 알리고, 가장 최근 확정본은 [n월 확정본 받기]로 늘 다시 받을 수 있다(초안이 없으면 확정본 한 줄 카드). 확정은 연구전담요원(PM)만(서버 can_write).
+  function rnoteCardHtml(doc, canWrite, ex){
+    ex = ex || {};
     var two = function(n){ return String(n).padStart(2, "0"); }, mo = rnoteMonth(doc.period), done = doc.status === "confirmed", cf = doc.confirmed || {};
     var t = new Date(Number(done ? cf.ts : doc.created_at) || 0), when = isNaN(t.getTime()) ? "" : two(t.getMonth() + 1) + "-" + two(t.getDate());
     var head = done ? "연구노트 " + mo + " 확정본" : "연구노트 " + mo + " 초안 — 확인해 주세요";
     var li = done ? ["확인함 · " + when + (cf.name ? " " + cf.name : "") + (cf.edited ? " · 고친 글로 확정" : " · 초안 그대로 확정")] : rnoteMeta(doc);
+    var others = (ex.others || []).map(rnoteMonth);
+    if (!done && others.length) li.push("확정 안 된 초안이 더 있습니다: " + others.join(" · ") + " — 이 달을 확정하면 다음 달이 나옵니다");
+    var lt = (!done && ex.latest && ex.latest.status === "confirmed") ? ex.latest : null;
+    if (lt) li.push("최근 확정본: " + rnoteMonth(lt.period) + " — 다시 받을 수 있습니다");
     var btn = done ? '<button type="button" class="b-ok" data-rnote="down">.md 내려받기</button>'
-      : (canWrite ? '<button type="button" class="b-ok" data-rnote="ack">확인</button><button type="button" class="mini-btn" data-rnote="edit">고침</button>' : '<span class="pc-who">확인하실 분: 연구전담요원</span>');
+      : (canWrite ? '<button type="button" class="b-ok" data-rnote="ack">확인</button><button type="button" class="mini-btn" data-rnote="edit">고침</button>' : '<span class="pc-who">확인하실 분: 연구전담요원(PM)</span>');
     return '<div style="font-weight:600;font-size:13.5px;">' + esc(head) + '</div>'
       + '<ul style="margin:6px 0 0;padding-left:18px;font-size:13px;line-height:1.5;">' + li.map(function(x){ return '<li style="margin:3px 0;">' + esc(x) + '</li>'; }).join("") + '</ul>'
       + '<div class="pc-none" style="padding:4px 0 0;">' + esc(done ? "확정본을 연구노트 폴더에 보관해 주세요" : (when ? when + " " : "") + "자동으로 만든 초안 · 확정하면 확정본(.md)을 내려받습니다") + '</div>'
-      + '<div class="pc-btns" style="justify-content:flex-start;margin-top:8px;">' + btn + '<button type="button" class="mini-btn" data-rnote="view">글 보기</button></div>'
+      + '<div class="pc-btns" style="justify-content:flex-start;margin-top:8px;flex-wrap:wrap;">' + btn + '<button type="button" class="mini-btn" data-rnote="view">글 보기</button>'
+      + (lt ? '<button type="button" class="mini-btn" data-rnote="downlast">' + esc(rnoteMonth(lt.period) + " 확정본 받기") + '</button>' : '') + '</div>'
       + '<pre id="rnotePre" style="display:none;white-space:pre-wrap;word-break:break-all;font-size:12px;line-height:1.5;max-height:320px;overflow:auto;margin:8px 0 0;padding:8px;border:1px solid var(--line);border-radius:8px;">' + esc(doc.text || "") + '</pre>';
   }
   function rnoteEditHtml(doc){
@@ -32239,15 +32247,16 @@ function dutyStage(nx){
       + '<textarea id="rnoteEdit" rows="14" style="width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);font-size:13px;font-family:inherit;resize:vertical;margin:8px 0 2px;box-sizing:border-box;">' + esc(doc.text || "") + '</textarea>'
       + '<div class="pc-btns" style="justify-content:flex-start;margin-top:6px;"><button type="button" class="b-ok" data-rnote="editok">고친 글로 확정</button><button type="button" class="mini-btn" data-rnote="editno">취소</button></div>';
   }
-  function rnoteBind(host, doc, canWrite){
+  function rnoteBind(host, doc, canWrite, ex){
     Array.prototype.forEach.call(host.querySelectorAll ? host.querySelectorAll("[data-rnote]") : [], function(b){
       b.addEventListener("click", function(){
         var a = b.getAttribute("data-rnote");
         if (a === "view"){ var p = document.getElementById("rnotePre"); if (p) p.style.display = p.style.display === "none" ? "" : "none"; return; }
         if (a === "down"){ rnoteDownload(doc); return; }
+        if (a === "downlast"){ rnoteDownload(ex && ex.latest); return; }
         if (a === "ack"){ rnoteSave(doc, null); return; }
-        if (a === "edit"){ host.innerHTML = rnoteEditHtml(doc); rnoteBind(host, doc, canWrite); return; }
-        if (a === "editno"){ host.innerHTML = rnoteCardHtml(doc, canWrite); rnoteBind(host, doc, canWrite); return; }
+        if (a === "edit"){ host.innerHTML = rnoteEditHtml(doc); rnoteBind(host, doc, canWrite, ex); return; }
+        if (a === "editno"){ host.innerHTML = rnoteCardHtml(doc, canWrite, ex); rnoteBind(host, doc, canWrite, ex); return; }
         if (a === "editok"){ var ta = document.getElementById("rnoteEdit"); rnoteSave(doc, ta ? String(ta.value) : null); }
       });
     });
@@ -32256,11 +32265,12 @@ function dutyStage(nx){
     if (!host) return;
     gwCall("gw-data", { action: "rnote_get" }).then(function(res){
       if (res.status !== 200 || !res.body){ host.style.display = ""; host.innerHTML = '<div style="font-weight:600;font-size:13.5px;">연구노트</div><div class="pc-none" style="color:#B00020;">연구노트 초안을 불러오지 못했습니다 (' + esc((res.body && res.body.error_code) || res.status) + ')</div>'; pmconChecksSync(); return; }
-      var doc = res.body.doc;
+      var latest = res.body.latest || null, doc = res.body.doc || latest;
       if (!doc){ host.style.display = "none"; host.innerHTML = ""; pmconChecksSync(); return; }
+      var ex = { latest: latest, others: (res.body.months || []).filter(function(x){ return x && x.status !== "confirmed" && x.period !== doc.period; }).map(function(x){ return x.period; }) };
       host.style.display = "";
-      host.innerHTML = rnoteCardHtml(doc, !!res.body.can_write);
-      rnoteBind(host, doc, !!res.body.can_write);
+      host.innerHTML = rnoteCardHtml(doc, !!res.body.can_write, ex);
+      rnoteBind(host, doc, !!res.body.can_write, ex);
       pmconChecksSync();
     }).catch(function(){ host.style.display = ""; host.innerHTML = '<div style="font-weight:600;font-size:13.5px;">연구노트</div><div class="pc-none" style="color:#B00020;">연구노트 초안을 불러오지 못했습니다(네트워크)</div>'; pmconChecksSync(); });
   }
@@ -32278,7 +32288,7 @@ function dutyStage(nx){
       var code = res.body && res.body.error_code;
       if (res.status === 409){ apprToastShow("연구노트가 방금 바뀌었습니다 — 최신으로 다시 불러왔습니다"); renderPmcon(); return; }
       if (code === "RNOTE_CONFIRMED"){ apprToastShow("이미 확정된 달입니다"); renderPmcon(); return; }
-      alert("연구노트 확정 실패 (" + (code || res.status) + ")"); renderPmcon();
+      alert("연구노트 확정 실패 (" + (code || res.status) + ") — 쓴 글은 그대로 두었습니다. 잠시 뒤 다시 눌러 주세요.");   // 검토 11/15 ⑤: 다시 그리지 않음(고친 글이 입력 칸에 남게)
     }).catch(function(){ rnoteBusy = false; alert("연구노트 확정 실패(네트워크) — 다시 시도해주세요."); });
   }
   function rnoteDownload(doc){

@@ -5747,14 +5747,15 @@ async function handleMchkRun(event, d, R) {
   return jr(o.ok ? 200 : (o.code === 'BAD_PERIOD' ? 400 : 500), Object.assign({ status: o.ok ? 'OK' : 'ERROR' }, o, { request_id: R }));
 }
 // ---- P1 판21 KOITA 연구노트 월 자동 초안(착수설명서 판21 · 원장 T759·C099) — 받기·재검사·문서·확정은 _lib/rnote.js 한 곳, 여기는 관문·봇 키 연결만 ----
-//   받기 rnote_put = 봇 키만(botKeyOk — 다른 봇 받기와 같은 상수시간 비교) · 열람 rnote_get·확정 rnote_save = 판29 pmconGate 읽기(로그인 → 기기 승인 → 관리자 — 요원 = PM은 관리자)
+//   받기 rnote_put = 봇 키만(botKeyOk — 다른 봇 받기와 같은 상수시간 비교) · 열람 rnote_get = 판29 pmconGate 읽기(로그인 → 기기 승인 → 관리자) · 확정 rnote_save = pmconGate 쓰기(PM)
 const RNOTE = require('./_lib/rnote');
 async function handleRnotePut(event, d, R) {
   if (!botKeyOk(d.key)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
   const o = await RNOTE.put(d); return jr(o.code, Object.assign(o.body, { request_id: R }));
 }
-async function handleRnoteGet(event, d, R) { const g = await pmconGate(event, R, false); if (g.res) return g.res; const o = await RNOTE.get(d); return jr(o.code, Object.assign(o.body, { request_id: R })); }
-async function handleRnoteSave(event, d, R) { const g = await pmconGate(event, R, false); if (g.res) return g.res; const o = await RNOTE.save(d, g.c.member); return jr(o.code, Object.assign(o.body, { request_id: R })); }
+//   검토 11/15 ④: 확정은 연구전담요원(PM)만 — 월 점검 [확인]과 같은 pmconGate 쓰기(명시 tier pm · 명부 못 읽으면 503) · 읽기 can_write = PM일 때만
+async function handleRnoteGet(event, d, R) { const g = await pmconGate(event, R, false); if (g.res) return g.res; const o = await RNOTE.get(d, g.isPm); return jr(o.code, Object.assign(o.body, { request_id: R })); }
+async function handleRnoteSave(event, d, R) { const g = await pmconGate(event, R, true); if (g.res) return g.res; const o = await RNOTE.save(d, g.c.member); return jr(o.code, Object.assign(o.body, { request_id: R })); }
 
 // v378 큰 본문 양방향 gzip(2026-10-08 실사고): col:bids가 9/11 3.94MB(2,462건)에서 10/8 07:52 분할 전송 수신 뒤 6.69MB(3,953건)로 자라
 // Netlify 동기 함수 응답 한도 6MB(6,291,456B)를 넘자 get이 실패했고, 앱은 그 실패를 삼켜 "수집된 공고가 없습니다"로 보였다(PM "기존거 다 날라갔나").
