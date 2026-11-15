@@ -15958,5 +15958,99 @@ try {
     okS && par.diff === 0 && par.hits >= 8 && kS.every((v) => v === true), JSON.stringify({ okS, par, kS }));
 } catch (e) { console.log('  (P1 판24 검사 생략 — ' + e.message + ')'); fails++; }
 
+try {   // ---- P1 판20 인허가 기한 → 담당 자동 지시 — ① 탭 날짜 = 지시 날짜: 앱 @lic-month 구간 lmGroups(작은 상자에서 실행)와 서버 _lib/licduty(states·plan)를 같은 입력·여러 날짜에서 대조
+  //   (표본 = tools/lic_month_fixture.json 19행 + data/duties_seed.json · 그대로 1벌 + 완료 기록·기한 정정·해당 없음·기준일을 넣은 1벌 · 2026-11-13 ~ 2027-12-31 매일). 한 번이라도 다르면 실패.
+  //   ② PM 콘솔 줄(pmconRowsAutotask·pmconLicWhy) — 연습이면 '인허가 기한 지시를 켤까요?' 한 줄(무응답 = 그대로) · 꺼짐이면 연습으로 되돌릴 줄 · 켜짐·스위치 없음이면 줄 없음 · 글에 내부 키 0
+  //   ③ 앱은 인허가 기한 지시를 만들지 않음(지시를 만드는 길 = 서버 ingest 하나 — 관리자 접속 생성기 runAutoTaskGen에 그 키 꼴 0). 결함 사본(서버 판정·콘솔 줄 한 곳씩) = 깨짐.
+  const one20 = (src, a, b) => { const i = src.indexOf(a), j = src.indexOf(b); if (i < 0 || j < i || src.indexOf(a, i + 1) >= 0) throw new Error(a + ' 구간 없음·둘'); return src.slice(i, j); };
+  const fn20 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0 || src.indexOf('function ' + name + '(', i + 1) >= 0) throw new Error('함수 없음·둘: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('함수 끝 없음: ' + name); };
+  const blk20 = one20(html, '// @lic-month-start', '// @lic-month-end');
+  const SB20 = '// ==== DUTY_SHARED_BEGIN ====', SE20 = '// ==== DUTY_SHARED_END ====', sh20 = one20(html, SB20, SE20) + SE20;
+  const req20 = createRequire(import.meta.url), Mod20 = req20('module');
+  const LDF20 = join(ROOT, 'netlify', 'functions', '_lib', 'licduty.js'), LDS20 = readFileSync(LDF20, 'utf8');
+  const comp20 = (src) => { const m = new Mod20(LDF20); m.filename = LDF20; m.paths = Mod20._nodeModulePaths(dirname(LDF20)); m._compile(src, LDF20); return m.exports; };
+  const mut20 = (src, a, b) => { if (src.split(a).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + a.slice(0, 60)); return src.replace(a, () => b); };
+  const FX20 = JSON.parse(readFileSync(join(ROOT, 'tools', 'lic_month_fixture.json'), 'utf8')), SEED20 = JSON.parse(readFileSync(join(ROOT, 'data', 'duties_seed.json'), 'utf8')).items;
+  const mkTab20 = (duties, lics) => {   // 앱 lmGroups 그대로(상자 한 번 만들고 날짜만 바꿈) → (오늘) → { no: { g, due, orig } }
+    const pre = [fn20(html, 'esc'), fn20(html, 'isDate'), fn20(html, 'findDuty'), fn20(html, 'liveDuties'), sh20, 'var duties = ENV.duties, licenses = ENV.licenses;',
+      'function myId(){ return "u1"; } function isAdmin(){ return true; } function todayStr(){ return ENV.today; } function gwCall(){ throw new Error("서버 부르면 안 됨"); }'].join('\n');
+    const ENV = { duties, licenses: lics, rows: JSON.parse(JSON.stringify(FX20.rows)), today: '' };
+    const groups = new Function('ENV', 'document', pre + '\n' + blk20 + '\nlicMonth.rows = ENV.rows; return function(d){ ENV.today = d; return lmGroups(d); };')(ENV, { getElementById: () => null });
+    return (today) => { const api = groups(today), out = {}; Object.keys(api).forEach((g) => api[g].forEach((it) => { out[it.r.no] = { g, due: it.nx && it.nx.due ? it.nx.due : '', orig: it.nx && it.nx.orig ? it.nx.orig : '' }; })); return out; };
+  };
+  const srv20 = (L, duties, lics, today) => {   // 서버 판정 + 지시가 말하는 날짜(행별 지시 due·키의 계산 기한 · 첫 회차 묶음의 행·회차)
+    const rows = JSON.parse(JSON.stringify(FX20.rows)), rules = { 'lic:': { who_id: 'u1' } };
+    const st = {}; L.states(rows, duties, lics, today).forEach((s) => { st[s.no] = { g: s.stage, due: s.due, orig: s.orig }; });
+    const pr = L.plan({ rows, duties, lics, tasks: [{ id: 'x', auto_key: 'lic:-:duty:over:2000-01-03:1', del: 1 }], rules, names: {}, today });   // 첫 실행 아님 = 지남도 행별
+    const p1 = L.plan({ rows, duties, lics, tasks: [], rules, names: {}, today });   // 첫 실행 = 지남은 묶음
+    const task = {}; pr.create.forEach((c) => { task[c.no] = { due: c.due, key: c.key }; });
+    const bun = {}; p1.bundles.forEach((b) => b.rows.forEach((x) => { bun[x.no] = x.due; }));
+    return { st, task, bun };
+  };
+  const lics20 = [{ id: 'lseed07', name: '화물', issued: FX20.issued.lseed07 }];
+  const dutiesB20 = () => { const d = JSON.parse(JSON.stringify(SEED20)), f = (no) => d.find((x) => x.no === no);
+    f(37).runs = [{ due: '2026-02-28', done_at: '2026-11-10', ref: 'A-1' }]; f(44).due_fix = { '2026-02-15': { to: '2026-12-20', reason: '공고 연장' } }; f(2).na = { on: true, reason: '해당 없음' };
+    f(22).base_date = '2026-06-01'; f(16).base_date = '2025-01-10'; f(1).runs = [{ due: '2025-06-22', done_at: '2025-06-01' }]; return d; };
+  const days20 = []; for (let k = 0; k < 414; k++) days20.push(new Date(Date.UTC(2026, 10, 13 + k)).toISOString().slice(0, 10));
+  const sets20 = [JSON.parse(JSON.stringify(SEED20)), dutiesB20()];
+  const tabs20 = sets20.map((du) => { const f = mkTab20(JSON.parse(JSON.stringify(du)), lics20); const o = {}; days20.forEach((d) => { o[d] = f(d); }); return o; });   // 탭 결과는 서버 사본과 무관 — 한 번만
+  const cmp20 = (L) => {
+    const bad = [], days = days20;
+    const seen = { over: 0, d7: 0, d30: 0, base: 0, later: 0, na: 0 }; let tasksN = 0, bunN = 0;
+    sets20.forEach((du, si) => days.forEach((day) => {
+      const a = tabs20[si][day], b = srv20(L, du, lics20, day);
+      const nos = new Set(Object.keys(a).concat(Object.keys(b.st)));
+      nos.forEach((no) => {
+        const x = a[no], y = b.st[no];
+        if (!x || !y || x.g !== y.g || x.due !== y.due || x.orig !== y.orig) { bad.push(si + ':' + day + ':' + no + ' 탭 ' + JSON.stringify(x) + ' / 서버 ' + JSON.stringify(y)); return; }
+        seen[x.g]++;
+        const t = b.task[no];
+        if (x.g === 'over' || x.g === 'd7' || x.g === 'd30') {
+          if (!t || t.due !== x.due || !t.key.endsWith(':duty:' + no + ':' + x.orig)) bad.push(si + ':' + day + ':' + no + ' 지시 ' + JSON.stringify(t) + ' 탭 ' + JSON.stringify(x)); else tasksN++;
+          if (x.g === 'over') { if (b.bun[no] !== x.orig) bad.push(si + ':' + day + ':' + no + ' 묶음 ' + b.bun[no]); else bunN++; }
+        } else if (t || b.bun[no]) bad.push(si + ':' + day + ':' + no + ' 지시 없어야 ' + JSON.stringify(t));
+      });
+    }));
+    return { bad, seen, tasksN, bunN };
+  };
+  const C20 = cmp20(req20(LDF20));
+  T('P1 판20 ① 탭 날짜 = 지시 날짜: 앱 이번 달 탭 묶음·기한(lmGroups)과 서버 판정(_lib/licduty)·행별 지시 기한·키의 계산 기한·첫 회차 묶음 회차가 표본 2벌 × 414일 동안 한 번도 다르지 않음(묶음 칸 ' + JSON.stringify(C20.seen) + ' · 지시 대조 ' + C20.tasksN + ' · 묶음 대조 ' + C20.bunN + ') · 기준일 없음·해당 없음·30일 밖 = 지시 0',
+    C20.bad.length === 0 && C20.seen.over > 0 && C20.seen.d7 > 0 && C20.seen.d30 > 0 && C20.seen.base > 0 && C20.seen.later > 0 && C20.seen.na > 0, JSON.stringify(C20.bad.slice(0, 5)));
+  const MC20 = [["  const nx = DUTY.dutyCur(Object.assign({}, d, { sched: r }), lic, today);\n  if (!nx || !nx.due) return { no: no, stage: 'base'", "  const nx = DUTY.dutyNext(Object.assign({}, d, { sched: r }), lic, today);\n  if (!nx || !nx.due) return { no: no, stage: 'base'"],   // 정정·해당 없음 안 봄
+    ["  return { no: no, stage: DUTY.dutyStage(nx) || 'later', due: nx.due,", "  return { no: no, stage: (nx.days < 0 ? 'over' : nx.days <= 14 ? 'd7' : nx.days <= 30 ? 'd30' : '') || 'later', due: nx.due,"],   // 단계 경계를 따로 짬
+    ["function findDuty(duties, no) { const a = Array.isArray(duties) ? duties : []; for (let i = 0; i < a.length; i++) { if (a[i] && a[i].no === no) return a[i]; } return null; }", "function findDuty(duties, no) { return null; }"],
+    ["    out.create.push({ key: key, no: s.no, stage: s.stage, who_id: a.who_id, title: rowTitle(r, s.stage), detail: rowDetail(r, s), due: s.due, orig: s.orig });", "    out.create.push({ key: key, no: s.no, stage: s.stage, who_id: a.who_id, title: rowTitle(r, s.stage), detail: rowDetail(r, s), due: s.orig, orig: s.orig });"]];   // 지시 기한 = 계산 기한(정정 무시)
+  const kC20 = MC20.map(([a, b]) => { try { return cmp20(comp20(mut20(LDS20, a, b))).bad.length === 0; } catch (e) { return 'err ' + e.message; } });
+  T('P1 판20 ① 결함 사본 ' + MC20.length + '개(서버가 정정·해당 없음을 안 봄 · 단계 경계를 따로 짬 · 의무 행 못 찾음 · 지시 기한을 정정 전 날짜로) = 모두 ✗', kC20.every((v) => v === false), JSON.stringify(kC20));
+  // ② PM 콘솔 줄
+  const L20 = req20(LDF20);
+  const dry20 = Object.assign({ mode: 'dry', ver: FX20.ver }, L20.drySummary({ rows: JSON.parse(JSON.stringify(FX20.rows)), duties: JSON.parse(JSON.stringify(SEED20)), lics: lics20, tasks: [], rules: { 'lic:': { who_id: 'u1' } }, names: {}, today: '2026-11-16' }, 60));
+  const pre20 = [fn20(html, 'esc'), fn20(html, 'pmconPlan'), fn20(html, 'pmconRowsAutotask'), fn20(html, 'pmconLicWhy'), (/var AUTO_RULE_ORDER = \[[^\]]+\];/.exec(html) || [''])[0], (/var PMCON_PLAN = \{[^\n]+\};/.exec(html) || [''])[0],
+    'function todayStr(){ return "2026-11-16"; } function memberName(id){ return id === "u1" ? "담당가" : ""; }'].join('\n');
+  const rowsP20 = (pre, b) => new Function('B', pre + '\nreturn pmconRowsAutotask(B);')(b);
+  const B20 = (lc, dry) => ({ rules: Object.assign({ site_missing: 'dry', veh_insp90: 'dry', wk_missing: 'dry' }, lc === undefined ? {} : { lic_duty: lc }), meta: { site_missing: { label: '현장' }, veh_insp90: { label: '차량' }, wk_missing: { label: '일용직' } },
+    meta_srv: { lic_duty: { label: '인허가 의무 기한 지시(30일·7일 전·지남 → 인허가 담당)' } }, updated_at: 44, dry: dry === undefined ? { rules: { lic_duty: dry20 } } : dry });
+  const chkP20 = (pre) => {
+    const r1 = rowsP20(pre, B20('dry')), r2 = rowsP20(pre, B20('off')), r3 = rowsP20(pre, B20('live')), r4 = rowsP20(pre, B20(undefined)), r5 = rowsP20(pre, B20('dry', null));
+    const L1 = r1.find((x) => x.id === 'autotask:lic_duty:live'), L5 = r5.find((x) => x.id === 'autotask:lic_duty:live');
+    const w = (L1 && L1.why) || '';
+    return { ok: !!L1 && r1.length === 1 && L1.q === '인허가 기한 지시를 켤까요?' && L1.def === 'keep' && JSON.stringify(L1.args) === '{"rule":"lic_duty","mode":"live"}' && L1.setBase === 44
+      && w.indexOf("담당가에게 '지난 기한 8건 정리' 지시 1건·알림 1발") >= 0 && w.indexOf('기준일 없는 10행은 지시 없이') >= 0 && /60일 안 행별 지시 \d+건/.test(w) && w.indexOf('사흘 전 예고') >= 0 && w.indexOf('[되돌리기]') >= 0
+      && !/lic_duty|auto_key|duty:|dry_put|settings:/.test(w + L1.q)
+      && r2.length === 1 && r2[0].id === 'autotask:lic_duty:dry' && r3.length === 0 && r4.length === 0 && !!L5 && /아직 연습 집계가 없습니다/.test(L5.why), w };
+  };
+  const P20 = chkP20(pre20);
+  T('P1 판20 ② PM 콘솔 줄: 연습 = "인허가 기한 지시를 켤까요?" 1줄(무응답 그대로 · 값 lic_duty live · set_base) · 글 = 담당 이름에게 지난 기한 8건 묶음 1건·알림 1발 · 60일 안 행별 지시 수 · 기준일 없는 10행 지시 없음 · 사흘 전 예고 · 되돌리기 · 내부 키 0 · 꺼짐 = 연습으로 되돌릴 줄 · 켜짐·스위치 없음 = 줄 없음 · 집계 전 = 안내',
+    P20.ok, P20.w);
+  const MP20 = [pre20.replace('else if (lm && lc === "dry") out.push({ id: "autotask:lic_duty:live"', 'else if (false) out.push({ id: "autotask:lic_duty:live"'), pre20.replace('def: "keep",\n      why: pmconLicWhy(b)', 'def: "rec",\n      why: pmconLicWhy(b)'),
+    pre20.replace("parts.push(who(x.who_id) + \"에게 '지난 기한 \" + x.n + \"건 정리' 지시 1건·알림 1발", "parts.push(\"'지난 기한 정리' 지시")];
+  const kP20 = MP20.map((p) => { if (p === pre20) return 'same'; try { return chkP20(p).ok; } catch (e) { return 'err ' + e.message; } });
+  T('P1 판20 ② 결함 사본 ' + MP20.length + '개(연습 줄 걷음 · 무응답 기본을 켬으로 · 묶음 건수·담당 빠짐) = 모두 ✗', kP20.every((v) => v === false), JSON.stringify(kP20));
+  // ③ 지시를 만드는 길 = 서버 하나
+  const gen20 = fn20(html, 'runAutoTaskGen') + fn20(html, 'recOverdueGen');
+  T('P1 판20 ③ 앱은 인허가 기한 지시를 만들지 않음: 관리자 접속 생성기(runAutoTaskGen·recOverdueGen)·앱 전체에 그 키 꼴(:duty:) 0 · 앱 관리자 카드 줄(AUTO_RULE_ORDER) 3건 그대로(인허가 기한은 PM 콘솔 줄만)',
+    gen20.indexOf('duty') < 0 && html.indexOf(':duty:') < 0 && /var AUTO_RULE_ORDER = \["site_missing","veh_insp90","wk_missing"\];/.test(html));
+} catch (e) { console.log('  (P1 판20 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

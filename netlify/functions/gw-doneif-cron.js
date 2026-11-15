@@ -35,6 +35,7 @@ async function run(st, nowMs) {
     const items = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : [];
     if (col === 'asbestos' || col === 'workers') recs.__rows[col] = items;   // v417: 집계형 신호(site·wk)는 원본 배열
     else recs[col] = D.byId(items);
+    if (col === 'licenses') recs.__rows.lic_duties = (r.ok && r.data && Array.isArray(r.data.duties)) ? r.data.duties : null;   // P1 판20 인허가 기한 지시 신호(의무 대장 행 — 못 읽음 = null = 신호 없음)
   }
   const p = D.plan(tdoc.items, recs);
   const last = { ts: nowMs, today: today, on: on, scanned: p.scanned, candidates: p.candidates.slice(0, 50), moved: 0, notified: 0 };

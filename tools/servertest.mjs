@@ -11260,4 +11260,216 @@ function J91a(x) { return JSON.stringify(x); }
   finally { resetC24(); }
 }
 
+{ // ---- P1 판20 인허가 의무 기한 → 담당 자동 지시(원장 T179·C117 · 착수설명서 판20) — _lib/licduty(판정 = 이번 달 탭과 같은 dutyCur·dutyStage) · autotask_ingest(스위치 lic_duty, 기본 dry) ·
+  //   autotask_dry_put 연습 요약 · 완료 신호(_lib/doneif · gw-doneif-cron) · 저장 이월(lic_stage·lic_rows) · PM 콘솔 줄(autotask:lic_duty:live). 탭 날짜와의 대조는 uismoke P1 판20.
+  //   날짜는 서버 오늘(KST)에 맞춰 만든다(기준일 = 오늘 − 12개월 + n일 → 기한 ≈ 오늘 + n일, 같은 _lib/duty.js 산술). 결함 사본(licduty·doneif·gw-data 한 곳씩, 메모리 컴파일)마다 해당 검사가 깨진다.
+  const fs20 = require('fs'), Mod20 = require('module'), D20 = require(join(FN, '_lib', 'duty.js'));
+  const LDP20 = join(FN, '_lib', 'licduty.js'), DIP20 = join(FN, '_lib', 'doneif.js'), GWP20 = join(FN, 'gw-data.js'), CRP20 = join(FN, 'gw-doneif-cron.js');
+  const SRC20 = { ld: fs20.readFileSync(LDP20, 'utf8'), di: fs20.readFileSync(DIP20, 'utf8'), gw: fs20.readFileSync(GWP20, 'utf8'), cr: fs20.readFileSync(CRP20, 'utf8') };
+  const comp20 = (file, src) => { const m = new Mod20(file); m.filename = file; m.paths = Mod20._nodeModulePaths(dirname(file)); m._compile(src, file); return m.exports; };
+  const mut20 = (src, from, to) => { if (src.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return src.replace(from, () => to); };
+  const cl20 = (mod) => async (body, tok, dev) => { const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+  const LD20 = require(LDP20), rpDI20 = require.resolve(DIP20), keepDI20 = require.cache[rpDI20];
+  const snap20 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data, f: mem.gw_files || {} });
+  const TD20 = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10), plus20 = (n) => D20.dutyAddDays(TD20, n);
+  const at20 = (n) => D20.dutyAddDays(D20.dutyAddMonths(TD20, -12), n), due20 = (n) => D20.dutyAddMonths(at20(n), 12);   // 기준일 · 그 기한(계산 기한 = 키의 날짜)
+  const MA20 = { id: 'u20a', name: '인허가담당20', admin: false, perms: { lic: 'do', tasks: 'do' } }, MB20 = { id: 'u20b', name: '다른사람20', admin: false, perms: { tasks: 'do' } };
+  const tA20 = issueSession(MA20).token, KEY20 = 'test-ingest-key';
+  const R20 = (no, lic, duty) => ({ no: no, auto: true, type: 'interval', base: 'manual', every_n: 12, every_unit: 'month', lic_id: lic, duty: duty, lic: '시험 허가', cycle: '연 1회', badge: '', cites: [{ law: '시험법' }] });
+  const BG20 = () => ({ schema: 1, ver: 'v1-test20', status: 'promoted', rows: [R20(101, 'L1', '지난 의무 가(보고)'), R20(102, 'L1', '지난 의무 나'), R20(103, 'L1', '30일 안 의무'), R20(104, 'L1', '7일 안 의무'), R20(105, 'L1', '먼 의무'),
+    R20(106, 'L1', '기준일 없는 의무'), R20(107, 'L1', '해당 없는 의무'), R20(108, 'L3', '담당 없는 의무'), { no: 109, auto: false, type: 'event', lic_id: 'L1', duty: '사건형' }] });
+  const DU20 = () => [{ no: 101, duty: '지난 의무 가(보고)', base_date: at20(-40), updated_ts: 1 }, { no: 102, duty: '지난 의무 나', base_date: at20(-5), updated_ts: 2 }, { no: 103, duty: '30일 안 의무', base_date: at20(20), updated_ts: 3 },
+    { no: 104, duty: '7일 안 의무', base_date: at20(5), updated_ts: 4 }, { no: 105, duty: '먼 의무', base_date: at20(45), updated_ts: 5 }, { no: 106, duty: '기준일 없는 의무', updated_ts: 6 },
+    { no: 107, duty: '해당 없는 의무', base_date: at20(-3), na: { on: true, reason: '시험' }, updated_ts: 7 }, { no: 108, duty: '담당 없는 의무', base_date: at20(10), updated_ts: 8 }, { no: 109, duty: '사건형', updated_ts: 9 }];
+  const RULES20 = () => ({ 'lic:': { who_id: 'u20a' }, 'lic:L3:': { who_id: '' } });
+  const seed20 = (o) => { o = o || {}; const s = JSON.parse(snap20); blobsMock.hooks.failGet = null;
+    mem.gw_users = Object.assign(s.u, { 'member:u20a': MA20, 'member:u20b': MB20, 'device:dev1': { status: 'approved' } }); mem.gw_data = s.d; mem.gw_files = s.f;
+    mem.gw_data['bg:lic:law:v1'] = BG20();
+    mem.gw_data['col:licenses'] = { schema: 1, items: [{ id: 'L1', name: '시험 허가' }, { id: 'L3', name: '허가 3' }], duties: DU20(), updated_at: 9000, updated_by: 'x' };
+    mem.gw_data['settings:assign'] = { schema: 1, rules: RULES20(), approver_id: '', prev: null, updated_at: 5, updated_by: 'x' };
+    mem.gw_data['col:tasks'] = { schema: 1, items: [], updated_at: 100 };
+    mem.gw_data['settings:notify'] = { schema: 1, events: { task_auto_create: 'assignee' }, prev: null, updated_at: Date.now() - 30 * 86400000, updated_by: 'x' };   // 담당 1발(병행 끝) — 일반 자동 지시 알림 길이 인허가 지시를 또 보내지 않는지
+    ['settings:autotask', 'it:autotask:dry', 'settings:doneif', 'it:doneif:last', 'col:vehicles'].forEach((k) => { delete mem.gw_data[k]; });
+    Object.keys(mem.gw_data).filter((k) => k.indexOf('ver:') === 0 || k.indexOf('veridx:') === 0).forEach((k) => { delete mem.gw_data[k]; });
+    if (o.live) mem.gw_data['settings:autotask'] = { schema: 1, rules: { lic_duty: 'live' }, prev: null, updated_at: 7, updated_by: 'uadmin' };
+  };
+  const tasks20 = () => (mem.gw_data['col:tasks'] || { items: [] }).items;
+  const row20 = (no) => mem.gw_data['col:licenses'].duties.find((x) => x.no === no);
+  const pushes20 = [], sendSave20 = pushMock.sendTo;
+  const licPush20 = () => pushes20.filter((x) => /^lic-duty-/.test(String((x.p && x.p.tag) || '')));
+  // ① 순수 함수(_lib/licduty) — 날짜를 옮겨 가며: 첫 회차 묶음 · 행별 · 단계만 올림(지남은 매일 반복 안 함) · 묶음에 든 회차 · 닫힌 묶음 · 기한 정정·해당 없음 반영 · 담당 없음
+  const chkU20 = (L) => {
+    const o = {}; let n = 0; const mk = () => 'u' + (++n);
+    const base = { rows: BG20().rows.filter((r) => r.auto), duties: DU20(), lics: [{ id: 'L1' }, { id: 'L3' }], rules: RULES20(), names: { u20a: '담당' }, today: TD20 };
+    const tk = [];
+    const p0 = L.plan(Object.assign({}, base, { tasks: tk }));
+    o.p0 = p0.first && p0.bundles.length === 1 && JSON.stringify(p0.bundles[0].rows) === JSON.stringify([{ no: 101, due: due20(-40) }, { no: 102, due: due20(-5) }]) && p0.bundles[0].who_id === 'u20a'
+      && p0.create.map((c) => c.no + c.stage).join() === '103d30,104d7' && JSON.stringify(p0.no_who) === '[108]' && JSON.stringify(p0.base) === '[106]' && JSON.stringify(p0.na) === '[107]' && JSON.stringify(p0.later) === '[105]'
+      && p0.create[0].key === 'lic:L1:duty:103:' + due20(20) && p0.bundles[0].key === 'lic:-:duty:over:' + TD20 + ':1';
+    const a0 = L.apply(p0, tk, TD20, base.names, mk);
+    o.a0 = a0.bundled === 1 && a0.made === 2 && tk.length === 3 && tk[0].lic_rows.length === 2 && tk[1].lic_stage === 'd30' && tk[1].who === '담당' && tk[1].who_by === 'assign' && (a0.notify.u20a || []).length === 3;
+    const at = (d, extra) => L.plan(Object.assign({}, base, { tasks: tk, today: d }, extra || {}));
+    const p1 = at(plus20(1)); o.p1 = !p1.first && p1.bundles.length === 0 && p1.create.length === 0 && p1.bump.length === 0;   // 다음 날 = 아무것도 없음(같은 단계)
+    const p6 = at(plus20(6)); const r6 = L.apply(p6, tk, plus20(6), {}, mk);
+    o.p6 = p6.create.length === 0 && p6.bump.length === 1 && p6.bump[0].no === 104 && p6.bump[0].rise && p6.bump[0].to === 'over' && r6.bumped === 1 && tk[2].lic_stage === 'over' && /^인허가 기한 기한 지남 — 104\./.test(tk[2].title);   // 101·102는 묶음 안
+    const p7 = at(plus20(7)); o.p7 = p7.bump.length === 0 && p7.create.length === 0;   // 지남 다음 날 = 다시 안 감
+    const p17 = at(plus20(17)); o.p17 = p17.bump.some((b) => b.no === 103 && b.to === 'd7' && b.rise) && p17.create.some((c) => c.no === 105 && c.stage === 'd30');
+    tk[0].status = 'done'; const p8 = at(plus20(8)); o.p8 = p8.create.map((c) => c.no + c.stage).join() === '101over,102over' && p8.bundles.length === 0;   // 사람이 묶음을 닫음 = 남은 지남은 행별로
+    tk[0].status = 'open';
+    // 기한 정정(103 → 오늘+2 = 7일 안) · 해당 없음(104) — dutyCur를 써야 보임
+    const du = DU20(); du[2].due_fix = {}; du[2].due_fix[due20(20)] = { to: plus20(2) }; du[3].na = { on: true };
+    const pf = at(TD20, { duties: du });
+    o.fix = pf.bump.some((b) => b.no === 103 && b.to === 'd7' && b.rise && b.due === plus20(2)) && pf.na.indexOf(104) >= 0 && pf.states.find((s) => s.no === 103).fixed === true;
+    const du2 = DU20(); du2[2].due_fix = {}; du2[2].due_fix[due20(20)] = { to: plus20(40) };   // 30일 밖으로 정정 = 날짜만 따라감(단계 그대로·오름 아님)
+    const pd = at(TD20, { duties: du2 });
+    const pd3 = pd.bump.find((b) => b.no === 103);   // (104는 이미 지남으로 올라간 지시를 오늘 날짜로 다시 보면 7일 안 = 내려감 — 역시 오름 아님)
+    o.down = pd.bump.length >= 1 && pd.bump.every((b) => b.rise === false) && !!pd3 && pd3.to === 'd30' && pd3.due === plus20(40) && pd.create.length === 0;
+    const ds = L.drySummary(Object.assign({}, base, { tasks: [] }), 60);
+    o.ds = ds.now.bundles.length === 1 && ds.now.bundles[0].n === 2 && ds.now.create.length === 2 && ds.ahead.create >= 1 && ds.ahead.rise >= 2 && ds.ahead.list.some((e) => e.nos.indexOf(105) >= 0) && !/담당/.test(JSON.stringify(ds));
+    o.key = L.isDutyKey('lic:L1:duty:5:2026-01-31') && L.isDutyKey('lic:-:duty:over:2026-11-16:1') && !L.isDutyKey('lic:L1:exp:2026-01-31') && !L.isDutyKey('lic:L1:duty:5:2026-01-31 ') && L.isRunDay('2026-11-16') && !L.isRunDay('2026-11-15');
+    o.ok = Object.keys(o).every((k) => o[k] === true);
+    return o;
+  };
+  // ② e2e(gw-data) — 배포만(연습) · 켬 · 이틀째 · 기한 정정 · 완료·해당 없음 → 승인 대기 · 허용 꼴 · 저장 이월 · 배정표 못 읽음 · PM 콘솔 · 끔
+  const chkE20 = async (gw, cron) => {
+    const c = cl20(gw), o = {}, I = {};
+    try {   // 중간에 던지면(결함 사본이 칸을 안 남겨 읽기가 깨짐) 남은 단계는 거짓으로 — o.err에 까닭
+    // A 연습(스위치 없음 = 기본 dry): ingest = 인허가 0·응답 칸 없음·알림 0 · dry_put = 요약(봇이 보낸 칸 버림) · autotask_get = meta 3건 그대로 + meta_srv
+    seed20(); pushes20.length = 0;
+    const a1 = await c({ action: 'autotask_ingest', key: KEY20, items: [] });
+    o.A1 = a1.code === 200 && a1.body.lic === undefined && tasks20().length === 0 && pushes20.length === 0;
+    const a2 = await c({ action: 'autotask_dry_put', key: KEY20, day: TD20, run: 'st20', dry: { site_missing: { mode: 'dry', count: 0 }, lic_duty: { forged: 1 } } });
+    const dy = mem.gw_data['it:autotask:dry'] && mem.gw_data['it:autotask:dry'].rules.lic_duty;
+    o.A2 = a2.code === 200 && !!dy && dy.mode === 'dry' && !dy.forged && dy.ver === 'v1-test20' && dy.now.bundles.length === 1 && dy.now.bundles[0].n === 2 && JSON.stringify(dy.now.bundles[0].nos) === '[101,102]'
+      && dy.now.create.map((x) => x.no + x.stage).join() === '103d30,104d7' && JSON.stringify(dy.no_who) === '[108]' && JSON.stringify(dy.base) === '[106]' && JSON.stringify(dy.na) === '[107]' && dy.who[0].id === 'u20a'
+      && mem.gw_data['it:autotask:dry'].rules.site_missing.count === 0 && tasks20().length === 0 && pushes20.length === 0 && !/인허가담당20/.test(JSON.stringify(mem.gw_data['it:autotask:dry']));
+    const a3 = await c({ action: 'autotask_get' }, tokA);
+    o.A3 = a3.code === 200 && Object.keys(a3.body.meta).length === 3 && !!(a3.body.meta_srv && a3.body.meta_srv.lic_duty) && a3.body.rules.lic_duty === 'dry' && a3.body.dry.rules.lic_duty.mode === 'dry';
+    I.A = [a1.code, a1.body.lic, dy && dy.now, a3.code];
+    // B 켬(관리자 스위치) → 첫 실행: 묶음 1(지남 2행) + 행별 2 · 담당 없음 1행 · 응답 made 0(관리자 '정기업무' 알림에 안 섞임) · 알림 = 담당 1명에게 1발(일반 자동 지시 알림 길 0)
+    const b0 = await c({ action: 'autotask_set', rule: 'lic_duty', mode: 'live', base: 0 }, tokA);
+    const n0 = auditMock.logs.length;
+    const b1 = await c({ action: 'autotask_ingest', key: KEY20, items: [] });
+    const T1 = tasks20(), bun = T1.find((t) => LD20.BUNDLE_RE.test(t.auto_key)), rws = T1.filter((t) => LD20.KEY_RE.test(t.auto_key));
+    const aud = auditMock.logs.slice(n0).map((e) => e.ev && e.ev[0] && e.ev[0].t).join(' | ');
+    o.B = b0.code === 200 && b1.code === 200 && b1.body.made === 0 && b1.body.lic && b1.body.lic.bundled === 1 && b1.body.lic.made === 2 && b1.body.lic.no_who === 1 && b1.body.lic.notified === 1 && b1.body.lic.notify === undefined
+      && !!bun && bun.who_id === 'u20a' && bun.title === '인허가 지난 기한 2건 정리' && JSON.stringify(bun.lic_rows.map((x) => x.no)) === '[101,102]' && bun.status === 'open' && bun.from === '자동'
+      && rws.map((t) => t.auto_key).sort().join() === ['lic:L1:duty:103:' + due20(20), 'lic:L1:duty:104:' + due20(5)].join()
+      && rws.every((t) => t.who_id === 'u20a' && t.who === '인허가담당20' && t.who_by === 'assign' && t.status === 'open') && rws.find((t) => /:103:/.test(t.auto_key)).lic_stage === 'd30' && rws.find((t) => /:104:/.test(t.auto_key)).due === due20(5)
+      && !T1.some((t) => /:duty:108:/.test(t.auto_key)) && T1.every((t) => !/auto_key|lic:|duty|lic_rows/.test(t.title + ' ' + t.detail) && /\[완료\+수령 올리기\]/.test(t.detail))
+      && pushes20.length === 1 && JSON.stringify(pushes20[0].ids) === '["u20a"]' && pushes20[0].p.title === '인허가 기한 지시 3건' && pushes20[0].p.tag === 'lic-duty-u20a-' + TD20
+      && /인허가 기한 묶음 1 · 새 2 · 단계 올림 0 · 담당 없음 1행/.test(aud);
+    I.B = [b0.code, b1.body, T1.map((t) => t.auto_key), pushes20.map((x) => x.p.title), aud];
+    // C 이틀째(같은 날 다시) = 0 · 알림 0
+    const c1 = await c({ action: 'autotask_ingest', key: KEY20, items: [] });
+    o.C = c1.code === 200 && c1.body.lic.bundled === 0 && c1.body.lic.made === 0 && c1.body.lic.bumped === 0 && tasks20().length === 3 && pushes20.length === 1;
+    // D 담당이 [기한 정정](103 → 오늘+3 = 7일 안) → 같은 지시가 날짜·단계를 따라가고 알림 1발 · 다시 정정(오늘+40 = 30일 밖) → 날짜만 따라감·알림 없음
+    const d1 = await c({ action: 'lic_duty_set', no: 103, op: 'fix', base: row20(103).updated_ts, v: { due: due20(20), to: plus20(3), reason: '기관 통지' } }, tA20, 'dev1');
+    const d2 = await c({ action: 'autotask_ingest', key: KEY20, items: [] });
+    const t103 = () => tasks20().find((t) => /:duty:103:/.test(t.auto_key));
+    const dA = t103() && t103().due === plus20(3) && t103().lic_stage === 'd7' && /^인허가 기한 7일 안 — 103\./.test(t103().title) && t103().auto_key === 'lic:L1:duty:103:' + due20(20);
+    const d3 = await c({ action: 'lic_duty_set', no: 103, op: 'fix', base: row20(103).updated_ts, v: { due: due20(20), to: plus20(40), reason: '공고 연장' } }, tA20, 'dev1');
+    const d4 = await c({ action: 'autotask_ingest', key: KEY20, items: [] });
+    o.D = d1.code === 200 && d2.body.lic.bumped === 1 && dA && licPush20().length === 2 && licPush20()[1].p.title === '인허가 기한 지시 1건'
+      && d3.code === 200 && d4.body.lic.bumped === 0 && t103().due === plus20(40) && t103().lic_stage === 'd7' && licPush20().length === 2 && tasks20().length === 3;
+    I.D = [d1.code, d1.body.error_code, d2.body.lic, t103(), d3.code, d4.body.lic];
+    // E 담당이 [완료+수령 올리기](104) · [해당 없음](102) · [완료](101) → 완료 신호 워커(켜짐) = 104 지시·묶음(101·102 다 정리) 승인 대기(앱 기준) · 103은 그대로
+    const e1 = await c({ action: 'lic_duty_set', no: 104, op: 'done', base: row20(104).updated_ts, v: { due: due20(5), done_at: TD20, ref: 'A-20' } }, tA20, 'dev1');
+    const e2 = await c({ action: 'lic_duty_set', no: 102, op: 'na', base: row20(102).updated_ts, v: { reason: '시험 해당 없음' } }, tA20, 'dev1');
+    mem.gw_data['settings:doneif'] = { schema: 1, on: true, updated_at: 1 };
+    const e3 = await cron.run(blobsMock.store('gw_data'), Date.now());
+    const bunE = () => tasks20().find((t) => LD20.BUNDLE_RE.test(t.auto_key)), t104 = () => tasks20().find((t) => /:duty:104:/.test(t.auto_key));
+    const midE = bunE().status === 'open' && t104().status === 'review';   // 101이 남아 묶음은 아직
+    const e4 = await c({ action: 'lic_duty_set', no: 101, op: 'done', base: row20(101).updated_ts, v: { due: due20(-40), done_at: TD20, ref: 'A-21' } }, tA20, 'dev1');
+    const e5 = await cron.run(blobsMock.store('gw_data'), Date.now());
+    const e6 = await c({ action: 'autotask_ingest', key: KEY20, items: [] });
+    o.E = e1.code === 200 && e2.code === 200 && e3.ok && midE && t104().done_by === '앱 기준' && /lic\.duty 104/.test(t104().done_src || '') && e4.code === 200 && e5.ok
+      && bunE().status === 'review' && /lic\.duty over 2\/2/.test(bunE().done_src || '') && t103().status === 'open' && e6.body.lic.made === 0 && e6.body.lic.bundled === 0 && tasks20().length === 3;
+    I.E = [e1.code, e1.body.error_code, e2.code, e3.candidates, midE, e4.code, e5.candidates, bunE().status, e6.body.lic];
+    // F 봇이 인허가 기한 키를 보내면 = 허용 꼴 밖(unknown) 막음
+    const f1 = await c({ action: 'autotask_ingest', key: KEY20, items: [{ auto_key: 'lic:L1:duty:105:' + due20(45), title: '가짜' }, { auto_key: 'lic:-:duty:over:' + TD20 + ':9', title: '가짜 묶음' }] });
+    o.F = f1.code === 200 && f1.body.blocked === 2 && f1.body.blocked_rules.unknown === 2 && tasks20().length === 3;
+    // G 클라 통째 저장: 단계·묶은 회차 = 서버 값 이월 · 서버에 없던 줄이 이 키 꼴 = 키를 뗌
+    const sv = JSON.parse(JSON.stringify(mem.gw_data['col:tasks']));
+    sv.items.forEach((t) => { if (LD20.BUNDLE_RE.test(t.auto_key)) t.lic_rows = [{ no: 105, due: due20(45) }]; if (/:duty:103:/.test(t.auto_key)) delete t.lic_stage; });
+    sv.items.push({ id: 'tfake20', title: '가짜', auto_key: 'lic:-:duty:over:2026-01-05:1', lic_rows: [{ no: 105, due: due20(45) }], status: 'open' });
+    const g1 = await c({ action: 'save', collection: 'tasks', base: mem.gw_data['col:tasks'].updated_at, doc: sv }, tokA);
+    const fk = tasks20().find((t) => t.id === 'tfake20');
+    o.G = g1.code === 200 && JSON.stringify(bunE().lic_rows.map((x) => x.no)) === '[101,102]' && t103().lic_stage === 'd7' && !!fk && fk.auto_key === undefined && fk.lic_rows === undefined;
+    I.G = [g1.code, g1.body.error_code, bunE().lic_rows, t103().lic_stage, fk];
+    // H 배정표를 못 읽음 = 켜져 있어도 만들지 않음(빈 표로 보지 않음) · 연습 요약도 '건너뜀'
+    seed20({ live: true }); pushes20.length = 0; blobsMock.hooks.failGet = (k) => (k === 'settings:assign' ? 'STORAGE_READ_FAILED' : null);
+    const h1 = await c({ action: 'autotask_ingest', key: KEY20, items: [] });
+    const h2 = await c({ action: 'autotask_dry_put', key: KEY20, day: TD20, run: 'st20', dry: {} });
+    blobsMock.hooks.failGet = null;
+    o.H = h1.code === 200 && h1.body.lic && h1.body.lic.skip === 'ASSIGN_UNAVAILABLE' && tasks20().length === 0 && pushes20.length === 0 && h2.code === 200 && mem.gw_data['it:autotask:dry'].rules.lic_duty.skip === 'ASSIGN_UNAVAILABLE';
+    // I PM 콘솔 줄 'autotask:lic_duty:live' = 기존 autotask_set 길(감사 '자동지시규칙' · 이름 = 인허가 의무 기한 지시) · 되돌리기 = dry
+    seed20();
+    const g0 = await c({ action: 'pmcon_get' }, tokA, 'dev1');
+    const i1 = await c({ action: 'pmcon_decide', kind: 'autotask', row: 'autotask:lic_duty:live', choice: 'ok', grade: 'R1', q: '인허가 기한 지시를 켤까요?', rec: '켬', args: { rule: 'lic_duty', mode: 'live' }, set_base: 0, base: g0.body.updated_at }, tokA, 'dev1');
+    const live1 = mem.gw_data['settings:autotask'] && mem.gw_data['settings:autotask'].rules.lic_duty === 'live';
+    const auI = auditMock.logs.filter((e) => e.ev && e.ev[0] && e.ev[0].op === '자동지시규칙' && e.ev[0].id === 'lic_duty').slice(-1)[0];
+    const i2 = await c({ action: 'autotask_revert', base: mem.gw_data['settings:autotask'].updated_at }, tokA);
+    o.I = g0.code === 200 && i1.code === 200 && i1.body.applied === true && live1 && !!auI && /^인허가 의무 기한 지시\(.*\) dry→live$/.test(auI.ev[0].t) && i2.code === 200 && i2.body.rules.lic_duty === 'dry';
+    I.I = [g0.code, i1.code, i1.body.error_code, live1, auI && auI.ev[0].t, i2.code];
+    // J 끔(off) = 연습 요약 없음 · ingest 0
+    seed20(); mem.gw_data['settings:autotask'] = { schema: 1, rules: { lic_duty: 'off' }, prev: null, updated_at: 3, updated_by: 'uadmin' };
+    const j1 = await c({ action: 'autotask_dry_put', key: KEY20, day: TD20, run: 'st20', dry: { lic_duty: { forged: 1 } } }), j2 = await c({ action: 'autotask_ingest', key: KEY20, items: [] });
+    o.J = j1.code === 200 && mem.gw_data['it:autotask:dry'].rules.lic_duty === undefined && j2.body.lic === undefined && tasks20().length === 0;
+    } catch (e) { o.err = String((e && e.message) || e).slice(0, 160); blobsMock.hooks.failGet = null; }
+    o.ok =['A1', 'A2', 'A3', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'].every((k) => o[k] === true);
+    return { o, I };
+  };
+  // ③ 완료 신호(_lib/doneif) 단위
+  const chkD20 = (DI) => {
+    const rows = [{ no: 5, runs: [{ due: '2026-03-31' }] }, { no: 6, na: { on: true } }, { no: 7, runs: [] }];
+    const s1 = DI.signalFor({ auto_key: 'lic:L1:duty:5:2026-03-31' }, { __rows: { lic_duties: rows } }), s2 = DI.signalFor({ auto_key: 'lic:L1:duty:5:2027-03-31' }, { __rows: { lic_duties: rows } });
+    const s3 = DI.signalFor({ auto_key: 'lic:-:duty:over:2026-11-16:1', lic_rows: [{ no: 5, due: '2026-03-31' }, { no: 6, due: '2026-01-31' }] }, { __rows: { lic_duties: rows } });
+    const s4 = DI.signalFor({ auto_key: 'lic:-:duty:over:2026-11-16:1', lic_rows: [{ no: 5, due: '2026-03-31' }, { no: 7, due: '2026-01-31' }] }, { __rows: { lic_duties: rows } });
+    const s5 = DI.signalFor({ auto_key: 'lic:L1:duty:5:2026-03-31' }, { __rows: {} }), s6 = DI.signalFor({ auto_key: 'lic:-:duty:over:2026-11-16:1' }, { __rows: { lic_duties: rows } });
+    const s7 = DI.signalFor({ auto_key: 'lic:L1:exp:2026-12-01' }, { licenses: { L1: { expiry: '2027-12-01' } } });   // 종전 인허가 만료 신호 그대로
+    return s1.ok && !s2.ok && s3.ok && /over 2\/2/.test(s3.why) && !s4.ok && /over 1\/2/.test(s4.why) && !s5.ok && s5.why === 'no_rows' && !s6.ok && s7.ok && DI.parseKey('lic:L1:duty:5:2026-03-31').col === 'licenses';
+  };
+  try {
+    pushMock.sendTo = async (ids, p) => { pushes20.push({ ids: ids.slice(), p: p }); return { sent: ids.length, removed: 0 }; };
+    const U0 = chkU20(LD20);
+    T('P1 판20 ① 판정·계획(_lib/licduty — 이번 달 탭과 같은 dutyCur·dutyStage): 켠 뒤 첫 실행 = 지남 2행 묶음 1건(담당 1명) + 30일 안·7일 안 행별 2건 · 담당 없는 행 0건(no_who) · 기준일 없음·해당 없음·30일 밖 = 지시 없음 · 키 = 행·계산 기한 · 다음 날 0 · 7일 안 → 지남 = 같은 지시 단계만 올림(알림 1) · 그다음 날 0(지남 매일 반복 없음) · 30일 → 7일 · 새 30일 행 · 사람이 묶음을 닫으면 남은 지남 = 행별 · 기한 정정 = 같은 지시 날짜·단계 · 해당 없음 = na · 연습 요약(60일 미리 세기 · 이름 없음) · 키 꼴',
+      U0.ok, JSON.stringify(U0));
+    const MU20 = [["  const nx = DUTY.dutyCur(Object.assign({}, d, { sched: r }), lic, today);\n  if (!nx || !nx.due) return { no: no, stage: 'base'", "  const nx = DUTY.dutyNext(Object.assign({}, d, { sched: r }), lic, today);\n  if (!nx || !nx.due) return { no: no, stage: 'base'"],
+      ["    if (first && s.stage === 'over') {", "    if (false && s.stage === 'over') {"],
+      ["rise: STAGE_RANK[to] > STAGE_RANK[from], due: s.due, title: rowTitle(r, to) });", "rise: true, due: s.due, title: rowTitle(r, to) });"],
+      ["    if (covered[s.no + ':' + s.orig]) return;   // 열린 묶음 지시에 든 회차", ''],
+      ["    if (t.del === 1 || t.status === 'done') return;   // 묶음이 닫혔으면", "    if (t.del === 1) return;   // 묶음이 닫혔으면"],
+      ["  if (d.na && d.na.on) return { no: no, stage: 'na'", "  if (false) return { no: no, stage: 'na'"]];
+    const kU20 = MU20.map(([a, b]) => { try { return chkU20(comp20(LDP20, mut20(SRC20.ld, a, b))).ok; } catch (e) { return 'err ' + e.message; } });
+    T('P1 판20 ① 결함 사본 ' + MU20.length + '개(탭과 다른 계산 dutyNext · 첫 회차 묶음 걷음 · 단계 그대로여도 알림 · 묶음 회차 무시 · 닫힌 묶음도 덮음 · 해당 없음 무시) = 모두 ✗', kU20.every((v) => v === false), JSON.stringify(kU20));
+    T('P1 판20 ③ 완료 신호(_lib/doneif): 그 회차 완료 기록 = 신호 · 다른 회차 = 아님 · 묶음 = 묶은 행 모두 완료·해당 없음일 때만(2/2 · 1/2 아님) · 의무 대장 못 읽음·묶음 칸 없음 = 아님 · 종전 인허가 만료 신호 그대로', chkD20(require(DIP20)));
+    const MD20 = [["  const ld = LD.parse(k);   // P1 판20", "  const ld = null;   // P1 판20"], ["  if (r.na && r.na.on) return 'na';\n", ''], ["    return n === list.length ? { ok: true, why: 'lic.duty over '", "    return n >= 1 ? { ok: true, why: 'lic.duty over '"]];
+    const kD20 = MD20.map(([a, b]) => { try { return chkD20(comp20(DIP20, mut20(SRC20.di, a, b))); } catch (e) { return 'err ' + e.message; } });
+    T('P1 판20 ③ 결함 사본 ' + MD20.length + '개(키 읽기 걷음 · 해당 없음 신호 걷음 · 묶음 하나만 정리돼도 신호) = 모두 ✗', kD20.every((v) => v === false), JSON.stringify(kD20));
+    const R0 = await chkE20(gwd, require(CRP20));
+    T('P1 판20 ② e2e: 배포만(스위치 없음 = 연습) = ingest 인허가 0·응답 칸 없음·알림 0 · 연습 요약 = 서버가 셈(묶음 1건 2행·행별 2·담당 없음 1·기준일 없음 1·해당 없음 1 · 봇이 보낸 칸 버림 · 이름 0) · autotask_get meta 3건 그대로 + meta_srv · 켬 → 첫 실행 묶음 1 + 행별 2 · made 0 · 알림 = 담당 1명 1발(일반 자동 지시 알림 0) · 감사 1줄 · 지시 글에 내부 키 0 · 같은 날 다시 0 · [기한 정정] = 같은 지시 날짜·7일 안 + 알림 1 · 다시 정정(30일 밖) = 날짜만·알림 0 · [완료+수령]·[해당 없음] → 완료 신호 = 행별·묶음 승인 대기(묶음은 다 정리된 뒤) · 봇이 보낸 인허가 기한 키 = unknown 막음 · 통째 저장 = 단계·묶은 회차 서버 값·가짜 키 뗌 · 배정표 못 읽음 = 0건·건너뜀 · PM 콘솔 줄 = 기존 스위치 길·감사·되돌리기 · 끔 = 요약·ingest 0',
+      R0.o.ok, JSON.stringify(R0.o.ok ? R0.o : R0));
+    const MG20 = [["  if (sw.rules.lic_duty === 'live') {\n    try {\n      const li = await licDutyInput(st, doc.items, today);", "  if (sw.rules.lic_duty !== 'off') {\n    try {\n      const li = await licDutyInput(st, doc.items, today);"],
+      ["return t && t.auto_key && t.who_id && !licNew[t.id] && (t.created", "return t && t.auto_key && t.who_id && (t.created"],
+      ["        ar.ids.forEach(function (id) { licNew[id] = 1; });", "        ar.ids.forEach(function (id) { licNew[id] = 1; made++; });"],
+      ["['lic_stage', 'lic_rows'].forEach(function (f) { if (o[f] !== undefined) t[f] = o[f]; else delete t[f]; });", ''],
+      ["if (!prevReadFailed) { delete t.auto_key; delete t.lic_stage; delete t.lic_rows; }", ''],
+      ["    if (ls && !AR.piiScan(ls)) doc.rules = Object.assign({}, doc.rules, { lic_duty: ls });", ''],
+      ["  if (hasOwn(dry, 'lic_duty')) { doc.rules = Object.assign({}, dry); delete doc.rules.lic_duty; }", ''],
+      ["  const as = await licAssignStrict(st);\n  if (!as.ok) return { ok: false, why: 'ASSIGN_UNAVAILABLE' };\n  let items = tasks;", "  const as = { ok: true, rules: {} };\n  let items = tasks;"],
+      ["  if (lic && lic.notify) { licSent = await licDutyNotify(lic.notify, today); delete lic.notify; }", "  if (lic && lic.notify) { licSent = 0; delete lic.notify; }"]];
+    const kG20 = [];
+    for (const [a, b] of MG20) { let v; try { v = (await chkE20(comp20(GWP20, mut20(SRC20.gw, a, b)), require(CRP20))).o.ok; } catch (e) { v = 'err ' + e.message; } kG20.push(v); }
+    // 완료 신호 결함(doneif 사본을 크론이 쓰게) — e2e E가 깨져야
+    let kC20;
+    try { require.cache[rpDI20] = { id: rpDI20, filename: rpDI20, loaded: true, exports: comp20(DIP20, mut20(SRC20.di, "  if (k.dom === 'licduty') return licDutySignal(task, k, recs);", '')) }; kC20 = (await chkE20(gwd, comp20(CRP20, SRC20.cr))).o.ok; }
+    catch (e) { kC20 = 'err ' + e.message; } finally { require.cache[rpDI20] = keepDI20; }
+    kG20.push(kC20);
+    T('P1 판20 ② 결함 사본 ' + kG20.length + '개(연습인데 만듦 · 일반 알림 길도 보냄 · made에 섞음 · 저장 이월 걷음 · 가짜 키 통과 · 연습 요약 안 남김 · 봇이 보낸 요약 칸 통과 · 배정표 못 읽음을 빈 표로 · 담당 알림 안 보냄 · 완료 신호 갈래 걷음) = 모두 ✗',
+      kG20.every((v) => v === false), JSON.stringify(kG20));
+  } catch (e) { T('P1 판20 검사 실행', false, String(e && e.stack || e).slice(0, 500)); }
+  finally { pushMock.sendTo = sendSave20; require.cache[rpDI20] = keepDI20; const s = JSON.parse(snap20); mem.gw_users = s.u; mem.gw_data = s.d; mem.gw_files = s.f; blobsMock.hooks.failGet = null; }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

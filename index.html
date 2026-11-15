@@ -32029,7 +32029,29 @@ function dutyStage(nx){
       else if (live.indexOf(k) >= 0 && cur !== "live") out.push({ id: "autotask:" + k + ":live", q: m.label + " — 연습에서 실제 발행으로 바꿀까요?", recTxt: "실제 발행", curTxt: cur === "dry" ? "연습(발행 0)" : String(cur || ""), args: { rule: k, mode: "live" }, def: "rec",
         why: "바꾸면 다음 08:10 실행부터 실제 지시가 생깁니다." + (plan && plan.note ? " · " + plan.note : ""), setBase: b.updated_at || 0 });
     });
+    // P1 판20 인허가 기한 지시 — 서버가 직접 세는 규칙(meta_srv · 관리자 카드 줄 없음). 켜는 길은 이 줄 하나 · 무응답 = 그대로(연습) · 되돌리기 = 규칙 스위치 카드 [되돌리기]
+    var lm = (b.meta_srv && b.meta_srv.lic_duty) || null, lc = rules.lic_duty;
+    if (lm && lc === "off") out.push({ id: "autotask:lic_duty:dry", q: lm.label + " — 꺼진 규칙을 연습 모드(발행 0)로 되돌릴까요?", recTxt: "연습(발행 0)", curTxt: "꺼짐", args: { rule: "lic_duty", mode: "dry" }, def: "rec",
+      why: "연습 모드는 매일 평일 08:10에 '켰으면 생겼을 지시'만 세고 지시·알림을 만들지 않습니다.", setBase: b.updated_at || 0 });
+    else if (lm && lc === "dry") out.push({ id: "autotask:lic_duty:live", q: "인허가 기한 지시를 켤까요?", recTxt: "켬(실제 발행)", curTxt: "연습(발행 0)", args: { rule: "lic_duty", mode: "live" }, def: "keep",
+      why: pmconLicWhy(b), setBase: b.updated_at || 0 });
     return out;
+  }
+  // P1 판20 — 연습 요약(it:autotask:dry의 인허가 칸, 서버 _lib/licduty drySummary)을 업무 말로: 무엇이 누구에게 몇 건 · 앞으로 60일 · 지시 안 가는 행 · 되돌리기
+  function pmconLicWhy(b){
+    var ls = b.dry && b.dry.rules && b.dry.rules.lic_duty, md = function(s){ var p = String(s || "").split("-"); return p.length === 3 ? (+p[1]) + "/" + (+p[2]) : String(s || ""); }, who = function(id){ return memberName(id) || "배정표 인허가 담당"; };
+    var tail = " 직원에게 새로 가는 알림이라 사흘 전 예고 뒤에 켭니다. 되돌리기: 규칙 스위치 카드 [되돌리기] 1클릭(이미 생긴 지시는 남음).";
+    if (!ls) return "아직 연습 집계가 없습니다(다음 평일 08:10 정기업무 봇 뒤에 채워짐)." + tail;
+    if (ls.skip) return "연습 집계를 하지 못했습니다(" + ({ NO_BG: "인허가 근거표 승격 전", ASSIGN_UNAVAILABLE: "배정표를 읽지 못함", BG_READ_FAILED: "근거표를 읽지 못함", LIC_READ_FAILED: "인허가 대장을 읽지 못함", NO_LICENSES: "인허가 대장 없음", TASKS_READ_FAILED: "지시를 읽지 못함" }[ls.skip] || ls.skip) + ")." + tail;
+    var nw = ls.now || {}, parts = [];
+    (nw.bundles || []).forEach(function(x){ parts.push(who(x.who_id) + "에게 '지난 기한 " + x.n + "건 정리' 지시 1건·알림 1발(켠 뒤 첫 실행 묶음 — 행마다 따로 가지 않음)"); });
+    if ((nw.create || []).length) parts.push("행별 지시 " + nw.create.length + "건(" + nw.create.slice(0, 4).map(function(x){ return x.no + "행 ~" + md(x.due); }).join(" · ") + ")");
+    if (!parts.length) parts.push("첫 실행에 생길 지시 없음");
+    var ah = ls.ahead || {}, al = (ah.list || []).filter(function(e){ return (e.nos || []).length; });
+    var s = md(ls.today) + " 계산 — 켜면 다음 평일 08:10부터: " + parts.join(" · ") + ". 그 뒤 " + (ah.days || 60) + "일 안 행별 지시 " + (ah.create || 0) + "건" + (al.length ? "(" + al.slice(0, 4).map(function(e){ return md(e.day) + " " + e.nos.join("·") + "행"; }).join(" · ") + ")" : "") + " · 7일 전·지남으로 오를 때 알림 " + (ah.rise || 0) + "발.";
+    if ((ls.base || []).length) s += " 기준일 없는 " + ls.base.length + "행은 지시 없이 '기준일 없음' 표시 그대로.";
+    if ((ls.no_who || []).length) s += " 담당 없는 " + ls.no_who.length + "행은 만들지 않음.";
+    return s + tail;
   }
   function pmconRowsLearn(b){
     var s = (b.settings && b.settings.contract) || {};

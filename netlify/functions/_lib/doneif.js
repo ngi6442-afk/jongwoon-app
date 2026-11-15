@@ -6,6 +6,7 @@
 // 손대지 않는 것: 사람이 완료 체크한 review(done_by 실명) · done · 삭제 · 승인권자가 반려해 신호를 끈 항목(doneif_off=1) · 자동 지시 아닌 것.
 const crypto = require('crypto');
 const AR = require('./autorules');   // v417 카드 10 ⑤ 완료 신호 2종(site·wk 월 키 — 다음 회차 미입력 0) — 집계 함수를 서버 autotask_facts와 공유
+const LD = require('./licduty');     // P1 판20 인허가 기한 지시 키 꼴(만드는 곳과 같은 함수)
 
 const DONEIF_KEY = 'settings:doneif';   // {schema:1, on:false, prev:{on}, updated_at, updated_by} — 기본 꺼짐 = dry-run(계획만 기록)
 const DONEIF_LAST = 'it:doneif:last';    // 마지막 점검 {ts, today, on, scanned, candidates[≤50], moved, notified}
@@ -13,6 +14,8 @@ const DONEIF_LAST = 'it:doneif:last';    // 마지막 점검 {ts, today, on, sca
 function isDate(s) { return /^\d{4}-\d{2}-\d{2}$/.test(String(s || '')); }
 
 function parseKey(k) {   // 'veh:<id>:insp:<due>' · 'veh:<id>:ins:<due>' · 'lic:<id>:exp:<due>' · 'lic:<id>:edu:<due>' · 'rec:<id>:over45'
+  const ld = LD.parse(k);   // P1 판20 인허가 기한 지시 'lic:<허가증>:duty:<번호>:<회차 기한>' · 첫 회차 묶음 'lic:-:duty:over:<날>:<n>' — 아래 lic 갈래보다 먼저
+  if (ld) return ld.bundle ? { dom: 'licduty', col: 'licenses', id: '', kind: 'bundle', bundle: true } : { dom: 'licduty', col: 'licenses', id: ld.lic, kind: 'duty', no: ld.no, due: ld.due };
   const p = String(k || '').split(':');
   if (p[0] === 'veh' && p.length >= 4) return { dom: 'veh', col: 'vehicles', id: p[1], kind: p[2], due: p[3] };
   if (p[0] === 'lic' && p.length >= 4) return { dom: 'lic', col: 'licenses', id: p[1], kind: p[2], due: p[3] };
@@ -90,6 +93,29 @@ function certSignal(task, k, recs) {
   return { ok: true, why: 'cert.c' + k.cyc + '·이름기준 ' + CERT_KINDS.map(function (c) { return c.label; }).join('·') };
 }
 
+// ---- P1 판20 인허가 기한 지시 올림 신호 ----
+// 행별(lic:<허가증>:duty:<번호>:<회차 기한>): 그 행 완료 기록에 그 회차(runs[].due = 회차 기한 — 이번 달 탭 [완료+수령 올리기]가 접수번호나 수령본과 함께 남김)가 있거나 [해당 없음](na.on)이면 신호.
+//   [기한 정정]은 회차를 바꾸지 않으므로 신호가 아니다(지시는 열린 채 기한만 따라감 — 만드는 쪽 _lib/licduty).
+// 묶음(lic:-:duty:over:<날>:<n>): 묶은 행·회차(task.lic_rows) 전부가 위 조건이면 신호. 묶음 칸이 없거나 비면 신호 없음(사람이 [완료]).
+function licDutyDone(rows, no, due) {
+  const r = rows.find(function (x) { return x && x.no === no; });
+  if (!r) return '';
+  if (r.na && r.na.on) return 'na';
+  return (Array.isArray(r.runs) && r.runs.some(function (x) { return x && x.due === due; })) ? 'done' : '';
+}
+function licDutySignal(task, k, recs) {
+  const rows = recs && recs.__rows ? recs.__rows.lic_duties : null;
+  if (!Array.isArray(rows)) return { ok: false, why: 'no_rows' };
+  if (k.bundle) {
+    const list = Array.isArray(task.lic_rows) ? task.lic_rows.filter(function (x) { return x && Number.isInteger(x.no) && isDate(x.due); }) : [];
+    if (!list.length) return { ok: false, why: 'lic.duty no_list' };
+    const n = list.filter(function (x) { return !!licDutyDone(rows, x.no, x.due); }).length;
+    return n === list.length ? { ok: true, why: 'lic.duty over ' + n + '/' + list.length } : { ok: false, why: 'lic.duty over ' + n + '/' + list.length };
+  }
+  const s = licDutyDone(rows, k.no, k.due);
+  return s ? { ok: true, why: 'lic.duty ' + k.no + ' ' + (s === 'na' ? '해당 없음' : k.due + ' 완료') } : { ok: false, why: 'lic.duty open' };
+}
+
 function eligible(t) {
   return !!(t && t.auto_key && t.del !== 1 && (t.status === 'open' || t.status === 'hold') && !t.doneif_off);
 }
@@ -107,6 +133,7 @@ function signalFor(task, recs) {
     return n2 === 0 ? { ok: true, why: 'wk.birth_blank 0' } : { ok: false, why: 'wk.birth_blank ' + n2 };
   }
   if (k.dom === 'cert') return certSignal(task, k, recs);   // P1 판19 — recs.__rows.proof(증빙 보관함 색인, 읽기 실패 = null) · recs.__certOpen(plan이 싣는다)
+  if (k.dom === 'licduty') return licDutySignal(task, k, recs);   // P1 판20 — recs.__rows.lic_duties(의무 대장 행, 크론이 싣는다 · 못 읽음 = 신호 없음)
   const rec = ((recs || {})[k.col] || {})[k.id];
   if (!rec) return { ok: false, why: 'no_record' };
   if (k.dom === 'veh' || k.dom === 'lic') {
