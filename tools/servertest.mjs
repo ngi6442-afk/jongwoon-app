@@ -10286,7 +10286,15 @@ function J91a(x) { return JSON.stringify(x); }
       const s3 = run(['머리', '~{{가}}', '꼬리'], { 가: '톤' }, ['머리', '~식', '꼬리'], ['가']);
       const s4 = run(['머리', '값 {{가}}{{나}} 끝', '다칸: {{다}}', '꼬리'], { 가: '1', 나: '2', 다: '3' }, ['머리', '값 13 끝', '다칸: 4', '꼬리'], ['가', '나', '다']);   // 칸 둘이 글자 없이 붙음 = 비교 불가
       const okE = val(s1, '가') === '식' && val(s1, '나') === '액상' && allUnc(s2, ['a', 'b']) && val(s3, '가') === '식' && s4.r.rows.map((x) => x.ref).join() === '다' && val(s4, '다') === '4' && ['가', '나'].every((nm) => s4.d.refs_uncomparable.indexOf(nm) >= 0);
-      const okF = true;
+      // 3차 검토 S1·S2·S2b·S4·S9·S7: 겹치는 틀·한 글자 틀·같은 꼬리 줄 더 넣음·틀이 값 안에 = 비교 불가(틀린 값 0) · S8 한컴 공백 변경 = 제 값
+      const S1 = run(['머리', '수량 {{가}}', '수량합계 {{나}}', '꼬리'], { 가: '5', 나: '7' }, ['머리', '새 문단', '수량합계 9', '꼬리'], ['가', '나']);
+      const S2 = run(['머리', '{{가}} 원', '{{나}} 만원', '꼬리'], { 가: '5', 나: '7' }, ['머리', '6 만원', '8 만원', '꼬리'], ['가', '나']);
+      const S2b = run(['머리', '금액 {{가}}원', '금액 {{나}}만원', '꼬리'], { 가: '5', 나: '7' }, ['머리', '금액 8만원', '꼬리'], ['가', '나']);
+      const S4 = run(['머리', '단위 {{가}}', '단위가격 {{나}}', '꼬리'], { 가: '톤', 나: '1000' }, ['머리', '단위가격 2000', '단위 식', '꼬리'], ['가', '나']);
+      const S9 = run(['머리', '{{가}} 귀하', '꼬리'], { 가: '포항시' }, ['머리', '새 문단 귀하', '포항시청 귀하', '꼬리'], ['가']);
+      const S7 = run(['머리', '단위: {{가}}', '꼬리'], { 가: '톤' }, ['머리', '단위: 톤 단위: 식', '꼬리'], ['가']);
+      const S8 = run(['머리', '수량 : {{가}} 개', '꼬리'], { 가: '5' }, ['머리', '수량:6개', '꼬리'], ['가']);
+      const okF = allUnc(S1, ['가', '나']) && allUnc(S2, ['가', '나']) && allUnc(S2b, ['가', '나']) && allUnc(S4, ['가', '나']) && allUnc(S9, ['가']) && JSON.stringify(S9).indexOf('새 문단') < 0 && val(S7, '가') === '톤 단위: 식' && val(S8, '가') === '6';   // S7 = 틀 뒤 글 전체를 그 칸 값으로(다른 칸 값이 아님 — 앞·끝 틀은 문단 처음·끝에 붙여 읽어 끊는 자리가 하나)
       const g = run(['머리', '{{가}}', '{{나}}', '', '꼬리'], { 가: '', 나: '' }, ['머리', 'x', '', '', '꼬리'], ['가', '나']);
       const okG = g.r.rows.length === 0 && (g.d.refs_uncomparable || []).slice().sort().join() === '가,나';
       // 사이 글자가 값 안에 = 그 문단 못 읽음(잘린 값 0)
@@ -10299,33 +10307,42 @@ function J91a(x) { return JSON.stringify(x); }
       return { ok: okA && okB && okC && okE && okF && okG && okH && okI, info: { okA, okB, okC, okE, okF, okG, okH, okI, b: b.r.rows, a: a.d.code || a.d.refs_uncomparable, dmMB: Math.round(dm / 1048576) } };
     };
     const rB16 = chkB16(DD);
-    T('P1 판16 ①-2 틀 없는 칸 문단·사이 글자·빈 문단 폭탄(검토 11/15 · 2차): 재현 ① 칸만 있는 문단 + 설명 문단 지우고 새 문단 = 업체명 비교 불가(새 문단 글이 값으로 안 나감) · 재현 ② 품목 표 꼴·같은 값 두 칸·빈칸 셋·빈 문단 앞 · R2(빈 칸 뒤 빈 문단 + 넣은 이름)·R3(틀 칸 문단 지우고 새 문단)·R4(표 칸 차례 바뀜) = 모두 비교 불가(틀 없는 칸 문단은 읽지 않음 — 틀린 값·값 노출 0) · 틀 칸 둘의 차례 바뀜 + 값 고침 = 각자 맞는 값 · 같은 틀 글자 둘 = 비교 불가 · 한 글자 틀 = 같은 차례 짝 + 틀 읽기 · 구간에 칸 없는 빈 문단 섞임 = 비교 불가 · 값 안에 사이 글자(갑 및 을) = 그 문단 비교 불가·다른 문단은 읽음 · 빈 문단 300만 개 압축 = TOO_MANY_PARAS(힙 64MB 안)',
+    T('P1 판16 ①-2 틀 없는 칸 문단·사이 글자·빈 문단 폭탄(검토 11/15 · 2차 · 3차 S1·S2·S2b·S4·S9 겹치는 틀·같은 꼬리 줄 = 비교 불가 · S7 틀이 값 안에 = 틀 뒤 글 전체 · S8 공백 변경 = 제 값):재현 ① 칸만 있는 문단 + 설명 문단 지우고 새 문단 = 업체명 비교 불가(새 문단 글이 값으로 안 나감) · 재현 ② 품목 표 꼴·같은 값 두 칸·빈칸 셋·빈 문단 앞 · R2(빈 칸 뒤 빈 문단 + 넣은 이름)·R3(틀 칸 문단 지우고 새 문단)·R4(표 칸 차례 바뀜) = 모두 비교 불가(틀 없는 칸 문단은 읽지 않음 — 틀린 값·값 노출 0) · 틀 칸 둘의 차례 바뀜 + 값 고침 = 각자 맞는 값 · 같은 틀 글자 둘 = 비교 불가 · 한 글자 틀 = 같은 차례 짝 + 틀 읽기 · 구간에 칸 없는 빈 문단 섞임 = 비교 불가 · 값 안에 사이 글자(갑 및 을) = 그 문단 비교 불가·다른 문단은 읽음 · 빈 문단 300만 개 압축 = TOO_MANY_PARAS(힙 64MB 안)',
       rB16.ok, JSON.stringify(rB16.info));
     // ①-3 씨앗 고정 퍼징(2차 검토 ⑤): 양식(틀 없는 칸·틀 칸·글 문단) → 무작위 편집(값 고침·빈 문단·새 문단·지움·글 고침·차례 바꿈) →
     //   '값이 보인 칸(rows)의 최종 값 ≠ 실제 그 칸의 값' 횟수. 고정 난수(LCG)라 매번 같은 판. 비교 불가는 허용.
     const fz16 = (D, N, seed0) => {
       let seed = seed0; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
       const pk = (a) => a[Math.floor(rnd() * a.length)];
-      const PLAIN = ['', '', '', '구분', '원', '합계', '비고', '견 적 서', '위와 같이'], VALS = ['', '', '톤', '식', '고상', '운반', '슬러지', '주식회사 종운환경'];
+      // 3차 검토: 흔한 낱말 글 문단('원'·'귀하'·'합계 1000 원')·겹치는 틀(수량/수량합계 · 원/만원 · 단위/단위가격 · 귀하)·틀 글자를 담은 새 줄 넣기를 섞는다
+      const PLAIN = ['', '', '', '구분', '원', '합계', '비고', '견 적 서', '위와 같이', '귀하', '합계 1000 원', '수량', '일'], VALS = ['', '', '톤', '식', '고상', '운반', '슬러지', '주식회사 종운환경', '5', '12'];
+      const FAM = [{ pre: '수량 ', suf: '' }, { pre: '수량합계 ', suf: '' }, { pre: '', suf: ' 원' }, { pre: '', suf: ' 만원' }, { pre: '', suf: ' 귀하' }, { pre: '단위 ', suf: '' }, { pre: '단위가격 ', suf: '' }, { pre: '금액 ', suf: '원' }, { pre: '금액 ', suf: '만원' }];
       const st = { runs: 0, wrong: 0, wrongSwap: 0, seen: 0 }; let ex = null;
       const nz = (s) => String(s == null ? '' : s).replace(/\s+/g, '');
       for (let r = 0; r < N; r++) {
         const len = 4 + Math.floor(rnd() * 10), tpl = [], meta = []; let tn = 0;
-        // 칸 문단: 틀 없음 60% · 긴 틀('k0칸: ') 20% · 한 글자 틀(동그라미 숫자 — 칸마다 다름) 20%
-        for (let i = 0; i < len; i++) { if (rnd() < 0.5) { const nm = 'k' + tn, x = rnd(), fr = x < 0.6 ? '' : (x < 0.8 ? nm + '칸: ' : String.fromCharCode(0x2460 + tn)); tn++; tpl.push(fr + '{{' + nm + '}}'); meta.push({ nm, fr }); } else { tpl.push(pk(PLAIN)); meta.push(null); } }
+        // 칸 문단: 틀 없음 40% · 긴 틀('k0칸: ') 15% · 한 글자 틀(동그라미 숫자 — 칸마다 다름) 15% · 겹치는 틀 묶음 30%
+        for (let i = 0; i < len; i++) {
+          if (rnd() < 0.5) { const nm = 'k' + tn, x = rnd(); const fm = x < 0.4 ? { pre: '', suf: '' } : (x < 0.55 ? { pre: nm + '칸: ', suf: '' } : (x < 0.7 ? { pre: String.fromCharCode(0x2460 + tn), suf: '' } : pk(FAM))); tn++; tpl.push(fm.pre + '{{' + nm + '}}' + fm.suf); meta.push({ nm, pre: fm.pre, suf: fm.suf }); }
+          else { tpl.push(pk(PLAIN)); meta.push(null); }
+        }
         if (!tn) continue;
         const dv = {}; meta.forEach((m) => { if (m) dv[m.nm] = pk(VALS); });
-        const render = (m, v, i) => (m ? m.fr + v : tpl[i]);
+        const render = (m, v, i) => (m ? m.pre + v + m.suf : tpl[i]);
         const Dp = tpl.map((p, i) => render(meta[i], dv[meta[i] && meta[i].nm], i));
-        const F = Dp.map((s, i) => ({ s, o: i, v: meta[i] ? dv[meta[i].nm] : null })); let swapped = false;
+        const F = Dp.map((s, i) => ({ s, o: i, v: meta[i] ? dv[meta[i].nm] : null })); let swapped = false; const prot = {};
         const ops = 1 + Math.floor(rnd() * 4);
         for (let k = 0; k < ops; k++) {
           const x = rnd(), j = Math.floor(rnd() * F.length);
-          if (x < 0.4) { const e = F[j]; if (e && e.o !== null && meta[e.o]) { const nv = pk(VALS.concat(['새값' + k])); e.v = nv; e.s = render(meta[e.o], nv, e.o); } }
-          else if (x < 0.55) F.splice(j, 0, { s: '', o: null });
-          else if (x < 0.7) F.splice(j, 0, { s: pk(['새 문단', '홍길동 현장', '톤', '']), o: null });
-          else if (x < 0.82) { if (F.length > 2) F.splice(j, 1); }
-          else if (x < 0.92) { const e = F[j]; if (e && e.o !== null && !meta[e.o]) e.s = e.s + ' 고침'; }
+          if (x < 0.35) { const e = F[j]; if (e && e.o !== null && meta[e.o]) { const nv = pk(VALS.concat(['새값' + k])); e.v = nv; e.s = render(meta[e.o], nv, e.o); } }
+          else if (x < 0.47) F.splice(j, 0, { s: '', o: null });
+          else if (x < 0.57) F.splice(j, 0, { s: pk(['새 문단', '홍길동 현장', '톤', '', '원', '귀하']), o: null });
+          else if (x < 0.69) {   // 틀 글자를 담은 새 줄(직원이 같은 꼴 줄을 더 씀) — 원래 칸 문단이 남아 있을 때만, 그 뒤로는 원래 문단을 지우지 않음(지우고 새 줄이면 고친 것과 가를 수 없어 '실제 값'이 정해지지 않음)
+            const cand = meta.map((m, i) => (m && (m.pre || m.suf) && F.some((y) => y.o === i) ? i : -1)).filter((i) => i >= 0);
+            if (cand.length) { const i = pk(cand), m = meta[i]; prot[i] = 1; F.splice(j, 0, { s: m.pre + '새줄' + k + m.suf, o: null }); }
+          }
+          else if (x < 0.8) { const e = F[j]; if (F.length > 2 && !(e && e.o !== null && prot[e.o])) F.splice(j, 1); }
+          else if (x < 0.9) { const e = F[j]; if (e && e.o !== null && !meta[e.o]) e.s = e.s + ' 고침'; }
           else if (j + 1 < F.length) { const t = F[j]; F[j] = F[j + 1]; F[j + 1] = t; swapped = true; }
         }
         const truth = {}; meta.forEach((m, i) => { if (m) { const e = F.filter((y) => y.o === i)[0]; truth[m.nm] = e ? e.v : undefined; } });
@@ -10340,19 +10357,23 @@ function J91a(x) { return JSON.stringify(x); }
     const FZ = fz16(DD, 800, 16);
     T('P1 판16 ①-3 씨앗 고정 퍼징 ' + FZ.runs + '회(값 보인 칸 ' + FZ.seen + '): 값이 보인 칸의 최종 값이 실제 그 칸 값과 다름 = ' + FZ.wrong + '(차례 바뀜 판 ' + FZ.wrongSwap + ') — 0이어야 함',
       FZ.runs >= 700 && FZ.seen >= 300 && FZ.wrong === 0, JSON.stringify(FZ));
-    const R1Z = ['    if (bare[i] || frameN[frameOf[i]] > 1) { unc(); continue; }', '    if (frameN[frameOf[i]] > 1) { unc(); continue; }'];   // ① 틀 없는 칸 문단을 다시 읽음
+    const R1Z = ['    if (bare[i] || conf[i]) { unc(); continue; }', '    if (conf[i]) { unc(); continue; }'];   // ① 틀 없는 칸 문단을 다시 읽음
+    const R4Z = ['    if (bare[i] || conf[i]) { unc(); continue; }', '    if (bare[i]) { unc(); continue; }'];   // 3차 ① 겹치는 틀(다른 칸 문단을 읽는 틀) 검사 걷음
+    const R5Z = ['      if (readersAll.length !== 1 || readers.length !== 1) { unc(); continue; }', '      if (!readers.length) { unc(); continue; }'];   // 3차 ② 구간에 그 틀로 읽히는 문단이 여럿이어도 첫 문단을 집음
     const R2Z = ["return (bare[i] || !s) ? '\\u0000d' + i : s; }), b = F.map(function (x, j) { const s = stripWs(x.s); return s ? s : '\\u0000f' + j; });", "return bare[i] ? '\\u0000d' + i : s; }), b = F.map(function (x, j) { const s = stripWs(x.s); return s; });"];   // ② 빈 글 문단을 LCS 기준점으로
     const R3Z = ['      if (!fv) { unc(); continue; }   // 2차 검토 ③', '      if (!fv) fv = s0.toks.map(function () { return F[pick].s; });   // 2차 검토 ③'];   // ③ 같은 차례 짝을 틀 확인 없이
     const fzM = (muts) => { try { let s = SDD; muts.forEach(([x, y]) => { s = mut16(s, x, y); }); return fz16(load16(FDD, s), 800, 16).wrong; } catch (e) { return 'err ' + e.message; } };
-    const MZ = [fzM([R1Z]), fzM([R2Z]), fzM([R1Z, R2Z]), fzM([R3Z])];
-    // ①·② 하나씩은 다른 한 겹이 막아(서로 겹친 방어) 이 퍼징에서 0일 수 있다 — 둘 다 되돌린 사본(= 지난 판)과 ③은 반드시 0 아님. 하나씩 수는 기록만
-    T('P1 판16 ①-3 퍼징 결함 사본(틀 없는 칸 읽기 되돌림 ' + MZ[0] + ' · 빈 글 문단 기준점 되돌림 ' + MZ[1] + ' · 둘 다 되돌림 ' + MZ[2] + ' · 같은 차례 짝 틀 확인 되돌림 ' + MZ[3] + ') = 둘 다·③ 틀린 값 0 아님', typeof MZ[2] === 'number' && MZ[2] > 0 && typeof MZ[3] === 'number' && MZ[3] > 0 && typeof MZ[0] === 'number' && typeof MZ[1] === 'number', JSON.stringify(MZ));
+    const MZ = [fzM([R1Z]), fzM([R2Z]), fzM([R1Z, R2Z]), fzM([R3Z]), fzM([R4Z]), fzM([R5Z])];
+    // 2차 겹(틀 없는 칸 안 읽음·빈 문단 기준점 뺌·같은 차례 짝 틀 확인)은 3차 '최종본 전체에서 그 틀로 읽히는 문단 하나'가 함께 막아 되돌려도 0일 수 있다(기록만 — 틀 없는 칸 틀은 모든 문단을 읽어 늘 둘 이상).
+    //   3차 ①(겹치는 틀)·②(읽히는 문단 하나)는 하나씩 되돌려도 반드시 0 아님
+    const num = (v) => typeof v === 'number';
+    T('P1 판16 ①-3 퍼징 결함 사본(2차: 틀 없는 칸 읽기 ' + MZ[0] + ' · 빈 글 문단 기준점 ' + MZ[1] + ' · 둘 다 ' + MZ[2] + ' · 같은 차례 짝 틀 확인 ' + MZ[3] + ' — 기록만 / 3차: 겹치는 틀 검사 ' + MZ[4] + ' · 읽히는 문단 하나 ' + MZ[5] + ') = 3차 하나씩 틀린 값 0 아님',
+      MZ.every(num) && MZ[4] > 0 && MZ[5] > 0, JSON.stringify(MZ));
     const MB16 = [
-      ['    if (bare[i] || frameN[frameOf[i]] > 1) { unc(); continue; }', '    if (bare[i]) { unc(); continue; }'],   // 같은 틀 둘 검사 걷음
       ["    const adj = s0.lits.slice(1, -1).some(function (l) { return !stripWs(l); });", '    const adj = false;', '    else { if (!L[j]) return null; q = st.indexOf(L[j], p); if (q < 0) return null; }', '    else { q = st.indexOf(L[j], p); if (q < 0) return null; }'],   // 붙은 칸 두 겹 다 걷음
       ['  for (let j = 1; j < k; j++) { if (L[j] && cnt(st, L[j]) > cnt(tplLit, L[j])) return null; }', ''],
       ['      if (out.length + stack.length > TOK_PARA_CAP) return OVER;\n', '']].map(([x, y, x2, y2]) => { try { let s = mut16(SDD, x, y); if (x2) s = mut16(s, x2, y2); const M = load16(FDD, s); return chkB16(M).ok && fz16(M, 400, 7).wrong === 0; } catch (e) { return 'err ' + e.message; } });   // 고정 시험 또는 퍼징(400회) 어느 쪽이든 잡으면 ✗
-    T('P1 판16 ①-2 결함 사본 ' + MB16.length + '개(같은 틀 글자 둘 검사 걷음·붙은 칸 두 겹 걷음·사이 글자 횟수 검사 걷음·담는 중 상한 걷음 — 고정 시험 또는 퍼징 400회) = 모두 ✗', MB16.every((v) => v === false), JSON.stringify(MB16));
+    T('P1 판16 ①-2 결함 사본 ' + MB16.length + '개(붙은 칸 두 겹 걷음·사이 글자 횟수 검사 걷음·담는 중 상한 걷음 — 고정 시험 또는 퍼징 400회) = 모두 ✗', MB16.every((v) => v === false), JSON.stringify(MB16));
 
     // ② 추천값 — 앱의 토큰 만드는 곳과 칸 목록 대조(드리프트) · 추천 고정 · 정산합의서 전부 돈 칸
     const html16 = fs16.readFileSync(join(ROOT, 'index.html'), 'utf8');
