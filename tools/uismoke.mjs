@@ -15138,8 +15138,8 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
     const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check'];
     const mF = ['`wkDocAsbEnsure`', '`wkDocBaseNote`', '`wkDocBase`', '착수일', '서버 변경 없음'].filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v479 \(2026-11-15\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length >= 3 && !cb.some((l) => /\(PM/.test(l))
-      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && /SHELL_CACHE = 'jw-shell-v479'/.test(d.sw)
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 479 /* v480: 기준 줄·sw = 이 판 이상 */ && ftv.length > 0 && mF.length === 0 && cb.length >= 3 && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 479
       && d.mn.indexOf('현장 대장을 아직 읽지 못했으면') > 0 && !/wkDocBaseNote|wkDocAsbEnsure/.test(d.mn);
     return { ok, info: { mF, cb: cb.length, gate: gate.length } };
   };
@@ -15538,6 +15538,33 @@ try {
     && edVis21.indexOf('연구노트 10월 초안 고치기') >= 0 && edVis21.indexOf('고친 글로 확정') >= 0 && edVis21.indexOf('취소') >= 0 && !/\brnote\b|\b[a-z]+_[a-z_]+\b/.test(edVis21),
     '새는 글: ' + leak21.join(',') + ' · 고침 칸 ' + edN21);
 } catch (e) { console.log('  (P1 판21 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v480(Phase 1 판9·16·18·21 — PM 11/15 09:38 "ㄱ"): 실행 검사는 위 'P1 판9'·'P1 판16'·'P1 판21' 블록 · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '480 이상'으로 풀 것
+try {
+  const rd480 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D480 = { ft: rd480('FEATURES.md'), tl: rd480('TESTLIST.md'), sw: rd480('sw.js'), man: rd480('MANUAL.html'), cl: rd480('CLAUDE.md') };
+  const chk480 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v480 (11/15)', '\n### '), tlv = cut(d.tl, '\n## v480 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ['`isTestMember`', '`hrTestToggle`', '`leaveLate`', '`leaveEndNote`', '`contractPlan`', '`hwpxTokDiff`', '`_lib/learnallow2.js`', '`LA2.injectFilter`', '`learnhw`', '`tpl_sha`', '`_lib/rnote.js`', '`rnote_put`', '`RULES_VER`', '`bot_text`', '`ROWMAP`', '원장 C165', '제4조① 단서 **4호**', '비교 불가', '연구전담요원 PM만'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = ['<b>승인 대기가 하루를 넘으면</b>', '<b>시험 계정 표식</b>', '<li><b>연구노트</b> (2026-11 v480)', '<b>계약 서류 학습 — 한글 양식</b> (2026-11 v480)'];
+    const ok = /기준: v480 \(2026-11-15\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 13 && gate.length === 3 && scr.length === 10 && !cb.some((l) => /\(PM/.test(l))
+      && d.ft.indexOf('단서 5호') < 0 && d.ft.indexOf('§4①5호') < 0
+      && MAN.every((s) => d.man.indexOf(s) > 0) && !/test_acct|hwpx_tok|learnhw|rnote_|bot_text|tpl_sha/.test(MAN.map((s) => cut(d.man, s, '\n')).join(' '))
+      && d.cl.indexOf('**P1 판9·16·18·21(v480') > 0 && d.cl.indexOf('`LA2.injectFilter`') > 0
+      && /SHELL_CACHE = 'jw-shell-v480'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r480 = chk480(D480);
+  const mu480 = (k, f) => chk480(Object.assign({}, D480, { [k]: f(D480[k]) })).ok;
+  const M480 = [mu480('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v479 (')), mu480('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v479'")),
+    mu480('ft', (s) => s.split('`LA2.injectFilter`').join('LA2.injectFilter')), mu480('ft', (s) => s.replace('단서 4호', '단서 5호')),
+    mu480('man', (s) => s.replace('<b>시험 계정 표식</b>', '시험 계정 표식')), mu480('cl', (s) => s.replace('**P1 판9·16·18·21(v480', 'P1 판9·16·18·21('))];
+  T('v480 문서·판 번호(정확 검사): FEATURES 기준 v480 (2026-11-15)·v480 절·옛 "5호" 0 · TESTLIST v480 칸 13(화면·운영 확인 10 · 게이트 [x] 3) · MANUAL 휴가 지연·시험 계정·연구노트·한글 양식 학습(내부 이름 0) · CLAUDE.md 줄 · sw jw-shell-v480 · 결함 사본 ' + M480.length + '개 = 모두 ✗',
+    r480.ok && M480.every((v) => v === false), JSON.stringify({ r: r480.info, mut: M480 }));
+} catch (e) { console.log('  (v480 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
