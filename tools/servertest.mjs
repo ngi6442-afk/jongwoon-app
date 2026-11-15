@@ -10251,12 +10251,53 @@ function J91a(x) { return JSON.stringify(x); }
       rDD.ok, JSON.stringify(rDD.info));
     const MDD = [
       ["    if (T[i].box || D[i].box || !dv[i] || adj || s0.toks.length > TOK_PER_PARA) { unc(); continue; }", "    if (!dv[i] || adj || s0.toks.length > TOK_PER_PARA) { unc(); continue; }", '    if (ma[i] >= 0) { if (F[ma[i]].box) { unc(); continue; } fv = dv[i].slice(); }', '    if (ma[i] >= 0) { fv = dv[i].slice(); }'],   // 글상자 두 겹 다 걷음
-      ['      if (candF.length === gapD.length) pick = candF[gapD.indexOf(i)];', '      if (false) pick = candF[gapD.indexOf(i)];'],
+      ['      if (candF.length === gapD.length && gapD.every(function (x) { return !!sp[x]; })) pick = candF[gapD.indexOf(i)];', '      if (false) pick = candF[gapD.indexOf(i)];'],
       ["    const adj = s0.lits.slice(1, -1).some(function (l) { return !stripWs(l); });", '    const adj = false;', '    else { if (!L[j]) return null; q = st.indexOf(L[j], p); if (q < 0) return null; }', '    else { q = st.indexOf(L[j], p); if (q < 0) return null; }'],   // 붙은 칸 두 겹 다 걷음
       ["  if (T.length !== D.length) return { ok: false, code: 'TPL_CHANGED' };", ''],
       ["      put(nm, stripWs(d) === stripWs(f) ? (stripWs(d) === '' ? 'blank' : 'same') : 'changed', d, f);", "      put(nm, stripWs(d) === stripWs(f) ? 'same' : 'changed', d, f);"],
       ["    if (A[t.name]) rows.push(", "    if (true) rows.push("]].map(([a, b, c, d]) => { try { let s = mut16(SDD, a, b); if (c) s = mut16(s, c, d); return chkDD(load16(FDD, s)).ok; } catch (e) { return 'err ' + e.message; } });
     T('P1 판16 ① 결함 사본 ' + MDD.length + '개(글상자 걷음·같은 차례 짝 걷음·붙은 칸 검사 걷음·양식 바뀜 검사 걷음·빈칸↔빈칸 걷음·허용 밖 값 노출) = 모두 ✗', MDD.every((v) => v === false), JSON.stringify(MDD));
+    // ①-2 검토 반영(11/15) — 틀 없는 칸 문단(표 칸) · 사이 글자가 값 안에 · 빈 문단 폭탄. 원칙: 틀리게 세느니 비교 불가(틀린 값·사라짐 0)
+    const zlib16 = require('zlib');
+    const mkZipD = (entries) => { const locals = [], cds = []; let off = 0; for (const [name, text] of entries) { const nb = Buffer.from(name), raw = Buffer.from(text), db = zlib16.deflateRawSync(raw), crc = crc32(raw); const lh = Buffer.alloc(30); lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(8, 8); lh.writeUInt32LE(crc, 14); lh.writeUInt32LE(db.length, 18); lh.writeUInt32LE(raw.length, 22); lh.writeUInt16LE(nb.length, 26); const cd = Buffer.alloc(46); cd.writeUInt32LE(0x02014b50, 0); cd.writeUInt16LE(20, 4); cd.writeUInt16LE(20, 6); cd.writeUInt16LE(8, 10); cd.writeUInt32LE(crc, 16); cd.writeUInt32LE(db.length, 20); cd.writeUInt32LE(raw.length, 24); cd.writeUInt16LE(nb.length, 28); cd.writeUInt32LE(off, 42); locals.push(lh, nb, db); cds.push(cd, nb); off += 30 + nb.length + db.length; } const cdb = Buffer.concat(cds), eocd = Buffer.alloc(22); eocd.writeUInt32LE(0x06054b50, 0); eocd.writeUInt16LE(entries.length, 8); eocd.writeUInt16LE(entries.length, 10); eocd.writeUInt32LE(cdb.length, 12); eocd.writeUInt32LE(off, 16); return Buffer.concat([...locals, cdb, eocd]); };
+    const chkB16 = (D) => {
+      const run = (tpl, v, fin, allow) => { const Tb = hwpx16(tpl), Db = hwpx16(tpl.map((p) => fillP(p, v))), Fb = hwpx16(fin); return { d: D.hwpxTokDiff(Tb, Db, Fb), r: D.hwpxTokRows(Tb, Db, Fb, allow || []) }; };
+      const val = (x, nm) => { const r = x.r.rows.filter((y) => y.ref === nm)[0]; return r ? r.final : undefined; };
+      // 재현 ① 틀 없는 칸 + 설명 문단을 지우고 새 문단 = 업체명 비교 불가(값이 안 나감)
+      const a = run(['머리', '{{업체명}}', '설명 문단', '꼬리'], { 업체명: '주식회사 종운환경' }, ['머리', '새로 넣은 문단', '주식회사 바뀐회사', '꼬리'], ['업체명']);
+      const okA = a.r.rows.length === 0 && JSON.stringify(a).indexOf('새로 넣은 문단') < 0 && (a.d.ok ? a.d.refs_uncomparable.indexOf('업체명') >= 0 : a.d.refs_uncomparable.indexOf('업체명') >= 0);
+      // 재현 ② 견적 품목 표 꼴 — 성상·구분·단위 빈칸, 직원이 성상 고상·단위 톤만 채움 = 맞게 읽음
+      const TQ = ['품명', '성상', '구분', '단위', '수량', '{{품명}}', '{{성상}}', '{{구분}}', '{{단위}}', '{{수량}}'], VQ = { 품명: '슬러지', 성상: '', 구분: '', 단위: '', 수량: '5' };
+      const FQ = TQ.map((p) => fillP(p, VQ)); FQ[6] = '고상'; FQ[8] = '톤';
+      const b = run(TQ, VQ, FQ, ['성상', '구분', '단위']);
+      const okB = b.d.ok && b.d.changed === 2 && b.d.refs_changed.slice().sort().join() === ['단위', '성상'].sort().join() && val(b, '성상') === '고상' && val(b, '단위') === '톤' && val(b, '구분') === '' && b.d.uncomparable === 0;
+      // 표 칸 꼴: 같은 값 두 칸 중 하나만 고침 · 빈칸 셋 중 1·3 채움 · 빈 문단 앞에 두고 2번째만 · 구간에 칸 없는 빈 문단이 섞임 = 비교 불가(틀린 값 0)
+      const c = run(['머리', '{{가}}', '{{나}}', '꼬리'], { 가: '톤', 나: '톤' }, ['머리', '톤', '식', '꼬리'], ['가', '나']);
+      const okC = c.d.ok && c.d.refs_changed.join() === '나' && val(c, '가') === '톤' && val(c, '나') === '식';
+      const e = run(['머리', '{{가}}', '{{나}}', '{{다}}', '꼬리'], { 가: '', 나: '', 다: '' }, ['머리', 'x', '', 'y', '꼬리'], ['가', '나', '다']);
+      const okE = e.d.ok && val(e, '가') === 'x' && val(e, '나') === '' && val(e, '다') === 'y';
+      const f = run(['머리', '', '{{가}}', '{{나}}', '꼬리'], { 가: '', 나: '' }, ['머리', '', '', 'y', '꼬리'], ['가', '나']);
+      const okF = f.d.ok && val(f, '가') === '' && val(f, '나') === 'y';
+      const g = run(['머리', '{{가}}', '{{나}}', '', '꼬리'], { 가: '', 나: '' }, ['머리', 'x', '', '', '꼬리'], ['가', '나']);
+      const okG = g.r.rows.length === 0 && (g.d.refs_uncomparable || []).slice().sort().join() === '가,나';
+      // 사이 글자가 값 안에 = 그 문단 못 읽음(잘린 값 0)
+      const h = run(['기간: {{가}} 및 {{나}}', '머리 {{다}}'], { 가: '갑 및 을', 나: '병', 다: '하나' }, ['기간: 갑 및 을 및 정', '머리 둘'], ['가', '나', '다']);
+      const okH = h.r.rows.every((x) => x.ref === '다') && val(h, '다') === '둘' && h.d.refs_uncomparable.slice().sort().join() === '가,나';
+      // 빈 문단 수백만 개 압축 = 담는 중에 상한(메모리 수백 MB 전)
+      const bomb = mkZipD([['mimetype', 'application/hwp+zip'], ['Contents/section0.xml', '<hs:sec>' + '<hp:p/>'.repeat(3000000) + '</hs:sec>']]);
+      const m0 = process.memoryUsage().heapUsed, gb = D.hwpxTokDiff(hwpx16(['{{가}}']), hwpx16(['x']), bomb), dm = process.memoryUsage().heapUsed - m0;
+      const okI = gb.code === 'TOO_MANY_PARAS' && dm < 64 * 1048576;
+      return { ok: okA && okB && okC && okE && okF && okG && okH && okI, info: { okA, okB, okC, okE, okF, okG, okH, okI, b: b.r.rows, a: a.d.code || a.d.refs_uncomparable, dmMB: Math.round(dm / 1048576) } };
+    };
+    const rB16 = chkB16(DD);
+    T('P1 판16 ①-2 틀 없는 칸 문단·사이 글자·빈 문단 폭탄(검토 11/15): 재현 ① 칸만 있는 문단 + 설명 문단 지우고 새 문단 = 업체명 비교 불가(새 문단 글이 값으로 안 나감) · 재현 ② 품목 표 꼴 성상 고상·단위 톤 = 맞게 읽음(구분 빈칸) · 같은 값 두 칸 중 하나만 고침 · 빈칸 셋 중 1·3 · 빈 문단 앞 + 2번째 · 구간에 칸 없는 빈 문단 섞임 = 비교 불가 · 값 안에 사이 글자(갑 및 을) = 그 문단 비교 불가·다른 문단은 읽음 · 빈 문단 300만 개 압축 = TOO_MANY_PARAS(힙 64MB 안)',
+      rB16.ok, JSON.stringify(rB16.info));
+    const MB16 = [
+      ["  const a = D.map(function (x, i) { return bare[i] ? '\\u0000칸' + i : stripWs(x.s); })", '  const a = D.map(function (x, i) { return stripWs(x.s); })'],
+      ['      if (candF.length === gapD.length && gapD.every(function (x) { return !!sp[x]; })) pick', '      if (candF.length === gapD.length) pick'],
+      ['  for (let j = 1; j < k; j++) { if (L[j] && cnt(st, L[j]) > cnt(tplLit, L[j])) return null; }', ''],
+      ['      if (out.length + stack.length > TOK_PARA_CAP) return OVER;\n', '']].map(([x, y]) => { try { return chkB16(load16(FDD, mut16(SDD, x, y))).ok; } catch (e) { return 'err ' + e.message; } });
+    T('P1 판16 ①-2 결함 사본 ' + MB16.length + '개(칸만 있는 문단을 LCS에 넣음·같은 차례 짝에 칸 없는 문단 허용·사이 글자 횟수 검사 걷음·담는 중 상한 걷음) = 모두 ✗', MB16.every((v) => v === false), JSON.stringify(MB16));
 
     // ② 추천값 — 앱의 토큰 만드는 곳과 칸 목록 대조(드리프트) · 추천 고정 · 정산합의서 전부 돈 칸
     const html16 = fs16.readFileSync(join(ROOT, 'index.html'), 'utf8');
@@ -10277,6 +10318,22 @@ function J91a(x) { return JSON.stringify(x); }
       && CARD.dropped.money + CARD.dropped.date + CARD.dropped.case + CARD.dropped.pii === Object.keys(LA2.TOKENS).reduce((s, t) => s + LA2.TOKENS[t].length, 0) - 12 + 8;
     T('P1 판16 ② 허용 칸 추천(_lib/learnallow2): 칸 목록 = 앱 토큰 만드는 곳(xgConTok 3종·xgAdvTok·xgQuoteTok·적격심사 qTokens — 드리프트 ' + drift.length + ') · 추천 6양식 12칸(업체명·상호·견적 부가세구분·성상·구분·단위) · 적격심사 0 · 정산합의서 = 앱 채움 칸(F열 7 + L26)과 같은 8칸 전부 돈 칸·추천 0 · 금액·요율·점수·날짜·수신처·번호·품명·주소·연락처·계좌·대표자·담당자·사업자번호 = 뺌',
       drift.length === 0 && recOk, JSON.stringify({ drift, REC, settleApp, dropped: CARD.dropped }));
+    // ②-2 주입 잠금(검토 ⑤·⑥): 견적서 2종 = 주입 0(재기만) · 정산합의서 0 · 추천 목록 밖 한글 양식(안전·노무비) = 칸 이름 꼴 0 · 1차 xlsx 칸 좌표는 그대로(회귀)
+    const chkI16 = (L) => {
+      const f = L.injectFilter;
+      const ok = JSON.stringify(f('quote_env', { 단위: '톤', 성상: '고상' })) === '{}' && JSON.stringify(f('quote_con', { 구분: '운반' })) === '{}' && JSON.stringify(f('settle_doc', { '원가계산서 (정산)!F14': '1' })) === '{}'
+        && JSON.stringify(f('labor_split', { 노무비: '100' })) === '{}' && JSON.stringify(f('safety_plan', { 작성일: 'x', 현장명: 'y' })) === '{}' && JSON.stringify(f('labor_exempt', { 업체명: 'z' })) === '{}'
+        && JSON.stringify(f('asb_plan', { '1.공사개요!C7': 'a', H8: 'b', '3!K99': 'c' })) === '{"1.공사개요!C7":"a","H8":"b","3!K99":"c"}' && JSON.stringify(f('work_start', { '착공계!A1': 'x' })) === '{"착공계!A1":"x"}'
+        && JSON.stringify(f('contract_pledge', { 업체명: '주식회사 종운환경', 금액숫자: '1' })) === '{"업체명":"주식회사 종운환경"}' && JSON.stringify(f('adv_pay', { 상호: 'a', 계좌번호: 'b' })) === '{"상호":"a"}'
+        && JSON.stringify(L.injectable()) === '{"contract_pledge":["업체명"],"seal_reg":["업체명"],"bond_waiver":["업체명"],"adv_pay":["상호"]}' && L.card().tpls.quote_env.no_inject === true && !L.card().tpls.adv_pay.no_inject;
+      return ok;
+    };
+    const FLA = join(FN, '_lib', 'learnallow2.js'), SLA = fs16.readFileSync(FLA, 'utf8');
+    const MI16 = [["const NO_INJECT = { settle_doc: 1, quote_env: 1, quote_con: 1 };", "const NO_INJECT = { settle_doc: 1 };"],
+      ["  if (!Object.prototype.hasOwnProperty.call(TOKENS, tpl)) { Object.keys(d).forEach(function (k) { if (CELL_REF.test(k)) out[k] = d[k]; }); return out; }", '  if (!Object.prototype.hasOwnProperty.call(TOKENS, tpl)) return d;'],
+      ["const CELL_REF = /^(?:[^!]+!)?\\$?[A-Z]{1,3}\\$?\\d{1,7}$/;", "const CELL_REF = /^[A-Z]{1,3}\\d{1,7}$/;"]].map(([x, y]) => { try { return chkI16(load16(FLA, mut16(SLA, x, y))); } catch (e) { return 'err ' + e.message; } });
+    T('P1 판16 ②-2 주입 잠금(검토 ⑤·⑥): 견적서 2종 주입 0(재기만 — 생성 창에 학습값 표시가 없어 사람이 비운 칸을 말없이 채우지 않음) · 정산합의서 0 · 목록 밖 한글 양식(노무비 구분·안전보건관리계획서·노무비제외) 0 · 1차 xlsx 칸 좌표(시트!칸·칸) 그대로 · 서약서 업체명·선금 상호만 주입(돈·계좌 칸 뺌) · 주입 칸 4양식 4칸 · 결함 사본 ' + MI16.length + '개 = 모두 ✗',
+      chkI16(LA2) && MI16.every((v) => v === false), JSON.stringify(MI16));
 
     // ③ e2e — 짝(hwpx_tok · 값 없음) · PM 콘솔 learnhw:on(기존 핸들러·상한·낙관락) · 허용 뒤 pending · 양식 바뀜 = 문단 비교 + 까닭
     const b16 = (x) => Buffer.from(x).toString('base64');
@@ -10294,40 +10351,46 @@ function J91a(x) { return JSON.stringify(x); }
       r = await cl({ action: 'cdoc_put', cid: 'c16', i: 0, doc_key: 'main.작성-0', kind: 'final', name: '견적서_고침.hwpx', data: b16(hwpx16(FIN1)), pii: 1, pair_tpl: 'quote_env' }, tk);
       const L1 = (r.body && r.body.learn) || {}, p1 = L1.id ? mem.gw_data['learn:contract:in:' + L1.id] : null;
       o.p1 = L1.ok && L1.kind === 'hwpx_tok' && L1.status === 'done_nomodel' && L1.changed === 4 && L1.compared === 8 && p1 && JSON.stringify(p1).indexOf('포항시청') < 0 && JSON.stringify(p1).indexOf('이백만원') < 0;
+      // 검토 ④: 초안 메타에 그때 빈 양식 지문
+      const drK = Object.keys(mem.gw_files).filter((k) => k.indexOf('cdoc:c16:') === 0 && k.indexOf(':gen.quote_env:') > 0)[0];
+      o.sha = !!drK && mem.gw_files[drK].tpl_sha === DD.tplFinger(b16(tplB)) && /^[0-9a-f]{16}$/.test(mem.gw_files[drK].tpl_sha);
+      // 검토 ⑧: 사람이 손으로 넣어 둔 같은 양식 칸(견적 품명) — [ㄱ] 뒤에도 남아야(합집합)
+      mem.gw_data['settings:learn'].contract.allow.quote_env = ['품명'];
       // 콘솔
       const lp = await cl({ action: 'learn_pairs_get' }, tokA); o.rec2 = lp.code === 200 && lp.body.rec2 && JSON.stringify(lp.body.rec2.tpls.quote_env.rec) === '["부가세구분","성상","구분","단위"]';
       const g0 = await cl({ action: 'pmcon_get' }, tokA);
       const body = (x) => Object.assign({ action: 'pmcon_decide', kind: 'learnhw', row: 'learnhw:on', choice: 'ok', grade: 'R2', due: '2026-11-22', q: '한글 양식 서류도 학습 허용 칸에 넣을까요?', rec: '추천 6양식 12칸', args: { on: true }, set_base: 1000, base: g0.body.updated_at }, x || {});
-      const stale = await cl(body({ set_base: 999 }), tokA); o.stale = stale.code === 409 && JSON.stringify(mem.gw_data['settings:learn'].contract.allow) === '{"asb_plan":["C7"]}';
+      const stale = await cl(body({ set_base: 999 }), tokA); o.stale = stale.code === 409 && JSON.stringify(mem.gw_data['settings:learn'].contract.allow) === '{"asb_plan":["C7"],"quote_env":["품명"]}';
       const wk = await cl(body(), tW16()); o.notPm = wk.code === 403;
       const ok1 = await cl(body(), tokA); const al = mem.gw_data['settings:learn'].contract.allow;
-      o.applied = ok1.code === 200 && ok1.body.applied === true && JSON.stringify(al.asb_plan) === '["C7"]' && Object.keys(al).length === 7 && JSON.stringify(al.quote_env) === '["부가세구분","성상","구분","단위"]' && !al.qual_packet && !al.settle_doc
+      o.applied = ok1.code === 200 && ok1.body.applied === true && JSON.stringify(al.asb_plan) === '["C7"]' && Object.keys(al).length === 7 && JSON.stringify(al.quote_env) === '["품명","부가세구분","성상","구분","단위"]' && !al.qual_packet && !al.settle_doc
         && mem.gw_data['settings:learn'].prev && auditMock.logs.some((e) => e.ev && e.ev[0] && e.ev[0].op === '학습설정') && mem.gw_data['status:decide'].log.slice(-1)[0].row === 'learnhw:on';
       r = await cl({ action: 'cdoc_put', cid: 'c16', i: 0, doc_key: 'main.작성-0', kind: 'final', name: '견적서_고침2.hwpx', data: b16(hwpx16(FIN2)), pii: 1, pair_tpl: 'quote_env', allow_dup: true }, tk);
       o.pending = r.body.learn && r.body.learn.kind === 'hwpx_tok' && r.body.learn.status === 'pending'; o.pid = r.body.learn && r.body.learn.id;
-      // 주입 잠금 — 허용 사전에 돈 칸(금액)을 손으로 넣어도 한글 양식 기본값에서 빠짐 · 정산합의서 = 주입 없음
-      mem.gw_data['settings:learn'].contract.allow.quote_env = ['단위', '금액']; mem.gw_data['settings:learn'].contract.allow.settle_doc = ['원가계산서 (정산)!F14'];
+      // 주입 잠금 — 서약서: 허용 사전에 돈 칸(금액숫자)을 손으로 넣어도 업체명만 · 견적서 = 주입 0(검토 ⑥) · 정산합의서 = 주입 0
+      mem.gw_data['settings:learn'].contract.allow.contract_pledge = ['업체명', '금액숫자']; mem.gw_data['settings:learn'].contract.allow.quote_env = ['단위', '금액']; mem.gw_data['settings:learn'].contract.allow.settle_doc = ['원가계산서 (정산)!F14'];
+      mem.gw_data['lessons:contract:contract_pledge'] = { rules: [{ id: 'r0', text: '업체명', scope: 'field_default', field: '업체명', value: '주식회사 종운환경', n: 2 }, { id: 'r9', text: '금액', scope: 'field_default', field: '금액숫자', value: '1,000', n: 3 }] };
       mem.gw_data['lessons:contract:quote_env'] = { rules: [{ id: 'r1', text: '단위는 톤', scope: 'field_default', field: '단위', value: '톤', n: 2 }, { id: 'r2', text: '금액', scope: 'field_default', field: '금액', value: '1,000', n: 3 }] };
       mem.gw_data['lessons:contract:settle_doc'] = { rules: [{ id: 'r3', text: 'F14', scope: 'field_default', field: '원가계산서 (정산)!F14', value: '5000', n: 4 }] };
-      const i1 = await cl({ action: 'learn_defaults_get', tpl: 'quote_env' }, tk), i2 = await cl({ action: 'learn_defaults_get', tpl: 'settle_doc' }, tk);
-      o.inject = i1.code === 200 && JSON.stringify(i1.body.defaults) === '{"단위":"톤"}' && i2.code === 200 && JSON.stringify(i2.body.defaults) === '{}';
+      const i0 = await cl({ action: 'learn_defaults_get', tpl: 'contract_pledge' }, tk), i1 = await cl({ action: 'learn_defaults_get', tpl: 'quote_env' }, tk), i2 = await cl({ action: 'learn_defaults_get', tpl: 'settle_doc' }, tk);
+      o.inject = i0.code === 200 && JSON.stringify(i0.body.defaults) === '{"업체명":"주식회사 종운환경"}' && i1.code === 200 && JSON.stringify(i1.body.defaults) === '{}' && i2.code === 200 && JSON.stringify(i2.body.defaults) === '{}';
       // 끄기(off) = 추천 양식 키만 뺌
       const g1 = await cl({ action: 'pmcon_get' }, tokA);
       const off = await cl(body({ row: 'learnhw:off', args: { on: false }, set_base: mem.gw_data['settings:learn'].updated_at, base: g1.body.updated_at }), tokA);
       const al2 = mem.gw_data['settings:learn'].contract.allow;
       o.off = off.code === 200 && Object.keys(al2).sort().join() === 'asb_plan,settle_doc';
-      // 양식을 갈아 끼움 → 문단 비교 + tok_code
-      mem.gw_files['tpl:quote_env'] = { name: '새 견적서.hwpx', data: b16(hwpx16(['새 머리'].concat(TPL16))), by: 'x', ts: 2 };
+      // 양식을 갈아 끼움(문단 수는 같고 칸 이름만 단위 → 규격 — 지문 없으면 옛 값이 새 이름으로 읽힘) → 문단 비교 + tok_code(검토 ④)
+      mem.gw_files['tpl:quote_env'] = { name: '새 견적서.hwpx', data: b16(hwpx16(TPL16.map((p) => (typeof p === 'string' ? p.replace('{{단위}}', '{{규격}}') : p)))), by: 'x', ts: 2 };
       r = await cl({ action: 'cdoc_put', cid: 'c16', i: 0, doc_key: 'main.작성-0', kind: 'final', name: '견적서_고침3.hwpx', data: b16(hwpx16(FIN1)), pii: 1, pair_tpl: 'quote_env', allow_dup: true }, tk);
       const p3 = r.body.learn && r.body.learn.id ? mem.gw_data['learn:contract:in:' + r.body.learn.id] : null;
       o.tplChg = r.body.learn && r.body.learn.kind === 'hwpx_para' && p3 && p3.diff && p3.diff.tok_code === 'TPL_CHANGED';
       mem.gw_files['tpl:quote_env'] = { name: '견적서.hwpx', data: b16(tplB), by: 'x', ts: 3 };
-      o.ok = o.d === 200 && o.p1 && o.rec2 && o.stale && o.notPm && o.applied && o.pending && o.inject && o.off && o.tplChg;
+      o.ok = o.d === 200 && o.p1 && o.sha && o.rec2 && o.stale && o.notPm && o.applied && o.pending && o.inject && o.off && o.tplChg;
       return o;
     };
     const tW16 = () => { mem.gw_users['member:u16a'] = { id: 'u16a', name: '관리부16', role: '관리자', admin: true, perms: {} }; return issueSession(mem.gw_users['member:u16a']).token; };
     const R16 = await run16(gwd);
-    T('P1 판16 ③ e2e: 한글 견적서 최종본 = 칸 비교 짝(hwpx_tok · 바뀜 4/8 · 짝 블롭에 값 없음 · 허용 전 done_nomodel) · learn_pairs_get rec2 · PM 콘솔 learnhw:on = 기존 learn_settings_set 길(낡은 set_base 409·PM 아닌 관리자 403·1차 asb_plan 그대로 + 추천 6양식·감사 학습설정·누른 기록) · 그 뒤 최종본 pending · 주입 잠금(한글 양식 돈 칸 금액 뺌·정산합의서 {}) · learnhw:off = 추천 양식 키만 뺌 · 양식을 갈아 끼우면 문단 비교 + tok_code TPL_CHANGED',
+    T('P1 판16 ③ e2e: 한글 견적서 최종본 = 칸 비교 짝(hwpx_tok · 바뀜 4/8 · 짝 블롭에 값 없음 · 허용 전 done_nomodel) · learn_pairs_get rec2 · PM 콘솔 learnhw:on = 기존 learn_settings_set 길(낡은 set_base 409·PM 아닌 관리자 403·1차 asb_plan 그대로 + 추천 6양식 · 같은 양식 손 칸(견적 품명)은 남김(합집합) · 감사 학습설정·누른 기록) · 그 뒤 최종본 pending · 주입 잠금(서약서 돈 칸 금액숫자 뺌·견적서 {}·정산합의서 {}) · learnhw:off = 추천 양식 키만 뺌 · 초안 메타 양식 지문 tpl_sha · 칸 이름만 바꿔 다시 올린 양식 = 문단 비교 + tok_code TPL_CHANGED(워커도 TPL_CHANGED·호출 0)',
       R16.ok, JSON.stringify(R16));
     // ④ 워커 — 허용 칸만 값 · 칸 이름 프롬프트 · 규칙 field = 칸 이름
     reset16();
@@ -10344,7 +10407,14 @@ function J91a(x) { return JSON.stringify(x); }
         return { ok: true, status: 200, text: async () => JSON.stringify({ model: b.model, stop_reason: 'end_turn', usage: { input_tokens: 100, output_tokens: 20 }, content: [{ type: 'text', text }] }) }; };
       await worker.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + issueSession({ id: '__promoai__', role: 'system' }).token }, body: JSON.stringify({ pair_id: r0.pid }) }, {});
       const P = mem.gw_data['learn:contract:in:' + r0.pid], L = mem.gw_data['lessons:contract:quote_env'], u = api[0] || '';
-      return { st: P.status, code: P.code, calls: api.length, vis: P.visible_n, hid: P.hidden_changed_n, unitLine: /한글\(hwpx\) 양식/.test(u) && /\(칸 이름 · 앱 초안 값/.test(u), val: u.indexOf('"고상"') > 0, leak: u.indexOf('포항시청') >= 0, rules: L && L.rules.map((x) => x.field) };
+      // 검토 ④: 짝 뒤 빈 양식을 다시 올렸으면(지문 다름) 워커도 칸 비교·모델 호출을 하지 않음
+      const st0 = P.status;
+      mem.gw_files['tpl:quote_env'] = { name: '새 견적서.hwpx', data: b16(hwpx16(TPL16.map((p) => (typeof p === 'string' ? p.replace('{{단위}}', '{{규격}}') : p)))), by: 'x', ts: 9 };
+      mem.gw_data['learn:contract:in:' + r0.pid].status = 'pending';
+      await worker.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + issueSession({ id: '__promoai__', role: 'system' }).token }, body: JSON.stringify({ pair_id: r0.pid }) }, {});
+      const P2 = mem.gw_data['learn:contract:in:' + r0.pid];
+      if (!(P2.status === 'done_nomodel' && P2.code === 'TPL_CHANGED' && api.length === 1)) return { tplWorker: [P2.status, P2.code, api.length] };
+      return { st: st0, code: P.code, calls: api.length, vis: P.visible_n, hid: P.hidden_changed_n, unitLine: /한글\(hwpx\) 양식/.test(u) && /\(칸 이름 · 앱 초안 값/.test(u), val: u.indexOf('"고상"') > 0, leak: u.indexOf('포항시청') >= 0, rules: L && L.rules.map((x) => x.field) };
     })();
     T('P1 판16 ④ 학습 워커 hwpx_tok: 허용 칸(부가세구분·성상·구분·단위)만 값이 프롬프트에(성상 "고상") · 허용 밖 수신처는 칸 이름만(포항시청 미노출) · 한글 양식 단위 글 · 모델 규칙 중 허용 밖 칸(수신처) field_default 버림 → 성상 1',
       R16w.st === 'done' && R16w.calls === 1 && R16w.vis === 4 && R16w.hid === 1 && R16w.unitLine && R16w.val && !R16w.leak && JSON.stringify(R16w.rules) === '["성상"]', JSON.stringify(R16w));
@@ -10355,12 +10425,15 @@ function J91a(x) { return JSON.stringify(x); }
       ["  const status = ((kind === 'xlsx_cell' || kind === 'hwpx_tok') && learnAllowed(s, tpl))", "  const status = ((kind === 'xlsx_cell') && learnAllowed(s, tpl))"],
       ['  const defaults = LA2.injectFilter(tpl, LN.fieldDefaults(', '  const defaults = (function (t, x) { return x; })(tpl, LN.fieldDefaults('],
       ["    if (tk && tk.ok) { diff = tk; kind = 'hwpx_tok'; }", "    if (false) { diff = tk; kind = 'hwpx_tok'; }"],
-      ["  Object.keys(rec).forEach(function (t) { if (d.on) next[t] = rec[t].slice(); else delete next[t]; });", "  const next2 = {}; Object.keys(rec).forEach(function (t) { if (d.on) next2[t] = rec[t].slice(); }); Object.keys(next).forEach(function (k) { delete next[k]; }); Object.assign(next, next2);"],
+      ["  Object.keys(rec).forEach(function (t) { if (d.on) { const cur0 = Array.isArray(next[t]) ? next[t].slice() : []; rec[t].forEach(function (f) { if (cur0.indexOf(f) < 0) cur0.push(f); }); next[t] = cur0; } else delete next[t]; });", "  const next2 = {}; Object.keys(rec).forEach(function (t) { if (d.on) next2[t] = rec[t].slice(); }); Object.keys(next).forEach(function (k) { delete next[k]; }); Object.assign(next, next2);"],
+      ["  Object.keys(rec).forEach(function (t) { if (d.on) { const cur0 = Array.isArray(next[t]) ? next[t].slice() : []; rec[t].forEach", "  Object.keys(rec).forEach(function (t) { if (d.on) { const cur0 = []; rec[t].forEach"],   // 검토 ⑧ 합집합 걷음(추천값으로 바꿔 씀)
+      ["if (tr.ok && tr.data && tr.data.data) rec.tpl_sha = DD.tplFinger(tr.data.data); } catch (e) {} }", "} catch (e) {} }"],   // 검토 ④ 지문 안 남김
+      ["tk = (tr.ok && tr.data && tr.data.data && dr.data.tpl_sha && DD.tplFinger(tr.data.data) !== dr.data.tpl_sha) ? { ok: false, code: 'TPL_CHANGED' } : ", 'tk = '],   // 검토 ④ 지문 대조 걷음
       ["  return handleLearnSettingsSet(event, { allow: next, base: d.base }, R);", "  return handleLearnSettingsSet(event, { allow: next }, R);"],
       ["'outside_changed', 'refs_outside', 'tok_code'].forEach", "'outside_changed', 'refs_outside'].forEach"]];
     const kGD = [];
     for (const [a, b] of MGD) { let v; try { v = (await run16(load16(FGD, mut16(SGD, a, b)))).ok; } catch (e) { v = 'err ' + e.message; } kGD.push(v); }
-    T('P1 판16 ⑤ 결함 사본 ' + MGD.length + '개(한글 양식 칸 짝 pending 걷음·주입 잠금 걷음·칸 비교 걷음·1차 허용 칸 날림·낙관락 base 걷음·까닭 tok_code 걷음) = 모두 ✗', kGD.every((v) => v === false), JSON.stringify(kGD));
+    T('P1 판16 ⑤ 결함 사본 ' + MGD.length + '개(한글 양식 칸 짝 pending 걷음·주입 잠금 걷음·칸 비교 걷음·1차 허용 칸 날림·같은 양식 손 칸 날림(합집합 걷음)·양식 지문 안 남김·지문 대조 걷음·낙관락 base 걷음·까닭 tok_code 걷음) = 모두 ✗', kGD.every((v) => v === false), JSON.stringify(kGD));
   } catch (e) { T('P1 판16 검사 실행', false, String(e && e.stack || e).slice(0, 500)); }
   finally { reset16(); global.fetch = realFetch16; process.env.GW_ANTHROPIC_KEY = savedKey16; }
 }

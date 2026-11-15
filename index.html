@@ -32010,22 +32010,33 @@ function dutyStage(nx){
     return [{ id: "learn:on", q: "계약 서류 학습을 켤까요?", recTxt: "켬", curTxt: "꺼짐", args: { on: true }, def: "keep",
       why: "켜면 허용 양식 " + Object.keys(s.allow || {}).length + "종을 직원 수정본과 견줘 배웁니다(짝·간극은 꺼져 있어도 계속 잽니다).", setBase: (b.settings && b.settings.updated_at) || 0 }];
   }
-  // P1 판16(원장 T396) — 서버 learn_pairs_get의 rec2(_lib/learnallow2 추천값)가 허용 사전에 다 들어가 있지 않으면 한 줄. [ㄱ] = 추천 양식 허용 칸을 추천값으로(다른 양식 그대로)
+  // P1 판16(원장 T396) — 서버 learn_pairs_get의 rec2(_lib/learnallow2 추천값) 중 허용 사전에 빠진 칸이 있으면 한 줄. [ㄱ] = 추천 양식 허용 칸에 추천 칸을 더함(기존 ∪ 추천 — 서버)
+  //   검토 ⑦ 표본 = 양식별 실제 짝 수(최근 짝 목록과 lessons 짝 수 중 큰 쪽) · ⑧ 추천 칸이 다 들어 있으면 줄 없음(손으로 더 넣은 칸은 상관없음) · ⑨ 글 = 짧은 한 줄, 양식별 칸 이름·뺀 칸 수는 풍선 글(tip)
+  var PMCON_HW_SHORT = { contract_pledge: "서약서", seal_reg: "인감계", bond_waiver: "채권포기각서", adv_pay: "선금" };
   function pmconRowsLearnHw(b){
     var s = (b.settings && b.settings.contract) || {}, al = s.allow || {}, R2 = b.rec2 || null;
     if (!R2 || !R2.tpls) return [];
     var tk = Object.keys(R2.tpls), rec = tk.filter(function(t){ return (R2.tpls[t].rec || []).length; });
     if (!rec.length) return [];
-    var same = function(a, x){ return Object.prototype.toString.call(a) === "[object Array]" && a.length === x.length && x.every(function(f){ return a.indexOf(f) >= 0; }); };
-    if (rec.every(function(t){ return same(al[t], R2.tpls[t].rec); })) return [];
-    var les = b.lessons || {}, cells = 0, n = 0, dr = R2.dropped || {};
+    var isArr = function(a){ return Object.prototype.toString.call(a) === "[object Array]"; };
+    if (rec.every(function(t){ return isArr(al[t]) && R2.tpls[t].rec.every(function(f){ return al[t].indexOf(f) >= 0; }); })) return [];
+    var les = b.lessons || {}, ps = b.pairs || [], cells = 0, n = 0, dr = R2.dropped || {};
     rec.forEach(function(t){ cells += R2.tpls[t].rec.length; });
-    tk.forEach(function(t){ n += Number((les[t] || {}).pairs) || 0; });
-    var parts = rec.map(function(t){ return genLabel(t) + " " + R2.tpls[t].rec.length + "칸(" + R2.tpls[t].rec.join("·") + ")"; });
+    tk.forEach(function(t){ var k = ps.filter(function(p){ return p && p.tpl === t && p.status !== "superseded"; }).length; n += Math.max(k, Number((les[t] || {}).pairs) || 0); });
+    // 칸 수가 같은 양식끼리 묶어 짧게 — 견적서 둘은 '견적서 2종'
+    var grp = {}, order = [];
+    rec.forEach(function(t){ var c = R2.tpls[t].rec.length; if (!grp[c]){ grp[c] = []; order.push(c); } grp[c].push(t); });
+    var seg = order.map(function(c){
+      var ts = grp[c], q2 = ts.indexOf("quote_env") >= 0 && ts.indexOf("quote_con") >= 0;
+      var nm = ts.filter(function(t){ return !(q2 && (t === "quote_env" || t === "quote_con")); }).map(function(t){ return PMCON_HW_SHORT[t] || genLabel(t); });
+      if (q2) nm.push("견적서 2종");
+      return nm.join("·") + (ts.length > 1 ? " 각 " : " ") + c + "칸";
+    });
     var none = tk.filter(function(t){ return !(R2.tpls[t].rec || []).length; }).map(genLabel);
-    return [{ id: "learnhw:on", q: "한글 양식 서류도 학습 허용 칸에 넣을까요?", recTxt: "추천 " + rec.length + "양식 " + cells + "칸", curTxt: "허용 전(간극만)", args: { on: true }, def: "rec",
-      why: parts.join(" · ") + ". 뺀 칸: 금액·요율 " + (dr.money || 0) + " · 날짜 " + (dr.date || 0) + " · 건마다 다른 값 " + (dr["case"] || 0) + " · 개인정보·연락처·계좌 " + (dr.pii || 0)
-        + (none.length ? " · 추천 칸 없음: " + none.join("·") : "") + ". 표본 " + n + "건(지금까지 짝)." + (s.on ? "" : " 계약 학습이 꺼져 있어 켜야 배웁니다."), setBase: (b.settings && b.settings.updated_at) || 0 }];
+    var tip = rec.map(function(t){ return genLabel(t) + " " + R2.tpls[t].rec.length + "칸(" + R2.tpls[t].rec.join("·") + ")" + (R2.tpls[t].no_inject ? " — 재기만, 빈 칸 채움 없음" : ""); }).join(" · ")
+      + ". 뺀 칸: 금액·요율 " + (dr.money || 0) + " · 날짜 " + (dr.date || 0) + " · 건마다 다른 값 " + (dr["case"] || 0) + " · 개인정보·연락처·계좌 " + (dr.pii || 0) + (none.length ? " · 추천 칸 없음: " + none.join("·") : "");
+    return [{ id: "learnhw:on", q: "한글 양식 서류도 학습 허용 칸에 넣을까요?", recTxt: rec.length + "양식 " + cells + "칸", curTxt: "허용 전(간극만)", args: { on: true }, def: "rec", tip: tip,
+      why: seg.join(" · ") + " — 금액·날짜·건별 값·개인정보 칸은 뺌 · 표본 " + n + "건" + (s.on ? "" : " · 학습 꺼짐(켜야 배움)"), setBase: (b.settings && b.settings.updated_at) || 0 }];
   }
   function pmconRowsBrief(b){
     var v = b.values || {};
@@ -32089,7 +32100,7 @@ function dutyStage(nx){
         return '<div class="pc-row" data-pc-row="' + esc(r.id) + '"><div class="pc-main">'
           + '<div class="pc-q"><span class="g ' + (r.grade === "R2" ? "r2" : "r1") + '">' + esc(r.grade) + '</span><span>' + esc(r.q) + '</span></div>'
           + '<div class="pc-meta"><span>' + esc(r.k.label) + '</span><span>추천 <b>' + esc(r.recTxt || "없음(카드에서 고름)") + '</b></span><span class="due">' + esc(inHold ? (mk.st === "hold" ? "보류 — 무응답 적용일 지움" : "그대로 두기로 함") : pmconDueTxt(r)) + '</span><span>되돌리기 ' + esc(r.k.revert) + '</span></div>'
-          + '<div class="pc-why">' + esc(r.why || "") + (inHold && mk.why ? ' · 다시 열 조건: ' + esc(mk.why) : '') + (r.block && !inHold ? ' · ' + esc(r.block) : '')
+          + '<div class="pc-why"' + (r.tip ? ' title="' + esc(r.tip) + '"' : '') + '>' + esc(r.why || "") + (inHold && mk.why ? ' · 다시 열 조건: ' + esc(mk.why) : '') + (r.block && !inHold ? ' · ' + esc(r.block) : '')
           + ' <button type="button" class="link-btn" data-pc-open="' + esc(r.k.card) + '">카드 열기 ›</button></div>'
           + '</div>' + btns(r, inHold) + '</div>';
       };

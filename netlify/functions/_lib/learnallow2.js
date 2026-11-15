@@ -19,7 +19,11 @@ const TOKENS = {
 // 준공 정산합의서 — 앱 채움 맵(index.html XST_ITEMS의 F열 실지급액 + L26 조정 이윤율)이 전부 settleCalc 돈 계산 칸이라 추천 0·주입 금지.
 const SETTLE_SHEET = '원가계산서 (정산)';
 const SETTLE_CELLS = ['F14', 'F15', 'F16', 'F17', 'F18', 'F19', 'F22', 'L26'].map(function (r) { return SETTLE_SHEET + '!' + r; });
-const NO_INJECT = { settle_doc: 1 };   // 학습 주입 대상이 아닌 양식(돈 계산 결과를 덮어쓸 수 있는 칸뿐)
+// 학습 주입 대상이 아닌 양식 — 추천(간극 재기·모델 학습)에는 두되 다음 초안에 값을 넣지 않는다.
+//   settle_doc = 돈 계산 결과를 덮어쓸 수 있는 칸뿐 · quote_env·quote_con(판16 검토 ⑥) = 밖으로 나가는 견적서에서 사람이 일부러 비운 칸(일식 견적의 단위·성상·구분)을
+//   앱이 말없이 채우면 견적의 뜻이 바뀐다. 생성 창에 '학습값' 표시·지우는 자리가 없으므로(초안 메타 fill.learned 기록뿐) 견적서 2종은 주입 0.
+const NO_INJECT = { settle_doc: 1, quote_env: 1, quote_con: 1 };
+const CELL_REF = /^(?:[^!]+!)?\$?[A-Z]{1,3}\$?\d{1,7}$/;   // xlsx 칸 좌표('시트!A1'·'A1') — 1차 xlsx 양식의 허용 칸 꼴
 // 칸 이름 → 뺄 까닭('' = 추천). 차례: 개인정보·연락처 → 돈 → 날짜 → 건마다 다른 값
 const RE_PII = /주민|생년|성명|이름|대표자|담당자|주소|전화|연락처|팩스|이메일|메일|계좌|은행|예금|사업자/;
 const RE_MONEY = /금액|액$|액한글|가격|단가|수량|요율|률$|비$|비한글$|비용|소계|부가세$|잔액|차액|점수|노무비|재료비|경비|자재/;
@@ -46,18 +50,23 @@ function card() {
     const d = { money: 0, date: 0, case: 0, pii: 0 }, r = [];
     TOKENS[t].forEach(function (n) { const w = why(n); if (w) { d[w]++; dropped[w]++; } else r.push(n); });
     tpls[t] = { rec: r, n: TOKENS[t].length, drop: d };
+    if (NO_INJECT[t]) tpls[t].no_inject = true;
   });
   tpls.settle_doc = { rec: [], n: SETTLE_CELLS.length, drop: { money: SETTLE_CELLS.length, date: 0, case: 0, pii: 0 }, no_inject: true };
   dropped.money += SETTLE_CELLS.length;
   return { ver: VER, tpls: tpls, dropped: dropped };
 }
-// 주입 잠금 — learn_defaults_get이 내보내기 전에 거른다. 정산합의서 = 전부 뺌 · 한글 양식 = 추천 규칙에 걸리는 칸(돈·날짜·건마다 다른 값·개인정보)은 허용 사전에 들어 있어도 뺌 · 그 밖 양식(1차 xlsx) = 그대로.
+// 주입 잠금 — learn_defaults_get이 내보내기 전에 거른다.
+//   NO_INJECT 양식 = 전부 뺌 · 추천 목록의 한글 양식 = 추천 규칙에 걸리는 칸(돈·날짜·건마다 다른 값·개인정보)은 허용 사전에 들어 있어도 뺌 ·
+//   그 밖 양식 = xlsx 칸 좌표 꼴만 그대로(1차 xlsx) — 판16 검토 ⑤: 추천 목록에 없는 한글 양식(safety_plan·labor_split·labor_exempt 등)의 칸 이름은 좌표 꼴이 아니라 주입 0.
 function injectFilter(tpl, defaults) {
   const d = (defaults && typeof defaults === 'object') ? defaults : {};
   if (NO_INJECT[tpl]) return {};
-  if (!Object.prototype.hasOwnProperty.call(TOKENS, tpl)) return d;
   const out = {};
+  if (!Object.prototype.hasOwnProperty.call(TOKENS, tpl)) { Object.keys(d).forEach(function (k) { if (CELL_REF.test(k)) out[k] = d[k]; }); return out; }
   Object.keys(d).forEach(function (k) { if (TOKENS[tpl].indexOf(k) >= 0 && !why(k)) out[k] = d[k]; });
   return out;
 }
-module.exports = { VER, TOKENS, SETTLE_CELLS, NO_INJECT, why, rec, card, injectFilter };
+// 주입되는 칸(보고·카드용) — 추천 칸 중 NO_INJECT 양식을 뺀 것
+function injectable() { const r = rec(), out = {}; Object.keys(r).forEach(function (t) { if (!NO_INJECT[t]) out[t] = r[t]; }); return out; }
+module.exports = { VER, TOKENS, SETTLE_CELLS, NO_INJECT, why, rec, card, injectFilter, injectable };

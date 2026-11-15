@@ -260,7 +260,7 @@ function hwpxParaItemsRaw(buf) {
   const num = function (n) { return Number((/section(\d+)\.xml$/i.exec(n) || [0, 0])[1]); };
   const names = Object.keys(z).sort(function (a, b) { return num(a) - num(b); });
   if (!names.length) return null;
-  const out = [];
+  const out = [], OVER = { over: true };   // 판16 검토 ②: 문단(·열린 문단)을 담을 때마다 상한을 본다 — 빈 문단 수백만 개 압축 파일이 배열로 수백 MB가 되기 전에 TOO_MANY_PARAS
   for (const n of names) {
     if (!z[n]) return null;   // 풀지 못한 구역이 있으면 차례를 믿을 수 없다
     const xml = z[n].toString('utf8'), stack = []; let box = 0;
@@ -271,9 +271,9 @@ function hwpxParaItemsRaw(buf) {
       else if (tok === '</hp:drawText>') { if (box > 0) box--; }
       else if (tok.indexOf('<hp:drawText') === 0) { if (m[2] !== '/') box++; }
       else if (tok.indexOf('<hp:p') === 0) { if (m[1] !== '/') stack.push({ t: '', box: box > 0 }); else out.push({ s: '', box: box > 0 }); }
-      else if (m[3] !== undefined && stack.length) stack[stack.length - 1].t += m[3].replace(/<hp:(?:tab|fwSpace|nbSpace|lineBreak)\b[^>]*\/?>/g, ' ').replace(/<[^>]+>/g, '');
+      else if (m[3] !== undefined && stack.length) { const x = stack[stack.length - 1]; x.t += m[3].replace(/<hp:(?:tab|fwSpace|nbSpace|lineBreak)\b[^>]*\/?>/g, ' ').replace(/<[^>]+>/g, ''); if (x.t.length > TOK_PARA_LEN * 8) return OVER; }
+      if (out.length + stack.length > TOK_PARA_CAP) return OVER;
     }
-    if (out.length > TOK_PARA_CAP * 4) break;
   }
   return out;
 }
@@ -292,6 +292,10 @@ function tokRead(sp, text) {
   for (let i = 0; i < o.length; i++) { if (!/\s/.test(o[i])) { st += o[i]; pos.push(i); } }
   const L = sp.lits.map(stripWs), k = L.length - 1;
   if (st.indexOf(L[0]) !== 0) return null;
+  // 판16 검토 ③: 칸 사이 글자가 문단 글에 양식보다 많이 나오면(값 안에 같은 글자 — '갑 및 을') 어디서 끊을지 모른다 = 못 읽음
+  const cnt = function (h, s) { let c = 0, q = h.indexOf(s); while (q >= 0) { c++; q = h.indexOf(s, q + s.length); } return c; };
+  const tplLit = L.join('\u0001');
+  for (let j = 1; j < k; j++) { if (L[j] && cnt(st, L[j]) > cnt(tplLit, L[j])) return null; }
   let p = L[0].length; const vals = [];
   for (let j = 1; j <= k; j++) {
     let q;
@@ -314,7 +318,7 @@ function lcsPairs(a, b) {
 function hwpxTokCore(tplBuf, draftBuf, finalBuf) {
   const T = hwpxParaItems(tplBuf), D = hwpxParaItems(draftBuf), F = hwpxParaItems(finalBuf);
   if (!T || !D || !F) return { ok: false, code: 'NO_SECTION' };
-  if (T.length > TOK_PARA_CAP || D.length > TOK_PARA_CAP || F.length > TOK_PARA_CAP) return { ok: false, code: 'TOO_MANY_PARAS' };
+  if (T.over || D.over || F.over || T.length > TOK_PARA_CAP || D.length > TOK_PARA_CAP || F.length > TOK_PARA_CAP) return { ok: false, code: 'TOO_MANY_PARAS' };
   const sp = T.map(function (x) { return x.s.length <= TOK_PARA_LEN ? tokSplit(x.s) : null; });
   if (!sp.some(Boolean)) return { ok: false, code: 'NO_TOKENS' };
   if (T.length !== D.length) return { ok: false, code: 'TPL_CHANGED' };
@@ -326,7 +330,9 @@ function hwpxTokCore(tplBuf, draftBuf, finalBuf) {
   }
   if ((plain && plainSame / plain < 0.9) || tokOk * 2 < tokP) return { ok: false, code: 'TPL_CHANGED' };
   // ② 초안 ↔ 최종본 맞추기
-  const a = D.map(function (x) { return stripWs(x.s); }), b = F.map(function (x) { return stripWs(x.s); });
+  // 판16 검토 ①: 틀 글자 없이 칸만 있는 문단(표 칸 '{{품명}}')은 LCS 짝에서 뺀다 — 빈 값이면 다른 빈 문단과, 값이 같으면 다른 칸과 짝이 되어 값이 엉뚱한 칸에 붙거나 사라졌다. 구간 짝으로만 읽는다.
+  const bare = sp.map(function (x) { return !!x && !stripWs(x.lits.join('')); });
+  const a = D.map(function (x, i) { return bare[i] ? '\u0000칸' + i : stripWs(x.s); }), b = F.map(function (x) { return stripWs(x.s); });
   const ma = lcsPairs(a, b), lcsF = {}, usedF = {};   // lcsF = LCS로 맞은 최종 문단 · usedF = 이 돌기에서 칸 문단으로 집은 최종 문단
   for (let i = 0; i < ma.length; i++) if (ma[i] >= 0) lcsF[ma[i]] = 1;
   const occ = {};   // 칸 이름 → [{st, d, f}]
@@ -346,7 +352,8 @@ function hwpxTokCore(tplBuf, draftBuf, finalBuf) {
       for (let y = lo + 1; y < hi; y++) if (!lcsF[y]) candF.push(y);
       for (let x = ilo + 1; x < ihi; x++) if (ma[x] < 0) gapD.push(x);
       let pick = -1;
-      if (candF.length === gapD.length) pick = candF[gapD.indexOf(i)];   // 구간 안 문단 수가 같다 = 같은 차례끼리(고친 문단)
+      // 같은 차례 짝 = 구간의 안 맞은 초안 문단이 **전부 칸 문단이고** 수가 양쪽 같을 때만(판16 검토 ① — 칸 없는 문단이 섞이면 지우고 더한 문단과 칸을 가를 수 없다). 틀리게 세느니 비교 불가.
+      if (candF.length === gapD.length && gapD.every(function (x) { return !!sp[x]; })) pick = candF[gapD.indexOf(i)];
       else if (stripWs(s0.lits.join('')).length >= 2) { for (const y of candF) { if (!usedF[y] && tokRead(s0, F[y].s)) { pick = y; break; } } }
       if (pick === undefined || pick < 0 || usedF[pick] || F[pick].box) { unc(); continue; }
       fv = tokRead(s0, F[pick].s);
@@ -371,6 +378,9 @@ function hwpxTokCore(tplBuf, draftBuf, finalBuf) {
   });
   return { ok: true, toks: toks };
 }
+// 판16 검토 ④: 빈 양식 지문 — 한글 양식 초안을 남길 때 그때 양식(tpl:<양식>의 data)의 지문을 초안 메타(tpl_sha)에 적고, 짝 지을 때 지금 양식 지문과 다르면 TPL_CHANGED
+//   (양식을 다시 올려 칸 이름이 바뀌면 옛 값이 새 이름으로 읽혔다). 지문이 없는 옛 초안은 종전처럼 문단 수·같음 비율로 판정. 내장 crypto.
+function tplFinger(b64) { return require('crypto').createHash('sha256').update(String(b64 || ''), 'utf8').digest('hex').slice(0, 16); }
 function hwpxTokDiff(tplBuf, draftBuf, finalBuf) {
   let c; try { c = hwpxTokCore(tplBuf, draftBuf, finalBuf); } catch (e) { c = { ok: false, code: 'TOK_THREW' }; }
   if (!c.ok) return { ok: false, code: c.code, kind: 'hwpx_tok', compared: 0, changed: 0, uncomparable: 0, refs_changed: [], refs_uncomparable: [] };
@@ -499,4 +509,4 @@ function cellRows(edits, finalBuf, allowRefs) {
   });
   return { ok: true, rows: rows, hidden_changed: hidden_changed.slice(0, 100), hidden_same_n: hidden_same };
 }
-module.exports = { ZIP_ENTRY_MAX, ZIP_TOTAL_MAX, ZIP_ENTRIES_MAX, XLSX_CELLS_MAX, zipBudget, zipEntries, xlsxCells, xlsxCellDiff, xlsxFileDiff, docxParas, docxParaDiff, hwpxParas, hwpxParaDiff, hwpxParaItems, hwpxTokDiff, hwpxTokRows, TOK_PARA_CAP, matchScore, genMarkOf, genMarkParse, listDiff, gapScore, refRC, inMergedNonAnchor, splitRef, cellRows, flattenEdits };
+module.exports = { ZIP_ENTRY_MAX, ZIP_TOTAL_MAX, ZIP_ENTRIES_MAX, XLSX_CELLS_MAX, zipBudget, zipEntries, xlsxCells, xlsxCellDiff, xlsxFileDiff, docxParas, docxParaDiff, hwpxParas, hwpxParaDiff, hwpxParaItems, hwpxTokDiff, hwpxTokRows, tplFinger, TOK_PARA_CAP, matchScore, genMarkOf, genMarkParse, listDiff, gapScore, refRC, inMergedNonAnchor, splitRef, cellRows, flattenEdits };

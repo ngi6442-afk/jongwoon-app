@@ -73,6 +73,7 @@ exports.handler = async function (event, context) {
       if (!draftBuf) { await finish('fail', 'NO_DRAFT_FILE', '초안 파일이 없습니다'); return; }
       const tr = await blobGet(store(FILES), 'tpl:' + pair.tpl);
       if (!tr.ok || !tr.data || !tr.data.data) { await finish('fail', 'NO_TPL', '빈 양식을 읽지 못했습니다'); return; }
+      if (dr.data.tpl_sha && DD.tplFinger(tr.data.data) !== dr.data.tpl_sha) { await finish('done_nomodel', 'TPL_CHANGED', '빈 양식이 초안 때와 달라 칸 비교를 하지 않습니다'); return; }   // 판16 검토 ④
       tplBuf = Buffer.from(String(tr.data.data), 'base64');
     }
     // v424 검토: 보관·영구 삭제된 최종본, 민감정보로 올린 최종본은 모델에 보내지 않는다

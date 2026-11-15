@@ -3258,7 +3258,7 @@ async function cdocLearnPair(st, member, ref, idx, item, ext, b64, orig, d) {
   else if (fb && db && ext === 'hwpx' && pick.ext === 'hwpx') {
     // P1 판16(T396): 한글 양식은 빈 양식(tpl:<양식>)의 {{칸}} 틀로 칸 단위 비교 먼저 — 양식이 바뀌었거나 칸을 못 찾으면 종전 문단 비교(까닭 tok_code)
     let tk = null;
-    try { const tr = await blobGet(files, 'tpl:' + tpl); tk = (tr.ok && tr.data && tr.data.data) ? DD.hwpxTokDiff(Buffer.from(String(tr.data.data), 'base64'), db, fb) : { ok: false, code: tr.ok ? 'NO_TPL' : (tr.code === 'NOT_FOUND' ? 'NO_TPL' : 'TPL_READ_FAILED') }; } catch (e) { tk = { ok: false, code: 'TOK_THREW' }; }
+    try { const tr = await blobGet(files, 'tpl:' + tpl); tk = (tr.ok && tr.data && tr.data.data && dr.data.tpl_sha && DD.tplFinger(tr.data.data) !== dr.data.tpl_sha) ? { ok: false, code: 'TPL_CHANGED' } : (tr.ok && tr.data && tr.data.data) ? DD.hwpxTokDiff(Buffer.from(String(tr.data.data), 'base64'), db, fb) : { ok: false, code: tr.ok ? 'NO_TPL' : (tr.code === 'NOT_FOUND' ? 'NO_TPL' : 'TPL_READ_FAILED') }; } catch (e) { tk = { ok: false, code: 'TOK_THREW' }; }
     if (tk && tk.ok) { diff = tk; kind = 'hwpx_tok'; }
     else { diff = DD.hwpxParaDiff(db, fb); kind = 'hwpx_para'; if (diff && tk && tk.code) diff.tok_code = String(tk.code).slice(0, 30); }
   }
@@ -3380,7 +3380,8 @@ async function handleLearnAllow2Set(event, d, R) {
   if (!r0.ok && r0.code !== 'NOT_FOUND') return jr(503, { status: 'ERROR', error_code: 'LEARN_READ_FAILED', request_id: R });
   if (typeof d.on !== 'boolean') return jr(400, { status: 'REJECTED', error_code: 'BAD_VALUE', request_id: R });
   const cur = await learnSettings(st), next = Object.assign({}, cur.contract.allow), rec = LA2.rec();
-  Object.keys(rec).forEach(function (t) { if (d.on) next[t] = rec[t].slice(); else delete next[t]; });
+  // 판16 검토 ⑧: on = 기존 ∪ 추천(사람이 손으로 넣어 둔 같은 양식 칸을 지우지 않음) · off = 추천 양식 키를 뺌
+  Object.keys(rec).forEach(function (t) { if (d.on) { const cur0 = Array.isArray(next[t]) ? next[t].slice() : []; rec[t].forEach(function (f) { if (cur0.indexOf(f) < 0) cur0.push(f); }); next[t] = cur0; } else delete next[t]; });
   return handleLearnSettingsSet(event, { allow: next, base: d.base }, R);
 }
 async function cdocAudit(member, op, cid, t) {
@@ -3470,6 +3471,8 @@ async function cdocCommit(c, d, R, ref, kind, pii, orig, ext, b64, fill, att) {
   const fkey = cdocKey(ref.cid, ref.i, ref.dk, n);
   const rec = { name: std, orig: orig, type: (fill && !b64) ? 'application/json' : (DOC_ATT_MIME[ext] || 'application/octet-stream'), kind: kind, cid: ref.cid, i: ref.i, dk: ref.dk, n: n, ver: ver, pii: pii, by: c.member.name, bid: c.member.id, ts: now, sha: sha };
   if (fill) rec.fill = fill;
+  // P1 판16 검토 ④: 한글 양식 AI 초안 = 그때 빈 양식 지문(짝 지을 때 양식이 바뀌었으면 칸 비교를 하지 않음). 못 읽으면 지문 없이(종전 판정)
+  if (kind === 'draft' && ext === 'hwpx' && ref.dk.indexOf('gen.') === 0) { try { const tr = await blobGet(store(FILES), 'tpl:' + ref.dk.slice(4)); if (tr.ok && tr.data && tr.data.data) rec.tpl_sha = DD.tplFinger(tr.data.data); } catch (e) {} }
   if (att && att.rec.parts) { rec.att = att.id; rec.parts = att.rec.parts; }   // v423 큰 파일: 조각은 attp:에 그대로
   else if (b64) rec.data = b64;
   // v424 AI 초안의 표식 — 파일 안 문서 정보에 같은 번호가 들어 있다. 계약·서류가 맞을 때만 받는다

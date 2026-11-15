@@ -15363,25 +15363,34 @@ try {
     st16(html) && m16b.every((v) => v === false), JSON.stringify({ st: st16(html), mut: m16b }));
   // ③ PM 콘솔 줄(실행 — 실제 pmconRowsLearnHw) · 무응답 적용일 · 같은 조회 한 번
   const LBL16 = { quote_env: '견적서(환경)', quote_con: '견적서(건설)', contract_pledge: '계약이행서약서', seal_reg: '사용인감계', bond_waiver: '채권포기각서', adv_pay: '선금지급신청 세트', qual_packet: '적격심사 패킷', settle_doc: '준공 정산합의서' };
-  const REC16 = { ver: '20261115', tpls: { qual_packet: { rec: [] }, contract_pledge: { rec: ['업체명'] }, seal_reg: { rec: ['업체명'] }, bond_waiver: { rec: ['업체명'] }, quote_env: { rec: ['부가세구분', '성상', '구분', '단위'] }, quote_con: { rec: ['부가세구분', '성상', '구분', '단위'] }, adv_pay: { rec: ['상호'] }, settle_doc: { rec: [], no_inject: true } }, dropped: { money: 46, date: 21, case: 19, pii: 22 } };
+  const REC16 = { ver: '20261115', tpls: { qual_packet: { rec: [] }, contract_pledge: { rec: ['업체명'] }, seal_reg: { rec: ['업체명'] }, bond_waiver: { rec: ['업체명'] }, quote_env: { rec: ['부가세구분', '성상', '구분', '단위'], no_inject: true }, quote_con: { rec: ['부가세구분', '성상', '구분', '단위'], no_inject: true }, adv_pay: { rec: ['상호'] }, settle_doc: { rec: [], no_inject: true } }, dropped: { money: 46, date: 21, case: 19, pii: 22 } };
+  //   검토 11/15 ⑦ 표본 = 양식별 실제 짝 수(최근 짝 목록·lessons 중 큰 쪽) · ⑧ 추천 칸이 다 들어 있으면 줄 없음(손 칸 더 있어도) · ⑨ 값 '6양식 12칸'(라벨 '추천'과 안 겹침) · 줄 글 90자 안 · 자세한 칸 이름은 풍선 글(tip → title)
   const chkR16 = (h) => {
-    const R = new Function('LBL', 'function genLabel(k){ return LBL[k] || k; }\n' + f16(h, 'pmconRowsLearnHw') + '\nreturn pmconRowsLearnHw;')(LBL16);
+    const R = new Function('LBL', 'function genLabel(k){ return LBL[k] || k; }\n' + (h.match(/var PMCON_HW_SHORT = \{[^}]*\};/) || [''])[0] + '\n' + f16(h, 'pmconRowsLearnHw') + '\nreturn pmconRowsLearnHw;')(LBL16);
     const allRec = {}; Object.keys(REC16.tpls).forEach((t) => { if (REC16.tpls[t].rec.length) allRec[t] = REC16.tpls[t].rec.slice().reverse(); });
-    const a = R({ settings: { contract: { on: true, allow: { asb_plan: ['C7'], quote_env: ['단위'] } }, updated_at: 77 }, lessons: { quote_env: { pairs: 2 }, adv_pay: { pairs: 1 }, asb_plan: { pairs: 9 } }, rec2: REC16 });
-    const b = R({ settings: { contract: { on: true, allow: Object.assign({ asb_plan: ['C7'] }, allRec) }, updated_at: 78 }, rec2: REC16 });
+    const pairs = [{ tpl: 'quote_env', status: 'done_nomodel' }, { tpl: 'quote_env', status: 'pending' }, { tpl: 'quote_env', status: 'superseded' }, { tpl: 'asb_plan', status: 'done' }];
+    const a = R({ settings: { contract: { on: true, allow: { asb_plan: ['C7'], quote_env: ['단위'] } }, updated_at: 77 }, pairs, lessons: { quote_env: { pairs: 1 }, adv_pay: { pairs: 1 }, asb_plan: { pairs: 9 } }, rec2: REC16 });
+    const b = R({ settings: { contract: { on: true, allow: Object.assign({ asb_plan: ['C7'] }, allRec, { quote_env: ['품명'].concat(allRec.quote_env) }) }, updated_at: 78 }, rec2: REC16 });   // 손 칸(품명)이 더 있어도 추천이 다 들어 있으면 줄 없음
+    const b2 = R({ settings: { contract: { on: true, allow: Object.assign({}, allRec, { adv_pay: ['담당자'] }) }, updated_at: 79 }, rec2: REC16 });   // 선금 상호가 빠짐 = 줄
     const c = R({ settings: { contract: { on: false, allow: {} } } }), d = R({ settings: { contract: { on: false, allow: {} }, updated_at: 5 }, rec2: REC16 });
-    const r = a[0] || {}, w = r.why || '';
-    const ok = a.length === 1 && r.id === 'learnhw:on' && r.q === '한글 양식 서류도 학습 허용 칸에 넣을까요?' && r.recTxt === '추천 6양식 12칸' && r.def === 'rec' && JSON.stringify(r.args) === '{"on":true}' && r.setBase === 77
-      && w.indexOf('견적서(환경) 4칸(부가세구분·성상·구분·단위)') >= 0 && w.indexOf('선금지급신청 세트 1칸(상호)') >= 0 && w.indexOf('뺀 칸: 금액·요율 46 · 날짜 21 · 건마다 다른 값 19 · 개인정보·연락처·계좌 22') >= 0 && w.indexOf('추천 칸 없음: 적격심사 패킷·준공 정산합의서') >= 0 && w.indexOf('표본 3건') >= 0
-      && !/quote_|settle_doc|qual_packet|adv_pay|contract_pledge/.test(w + r.q + r.recTxt) && w.indexOf('켜야 배웁니다') < 0
-      && b.length === 0 && c.length === 0 && d.length === 1 && d[0].why.indexOf('계약 학습이 꺼져 있어 켜야 배웁니다') > 0;
-    return { ok, info: { a: a.map((x) => x.id), b: b.length, c: c.length, w } };
+    const r = a[0] || {}, w = r.why || '', tp = r.tip || '';
+    const W = '서약서·인감계·채권포기각서·선금 각 1칸 · 견적서 2종 각 4칸 — 금액·날짜·건별 값·개인정보 칸은 뺌 · 표본 2건';
+    const ok = a.length === 1 && r.id === 'learnhw:on' && r.q === '한글 양식 서류도 학습 허용 칸에 넣을까요?' && r.recTxt === '6양식 12칸' && r.def === 'rec' && JSON.stringify(r.args) === '{"on":true}' && r.setBase === 77
+      && w === W.replace('표본 2건', '표본 3건') && w.length <= 90
+      && tp.indexOf('견적서(환경) 4칸(부가세구분·성상·구분·단위) — 재기만, 빈 칸 채움 없음') >= 0 && tp.indexOf('선금지급신청 세트 1칸(상호)') >= 0 && tp.indexOf('선금지급신청 세트 1칸(상호) —') < 0 && tp.indexOf('뺀 칸: 금액·요율 46 · 날짜 21 · 건마다 다른 값 19 · 개인정보·연락처·계좌 22') >= 0 && tp.indexOf('추천 칸 없음: 적격심사 패킷·준공 정산합의서') >= 0
+      && !/quote_|settle_doc|qual_packet|adv_pay|contract_pledge/.test(w + tp + r.q + r.recTxt)
+      && b.length === 0 && b2.length === 1 && c.length === 0 && d.length === 1 && / · 표본 0건 · 학습 꺼짐\(켜야 배움\)$/.test(d[0].why);
+    return { ok, info: { a: a.map((x) => x.id), b: b.length, b2: b2.length, c: c.length, w, n: w.length, d: d[0] && d[0].why } };
   };
   const r16c = chkR16(html);
-  const m16c = [sm16(html, '    if (rec.every(function(t){ return same(al[t], R2.tpls[t].rec); })) return [];\n', ''), sm16(html, '    tk.forEach(function(t){ n += Number((les[t] || {}).pairs) || 0; });', ''), sm16(html, '추천 칸 없음: " + none.join("·")', '추천 칸 없음: " + tk.join("·")'), sm16(html, 'var parts = rec.map(function(t){ return genLabel(t) + " "', 'var parts = rec.map(function(t){ return t + " "')].map((h) => safe16(() => chkR16(h)).ok);
-  const plan16 = /var PMCON_PLAN = \{[^\n]*learnhw: \{ due: "2026-11-22", def: "rec",/.test(html) && /var once = \{\};[^\n]*\n\s*var calls = \[soft\(gwCall\("gw-data", \{ action: "pmcon_get" \}\)\)\]\.concat\(PMCON_KINDS\.map\(function\(k\)\{ return once\[k\.get\] \|\| \(once\[k\.get\] = soft\(gwCall\("gw-data", \{ action: k\.get \}\)\)\); \}\)\);/.test(html)
+  const m16c = [sm16(html, '    if (rec.every(function(t){ return isArr(al[t]) && R2.tpls[t].rec.every(function(f){ return al[t].indexOf(f) >= 0; }); })) return [];', '    if (rec.every(function(t){ return isArr(al[t]) && al[t].length === R2.tpls[t].rec.length; })) return [];'),
+    sm16(html, 'n += Math.max(k, Number((les[t] || {}).pairs) || 0);', 'n += Number((les[t] || {}).pairs) || 0;'), sm16(html, 'p.tpl === t && p.status !== "superseded"', 'p.tpl === t'),
+    sm16(html, 'recTxt: rec.length + "양식 " + cells + "칸"', 'recTxt: "추천 " + rec.length + "양식 " + cells + "칸"'), sm16(html, '+ (R2.tpls[t].no_inject ? " — 재기만, 빈 칸 채움 없음" : "")', ''),
+    sm16(html, 'map(function(t){ return PMCON_HW_SHORT[t] || genLabel(t); })', 'map(function(t){ return genLabel(t); })'), sm16(html, '추천 칸 없음: " + none.join("·")', '추천 칸 없음: " + tk.join("·")')].map((h) => safe16(() => chkR16(h)).ok);
+  const ttl16 = (h) => f16(h, 'renderPmcon').indexOf(`'<div class="pc-why"' + (r.tip ? ' title="' + esc(r.tip) + '"' : '') + '>' + esc(r.why || "")`) > 0;
+  const plan16 = ttl16(html) && !ttl16(sm16(html, `'<div class="pc-why"' + (r.tip ? ' title="' + esc(r.tip) + '"' : '') + '>'`, `'<div class="pc-why">'`)) && /var PMCON_PLAN = \{[^\n]*learnhw: \{ due: "2026-11-22", def: "rec",/.test(html) && /var once = \{\};[^\n]*\n\s*var calls = \[soft\(gwCall\("gw-data", \{ action: "pmcon_get" \}\)\)\]\.concat\(PMCON_KINDS\.map\(function\(k\)\{ return once\[k\.get\] \|\| \(once\[k\.get\] = soft\(gwCall\("gw-data", \{ action: k\.get \}\)\)\); \}\)\);/.test(html)
     && /\{ kind: "learnhw", label: "계약 학습\(한글 양식\)", grade: "R2", get: "learn_pairs_get", card: "conLearnCard",/.test(html);
-  T('P1 판16 ③ PM 콘솔 줄(실행 — 실제 pmconRowsLearnHw): 추천이 허용 사전에 다 안 들어 있으면 R2 한 줄 "한글 양식 서류도 학습 허용 칸에 넣을까요?" · 추천 6양식 12칸 · 양식 이름표(내부 키 0)·칸 이름·뺀 칸 수 · 추천 칸 없는 양식 · 표본 n건(그 양식 짝 수) · 다 들어 있으면/추천 없음 = 줄 없음 · 꺼져 있으면 안내 · 무응답 적용일 11/22 = 추천값 · 같은 조회(learn_pairs_get) 한 번 · 결함 사본 ' + m16c.length + '개 = 모두 ✗',
+  T('P1 판16 ③ PM 콘솔 줄(실행 — 실제 pmconRowsLearnHw · 검토 11/15 반영): 추천 칸이 허용 사전에 빠져 있으면 R2 한 줄 "한글 양식 서류도 학습 허용 칸에 넣을까요?" · 값 "6양식 12칸"(라벨과 안 겹침) · 줄 글 = 짧은 한 줄 90자 안("서약서·인감계·채권포기각서·선금 각 1칸 · 견적서 2종 각 4칸 — …") · 양식 이름표·칸 이름·견적서 재기만·뺀 칸 수·추천 칸 없는 양식은 풍선 글(title) · 표본 = 양식별 실제 짝 수(옮김·보관 뺌, lessons와 큰 쪽) · 추천 칸이 다 들어 있으면(손 칸 더 있어도) 줄 없음 · 하나라도 빠지면 줄 · 꺼져 있으면 안내 · 무응답 적용일 11/22 = 추천값 · 같은 조회(learn_pairs_get) 한 번 · 결함 사본 ' + m16c.length + '개 = 모두 ✗',
     r16c.ok && plan16 && m16c.every((v) => v === false), JSON.stringify({ r: r16c.info, plan: plan16, mut: m16c }));
 } catch (e) { console.log('  (P1 판16 검사 생략 — ' + e.message + ')'); fails++; }
 
