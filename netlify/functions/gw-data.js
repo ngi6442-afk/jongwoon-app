@@ -465,15 +465,15 @@ async function handleSave(event, d, R) {
     //   서버 문서에 이 키 꼴로 있던 지시 = 키·두 칸 모두 서버 값(빼거나 바꿔 보내도 되돌림 — 키가 빠져 다음 실행에서 첫 회차 묶음이 다시 생기지 않게)
     //   서버 문서에 없던 줄·다른 키였던 지시가 이 키 꼴을 달고 오면 = 종전 키로 되돌리고(없었으면 뗌) 두 칸은 버림(앱은 만들지 않음 — 서버 ingest만 만든다).
     //   직전 문서를 못 읽은 저장에 이 키 꼴이나 두 칸이 있으면 500 PREV_READ_FAILED(서버 값을 모르고 덮지 않게 · 이 꼴이 없는 저장은 종전대로).
-    const ldTouch = function (t) { return !!t && typeof t === 'object' && (LD.isDutyKey(t.auto_key) || t.lic_stage !== undefined || t.lic_rows !== undefined); };
+    const ldTouch = function (t) { return !!t && typeof t === 'object' && (LD.isDutyKey(t.auto_key) || t.lic_stage !== undefined || t.lic_rows !== undefined || t.lic_next !== undefined); };
     if (prevReadFailed && doc.items.some(ldTouch)) return jr(500, { status: 'ERROR', error_code: 'PREV_READ_FAILED', request_id: R });
     doc.items.forEach(function (t) {
       if (!t || typeof t !== 'object') return;
       const o = oldByA[t.id];
-      if (o && LD.isDutyKey(o.auto_key)) { t.auto_key = o.auto_key; ['lic_stage', 'lic_rows'].forEach(function (f) { if (o[f] !== undefined) t[f] = o[f]; else delete t[f]; }); return; }
+      if (o && LD.isDutyKey(o.auto_key)) { t.auto_key = o.auto_key; ['lic_stage', 'lic_rows', 'lic_next'].forEach(function (f) { if (o[f] !== undefined) t[f] = o[f]; else delete t[f]; }); return; }
       if (!ldTouch(t)) return;
       if (LD.isDutyKey(t.auto_key)) { if (o && o.auto_key !== undefined) t.auto_key = o.auto_key; else delete t.auto_key; }
-      delete t.lic_stage; delete t.lic_rows;
+      delete t.lic_stage; delete t.lic_rows; delete t.lic_next;
     });
     doc.items.forEach(function (t) { if (!t || !t.auto_key || t.who_id) return; const o = oldByA[t.id]; if (o && o.who_id && o.who_by === 'assign') { t.who_id = o.who_id; t.who = o.who || ''; t.who_by = 'assign'; } });
     // v397 앱 기준 review 보호: 서버가 올린 review('앱 기준')를 클라 사본이 open으로 보내면 반려(doneif_off=1)가 아닌 한 서버 값을 이월(낡은 사본·로컬 우선 병합 방지). 승인(done)은 통과
@@ -1017,7 +1017,7 @@ async function handleAutotaskIngest(event, d, R) {
         const p = LD.plan(li.input);
         const ar = LD.apply(p, doc.items, today, li.input.names, function () { return 't' + crypto.randomBytes(6).toString('hex'); });
         ar.ids.forEach(function (id) { licNew[id] = 1; });
-        lic = { mode: 'live', made: ar.made, bundled: ar.bundled, bumped: ar.bumped, redated: ar.redated, moved: ar.moved, touched: ar.changed, no_who: p.no_who.length, base: p.base.length, first: p.first, notify: ar.notify };
+        lic = { mode: 'live', made: ar.made, bundled: ar.bundled, bumped: ar.bumped, redated: ar.redated, moved: ar.moved, next: ar.next_rise, touched: ar.changed, no_who: p.no_who.length, base: p.base.length, first: p.first, notify: ar.notify };
       }
     } catch (e) { lic = { mode: 'live', skip: 'ERROR' }; }
   }
@@ -1035,7 +1035,7 @@ async function handleAutotaskIngest(event, d, R) {
   let notified = 0;
   if (notifyItems.length) notified = await notifyAutoCreated(st, notifyItems, '정기봇');
   const blockTxt = blocked ? ' · 스위치 막음 ' + blocked + '(' + Object.keys(blockedBy).map(function (k) { return k + ' ' + blockedBy[k] + ' — ' + (k === 'unknown' ? '허용 꼴 밖' : sw.rules[k]); }).join(', ') + ')' : '';   // v453 규칙 이름·건수·스위치 값만(키·본문 없음)
-  const licTxt = !lic ? '' : (lic.skip ? ' · 인허가 기한 건너뜀(' + lic.skip + ')' : ((lic.bundled || lic.made || lic.bumped || lic.moved || lic.no_who) ? ' · 인허가 기한 ' + (lic.bundled ? '묶음 ' + lic.bundled + ' · ' : '') + '새 ' + lic.made + ' · 단계 올림 ' + lic.bumped + (lic.moved ? ' · 담당 옮김 ' + lic.moved : '') + (lic.no_who ? ' · 담당 없음 ' + lic.no_who + '행' : '') : ''));   // P1 판20 수·행 수만
+  const licTxt = !lic ? '' : (lic.skip ? ' · 인허가 기한 건너뜀(' + lic.skip + ')' : ((lic.bundled || lic.made || lic.bumped || lic.moved || lic.next || lic.no_who) ? ' · 인허가 기한 ' + (lic.bundled ? '묶음 ' + lic.bundled + ' · ' : '') + '새 ' + lic.made + ' · 단계 올림 ' + lic.bumped + (lic.moved ? ' · 담당 옮김 ' + lic.moved : '') + (lic.next ? ' · 다음 회차 ' + lic.next : '') + (lic.no_who ? ' · 담당 없음 ' + lic.no_who + '행' : '') : ''));   // P1 판20 수·행 수만
   if (made || fixed || assigned || (lic && lic.touched)) {
     doc.updated_by = '정기봇'; doc.updated_at = Date.now();
     const w = await blobSet(st, colKey('tasks'), doc);
@@ -2223,6 +2223,7 @@ function licBgOut(x) {   // 앱에 내리는 칸 — 주기 칸 + 표시 글(이
   const ci = Array.isArray(x.cites) && x.cites[0] && typeof x.cites[0] === 'object' ? x.cites[0] : {};
   const o = { no: Number(x.no), duty: String(x.duty || ''), lic: String(x.lic || ''), lic_id: String(x.lic_id || ''), unit: String(x.unit || ''), cycle: String(x.cycle || ''), badge: String(x.badge || ''), law: String(ci.law || '') };
   ['type', 'every_n', 'every_unit', 'fixed_month', 'fixed_day', 'fixed2_month', 'fixed2_day', 'base', 'grace_days', 'auto', 'needs_manual_date'].forEach(function (k) { o[k] = x[k] === undefined ? null : x[k]; });
+  if (x.count_from !== undefined) o.count_from = x.count_from;   // P1 판20 재검토 2: 세기 시작일(새 근거 표 행에만 — 없으면 칸 없음, 종전 응답 그대로)
   return o;
 }
 async function handleLicMonthGet(event, d, R) {

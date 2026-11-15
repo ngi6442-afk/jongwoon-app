@@ -47,10 +47,17 @@ function licOf(lics, id) { if (!id) return null; const a = Array.isArray(lics) ?
 function rowState(r, d, lic, today) {
   if (!r || !d) return null;
   const no = r.no;
-  if (d.na && d.na.on) return { no: no, stage: 'na', due: '', orig: '', days: null, fixed: false, missing: null };
+  if (d.na && d.na.on) return { no: no, stage: 'na', due: '', orig: '', days: null, fixed: false, missing: null, ahead: [] };
   const nx = DUTY.dutyCur(Object.assign({}, d, { sched: r }), lic, today);
-  if (!nx || !nx.due) return { no: no, stage: 'base', due: '', orig: '', days: null, fixed: false, missing: nx ? nx.missing : 'sched' };
-  return { no: no, stage: DUTY.dutyStage(nx) || 'later', due: nx.due, orig: nx.orig, days: nx.days, fixed: !!nx.fixed, missing: null };
+  if (!nx || !nx.due) return { no: no, stage: 'base', due: '', orig: '', days: null, fixed: false, missing: nx ? nx.missing : 'sched', ahead: [] };
+  // 판20 재검토 1: ahead = 지금 회차가 지났을 때 그 뒤로 30일 안에 들어왔거나 지난 회차(dutyCur — 탭 '다음 회차' 작은 글과 같은 값)
+  const ahead = (nx.ahead || []).map(function (a) { return { due: a.due, days: a.days, stage: DUTY.dutyStage(a) }; });
+  return { no: no, stage: DUTY.dutyStage(nx) || 'later', due: nx.due, orig: nx.orig, days: nx.days, fixed: !!nx.fixed, missing: null, ahead: ahead };
+}
+// '다음 회차' 한 줄 — 지시 글 끝(NEXT_SEP 뒤)에 붙임. 날마다 바뀌지 않게 날짜 + 단계 말만(일수 안 씀)
+const NEXT_SEP = '\n※ ';
+function aheadLine(items) {
+  return items.map(function (x) { const p = DUTY.dutyParse(x.due); return x.no + '행 다음 회차 기한 ' + (p ? p.m + '월 ' + p.d + '일' : x.due) + (x.stage === 'over' ? '도 지났습니다' : '도 다가옵니다(' + STAGE_TXT[x.stage] + ')'); }).join(' · ');
 }
 function states(rows, duties, lics, today) {
   return (Array.isArray(rows) ? rows : []).map(function (r) { return rowState(r, findDuty(duties, r.no), licOf(lics, r.lic_id), today); }).filter(Boolean);
@@ -85,9 +92,10 @@ function plan(input) {
     if (!p.bundle) { if (!byKey[t.auto_key]) byKey[t.auto_key] = t; return; }
     if (t.del === 1 || t.status === 'done') return;   // 묶음이 닫혔으면(사람이 완료·삭제) 남은 행은 행별 지시로
     if (openish(t)) openBundles.push(t);
-    (Array.isArray(t.lic_rows) ? t.lic_rows : []).forEach(function (x) { if (x && x.no != null && x.due) covered[x.no + ':' + x.due] = 1; });
+    (Array.isArray(t.lic_rows) ? t.lic_rows : []).forEach(function (x) { if (x && x.no != null && x.due) covered[x.no + ':' + x.due] = t; });
   });
-  const out = { today: today, first: first, states: [], create: [], bump: [], move: [], bundles: [], no_who: [], base: [], na: [], later: [] };
+  const out = { today: today, first: first, states: [], create: [], bump: [], move: [], bundles: [], ahead: [], no_who: [], base: [], na: [], later: [] };
+  const aheadOf = function (s) { return s.stage === 'over' ? s.ahead.map(function (a) { return { no: s.no, due: a.due, stage: a.stage }; }) : []; };
   // 열린 지시의 담당 따라가기(판20 검토 B2): 배정표 담당이 바뀌면 새 담당으로 · 담당이 재직자가 아니고 배정표에도 재직 담당이 없으면 비움('담당 없음').
   //   사람이 지시 창에서 바꾼 담당(who_by 'edit')·[내 것 아님]으로 빠진 같은 사람에게는 되돌리지 않는다(종전 배정 채움과 같은 원칙).
   const follow = function (t, tw, no) {
@@ -120,23 +128,25 @@ function plan(input) {
       const tw = target(s.no, r.lic_id);
       if (!tw) out.no_who.push(s.no);
       follow(have, tw, s.no);
+      out.ahead.push({ id: have.id, items: aheadOf(s) });   // 판20 재검토 1: 그 행 열린 지시에 '다음 회차' 줄(없으면 빈 목록 = 줄 지움)
       return;
     }
     if (s.stage === 'later') { out.later.push(s.no); return; }
-    if (covered[s.no + ':' + s.orig]) return;   // 열린 묶음 지시에 든 회차
+    const cb = covered[s.no + ':' + s.orig];
+    if (cb) { if (openish(cb)) out.ahead.push({ id: cb.id, items: aheadOf(s) }); return; }   // 열린 묶음 지시에 든 회차 — '다음 회차' 줄은 그 묶음에
     const tw = target(s.no, r.lic_id);
     if (!tw) { out.no_who.push(s.no); return; }   // 배정표에 없거나 재직자가 아님 — 만들지 않음(관리자 폴백 없음)
     if (first && s.stage === 'over') {
       if (!overBy[tw]) { overBy[tw] = []; whoOrder.push(tw); }
-      overBy[tw].push({ no: s.no, due: s.orig, shown: s.due });
+      overBy[tw].push({ no: s.no, due: s.orig, shown: s.due, ahead: aheadOf(s) });
       return;
     }
-    out.create.push({ key: key, no: s.no, stage: s.stage, who_id: tw, title: rowTitle(r, s.stage), detail: rowDetail(r, s), due: s.due, orig: s.orig });
+    out.create.push({ key: key, no: s.no, stage: s.stage, who_id: tw, title: rowTitle(r, s.stage), detail: rowDetail(r, s), due: s.due, orig: s.orig, ahead: aheadOf(s) });
   });
   whoOrder.forEach(function (w, i) {
     const list = overBy[w];
     out.bundles.push({ key: bundleKey(today, i + 1), who_id: w, title: '인허가 지난 기한 ' + list.length + '건 정리', detail: bundleDetail(list.map(function (x) { return { no: x.no, due: x.shown }; })),
-      rows: list.map(function (x) { return { no: x.no, due: x.due }; }) });
+      rows: list.map(function (x) { return { no: x.no, due: x.due }; }), ahead: list.reduce(function (a, x) { return a.concat(x.ahead); }, []) });
   });
   out.no_who = out.no_who.filter(function (v, i, a) { return a.indexOf(v) === i; });
   return out;
@@ -145,9 +155,20 @@ function plan(input) {
 // 적용 — tasks 배열에 넣고 고친다. mkId() = 새 지시 id. 반환 {made, bundled, bumped, redated, moved, changed, ids(새로 만든 id), notify{who_id:[제목]}}
 //   알림 줄 = 새 지시(묶음·행별) · 새 담당으로 옮긴 지시 · 단계가 오른 지시(옮긴 뒤의 담당에게) — 같은 지시는 한 줄.
 function apply(p, tasks, today, names, mkId) {
-  const res = { made: 0, bundled: 0, bumped: 0, redated: 0, moved: 0, changed: 0, ids: [], notify: {} };
+  const res = { made: 0, bundled: 0, bumped: 0, redated: 0, moved: 0, changed: 0, next_rise: 0, next: [], ids: [], notify: {} };
   const nm = names || {}, noted = {};
   const note = function (who, id, line) { if (!who || who === '__all__' || noted[id]) return; noted[id] = 1; (res.notify[who] = res.notify[who] || []).push(line); };
+  // 판20 재검토 1: 지시의 '다음 회차' 칸(lic_next {'행:기한': 단계} — 서버만 씀)·글 끝 한 줄을 맞추고, 단계가 오른 것이 있으면 true(같은 단계로 다시 안 보냄 — 기록은 지우지 않음)
+  const setNext = function (t, items) {
+    const nx = Object.assign({}, (t.lic_next && typeof t.lic_next === 'object') ? t.lic_next : {});
+    let rise = false;
+    items.forEach(function (x) { const k = x.no + ':' + x.due, prev = nx[k]; if (prev !== x.stage) { if (STAGE_RANK[x.stage] > (STAGE_RANK[prev] || 0)) { rise = true; res.next.push({ no: x.no, due: x.due, stage: x.stage }); } nx[k] = x.stage; } });
+    const base = String(t.detail || '').split(NEXT_SEP)[0], line = aheadLine(items), det = (line ? base + NEXT_SEP + line : base).slice(0, 900);
+    let ch = false;
+    if (Object.keys(nx).length && JSON.stringify(nx) !== JSON.stringify(t.lic_next || {})) { t.lic_next = nx; ch = true; }
+    if (det !== t.detail) { t.detail = det; ch = true; }
+    return { rise: rise, ch: ch, line: line };
+  };
   const base = function (key, who, title, detail, due) {
     return { id: mkId(), title: String(title).slice(0, 120), detail: String(detail).slice(0, 500), who_id: who, who: nm[who] || '', who_by: 'assign', scope: [],
       from: '자동', from_id: '', by: '자동', due: due || '', status: 'open', done_at: null, done_by: null, auto_key: key, created: today, updated: today };
@@ -167,14 +188,25 @@ function apply(p, tasks, today, names, mkId) {
     t.updated = today; res.changed++;
     if (b.rise) { res.bumped++; note(t.who_id, t.id, t.title + ' ~' + t.due); }
   });
+  // 열린 지시의 '다음 회차' — 같은 지시(묶음에 여러 행)는 한 번에 모아 한 줄·알림 한 줄
+  const byTask = {}, order = [];
+  (p.ahead || []).forEach(function (a) { if (!byTask[a.id]) { byTask[a.id] = []; order.push(a.id); } Array.prototype.push.apply(byTask[a.id], a.items); });
+  order.forEach(function (id) {
+    const t = byId[id]; if (!openish(t)) return;
+    const r = setNext(t, byTask[id]);
+    if (r.ch) { t.updated = today; res.changed++; }
+    if (r.rise) { res.next_rise++; note(t.who_id, t.id, t.title + ' · ' + r.line); }
+  });
   p.bundles.forEach(function (b) {
     const t = base(b.key, b.who_id, b.title, b.detail, '');
     t.lic_rows = b.rows.map(function (x) { return { no: x.no, due: x.due }; });
+    if ((b.ahead || []).length) setNext(t, b.ahead);   // 처음부터 다음 회차가 걸려 있으면 그 줄을 달고(알림은 새 지시 1발에 함께)
     tasks.push(t); res.ids.push(t.id); res.bundled++; res.changed++; note(b.who_id, t.id, b.title);
   });
   p.create.forEach(function (c) {
     const t = base(c.key, c.who_id, c.title, c.detail, c.due);
     t.lic_stage = c.stage;
+    if ((c.ahead || []).length) setNext(t, c.ahead);
     tasks.push(t); res.ids.push(t.id); res.made++; res.changed++; note(c.who_id, t.id, c.title + ' ~' + c.due);
   });
   return res;
@@ -192,8 +224,10 @@ function forecast(input, days) {
     const p = plan(Object.assign({}, input, { today: day, tasks: tasks }));
     const ev = { day: day, bundles: p.bundles.map(function (b) { return { n: b.rows.length, nos: b.rows.map(function (x) { return x.no; }) }; }),
       create: p.create.map(function (c) { return { no: c.no, stage: c.stage, due: c.due }; }), rise: p.bump.filter(function (b) { return b.rise; }).map(function (b) { return { no: b.no, to: b.to }; }) };
-    apply(p, tasks, day, {}, function () { n++; return 'sim' + n; });
-    if (ev.bundles.length || ev.create.length || ev.rise.length) out.push(ev);
+    const ar = apply(p, tasks, day, {}, function () { n++; return 'sim' + n; });
+    ev.next = ar.next;   // 판20 재검토 1: 열린 지시에 걸린 다음 회차의 단계 오름(그날 알림에 들어감)
+    ev.sent = Object.keys(ar.notify).length;   // 그날 담당 알림 발 수(사람별 1발)
+    if (ev.bundles.length || ev.create.length || ev.rise.length || ev.next.length) out.push(ev);
   }
   return out;
 }
@@ -201,12 +235,12 @@ function forecast(input, days) {
 function drySummary(input, days) {
   const p = plan(input), f = forecast(input, days || 60);
   const whoN = {}; p.bundles.forEach(function (b) { whoN[b.who_id] = (whoN[b.who_id] || 0) + 1; }); p.create.forEach(function (c) { whoN[c.who_id] = (whoN[c.who_id] || 0) + 1; });
-  let ahead = 0, rises = 0; f.forEach(function (e) { if (e.day !== input.today) { ahead += e.create.length; rises += e.rise.length; } });
+  let ahead = 0, rises = 0; f.forEach(function (e) { if (e.day !== input.today) { ahead += e.create.length; rises += e.rise.length + e.next.length; } });
   return { today: input.today, first: p.first, rows: p.states.length,
     now: { bundles: p.bundles.map(function (b) { return { who_id: b.who_id, n: b.rows.length, nos: b.rows.map(function (x) { return x.no; }) }; }), create: p.create.map(function (c) { return { no: c.no, stage: c.stage, due: c.due, who_id: c.who_id }; }), bump: p.bump.length },
     who: Object.keys(whoN).map(function (k) { return { id: k, n: whoN[k] }; }),
     no_who: p.no_who, base: p.base, na: p.na,
-    ahead: { days: days || 60, create: ahead, rise: rises, list: f.filter(function (e) { return e.day !== input.today; }).slice(0, 20).map(function (e) { return { day: e.day, nos: e.create.map(function (c) { return c.no; }), stage: e.create.map(function (c) { return c.stage; }), rise: e.rise.map(function (x) { return x.no; }) }; }) } };
+    ahead: { days: days || 60, create: ahead, rise: rises, list: f.filter(function (e) { return e.day !== input.today; }).slice(0, 20).map(function (e) { return { day: e.day, nos: e.create.map(function (c) { return c.no; }), stage: e.create.map(function (c) { return c.stage; }), rise: e.rise.map(function (x) { return x.no; }).concat(e.next.map(function (x) { return x.no; })) }; }) } };
 }
 
 module.exports = { STAGE_TXT, STAGE_RANK, KEY_RE, BUNDLE_RE, keyId, dutyKey, taskKey, bundleKey, isDutyKey, parse, assignFor, findDuty, licOf, rowState, states, rowTitle, plan, apply, isRunDay, forecast, drySummary };

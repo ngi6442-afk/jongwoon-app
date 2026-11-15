@@ -80,12 +80,19 @@ function dutyStartIdx(cands, done, anchor){
 //   그 뒤에 기한이 온 회차는 [완료+수령 올리기]·[해당 없음]으로 닫힐 때까지 해가 바뀌어도 '지남'으로 남는다(가장 오래된 것부터 — 종전엔 1월 1일·한 주기 뒤에 기록 없이 사라짐).
 //   이 날 이후 아무 날의 결과는 종전 규칙을 이 날에 멈춘 것과 같고, 이 날 이전 날짜(시험)는 종전 그대로(오늘).
 var DUTY_FROM = "2026-11-13";
+// 판20 재검토 2: 그 행의 세기 시작일 — 근거 표 행(sched.count_from)·의무 대장 행(count_from)·허가증 등록일(created — 앱 허가증 등록 두 길이 늘 적음) 가운데 가장 늦은 날,
+//   DUTY_FROM보다 이르거나 없으면 DUTY_FROM. 나중에 근거 표에 오르는 행·새로 등록하는 허가증이 DUTY_FROM 해 회차부터 '지남'으로 보이지 않게(지금 98행·허가증 13개 = 칸 없음·등록 2026-07-08 → 결과 같음).
+function dutyFrom(d, lic){
+  var f = DUTY_FROM, c = [d && d.sched && d.sched.count_from, d && d.count_from, lic && lic.created], i, x;
+  for (i = 0; i < c.length; i++){ x = String(c[i] || "").slice(0, 10); if (dutyParse(x) && x > f) f = x; }
+  return f;
+}
 // d = 의무 행, lic = 붙는 허가증({issued}) 또는 null, today = 'YYYY-MM-DD'
 function dutyNext(d, lic, today){
   var s = d && d.sched;
   if (!s || !s.auto) return null;
   var done = dutyDoneSet(d), anchor = dutyAnchor(d), grace = Number(s.grace_days) || 0, k, j, due, cands = [], start = 0;
-  var lim = today < DUTY_FROM ? today : DUTY_FROM;   // 기준 없는 행의 '지난 회차 걸러 내기' 기준 날
+  var from = dutyFrom(d, lic), lim = today < from ? today : from;   // 기준 없는 행의 '지난 회차 걸러 내기' 기준 날
   var out = { due: "", days: 0, overdue: false, kind: s.type, anchor: anchor, missing: null };
   if (s.type === "fixed"){
     // 매년 1~2개 고정일(fixed_month/day, 선택 fixed2_month/day — 예: 반기 보고 7/31·익년 1/31). 말일 = day 0.
@@ -130,6 +137,9 @@ function dutyNext(d, lic, today){
   if (!out.due){ out.missing = "range"; return out; }
   out.days = dutyDiffDays(out.due, today);
   out.overdue = out.days < 0;
+  // 판20 재검토 1: 이 회차 뒤로 이미 30일 안에 들어왔거나 지난 회차들(완료 안 된 것) — 지난 회차가 열려 있는 동안 진짜 다음 기한이 조용히 지나가지 않게. 쓰는 쪽은 dutyCur(지금 회차가 지났을 때만)
+  out.ahead = [];
+  for (j = k + 1; j < cands.length; j++){ if (done[cands[j]]) continue; due = dutyDiffDays(cands[j], today); if (due > 30) break; out.ahead.push({ due: cands[j], days: due }); }
   return out;
 }
 // 이번 회차(P1 판28) — dutyNext에 그 행의 [해당 없음]·[기한 정정]을 얹는다. 해당 없음(d.na.on) = null(자동 회차 끔 — 행·근거·완료 기록은 그대로).
@@ -142,6 +152,7 @@ function dutyCur(d, lic, today){
   var fm = (d && d.due_fix && typeof d.due_fix === "object") ? d.due_fix : null;
   var fx = (fm && Object.prototype.hasOwnProperty.call(fm, nx.due)) ? fm[nx.due] : null;
   if (fx && dutyParse(fx.to)){ nx.due = fx.to; nx.fixed = true; nx.days = dutyDiffDays(nx.due, today); nx.overdue = nx.days < 0; }
+  if (!nx.overdue) nx.ahead = [];   // 판20 재검토 1: '다음 회차'는 지금 회차가 지났을 때만(월 1회 행이 매달 겹쳐 보이지 않게 — 지금 회차가 안 지났으면 그 지시가 먼저)
   return nx;
 }
 // 알림 단계 — 'over'(지남, 매일) · 'd7'(7일 이내 1회) · 'd30'(30일 이내 1회) · ''
@@ -154,4 +165,4 @@ function dutyStage(nx){
 }
 // ==== DUTY_SHARED_END ====
 
-module.exports = { DUTY_FROM, dutyParse, dutyLastDay, dutyMake, dutyAddMonths, dutyAddDays, dutyDiffDays, dutyPeriodMonths, dutyAnchor, dutyDoneSet, dutyFilledIdx, dutyStartIdx, dutyNext, dutyCur, dutyStage };
+module.exports = { DUTY_FROM, dutyFrom, dutyParse, dutyLastDay, dutyMake, dutyAddMonths, dutyAddDays, dutyDiffDays, dutyPeriodMonths, dutyAnchor, dutyDoneSet, dutyFilledIdx, dutyStartIdx, dutyNext, dutyCur, dutyStage };
