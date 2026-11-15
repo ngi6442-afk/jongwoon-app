@@ -15429,7 +15429,7 @@ try {
       'function apprToastShow(m){ __log.push("toast:" + m); } function renderPmcon(){ __log.push("renderPmcon"); } function downloadBlob(n, b){ __dl.push({ n: n, t: b.parts.join(""), type: b.type }); }',
       'var confirm = function(){ return __o.confirm !== false; }, alert = function(m){ __log.push("alert:" + m); };',
       fn21(H, 'esc'), st21(H, /var PMCON_CHECKS = \[\];/), st21(H, /var rnoteBusy = false;/),
-      ...['pmconChecksRender', 'pmconChecksSync', 'rnoteMonth', 'rnoteMeta', 'rnoteCardHtml', 'rnoteEditHtml', 'rnoteBind', 'rnoteRender', 'rnoteSave', 'rnoteDownload'].map((n) => fn21(H, n)),
+      ...['pmconChecksRender', 'pmconChecksSync', 'rnoteFresh', 'rnoteMonth', 'rnoteMeta', 'rnoteCardHtml', 'rnoteEditHtml', 'rnoteBind', 'rnoteRender', 'rnoteSave', 'rnoteDownload'].map((n) => fn21(H, n)),
       st21(H, /PMCON_CHECKS\.push\(\{ id: "rnote"[^\n]+\);/),
       'return { render: pmconChecksRender };'].join('\n'))(doc, gw, log, o, dl, FakeBlob);
     doc.getElementById('pmconChecksWrap').style.display = 'none';
@@ -15440,7 +15440,8 @@ try {
   const META21 = { counts: { 1: 0, 2: 3, 3: 65 }, excluded: 211, repos: [{ label: '앱 저장소', n: 40 }, { label: '수집기 저장소', n: 24 }], missing: [{ label: '문서 저장소', why: '비공개 — 새 키 없이 읽을 수 없음' }], masked: { name: 1 }, made_at: '2026-11-01 08:20' };
   const TXT21 = '# 연구개발전담부서 연구노트 — 2026-10 (자동 초안)\n- 10-14 · 앱 1ca49a8 · v385 운반일지 <엑셀> & "화면"\n';
   const DOC21 = (over) => Object.assign({ period: '2026-10', status: 'draft', text: TXT21, meta: META21, created_at: new Date(2026, 10, 1, 8, 31).getTime(), updated_at: 1793500000000, confirmed: null }, over || {});
-  const CONF21 = DOC21({ status: 'confirmed', confirmed: { ts: new Date(2026, 10, 2, 9, 0).getTime(), by: 'u21pm', name: '가짜요원', edited: true } });
+  const CTS21 = Date.now() - 86400000, CDAY21 = String(new Date(CTS21).getMonth() + 1).padStart(2, '0') + '-' + String(new Date(CTS21).getDate()).padStart(2, '0');   // C174 ④: 확정본만 남은 카드는 확정 뒤 7일까지 — 시험 확정 시각 = 하루 전
+  const CONF21 = DOC21({ status: 'confirmed', confirmed: { ts: CTS21, by: 'u21pm', name: '가짜요원', edited: true } });
   const RES21 = (d, cw, ex) => ({ rnote_get: { status: 200, body: { status: 'OK', period: '2026-10', doc: d, latest: (ex && ex.latest) || null, months: (ex && ex.months) || [], can_write: cw !== false } } });
   const LRES21 = () => RES21(null, true, { latest: CONF21 });   // 검토 ③: 초안 없음 + 최근 확정본(서버 latest)
   const CONF09 = Object.assign({}, CONF21, { period: '2026-09' });
@@ -15455,7 +15456,7 @@ try {
     dr.card.style.display === '' && dr.wrap.style.display === '' && dr.vis().indexOf('연구노트 10월 초안 — 확인해 주세요') >= 0 && dr.vis().indexOf('과제1 0건 · 과제2 3건 · 과제3 65건 (자동 커밋 211건은 뺌)') >= 0
     && dr.vis().indexOf('재료: 앱 저장소 40건 · 수집기 저장소 24건 (커밋 이력)') >= 0 && dr.vis().indexOf('빠진 저장소: 문서 저장소(비공개 — 새 키 없이 읽을 수 없음)') >= 0 && dr.vis().indexOf('가린 것: 직원 이름 1') >= 0
     && bt(dr) === 'ack,edit,view' && dr.els.rnotePre && dr.els.rnotePre.style.display === 'none' && bt(ro) === 'view' && ro.vis().indexOf('확인하실 분: 연구전담요원(PM)') >= 0
-    && cf.vis().indexOf('연구노트 10월 확정본') >= 0 && cf.vis().indexOf('확인함 · 11-02 가짜요원 · 고친 글로 확정') >= 0 && bt(cf) === 'down,view'
+    && cf.vis().indexOf('연구노트 10월 확정본') >= 0 && cf.vis().indexOf('확인함 · ' + CDAY21 + ' 가짜요원 · 고친 글로 확정') >= 0 && bt(cf) === 'down,view'
     && (await muOk(html)) && nu.card.style.display === 'none' && nu.wrap.style.display === 'none' && er.card.style.display === '' && er.vis().indexOf('연구노트 초안을 불러오지 못했습니다 (RNOTE_READ_FAILED)') >= 0 && ne.vis().indexOf('네트워크') >= 0,
     JSON.stringify({ v: dr.vis().slice(0, 260), b: [bt(dr), bt(ro), bt(cf)], nu: nu.wrap.style.display }));
   // ③ 누름
@@ -15508,12 +15509,26 @@ try {
     ['if (!done && others.length) li.push(', 'if (false && others.length) li.push('],
     ['if (lt) li.push("최근 확정본: "', 'if (false) li.push("최근 확정본: "'],
     ['        if (a === "downlast"){ rnoteDownload(ex && ex.latest); return; }\n', ''],
-    ['var latest = res.body.latest || null, doc = res.body.doc || latest;', 'var latest = res.body.latest || null, doc = res.body.doc;'],
+    ['var latest = res.body.latest || null, doc = res.body.doc || (rnoteFresh(latest) ? latest : null);', 'var latest = res.body.latest || null, doc = res.body.doc;'],
+    ['var latest = res.body.latest || null, doc = res.body.doc || (rnoteFresh(latest) ? latest : null);', 'var latest = res.body.latest || null, doc = res.body.doc || latest;'],
+    ['if (!doc && unread.length){', 'if (false){'],
+    ['if (un.length) li.push(', 'if (false) li.push('],
+    ['return ts > 0 && Date.now() - ts < 7 * 86400000; }', 'return ts > 0; }'],
     ['.filter(function(x){ return x && x.status !== "confirmed" && x.period !== doc.period; })', '.filter(function(x){ return x && x.period !== doc.period; })'],
   ];
   const EVIL21 = DOC21({ text: '<img src=x onerror=1> & "q"', meta: Object.assign({}, META21, { missing: [{ label: '문서<b>저장소</b>', why: 'x' }] }) });
   const evilOk = async (H) => { const r = await run21({ res: RES21(EVIL21) }, H); return r.card.innerHTML.indexOf('<img') < 0 && r.card.innerHTML.indexOf('&lt;img') >= 0 && r.card.innerHTML.indexOf('<b>저장소</b>') < 0; };
   const dlGuard = async (H) => { const dlx = []; const f = new Function('downloadBlob', 'Blob', fn21(H, 'rnoteDownload') + '\nreturn rnoteDownload;')((n, b) => dlx.push(n), function () {}); f(DOC21()); return dlx.length === 0; };
+  // C174 ④ 확정본만 남은 카드 = 확정 뒤 7일까지(8일 지난 것은 숨김·묶음 제목도) · ③ 못 읽은 달(서버 unread) = 초안 카드에 한 줄 · 보일 문서가 없으면 빨간 한 줄 카드
+  const OLDC21 = DOC21({ status: 'confirmed', confirmed: { ts: Date.now() - 8 * 86400000, by: 'u21pm', name: '가짜요원', edited: false } });
+  const URES21 = (d) => ({ rnote_get: { status: 200, body: { status: 'OK', period: d ? '2026-10' : '', doc: d, latest: null, months: [], unread: ['2026-09'], can_write: true } } });
+  const c174ok = async (H) => {
+    const old = await run21({ res: RES21(null, true, { latest: OLDC21 }) }, H), un = await run21({ res: URES21(null) }, H), du = await run21({ res: URES21(DOC21()) }, H);
+    return old.card.style.display === 'none' && old.wrap.style.display === 'none' && un.card.style.display === '' && un.wrap.style.display === '' && un.vis().indexOf('읽지 못한 달: 9월 — 잠시 뒤 다시 열어 주세요') >= 0
+      && du.vis().indexOf('연구노트 10월 초안 — 확인해 주세요') >= 0 && du.vis().indexOf('읽지 못한 달: 9월 — 잠시 뒤 다시 열어 주세요') >= 0 && bt(du) === 'ack,edit,view';
+  };
+  const c1740 = await c174ok(html);
+  T('C174 ③④ 카드(실행): 초안 없이 확정본만 = 확정 뒤 7일까지만 보임(8일 지난 확정본 = 카드·묶음 제목 숨김, 하루 지난 것은 보임) · 서버가 못 읽은 달 = 초안 카드에 "읽지 못한 달: 9월 — 잠시 뒤 다시 열어 주세요" 한 줄(단추 그대로) · 보일 문서 없이 못 읽은 달만 = 그 한 줄 카드(숨기지 않음)', c1740, '');
   const evil0 = await evilOk(html), dlg0 = await dlGuard(html);
   const kill21 = [];
   for (const [from, to] of MUT21) {
@@ -15523,11 +15538,11 @@ try {
     try {
       const a = await run21({ res: RES21(DOC21(), false) }, Hx), b = await run21({ res: RES21(null) }, Hx), c = await run21({ res: LRES21() }, Hx);
       const p = await press({}, Hx);
-      broken = !(bt(a) === 'view' && b.wrap.style.display === 'none' && bt(c) === 'down,view' && chk21p(p) && (await evilOk(Hx)) && (await dlGuard(Hx)) && (await muOk(Hx)));
+      broken = !(bt(a) === 'view' && b.wrap.style.display === 'none' && bt(c) === 'down,view' && chk21p(p) && (await evilOk(Hx)) && (await dlGuard(Hx)) && (await muOk(Hx)) && (await c174ok(Hx)));
     } catch (err) { broken = true; }
     if (!broken) kill21.push(from.slice(0, 60) + ' 안 깨짐');
   }
-  T('P1 판21 ④ 결함 사본 ' + MUT21.length + '개(숨을 때 묶음 안 셈 · base 없이 확정 · 늘 글 실음 · 확인 창 건너뜀 · 확정 뒤 내려받기 없음 · 쓸 수 없는데 [확인] · 확정본에 [확인] · 빈 글 막음 걷음 · 줄 이스케이프 걷음 · 글 보기 이스케이프 걷음 · 초안도 내려받기 · 확정자 꼬리 바꿈 · 검토 11/15: 실패 때 다시 그림 · 다른 달 초안 줄 · 최근 확정본 줄 · 최근 확정본 받기 · 초안 없을 때 확정본 카드 · 확정된 달도 초안으로 셈) 전부 깨짐 · 이스케이프(꺾쇠·따옴표) 기준 통과',
+  T('P1 판21 ④ 결함 사본 ' + MUT21.length + '개(숨을 때 묶음 안 셈 · base 없이 확정 · 늘 글 실음 · 확인 창 건너뜀 · 확정 뒤 내려받기 없음 · 쓸 수 없는데 [확인] · 확정본에 [확인] · 빈 글 막음 걷음 · 줄 이스케이프 걷음 · 글 보기 이스케이프 걷음 · 초안도 내려받기 · 확정자 꼬리 바꿈 · 검토 11/15: 실패 때 다시 그림 · 다른 달 초안 줄 · 최근 확정본 줄 · 최근 확정본 받기 · 초안 없을 때 확정본 카드 · 확정된 달도 초안으로 셈 · C174: 오래된 확정본도 보임·7일 기준 걷음·못 읽은 달 한 줄·못 읽은 달만 카드) 전부 깨짐 · 이스케이프(꺾쇠·따옴표) 기준 통과',
     evil0 && dlg0 && kill21.length === 0, JSON.stringify({ evil0, dlg0, kill21 }));
   // ⑤ 화면 글 — 내부 키 이름·밑줄 이름·상태 글자 0 · 초안 카드에 입력 칸 0(고침 때만 글 칸 1)
   const leak21 = (dr.vis() + ' ' + cf.vis()).replace(TXT21.replace(/<[^>]+>/g, ' '), ' ').match(/\b[a-z]+_[a-z_]+\b|\brnote\b|\b(?:draft|confirmed|bot)\b/g) || [];

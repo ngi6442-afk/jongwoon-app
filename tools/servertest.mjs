@@ -10541,7 +10541,7 @@ function J91a(x) { return JSON.stringify(x); }
   const chk21 = async (cl, RM) => {
     const P = {}, I = {}; RM = RM || RN21;   // RM = 흔적 판정을 직접 부를 rnote 모듈(결함 사본이면 그 사본)
     reset21();
-    const put = (b) => cl(Object.assign({ action: 'rnote_put', key: KEY21, rules_ver: RV21 }, b));
+    const put = (b) => cl(Object.assign({ action: 'rnote_put', key: KEY21, rules_ver: RV21, rules_fp: RM.RULES_FP }, b));
     const st = () => mem.gw_data['it:cron:rnote:last'] || null, doc = (p) => mem.gw_data['rnote:' + (p || PREV21)];
     // ① 받기 관문
     const a1 = await cl({ action: 'rnote_put', key: 'wrong', period: PREV21, text: CLEAN21 }), a2 = await cl({ action: 'rnote_put', period: PREV21, text: CLEAN21 });
@@ -10550,7 +10550,12 @@ function J91a(x) { return JSON.stringify(x); }
     P.A = a1.code === 403 && a1.body.error_code === 'BAD_INGEST_KEY' && a2.code === 403 && a3.code === 400 && a3.body.error_code === 'BAD_PERIOD' && a4.code === 400 && a4.body.error_code === 'BAD_PERIOD'
       && a5.code === 400 && a5.body.error_code === 'BAD_TEXT' && a6.code === 413 && a7.code === 400 && a7.body.error_code === 'BAD_META'
       && a8.code === 400 && a8.body.error_code === 'RNOTE_RULES_VER' && a8s && a8s.ok === false && /규칙 판 다름/.test(a8s.note || '') && a9.code === 400 && a9.body.error_code === 'RNOTE_RULES_VER' && !doc();
-    I.A = [a1, a2, a3, a4, a5, a6, a7, a8, a9].map((x) => x.code + '/' + x.body.error_code);
+    // 원장 C174 ⑤: 거르기 표 내용 지문 — 다르거나 없으면 400 RNOTE_RULES_FP(흔적 '표 내용 다름') · 지문 = 16자 16진 · 표 내용(보통 낱말 하나)이 바뀌면 지문도 바뀜
+    const a10 = await put({ period: PREV21, text: CLEAN21, rules_fp: '0000000000000000' }), a10s = st(), a11 = await put({ period: PREV21, text: CLEAN21, rules_fp: undefined });
+    const fpX = comp21(P21, S21.replace("const NAME_SKIP = { '개인': 1,", () => "const NAME_SKIP = { '가짜낱말': 1, '개인': 1,")).RULES_FP;
+    P.A2 = a10.code === 400 && a10.body.error_code === 'RNOTE_RULES_FP' && a10s && a10s.ok === false && /표 내용 다름/.test(a10s.note || '') && a11.code === 400 && a11.body.error_code === 'RNOTE_RULES_FP' && !doc()
+      && /^[0-9a-f]{16}$/.test(RM.RULES_FP) && RM.RULES_FP === RM.rulesFp() && fpX !== RN21.RULES_FP;
+    I.A = [a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11].map((x) => x.code + '/' + x.body.error_code);
     // ② 서버 재검사(검토 11/15 ②⑥⑦ — 느슨한 꼴·핵심 이름·NFC·폭 없는 문자·금액·메일)
     const LEAKS = [['회원 실명', '- 가짜요원 확인\n', 'name'], ['띄어 쓴 3자 일용직 이름', '- 가짜 꾼 요청\n', 'name'], ['가운뎃점 섞은 이름', '- 가짜·꾼 요청\n', 'name'], ['풀어 쓴 한글(NFD)', '- ' + '가짜요원'.normalize('NFD') + '\n', 'name'],
       ['폭 없는 문자 낀 이름', '- 가짜​요원\n', 'name'], ['거래처', '- 가짜상사 단가\n', 'client'], ['계약 상대', '- 가짜발주처 건\n', 'client'], ['법인 표기 뗀 핵심 이름', '- 가짜코어상사 건\n', 'client'],
@@ -10595,6 +10600,20 @@ function J91a(x) { return JSON.stringify(x); }
     P.E = f1.code === 200 && f1s.ok === false && /LEAK_NAME/.test(f1s.note) && f2.code === 400 && f2.body.error_code === 'BAD_FAIL' && f3.code === 400 && pg.code === 200 && pg.body.due === PREV21 && pg.body.due_ok === true && pgs.ok === true && pgs.fn === 'rnote'
       && ds1.ok === false && /확정 안 된 초안 2026-11/.test(ds1.note) && ds2.ok === true && ds3.ok === true && ds4.ok === false;
     I.E = { f1: f1.code, f1s, f2: f2.code, f3: f3.code, pg: pg.body, ds: [ds1, ds2, ds3, ds4] };
+    // 원장 C174 ②: 1~3일(봇이 묻기·저장)에도 오래 미확정 초안 경고가 흔적에 남음 · ③ 한 달만 못 읽으면 흔적 ok false('읽지 못한 달') — 2027-02-02 KST, 2026-11 초안이 확정 안 된 채
+    const g1d = JSON.stringify(mem.gw_data);
+    mem.gw_data['rnote:2026-11'] = { schema: 1, period: '2026-11', status: 'draft', text: 'x', updated_at: 1 }; mem.gw_data['rnote:2027-01'] = { schema: 1, period: '2027-01', status: 'draft', text: 'x', updated_at: 1 };
+    const FEB02 = Date.UTC(2027, 1, 2, 1);
+    const w1 = await RM.put({ period: '2027-01', probe: true }, FEB02), w1s = st();
+    const w2 = await RM.put({ period: '2026-12', text: CLEAN21, meta: meta21, rules_ver: RV21, rules_fp: RM.RULES_FP }, FEB02), w2s = st();
+    mem.gw_data['rnote:2026-11'].status = 'confirmed'; const w3 = await RM.put({ period: '2027-01', probe: true }, FEB02), w3s = st();
+    blobsMock.hooks.failGet = (k) => k === 'rnote:2026-11'; const w4 = await RM.dueState(Date.UTC(2027, 1, 10, 1)); const w5 = await RM.put({ period: '2027-01', probe: true }, FEB02), w5s = st(); blobsMock.hooks.failGet = null;
+    const back1 = JSON.parse(g1d); delete mem.gw_data['rnote:2026-11']; delete mem.gw_data['rnote:2027-01']; delete mem.gw_data['rnote:2026-12']; Object.keys(back1).forEach((k) => { if (!(k in mem.gw_data)) mem.gw_data[k] = back1[k]; });
+    P.E2 = w1.code === 200 && w1.body.exists === true && w1s.ok === false && /확정 안 된 초안 2026-11/.test(w1s.note) && /2027-01분 이미 있음/.test(w1s.note)
+      && w2.code === 200 && w2.body.saved === true && w2s.ok === false && /2026-12분 초안 저장/.test(w2s.note) && /확정 안 된 초안 2026-11/.test(w2s.note)
+      && w3.code === 200 && w3s.ok === true && !/확정 안 된/.test(w3s.note)
+      && w4.ok === false && /읽지 못한 달 2026-11/.test(w4.note) && w5.code === 200 && w5s.ok === false && /읽지 못한 달 2026-11/.test(w5s.note);
+    I.E2 = { w1: w1s, w2: w2s, w3: w3s, w4, w5: w5s };
     // ④ 읽기 — 목록·가장 오래된 초안·가장 최근 확정본 · can_write = PM만
     mem.gw_data['rnote:' + OLD21] = { schema: 1, period: OLD21, status: 'draft', text: '옛 초안', bot_text: '옛 초안', updated_at: 5, created_at: 5 };
     mem.gw_data['rnote:' + CONF21] = { schema: 1, period: CONF21, status: 'confirmed', text: '확정본 글', bot_text: '봇 글', updated_at: 6, confirmed: { ts: 6, by: 'u21pm', name: '가짜요원', edited: true } };
@@ -10605,6 +10624,13 @@ function J91a(x) { return JSON.stringify(x); }
       && gp.body.period === OLD21 && gp.body.doc && gp.body.doc.text === '옛 초안' && mo === [CONF21 + ':confirmed', OLD21 + ':draft', PREV21 + ':draft'].join() && gp.body.latest && gp.body.latest.text === '확정본 글'
       && !('bot_text' in gp.body.doc) && !('bot_text' in gp.body.latest) && ga.code === 200 && ga.body.can_write === false && ga.body.doc && ga.body.doc.text === d3.text && gn.code === 200 && gn.body.doc === null && gb.code === 400;
     I.F = { c: [g0, gw, gd, gp, ga, gn, gb].map((x) => x.code + '/' + (x.body.error_code || '')), mo, p: gp.body.period, cw: [gp.body.can_write, ga.body.can_write] };
+    // 원장 C174 ③: 한 달 문서만 못 읽음 = 카드 전체 실패가 아니라 그 달만 unread · 나머지 달(다음 초안·최근 확정본)은 그대로 · 목록 자체 실패는 503 그대로
+    blobsMock.hooks.failGet = (k) => k === 'rnote:' + OLD21; const gu = await cl({ action: 'rnote_get' }, T21.pm, 'dev1'); blobsMock.hooks.failGet = null;
+    blobsMock.hooks.failList = true; const gl = await cl({ action: 'rnote_get' }, T21.pm, 'dev1'); blobsMock.hooks.failList = false;
+    const mou = (gu.body.months || []).map((x) => x.period + ':' + x.status).join();
+    P.F2 = gu.code === 200 && JSON.stringify(gu.body.unread) === JSON.stringify([OLD21]) && gu.body.period === PREV21 && gu.body.doc && gu.body.latest && gu.body.latest.text === '확정본 글'
+      && mou === [CONF21 + ':confirmed', PREV21 + ':draft'].join() && JSON.stringify(gp.body.unread) === '[]' && gl.code === 503 && gl.body.error_code === 'RNOTE_READ_FAILED';
+    I.F2 = { gu: gu.code + '/' + JSON.stringify(gu.body.unread) + '/' + gu.body.period, mou, gl: gl.code };
     delete mem.gw_data['rnote:' + OLD21]; delete mem.gw_data['rnote:' + CONF21];
     // ⑤ [확인] — PM만(검토 ④)
     const base = doc().updated_at, bot0 = doc().bot_text, a0 = auditMock.logs.length;
@@ -10645,7 +10671,12 @@ function J91a(x) { return JSON.stringify(x); }
       ['R', "  return out.length ? out : null;   // 검토 11/15 ⑧", "  return out;   // 검토 11/15 ⑧"],
       ['R', "const NAME_COLS = [['col:workers', 'name'], ['col:vehicles', 'driver']];", "const NAME_COLS = [['col:vehicles', 'driver']];"],
       ['R', "const CLIENT_COLS = [['col:clients', 'name'], ['col:contracts', 'client'], ['col:asbestos', 'client'], ['col:quotes', 'recv']];", "const CLIENT_COLS = [['col:clients', 'name']];"],
-      ['R', "  return new RegExp(cs.join(cs.length >= 3 ? '[\\\\s,·・∙•]*' : ''), 'i');", "  return new RegExp(cs.join(''), 'i');"],
+      ['R', "  return new RegExp(cs.join(cs.length >= 3 ? NAME_JOIN : ''), 'i');", "  return new RegExp(cs.join(''), 'i');"],
+      ['R', "  if (String(d.rules_fp || '') !== RULES_FP) {", "  if (false) {"],
+      ['R', "  await stampOk(!w.bad, note + w.note);", "  await stampOk(true, note);"],
+      ['R', "    if (!r.ok) { unread.push(p); continue; }", "    if (!r.ok) return null;"],
+      ['R', "  const note = (old.length ? ' · 확정 안 된 초안 ' + old.join('·') : '') + (rs.unread.length ? ' · 읽지 못한 달 ' + rs.unread.join('·') : '');\n  return { bad: !!(old.length || rs.unread.length), note: note };", "  const note = (old.length ? ' · 확정 안 된 초안 ' + old.join('·') : '');\n  return { bad: !!old.length, note: note };"],
+      ['R', "months: months, unread: rs.unread, can_write:", "months: months, unread: [], can_write:"],
       ['R', "function normText(s) { return String(s == null ? '' : s).normalize('NFC').replace(ZW_RE, ''); }", "function normText(s) { return String(s == null ? '' : s).replace(ZW_RE, ''); }"],
       ['R', "function normText(s) { return String(s == null ? '' : s).normalize('NFC').replace(ZW_RE, ''); }", "function normText(s) { return String(s == null ? '' : s).normalize('NFC'); }"],
       ['R', "    if (client) { const core = t.replace(CORP_RE, '').replace(/\\s+/g, ''); if (core.length >= CORE_MIN && core !== t) add(core); }", ""],
@@ -10658,7 +10689,7 @@ function J91a(x) { return JSON.stringify(x); }
       ['R', "  if (String(d.rules_ver || '') !== RULES_VER) {", "  if (false) {"],
       ['R', "  if (d.probe === true) {", "  if (false) {"],
       ['R', "      if (d.force === true) return { code: 409,", "      if (false) return { code: 409,"],
-      ['R', "    if (d.force !== true) { await stampOk(true, period + '분 이미 있음(초안)');", "    if (false) { await stampOk(true, period + '분 이미 있음(초안)');"],
+      ['R', "    if (d.force !== true) { await stampWarn(period + '분 이미 있음(초안)', now);", "    if (false) { await stampWarn(period + '분 이미 있음(초안)', now);"],
       ['R', "  if (doc.status === 'confirmed') return { code: 400,", "  if (false) return { code: 400,"],
       ['R', "  if (d.base === undefined || num(d.base) !== num(doc.updated_at)) return { code: 409,", "  if (false) return { code: 409,"],
       ['R', "  doc.text = text; doc.status = 'confirmed';", "  doc.text = text; doc.bot_text = text; doc.status = 'confirmed';"],
@@ -10666,10 +10697,10 @@ function J91a(x) { return JSON.stringify(x); }
       ['R', "  if (!ymOk(period) || period >= kstYm(now)) return", "  if (!ymOk(period)) return"],
       ['R', "  if (bytes(d.text) > TEXT_MAX) return { code: 413,", "  if (false) return { code: 413,"],
       ['R', "  try { au = (await AUDIT.appendAudit(", "  try { au = (await (async () => false)("],
-      ['R', "    const p = rs.find(function (x) { return x.status === 'draft'; });", "    const p = rs.filter(function (x) { return x.status === 'draft'; }).pop();"],
-      ['R', "  const lc = rs.filter(function (x) { return x.status === 'confirmed'; }).pop() || null;", "  const lc = null;"],
+      ['R', "    const p = rs.docs.find(function (x) { return x.status === 'draft'; });", "    const p = rs.docs.filter(function (x) { return x.status === 'draft'; }).pop();"],
+      ['R', "  const lc = rs.docs.filter(function (x) { return x.status === 'confirmed'; }).pop() || null;", "  const lc = null;"],
       ['R', "function staleDraft(p, nowMs) { const lim = addYm(p, 2) + '-04'; return kstDay(nowMs) >= lim; }", "function staleDraft(p, nowMs) { return false; }"],
-      ['R', "  return { code: 200, body: { status: 'OK', period: period, doc: view(doc), latest: lc ? view(lc.doc) : null, months: months, can_write: !!canWrite } };", "  return { code: 200, body: { status: 'OK', period: period, doc: view(doc), latest: lc ? view(lc.doc) : null, months: months, can_write: true } };"],
+      ['R', "months: months, unread: rs.unread, can_write: !!canWrite } };", "months: months, unread: rs.unread, can_write: true } };"],
       ['G', "async function handleRnoteGet(event, d, R) { const g = await pmconGate(event, R, false); if (g.res) return g.res;", "async function handleRnoteGet(event, d, R) { const g = {};"],
       ['G', "async function handleRnoteSave(event, d, R) { const g = await pmconGate(event, R, true);", "async function handleRnoteSave(event, d, R) { const g = await pmconGate(event, R, false);"],
       ['G', "  if (!botKeyOk(d.key)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });\n  const o = await RNOTE.put(d);", "  const o = await RNOTE.put(d);"],
@@ -10688,7 +10719,10 @@ function J91a(x) { return JSON.stringify(x); }
     }
     const place21 = MUT21.filter(([k, from]) => (k === 'R' ? S21 : SG21).split(from).length !== 2).map(([k, from]) => k + ':' + from.trim().slice(0, 40) + ' 자리');
     kill21.push(...place21);
-    T('P1 판21 ⑨ 결함 사본 ' + MUT21.length + '개(재검사 끔·명부 못 읽음 통과·회원 0명 통과·일용직/계약 상대 표 뺌·느슨한 꼴·NFC·폭 없는 문자·핵심 이름·보통 낱말 뒤 숫자·천만·KRW 앞·메일·금액 검사 뺌·meta 안 봄·규칙 판 안 봄·probe 걷음·확정 덮기·초안 덮기·확정 두 번·base 안 봄·봇 원본 덮기·원본 내림·이번 달 받음·크기 안 봄·감사 없음·초안 순서·최근 확정본 없음·오래된 초안 판정 끔·can_write 늘 참 · gw-data 읽기 관문 걷음·확정 PM 관문을 관리자로·봇 키 안 봄) = 모두 ✗', kill21.length === 0, kill21.join(' | '));
+    T('C174 ⑤ 거르기 표 내용 지문: 다르거나 없으면 400 RNOTE_RULES_FP(흔적 \'표 내용 다름\')·저장 0 · 지문 16자 16진 = 표 내용에서 계산 · 보통 낱말 하나만 더해도 지문이 바뀜', R21.P.A2, JSON.stringify(R21.I.A));
+    T('C174 ② 1~3일 묻기·이미 있음·저장 흔적에도 오래 미확정 초안 경고(ok false·\'확정 안 된 초안 2026-11\') · 확정하면 ok · ③ 한 달 못 읽음 = 흔적 ok false(\'읽지 못한 달\')', R21.P.E2, JSON.stringify(R21.I.E2));
+    T('C174 ③ 읽기: 한 달 문서만 못 읽음 = 200 · 그 달만 unread · 다음 초안·최근 확정본·목록은 그대로 · 평소 unread 빈 목록 · 목록 자체 실패 = 503', R21.P.F2, JSON.stringify(R21.I.F2));
+    T('P1 판21 ⑨ 결함 사본 ' + MUT21.length + '개(재검사 끔·명부 못 읽음 통과·회원 0명 통과·일용직/계약 상대 표 뺌·느슨한 꼴·NFC·폭 없는 문자·핵심 이름·보통 낱말 뒤 숫자·천만·KRW 앞·메일·금액 검사 뺌·meta 안 봄·규칙 판 안 봄·probe 걷음·확정 덮기·초안 덮기·확정 두 번·base 안 봄·봇 원본 덮기·원본 내림·이번 달 받음·크기 안 봄·감사 없음·초안 순서·최근 확정본 없음·오래된 초안 판정 끔·can_write 늘 참 · gw-data 읽기 관문 걷음·확정 PM 관문을 관리자로·봇 키 안 봄 · C174: 표 내용 지문 안 봄·1~3일 흔적 경고 꼬리 걷음·한 달 실패 = 전체 실패·못 읽은 달 경고 걷음·unread 안 내림) = 모두 ✗', kill21.length === 0, kill21.join(' | '));
   } catch (e) { T('P1 판21 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
   finally { reset21(); const s = JSON.parse(snap21); mem.gw_users = s.u; mem.gw_data = s.d; require.cache[rp21] = keep21; }
 }

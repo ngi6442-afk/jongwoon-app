@@ -47,6 +47,18 @@ const KEY_RES = [
   /\b(?:api[_-]?key|key|token|secret|password|passwd|pwd|oc)\s*[=:]\s*[^\s,;]{6,}/i,
 ];
 const MAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/;   // appdata rnote.py MAIL_RE와 같음(검토 11/15 ⑦)
+const NAME_JOIN = '[\\s,·・∙•]*';   // 이름 글자 사이에 허용하는 것(공백·쉼표·가운뎃점) — appdata rnote.py NAME_JOIN과 같음
+// 사람 이름 = 회원 + 아래 칸(일용직·차량 운전자) · 거래처 이름 = 아래 칸 — appdata rnote.py NAME_COLS·CLIENT_COLS와 같은 표
+const NAME_COLS = [['col:workers', 'name'], ['col:vehicles', 'driver']];
+const CLIENT_COLS = [['col:clients', 'name'], ['col:contracts', 'client'], ['col:asbestos', 'client'], ['col:quotes', 'recv']];
+// 거르기 표 내용 지문(원장 C174 ⑤ — 판 번호만 맞추면 한쪽 표만 고친 것을 못 잡음): 두 저장소가 같은 차례로 표 내용을 JSON 배열로 늘어놓고 sha256 앞 16자.
+//   수집기 rnote.py rules_fp()와 같은 배열이어야 한다 — 받기 때 수집기 지문과 다르면 400 RNOTE_RULES_FP(원천: 표 내용 자체를 견줌). 번호 꼴(PII)은 앱 learn.js piiScan과 수집기 PII_RES가 일부러 다른 구현이라 뺀다.
+function rulesFp() {
+  const arr = [['v', 1], ['name_min', NAME_MIN], ['core_min', CORE_MIN], ['name_skip', Object.keys(NAME_SKIP).sort()], ['corp', CORP_RE.source], ['zw', ZW_RE.source], ['join', NAME_JOIN],
+    ['name_cols', NAME_COLS], ['client_cols', CLIENT_COLS], ['amount', AMOUNT_RES.map(function (r) { return r.source; })], ['key', KEY_RES.map(function (r) { return r.source; })], ['mail', MAIL_RE.source]];
+  return require('crypto').createHash('sha256').update(JSON.stringify(arr), 'utf8').digest('hex').slice(0, 16);
+}
+const RULES_FP = rulesFp();
 
 function kstYm(ms) { return new Date(ms + 9 * H).toISOString().slice(0, 7); }
 function kstDay(ms) { return new Date(ms + 9 * H).toISOString().slice(0, 10); }
@@ -71,9 +83,6 @@ async function memberNames() {
   }
   return out.length ? out : null;   // 검토 11/15 ⑧: 회원 이름 0명 = 명부를 못 읽은 것으로 본다(검사 없이 받지 않음)
 }
-// 사람 이름 = 회원 + 아래 칸(일용직·차량 운전자) · 거래처 이름 = 아래 칸 — appdata rnote.py NAME_COLS·CLIENT_COLS와 같은 표
-const NAME_COLS = [['col:workers', 'name'], ['col:vehicles', 'driver']];
-const CLIENT_COLS = [['col:clients', 'name'], ['col:contracts', 'client'], ['col:asbestos', 'client'], ['col:quotes', 'recv']];
 async function colNames(cols) {   // 못 읽은 컬렉션이 하나라도 있으면 null · 없는 컬렉션 = 빈 목록
   const out = [];
   for (const [key, field] of cols) {
@@ -106,7 +115,7 @@ function cleanNames(list, client) {
 // 이름 하나의 느슨한 꼴 — 글자 사이 공백·쉼표·가운뎃점 허용(appdata rnote.py name_re와 같음) · 공백 뺀 2자 이름은 붙여 쓴 꼴만('이 도구' 같은 보통 글이 두 글자 이름으로 가려지지 않게)
 function nameRe(n) {
   const cs = Array.from(n.replace(/\s+/g, '')).map(function (ch) { return ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); });
-  return new RegExp(cs.join(cs.length >= 3 ? '[\\s,·・∙•]*' : ''), 'i');
+  return new RegExp(cs.join(cs.length >= 3 ? NAME_JOIN : ''), 'i');
 }
 // 재검사(순수) — 걸린 종류 목록(값 없음). names/clients = cleanNames 결과
 function leakKinds(text, names, clients) {
@@ -124,19 +133,20 @@ async function readDoc(st, period) {   // { ok, doc } — 없음 = doc null · �
   if (!r.ok) return r.code === 'NOT_FOUND' ? { ok: true, doc: null } : { ok: false };
   return { ok: true, doc: isObj(r.data) ? r.data : null };
 }
-// 최근 n달 가운데 문서가 있는 달 — [{ period, status, doc }] 오래된 순 · 하나라도 못 읽으면 null
+// 최근 n달 가운데 문서가 있는 달 — { docs: [{ period, status, doc }] 오래된 순, unread: [못 읽은 달] } · 목록 자체를 못 읽으면 null
+//   원장 C174 ③: 한 달 문서만 못 읽어도 카드 전체가 실패하던 것 → 그 달만 unread로 빼고 나머지는 보인다(흔적 판정은 unread가 있으면 ok false)
 async function recentDocs(nowMs, n) {
   const st = store(DATA), cur = kstYm(nowMs), lo = addYm(cur, -(n || LIST_MONTHS));
   const l = await blobList(st, PREFIX);
   if (!l || !l.ok || !Array.isArray(l.keys)) return null;
   const ps = l.keys.filter(function (k) { return String(k).indexOf(PREFIX) === 0; }).map(function (k) { return String(k).slice(PREFIX.length); }).filter(function (p) { return String(p) && ymOk(p) && p >= lo && p < cur; }).sort();
-  const out = [];
+  const out = [], unread = [];
   for (const p of ps) {
     const r = await readDoc(st, p);
-    if (!r.ok) return null;
+    if (!r.ok) { unread.push(p); continue; }
     if (r.doc) out.push({ period: p, status: r.doc.status === 'confirmed' ? 'confirmed' : 'draft', doc: r.doc });
   }
-  return out;
+  return { docs: out, unread: unread };
 }
 function view(doc) {   // 화면에 내리는 칸 — 봇 원본(bot_text)은 내리지 않는다(학습 재료로 저장만)
   if (!doc) return null;
@@ -148,15 +158,27 @@ function view(doc) {   // 화면에 내리는 칸 — 봇 원본(bot_text)은 �
 async function stampOk(ok, note) { await cronstamp.stamp(STAMP_FN, { state: 'end', ok: ok, note: String(note || '').slice(0, 120) }); }
 // 확정 안 된 채 오래된 초안 — 그 달 다음다음 달 4일(KST)부터(만든 달 + 1달 + 3일 창 넘김)
 function staleDraft(p, nowMs) { const lim = addYm(p, 2) + '-04'; return kstDay(nowMs) >= lim; }
+// 확정 안 된 채 오래된 초안·못 읽은 달 — 흔적 경고 꼬리(rs = recentDocs 결과) · { bad, note }
+function warnOf(rs, nowMs) {
+  const old = rs.docs.filter(function (x) { return x.status === 'draft' && x.period >= FIRST && staleDraft(x.period, nowMs); }).map(function (x) { return x.period; });
+  const note = (old.length ? ' · 확정 안 된 초안 ' + old.join('·') : '') + (rs.unread.length ? ' · 읽지 못한 달 ' + rs.unread.join('·') : '');
+  return { bad: !!(old.length || rs.unread.length), note: note };
+}
 async function dueState(nowMs) {   // 흔적용 — 지난달 문서가 있어야 하는 날인가 + 확정 안 된 채 오래된 초안(검토 11/15 ③)
   const due = prevYm(kstYm(nowMs)), dd = Number(kstDay(nowMs).slice(8, 10));
   const rs = await recentDocs(nowMs, LIST_MONTHS);
   if (rs === null) return { due: due, ok: false, note: '연구노트 문서를 읽지 못함' };
-  const old = rs.filter(function (x) { return x.status === 'draft' && x.period >= FIRST && staleDraft(x.period, nowMs); }).map(function (x) { return x.period; });
-  const oldNote = old.length ? ' · 확정 안 된 초안 ' + old.join('·') : '';
-  if (due < FIRST || dd <= 3) return { due: due, ok: !old.length, note: (due < FIRST ? '첫 회 전(' + FIRST + '분이 첫 회)' : due + '분 만드는 날') + oldNote };
-  const has = rs.find(function (x) { return x.period === due; });
-  return { due: due, ok: !!has && !old.length, note: (has ? due + '분 있음(' + has.status + ')' : due + '분 초안 없음 — 매월 1~3일 만들기 실패') + oldNote };
+  const w = warnOf(rs, nowMs);
+  if (due < FIRST || dd <= 3) return { due: due, ok: !w.bad, note: (due < FIRST ? '첫 회 전(' + FIRST + '분이 첫 회)' : due + '분 만드는 날') + w.note };
+  const has = rs.docs.find(function (x) { return x.period === due; });
+  return { due: due, ok: !!has && !w.bad, note: (has ? due + '분 있음(' + has.status + ')' : due + '분 초안 없음 — 매월 1~3일 만들기 실패') + w.note };
+}
+// 원장 C174 ②: 1~3일에는 봇이 ping 대신 묻기·저장을 해 흔적이 늘 ok로 덮였다(오래 미확정 초안 경고가 그 사흘 가려짐) → 잘 된 흔적에도 같은 경고 꼬리를 붙인다
+async function stampWarn(note, nowMs) {
+  const rs = await recentDocs(nowMs, LIST_MONTHS);
+  if (rs === null) { await stampOk(false, note + ' · 연구노트 문서를 읽지 못함'); return; }
+  const w = warnOf(rs, nowMs);
+  await stampOk(!w.bad, note + w.note);
 }
 async function put(d, nowMs) {
   const now = nowMs || Date.now();
@@ -175,18 +197,19 @@ async function put(d, nowMs) {
   if (!r.ok) return { code: 503, body: { status: 'ERROR', error_code: 'RNOTE_READ_FAILED' } };
   if (d.probe === true) {   // 묻기만(글 없음) — 수집기가 1~3일에 만들기 전에
     if (d.text !== undefined) return { code: 400, body: { status: 'REJECTED', error_code: 'BAD_PROBE' } };
-    if (r.doc) await stampOk(true, period + '분 이미 있음(' + r.doc.status + ')');
+    if (r.doc) await stampWarn(period + '분 이미 있음(' + r.doc.status + ')', now);
     return { code: 200, body: { status: 'OK', probe: true, exists: !!r.doc, doc_status: r.doc ? r.doc.status : '' } };
   }
   if (r.doc) {
     if (r.doc.status === 'confirmed') {
       if (d.force === true) return { code: 409, body: { status: 'CONFLICT', error_code: 'RNOTE_CONFIRMED' } };   // 요원이 확정한 달은 봇이 못 덮음
-      await stampOk(true, period + '분 이미 있음(확정)');
+      await stampWarn(period + '분 이미 있음(확정)', now);
       return { code: 200, body: { status: 'OK', exists: true, doc_status: 'confirmed' } };
     }
-    if (d.force !== true) { await stampOk(true, period + '분 이미 있음(초안)'); return { code: 200, body: { status: 'OK', exists: true, doc_status: 'draft' } }; }
+    if (d.force !== true) { await stampWarn(period + '분 이미 있음(초안)', now); return { code: 200, body: { status: 'OK', exists: true, doc_status: 'draft' } }; }
   }
   if (String(d.rules_ver || '') !== RULES_VER) { await stampOk(false, period + '분 받기 거절 — 규칙 판 다름(수집기 ' + String(d.rules_ver || '없음').slice(0, 20) + ' · 앱 ' + RULES_VER + ')'); return { code: 400, body: { status: 'REJECTED', error_code: 'RNOTE_RULES_VER', want: RULES_VER } }; }
+  if (String(d.rules_fp || '') !== RULES_FP) { await stampOk(false, period + '분 받기 거절 — 거르기 표 내용 다름(수집기 ' + String(d.rules_fp || '없음').slice(0, 16) + ' · 앱 ' + RULES_FP + ')'); return { code: 400, body: { status: 'REJECTED', error_code: 'RNOTE_RULES_FP', want: RULES_FP } }; }
   if (typeof d.text !== 'string' || !d.text.trim()) return { code: 400, body: { status: 'REJECTED', error_code: 'BAD_TEXT' } };
   if (bytes(d.text) > TEXT_MAX) return { code: 413, body: { status: 'REJECTED', error_code: 'TOO_LARGE', max: TEXT_MAX } };
   const meta = d.meta === undefined ? {} : d.meta;
@@ -199,7 +222,7 @@ async function put(d, nowMs) {
     created_at: r.doc ? num(r.doc.created_at) || now : now, updated_at: Math.max(now, r.doc ? num(r.doc.updated_at) + 1 : 0), confirmed: null, by: 'bot' };
   const w = await blobSet(st, key, doc);
   if (!w || !w.ok) { await stampOk(false, period + '분 저장 실패'); return { code: 500, body: { status: 'ERROR', error_code: 'RNOTE_WRITE_FAILED' } }; }
-  await stampOk(true, period + '분 초안 저장' + (r.doc ? '(다시 만듦)' : ''));
+  await stampWarn(period + '분 초안 저장' + (r.doc ? '(다시 만듦)' : ''), now);
   return { code: 200, body: { status: 'OK', saved: true, period: period, replaced: !!r.doc } };
 }
 
@@ -211,7 +234,7 @@ async function get(d, canWrite, nowMs) {
   if (hasP && !ymOk(String(d.period))) return { code: 400, body: { status: 'REJECTED', error_code: 'BAD_PERIOD' } };
   const rs = await recentDocs(now, LIST_MONTHS);
   if (rs === null) return { code: 503, body: { status: 'ERROR', error_code: 'RNOTE_READ_FAILED' } };
-  const months = rs.map(function (x) { return { period: x.period, status: x.status }; });
+  const months = rs.docs.map(function (x) { return { period: x.period, status: x.status }; });
   let doc = null, period = '';
   if (hasP) {
     period = String(d.period);
@@ -219,11 +242,11 @@ async function get(d, canWrite, nowMs) {
     if (!r.ok) return { code: 503, body: { status: 'ERROR', error_code: 'RNOTE_READ_FAILED' } };
     doc = r.doc;
   } else {
-    const p = rs.find(function (x) { return x.status === 'draft'; });   // 오래된 순 첫 초안
+    const p = rs.docs.find(function (x) { return x.status === 'draft'; });   // 오래된 순 첫 초안
     if (p) { doc = p.doc; period = p.period; }
   }
-  const lc = rs.filter(function (x) { return x.status === 'confirmed'; }).pop() || null;
-  return { code: 200, body: { status: 'OK', period: period, doc: view(doc), latest: lc ? view(lc.doc) : null, months: months, can_write: !!canWrite } };
+  const lc = rs.docs.filter(function (x) { return x.status === 'confirmed'; }).pop() || null;
+  return { code: 200, body: { status: 'OK', period: period, doc: view(doc), latest: lc ? view(lc.doc) : null, months: months, unread: rs.unread, can_write: !!canWrite } };
 }
 // [확인] = 글 없이(지금 글 그대로 확정) · [고침] = text(고친 글로 확정). 봇 원본 bot_text는 그대로 남아 판33 학습 짝(원본 ↔ 확정본)이 된다.
 async function save(d, member, nowMs) {
@@ -255,4 +278,4 @@ async function save(d, member, nowMs) {
   return { code: 200, body: { status: 'OK', period: period, doc: view(doc), audit: au } };
 }
 
-module.exports = { PREFIX, FIRST, STAMP_FN, RULES_VER, TEXT_MAX, META_MAX, LIST_MONTHS, AMOUNT_RES, KEY_RES, MAIL_RE, NAME_COLS, CLIENT_COLS, kstYm, prevYm, addYm, ymOk, normText, skipName, cleanNames, nameRe, leakKinds, memberNames, peopleNames, clientNames, recentDocs, staleDraft, dueState, put, get, save, view };
+module.exports = { PREFIX, FIRST, STAMP_FN, RULES_VER, RULES_FP, rulesFp, TEXT_MAX, META_MAX, LIST_MONTHS, AMOUNT_RES, KEY_RES, MAIL_RE, NAME_COLS, CLIENT_COLS, kstYm, prevYm, addYm, ymOk, normText, skipName, cleanNames, nameRe, leakKinds, memberNames, peopleNames, clientNames, recentDocs, staleDraft, dueState, put, get, save, view };
