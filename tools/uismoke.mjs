@@ -15976,6 +15976,31 @@ try {
   const kSub = [!(await runSubP24(mutS('    if (p.snap) acBody.snap = p.snap;', ''))).ok, !(await runSubP24(mutS('ref: csApprRef(c, p, i), snap: (s.aw === "amt" ?', 'ref: csApprRef(c, p, i), snap: (false ?'))).ok];
   T('P1 판24-③ 재검토 화면: 변경계약 [상신] = 결재함 카드 요청(approval_create)에 사본 {1500·2027-03-31}·단계 appr.snap과 같은 값·본문 "변경 1,000→1,500원" · 결재 카드 줄 "승인하면 반영되는 값: 변경 계약금액 1,500원 · 변경 종료일 2027-03-31"(결재권자가 보는 값 = 서버가 묶는 값) · 결함 사본 2개(요청에 사본 안 실음·큐에 사본 안 넣음) = 모두 ✗',
     sub24.ok && kSub.every((v) => v === true), JSON.stringify({ sub24: sub24.info, kSub }));
+  // ③-4 3차 재검토: 배포 전 기기에 쌓인 사본 없는 상신 대기 줄 → 서버 400 SNAP_REQUIRED = 큐에서 빼고 단계 '미전송'(csApprDropped)·알림에 "새로 고친 뒤 다시 상신" · 409 CID_TAKEN 안내 ·
+  //   이미 승인된 사본 없는(또는 다른) 변경계약 카드 = 반영하지 않고 상신 기록을 지워 [상신]을 다시 엶(csApprTake — 60초 거절 되풀이 멈춤) · 사본 같은 카드·금액 아닌 단계는 종전대로 반영
+  const runFlushP24 = async (H, code) => {
+    const env = { alerts: [], dropped: [] };
+    const f = new Function('ENV', [(H.match(/  var SNAP_REQUIRED_MSG = "[^"\n]*";/) || [''])[0], 'var apprPendingCreates = [{ cid: "cq", mid: "u1", kind: "계약 단계", title: "[계약] 옛 대기", body: "", ref: "con:k|chg|0" }], apprFlushBusy = false;',
+      'function apprSavePending(){} function curMember(){ return { id: "u1" }; } function isAdmin(){ return false; } function apprRefresh(){} function apprToastShow(){} function alert(m){ ENV.alerts.push(String(m)); } function csApprDropped(ref, cid){ ENV.dropped.push(ref + "#" + cid); }',
+      'function gwCall(fn, body){ ENV.body = body; return Promise.resolve({ status: ' + (code === 'CID_TAKEN' ? 409 : 400) + ', body: { error_code: "' + code + '" } }); }', fnP24(H, 'apprFlushCreates'), 'return function(){ apprFlushCreates(); return function(){ return apprPendingCreates.length; }; };'].join('\n'))(env);
+    const left = f(); for (let i = 0; i < 4; i++) await tickP24(); env.left = left(); return env;
+  };
+  const fl1 = await runFlushP24(html, 'SNAP_REQUIRED'), fl2 = await runFlushP24(html, 'CID_TAKEN');
+  const flOk = fl1.left === 0 && fl1.dropped.join() === 'con:k|chg|0#cq' && !('snap' in (fl1.body || {})) && fl1.alerts.length === 1 && /SNAP_REQUIRED/.test(fl1.alerts[0]) && /새로 고친 뒤 단계 카드에서 다시 상신/.test(fl1.alerts[0])
+    && fl2.left === 0 && fl2.dropped.length === 1 && /같은 상신 번호를 다른 상신이 쓰고 있습니다/.test(fl2.alerts[0]);
+  const runTakeP24 = (H, sAw, itSnap) => {
+    const env = { toasts: [], applied: 0 };
+    const f = new Function('ENV', [(H.match(/  var CON_APPR_OLD_MSG = "[^"\n]*";/) || [''])[0], 'function apprToastShow(m){ ENV.toasts.push(String(m)); } function csApprApply(){ ENV.applied++; }', fnP24(H, 'csApprTake'),
+      'return function(aw, snap){ var s = { name: "변경계약", aw: aw, status: "open", appr: { cid: "c1", status: "대기", snap: { chg_amt: 1500, chg_end: "2027-03-31" } } }, p = { cur: 0, stages: [s] }; var ch = csApprTake({}, p, 0, { id: "ap1", status: "승인", snap: snap }); return { ch: ch, appr: s.appr }; };'].join('\n'))(env);
+    const r = f(sAw, itSnap); return { ch: r.ch, gone: !r.appr, applied: env.applied, toasts: env.toasts };
+  };
+  const tk1 = runTakeP24(html, 'amt', undefined), tk2 = runTakeP24(html, 'amt', { chg_amt: '1500', chg_end: '2027-03-31' }), tk3 = runTakeP24(html, 'amt', { chg_amt: '9999', chg_end: '2027-03-31' }), tk4 = runTakeP24(html, undefined, undefined);
+  const tkOk = tk1.ch === true && tk1.gone && tk1.applied === 0 && tk1.toasts.length === 1 && /옛 화면에서 올라와/.test(tk1.toasts[0]) && !tk2.gone && tk2.applied === 1 && tk2.toasts.length === 0
+    && tk3.gone && tk3.applied === 0 && !tk4.gone && tk4.applied === 1;
+  const kOld = [!(await (async () => { const a = await runFlushP24(mutS('((res.body && res.body.error_code === "SNAP_REQUIRED") ? "\\n" + SNAP_REQUIRED_MSG : "")', '""'), 'SNAP_REQUIRED'); return a.alerts.length === 1 && /새로 고친 뒤 단계 카드에서 다시 상신/.test(a.alerts[0]); })()),
+    (() => { const H2 = mutS('      delete s.appr; if (typeof apprToastShow === "function") apprToastShow(CON_APPR_OLD_MSG); return true;', '      return true;'); return runTakeP24(H2, 'amt', undefined).gone === false; })()];
+  T('P1 판24-③ 3차 재검토 화면: 배포 전 대기 줄(사본 없음) → 서버 400 SNAP_REQUIRED = 큐에서 뺌·단계 미전송(csApprDropped)·알림 "…새로 고친 뒤 단계 카드에서 다시 상신" · 409 CID_TAKEN = 큐에서 뺌·안내 · 승인 카드 사본 없음·다름 = 반영 안 함·상신 기록 지움(다시 상신 가능)·안내 1번 · 사본 같음·금액 아닌 단계 = 종전대로 반영(실행 — 실제 apprFlushCreates·csApprTake) · 결함 사본 2개 = 모두 ✗',
+    flOk && tkOk && kOld.every((v) => v === true), JSON.stringify({ fl1: { left: fl1.left, d: fl1.dropped, a: fl1.alerts }, fl2: fl2.alerts, tk1, tk2, tk3, tk4, kOld }));
   T('P1 판24-③ 화면: 계약 저장 400 CON_APPR_REQUIRED = "계약 저장이 거절됐습니다 … 다시 불러옵니다" 알림 1번 + 서버 값 다시 읽기 1번(실행 — 실제 doSaveContracts) · (검토 B9) 서버 오류 500 APPROVALS_READ_FAILED·502 = "저장되지 않았습니다 … 다시 불러옵니다" 알림 1번 + 다시 읽기 · 다른 400·200 = 알림 0·다시 읽기 0(종전) · 결재 대상 판정 두 벌(앱 csApprKindOf = 서버 _lib/conappr apprKindOf, 표본 ' + SP24.length + ' · 다름 0 · 결재 대상 ≥ 8) · 결함 사본 3개(거절 알림 걷음·5xx 알림 걷음·앱 판정표만 바꿈) = 모두 ✗',
     okS && par.diff === 0 && par.hits >= 8 && kS.every((v) => v === true), JSON.stringify({ okS, par, kS }));
 } catch (e) { console.log('  (P1 판24 검사 생략 — ' + e.message + ')'); fails++; }

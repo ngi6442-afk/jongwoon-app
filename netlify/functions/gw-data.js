@@ -681,7 +681,9 @@ async function handleSave(event, d, R) {
   // P1 판24-③ (원장 C095 · 옛 T424 — 재현됨): 계약 단계 결재 서버 강제 — 이번 저장에서 새로 '끝남'이 된 결재 대상 단계·새로 '승인'이 적힌 상신·같은 상신 번호의 사본 바뀜만 본다(_lib/conappr.js).
   //   직전 서버 문서에 이미 있는 어긋남은 그대로 통과(운영 11/14 백업 실측 0건) · 결재함 '승인' 항목이 있으면 통과 · 거절은 저장 통째(400 CON_APPR_REQUIRED — 앱은 알림 뒤 서버 값을 다시 읽음).
   //   직전 문서를 못 읽었으면 빈 문서로 보고 센다(더 닫힌 쪽 — 결재된 단계는 결재함 항목으로 통과). 결재함을 못 읽으면 500(통과시키지 않음)
+  let conOrig = [];   // 3차 재검토 B1(덧대기): 승인된 변경계약이 있는 계약의 원계약 금액·준공일 칸 바뀜 — 감사 줄만(값 없음 · 막지 않음)
   if (col === 'contracts') {
+    try { conOrig = CONAPPR.origChanged(oldItems, doc.items); } catch (e) { conOrig = []; }
     const caRows = CONAPPR.scan(oldItems, doc.items);   // 직전을 못 읽었으면 oldItems = [](위 읽기) — 모든 결재 대상 끝남·승인을 결재함과 대조
     if (caRows.length) {
       const rdCa = await approvalsDoc(store(DATA));
@@ -719,6 +721,7 @@ async function handleSave(event, d, R) {
     if (recDelKept) ev.push({ op: '삭제 보호', id: '-', t: '비관리자 저장이 처리된(입금·발행·검수) 기성 ' + recDelKept + '건을 지우려 해 서버가 원본을 남겼습니다(v464 — 지우기는 관리자만)' });
     if (obPurged) ev.push({ op: '정리', id: '', t: '부동산 정리 ' + obPurged + '건(마감 ' + BIDS_KEEP_DAYS + '일 경과 신규·패스 — 저장 때)' });   // v444
     if (vehDueKept) ev.push({ op: '만기일 보호', id: '-', t: '낡은 사본이 지시 완료 창 만기일 ' + vehDueKept + '칸을 바꾸기 전 날짜로 되돌리려 해 서버 값을 지켰습니다 — 그 사람의 앱 화면이 낡은 사본입니다' });   // P1 판2 검토(S1)
+    conOrig.slice(0, 20).forEach(function (x) { ev.push({ op: '원계약 칸 바뀜', id: x.cid, t: '승인된 변경계약이 있는 계약의 원계약 ' + x.f.map(function (k) { return k === 'amount' ? '금액' : '준공일'; }).join('·') + ' 칸이 바뀜(값은 적지 않음 — 유효 금액·종료일은 승인된 변경계약 값)' }); });   // P1 판24-③ 3차 재검토 B1
     if (ev.length) await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: col, ev: ev });
   } catch (e) {}
   // 문서함 등재 결재 훅(v314): 비관리자의 '대기' 문서마다 결재함에 '문서함 등재' 카드를 서버가 대신 기안(by=등재한 직원, ref 'doc:'+id, cid 멱등).
@@ -4404,8 +4407,22 @@ async function handleApprovalCreate(event, d, R) {
     if (myT !== 'pm') return apprSelfDecideDeny(myT, R);   // 전결 = tier pm만(v321, 명시 등급 기준)
     if (APPR_SELF_DECIDE_EXCLUDE[kind0]) return jr(400, { status: 'REJECTED', error_code: 'SELF_DECIDE_KIND', request_id: R });
   }
+  // P1 판24-③ 3차 재검토(원천): 금액·종료일이 걸린 변경계약 단계(변경계약 줄 chg · 또는 계약 단계 aw 'amt')의 상신인데 사본(snap)이 없으면 받지 않는다 —
+  //   사본 없는 카드는 승인돼도 계약 반영이 영영 거절돼(SNAP_UNBOUND) 멈췄다(옛 캐시 화면·배포 전 기기에 쌓인 상신 대기 줄). 앱은 4xx를 '미전송'으로 되돌려 다시 상신하게 한다(옛 판도 같은 길 — 카드가 안 생김)
+  if (refRaw.indexOf('con:') === 0 && !(d.snap && typeof d.snap === 'object' && !Array.isArray(d.snap))) {
+    const mR = /^con:([^|]+)\|([^|]+)\|(\d+)$/.exec(refRaw.slice(0, 60));
+    let needSnap = !!(mR && mR[2] === 'chg');
+    if (mR && !needSnap) {
+      const rcR = await blobGet(store(DATA), colKey('contracts'));
+      const ccR = (rcR.ok && rcR.data && Array.isArray(rcR.data.items)) ? rcR.data.items.find(function (x) { return x && String(x.id) === mR[1]; }) : null;
+      const ppR = (ccR && Array.isArray(ccR.pipes)) ? ccR.pipes.find(function (q) { return q && q.key === mR[2]; }) : null;
+      const ssR = (ppR && Array.isArray(ppR.stages)) ? ppR.stages[Number(mR[3])] : null;
+      needSnap = !!(ssR && ssR.aw === 'amt');
+    }
+    if (needSnap) return jr(400, { status: 'REJECTED', error_code: 'SNAP_REQUIRED', hint: '화면을 새로 고친 뒤 다시 상신해 주세요(변경 금액·종료일 사본이 없는 옛 화면의 상신)', request_id: R });
+  }
   const r = await apprCreateItem(store(DATA), c.member, { kind: kind0, title: title, body: d.body, ref: d.ref, cid: d.cid, boss_up: !!d.boss_up, self_decide: selfDecide, tc: tc, snap: d.snap });
-  if (!r.ok) return jr((r.http === 400 || r.http === 403) ? r.http : 500, { status: r.http === 400 ? 'REJECTED' : (r.http === 403 ? 'FORBIDDEN' : 'ERROR'), error_code: r.code, request_id: R });
+  if (!r.ok) return jr((r.http === 400 || r.http === 403 || r.http === 409) ? r.http : 500, { status: r.http === 400 ? 'REJECTED' : (r.http === 403 ? 'FORBIDDEN' : (r.http === 409 ? 'CONFLICT' : 'ERROR')), error_code: r.code, request_id: R });
   const out = { status: 'OK', id: r.id, request_id: R };
   if (r.dedup) out.dedup = true;
   if (r.updated) out.updated = true;
@@ -4415,6 +4432,8 @@ async function handleApprovalCreate(event, d, R) {
 // 상신 본체 — 사용자 기안(handleApprovalCreate)과 서버 내부 훅(문서함 등재 자동 상신, v314)이 같은 규칙을 탄다:
 // cid 멱등·dupOpenRef(ab: 정정)·등급 스냅샷·자가복구·감사로그·푸시 라우팅. 두 벌로 갈라지면 등급표·통지가 한쪽만 바뀌는 사고가 난다.
 // 입력 검증(title 비어있음·시스템 kind)은 호출자 몫. member = 기안자(훅에서는 등재한 직원). 반환 {ok,id,dedup|updated} / {ok:false,code}
+// P1 판24-③ 3차 재검토 B2: cid 멱등은 '같은 기안자·같은 대상(ref)의 재전송'만 흡수 — 남의 번호를 먼저 써서 그 사람의 상신을 엉뚱한 카드로 묶는 길을 막음
+function apprCidTaken(dup, member, o) { const rf = String(o.ref || '').slice(0, 60); return !!dup && ((dup.by && dup.by.id) !== (member && member.id) || (!!rf && String(dup.ref || '') !== rf)); }   // 대상 없이 온 재전송(ref 생략)은 같은 기안자면 종전대로 흡수
 async function apprCreateItem(st, member, o) {
   const title = String(o.title || '').trim().slice(0, 120);
   const kind0 = String(o.kind || '일반').slice(0, 20);
@@ -4425,6 +4444,7 @@ async function apprCreateItem(st, member, o) {
   const cid = String(o.cid || '').slice(0, 48);
   if (cid) {
     const dup = doc.items.find(function (x) { return x && x.cid === cid; });
+    if (dup && apprCidTaken(dup, member, o)) return { ok: false, code: 'CID_TAKEN', http: 409 };   // P1 판24-③ 3차 재검토 B2: 같은 번호를 다른 기안자·다른 대상이 먼저 차지 — 흡수하지 않음
     if (dup) return { ok: true, id: dup.id, dedup: true, self_decided: dup.self_decided === true };
   }
   // 운반일지(ref ab:날짜)는 자동 기안(워커)과 수동 상신이 같은 날짜에 겹친다 — 열린(대기·보류) 동일 ref는
@@ -4462,6 +4482,7 @@ async function apprCreateItem(st, member, o) {
   const fresh = rd2.ok ? rd2.doc : doc;
   if (cid) {
     const dup2 = fresh.items.find(function (x) { return x && x.cid === cid; });
+    if (dup2 && apprCidTaken(dup2, member, o)) return { ok: false, code: 'CID_TAKEN', http: 409 };
     if (dup2) return { ok: true, id: dup2.id, dedup: true, self_decided: dup2.self_decided === true };
   }
   const dr2 = dupOpenRef(fresh.items);

@@ -4740,7 +4740,7 @@
         apprPendingCreates.splice(idx, 1); apprSavePending();
         if (String(p.ref || "").indexOf("con:") === 0 && typeof csApprDropped === "function"){ try { csApprDropped(p.ref, p.cid); } catch(e){} }   // v384: 계약 단계 상신이면 카드에 [상신] 다시
         if (String(p.ref || "").indexOf("stmt:") === 0 && typeof stmtApprDropped === "function"){ try { stmtApprDropped(p.ref); } catch(e){} }   // 29 판⑤: 월말명세서 보고 — 보고·결제 줄이 '보고 없음'을 다시 알리게
-        alert("대표 상신 실패: " + String(p.title || "").slice(0, 30) + " (" + ((res.body && res.body.error_code) || res.status) + ")");
+        alert("대표 상신 실패: " + String(p.title || "").slice(0, 30) + " (" + ((res.body && res.body.error_code) || res.status) + ")" + ((res.body && res.body.error_code === "SNAP_REQUIRED") ? "\n" + SNAP_REQUIRED_MSG : "") + ((res.body && res.body.error_code === "CID_TAKEN") ? "\n같은 상신 번호를 다른 상신이 쓰고 있습니다 — 단계 카드에서 다시 상신해 주세요." : ""));   // P1 판24-③ 3차 재검토
         apprFlushCreates();
       }
     }).catch(function(){
@@ -14325,6 +14325,8 @@
   }
   var contractsPending=false;   // 저장 디바운스(1.4s) 사이 재로드가 편집을 덮지 않게 — bids/quotes와 동일 패턴
   var CON_APPR_REJECT_MSG = "계약 저장이 거절됐습니다 — 결재(계약 단계·청구 검수)가 끝나지 않은 단계를 완료로 바꾸었거나, 결재함에서 승인되지 않은 상신을 승인으로 적은 변경이 들어 있습니다.\n서버에 저장된 값으로 다시 불러옵니다. 이 저장에 같이 고친 내용이 있으면 다시 입력해 주세요.\n결재 대상 단계는 단계 카드의 [상신] → 결재함 승인으로 넘어갑니다.";   // P1 판24-③
+  var CON_APPR_OLD_MSG = "이 변경계약 상신은 옛 화면에서 올라와 승인돼도 계약에 반영할 수 없습니다 — 단계 카드에서 다시 상신해 주세요(결재함의 그 카드는 효과 없음).";   // P1 판24-③ 3차 재검토
+  var SNAP_REQUIRED_MSG = "변경계약 상신이 받아지지 않았습니다 — 화면을 새로 고친 뒤 단계 카드에서 다시 상신해 주세요(변경 금액·종료일 사본이 없는 옛 화면의 상신).";   // 3차 재검토(서버 400 SNAP_REQUIRED)
   var CON_SAVE_FAIL_MSG = "계약이 서버에 저장되지 않았습니다(서버 오류) — 서버에 저장된 값으로 다시 불러옵니다. 방금 고친 내용은 잠시 뒤 다시 입력해 주세요.";   // P1 판24-③ 검토 B9
   function scheduleContractSave(){ contractsPending=true; if(contractSaveTimer) clearTimeout(contractSaveTimer); contractSaveTimer=setTimeout(doSaveContracts, 1400); }
   function mergeContracts(local, remote){
@@ -15720,7 +15722,8 @@
     return i >= w.b ? n : 0;
   }
   function csTaskChg(t){ var c = (t && t.proc_id) ? findProc(t.proc_id) : null, p = c ? csPipeOf(c, t.pipe) : null, s = p ? p.stages[t.stage_i] : null; return !!(s && s.aid === "change_contract"); }   // v402 검토 3: 7번 고정 대안(main 줄 변경계약)도 지시 탭 서류 버튼 숨김
-  function csApprRef(c, p, i){ return "con:" + c.id + "|" + p.key + "|" + i; }  function csApprSubmit(c, p, i){
+  function csApprRef(c, p, i){ return "con:" + c.id + "|" + p.key + "|" + i; }
+  function csApprSubmit(c, p, i){
     var s = p.stages[i], kind = csApprKindOf(c, s); if (!kind) return false;
     var cid = "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), amt = conAmtEff(c);
     apprPendingCreates.push({ cid: cid, mid: myId(), kind: kind, title: ("[계약] " + (c.client || c.label || "") + " · " + csStageLabel(s)).slice(0, 120),
@@ -15863,6 +15866,11 @@
   // 결재함 항목 1건을 단계에 옮긴다 — 상태가 바뀌면 true. 승인이고 현재 단계면 진행(csApprApply)
   function csApprTake(c, p, i, it){
     var s = p.stages[i], st = it.status || "대기", changed = false;
+    // P1 판24-③ 3차 재검토: 변경계약 승인 카드에 사본이 없거나(옛 화면·배포 전 대기 줄로 올라온 상신) 단계 사본과 다르면 서버가 반영을 받지 않는다(SNAP_UNBOUND) —
+    //   반영하지 않고 상신 기록을 지워 [상신]을 다시 연다(60초마다 거절 알림이 되풀이되던 멈춤 길). 승인 카드는 결재함에 남지만 계약에는 효과 없음
+    if (st === "승인" && s.aw === "amt" && s.appr && s.appr.snap && !(it.snap && String(it.snap.chg_amt == null ? "" : it.snap.chg_amt) === String(s.appr.snap.chg_amt == null ? "" : s.appr.snap.chg_amt) && String(it.snap.chg_end == null ? "" : it.snap.chg_end) === String(s.appr.snap.chg_end == null ? "" : s.appr.snap.chg_end))){
+      delete s.appr; if (typeof apprToastShow === "function") apprToastShow(CON_APPR_OLD_MSG); return true;
+    }
     if (st !== s.appr.status || (it.id && !s.appr.id)){ s.appr.status = st; s.appr.id = it.id || s.appr.id; s.appr.reason = it.reason || ""; s.appr.decided_by = (it.decided_by && it.decided_by.name) || ""; s.appr.decided_at = (it.decided_at || "").slice(0, 10); changed = true; }
     if (st === "승인" && s.status !== "done" && s.status !== "skipped" && i === p.cur) csApprApply(c, p, i);
     return changed;
@@ -15876,7 +15884,7 @@
       if (sc) csSyncFromServer(c, sc);
       var p = (c.pipes || []).filter(function(q){ return q.key === cp[1]; })[0], i = Number(cp[2]);
       if (!p || !p.stages[i] || !p.stages[i].appr){ if (typeof apprToastShow === "function") apprToastShow("계약 단계에 상신 기록이 없습니다 — 계약 탭 단계·서류 탭에서 동기화됩니다"); return; }
-      if (csApprTake(c, p, i, { id: it.id, status: it.status, reason: it.reason, decided_by: it.decided_by || { name: myName() }, decided_at: it.decided_at || todayStr() })){ c.updated = todayStr(); csSaveNow(); renderContracts(); }
+      if (csApprTake(c, p, i, { id: it.id, status: it.status, reason: it.reason, decided_by: it.decided_by || { name: myName() }, decided_at: it.decided_at || todayStr(), snap: it.snap })){   // 3차 재검토: 카드 사본도 넘김(csApprTake 대조) c.updated = todayStr(); csSaveNow(); renderContracts(); }
     }).catch(function(){});
   }
   // 승인된 단계를 진행 — 지시를 승인 완료로 닫고 advanceProc(다음 단계 생성·청구면 기성 등록). 지시가 없으면 단계만 진행(청구면 기성 연동은 같게)

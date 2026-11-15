@@ -73,7 +73,40 @@ function scan(oldItems, newItems) {
       });
     });
   });
+  // 3차 재검토 B1: 유효 금액·종료일을 내던 승인된 변경계약 차수(직전 서버 값)를 지우거나 '건너뜀'으로 바꾸거나 그 자리를 다른 단계로 바꾸면 결재 없이 원계약 값으로 돌아간다 — 거절(관리자도).
+  //   되돌리려면 새 변경계약을 상신. 계약 자체를 지운 것(del 1·목록에서 빠짐)은 대상 아님
+  const newBy = {};
+  (Array.isArray(newItems) ? newItems : []).forEach(function (c) { if (isObj(c) && c.id != null) newBy[String(c.id)] = c; });
+  Object.keys(oldBy).forEach(function (id) {
+    const o = oldBy[id], c = newBy[id];
+    if (!isObj(o) || !c || c.del === 1) return;
+    (Array.isArray(o.pipes) ? o.pipes : []).forEach(function (op) {
+      if (!isObj(op) || !Array.isArray(op.stages)) return;
+      const p = Array.isArray(c.pipes) ? c.pipes.find(function (q) { return isObj(q) && q.key === op.key; }) : null;
+      op.stages.forEach(function (os, i) {
+        if (!(isObj(os) && os.aw === 'amt' && os.status === 'done' && isObj(os.appr) && os.appr.status === '승인' && isObj(os.appr.snap))) return;
+        const s = (p && Array.isArray(p.stages)) ? p.stages[i] : null;
+        if (!isObj(s) || s.status === 'skipped' || stageId(s) !== stageId(os)) rows.push({ why: 'APPR_REVOKED', ref: 'con:' + id + '|' + op.key + '|' + i, appr: null, kind: '', hard: true, cid: id, pipe: String(op.key || ''), i: i });
+      });
+    });
+  });
   return rows;
+}
+// 3차 재검토 B1(덧대기 — 막지 않음): 승인된 변경계약 차수가 있는 계약에서 원계약 금액·준공일 칸(contract_info.amount·d3)이 바뀐 계약 — 감사 줄용(값 없음). 반환 [{cid, f:['amount'|'d3']}]
+function origChanged(oldItems, newItems) {
+  const oldBy = {}, out = [];
+  (Array.isArray(oldItems) ? oldItems : []).forEach(function (o) { if (o && o.id != null) oldBy[String(o.id)] = o; });
+  (Array.isArray(newItems) ? newItems : []).forEach(function (c) {
+    if (!isObj(c) || c.id == null) return;
+    const o = oldBy[String(c.id)]; if (!isObj(o)) return;
+    const hasAppr = (Array.isArray(o.pipes) ? o.pipes : []).some(function (p) { return isObj(p) && Array.isArray(p.stages) && p.stages.some(function (s) { return isObj(s) && s.aw === 'amt' && s.status === 'done' && isObj(s.appr) && s.appr.status === '승인'; }); });
+    if (!hasAppr) return;
+    const a = isObj(o.contract_info) ? o.contract_info : {}, b = isObj(c.contract_info) ? c.contract_info : {}, f = [];
+    if (String(a.amount == null ? '' : a.amount) !== String(b.amount == null ? '' : b.amount)) f.push('amount');
+    if (String(a.d3 == null ? '' : a.d3) !== String(b.d3 == null ? '' : b.d3)) f.push('d3');
+    if (f.length) out.push({ cid: String(c.id), f: f });
+  });
+  return out;
 }
 // 거절할 줄 — rows(scan 결과) 중 결재함에 '승인' 항목이 없는 것 + 사본 바뀜(늘 거절). 반환 [{cid, pipe, i, why}] (이름·금액 없음)
 function judge(rows, apItems) {
@@ -85,4 +118,4 @@ function judge(rows, apItems) {
   });
   return out;
 }
-module.exports = { CON_APPR_KINDS, apprKind, apprKindOf, ownKind, chgAmtMoved, chgTermMoved, scan, judge, approvedItem };
+module.exports = { CON_APPR_KINDS, apprKind, apprKindOf, ownKind, chgAmtMoved, chgTermMoved, scan, judge, approvedItem, origChanged };
