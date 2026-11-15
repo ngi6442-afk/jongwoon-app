@@ -14564,7 +14564,7 @@ try {
   const r71 = chk71(D71);
   const mu71 = (k, f) => chk71(Object.assign({}, D71, { [k]: f(D71[k]) })).ok;
   const M71 = [mu71('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v473 (')), mu71('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v473'")),
-    mu71('ft', (s) => s.split('`guessVendor`').join('guessVendor')), mu71('tl', (s) => { const k = s.lastIndexOf('`stmtread_d_check`'); return s.slice(0, k) + 'stmtread_d_check' + s.slice(k + 18); }),
+    mu71('ft', (s) => s.split('`guessVendor`').join('guessVendor')), mu71('tl', (s) => { const a = s.indexOf('\n## v474 '), e = s.indexOf('\n## ', a + 5), k = s.lastIndexOf('`stmtread_d_check`', e < 0 ? s.length : e); return /* v478: 이 판 절 안으로 묶음 */ s.slice(0, k) + 'stmtread_d_check' + s.slice(k + 18); }),
     mu71('man', (s) => s.split('원본 한꺼번에 넣기·첨부 원본').join('원본 한꺼번에')), mu71('cl', (s) => s.split('(v474 — 29 판⑥)').join('(29 판⑥)'))];
   T('v474 문서·판 번호(정확 검사): FEATURES 기준 v474 (2026-11-14)·v474 절(stmt_drop 6동작·drop_ids·stmtfile·stmtdrop·guessVendor·servertest 91·29 판⑥·실측 18개) · TESTLIST v474(화면 칸 ≥ 3 · PM 낱말 0 · 게이트 [x] 16종) · MANUAL 원본 한꺼번에 넣기·첨부 원본(옛 "결과는 버려집니다" 없음) · CLAUDE.md 판⑥ 줄 · sw jw-shell-v474 · 결함 사본 ' + M71.length + '개 = 모두 ✗',
     r71.ok && M71.every((x) => x === false), JSON.stringify({ info: r71.info, M71 }));
@@ -15067,8 +15067,8 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
     const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check'];
     const mF = ['`eduRegNeed(m, y, sup)`', '`eduNextFor`', '제27조①', '제27조②', '제1호의2', '8시간'].filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v477 \(2026-11-15\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length >= 3 && !cb.some((l) => /\(PM/.test(l))
-      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && /SHELL_CACHE = 'jw-shell-v477'/.test(d.sw)
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 477 /* v478: 기준 줄·sw = 이 판 이상 */ && ftv.length > 0 && mF.length === 0 && cb.length >= 3 && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 477
       && d.mn.indexOf('관리감독자 정기교육도 절반(연 8시간)') > 0 && d.mn.indexOf('관리감독자 16시간은 그대로') < 0 && !/eduRegNeed/.test(d.mn);
     return { ok, info: { mF, cb: cb.length, gate: gate.length } };
   };
@@ -15079,6 +15079,27 @@ try {
   T('v477 문서·판 번호(정확 검사) + 안전 설정 창 안내 글: FEATURES 기준 v477 (2026-11-15)·v477 절(함수·조문) · TESTLIST v477 게이트 [x] 12종·PM 칸 0 · MANUAL 관리감독자 절반(옛 문장 0·내부 이름 0) · sw jw-shell-v477 · 창 안내 글 · 결함 사본 ' + MD77.length + '개 = 모두 ✗',
     rD77.ok && st77 && MD77.every((v) => v === false), JSON.stringify({ r: rD77.info, st: st77, mut: MD77 }));
 } catch (e) { console.log('  (v477 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v478(29 판⑥-2 계산서뿐인 원본 = 계산서 품목 줄을 명세로, PM 11/15 덕천): 실행 검사는 stmtread_d ⑥·⑧ · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '478 이상'으로 풀 것
+try {
+  const rd78 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D78 = { ft: rd78('FEATURES.md'), tl: rd78('TESTLIST.md'), sw: rd78('sw.js'), mn: rd78('MANUAL.html') };
+  const chkD78 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v478 (11/15)', '\n### '), tlv = cut(d.tl, '\n## v478 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
+    const GATE = ['uismoke', 'servertest', 'stmtread_a_check', 'stmtread_b_check', 'stmtread_c_check', 'stmtread_d_check'];
+    const mF = ['`buildPrompt(vendor, ym, invOnly)`', '`INV_MASK`', '`invOnly`', '`ONLY_INVOICE`', '덕천'].filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v478 \(2026-11-15\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length >= 3 && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && /SHELL_CACHE = 'jw-shell-v478'/.test(d.sw)
+      && d.mn.indexOf('계산서뿐인 원본') > 0 && d.mn.indexOf('계산서 쪽만 있는 스캔은 첨부로만 남습니다') < 0 && !/invOnly|INV_MASK/.test(d.mn);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length } };
+  };
+  const rD78 = chkD78(D78), muD78 = (k, f) => chkD78(Object.assign({}, D78, { [k]: f(D78[k]) })).ok;
+  const MD78 = [muD78('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v477 (')), muD78('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v477'")), muD78('mn', (s) => s.replace('계산서뿐인 원본', '계산서 쪽만 있는 스캔은 첨부로만 남습니다')), muD78('ft', (s) => s.split('`INV_MASK`').join('INV_MASK'))];
+  T('v478 문서·판 번호(정확 검사): FEATURES 기준 v478 (2026-11-15)·v478 절(함수·덕천) · TESTLIST v478 게이트 [x]·PM 칸 0 · MANUAL 계산서뿐인 원본(옛 문장 0·내부 이름 0) · sw jw-shell-v478 · 결함 사본 ' + MD78.length + '개 = 모두 ✗',
+    rD78.ok && MD78.every((v) => v === false), JSON.stringify({ r: rD78.info, mut: MD78 }));
+} catch (e) { console.log('  (v478 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

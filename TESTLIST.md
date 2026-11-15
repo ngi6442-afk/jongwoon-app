@@ -1335,3 +1335,9 @@
 - [ ] (관리자) 감면 적용 연도를 넣은 회사의 관리감독자 지정 직원 — 안전 › 체크 칸 정기교육 칸의 기준이 8시간으로 바뀌고 근거 글에 '무재해 감면 적용'이 나오는지
 - [ ] (AI 시험 화면 대상) 감면 연도 저장 → 관리감독자 정기교육 칸 n/8시간(PC·375px)
 - [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` 전부 통과 + node --check(sw) — 숫자는 커밋 메시지
+
+## v478 — 체크 29 월말명세서 판⑥-2: 계산서뿐인 원본 = 계산서 품목 줄을 명세로(서버만 · 운영 데이터 변경 없음 · 화면 변경 없음)
+- [ ] (권민지) 덕천세차장 10월 원본(같은 파일)을 월 목록 상자에 다시 넣기 → 1~3분 뒤 덕천 상세를 열면 계산서 품목 3줄(오일교환·오일필터·구리스, 합계 566,500)로 채워지는지 확인하고 [저장]
+- [x] (AI) 실물 덕천 PDF(운영 첨부 사본)로 보낼 그림 확인 — 계산서뿐 판정 · 공급자·받는자 칸 흰색 · 품목 표·합계 남음 — ✓ AI 11/15
+- [x] (AI) `stmtread_d_check` ⑥ 결함 사본 5 · ⑧ 3건 · `uismoke` v477 문서 검사를 이 판 이상으로 풀고 v478 문서·판 번호 정확 검사 — ✓ AI 11/15
+- [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` 전부 통과 + node --check(함수·_lib·sw) — 숫자는 커밋 메시지
