@@ -195,7 +195,8 @@ async function handleLogin(st, d, R, event) {
     const fails = (lk.ok && lk.data && lk.data.fails ? lk.data.fails : 0) + 1;
     const rec = fails >= LOCK_THRESHOLD ? { fails: 0, until: now + LOCK_MS } : { fails: fails };
     await blobSet(st, lockKey(name), rec);
-    if (mlk) { const mf = (mlk.r.ok && mlk.r.data && mlk.r.data.fails ? mlk.r.data.fails : 0) + 1; await blobSet(st, mlk.key, mf >= LOCK_THRESHOLD ? { fails: 0, until: now + LOCK_MS } : { fails: mf }); }
+    // 재검토 B2: 회원 칸을 못 읽었으면 덮지 않음(쌓인 실패 수가 1로 덮이던 것) — 입력 칸 잠금은 종전대로
+    if (mlk && (mlk.r.ok || mlk.r.code === 'NOT_FOUND')) { const mf = (mlk.r.ok && mlk.r.data && mlk.r.data.fails ? mlk.r.data.fails : 0) + 1; await blobSet(st, mlk.key, mf >= LOCK_THRESHOLD ? { fails: 0, until: now + LOCK_MS } : { fails: mf }); }
     // Blobs엔 원자적 증가가 없어 병렬 대량 시도가 잠금 카운터를 우회한다 — 실패마다 고정 지연으로 완전탐색 비용을 올림
     await new Promise(function (r) { setTimeout(r, 600); });
     return GEN();

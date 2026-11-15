@@ -4403,7 +4403,7 @@ async function handleApprovalCreate(event, d, R) {
     if (myT !== 'pm') return apprSelfDecideDeny(myT, R);   // 전결 = tier pm만(v321, 명시 등급 기준)
     if (APPR_SELF_DECIDE_EXCLUDE[kind0]) return jr(400, { status: 'REJECTED', error_code: 'SELF_DECIDE_KIND', request_id: R });
   }
-  const r = await apprCreateItem(store(DATA), c.member, { kind: kind0, title: title, body: d.body, ref: d.ref, cid: d.cid, boss_up: !!d.boss_up, self_decide: selfDecide, tc: tc });
+  const r = await apprCreateItem(store(DATA), c.member, { kind: kind0, title: title, body: d.body, ref: d.ref, cid: d.cid, boss_up: !!d.boss_up, self_decide: selfDecide, tc: tc, snap: d.snap });
   if (!r.ok) return jr((r.http === 400 || r.http === 403) ? r.http : 500, { status: r.http === 400 ? 'REJECTED' : (r.http === 403 ? 'FORBIDDEN' : 'ERROR'), error_code: r.code, request_id: R });
   const out = { status: 'OK', id: r.id, request_id: R };
   if (r.dedup) out.dedup = true;
@@ -4498,6 +4498,9 @@ async function apprCreateItem(st, member, o) {
   const item = { id: 'ap' + crypto.randomBytes(6).toString('hex'), cid: cid || undefined, kind: kind0, to: (kind0 === '운반일지' ? 'boss' : undefined),
     title: title, body: String(o.body || '').slice(0, 500), ref: refIn,
     by: { id: member.id, name: member.name }, created: new Date().toISOString(), status: '대기' };
+  // P1 판24-③ 재검토(11/15 — 원천): 계약 단계 상신(ref 'con:')의 변경 금액·종료일 사본 — 서버가 받은 값으로 카드에 적고(결재권자 화면에 보임) 이후 바꾸는 길이 없다(cid 멱등은 기존 카드 그대로·정정 흡수는 ab:·stmt:만).
+  //   계약 저장 대조(_lib/conappr ④)가 단계의 appr.snap을 이 값과 맞춘다
+  if (refIn.indexOf('con:') === 0 && o.snap && typeof o.snap === 'object' && !Array.isArray(o.snap)) item.snap = { chg_amt: String(o.snap.chg_amt == null ? '' : o.snap.chg_amt).slice(0, 30), chg_end: String(o.snap.chg_end == null ? '' : o.snap.chg_end).slice(0, 20) };
   if (grade) {
     item.grade = grade;
     item.to = (grade === 3) ? 'boss' : 'pm';   // ①·② 1단계는 PM 큐, ③은 즉시 대표 큐(v308 운반일지 하드코딩의 일반화)

@@ -7,6 +7,7 @@
 //   ① 단계가 이번 저장에서 새로 '끝남(done)'이 됐고 그 단계가 결재 대상이면(앱 csApprKindOf와 같은 판정 · 시나리오 계약만) → 그 단계 ref의 결재함 항목이 '승인'이어야 한다
 //   ② 단계의 상신 기록(appr)이 이번 저장에서 새로 '승인'이 됐으면(직전 서버 값이 같은 상신 번호로 승인이 아님) → 같은 결재함 항목이 '승인'이어야 한다
 //   ③ 같은 상신 번호(appr.cid)인데 상신 때 사본(appr.snap — 변경 금액·종료일)이 바뀌었으면 거절(승인 뒤·대기 중에 금액을 바꿔치기 하는 길 — 재상신은 새 번호)
+//   ④ (재검토 11/15 — 원천) 변경계약 단계(aw 'amt')의 승인 사본은 결재함 항목에 서버가 상신 때 받아 둔 사본(approval_create snap — 승인 뒤 못 바꿈)과 같아야 한다 — ③은 보조
 //   결재함 항목 대조 = ref 'con:<계약 id>|<줄 key>|<단계 번호>' · 상신 번호(cid) 같음(번호 없는 승인은 대조 불가 — 앱은 v384부터 늘 붙임) · 단계 고유 종류와 항목 종류 같음 · 상태 '승인'
 //   검토(11/15) 반영: 직전에 번호가 있던 상신의 번호를 비우거나 빼면 바뀐 것으로 봄 · 사본 비교는 번호를 비운 것도 같은 상신으로 · 승인 표시 종류 = 단계 고유 종류(앱이 보낸 appr.kind 아님) ·
 //   그 자리 단계의 정체(이름·aid·ak·aw)가 직전과 다르면 직전 단계 없음으로 대조
@@ -61,6 +62,14 @@ function scan(oldItems, newItems) {
         if (a && a.status === '승인' && !(oa && oa.status === '승인' && aCid === oCid)) rows.push(Object.assign({ why: 'APPR_CLAIM', ref: ref, appr: a, kind: own, hard: !own }, at));
         // 사본: 같은 상신(번호 같음 — 새 번호가 비었으면 직전 상신과 같은 것으로 봄)인데 금액·종료일 사본이 다르면 거절(재상신은 새 번호)
         if (a && oa && (aCid === oCid || !aCid) && snapKey(oa) !== snapKey(a)) rows.push(Object.assign({ why: 'SNAP_CHANGED', ref: ref, appr: a, kind: '', hard: true }, at));
+        // 재검토(11/15 A — 원천): 유효 금액·종료일을 내는 변경계약 단계(aw 'amt' · 승인 표시 · 사본 있음 — 앱 conChgEff가 읽는 꼴)는 사본이 **결재함 항목의 사본**과 같아야 한다.
+        //   같은 자리의 직전 서버 값(정체·번호와 무관한 날 자리)과 승인·번호·사본이 모두 같으면 이미 대조된 상태라 건너뜀(결재함 읽기 아낌) — 그 밖은 다 대조(이름 바꿈·지웠다 다시 넣기·번호 돌리기 등 몇 번에 나눠도)
+        //   사본이 없는 옛 결재 항목은 대조할 사본이 없으므로 '직전 서버 값과 같을 때'(= 위 건너뜀)만 통과
+        if (s.aw === 'amt' && a && a.status === '승인' && isObj(a.snap)) {
+          const pa = (os0 && isObj(os0.appr)) ? os0.appr : null;
+          const prevSame = !!(pa && pa.status === '승인' && String(pa.cid || '') === aCid && snapKey(pa) === snapKey(a));
+          if (!prevSame) rows.push(Object.assign({ why: 'SNAP_UNBOUND', ref: ref, appr: a, kind: own, bind: true, hard: !own }, at));
+        }
       });
     });
   });
@@ -70,7 +79,9 @@ function scan(oldItems, newItems) {
 function judge(rows, apItems) {
   const out = [];
   rows.forEach(function (r) {
-    if (r.hard || !approvedItem(apItems, r.ref, r.appr, r.kind)) out.push({ cid: r.cid, pipe: r.pipe, i: r.i, why: r.why });
+    const it = r.hard ? null : approvedItem(apItems, r.ref, r.appr, r.kind);
+    const ok = !!it && (!r.bind || (isObj(it.snap) && snapKey(it) === snapKey(r.appr)));   // 재검토 A: 사본 묶음 — 결재함 항목 사본(서버가 상신 때 받은 값)과 같아야
+    if (!ok) out.push({ cid: r.cid, pipe: r.pipe, i: r.i, why: r.why });
   });
   return out;
 }

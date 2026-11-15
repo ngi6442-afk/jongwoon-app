@@ -83,6 +83,7 @@ async function gather(period) {
   m.members = (ms && !ms.unavailable) ? ms.filter(isObj) : null;
   m.devices = await listVals(su, 'device:');
   m.locks = await listVals(su, 'lock:');
+  m.mlocks = await listVals(su, 'lockm:');   // P1 판24-② 재검토 B1 회원 칸 잠금
   const subs = await getOr(sd, 'push:subs', { members: {} });
   m.subs = subs.ok && isObj(subs.data) && isObj(subs.data.members || {}) ? (subs.data.members || {}) : null;
   m.usage = {};
@@ -142,9 +143,15 @@ function judge(period, nowMs, m) {
   });
   // 2 잠금 — 기준 없음(숫자만). 잠금 기록은 성공 로그인 때 지워지므로 '남아 있는 기록' 기준
   guard('lock', function () {
-    if (!m.locks) { out.push(item('lock', 'unknown', ['잠금 기록을 읽지 못했습니다'])); return; }
-    const inM = m.locks.filter(function (x) { return num(x.v.until) >= b.s && num(x.v.until) < b.e + 15 * 60000; }).length;
-    const failing = m.locks.filter(function (x) { return num(x.v.fails) > 0; }).length;
+    if (!m.locks || m.mlocks === null) { out.push(item('lock', 'unknown', ['잠금 기록을 읽지 못했습니다'])); return; }
+    // P1 판24-② 재검토(11/15 B1): 회원 칸 잠금(lockm:<id> — gw-auth)도 센다 · 한 사람은 한 번만 — 입력 칸(lock:<아이디|이름>)은 명부의 아이디·이름으로 회원 id에 잇고, 못 이으면 그 칸 그대로
+    const all = m.locks.concat(Array.isArray(m.mlocks) ? m.mlocks : []), toId = {};
+    const norm = function (s) { return String(s == null ? '' : s).normalize('NFC').replace(/[​-‍﻿]/g, '').trim().toLowerCase(); };
+    (Array.isArray(m.members) ? m.members : []).forEach(function (x) { if (!isObj(x) || !x.id) return; if (x.uid) toId[norm(x.uid)] = x.id; if (x.name) toId[norm(x.name)] = x.id; });
+    const who = function (x) { if (x.key.indexOf('lockm:') === 0) return 'm:' + x.key.slice(6); const id = toId[x.key.slice(5)]; return id ? 'm:' + id : x.key; };
+    const uniq = function (f) { const s = {}; all.forEach(function (x) { if (f(x)) s[who(x)] = 1; }); return Object.keys(s).length; };
+    const inM = uniq(function (x) { return num(x.v.until) >= b.s && num(x.v.until) < b.e + 15 * 60000; });
+    const failing = uniq(function (x) { return num(x.v.fails) > 0; });
     out.push(item('lock', 'none', ['그달 잠금 ' + inM + '건(남은 기록 기준) · 실패가 쌓인 아이디 ' + failing + '개'], { locked: inM, failing: failing, keys: m.locks.length }));
   });
   // 3 퇴사자 접속 — 로그인한 날(KST)이 퇴사일보다 뒤

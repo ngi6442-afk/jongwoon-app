@@ -15957,6 +15957,25 @@ try {
   const kS = [!(await chkSaveP24(mutS('if(ec==="CON_APPR_REQUIRED"){ alert(CON_APPR_REJECT_MSG); loadContracts(); }', ''))),
     !(await chkSaveP24(mutS('if(resp.status>=500){', 'if(false){'))),
     parP24(appKindP24(mutS('  var CON_APPR_KINDS = [[/청구|입금/, "청구 검수"], [/계약서/, "계약 단계"]];', '  var CON_APPR_KINDS = [[/청구/, "청구 검수"], [/계약/, "계약 단계"]];'))).diff > 0];
+  // ③-3 재검토: 상신 때 같은 사본이 결재함 카드(approval_create snap)와 단계(appr.snap)에 · 결재 카드에 '승인하면 반영되는 값' 줄 = 그 사본(실행 — 실제 csApprSubmit·apprFlushCreates·apprSnapLine)
+  const runSubP24 = async (H) => {
+    const env = { sent: [] };
+    const f = new Function('ENV', [fnP24(H, 'csNum'), fnP24(H, 'csChgBase'), fnP24(H, 'csChgAmtMoved'), fnP24(H, 'csChgTermMoved'), fnP24(H, 'csChgApprBody'), fnP24(H, 'fmtAmount'), fnP24(H, 'apprSnapLine'), fnP24(H, 'esc'),
+      'var apprPendingCreates = [], apprFlushBusy = false; function apprSavePending(){} function csApprKindOf(){ return "계약 단계"; } function conAmtEff(){ return 1000; } function csStageLabel(s){ return s.name; } function csTitle(){ return "시험"; } function dispName(x){ return x; } function csPub(){ return "관급"; } function csKind(){ return "준설"; }',
+      'function myName(){ return "직원"; } function myId(){ return "u1"; } function findTask(){ return null; } function scheduleContractSave(){} function todayStr(){ return "2026-11-15"; } function curMember(){ return { id: "u1" }; } function isAdmin(){ return false; } function apprRefresh(){} function apprToastShow(){} function alert(){}',
+      'function gwCall(fn, body){ ENV.sent.push(body); return Promise.resolve({ status: 200, body: {} }); } function csApprRef(c, p, i){ return "con:" + c.id + "|" + p.key + "|" + i; }',
+      fnP24(H, 'apprFlushCreates'), fnP24(H, 'csApprSubmit'),
+      'return function(){ var c = { id: "k", contract_info: { amount: 1000 }, client: "발주" }, s = { name: "변경계약", aid: "change_contract", ak: "계약 단계", aw: "amt", amt0: 1000, term0: "2026-12-31", vals: { chg_amt: 1500, chg_end: "2027-03-31" } }, p = { key: "chg", stages: [s] };',
+      '  csApprSubmit(c, p, 0); return { s: s, line: apprSnapLine({ snap: ENV.sent[0] && ENV.sent[0].snap }) }; };'].join('\n'))(env);
+    const r = f(); for (let i = 0; i < 4; i++) await tickP24();
+    const sent = env.sent[0] || {};
+    return { ok: !!sent.snap && JSON.stringify(sent.snap) === JSON.stringify(r.s.appr.snap) && String(sent.snap.chg_amt) === '1500' && sent.snap.chg_end === '2027-03-31'
+      && /변경 1,000→1,500원/.test(sent.body || '') && /승인하면 반영되는 값: 변경 계약금액 1,500원 · 변경 종료일 2027-03-31/.test(r.line), info: { snap: sent.snap, body: sent.body, line: r.line } };
+  };
+  const sub24 = await runSubP24(html);
+  const kSub = [!(await runSubP24(mutS('    if (p.snap) acBody.snap = p.snap;', ''))).ok, !(await runSubP24(mutS('ref: csApprRef(c, p, i), snap: (s.aw === "amt" ?', 'ref: csApprRef(c, p, i), snap: (false ?'))).ok];
+  T('P1 판24-③ 재검토 화면: 변경계약 [상신] = 결재함 카드 요청(approval_create)에 사본 {1500·2027-03-31}·단계 appr.snap과 같은 값·본문 "변경 1,000→1,500원" · 결재 카드 줄 "승인하면 반영되는 값: 변경 계약금액 1,500원 · 변경 종료일 2027-03-31"(결재권자가 보는 값 = 서버가 묶는 값) · 결함 사본 2개(요청에 사본 안 실음·큐에 사본 안 넣음) = 모두 ✗',
+    sub24.ok && kSub.every((v) => v === true), JSON.stringify({ sub24: sub24.info, kSub }));
   T('P1 판24-③ 화면: 계약 저장 400 CON_APPR_REQUIRED = "계약 저장이 거절됐습니다 … 다시 불러옵니다" 알림 1번 + 서버 값 다시 읽기 1번(실행 — 실제 doSaveContracts) · (검토 B9) 서버 오류 500 APPROVALS_READ_FAILED·502 = "저장되지 않았습니다 … 다시 불러옵니다" 알림 1번 + 다시 읽기 · 다른 400·200 = 알림 0·다시 읽기 0(종전) · 결재 대상 판정 두 벌(앱 csApprKindOf = 서버 _lib/conappr apprKindOf, 표본 ' + SP24.length + ' · 다름 0 · 결재 대상 ≥ 8) · 결함 사본 3개(거절 알림 걷음·5xx 알림 걷음·앱 판정표만 바꿈) = 모두 ✗',
     okS && par.diff === 0 && par.hits >= 8 && kS.every((v) => v === true), JSON.stringify({ okS, par, kS }));
 } catch (e) { console.log('  (P1 판24 검사 생략 — ' + e.message + ')'); fails++; }

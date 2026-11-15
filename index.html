@@ -4573,12 +4573,14 @@
     var d = Math.floor((Date.now() - t) / 86400000);
     return d <= 0 ? "오늘" : ("D+" + d);
   }
+  function apprSnapLine(it){ var v = it && it.snap; if (!v || typeof v !== "object") return ""; var a = csNum(v.chg_amt), e = String(v.chg_end == null ? "" : v.chg_end); if (!a && !e) return ""; return '<div style="margin-top:6px;font-size:13px;font-weight:700;">승인하면 반영되는 값: ' + (a ? "변경 계약금액 " + esc(fmtAmount(a)) + "원" : "") + (a && e ? " · " : "") + (e ? "변경 종료일 " + esc(e) : "") + '</div>'; }   // P1 판24-③ 재검토
   function apprRenderCard(){
     var it = apprQueue[apprIdx];
     if (!it){ apprFinish(); return; }
     document.getElementById("apprCount").textContent = (apprIdx + 1) + "/" + apprQueue.length;
     var h = '<div style="font-weight:800;font-size:15px;">' + (APPR_KIND_EMOJI[it.kind] || "📄") + ' ' + esc(it.title || "(제목 없음)") + ' ' + apprGradeBadge(it) + '</div>';
     if (it.body) h += '<div style="margin-top:6px;font-size:13px;white-space:pre-wrap;">' + esc(it.body) + '</div>';
+    h += apprSnapLine(it);   // P1 판24-③ 재검토: 승인하면 반영되는 변경 금액·종료일(서버가 상신 때 받아 둔 값 — 계약에 반영되는 값과 같음)
     h += '<div style="margin-top:8px;font-size:12.5px;color:var(--sub);">' + esc(it.kind || "일반")
        + ' · 기안 ' + esc((it.by && it.by.name) || "?")
        + (it.created ? ' · ' + esc(apprDaysAgo(it.created)) : '')
@@ -4722,7 +4724,9 @@
     if (idx < 0) return;
     apprFlushBusy = true;
     var p = apprPendingCreates[idx];
-    gwCall("gw-data", { action: "approval_create", kind: p.kind, title: p.title, body: p.body, ref: p.ref, cid: p.cid, boss_up: p.boss ? 1 : 0 }).then(function(res){
+    var acBody = { action: "approval_create", kind: p.kind, title: p.title, body: p.body, ref: p.ref, cid: p.cid, boss_up: p.boss ? 1 : 0 };
+    if (p.snap) acBody.snap = p.snap;   // P1 판24-③ 재검토: 변경계약 금액·종료일 사본(서버가 카드에 묶음)
+    gwCall("gw-data", acBody).then(function(res){
       apprFlushBusy = false;
       if (res.status === 200){
         apprPendingCreates.splice(idx, 1); apprSavePending();
@@ -15716,15 +15720,14 @@
     return i >= w.b ? n : 0;
   }
   function csTaskChg(t){ var c = (t && t.proc_id) ? findProc(t.proc_id) : null, p = c ? csPipeOf(c, t.pipe) : null, s = p ? p.stages[t.stage_i] : null; return !!(s && s.aid === "change_contract"); }   // v402 검토 3: 7번 고정 대안(main 줄 변경계약)도 지시 탭 서류 버튼 숨김
-  function csApprRef(c, p, i){ return "con:" + c.id + "|" + p.key + "|" + i; }
-  function csApprSubmit(c, p, i){
+  function csApprRef(c, p, i){ return "con:" + c.id + "|" + p.key + "|" + i; }  function csApprSubmit(c, p, i){
     var s = p.stages[i], kind = csApprKindOf(c, s); if (!kind) return false;
     var cid = "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), amt = conAmtEff(c);
     apprPendingCreates.push({ cid: cid, mid: myId(), kind: kind, title: ("[계약] " + (c.client || c.label || "") + " · " + csStageLabel(s)).slice(0, 120),
-      body: (s.aw === "amt" ? csChgApprBody(c, s) : "") + (csTitle(c) ? "공사명 " + csTitle(c) + " · " : "") + (amt ? "금액 " + fmtAmount(amt) + "원 · " : "") + (c.who ? "담당 " + dispName(c.who) + " · " : "") + csPub(c) + " " + csKind(c), ref: csApprRef(c, p, i) });
+      body: (s.aw === "amt" ? csChgApprBody(c, s) : "") + (csTitle(c) ? "공사명 " + csTitle(c) + " · " : "") + (amt ? "금액 " + fmtAmount(amt) + "원 · " : "") + (c.who ? "담당 " + dispName(c.who) + " · " : "") + csPub(c) + " " + csKind(c), ref: csApprRef(c, p, i), snap: (s.aw === "amt" ? { chg_amt: (s.vals || {}).chg_amt == null ? "" : s.vals.chg_amt, chg_end: (s.vals || {}).chg_end == null ? "" : s.vals.chg_end } : undefined) });   // P1 판24-③ 재검토: 같은 사본을 결재함 카드에도(서버가 받아 두고 승인 뒤 못 바꿈 — 계약 저장 때 단계 사본과 맞춤 · 아래 s.appr.snap과 같은 식)
     apprSavePending(); apprFlushCreates();
     s.appr = { cid: cid, kind: kind, at: new Date().toISOString(), by: myName() || "", by_id: myId(), status: "대기" };
-    if (s.aw === "amt"){ var sv = s.vals || {}; s.appr.snap = { chg_amt: sv.chg_amt == null ? "" : sv.chg_amt, chg_end: sv.chg_end == null ? "" : sv.chg_end }; }   // 판10 검토 ①: 상신 때 금액·종료일 사본 — 유효 값(conChgEff)은 승인된 차수의 이 사본만 읽는다(상신 뒤·승인 뒤 입력 칸을 고쳐도 새지 않게, 재상신 = 새 사본)
+    if (s.aw === "amt"){ var sv = s.vals || {}; s.appr.snap = { chg_amt: sv.chg_amt == null ? "" : sv.chg_amt, chg_end: sv.chg_end == null ? "" : sv.chg_end }; }   // 판10 검토 ①: 상신 때 금액·종료일 사본 — 유효 값(conChgEff)은 승인된 차수의 이 사본만 읽는다(상신 뒤·승인 뒤 입력 칸을 고쳐도 새지 않게, 재상신 = 새 사본) · 위 상신 요청 snap과 같은 식
     var t = s.task_id ? findTask(s.task_id) : null;
     if (t && t.status !== "done"){ t.status = "review"; t.done_at = todayStr(); t.done_by = "결재함 상신(" + kind + ")"; t.updated = todayStr(); saveTasksCache(); scheduleTasksSave(); renderTasks(); }
     c.updated = todayStr(); scheduleContractSave();
