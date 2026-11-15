@@ -2058,7 +2058,7 @@ try {
 try {
   const srv24 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8'), ask24 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'ask.js'), 'utf8'), ds24 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'docscope.js'), 'utf8'), dd24 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'docdiff.js'), 'utf8'), pb24 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-parse-background.js'), 'utf8'), lw24 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-learn-background.js'), 'utf8'), sw24 = readFileSync(join(ROOT, 'sw.js'), 'utf8');
   T('v424 물어보기: 문서 도구가 docVisible을 거침 · 판정 한 곳(_lib/docscope.js, gw-data는 가져다 씀) · sw ≥ 424', /DS\.docVisible\(member, d, ds\)/.test(ask24) && /function docVisible\(m, it, settings\)/.test(ds24) && !/function docVisible\(/.test(srv24) && /require\('\.\/_lib\/docscope'\)/.test(srv24) && Number((sw24.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 424);
-  const dl24 = [...html.matchAll(/downloadBlob\(([^\n]{0,60})/g)].map((m) => m[1]).filter((x) => !/^"(?:차량목록|전체백업|실적목록|세무)/.test(x) && !/^r2\.body\.file/.test(x) && !/^res\.body\.name/.test(x) && !/^name, /.test(x) && !/^name\+"_안전 패킷/.test(x) && !/^name, blob\)\{/.test(x));
+  const dl24 = [...html.matchAll(/downloadBlob\(([^\n]{0,60})/g)].map((m) => m[1]).filter((x) => !/^"(?:차량목록|전체백업|실적목록|세무|연구노트_)/.test(x) && !/^r2\.body\.file/.test(x) && !/^res\.body\.name/.test(x) && !/^name, /.test(x) && !/^name\+"_안전 패킷/.test(x) && !/^name, blob\)\{/.test(x));
   T('v424 생성 경로: 양식으로 만든 파일은 전부 xgOut을 거침(직접 내려받기 없음) · 생성 12경로', dl24.length === 0 && (html.match(/xgOut\(|xgHwpxGen\(c, /g) || []).length >= 13 && /function xgHwpxGen\([^)]*\)\{[\s\S]{0,300}?return xgOut\(c, kind, name, blob,/.test(html) && ['"qual_packet"', '"contract_pledge"', '"seal_reg"', '"bond_waiver"', '"labor_exempt"', '"settle_doc"', '"adv_pay"', '"bid_rate"', 'qtKey'].every((k) => html.indexOf('xgOut(c, ' + k) > 0 || html.indexOf('xgHwpxGen(c, ' + k) > 0), JSON.stringify(dl24));   // P1 판16: 한글 양식은 xgHwpxGen(학습 칸 → xgOut) 한 곳을 거침
   T('v426 착공계 주민번호: 창 문구에 "양식 기본값" 없음 · 비우면 확인요망 · 서버가 주민번호 꼴 양식을 거부 · 앱이 쉬운 말로 알림 · 백업 흔적 통로', html.indexOf('양식 기본값 유지') < 0 && html.indexOf('현장대리인 주민등록번호(양식에 넣어 두지 않습니다') > 0 && /BJ\.rrnScan\(Buffer\.from\(b64, 'base64'\)\)/.test(gwd) && html.indexOf('tplCode === "TPL_HAS_RRN"') > 0 && /action === 'backup_stamp'/.test(gwd));
   T('v425 최종본 연결: 넣기가 초안 없으면 xgDraftMake 먼저(내려받기·값 저장·확인창 없음) · 창과 같은 토큰 함수 · 파일이 들어오면 단계 체크 · 사람이 쓰는 창은 안 건드림', /prep = xgDraftMake\(c, tpl\)/.test(html) && /o = \{ noDownload: true, noBack: true, wait: true, late: true \}/.test(html) && /var cdT=xgConTok\(c\)/.test(html) && /var qtT=xgQuoteTok\(\)/.test(html) && /var adT=xgAdvTok\(\)/.test(html) && /dd\.st = "done"; dd\.auto = 1/.test(html) && /back\.classList\.contains\("show"\)\) \|\| xgLateOn/.test(html));
@@ -15345,6 +15345,137 @@ try {
   T('P1 판16 ③ PM 콘솔 줄(실행 — 실제 pmconRowsLearnHw): 추천이 허용 사전에 다 안 들어 있으면 R2 한 줄 "한글 양식 서류도 학습 허용 칸에 넣을까요?" · 추천 6양식 12칸 · 양식 이름표(내부 키 0)·칸 이름·뺀 칸 수 · 추천 칸 없는 양식 · 표본 n건(그 양식 짝 수) · 다 들어 있으면/추천 없음 = 줄 없음 · 꺼져 있으면 안내 · 무응답 적용일 11/22 = 추천값 · 같은 조회(learn_pairs_get) 한 번 · 결함 사본 ' + m16c.length + '개 = 모두 ✗',
     r16c.ok && plan16 && m16c.every((v) => v === false), JSON.stringify({ r: r16c.info, plan: plan16, mut: m16c }));
 } catch (e) { console.log('  (P1 판16 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- P1 판21 KOITA 연구노트 월 자동 초안 카드(착수설명서 판21 · 원장 T759·C099) — PM 콘솔 점검 카드 자리(PMCON_CHECKS)에 붙는 카드 1장 ----
+//   ① 배선(정적) ② 실행 — 실제 pmconChecksRender·pmconChecksSync·rnote* 함수를 가짜 화면·가짜 gwCall로(초안 카드·확정본 한 줄·문서 없음 = 카드 없음·불러오기 실패 보임)
+//   ③ 누름 — [확인] = rnote_save(달·base, 글 없음) → 확정본 .md 내려받기 · [고침] = 고친 글로 rnote_save · 취소·빈 글·409 ④ 결함 사본이 실제로 깨짐 ⑤ 화면 글(내부 이름 0)
+try {
+  const fn21 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('중괄호 짝: ' + name); };
+  const st21 = (src, re) => { const m = src.match(re); if (!m) throw new Error('문장 없음: ' + re); return m[0]; };
+  const gwd21 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8'), lib21 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'rnote.js'), 'utf8');
+  const PUSH21 = 'PMCON_CHECKS.push({ id: "rnote", title: "연구노트", render: rnoteRender });';
+  // ① 배선
+  const iP21 = html.indexOf(PUSH21), iS21 = html.indexOf('function pmconChecksSync(){'), iM21 = html.indexOf('PMCON_CHECKS.push({ id: "mchk"'), iR21 = html.indexOf('function rnoteRender(host){');
+  T('P1 판21 ① 배선: 카드 1장 = PMCON_CHECKS.push 1줄(id rnote — pmconChecksSync 뒤·월 점검 카드 앞) · 서버 rnote_put·rnote_get·rnote_save 디스패치 · 감사 라벨 rnote "연구노트" · 새 푸시 0(rnote.js에 sendTo 없음) · 내려받기는 기존 downloadBlob',
+    html.split(PUSH21).length === 2 && iS21 > 0 && iS21 < iR21 && iR21 < iP21 && iP21 < iM21
+    && ['rnote_put', 'rnote_get', 'rnote_save'].every((a) => new RegExp("if \\(d && d\\.action === '" + a + "'\\) return await handleRnote\\w+\\(event, d, R\\);").test(gwd21))
+    && /var AUDIT_COL_LABEL = \{[^}]*rnote:"연구노트",/.test(html) && !/sendTo|push_send|pushSend/.test(lib21) && /downloadBlob\("연구노트_" \+ doc\.period \+ "_확정\.md"/.test(fn21(html, 'rnoteDownload')),
+    JSON.stringify({ iS21, iR21, iP21, iM21 }));
+  // ② 실행 — 가짜 화면(카드 자리 파싱 · data-rnote 버튼 · 글 보기 pre · 고침 textarea)
+  const run21 = async (o, srcHtml) => {
+    const H = srcHtml || html, els = {}, calls = [], log = [], dl = [];
+    const mk = (id) => {
+      const e = { id, _html: '', style: {}, children: [], value: '', _btn: [], focus() {}, addEventListener() {} };
+      Object.defineProperty(e, 'innerHTML', { get() { return e._html; }, set(v) { e._html = String(v);
+        if (id === 'pmconChecks') e.children = [...e._html.matchAll(/id="(pmconChk-[^"]+)"/g)].map((m) => { const c = mk(m[1]); els[m[1]] = c; return c; });
+        if (/id="rnotePre"/.test(e._html)) { const p = mk('rnotePre'); p.style.display = 'none'; els.rnotePre = p; }
+        if (/id="rnoteEdit"/.test(e._html)) { const t = mk('rnoteEdit'); const m = /<textarea id="rnoteEdit"[^>]*>([\s\S]*?)<\/textarea>/.exec(e._html); t.value = m ? m[1].replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&') : ''; els.rnoteEdit = t; }
+        e._btn = [...e._html.matchAll(/data-rnote="(\w+)"/g)].map((m) => ({ a: m[1], h: null, getAttribute() { return this.a; }, addEventListener(t, f) { this.h = f; } })); } });
+      e.querySelectorAll = () => e._btn;
+      return e;
+    };
+    const doc = { getElementById: (id) => { if (!els[id]) els[id] = mk(id); return els[id]; } };
+    const gw = (fn, body) => { calls.push(JSON.parse(JSON.stringify(body))); const r = (o.res || {})[body.action]; return r === 'net' ? Promise.reject(new Error('net')) : Promise.resolve(typeof r === 'function' ? r(body) : (r || { status: 500, body: { error_code: 'X' } })); };
+    function FakeBlob(parts, opt) { this.parts = parts; this.type = opt && opt.type; }
+    const api = new Function('document', 'gwCall', '__log', '__o', '__dl', 'Blob', [
+      'function apprToastShow(m){ __log.push("toast:" + m); } function renderPmcon(){ __log.push("renderPmcon"); } function downloadBlob(n, b){ __dl.push({ n: n, t: b.parts.join(""), type: b.type }); }',
+      'var confirm = function(){ return __o.confirm !== false; }, alert = function(m){ __log.push("alert:" + m); };',
+      fn21(H, 'esc'), st21(H, /var PMCON_CHECKS = \[\];/), st21(H, /var rnoteBusy = false;/),
+      ...['pmconChecksRender', 'pmconChecksSync', 'rnoteMonth', 'rnoteMeta', 'rnoteCardHtml', 'rnoteEditHtml', 'rnoteBind', 'rnoteRender', 'rnoteSave', 'rnoteDownload'].map((n) => fn21(H, n)),
+      st21(H, /PMCON_CHECKS\.push\(\{ id: "rnote"[^\n]+\);/),
+      'return { render: pmconChecksRender };'].join('\n'))(doc, gw, log, o, dl, FakeBlob);
+    doc.getElementById('pmconChecksWrap').style.display = 'none';
+    api.render(); for (let i = 0; i < 6; i++) await new Promise((r) => setTimeout(r, 0));
+    const card = els['pmconChk-rnote'] || mk('x');
+    return { els, calls, log, dl, card, wrap: els.pmconChecksWrap, vis: () => card.innerHTML.replace(/<[^>]+>/g, ' ') };
+  };
+  const META21 = { counts: { 1: 0, 2: 3, 3: 65 }, excluded: 211, repos: [{ label: '앱 저장소', n: 40 }, { label: '수집기 저장소', n: 24 }], missing: [{ label: '문서 저장소', why: '비공개 — 새 키 없이 읽을 수 없음' }], masked: { name: 1 }, made_at: '2026-11-01 08:20' };
+  const TXT21 = '# 연구개발전담부서 연구노트 — 2026-10 (자동 초안)\n- 10-14 · 앱 1ca49a8 · v385 운반일지 <엑셀> & "화면"\n';
+  const DOC21 = (over) => Object.assign({ period: '2026-10', status: 'draft', text: TXT21, meta: META21, created_at: new Date(2026, 10, 1, 8, 31).getTime(), updated_at: 1793500000000, confirmed: null }, over || {});
+  const CONF21 = DOC21({ status: 'confirmed', confirmed: { ts: new Date(2026, 10, 2, 9, 0).getTime(), by: 'u21pm', name: '가짜요원', edited: true } });
+  const RES21 = (d, cw) => ({ rnote_get: { status: 200, body: { status: 'OK', period: '2026-10', doc: d, can_write: cw !== false } } });
+  const dr = await run21({ res: RES21(DOC21()) }), ro = await run21({ res: RES21(DOC21(), false) }), cf = await run21({ res: RES21(CONF21) }), nu = await run21({ res: RES21(null) });
+  const er = await run21({ res: { rnote_get: { status: 503, body: { error_code: 'RNOTE_READ_FAILED' } } } }), ne = await run21({ res: { rnote_get: 'net' } });
+  const bt = (r) => r.card._btn.map((b) => b.a).join();
+  T('P1 판21 ② 카드(실행): 초안 = "연구노트 10월 초안 — 확인해 주세요" · 과제별 건수·자동 커밋 뺀 수 · 재료 저장소 · 빠진 저장소와 까닭 · 가린 것 · [확인]·[고침]·[글 보기](글은 접혀 있음) · 쓸 수 없는 사람 = "확인하실 분" 안내·[글 보기]만 · 확정본 = "연구노트 10월 확정본"·"확인함 · 11-02 가짜요원 · 고친 글로 확정"·[.md 내려받기]·[글 보기] · 문서 없는 달 = 카드·묶음 제목 숨김 · 불러오기 실패·네트워크 = 빨간 안내(숨기지 않음)',
+    dr.card.style.display === '' && dr.wrap.style.display === '' && dr.vis().indexOf('연구노트 10월 초안 — 확인해 주세요') >= 0 && dr.vis().indexOf('과제1 0건 · 과제2 3건 · 과제3 65건 (자동 커밋 211건은 뺌)') >= 0
+    && dr.vis().indexOf('재료: 앱 저장소 40건 · 수집기 저장소 24건 (커밋 이력)') >= 0 && dr.vis().indexOf('빠진 저장소: 문서 저장소(비공개 — 새 키 없이 읽을 수 없음)') >= 0 && dr.vis().indexOf('가린 것: 직원 이름 1') >= 0
+    && bt(dr) === 'ack,edit,view' && dr.els.rnotePre && dr.els.rnotePre.style.display === 'none' && bt(ro) === 'view' && ro.vis().indexOf('확인하실 분: 연구전담요원') >= 0
+    && cf.vis().indexOf('연구노트 10월 확정본') >= 0 && cf.vis().indexOf('확인함 · 11-02 가짜요원 · 고친 글로 확정') >= 0 && bt(cf) === 'down,view'
+    && nu.card.style.display === 'none' && nu.wrap.style.display === 'none' && er.card.style.display === '' && er.vis().indexOf('연구노트 초안을 불러오지 못했습니다 (RNOTE_READ_FAILED)') >= 0 && ne.vis().indexOf('네트워크') >= 0,
+    JSON.stringify({ v: dr.vis().slice(0, 260), b: [bt(dr), bt(ro), bt(cf)], nu: nu.wrap.style.display }));
+  // ③ 누름
+  const tick = async () => { for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0)); };
+  const click = (r, a) => { const b = r.card._btn.find((x) => x.a === a); if (!b) throw new Error('단추 없음 ' + a); b.h(); };
+  const OK21 = (b) => ({ status: 200, body: { status: 'OK', doc: Object.assign(DOC21(), { status: 'confirmed', text: b.text || TXT21, confirmed: { ts: new Date(2026, 10, 2, 9, 0).getTime(), name: '가짜요원', edited: !!b.text } }) } });
+  const press = async (o, H) => {
+    const ack = await run21({ res: Object.assign(RES21(DOC21()), { rnote_save: OK21 }) }, H); click(ack, 'ack'); await tick();
+    const can = await run21({ res: RES21(DOC21()), confirm: false }, H); click(can, 'ack'); await tick();
+    const stl = await run21({ res: Object.assign(RES21(DOC21()), { rnote_save: { status: 409, body: { error_code: 'RNOTE_STALE' } } }) }, H); click(stl, 'ack'); await tick();
+    const ed = await run21({ res: Object.assign(RES21(DOC21()), { rnote_save: OK21 }) }, H); click(ed, 'edit'); const taOrig = ed.els.rnoteEdit ? ed.els.rnoteEdit.value : null;
+    ed.els.rnoteEdit.value = TXT21 + '- 요원이 고친 줄\n'; click(ed, 'editok'); await tick();
+    const same = await run21({ res: Object.assign(RES21(DOC21()), { rnote_save: OK21 }) }, H); click(same, 'edit'); click(same, 'editok'); await tick();
+    const emp = await run21({ res: Object.assign(RES21(DOC21()), { rnote_save: OK21 }) }, H); click(emp, 'edit'); emp.els.rnoteEdit.value = '   '; click(emp, 'editok'); await tick();
+    const back = await run21({ res: RES21(DOC21()) }, H); click(back, 'edit'); const inEdit = /id="rnoteEdit"/.test(back.card.innerHTML); click(back, 'editno');
+    const vw = await run21({ res: RES21(DOC21()) }, H); click(vw, 'view'); const shown = vw.els.rnotePre.style.display;
+    const dn = await run21({ res: RES21(CONF21) }, H); click(dn, 'down');
+    const sv = (r) => r.calls.filter((c) => c.action === 'rnote_save');
+    return { ack, can, stl, ed, same, emp, back, vw, dn, taOrig, inEdit, shown, sv };
+  };
+  const chk21p = (p) => {
+    const a = p.sv(p.ack), e = p.sv(p.ed), s = p.sv(p.same);
+    return a.length === 1 && a[0].period === '2026-10' && a[0].base === 1793500000000 && !('text' in a[0]) && p.ack.dl.length === 1 && p.ack.dl[0].n === '연구노트_2026-10_확정.md'
+      && p.ack.dl[0].t.indexOf(TXT21) === 0 && p.ack.dl[0].t.indexOf('요원 확정: 가짜요원') > 0 && /text\/markdown/.test(p.ack.dl[0].type) && p.ack.log.indexOf('renderPmcon') >= 0 && p.ack.log.some((x) => x.indexOf('toast:연구노트 10월 확정') === 0)
+      && p.sv(p.can).length === 0 && p.can.dl.length === 0 && p.stl.log.some((x) => x.indexOf('toast:연구노트가 방금 바뀌었습니다') === 0) && p.stl.dl.length === 0
+      && p.taOrig === TXT21 && e.length === 1 && e[0].text === TXT21 + '- 요원이 고친 줄\n' && e[0].base === 1793500000000 && p.ed.dl.length === 1 && p.ed.dl[0].t.indexOf('요원이 고친 줄') > 0
+      && s.length === 1 && !('text' in s[0]) && p.sv(p.emp).length === 0 && p.emp.log.some((x) => x === 'alert:글이 비어 있습니다.')
+      && p.inEdit && !/id="rnoteEdit"/.test(p.back.card.innerHTML) && /data-rnote="ack"/.test(p.back.card.innerHTML) && p.shown === '' && p.dn.dl.length === 1 && p.sv(p.dn).length === 0;
+  };
+  const p21 = await press({});
+  T('P1 판21 ③ 누름: [확인] = rnote_save 하나(달 2026-10·base = 문서 updated_at·글 없음) → 안내 + 확정본 "연구노트_2026-10_확정.md"(글 + "요원 확정: 이름" 꼬리·markdown) 내려받기 + 콘솔 다시 그림 · 확인 창 취소 = 서버 안 부름 · 409 = "방금 바뀌었습니다"·내려받기 없음 · [고침] = 글이 든 입력 칸 → 고친 글로 rnote_save(글·base) → 고친 확정본 내려받기 · 안 고치고 확정 = 글 없이 · 빈 글 = 알림·서버 안 부름 · [취소] = 카드로 돌아감 · [글 보기] = 펼침 · 확정본 [.md 내려받기] = 서버 안 부르고 내려받기',
+    chk21p(p21), JSON.stringify({ ack: p21.sv(p21.ack), ed: p21.sv(p21.ed), same: p21.sv(p21.same), dl: p21.ack.dl.map((x) => x.n), log: p21.stl.log, ta: p21.taOrig && p21.taOrig.slice(0, 30) }));
+  // ④ 결함 사본
+  const MUT21 = [
+    ['if (!doc){ host.style.display = "none"; host.innerHTML = ""; pmconChecksSync(); return; }', 'if (!doc){ host.style.display = "none"; host.innerHTML = ""; return; }'],
+    ['var body = { action: "rnote_save", period: doc.period, base: doc.updated_at };', 'var body = { action: "rnote_save", period: doc.period };'],
+    ['    if (edited) body.text = String(text);', '    body.text = String(text);'],
+    ['if (!confirm((edited ? "[고침] 고친 글로 " : "[확인] 초안 그대로 ")', 'if (false && !confirm((edited ? "[고침] 고친 글로 " : "[확인] 초안 그대로 ")'],
+    ['apprToastShow("연구노트 " + rnoteMonth(doc.period) + " 확정 — 확정본을 내려받습니다"); rnoteDownload(res.body.doc); renderPmcon(); return; }', 'apprToastShow("연구노트 " + rnoteMonth(doc.period) + " 확정 — 확정본을 내려받습니다"); renderPmcon(); return; }'],
+    ['(canWrite ? \'<button type="button" class="b-ok" data-rnote="ack">확인</button>', '(true ? \'<button type="button" class="b-ok" data-rnote="ack">확인</button>'],
+    ['var btn = done ? \'<button type="button" class="b-ok" data-rnote="down">.md 내려받기</button>\'', 'var btn = false ? \'<button type="button" class="b-ok" data-rnote="down">.md 내려받기</button>\''],
+    ['    if (text !== null && text !== undefined && !String(text).trim()){ alert("글이 비어 있습니다."); return; }\n', ''],
+    ["'<li style=\"margin:3px 0;\">' + esc(x) + '</li>'", "'<li style=\"margin:3px 0;\">' + x + '</li>'"],
+    ['border-radius:8px;">\' + esc(doc.text || "") + \'</pre>\'', 'border-radius:8px;">\' + (doc.text || "") + \'</pre>\''],
+    ['    if (!doc || doc.status !== "confirmed") return;\n', ''],
+    ['var tail = "\\n\\n---\\n- 요원 확정: " + (cf.name || "")', 'var tail = "\\n\\n---\\n- 확정: "'],
+  ];
+  const EVIL21 = DOC21({ text: '<img src=x onerror=1> & "q"', meta: Object.assign({}, META21, { missing: [{ label: '문서<b>저장소</b>', why: 'x' }] }) });
+  const evilOk = async (H) => { const r = await run21({ res: RES21(EVIL21) }, H); return r.card.innerHTML.indexOf('<img') < 0 && r.card.innerHTML.indexOf('&lt;img') >= 0 && r.card.innerHTML.indexOf('<b>저장소</b>') < 0; };
+  const dlGuard = async (H) => { const dlx = []; const f = new Function('downloadBlob', 'Blob', fn21(H, 'rnoteDownload') + '\nreturn rnoteDownload;')((n, b) => dlx.push(n), function () {}); f(DOC21()); return dlx.length === 0; };
+  const evil0 = await evilOk(html), dlg0 = await dlGuard(html);
+  const kill21 = [];
+  for (const [from, to] of MUT21) {
+    if (html.split(from).length !== 2) { kill21.push('자리 ' + html.split(from).length + ': ' + from.slice(0, 50)); continue; }
+    const Hx = html.replace(from, () => to);
+    let broken = false;
+    try {
+      const a = await run21({ res: RES21(DOC21(), false) }, Hx), b = await run21({ res: RES21(null) }, Hx), c = await run21({ res: RES21(CONF21) }, Hx);
+      const p = await press({}, Hx);
+      broken = !(bt(a) === 'view' && b.wrap.style.display === 'none' && bt(c) === 'down,view' && chk21p(p) && (await evilOk(Hx)) && (await dlGuard(Hx)));
+    } catch (err) { broken = true; }
+    if (!broken) kill21.push(from.slice(0, 60) + ' 안 깨짐');
+  }
+  T('P1 판21 ④ 결함 사본 ' + MUT21.length + '개(숨을 때 묶음 안 셈 · base 없이 확정 · 늘 글 실음 · 확인 창 건너뜀 · 확정 뒤 내려받기 없음 · 쓸 수 없는데 [확인] · 확정본에 [확인] · 빈 글 막음 걷음 · 줄 이스케이프 걷음 · 글 보기 이스케이프 걷음 · 초안도 내려받기 · 확정자 꼬리 바꿈) 전부 깨짐 · 이스케이프(꺾쇠·따옴표) 기준 통과',
+    evil0 && dlg0 && kill21.length === 0, JSON.stringify({ evil0, dlg0, kill21 }));
+  // ⑤ 화면 글 — 내부 키 이름·밑줄 이름·상태 글자 0 · 초안 카드에 입력 칸 0(고침 때만 글 칸 1)
+  const leak21 = (dr.vis() + ' ' + cf.vis()).replace(TXT21.replace(/<[^>]+>/g, ' '), ' ').match(/\b[a-z]+_[a-z_]+\b|\brnote\b|\b(?:draft|confirmed|bot)\b/g) || [];
+  const ed21 = await run21({ res: RES21(DOC21()) }); click(ed21, 'edit');
+  const edN21 = (ed21.card.innerHTML.match(/<(input|select|textarea)\b/g) || []).length, edVis21 = ed21.card.innerHTML.replace(/<textarea[\s\S]*?<\/textarea>/, ' ').replace(/<[^>]+>/g, ' ');
+  T('P1 판21 ⑤ 화면 글: 카드에 내부 키 이름(rnote·밑줄 이름·draft/confirmed 같은 상태 글자) 0 · 초안 카드 입력 칸 0 · [고침] 화면 = 글 칸 1개(제목 "연구노트 10월 초안 고치기"·[고친 글로 확정]·[취소])',
+    leak21.length === 0 && !/<(input|select|textarea)\b/.test(dr.card.innerHTML) && edN21 === 1 && /<textarea id="rnoteEdit"/.test(ed21.card.innerHTML)
+    && edVis21.indexOf('연구노트 10월 초안 고치기') >= 0 && edVis21.indexOf('고친 글로 확정') >= 0 && edVis21.indexOf('취소') >= 0 && !/\brnote\b|\b[a-z]+_[a-z_]+\b/.test(edVis21),
+    '새는 글: ' + leak21.join(',') + ' · 고침 칸 ' + edN21);
+} catch (e) { console.log('  (P1 판21 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

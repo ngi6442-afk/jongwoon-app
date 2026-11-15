@@ -10365,4 +10365,142 @@ function J91a(x) { return JSON.stringify(x); }
   finally { reset16(); global.fetch = realFetch16; process.env.GW_ANTHROPIC_KEY = savedKey16; }
 }
 
+{ // ---- P1 판21 KOITA 연구노트 월 자동 초안(착수설명서 판21 · 원장 T759·C099) — gw-data rnote_put(봇 키)·rnote_get·rnote_save(판29 관문 읽기 = 관리자) · _lib/rnote.js
+  //   ① 받기: 봇 키·달 꼴(지난달까지)·크기 · 서버 재검사(회원·일용직·거래처·계약 상대 이름 — 띄어 쓴 3자 이름까지, 금액·전화·키 꼴, meta 속까지) = 400 RNOTE_LEAK·저장 0·흔적 ok false · 명부/거래처 못 읽음 = 503·저장 0
+  //      깨끗한 글 = 저장(초안·봇 원본 칸) · 같은 달 다시 = '이미 있음'·덮지 않음 · force = 초안만 덮음 · ping·fail = 흔적만(글 없음)
+  //   ② 읽기: 비로그인 401 · 직원 403 · 미승인 기기 403 · PM·PM 아닌 관리자 200(봇 원본 칸은 안 내림) · 없는 달 = doc null · 달 꼴 400
+  //   ③ 확정: 직원 403 · 낡은 base 409 · [확인] = 확정·글 그대로·봇 원본 보존·감사 1줄 · 두 번 = 400 · 확정된 달 = 봇 force 409·보통 받기는 '이미 있음' · [고침] = 고친 글·edited·봇 원본은 그대로 · 빈 글 400
+  //   ④ 결함 사본(rnote.js·gw-data 한 곳씩) = 위 검사가 깨짐
+  const fs21 = require('fs'), Mod21 = require('module');
+  const P21 = join(FN, '_lib', 'rnote.js'), G21 = join(FN, 'gw-data.js'), S21 = fs21.readFileSync(P21, 'utf8'), SG21 = fs21.readFileSync(G21, 'utf8');
+  const comp21 = (file, src) => { const m = new Mod21(file, null); m.filename = file; m.paths = Mod21._nodeModulePaths(dirname(file)); m._compile(src, file); return m.exports; };
+  const mut21 = (src, from, to) => { if (src.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return src.replace(from, () => to); };
+  const cl21 = (mod) => async (body, tok, dev) => { const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); let b = {}; try { b = JSON.parse(r.isBase64Encoded ? require('zlib').gunzipSync(Buffer.from(r.body, 'base64')).toString('utf8') : (r.body || '{}')); } catch (e) {} return { code: r.statusCode, body: b }; };
+  const rp21 = require.resolve(P21), keep21 = require.cache[rp21], RN21 = require(P21);
+  const snap21 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  const H21 = 3600000, NOWM21 = RN21.kstYm(Date.now()), PREV21 = RN21.prevYm(NOWM21), OLD21 = RN21.prevYm(PREV21);
+  const M21 = { pm: { id: 'u21pm', name: '가짜요원', admin: true, perms: {}, tier: 'pm' }, ad: { id: 'u21ad', name: '가짜관리', admin: true, perms: {} }, w: { id: 'u21w', name: '가짜직원', admin: false, perms: { tasks: 'do' } } };
+  const T21 = { pm: issueSession(M21.pm).token, ad: issueSession(M21.ad).token, w: issueSession(M21.w).token };
+  const reset21 = () => { const s = JSON.parse(snap21); blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; blobsMock.hooks.failList = false; require.cache[rp21] = keep21;
+    mem.gw_users = Object.assign(s.u, { 'member:u21pm': M21.pm, 'member:u21ad': M21.ad, 'member:u21w': M21.w, 'device:dev1': { status: 'approved' } });
+    mem.gw_data = Object.assign(s.d, { 'col:clients': { schema: 1, items: [{ id: 'c1', name: '가짜상사' }, { id: 'c2', name: '테스트' }] }, 'col:workers': { schema: 1, items: [{ id: 'k1', name: '가짜꾼' }] },
+      'col:contracts': { schema: 1, items: [{ id: 'k1', client: '가짜발주처' }] } });
+    for (const k of Object.keys(mem.gw_data)) if (/^rnote:/.test(k) || k === 'it:cron:rnote:last') delete mem.gw_data[k]; };
+  const KEY21 = 'test-ingest-key';
+  const CLEAN21 = '# 연구개발전담부서 연구노트 — ' + PREV21 + ' (자동 초안)\n\n- 부서: 기술개발부(인정번호 제2026155881호, 인정일 2026-09-02)\n## 과제3\n- 11-03 · 앱 a1b2c3d · v480 입찰 화면 수리 · (직원) 요청 · 회귀 테스트\n';
+  const meta21 = { counts: { 1: 0, 2: 0, 3: 1 }, excluded: 2, repos: [{ label: '앱 저장소', n: 1 }], missing: [{ label: '문서 저장소', why: '비공개 — 새 키 없이 읽을 수 없음' }], masked: { name: 1 }, made_at: '2026-12-01 08:20' };
+  const ghp21 = 'gh' + 'p_' + 'A1b2'.repeat(10);
+  const chk21 = async (cl) => {
+    const P = {}, I = {};
+    reset21();
+    const put = (b) => cl(Object.assign({ action: 'rnote_put', key: KEY21 }, b));
+    const st = () => mem.gw_data['it:cron:rnote:last'] || null, doc = (p) => mem.gw_data['rnote:' + (p || PREV21)];
+    // ① 받기
+    const a1 = await cl({ action: 'rnote_put', key: 'wrong', period: PREV21, text: CLEAN21 }), a2 = await cl({ action: 'rnote_put', period: PREV21, text: CLEAN21 });
+    const a3 = await put({ period: '2026-13', text: CLEAN21 }), a4 = await put({ period: NOWM21, text: CLEAN21 }), a5 = await put({ period: PREV21 }), a6 = await put({ period: PREV21, text: 'a'.repeat(200001) });
+    const a7 = await put({ period: PREV21, text: CLEAN21, meta: 'x' });
+    P.A = a1.code === 403 && a1.body.error_code === 'BAD_INGEST_KEY' && a2.code === 403 && a3.code === 400 && a3.body.error_code === 'BAD_PERIOD' && a4.code === 400 && a4.body.error_code === 'BAD_PERIOD'
+      && a5.code === 400 && a5.body.error_code === 'BAD_TEXT' && a6.code === 413 && a7.code === 400 && a7.body.error_code === 'BAD_META' && !doc();
+    I.A = [a1, a2, a3, a4, a5, a6, a7].map((x) => x.code + '/' + x.body.error_code);
+    const LEAKS = [['회원 실명', CLEAN21 + '- 가짜요원 확인\n', 'name'], ['띄어 쓴 3자 일용직 이름', CLEAN21 + '- 가짜 꾼 요청\n', 'name'], ['거래처', CLEAN21 + '- 가짜상사 단가\n', 'client'],
+      ['계약 상대', CLEAN21 + '- 가짜발주처 건\n', 'client'], ['금액 원', CLEAN21 + '- 단가 3,150,000원\n', 'amount'], ['금액 억', CLEAN21 + '- 2.5억 계약\n', 'amount'], ['금액 만원', CLEAN21 + '- 2600만원\n', 'amount'],
+      ['전화', CLEAN21 + '- 연락 010-1234-5678\n', 'pii'], ['주민번호', CLEAN21 + '- 900101-1234567\n', 'pii'], ['키 꼴', CLEAN21 + '- ' + ghp21 + '\n', 'key']];
+    const lk = [];
+    for (const [nm, txt, kind] of LEAKS) { const r = await put({ period: PREV21, text: txt, meta: meta21 }); if (!(r.code === 400 && r.body.error_code === 'RNOTE_LEAK' && (r.body.kinds || []).indexOf(kind) >= 0 && JSON.stringify(r.body).indexOf('가짜') < 0)) lk.push(nm + ' ' + r.code + '/' + JSON.stringify(r.body.kinds)); }
+    const mk = await put({ period: PREV21, text: CLEAN21, meta: Object.assign({}, meta21, { note: '가짜요원' }) });
+    const stL = st();
+    P.B = lk.length === 0 && mk.code === 400 && mk.body.error_code === 'RNOTE_LEAK' && !doc() && stL && stL.ok === false && /서버 재검사/.test(stL.note || '');
+    I.B = { lk, mk: mk.code + '/' + mk.body.error_code, st: stL };
+    blobsMock.hooks.failList = true; const n1 = await put({ period: PREV21, text: CLEAN21, meta: meta21 }); blobsMock.hooks.failList = false;
+    blobsMock.hooks.failGet = (k) => k === 'col:workers'; const n2 = await put({ period: PREV21, text: CLEAN21, meta: meta21 }); blobsMock.hooks.failGet = null;
+    blobsMock.hooks.failGet = (k) => k === 'col:contracts'; const n3 = await put({ period: PREV21, text: CLEAN21, meta: meta21 }); blobsMock.hooks.failGet = null;
+    P.C = [n1, n2, n3].every((x) => x.code === 503 && x.body.error_code === 'RNOTE_NAMES_UNAVAILABLE') && !doc();
+    I.C = [n1, n2, n3].map((x) => x.code + '/' + x.body.error_code);
+    const s1 = await put({ period: PREV21, text: CLEAN21, meta: meta21 }); const d1 = JSON.parse(JSON.stringify(doc() || {})); const st1 = st();
+    const s2 = await put({ period: PREV21, text: CLEAN21 + '- 다른 글\n', meta: meta21 }); const d2 = JSON.parse(JSON.stringify(doc() || {}));
+    const s3 = await put({ period: PREV21, text: CLEAN21 + '- 다시 만든 글\n', meta: meta21, force: true }); const d3 = doc() || {};
+    P.D = s1.code === 200 && s1.body.saved === true && d1.status === 'draft' && d1.text === CLEAN21 && d1.bot_text === CLEAN21 && d1.confirmed === null && d1.meta && d1.meta.excluded === 2 && st1 && st1.ok === true
+      && s2.code === 200 && s2.body.exists === true && s2.body.doc_status === 'draft' && JSON.stringify(d2) === JSON.stringify(d1)
+      && s3.code === 200 && s3.body.replaced === true && d3.text.indexOf('다시 만든 글') > 0 && d3.bot_text === d3.text && d3.updated_at > d1.updated_at;
+    I.D = { s1: s1.body, s2: s2.body, s3: s3.body, st1 };
+    const f1 = await put({ period: PREV21, fail: 'LEAK_NAME' }), f1s = st(), f2 = await put({ period: PREV21, fail: 'LEAK_NAME', text: 'x' }), f3 = await put({ period: PREV21, fail: 'bad code' });
+    const pg = await put({ ping: true }), pgs = st();
+    P.E = f1.code === 200 && f1s.ok === false && /LEAK_NAME/.test(f1s.note) && f2.code === 400 && f2.body.error_code === 'BAD_FAIL' && f3.code === 400 && pg.code === 200 && pg.body.due === PREV21 && pg.body.due_ok === true && pgs.ok === true && pgs.fn === 'rnote';
+    I.E = { f1: f1.code, f1s, f2: f2.code, f3: f3.code, pg: pg.body };
+    // ② 읽기
+    const g0 = await cl({ action: 'rnote_get' }, null, 'dev1'), gw = await cl({ action: 'rnote_get' }, T21.w, 'dev1'), gd = await cl({ action: 'rnote_get' }, T21.w, '');
+    const gp = await cl({ action: 'rnote_get' }, T21.pm, 'dev1'), ga = await cl({ action: 'rnote_get', period: PREV21 }, T21.ad, 'dev1'), gn = await cl({ action: 'rnote_get', period: OLD21 }, T21.ad, 'dev1'), gb = await cl({ action: 'rnote_get', period: '2026-1' }, T21.ad, 'dev1');
+    P.F = g0.code === 401 && gw.code === 403 && gw.body.error_code === 'ADMIN_ONLY' && gd.code === 403 && gd.body.error_code === 'DEVICE_NOT_APPROVED' && gp.code === 200 && gp.body.period === PREV21 && gp.body.doc && gp.body.doc.text === d3.text
+      && !('bot_text' in gp.body.doc) && ga.code === 200 && ga.body.doc && ga.body.doc.status === 'draft' && gn.code === 200 && gn.body.doc === null && gb.code === 400 && JSON.stringify(gw.body).indexOf('다시 만든 글') < 0;
+    I.F = [g0, gw, gd, gp, ga, gn, gb].map((x) => x.code + '/' + (x.body.error_code || ''));
+    // ③ 확정
+    const base = doc().updated_at, bot0 = doc().bot_text, a0 = auditMock.logs.length;
+    const c1 = await cl({ action: 'rnote_save', period: PREV21, base }, T21.w, 'dev1'), c2 = await cl({ action: 'rnote_save', period: PREV21, base: base - 1 }, T21.pm, 'dev1'), c2b = await cl({ action: 'rnote_save', period: PREV21 }, T21.pm, 'dev1');
+    const c3 = await cl({ action: 'rnote_save', period: PREV21, base }, T21.pm, 'dev1'); const dc = JSON.parse(JSON.stringify(doc() || {}));
+    const c4 = await cl({ action: 'rnote_save', period: PREV21, base: dc.updated_at }, T21.pm, 'dev1');
+    const c5 = await put({ period: PREV21, text: CLEAN21 + '- 봇이 덮으려는 글\n', meta: meta21, force: true }), c6 = await put({ period: PREV21, text: CLEAN21 + '- 봇이 덮으려는 글\n', meta: meta21 });
+    const auC = auditMock.logs.slice(a0);
+    P.G = c1.code === 403 && c2.code === 409 && c2.body.error_code === 'RNOTE_STALE' && c2b.code === 409 && c3.code === 200 && dc.status === 'confirmed' && dc.text === bot0 && dc.bot_text === bot0 && dc.confirmed && dc.confirmed.by === 'u21pm' && dc.confirmed.edited === false
+      && c3.body.doc && !('bot_text' in c3.body.doc) && c4.code === 400 && c4.body.error_code === 'RNOTE_CONFIRMED' && c5.code === 409 && c5.body.error_code === 'RNOTE_CONFIRMED' && c6.code === 200 && c6.body.exists === true && c6.body.doc_status === 'confirmed'
+      && JSON.stringify(doc()) === JSON.stringify(dc) && auC.length === 1 && auC[0].col === 'rnote' && auC[0].ev[0].op === '연구노트확정' && auC[0].ev[0].id === 'rnote:' + PREV21;
+    I.G = { c: [c1, c2, c2b, c3, c4, c5, c6].map((x) => x.code + '/' + (x.body.error_code || '')), au: auC.map((x) => x.ev[0].op), dc: dc.status };
+    const e0 = await put({ period: OLD21, text: CLEAN21, meta: meta21 }); const eb = doc(OLD21).updated_at;
+    const e1 = await cl({ action: 'rnote_save', period: OLD21, base: eb, text: '   ' }, T21.ad, 'dev1');
+    const e2 = await cl({ action: 'rnote_save', period: OLD21, base: eb, text: CLEAN21 + '- 요원이 고친 줄\n' }, T21.ad, 'dev1'); const de = doc(OLD21) || {};
+    const auE = auditMock.logs.slice(a0 + 1);
+    P.H = e0.code === 200 && e1.code === 400 && e1.body.error_code === 'BAD_TEXT' && e2.code === 200 && de.status === 'confirmed' && de.text.indexOf('요원이 고친 줄') > 0 && de.bot_text === CLEAN21 && de.confirmed.edited === true && de.confirmed.by === 'u21ad'
+      && auE.length === 1 && auE[0].ev[0].op === '연구노트고침';
+    I.H = { e: [e0, e1, e2].map((x) => x.code + '/' + (x.body.error_code || '')), au: auE.map((x) => x.ev[0].op) };
+    return { P, I };
+  };
+  try {
+    const R21 = await chk21(cl21(gwd));
+    T('P1 판21 ① 받기 관문: 틀린·없는 봇 키 403 · 달 꼴 틀림·이번 달 400 BAD_PERIOD(지난달까지만) · 글 없음 400 · 200,000바이트 넘음 413 · meta 꼴 400 · 저장 0', R21.P.A, JSON.stringify(R21.I.A));
+    T('P1 판21 ② 서버 재검사: 회원 실명·띄어 쓴 3자 일용직 이름·거래처·계약 상대·금액(원·억·만원)·전화·주민번호·키 꼴 하나라도 = 400 RNOTE_LEAK(종류만 — 값은 응답에 없음) · meta 속 이름도 · 저장 0 · 흔적 ok false(서버 재검사) · 거래처 칸의 \'테스트\'는 이름으로 안 봄', R21.P.B, JSON.stringify(R21.I.B));
+    T('P1 판21 ③ 명부 못 읽음(회원 목록·일용직·계약) = 503 RNOTE_NAMES_UNAVAILABLE · 검사 없이 받지 않음 · 저장 0', R21.P.C, JSON.stringify(R21.I.C));
+    T('P1 판21 ④ 깨끗한 글 = 초안 저장(봇 원본 칸 = 글 · 확정 없음 · meta) · 흔적 ok · 같은 달 다시 = \'이미 있음\'·문서 그대로 · force = 초안만 다시 만들어 덮음', R21.P.D, JSON.stringify(R21.I.D));
+    T('P1 판21 ⑤ 실패 사유(fail 코드만 — 글 같이 오면 400 · 꼴 틀리면 400) = 흔적 ok false · ping = 흔적만(지난달 문서 있음 = ok)', R21.P.E, JSON.stringify(R21.I.E));
+    T('P1 판21 ⑥ 읽기 관문: 비로그인 401 · 직원 403 ADMIN_ONLY · 직원 미승인 기기 403 · PM·PM 아닌 관리자 200 · 봇 원본 칸 안 내림 · 없는 달 = 빈 문서 · 달 꼴 400', R21.P.F, JSON.stringify(R21.I.F));
+    T('P1 판21 ⑦ [확인]: 직원 403 · 낡은·없는 base 409 · 확정 = 글 그대로·봇 원본 보존·확정한 사람 · 감사 1줄(연구노트확정) · 두 번 400 RNOTE_CONFIRMED · 확정된 달 = 봇 force 409·보통 받기 \'이미 있음(확정)\' — 문서 그대로', R21.P.G, JSON.stringify(R21.I.G));
+    T('P1 판21 ⑧ [고침]: 빈 글 400 · 고친 글로 확정(PM 아닌 관리자도) · edited · 봇 원본은 고치기 전 글(판33 학습 짝) · 감사 1줄(연구노트고침)', R21.P.H, JSON.stringify(R21.I.H));
+    const MUT21 = [
+      ['R', "  if (kinds.length) { await stampOk(false,", "  if (false) { await stampOk(false,"],
+      ['R', "  if (nm === null || cn === null) {", "  if (false) {"],
+      ['R', "const NAME_COLS = [['col:workers', 'name'], ['col:vehicles', 'driver']];", "const NAME_COLS = [['col:vehicles', 'driver']];"],
+      ['R', "const CLIENT_COLS = [['col:clients', 'name'], ['col:contracts', 'client'], ['col:asbestos', 'client'], ['col:quotes', 'recv']];", "const CLIENT_COLS = [['col:clients', 'name']];"],
+      ['R', " || flat.indexOf(n.replace(/\\s+/g, '')) >= 0", ""],
+      ['R', "  if (AMOUNT_RES.some(function (re) { return re.test(s); })) kinds.push('amount');", ""],
+      ['R', "  if (!LN.piiScan(s).ok) kinds.push('pii');", ""],
+      ['R', "  const kinds = leakKinds(d.text + '\\n' + JSON.stringify(meta),", "  const kinds = leakKinds(d.text,"],
+      ['R', "      if (d.force === true) return { code: 409,", "      if (false) return { code: 409,"],
+      ['R', "    if (d.force !== true) { await stampOk(true, period + '분 이미 있음(초안)');", "    if (false) { await stampOk(true, period + '분 이미 있음(초안)');"],
+      ['R', "  if (doc.status === 'confirmed') return { code: 400,", "  if (false) return { code: 400,"],
+      ['R', "  if (d.base === undefined || num(d.base) !== num(doc.updated_at)) return { code: 409,", "  if (false) return { code: 409,"],
+      ['R', "  doc.text = text; doc.status = 'confirmed';", "  doc.text = text; doc.bot_text = text; doc.status = 'confirmed';"],
+      ['R', "    confirmed: isObj(doc.confirmed) ? doc.confirmed : null };", "    confirmed: isObj(doc.confirmed) ? doc.confirmed : null, bot_text: doc.bot_text };"],
+      ['R', "  if (!ymOk(period) || period >= kstYm(now)) return", "  if (!ymOk(period)) return"],
+      ['R', "  if (bytes(d.text) > TEXT_MAX) return { code: 413,", "  if (false) return { code: 413,"],
+      ['R', "  try { au = (await AUDIT.appendAudit(", "  try { au = (await (async () => false)("],
+      ['G', "async function handleRnoteGet(event, d, R) { const g = await pmconGate(event, R, false); if (g.res) return g.res;", "async function handleRnoteGet(event, d, R) { const g = {};"],
+      ['G', "async function handleRnoteSave(event, d, R) { const g = await pmconGate(event, R, false); if (g.res) return g.res;", "async function handleRnoteSave(event, d, R) { const g = { c: { member: { id: 'u21w', name: '가짜직원' } } };"],
+      ['G', "  if (!botKeyOk(d.key)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });\n  const o = await RNOTE.put(d);", "  const o = await RNOTE.put(d);"],
+    ];
+    const kill21 = [];
+    for (const [k, from, to] of MUT21) {
+      let r;
+      try {
+        if (k === 'R') {
+          const Rx = comp21(P21, mut21(S21, from, to));
+          require.cache[rp21] = { id: rp21, filename: rp21, loaded: true, exports: Rx };
+          try { r = await chk21(cl21(comp21(G21, SG21))); } finally { require.cache[rp21] = keep21; }
+        } else r = await chk21(cl21(comp21(G21, mut21(SG21, from, to))));
+      } catch (e) { r = { P: { x: 'err ' + e.message } }; }
+      if (Object.values(r.P).every((v) => v === true)) kill21.push(k + ':' + from.trim().slice(0, 60) + ' 안 깨짐');
+      else if (Object.values(r.P).some((v) => typeof v === 'string')) kill21.push(k + ':' + from.trim().slice(0, 40) + ' ' + Object.values(r.P).find((v) => typeof v === 'string'));
+    }
+    T('P1 판21 ⑨ 결함 사본 ' + MUT21.length + '개(재검사 끔·명부 못 읽음 통과·일용직/계약 상대 표 뺌·띄어 쓴 이름·금액·번호 검사 뺌·meta 안 봄·확정 덮기·초안 덮기·확정 두 번·base 안 봄·봇 원본 덮기·원본 내림·이번 달 받음·크기 안 봄·감사 없음 · gw-data 읽기·확정 관문 걷음·봇 키 안 봄) = 모두 ✗', kill21.length === 0, kill21.join(' | '));
+  } catch (e) { T('P1 판21 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+  finally { reset21(); const s = JSON.parse(snap21); mem.gw_users = s.u; mem.gw_data = s.d; require.cache[rp21] = keep21; }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

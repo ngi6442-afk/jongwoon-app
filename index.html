@@ -31350,7 +31350,7 @@ function dutyStage(nx){
 
   var MOD_LABEL = {tasks:"지시", veh:"차량", hw:"화관법", rec:"기성·수금", stmt:"월말명세서", lic:"인허가", safety:"안전", site:"현장", check:"주기 체크", con:"계약", cli:"거래처", doc:"문서함", bid:"입찰", wk:"일용직", quote:"견적서", promo:"홍보"};   // check 권한은 주기 체크리스트 영역만 제어(내게 온 지시·내 할 일은 전원) — 탭 이름(내 업무)과 구분 · hw = 화관법 탭(v431 열 · v434 탭 숨김·폐기물 제출 수행 검사)
   // ---- 감사 로그 뷰어(관리자 전용, 서버 기록 열람) ----
-  var AUDIT_COL_LABEL = {tasks:"지시", vehicles:"차량", receivables:"기성", licenses:"인허가", checklist:"업무", documents:"문서함", clients:"거래처", contracts:"계약", leaves:"휴가", family:"가족친화", member:"회원", login:"로그인", progress:"진척도", pmcon:"PM 콘솔", mchk:"월 점검", corp_reg:"법인 등기", stmt:"월말명세서", safety:"안전 설정"};   // v436 safety = 현황 ⑤ 안전 설정(settings:safety) 고침(uismoke v436 ⑧이 safety를 끝으로 대조) · 29 판② stmt = gw-stmt 감사(거래처 목록·저장·되돌리기·차량 별칭)
+  var AUDIT_COL_LABEL = {tasks:"지시", vehicles:"차량", receivables:"기성", licenses:"인허가", checklist:"업무", documents:"문서함", clients:"거래처", contracts:"계약", leaves:"휴가", family:"가족친화", member:"회원", login:"로그인", progress:"진척도", pmcon:"PM 콘솔", mchk:"월 점검", corp_reg:"법인 등기", stmt:"월말명세서", rnote:"연구노트", safety:"안전 설정"};   // v436 safety = 현황 ⑤ 안전 설정(settings:safety) 고침(uismoke v436 ⑧이 safety를 끝으로 대조) · 29 판② stmt = gw-stmt 감사(거래처 목록·저장·되돌리기·차량 별칭)
   var AUDIT_FIELD_LABEL = {status:"상태", title:"제목", who:"담당", who_id:"담당", due:"기한", amount:"금액", paid:"입금", del:"삭제", scope:"공개범위", stage:"단계", cancel_req:"취소요청", name:"이름", role:"직책", rank:"직급", dept:"부서", admin:"관리자", perms:"권한", hire_date:"입사일", leave_date:"퇴사일", seq:"연번", annual_base:"잔여연차기준", annual_base_date:"기준일", annual_days:"연차수동", loa_days:"휴직누적", on_loa:"휴직중", loa_start:"휴직시작", loa_end:"휴직종료", annual_paid:"연차수당포함", emp_type:"고용형태", birth:"생년월일", annual_basis:"연차기준", reason:"사유", approver:"승인자", done_by:"완료자", detail:"상세", recur:"반복", hl:"하이라이트", mismatch:"불일치", PIN:"PIN", tier:"관리자등급", deleted_at:"삭제일", deleted_by:"삭제자", restored_at:"복구일", restored_by:"복구자",
     "kosha.stage":"KOSHA 단계", "kosha.apply_no":"접수번호", "kosha.applied_on":"접수일", "kosha.review_on":"심사일", "kosha.decided_on":"인정일(결정일)", "kosha.expires_on":"만료일", "kosha.rate_year":"요율 연도", "kosha.checks":"사후점검", "headcount.env":"상시근로자 종운환경", "headcount.con":"상시근로자 종운건설"};   // v436 검토: 안전 설정 감사 줄의 바뀐 칸(f) — 서버 gw-data SAFETY_FIELD_LABEL과 같은 글(uismoke v436 ⑧이 대조), 없으면 감사 화면에 영어 경로(kosha.stage)가 그대로 나왔다
   var auditMonthCur = "";
@@ -32158,6 +32158,89 @@ function dutyStage(nx){
     var n = 0; Array.prototype.forEach.call(host.children || [], function(el){ if (!(el.style && el.style.display === "none")) n++; });
     wrap.style.display = n ? "" : "none";
   }
+  // ---- P1 판21 KOITA 연구노트 월 자동 초안 카드(착수설명서 판21 · 원장 T759·C099) — 서버 rnote_get 하나(지난달 문서). 만드는 쪽 = appdata 봇(매월 1~3일, 직원명·거래처·금액을 가린 초안).
+  //   초안 = [확인](그대로 확정) · [고침](글을 고쳐 확정) · [글 보기] — 확정은 rnote_save 하나(달·base · 고침이면 고친 글), 확정되면 확정본 .md를 내려받는다(downloadBlob — 요원이 연구노트 폴더에 보관).
+  //   확정본 = 한 줄(누가·언제·고친 글인지) + [.md 내려받기]·[글 보기] · 문서가 없으면 카드 없음(pmconChecksSync) · 새 푸시 없음. 봇 원본 글은 서버가 따로 남긴다(판33 학습 짝 — 화면에는 내리지 않음).
+  var rnoteBusy = false;
+  function rnoteMonth(p){ var m = Number(String(p || "").slice(5, 7)); return m ? m + "월" : String(p || ""); }
+  function rnoteMeta(doc){
+    var m = (doc && doc.meta) || {}, c = m.counts || {}, li = [];
+    li.push("과제1 " + (Number(c["1"]) || 0) + "건 · 과제2 " + (Number(c["2"]) || 0) + "건 · 과제3 " + (Number(c["3"]) || 0) + "건" + (Number(m.excluded) ? " (자동 커밋 " + Number(m.excluded) + "건은 뺌)" : ""));
+    var src = (m.repos || []).map(function(r){ return String((r && r.label) || "") + " " + (Number(r && r.n) || 0) + "건"; }).filter(function(x){ return x.trim(); });
+    if (src.length) li.push("재료: " + src.join(" · ") + " (커밋 이력)");
+    var miss = (m.missing || []).map(function(r){ return String((r && r.label) || "") + ((r && r.why) ? "(" + String(r.why) + ")" : ""); }).filter(function(x){ return x; });
+    if (miss.length) li.push("빠진 저장소: " + miss.join(" · "));
+    var k = m.masked || {}, kt = [["name", "직원 이름"], ["client", "거래처"], ["amount", "금액"], ["num", "번호"], ["key", "키"]].filter(function(x){ return Number(k[x[0]]); }).map(function(x){ return x[1] + " " + Number(k[x[0]]); });
+    li.push(kt.length ? "가린 것: " + kt.join(" · ") : "가린 것: 없음");
+    return li;
+  }
+  function rnoteCardHtml(doc, canWrite){
+    var two = function(n){ return String(n).padStart(2, "0"); }, mo = rnoteMonth(doc.period), done = doc.status === "confirmed", cf = doc.confirmed || {};
+    var t = new Date(Number(done ? cf.ts : doc.created_at) || 0), when = isNaN(t.getTime()) ? "" : two(t.getMonth() + 1) + "-" + two(t.getDate());
+    var head = done ? "연구노트 " + mo + " 확정본" : "연구노트 " + mo + " 초안 — 확인해 주세요";
+    var li = done ? ["확인함 · " + when + (cf.name ? " " + cf.name : "") + (cf.edited ? " · 고친 글로 확정" : " · 초안 그대로 확정")] : rnoteMeta(doc);
+    var btn = done ? '<button type="button" class="b-ok" data-rnote="down">.md 내려받기</button>'
+      : (canWrite ? '<button type="button" class="b-ok" data-rnote="ack">확인</button><button type="button" class="mini-btn" data-rnote="edit">고침</button>' : '<span class="pc-who">확인하실 분: 연구전담요원</span>');
+    return '<div style="font-weight:600;font-size:13.5px;">' + esc(head) + '</div>'
+      + '<ul style="margin:6px 0 0;padding-left:18px;font-size:13px;line-height:1.5;">' + li.map(function(x){ return '<li style="margin:3px 0;">' + esc(x) + '</li>'; }).join("") + '</ul>'
+      + '<div class="pc-none" style="padding:4px 0 0;">' + esc(done ? "확정본을 연구노트 폴더에 보관해 주세요" : (when ? when + " " : "") + "자동으로 만든 초안 · 확정하면 확정본(.md)을 내려받습니다") + '</div>'
+      + '<div class="pc-btns" style="justify-content:flex-start;margin-top:8px;">' + btn + '<button type="button" class="mini-btn" data-rnote="view">글 보기</button></div>'
+      + '<pre id="rnotePre" style="display:none;white-space:pre-wrap;word-break:break-all;font-size:12px;line-height:1.5;max-height:320px;overflow:auto;margin:8px 0 0;padding:8px;border:1px solid var(--line);border-radius:8px;">' + esc(doc.text || "") + '</pre>';
+  }
+  function rnoteEditHtml(doc){
+    return '<div style="font-weight:600;font-size:13.5px;">' + esc("연구노트 " + rnoteMonth(doc.period) + " 초안 고치기") + '</div>'
+      + '<textarea id="rnoteEdit" rows="14" style="width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);font-size:13px;font-family:inherit;resize:vertical;margin:8px 0 2px;box-sizing:border-box;">' + esc(doc.text || "") + '</textarea>'
+      + '<div class="pc-btns" style="justify-content:flex-start;margin-top:6px;"><button type="button" class="b-ok" data-rnote="editok">고친 글로 확정</button><button type="button" class="mini-btn" data-rnote="editno">취소</button></div>';
+  }
+  function rnoteBind(host, doc, canWrite){
+    Array.prototype.forEach.call(host.querySelectorAll ? host.querySelectorAll("[data-rnote]") : [], function(b){
+      b.addEventListener("click", function(){
+        var a = b.getAttribute("data-rnote");
+        if (a === "view"){ var p = document.getElementById("rnotePre"); if (p) p.style.display = p.style.display === "none" ? "" : "none"; return; }
+        if (a === "down"){ rnoteDownload(doc); return; }
+        if (a === "ack"){ rnoteSave(doc, null); return; }
+        if (a === "edit"){ host.innerHTML = rnoteEditHtml(doc); rnoteBind(host, doc, canWrite); return; }
+        if (a === "editno"){ host.innerHTML = rnoteCardHtml(doc, canWrite); rnoteBind(host, doc, canWrite); return; }
+        if (a === "editok"){ var ta = document.getElementById("rnoteEdit"); rnoteSave(doc, ta ? String(ta.value) : null); }
+      });
+    });
+  }
+  function rnoteRender(host){
+    if (!host) return;
+    gwCall("gw-data", { action: "rnote_get" }).then(function(res){
+      if (res.status !== 200 || !res.body){ host.style.display = ""; host.innerHTML = '<div style="font-weight:600;font-size:13.5px;">연구노트</div><div class="pc-none" style="color:#B00020;">연구노트 초안을 불러오지 못했습니다 (' + esc((res.body && res.body.error_code) || res.status) + ')</div>'; pmconChecksSync(); return; }
+      var doc = res.body.doc;
+      if (!doc){ host.style.display = "none"; host.innerHTML = ""; pmconChecksSync(); return; }
+      host.style.display = "";
+      host.innerHTML = rnoteCardHtml(doc, !!res.body.can_write);
+      rnoteBind(host, doc, !!res.body.can_write);
+      pmconChecksSync();
+    }).catch(function(){ host.style.display = ""; host.innerHTML = '<div style="font-weight:600;font-size:13.5px;">연구노트</div><div class="pc-none" style="color:#B00020;">연구노트 초안을 불러오지 못했습니다(네트워크)</div>'; pmconChecksSync(); });
+  }
+  function rnoteSave(doc, text){
+    if (rnoteBusy || !doc || doc.status === "confirmed") return;
+    var edited = text !== null && text !== undefined && text !== String(doc.text || "");
+    if (text !== null && text !== undefined && !String(text).trim()){ alert("글이 비어 있습니다."); return; }
+    if (!confirm((edited ? "[고침] 고친 글로 " : "[확인] 초안 그대로 ") + "연구노트 " + rnoteMonth(doc.period) + "분을 확정합니다.\n확정하면 자동으로 다시 만들지 않고, 확정본(.md)을 내려받습니다.")) return;
+    var body = { action: "rnote_save", period: doc.period, base: doc.updated_at };
+    if (edited) body.text = String(text);
+    rnoteBusy = true;
+    gwCall("gw-data", body).then(function(res){
+      rnoteBusy = false;
+      if (res.status === 200 && res.body && res.body.doc){ apprToastShow("연구노트 " + rnoteMonth(doc.period) + " 확정 — 확정본을 내려받습니다"); rnoteDownload(res.body.doc); renderPmcon(); return; }
+      var code = res.body && res.body.error_code;
+      if (res.status === 409){ apprToastShow("연구노트가 방금 바뀌었습니다 — 최신으로 다시 불러왔습니다"); renderPmcon(); return; }
+      if (code === "RNOTE_CONFIRMED"){ apprToastShow("이미 확정된 달입니다"); renderPmcon(); return; }
+      alert("연구노트 확정 실패 (" + (code || res.status) + ")"); renderPmcon();
+    }).catch(function(){ rnoteBusy = false; alert("연구노트 확정 실패(네트워크) — 다시 시도해주세요."); });
+  }
+  function rnoteDownload(doc){
+    if (!doc || doc.status !== "confirmed") return;
+    var cf = doc.confirmed || {}, t = new Date(Number(cf.ts) || 0), day = isNaN(t.getTime()) ? "" : t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0");
+    var tail = "\n\n---\n- 요원 확정: " + (cf.name || "") + (day ? " · " + day : "") + (cf.edited ? " · 고친 글로 확정" : " · 초안 그대로 확정") + "\n";
+    downloadBlob("연구노트_" + doc.period + "_확정.md", new Blob([String(doc.text || "") + tail], { type: "text/markdown;charset=utf-8" }));
+  }
+  PMCON_CHECKS.push({ id: "rnote", title: "연구노트", render: rnoteRender });
   // ---- P1 판31 월 점검 카드(시안 판3 ③ 806~819 · 착수설명서 판31 · 원장 T476) — 서버 mchk_get 하나를 읽어 어긋남·확인 못 함 항목만 줄로 보인다.
   //   맞은 항목·기준 없음(숫자만 기록) 항목은 카드에 줄로 나오지 않고 서버 기록(그달 점검 문서)에만 남는다. 어긋남·확인 못 함이 0이거나 PM이 [확인]한 달이면 카드를 숨긴다(pmconChecksSync).
   //   [확인] = PM만(서버 응답 can_ack만 믿음 · mchk_ack — 누른 기록 1줄·감사 1줄) · [처리 지시] = 지시 탭 등록 칸에 어긋난 항목 글을 채워 여는 것까지(지시 등록은 사람이 — 자동 생성 없음).

@@ -5743,6 +5743,15 @@ async function handleMchkRun(event, d, R) {
   const o = await MCHK.run(Date.now(), { period: d.period === undefined ? '' : String(d.period), force: d.force === true, by: 'bot', log: MCHK_LOG });   // log = force가 [확인]을 풀면 누른 기록에 1줄(검토 11/14 ⑦)
   return jr(o.ok ? 200 : (o.code === 'BAD_PERIOD' ? 400 : 500), Object.assign({ status: o.ok ? 'OK' : 'ERROR' }, o, { request_id: R }));
 }
+// ---- P1 판21 KOITA 연구노트 월 자동 초안(착수설명서 판21 · 원장 T759·C099) — 받기·재검사·문서·확정은 _lib/rnote.js 한 곳, 여기는 관문·봇 키 연결만 ----
+//   받기 rnote_put = 봇 키만(botKeyOk — 다른 봇 받기와 같은 상수시간 비교) · 열람 rnote_get·확정 rnote_save = 판29 pmconGate 읽기(로그인 → 기기 승인 → 관리자 — 요원 = PM은 관리자)
+const RNOTE = require('./_lib/rnote');
+async function handleRnotePut(event, d, R) {
+  if (!botKeyOk(d.key)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
+  const o = await RNOTE.put(d); return jr(o.code, Object.assign(o.body, { request_id: R }));
+}
+async function handleRnoteGet(event, d, R) { const g = await pmconGate(event, R, false); if (g.res) return g.res; const o = await RNOTE.get(d); return jr(o.code, Object.assign(o.body, { request_id: R })); }
+async function handleRnoteSave(event, d, R) { const g = await pmconGate(event, R, false); if (g.res) return g.res; const o = await RNOTE.save(d, g.c.member); return jr(o.code, Object.assign(o.body, { request_id: R })); }
 
 // v378 큰 본문 양방향 gzip(2026-10-08 실사고): col:bids가 9/11 3.94MB(2,462건)에서 10/8 07:52 분할 전송 수신 뒤 6.69MB(3,953건)로 자라
 // Netlify 동기 함수 응답 한도 6MB(6,291,456B)를 넘자 get이 실패했고, 앱은 그 실패를 삼켜 "수집된 공고가 없습니다"로 보였다(PM "기존거 다 날라갔나").
@@ -5919,6 +5928,9 @@ async function handlerInner(event) {
     if (d && d.action === 'mchk_get') return await handleMchkGet(event, d, R);   // P1 판31 월 점검 열람 — 관리자
     if (d && d.action === 'mchk_ack') return await handleMchkAck(event, d, R);   // P1 판31 월 점검 [확인] — PM만(판29 판정)
     if (d && d.action === 'mchk_run') return await handleMchkRun(event, d, R);   // P1 판31 월 점검 다시 돌리기 — 봇 키만(시험·복구)
+    if (d && d.action === 'rnote_put') return await handleRnotePut(event, d, R);   // P1 판21 연구노트 월 초안 받기 — 봇 키만(appdata rnote.py)
+    if (d && d.action === 'rnote_get') return await handleRnoteGet(event, d, R);   // P1 판21 연구노트 열람 — 관리자(요원 = PM 포함)
+    if (d && d.action === 'rnote_save') return await handleRnoteSave(event, d, R);   // P1 판21 연구노트 [확인]/[고침] 확정 — 관리자 · 감사 1줄
     if (d && d.action === 'doc_att_put') return await handleDocAttPut(event, d, R);
     if (d && d.action === 'doc_att_get') return await handleDocAttGet(event, d, R);
     if (d && d.action === 'doc_att_del') return await handleDocAttDel(event, d, R);
