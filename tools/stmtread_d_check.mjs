@@ -119,7 +119,8 @@ const RD = require(join(LIB, 'stmtread.js'));
   const load = (src) => { const m = new Mod(join(LIB, 'stmtvision.js'), null); m.filename = join(LIB, 'stmtvision.js'); m.paths = Mod._nodeModulePaths(LIB); m._compile(src, m.filename); return m.exports; };
   const muts = [
     ['가림 칸 안 칠함', srcV.replace('rgba[p] = 255; rgba[p + 1] = 255;', 'rgba[p] = rgba[p]; rgba[p + 1] = 255;')],
-    ['계산서 쪽 안 뺌', srcV.replace("if (!photo && isInvoicePage(colorStats(rgba, p.w, p.h), p.text)) { skipped.push({ i: i, why: 'invoice' }); continue; }", '')],
+    ['계산서 쪽 안 뺌', srcV.replace("if (!photo && isInvoicePage(colorStats(rgba, p.w, p.h), p.text)) { skipped.push({ i: i, why: 'invoice' }); if (invs.length < 3) invs.push({ rgba: rgba, w: p.w, h: p.h, i: i }); continue; }", '')],
+    ['계산서뿐일 때 받는자 칸 안 가림', srcV.replace('paintWhite(v.rgba, v.w, v.h, BAND.concat(INV_MASK)', 'paintWhite(v.rgba, v.w, v.h, BAND')],
     ['다른 달 줄 안 뺌', srcV.replace("if (date && date.slice(0, 7) !== ym) { other++; return; }", '')],
     ['회원 이름 안 지움', srcV.replace("(names || []).forEach(function (n) { if (n && n.length >= 2) t = t.split(n).join(' '); });", '')]
   ];
@@ -132,12 +133,15 @@ const RD = require(join(LIB, 'stmtread.js'));
     const M = load(src);
     let caught = false;
     const d = mkp(); M.paintWhite(d, W, H, M.maskRects('v08', 0, W, H)); if (d[(Math.floor(0.19 * H) * W + 50) * 4] !== 255) caught = true;
-    const pr = await M.prepareImages('v05', [{ w: W, h: H, data: invP(), text: '' }]); if (pr.images.length !== 0) caught = true;
+    const pr = await M.prepareImages('v05', [{ w: W, h: H, data: invP(), text: '' }]); if (pr.images.length !== 1 || !pr.invOnly) caught = true;   // 계산서뿐 = 칸 가려 1장(invOnly)
+    const iv = invP(); const pv = await M.prepareImages('v05', [{ w: W, h: H, data: iv, text: '' }]);
+    const { Jimp } = require('jimp'); const jj = pv.images[0] ? await Jimp.read(pv.images[0].buf) : null;
+    if (!jj || jj.bitmap.data[(Math.floor(0.15 * jj.bitmap.height) * jj.bitmap.width + 20) * 4] < 240) caught = true;   // 공급자 칸(15%) = 흰색
     const tr = M.toResult({ rows: [{ date: '2026-09-01', item: 'x', amt: 1 }, { date: '2026-10-01', item: '홍길동 부품', amt: 2 }] }, { ym: '2026-10', vendor: {}, names: ['홍길동'] });
     if (tr.rows.length !== 1 || tr.rows[0].item !== '부품') caught = true;
     results.push(name + ':' + (caught ? '잡힘' : '못 잡음'));
   }
-  T('⑥ 결함 사본 4개(가림 안 칠함·계산서 쪽 안 뺌·다른 달 줄 안 뺌·회원 이름 안 지움) = 모두 잡힘', results.every((x) => /잡힘$/.test(x)), results.join(' | '));
+  T('⑥ 결함 사본 5개(가림 안 칠함·계산서 쪽 안 뺌·계산서뿐일 때 받는자 칸 안 가림·다른 달 줄 안 뺌·회원 이름 안 지움) = 모두 잡힘', results.every((x) => /잡힘$/.test(x)), results.join(' | '));
 }
 // ---- ⑦ 11/14 검토 반영: 걸러내기가 날짜·띄어 쓴 숫자·규격을 살림 · 줄바꿈 살림(글 판독) · 사진은 가림 없음 · 쪽 상한 알림 · 응답 잘림 = TOO_LONG · 그림 없는 글자 PDF = 글로 판독
 {
@@ -159,6 +163,35 @@ const RD = require(join(LIB, 'stmtread.js'));
   const tl = await V2.readVision([{ buf: Buffer.from([0xff, 0xd8]), w: 1, h: 1, i: 0 }], { name: 'x' }, '2026-10', []);
   require.cache[cp].exports.callApiStream = prevFn;
   T('⑦ 응답이 max_tokens로 잘림 = TOO_LONG(NO_JSON 아님 — 쪽을 나눠 넣으라는 안내로)', !tl.ok && tl.code === 'TOO_LONG', JSON.stringify(tl));
+}
+// ---- ⑧ 11/15 PM '덕천은 계산서에 적힌 게 명세' — 계산서뿐인 서류 = 공급자·받는자 칸 가리고 품목 줄을 명세로 · 명세가 함께 있으면 종전대로 계산서 쪽 뺌
+{
+  const W = 200, H = 280;
+  const inv = Buffer.alloc(W * H * 4, 255); for (let y = 10; y < 70; y++) for (let x = 5; x < 195; x++) if (x % 5 === 0) { const p = (y * W + x) * 4; if (x < 100) { inv[p] = 230; inv[p + 1] = 50; inv[p + 2] = 80; } else { inv[p] = 30; inv[p + 1] = 80; inv[p + 2] = 210; } }
+  for (let y = 110; y < 130; y++) for (let x = 20; x < 180; x++) { const p = (y * W + x) * 4; inv[p] = 0; inv[p + 1] = 0; inv[p + 2] = 0; }   // 품목 표(39~46%)
+  const plain = Buffer.alloc(W * H * 4, 255); for (let y = 30; y < 250; y += 7) for (let x = 20; x < 180; x++) { const p = (y * W + x) * 4; plain[p] = 0; plain[p + 1] = 0; plain[p + 2] = 0; }
+  const only = await V.prepareImages('v04', [{ w: W, h: H, data: Buffer.from(inv), text: '' }]);
+  const { Jimp } = require('jimp'); const j = await Jimp.read(only.images[0].buf); const bw = j.bitmap.width, bh = j.bitmap.height;
+  const px = (fx, fy) => j.bitmap.data[(Math.floor(fy * bh) * bw + Math.floor(fx * bw)) * 4];
+  const mixed = await V.prepareImages('v04', [{ w: W, h: H, data: Buffer.from(inv), text: '' }, { w: W, h: H, data: Buffer.from(plain), text: '' }]);
+  T('⑧ 계산서뿐 = 1장 보냄(invOnly) · 공급자 칸(10%·20%) 흰색 · 품목 표(42%) 그대로 · 명세가 함께면 계산서 쪽 뺌(종전)',
+    only.images.length === 1 && only.invOnly === true && only.skipped.length === 0 && px(0.3, 0.1) > 240 && px(0.7, 0.2) > 240 && px(0.5, 0.42) < 40 && mixed.images.length === 1 && !mixed.invOnly && mixed.skipped[0].why === 'invoice',
+    JSON.stringify({ n: only.images.length, inv: only.invOnly, a: px(0.3, 0.1), b: px(0.7, 0.2), t: px(0.5, 0.42), m: [mixed.images.length, mixed.invOnly] }));
+  const p1 = V.buildPrompt({ name: '덕천세차장', kind: 'wash' }, '2026-10', true), p0 = V.buildPrompt({ name: '덕천세차장', kind: 'wash' }, '2026-10');
+  T('⑧ 지시문: 계산서뿐이면 "품목 표의 줄을 거래 줄로" · 보통은 "명세서 쪽이 함께 있으면 … 옮기지 말고 … 세금계산서뿐이면 … 옮겨라" · "빼야 할 줄"에 계산서 통째 빼기 없음',
+    /세금계산서뿐이다/.test(p1) && /품목 표의 줄을 거래 줄로/.test(p1) && /명세서 쪽이 함께 있으면/.test(p0) && /세금계산서뿐이면 그 품목 표의 줄/.test(p0) && !/빈 줄, 계산서/.test(p0), p0.slice(0, 40));
+  fake.reply = JSON.stringify({ rows: [{ date: '10/31', vraw: '7678', item: '차량7678 오일교환', qty: 40, unit: 10000, amt: 400000, vat: 40000, note: 'R3' }, { date: '10/31', item: '오일필터', qty: 1, unit: 75000, amt: 75000, vat: 7500 }, { date: '10/31', item: '구리스', qty: 1, unit: 40000, amt: 40000, vat: 4000 }], sum: { supply: 515000, vat: 51500, total: 566500 }, carry: null });
+  delete require.cache[require.resolve(join(LIB, 'stmtvision.js'))];   // ⑦이 응답 잘림 가짜로 다시 불러 둔 사본을 버림
+  const pdfLike = await (async () => {   // readByAi pdf 길: pdftext.pdfPageImages를 가짜로
+    const pp = require.resolve(join(LIB, 'pdftext.js')); require(pp); const prev = require.cache[pp].exports.pdfPageImages;
+    require.cache[pp].exports.pdfPageImages = async function () { return { ok: true, pages: [{ w: W, h: H, data: Buffer.from(inv), text: '' }], more: 0 }; };
+    try { return await RD.readByAi(Buffer.from('%PDF-'), 'pdf', { ym: '2026-10', vk: 'v04', vendor: { name: '덕천세차장', kind: 'wash', group: 'veh', hint: ['덕천'] }, names: [] }); }
+    finally { require.cache[pp].exports.pdfPageImages = prev; }
+  })();
+  const sentP = JSON.stringify(fake.last || {});
+  T('⑧ readByAi(계산서뿐 PDF) → 3줄 · 줄 합 = 합계(경고 "줄 합이 … 다릅니다" 없음) · "계산서뿐인 서류" 경고 · 보낸 지시문 = 계산서뿐 지시',
+    pdfLike.ok && pdfLike.result.rows.length === 3 && !pdfLike.result.warn.some((w) => /줄 합이/.test(w)) && pdfLike.result.warn.some((w) => /계산서뿐인 서류/.test(w)) && /세금계산서뿐이다/.test(sentP),
+    JSON.stringify(pdfLike).slice(0, 300));
 }
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n원본 읽기(나누기·AI 판독) 시험 전 항목 통과 (' + pass + ')');
 process.exit(fail ? 1 : 0);

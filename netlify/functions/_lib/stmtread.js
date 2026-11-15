@@ -128,9 +128,10 @@ async function readByAi(buf, mode, ctx) {
   } else return { ok: false, code: 'BAD_MODE' };
   const prep = await V.prepareImages(ctx.vk, pages, { photo: mode === 'image' });
   if (!prep.images.length) return { ok: false, code: prep.skipped.some(function (x) { return x.why === 'invoice'; }) ? 'ONLY_INVOICE' : 'NO_PAGES' };
-  const r = await V.readVision(prep.images, ctx.vendor || {}, ctx.ym, ctx.names || []);
+  const r = await V.readVision(prep.images, ctx.vendor || {}, ctx.ym, ctx.names || [], !!prep.invOnly);
   if (!r.ok) return r;
   const res = finish(r.result, ctx);
+  if (prep.invOnly) res.warn.push('계산서뿐인 서류 — 계산서 품목 줄을 명세로 옮겼습니다(공급자·받는자 칸은 가리고 보냄)');
   const cnt = function (w) { return prep.skipped.filter(function (x) { return x.why === w; }).length; };
   if (cnt('invoice')) res.warn.push('계산서 쪽 ' + cnt('invoice') + '장은 AI에 보내지 않았습니다(계산서 합계는 보안 계산서 HTML을 넣거나 손으로)');
   if (cnt('too_many') + more) res.warn.push('쪽이 많아 ' + V.MAX_PAGES + '쪽까지만 읽었습니다 — 나머지 ' + (cnt('too_many') + more) + '쪽은 따로 넣어 주세요');

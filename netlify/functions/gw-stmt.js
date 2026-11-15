@@ -642,8 +642,9 @@ async function handleDrop(st, c, d, R) {
   if (!cur.ok) return fail(cur.code, R);
   const same = cur.list.filter(function (x) { return x.sha === sha; })[0];
   if (same) {
-    // 같은 파일 — 못 읽음(일시 오류)·거래처 없음(상세에서 거래처를 정해 다시 넣음)이면 그 줄을 다시 읽고, 아니면 건너뜀(검토 low6·7)
-    const rv = (same.state === 'novendor' && fixed) ? fixed : ((same.state === 'fail' && same.vk) ? vendorOf(cfg, fixed ? fixed.vk : same.vk) : null);
+    // 같은 파일 — 못 읽음(일시 오류)·거래처 없음(상세에서 거래처를 정해 다시 넣음)·읽었는데 줄 0(11/15 덕천 — 계산서뿐인 서류를 옛 지시문이 0줄로 읽음)이면 그 줄을 다시 읽고, 아니면 건너뜀(검토 low6·7)
+    const empty = same.state === 'read' && !Number(same.n) && same.vk && !same.applied;
+    const rv = (same.state === 'novendor' && fixed) ? fixed : (((same.state === 'fail' || empty) && same.vk) ? vendorOf(cfg, fixed ? fixed.vk : same.vk) : null);
     if (!rv) return jr(200, { status: 'OK', dup: true, entry: dropMeta(same), request_id: R });
     let e2 = same; e2.vk = rv.vk; if (fixed) e2.how = 'fixed';
     e2 = await dropRead(e2, buf, rv, c);

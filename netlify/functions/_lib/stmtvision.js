@@ -37,6 +37,8 @@ function paintWhite(rgba, w, h, rects) {
     for (let y = y0; y < y1; y++) { let p = (y * w + x0) * 4; for (let x = x0; x < x1; x++, p += 4) { rgba[p] = 255; rgba[p + 1] = 255; rgba[p + 2] = 255; rgba[p + 3] = 255; } }
   });
 }
+// 계산서뿐인 서류(PM 11/15 '덕천은 계산서에 적힌 게 명세') — 홈택스 인쇄 양식의 공급자·공급받는자 칸(승인번호 줄 ~ 이메일 줄, 덕천 10월 실물 쪽 비율 0.056~0.243 + 여유)을 가리고 품목 표를 읽힘
+const INV_MASK = [[0, 0.045, 1, 0.255]];
 // 계산서 쪽 판정 — 홈택스·보안메일 인쇄본은 빨강(공급자)·파랑(공급받는자) 테두리, 경영박사 계산서는 파랑 선이 쪽 전체 · 회색 스캔이면 글자층 낱말로
 function colorStats(rgba, w, h) {
   let red = 0, blue = 0, n = 0;
@@ -59,21 +61,32 @@ function isInvoicePage(stats, text) {
 async function prepareImages(vk, pages, opts) {
   const { Jimp } = require('jimp');
   const photo = !!(opts && opts.photo);
-  const images = [], skipped = [];
+  const images = [], skipped = [], invs = [];
   for (let i = 0; i < pages.length; i++) {
     const p = pages[i];
     if (images.length >= MAX_PAGES) { skipped.push({ i: i, why: 'too_many' }); if (p) p.data = null; continue; }
     if (!p || !p.w || !p.h || !p.data) { skipped.push({ i: i, why: 'empty' }); continue; }
     const rgba = Buffer.from(p.data.buffer ? Buffer.from(p.data.buffer, p.data.byteOffset, p.data.byteLength) : p.data);   // 사본에 칠함
     p.data = null;
-    if (!photo && isInvoicePage(colorStats(rgba, p.w, p.h), p.text)) { skipped.push({ i: i, why: 'invoice' }); continue; }
+    if (!photo && isInvoicePage(colorStats(rgba, p.w, p.h), p.text)) { skipped.push({ i: i, why: 'invoice' }); if (invs.length < 3) invs.push({ rgba: rgba, w: p.w, h: p.h, i: i }); continue; }
     if (!photo) paintWhite(rgba, p.w, p.h, maskRects(vk, i, p.w, p.h));
-    const img = new Jimp({ width: p.w, height: p.h, data: rgba });
-    const sc = Math.min(1, MAX_SIDE / Math.max(p.w, p.h));
-    if (sc < 1) img.resize({ w: Math.round(p.w * sc), h: Math.round(p.h * sc) });
-    images.push({ buf: await img.getBuffer('image/jpeg', { quality: JPEG_Q }), w: img.bitmap.width, h: img.bitmap.height, i: i });
+    images.push(await toJpeg(Jimp, rgba, p.w, p.h, i));
+  }
+  // 쪽이 전부 계산서 = 계산서가 곧 명세(덕천 등) — 공급자·공급받는자 칸을 가리고 품목 표만 보냄
+  if (!images.length && invs.length) {
+    for (const v of invs) {
+      paintWhite(v.rgba, v.w, v.h, BAND.concat(INV_MASK).map(function (r) { return [Math.floor(r[0] * v.w), Math.floor(r[1] * v.h), Math.ceil(r[2] * v.w), Math.ceil(r[3] * v.h)]; }));
+      images.push(await toJpeg(Jimp, v.rgba, v.w, v.h, v.i));
+    }
+    return { images: images, skipped: skipped.filter(function (x) { return x.why !== 'invoice'; }), invOnly: true };
   }
   return { images: images, skipped: skipped };
+}
+async function toJpeg(Jimp, rgba, w, h, i) {
+  const img = new Jimp({ width: w, height: h, data: rgba });
+  const sc = Math.min(1, MAX_SIDE / Math.max(w, h));
+  if (sc < 1) img.resize({ w: Math.round(w * sc), h: Math.round(h * sc) });
+  return { buf: await img.getBuffer('image/jpeg', { quality: JPEG_Q }), w: img.bitmap.width, h: img.bitmap.height, i: i };
 }
 // 사진(jpg·png) 한 장 → pages 꼴 · 화소 상한(4000만 — 검토 low: 큰 PNG 하나로 배경 함수가 메모리 부족으로 죽음)
 const PHOTO_MAX_PX = 40000000;
@@ -101,14 +114,17 @@ async function pagesFromImage(buf) {
 
 // ---- 지시문
 const KIND_HINT = { fuel: '주유(리터·단가·금액)', urea: '요소수', tire: '타이어', part: '부품', cover: '차량 덮개', tool: '작업용구', oil: '오일', wash: '세차', labor: '정비 공임' };
-function buildPrompt(vendor, ym) {
+function buildPrompt(vendor, ym, invOnly) {
   const kind = vendor && vendor.kind ? (KIND_HINT[vendor.kind] || vendor.kind) : '줄마다 다름';
   const tool = vendor && vendor.group === 'tool';
   return [
     '이 그림들은 거래처 "' + String(vendor && vendor.name || '') + '"가 우리 회사에 보낸 ' + ym + ' 거래명세서(또는 주유현황·원장·정비명세서)의 쪽들이다. 흰 칸은 가린 자리다.',
     '명세의 거래 줄만 JSON으로 옮겨라. 문서에 적힌 값만 — 추정·계산으로 채우지 말고, 안 보이거나 애매하면 null로 두고 note에 "확인 필요".',
     '절대 내지 말 것: 사람 이름, 전화·팩스 번호, 계좌번호, 사업자등록번호, 주민번호, 주소, 이메일. 이런 글이 품목·비고 칸에 섞여 있으면 그 부분은 빼고 적어라.',
-    '빼야 할 줄: 소계·합계·월계·총계·전기이월·이월·입금·결제 줄(이것들은 sum·carry에만), 빈 줄, 계산서.',
+    '빼야 할 줄: 소계·합계·월계·총계·전기이월·이월·입금·결제 줄(이것들은 sum·carry에만), 빈 줄.',
+    // 11/15 PM '덕천은 계산서에 적힌 게 명세' — 종전엔 '계산서'를 통째로 빼라 해서 계산서뿐인 서류가 0줄이 됐다
+    invOnly ? '이 서류는 세금계산서뿐이다(명세서가 따로 없다) — 계산서 아래 품목 표의 줄을 거래 줄로 옮겨라: date = 월·일, item = 품목, note = 규격, qty = 수량, unit = 단가, amt = 공급가액, vat = 세액. sum = 계산서의 공급가액·세액·합계금액.'
+      : '세금계산서 쪽: 명세서 쪽이 함께 있으면 계산서 품목은 거래 줄로 옮기지 말고(같은 거래가 두 번 잡힘) 합계만 sum에. 세금계산서뿐이면 그 품목 표의 줄(월·일·품목·규격·수량·단가·공급가액·세액)을 거래 줄로 옮겨라.',
     '칸: date = YYYY-MM-DD(' + ym + ' 안 — 월/일만 있으면 ' + ym.slice(0, 4) + '년), vraw = 그 줄의 차량 번호 글(예 "5288", "80버5474", "6441호" → "6441"; 없으면 ""), item = 품목·작업 내용(40자 안), ' +
       'qty = 수량(리터는 소수 그대로), unit = 단가, amt = 줄 금액(문서의 금액 칸 그대로 — 공급가액 칸이 따로 있으면 공급가액), vat = 줄 세액 칸이 있으면 그 값 아니면 null, note = 규격·비고(개인정보 빼고, 60자 안).',
     tool ? '작업용구 거래처다 — 차량 칸이 없으면 vraw "".' : '이 거래처 줄의 종류는 보통 ' + kind + '이다.',
@@ -194,12 +210,12 @@ function parseJson(text) {
   try { return JSON.parse(t.slice(a, b + 1)); } catch (e) { return null; }
 }
 // 판독 한 번: { ok, result, usage } | { ok:false, code }
-async function readVision(images, vendor, ym, names) {
+async function readVision(images, vendor, ym, names, invOnly) {
   const key = (process.env.ANTHROPIC_API_KEY || '').trim();
   if (!key) return { ok: false, code: 'NO_API_KEY' };
   if (!images.length) return { ok: false, code: 'NO_PAGES' };
   const content = images.map(function (im) { return { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: im.buf.toString('base64') } }; });
-  content.push({ type: 'text', text: buildPrompt(vendor, ym) });
+  content.push({ type: 'text', text: buildPrompt(vendor, ym, invOnly) });
   let res;
   try { res = await callApiStream(key, { model: MODEL(), max_tokens: MAX_TOKENS, messages: [{ role: 'user', content: content }] }, TIMEOUT_MS); }
   catch (e) { return { ok: false, code: (e instanceof ApiError) ? ('CLAUDE_' + e.code) : 'CLAUDE_FAILED', retry: !!(e && e.retryable) }; }
@@ -228,4 +244,4 @@ async function readText(txt, vendor, ym, names) {
   return { ok: true, result: out, usage: { in: Number(u.input_tokens) || 0, out: Number(u.output_tokens) || 0 }, model: MODEL() };
 }
 
-module.exports = { readText, MASKS, BAND, maskRects, paintWhite, colorStats, isInvoicePage, prepareImages, pagesFromImage, buildPrompt, scrubText, normDate, vrawOf, toResult, parseJson, readVision, MAX_PAGES };
+module.exports = { readText, MASKS, BAND, INV_MASK, maskRects, paintWhite, colorStats, isInvoicePage, prepareImages, pagesFromImage, buildPrompt, scrubText, normDate, vrawOf, toResult, parseJson, readVision, MAX_PAGES };
