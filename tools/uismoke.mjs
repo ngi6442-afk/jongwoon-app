@@ -14461,7 +14461,7 @@ try {
   const chk71 = (d) => {
     const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
     const ftv = cut(d.ft, '\n### v471 (11/14)', '\n### '), tlv = cut(d.tl, '\n## v471 ', '\n## ');
-    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[ \] \(AI 시험 화면 대상/.test(l));
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상/.test(l));   // 11/15: 화면 칸을 시험 화면에서 확인해 [x]로 닫음 — 칸이 있는지만 봄
     const FT = ['`sfNowCo`', '`sfNowCoHit`', '`sfNowSiteCo`', '`sfNowConCo`', '`sfNowMemberCo`', '`sfNowWorkerCo`', '`sfNowDutyCo`', '`both`', '공사금액 문턱'];
     const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
