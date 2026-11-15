@@ -3470,7 +3470,7 @@
     <span class="fld-label">소속 회사</span>
     <select id="meCorp"><option value="">(지정 안 함)</option><option value="env">종운환경</option><option value="con">종운건설</option><option value="both">종운환경·종운건설 (두 회사 중복 재적)</option></select>   <!-- v472(PM 11/14 18:48): 두 회사 중복 재적 = both(서버 MEMBER_CORP와 같은 값) -->
     <div style="font-size:12px;color:var(--sub);margin:-2px 2px 8px;">두 회사에 다 적을 둔 사람은 '두 회사 중복 재적'을 고릅니다 — 직원 목록에 '중복 재적' 표시가 붙습니다</div>
-    <label class="dg-check" id="meTestWrap"><input type="checkbox" id="meTestAcct"> 시험 계정 (안전 › 체크 칸 표·빠진 항목·합계에서 뺌 — 다른 화면은 그대로)</label>
+    <label class="dg-check" id="meTestWrap"><input type="checkbox" id="meTestAcct"> 시험 계정 (안전 체크 칸 표·인사 명부 인원 수·계약직 레이더·연차 현황에서 빠지고, 인사 명부 맨 아래 '시험 계정' 묶음에 남음)</label>
     <span class="fld-label">연차 부여 기준</span>
     <select id="meBasis"><option value="hire">입사일 기준</option><option value="fiscal">회계연도(1/1) 기준</option></select>
     <span class="fld-label">휴직 누적일수 (근속에서 제외)</span>
@@ -10916,7 +10916,7 @@
   function approvalInboxItems(){
     var out=[], me=getMemberId(), admin=isAdmin();
     liveLeaves().forEach(function(l){
-      if(admin && l.member_id!==me && leaveOfTest(l)) return;   // P1 판9 ④ 시험 계정 신청은 관리자 결재 대기에 넣지 않는다(본인 줄은 그대로)
+      if(admin && l.member_id!==me && leaveOfTest(l)) return;   // P1 판9 ④ 시험 계정 신청은 관리자 결재 대기 줄·건수(휴가 탭 배지)에 넣지 않는다 — 줄과 수가 어긋나지 않게 둘 다 뺌. 처리는 휴가 탭 목록(줄·단추 남음). 본인 줄은 그대로
       var nm=dispName(memberName(l.member_id))||l.member_name||"직원";
       if(l.type==="resign" || l.type==="loa"){
         var word=(l.type==="loa")?"휴직":"사직";
@@ -17481,7 +17481,7 @@
   function leaveLate(l, nowMs, today){
     if(!l || l.del===1 || l.status!=="pending" || l.type==="resign" || l.type==="loa") return false;
     var t = l.applied_ts ? Date.parse(l.applied_ts) : NaN;
-    if(!isNaN(t)) return (nowMs - t) > LEAVE_LATE_MS;
+    if(!isNaN(t) && t <= nowMs) return (nowMs - t) > LEAVE_LATE_MS;   // 검토: 신청 시각이 지금보다 미래(기기 시계 어긋남)면 아래 신청일 판정으로
     var a=String(l.applied||""), d=String(today||"");
     if(!/^\d{4}-\d{2}-\d{2}$/.test(a) || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
     return Math.round((Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10)) - Date.UTC(+a.slice(0,4),+a.slice(5,7)-1,+a.slice(8,10)))/86400000) >= 2;
@@ -17501,6 +17501,18 @@
     var last=new Date(e);
     return "연차 사용기간이 "+(last.getUTCMonth()+1)+"/"+last.getUTCDate()+"에 끝납니다"+(left>0 ? " — 남은 "+left+"일은 다음 기간으로 넘어가지 않습니다(이월 없음)" : "");
   }
+  // 검토: 회계연도 기준인데 입사 1년이 안 된 직원(월 단위 발생 구간)은 안내 줄을 내지 않는다 — 근로기준법 제60조⑦ 단서(최초 1년 근로가 끝날 때까지 사용)와
+  //   '다음 기간으로 넘어가지 않습니다' 단정이 어긋날 수 있다(노무사 확인 전). 입사일 기준은 기간 끝 = 입사 1년이라 그대로.
+  function leaveEndNoteSkip(m, today){
+    if(!m || (m.annual_basis||"hire")!=="fiscal" || !/^\d{4}-\d{2}-\d{2}$/.test(String(m.hire_date||""))) return false;
+    return ((+m.hire_date.slice(0,4)+1)+m.hire_date.slice(4)) > String(today||"");
+  }
+  // 사용기간 끝 표시 = 마지막 날(period.end는 다음 기간 첫날인 반열린 구간 끝 — 표시만 하루 전, 계산은 그대로)
+  function leavePeriodLastDay(per){
+    var s=String(per && per.end || ""); if(!/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    var d=new Date(Date.UTC(+s.slice(0,4),+s.slice(5,7)-1,+s.slice(8,10)) - 86400000);
+    return d.getUTCFullYear()+"-"+("0"+(d.getUTCMonth()+1)).slice(-2)+"-"+("0"+d.getUTCDate()).slice(-2);
+  }
   // @leave-end-note-end
   function renderLeaves(){
     var host=document.getElementById("leaveList"); if(!host) return;
@@ -17517,19 +17529,20 @@
           var parts = [grantLabel+" "+r.grant, "사용 "+r.used];
           if(r.scheduled) parts.push("예정 "+r.scheduled);
           if(r.mode!=="base" && r.expired) parts.push("지난 기간 소멸 "+r.expired);
-          if(r.period) parts.push("사용기간 "+r.period.start+"~"+r.period.end);
-          var endNote=leaveEndNote(r.period, r.left, todayStr());   // P1 판9 ③ 사용기간 끝 30일 전부터 1줄
+          if(r.period) parts.push("사용기간 "+r.period.start+"~"+leavePeriodLastDay(r.period));   // P1 판9 검토: 끝은 마지막 날로 표시(period.end는 다음 기간 첫날 — 계산값은 그대로)
+          // P1 판9 ③ 사용기간 끝 30일 전부터 1줄 — 남은 일수는 이미 승인된 예정 휴가를 뺀 값 · 회계연도 기준 입사 1년 미만(월 단위 발생 구간)은 내지 않음
+          var endNote=leaveEndNoteSkip(mm, todayStr()) ? "" : leaveEndNote(r.period, Math.max(0, Math.round((r.left-(r.scheduled||0))*100)/100), todayStr());
           mine.innerHTML='<div class="leave-bal">내 연차 <b>'+r.left+'</b>일 남음'+(r.scheduled?' <span class="lv-sched">예정 '+r.scheduled+'</span>':'')+' <span class="lv-sub">('+parts.join(" · ")+')</span></div>'
             +(endNote?'<div class="leave-bal" id="leaveEndNote"><span class="lv-sub" style="margin-left:0;">'+esc(endNote)+'</span></div>':'');
         }
       } else mine.innerHTML='';
     }
     var all=liveLeaves();
-    // P1 판9 ④ 관리자 목록·대기 수에서 시험 계정의 신청은 뺀다(내 신청은 내가 시험 계정이어도 그대로 보임)
-    var visible = isAdmin() ? all.filter(function(l){ return l.member_id===me || !leaveOfTest(l); }) : all.filter(function(l){ return l.member_id===me; });
+    var visible = isAdmin() ? all.slice() : all.filter(function(l){ return l.member_id===me; });
     function prio(l){ return (l.status==="pending" || (l.status==="approved" && l.cancel_req)) ? 0 : 1; }
     visible.sort(function(a,b){ var ap=prio(a), bp=prio(b); if(ap!==bp) return ap-bp; return (b.start||"").localeCompare(a.start||""); });
-    var pend=visible.filter(function(l){ return (l.status==="pending" || (l.status==="approved" && l.cancel_req)); }).length;
+    // P1 판9 ④(검토): 시험 계정의 신청은 관리자 목록에 줄째 남기고('시험 계정' 칩 · 승인·반려 단추 그대로 — leaveRowHtml) "n건 대기" 수에서만 뺀다(내 신청은 내가 시험 계정이어도 셈)
+    var pend=visible.filter(function(l){ return (l.status==="pending" || (l.status==="approved" && l.cancel_req)) && (l.member_id===me || !leaveOfTest(l)); }).length;
     var head=document.getElementById("leaveHead"); if(head) head.textContent = pend ? (pend+"건 대기") : "";
     host.innerHTML = visible.length ? visible.map(leaveRowHtml).join("") : '<div class="empty-line">휴가 신청이 없습니다.</div>';
     bindLeaveHandlers(host);
@@ -17556,7 +17569,7 @@
         if(eff>=todayStr() || dback<=3) ctrl += '<button class="mini-btn" data-lv-cxreq="'+l.id+'">취소 요청</button>';
       }
     }
-    var title = esc(nm)+' · '+esc(leaveTypeLabel(l.type))+' '+(l.days||0)+'일 '+chip;
+    var title = esc(nm)+' · '+esc(leaveTypeLabel(l.type))+' '+(l.days||0)+'일 '+chip+leaveTestChip(l);   // P1 판9 ④ 시험 계정 칩
     return '<div class="item"><div class="item-body"><div class="item-title">'+title+'</div><div class="item-meta"><span>'+esc(period)+'</span>'+(l.reason?'<span>'+esc(l.reason)+'</span>':'')+(l.approver?'<span class="author-chip">'+esc(dispName(l.approver))+'</span>':'')+'</div></div><div class="task-ctrl">'+ctrl+'</div></div>';
   }
   // 사직·휴직 공통 면담 라인: 근로자 면담신청 → 관리자 면담완료 → 근로자 본신청 → 관리자 승인
@@ -17596,7 +17609,7 @@
     if(l.interview_at) meta+='<span class="author-chip">면담완료 '+esc(l.interview_at)+'</span>';
     if(l.reason) meta+='<span>'+esc(l.reason)+'</span>';
     if(l.approver) meta+='<span class="author-chip">'+esc(dispName(l.approver))+'</span>';
-    return '<div class="item"><div class="item-body"><div class="item-title">'+esc(nm)+' · <b style="color:'+cfg.color+';">'+cfg.word+'</b> '+chip+'</div><div class="item-meta">'+meta+'</div></div><div class="task-ctrl">'+ctrl+'</div></div>';
+    return '<div class="item"><div class="item-body"><div class="item-title">'+esc(nm)+' · <b style="color:'+cfg.color+';">'+cfg.word+'</b> '+chip+leaveTestChip(l)+'</div><div class="item-meta">'+meta+'</div></div><div class="task-ctrl">'+ctrl+'</div></div>';
   }
   function bindLeaveHandlers(host){
     function wire(attr,fn){ Array.prototype.forEach.call(host.querySelectorAll("["+attr+"]"),function(el){ el.addEventListener("click",function(){ fn(el.getAttribute(attr)); }); }); }
@@ -20557,7 +20570,7 @@
     var r=famQRange();
     var lbl=document.getElementById("famQLabel"); if(lbl) lbl.textContent=r.y+"년 "+r.q+"분기";
     var rng=document.getElementById("famQRangeTxt"); if(rng) rng.textContent=r.start+" ~ "+r.end;
-    var recs=liveFam().filter(function(x){ return x.date && x.date>=r.start && x.date<=r.end; });
+    var recs=liveFam().filter(function(x){ return x.date && x.date>=r.start && x.date<=r.end && !isTestMember(findMember(x.member_id)); });   // P1 판9 검토: 시험 계정 기록은 제도별 건수·대상 인원·조기퇴근 표에서 뺌(같은 화면 연차 표와 맞춤)
     // (1) 4종 유형별 실시 건수 — 기간·건수·대상이 한눈에(인증 증빙용)
     var h='<div class="fam-sec-h">제도별 실시 건수 — '+r.start+' ~ '+r.end+'</div>'
       +'<div class="card fam-scroll" style="padding:4px 12px;"><table class="fam-table"><tr><th>제도</th><th class="num">건수</th><th class="num">대상 인원</th><th>실시 내역 (날짜 · 대상)</th></tr>';
@@ -20612,7 +20625,8 @@
     }
     var host=document.getElementById("famList");
     if(host){
-      var list=liveFam().slice().sort(function(a,b){ return (b.date||"").localeCompare(a.date||"") || (b.created||"").localeCompare(a.created||""); });
+      // P1 판9 검토: 시험 계정 기록은 목록·건수에서 뺌
+      var list=liveFam().filter(function(x){ return !isTestMember(findMember(x.member_id)); }).sort(function(a,b){ return (b.date||"").localeCompare(a.date||"") || (b.created||"").localeCompare(a.created||""); });
       var head=document.getElementById("famHead"); if(head) head.textContent=list.length?("총 "+list.length+"건"):"";
       host.innerHTML=list.length?list.map(function(x){
         var chip=FAM_CHIP[x.type]||"from-chip";
@@ -30521,10 +30535,13 @@ function dutyStage(nx){
   function activeMembers(){ return liveMembers().filter(function(m){ return !memberRetired(m); }); }
   // @hr-test-start
   // P1 판9 ④: 시험 계정(v447 회원 카드 표식 — 관리자만 저장·관리자는 member_list 원본으로 받음)은 사람을 세거나 줄로 늘어놓고 관리하는 인사 자리에서 뺀다
-  //   (인사 명부·부서 수·총 인원 · 계약직 2년 레이더 · 가족친화 연차 소진율·조기퇴근 표 · 휴가 목록·대기 수·결재 대기함). 로그인·권한관리·회원 관리·기기·담당 드롭다운은 그대로(계정 자체가 필요한 곳).
+  //   (부서 묶음·부서 수·총 인원 — 줄은 명부 맨 아래 '시험 계정' 묶음에만 · 계약직 2년 레이더 · 가족친화 연차 소진율·조기퇴근 표·제도별 건수·기록 목록 · 휴가 대기 수·배지·결재 대기함 건수).
+  //   관리자 휴가 목록에는 줄을 남겨 '시험 계정' 칩을 붙이고 승인·반려 단추를 그대로 둔다(검토 — 처리할 화면이 없어 영영 대기로 남지 않게).
+  //   로그인·권한관리·기기·담당 드롭다운은 그대로(계정 자체가 필요한 곳).
   function isTestMember(m){ return !!m && m.test_acct === true; }
   function hrMembers(){ return liveMembers().filter(function(m){ return !isTestMember(m); }); }
   function leaveOfTest(l){ return !!l && isTestMember(findMember(l.member_id)); }
+  function leaveTestChip(l){ return leaveOfTest(l) ? ' <span class="scope-chip" title="시험 계정의 신청 — 대기 수·결재 대기함 건수에는 안 셉니다">시험 계정</span>' : ''; }
   // @hr-test-end
   function findMember(id){ for (var i=0;i<members.length;i++){ if (members[i].id === id) return members[i]; } return null; }
   // 자동로그인 기본 OFF: 세션 저장이 기본, "로그인 유지" 체크 시에만 localStorage 영구 저장.
@@ -31161,6 +31178,13 @@ function dutyStage(nx){
     try{ localStorage.setItem(HR_RET_OPEN_KEY, hrRetOpen ? "1" : "0"); }catch(e){}
     drawHrRoster();
   }
+  // P1 판9 검토: 시험 계정 묶음(퇴사자 묶음과 같은 부품) 펼침 — 이 화면에서만 기억(기본 접힘). 접고 펼 때 열린 카드를 먼저 홀더로(위 hrRetToggle과 같은 이유)
+  var hrTestOpen = false;
+  function hrTestToggle(){
+    if (hrOpenId != null) hrCollapse();
+    hrTestOpen = !hrTestOpen;
+    drawHrRoster();
+  }
   // 인사 명부 한 줄. isRet=퇴사자 — 근속은 퇴사일에 정지(serviceInfo asOf)하고, 연차 잔여(오늘 기준으로 계속 굴러감)는 빼고 퇴직 연차수당만 남긴다.
   // @ct-radar-start
   // v368(PM 9/21 "무기계약직 레이더 탑재"): 계약직(기간제)의 2년 시계. 「기간제 및 단시간근로자 보호 등에 관한 법률」 제4조 — ① 사용자는 2년을 초과하지 않는 범위에서
@@ -31235,7 +31259,7 @@ function dutyStage(nx){
   }
   function drawHrRoster(reopenId){   // reopenId: 그리고 나서 되열 카드(저장 경로는 closeMemberEdit이 hrOpenId를 이미 비운다)
     var host = document.getElementById("hrRoster"); if (!host) return;
-    var mem = hrMembers(), testN = liveMembers().length - mem.length;   // P1 판9 ④ 시험 계정은 명부·부서 수·총 인원에서 뺀다(수정은 회원 관리에서)
+    var mem = hrMembers(), tests = liveMembers().filter(isTestMember), testN = tests.length;   // P1 판9 ④ 시험 계정은 부서 묶음·부서 수·총 인원에서 빼고, 맨 아래 접힌 '시험 계정' 묶음에만 둔다(카드를 열어 표식 끄기·수정)
     // v329 퇴사직원 분류(PM 9/8): 재직(퇴사예정·휴직 포함)은 종전대로 부서 그룹, 퇴사자는 맨 아래 접이식 '퇴사자' 그룹으로 분리.
     // 판정은 memberRetired(m) 하나만 쓴다(서버 _lib/tier.js retired와 같은 식) — 인사 탭에 새 판정식을 만들지 않는다.
     var act = [], ret = [];
@@ -31273,6 +31297,17 @@ function dutyStage(nx){
       ret.forEach(function(m){ html += hrRowHtml(m, true); });
       html += '</div></div>';
     }
+    if (testN){   // P1 판9 검토: 시험 계정 묶음 — 인원 수·집계 밖, 줄은 열어 고칠 수 있게(저장 뒤 다시 열 대상이 시험 계정이면 이 묶음을 펼쳐 연다)
+      var openTest = hrTestOpen || !!(reopen && isTestMember(findMember(reopen)));
+      tests.sort(function(a, b){ var sa = (typeof a.seq==="number") ? a.seq : 1e9, sb = (typeof b.seq==="number") ? b.seq : 1e9; return sa - sb; });
+      html += '<div class="hr-dept hr-ret">' +
+        '<button type="button" class="hr-dept-h hr-ret-h' + (openTest ? ' open' : '') + '" id="hrTestToggle" aria-expanded="' + (openTest ? "true" : "false") + '" aria-controls="hrTestBody" aria-label="시험 계정 ' + testN + '명 목록 ' + (openTest ? "접기" : "펼치기") + '">' +
+          '<span class="hr-ret-t">시험 계정 <span class="cnt">' + testN + '</span></span><span class="hr-caret">▾</span></button>' +
+        '<div id="hrTestBody"' + (openTest ? '' : ' style="display:none;"') + '>' +
+        '<div class="hr-ret-note">인원 수·부서 수·계약직 레이더·연차 현황·안전 체크 칸 표에서 빠지는 계정입니다 — 표식을 끄거나 고치려면 카드를 열어 수정.</div>';
+      tests.forEach(function(m){ html += hrRowHtml(m, memberRetired(m)); });
+      html += '</div></div>';
+    }
     hrOpenId = null;  // DOM 재생성으로 이전 패널 무효화 → 상태 초기화 후 재오픈
     host.innerHTML = html || '<div class="empty-line">직원이 없습니다.</div>';
     var total = document.getElementById("hrTotal"); if (total) total.textContent = ret.length ? ("총 " + mem.length + "명 (재직 " + act.length + " · 퇴사 " + ret.length + ")") : ("총 " + act.length + "명"); if (total && testN > 0) total.textContent += " · 시험 계정 " + testN + "명 제외";   // 권한관리(#permTotal '총 N명')와 같은 수 — 두 관리자 화면이 같은 명부에 다른 수를 말하지 않게
@@ -31281,7 +31316,8 @@ function dutyStage(nx){
       el.addEventListener("click", function(){ hrToggle(el.getAttribute("data-hr-toggle")); });
     });
     var retBtn = document.getElementById("hrRetToggle"); if (retBtn) retBtn.addEventListener("click", hrRetToggle);
-    if (reopen && findMember(reopen) && !isTestMember(findMember(reopen))) hrToggle(reopen);
+    var testBtn = document.getElementById("hrTestToggle"); if (testBtn) testBtn.addEventListener("click", hrTestToggle);
+    if (reopen && findMember(reopen)) hrToggle(reopen);
   }
   function hrStarted(){ return liveMembers().some(function(m){ return !!m.annual_base_date; }); }
   function hrStartWork(){

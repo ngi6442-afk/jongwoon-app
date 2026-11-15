@@ -393,7 +393,7 @@ async function handleMemberUpsert(st, event, d, R) {
   if (d.loa_end !== undefined) m.loa_end = String(d.loa_end || '');
   // v447 안전 › 체크 칸(사람별 표)이 쓰는 회원 칸 4개 — 필드별 복사(보내지 않은 칸은 그대로). 켜짐만 저장하고 꺼짐·빈 값은 칸째 지운다
   //   (인사 카드는 네 칸을 늘 함께 보내므로 '없음 → false'를 남기면 저장마다 감사 줄이 생긴다). 사무직(office) = 정기교육 반기 6시간·일반건강진단 2년 ·
-  //   관리감독자 지정(supervisor) = 정기교육 연 16시간 · 소속 회사(corp) = env 종운환경·con 종운건설 · 시험 계정(test_acct) = 체크 칸 표·빠진 항목·합계에서 뺌(다른 화면은 그대로)
+  //   관리감독자 지정(supervisor) = 정기교육 연 16시간 · 소속 회사(corp) = env 종운환경·con 종운건설 · 시험 계정(test_acct) = 체크 칸 표·빠진 항목·합계 · 인사 명부 인원 수(맨 아래 '시험 계정' 묶음에만)·계약직 레이더·연차 현황·휴가 대기 수에서 뺌(P1 판9 — 로그인·권한·기기는 그대로)
   if (d.office !== undefined) { if (d.office === true) m.office = true; else delete m.office; }
   if (d.supervisor !== undefined) { if (d.supervisor === true) m.supervisor = true; else delete m.supervisor; }
   // v460(원장 C085): 자격·담당 교육 대상 표시(quals — 운수종사자 drv · 건설기계조종사 cm · 폐기물 처리 담당자 wst · 환경기술인 env · 기술요원 tech · 전기안전관리자 elec) — 허용 키만 정해진 순서로, 하나도 없으면 칸째 지움(office와 같은 까닭)
