@@ -10863,14 +10863,21 @@ function J91a(x) { return JSON.stringify(x); }
     const bad = BG14(); bad.rows[1].calc = true;   // 확인 필요인데 계산에 씀 = 꼴 틀림
     seedH14(bad, { bg_ver: 'v1-20261115' }); const r1 = await c({ action: 'hr_bg_get' }, tV14, 'dev1'); out.push(r1.body.on + ':' + r1.body.why);
     seedH14(BG14()); const r2 = await c({ action: 'hr_bg_get' }, tV14, 'dev1'); out.push(r2.body.on + ':' + r2.body.why + ':' + JSON.stringify(r2.body.avail));
-    seedH14(BG14(), { bg_ver: 'v1-20261101', updated_at: 5 }); const r3 = await c({ action: 'hr_bg_get' }, tN14); out.push(r3.body.on + ':' + r3.body.why + ':' + r3.body.flag.bg_ver + ':' + r3.body.flag.updated_at + ':' + r3.body.can_write);
-    seedH14(BG14(), { bg_ver: 'v1-20261115' }); const r4 = await c({ action: 'hr_bg_get' }, tV14, 'dev1'), r5 = await c({ action: 'hr_bg_get' }, tokA);
+    seedH14(BG14(), { bg_ver: 'v1-20261101', bg_sha: 'abcdef0123456789', updated_at: 5 }); const r3 = await c({ action: 'hr_bg_get' }, tN14); out.push(r3.body.on + ':' + r3.body.why + ':' + r3.body.flag.bg_ver + ':' + r3.body.flag.updated_at + ':' + r3.body.can_write);
+    const FLG = { bg_ver: 'v1-20261115', bg_sha: 'abcdef0123456789' };
+    seedH14(BG14(), FLG); const r4 = await c({ action: 'hr_bg_get' }, tV14, 'dev1'), r5 = await c({ action: 'hr_bg_get' }, tokA);
     out.push(r4.body.on + ':' + JSON.stringify(r4.body.sum) + ':' + (r4.body.rows || []).length + ':' + r4.body.can_write, r5.body.on + ':' + r5.body.can_write);
-    seedH14(BG14(), { bg_ver: 'v1-20261115' }); blobsMock.hooks.failGet = (k) => k === KF; let r6; try { r6 = await c({ action: 'hr_bg_get' }, tokA); } finally { blobsMock.hooks.failGet = null; }
+    seedH14(BG14(), FLG); blobsMock.hooks.failGet = (k) => k === KF; let r6; try { r6 = await c({ action: 'hr_bg_get' }, tokA); } finally { blobsMock.hooks.failGet = null; }
     out.push(r6.body.on + ':' + r6.body.why);
-    const off = [r0, r1, r2, r3, r6].every((r) => r.code === 200 && r.body.on === false && !('rows' in r.body) && !('sum' in r.body));
-    const want = '401|NO_ACCESS|DEVICE_NOT_APPROVED|false:NO_BG:null|false:BAD_BG|false:NOT_PROMOTED:{"ver":"v1-20261115","checked":"2026-11-15","n":3,"n_pending":1,"n_calc_false":2}|false:NOT_PROMOTED:v1-20261101:5:false'
-      + '|true:{"ver":"v1-20261115","checked":"2026-11-15","n":3,"n_pending":1,"n_calc_false":2}:3:false|true:true|false:FLAG_READ_FAILED';
+    // 검토 11/15 ②: sha 없는 옛 꼴 스위치 = 미승격 · 승격 뒤 같은 판 이름으로 내용만 바뀌면(sha 다름) = 꺼짐 SHA_CHANGED
+    seedH14(BG14(), { bg_ver: 'v1-20261115' }); const r7 = await c({ action: 'hr_bg_get' }, tokA);
+    const chg = BG14(); chg.sha = '1111222233334444'; chg.rows[0].calc = false; chg.rows[0].calc_why = 'x';
+    seedH14(chg, FLG); const r8 = await c({ action: 'hr_bg_get' }, tokA);
+    out.push(r7.body.on + ':' + r7.body.why, r8.body.on + ':' + r8.body.why + ':' + r8.body.flag.bg_sha + ':' + r8.body.avail.sha);
+    const off = [r0, r1, r2, r3, r6, r7, r8].every((r) => r.code === 200 && r.body.on === false && !('rows' in r.body) && !('sum' in r.body));
+    const SUMJ = '{"ver":"v1-20261115","sha":"abcdef0123456789","checked":"2026-11-15","n":3,"n_pending":1,"n_calc_false":2}';
+    const want = '401|NO_ACCESS|DEVICE_NOT_APPROVED|false:NO_BG:null|false:BAD_BG|false:NOT_PROMOTED:' + SUMJ + '|false:NOT_PROMOTED:v1-20261101:5:false'
+      + '|true:' + SUMJ + ':3:false|true:true|false:FLAG_READ_FAILED|false:NOT_PROMOTED|false:SHA_CHANGED:abcdef0123456789:1111222233334444';
     return { ok: off && out.join('|') === want, info: out.join('|') };
   };
   const chkB = async (c) => {   // 승격 스위치 — PM만 · 값 검사 · 판 없음 409 · 낙관락 · 직전 값 · 다른 칸 보존 · 감사 1줄 · 해제 · 못 읽으면 503(덮지 않음)
@@ -10885,13 +10892,18 @@ function J91a(x) { return JSON.stringify(x); }
     const s1 = await c({ action: 'hr_bg_set', bg_ver: 'v1-20261115', base: 7 }, tokA);
     const f1 = JSON.parse(JSON.stringify(mem.gw_data[KF])), au1 = audH14().slice(au0);
     const s2 = await c({ action: 'hr_bg_set', bg_ver: 'v1-20261115', base: f1.updated_at }, tokA);
-    P.on = s1.code === 200 && s1.body.bg_ver === 'v1-20261115' && f1.bg_ver === 'v1-20261115' && !!f1.prev && f1.prev.bg_ver === '' && f1.prev.updated_at === 7 && f1.updated_by === 'uadmin' && f1.keep_me === 1 && f1.updated_at > 7
-      && au1.length === 1 && au1[0].ev[0].op === '인사근거' && /미승격→v1-20261115 · 확인 필요 1건/.test(au1[0].ev[0].t) && au1[0].bid === 'uadmin' && s1.body.audit === true
+    P.on = s1.code === 200 && s1.body.bg_ver === 'v1-20261115' && f1.bg_ver === 'v1-20261115' && f1.bg_sha === 'abcdef0123456789' && !!f1.prev && f1.prev.bg_ver === '' && f1.prev.bg_sha === '' && f1.prev.updated_at === 7 && f1.updated_by === 'uadmin' && f1.keep_me === 1 && f1.updated_at > 7
+      && au1.length === 1 && au1[0].ev[0].op === '인사근거' && /미승격→v1-20261115 · sha abcdef0123456789 · 확인 필요 1건/.test(au1[0].ev[0].t) && au1[0].bid === 'uadmin' && s1.body.audit === true
       && s2.code === 400 && s2.body.error_code === 'NO_CHANGE';
-    I.on = [s1.code, f1.bg_ver, f1.prev && f1.prev.bg_ver, f1.keep_me, au1.map((l) => l.ev[0].t).join('/'), s2.body.error_code];
-    blobsMock.hooks.failGet = (k) => k === KF; let s3; try { s3 = await c({ action: 'hr_bg_set', bg_ver: '', base: f1.updated_at }, tokA); } finally { blobsMock.hooks.failGet = null; }
-    const s4 = await c({ action: 'hr_bg_set', bg_ver: '', base: f1.updated_at }, tokA), f4 = mem.gw_data[KF];
-    P.off = s3.code === 503 && s3.body.error_code === 'HR_FLAG_READ_FAILED' && s4.code === 200 && f4.bg_ver === '' && !!f4.prev && f4.prev.bg_ver === 'v1-20261115' && f4.keep_me === 1;
+    I.on = [s1.code, f1.bg_ver, f1.bg_sha, f1.prev && f1.prev.bg_ver, f1.keep_me, au1.map((l) => l.ev[0].t).join('/'), s2.body.error_code];
+    // 검토 ②: 같은 판 이름으로 내용이 바뀌어 올라오면 꺼지고(SHA_CHANGED), 같은 ver로 다시 승격하면 새 sha가 스위치에 적힘
+    mem.gw_data[KB].sha = '1111222233334444';
+    const g5 = await c({ action: 'hr_bg_get' }, tokA), s5 = await c({ action: 'hr_bg_set', bg_ver: 'v1-20261115', base: f1.updated_at }, tokA), f5 = JSON.parse(JSON.stringify(mem.gw_data[KF])), g6 = await c({ action: 'hr_bg_get' }, tokA);
+    P.re = g5.body.on === false && g5.body.why === 'SHA_CHANGED' && s5.code === 200 && f5.bg_ver === 'v1-20261115' && f5.bg_sha === '1111222233334444' && !!f5.prev && f5.prev.bg_sha === 'abcdef0123456789' && g6.body.on === true;
+    I.re = [g5.body.why, s5.code, s5.body.error_code, f5.bg_sha, g6.body.on];
+    blobsMock.hooks.failGet = (k) => k === KF; let s3; try { s3 = await c({ action: 'hr_bg_set', bg_ver: '', base: f5.updated_at }, tokA); } finally { blobsMock.hooks.failGet = null; }
+    const s4 = await c({ action: 'hr_bg_set', bg_ver: '', base: f5.updated_at }, tokA), f4 = mem.gw_data[KF];
+    P.off = s3.code === 503 && s3.body.error_code === 'HR_FLAG_READ_FAILED' && s4.code === 200 && f4.bg_ver === '' && f4.bg_sha === '' && !!f4.prev && f4.prev.bg_ver === 'v1-20261115' && f4.keep_me === 1;
     I.off = [s3.code, s3.body.error_code, s4.code, f4.bg_ver, f4.prev && f4.prev.bg_ver];
     return { ok: Object.values(P).every((v) => v === true), info: { P, I } };
   };
@@ -10904,14 +10916,14 @@ function J91a(x) { return JSON.stringify(x); }
     const k1 = await c(body({ base: d1.body.updated_at }), tokA), fK = mem.gw_data[KF], log = (mem.gw_data['status:decide'] || {}).log || [];
     const ok = g1.code === 400 && g1.body.error_code === 'BAD_GRADE' && g2.code === 400 && g2.body.error_code === 'BAD_ROW' && g3.code === 403 && g3.body.error_code === 'PM_ONLY'
       && d1.code === 200 && d1.body.applied === false && fD.bg_ver === '' && fD.updated_at === 9 && mk['hrbg:v1-20261115'] && mk['hrbg:v1-20261115'].st === 'keep'
-      && k1.code === 200 && k1.body.applied === true && fK.bg_ver === 'v1-20261115' && fK.updated_by === 'uadmin' && log.length === 2 && log[1].kind === 'hrbg' && log[1].applied === true && !mk2(mem);
+      && k1.code === 200 && k1.body.applied === true && fK.bg_ver === 'v1-20261115' && fK.bg_sha === 'abcdef0123456789' && fK.updated_by === 'uadmin' && log.length === 2 && log[1].kind === 'hrbg' && log[1].applied === true && !mk2(mem);
     function mk2(m) { return ((m.gw_data['status:decide'] || {}).marks || {})['hrbg:v1-20261115']; }
     return { ok, info: [g1.body.error_code, g2.body.error_code, g3.body.error_code, d1.code, d1.body.applied, fD.bg_ver, k1.code, k1.body.error_code, fK.bg_ver, log.length] };
   };
   try {
     const c0 = callerH14(gwd), RA = await chkA(c0), RB = await chkB(c0), RC = await chkC(c0);
-    T('P1 판14 ① hr_bg_get: 비로그인 401 · 인사 권한 없는 직원 403 NO_ACCESS · 인사 보기 직원 미승인 기기 403 · 근거 없음 = on false(NO_BG·avail 없음) · 확인 필요 행이 계산에 쓰이면(calc true) 꼴 틀림 BAD_BG · 스위치 없음·다른 판 = NOT_PROMOTED(올라온 판 요약 avail만 — 행·sum 안 보냄 · 확인 필요 1건 · 가장 늦은 확인일) · 승격 = on true·sum·행 · can_write = PM만 · 스위치 못 읽음 = on false(FLAG_READ_FAILED)', RA.ok, RA.info);
-    T('P1 판14 ② hr_bg_set: PM 아닌 관리자 403 PM_ONLY · 직원 403 · 비로그인 401 · 글자 아님·틀린 꼴 400 BAD_VALUE · 올라온 판과 다른 ver 409 BG_MISSING · 낡은 base 409 HR_BG_STALE(전부 스위치 그대로·감사 0) · 승격 = bg_ver·prev(직전 값)·updated_by·다른 칸 보존·감사 1줄 "미승격→판 · 확인 필요 1건" · 같은 값 400 NO_CHANGE · 스위치 못 읽음 503(덮지 않음) · 해제(\'\') = prev에 승격본', RB.ok, JSON.stringify(RB.info));
+    T('P1 판14 ① hr_bg_get: 비로그인 401 · 인사 권한 없는 직원 403 NO_ACCESS · 인사 보기 직원 미승인 기기 403 · 근거 없음 = on false(NO_BG·avail 없음) · 확인 필요 행이 계산에 쓰이면(calc true) 꼴 틀림 BAD_BG · 스위치 없음·다른 판 = NOT_PROMOTED(올라온 판 요약 avail만 — 행·sum 안 보냄 · 확인 필요 1건 · 가장 늦은 확인일) · 승격 = on true·sum·행 · can_write = PM만 · 스위치 못 읽음 = on false(FLAG_READ_FAILED) · (검토 ②) sha 없는 옛 꼴 스위치 = NOT_PROMOTED · 승격 뒤 같은 판 이름으로 내용만 바뀜 = SHA_CHANGED', RA.ok, RA.info);
+    T('P1 판14 ② hr_bg_set: PM 아닌 관리자 403 PM_ONLY · 직원 403 · 비로그인 401 · 글자 아님·틀린 꼴 400 BAD_VALUE · 올라온 판과 다른 ver 409 BG_MISSING · 낡은 base 409 HR_BG_STALE(전부 스위치 그대로·감사 0) · 승격 = bg_ver·prev(직전 값)·updated_by·다른 칸 보존·감사 1줄 "미승격→판 · 확인 필요 1건" · 같은 값 400 NO_CHANGE · 스위치 못 읽음 503(덮지 않음) · 해제(\'\') = prev에 승격본 · (검토 ②) 승격 때 bg_sha = 그 판 sha · 내용만 바뀐 같은 판 = 다시 승격 가능(새 sha·prev에 옛 sha)', RB.ok, JSON.stringify(RB.info));
     T('P1 판14 ③ PM 콘솔 줄 hrbg(R2): 등급 R1 400 BAD_GRADE · 줄 id와 값이 다르면 400 BAD_ROW · PM 아닌 관리자 403 · [기본값] = 그대로(미승격 — 스위치 그대로·보류함 keep 표시) · [ㄱ] = hr_bg_set 길로 승격(updated_by = 누른 PM)·누른 기록 hrbg 적용·keep 표시 지움', RC.ok, JSON.stringify(RC.info));
     // ④ 계산은 그대로 — 인사 근거 키를 읽는 곳은 gw-data 이 블록뿐(연차·레이더 서버 계산 gw-duty-cron·gw-todo-cron·gw-auth는 이 표를 모름)
     const others = fsH14.readdirSync(FN).filter((f) => /\.js$/.test(f) && f !== 'gw-data.js').filter((f) => /bg:hr:law|settings:hr|hr_bg_/.test(fsH14.readFileSync(join(FN, f), 'utf8')));
@@ -10924,14 +10936,18 @@ function J91a(x) { return JSON.stringify(x); }
         ["  if (!c.member.admin && hp !== 'view' && hp !== 'do') return jr(403,", '  if (false) return jr(403,'],
         [" && typeof r.calc === 'boolean' && !(r.grade === '확인 필요' && r.calc !== false); });", " && typeof r.calc === 'boolean'; });"],
         ["  if (!fr.ok) return Object.assign(base, { on: false, why: 'FLAG_READ_FAILED' });\n", ''],
-        ["  const canWrite = !!(tc && !tc.unavailable && tc.tierOf(c.member) === 'pm');", '  const canWrite = !!c.member.admin;']],
+        ["  const canWrite = !!(tc && !tc.unavailable && tc.tierOf(c.member) === 'pm');", '  const canWrite = !!c.member.admin;'],
+        ["  if (!hrFsha) return Object.assign(base, { on: false, why: 'NOT_PROMOTED' });", ''],   // 검토 ②: sha 없는 옛 스위치를 승격으로
+        ["  if (hrFsha !== bg.sha) return Object.assign(base, { on: false, why: 'SHA_CHANGED' });", '']],   // 검토 ②: 내용 바뀜을 못 봄
       B: [["async function handleHrBgSet(event, d, R) {\n  const g = await pmconGate(event, R, true);", "async function handleHrBgSet(event, d, R) {\n  const g = await pmconGate(event, R, false);"],
         ["    if (!hrBgOk(bg) || bg.ver !== v) return jr(409, { status: 'CONFLICT', error_code: 'BG_MISSING', request_id: R });", '    if (!bg) return jr(409, { status: \'CONFLICT\', error_code: \'BG_MISSING\', request_id: R });'],
         ["  if (d.base !== undefined && Number(d.base) !== Number(cur.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'HR_BG_STALE', request_id: R });\n", ''],
         ["  if (!fr.ok) return jr(503, { status: 'ERROR', error_code: 'HR_FLAG_READ_FAILED', request_id: R });", '  if (false) return jr(503, {});'],
-        ["prev: { bg_ver: curVer, updated_at: Number(cur.updated_at) || 0, updated_by: cur.updated_by || '' }, ", ''],
+        ["prev: { bg_ver: curVer, bg_sha: curSha, updated_at: Number(cur.updated_at) || 0, updated_by: cur.updated_by || '' }, ", ''],
         ["  try { hrAu = await appendAudit({", '  try { hrAu = true || await appendAudit({'],
-        ["  const doc = Object.assign({}, cur, { schema: 1, bg_ver: v,", '  const doc = Object.assign({}, { schema: 1, bg_ver: v,']],
+        ["  const hrDoc = Object.assign({}, cur, { schema: 1, bg_ver: v,", '  const hrDoc = Object.assign({}, { schema: 1, bg_ver: v,'],   // 검토 0: 판13 veh_bg_set과 겹치지 않는 자리(handleHrBgSet 안)
+        ["schema: 1, bg_ver: v, bg_sha: newSha, prev:", "schema: 1, bg_ver: v, bg_sha: '', prev:"],   // 검토 ②: 승격 때 sha를 안 적음
+        ["  if (v === curVer && newSha === curSha) return jr(400,", '  if (v === curVer) return jr(400,']],   // 검토 ②: 내용 바뀐 같은 판 다시 승격 막힘
       C: [["PMCON_KINDS.hrbg = { label: '인사 법령 근거 승격', grade: 'R2',", "PMCON_KINDS.hrbg = { label: '인사 법령 근거 승격', grade: 'R1',"]]
     };
     const kill = [];
@@ -10939,7 +10955,7 @@ function J91a(x) { return JSON.stringify(x); }
       let k; try { k = !(await ({ A: chkA, B: chkB, C: chkC })[n](callerH14(loadH14(mutH14(from, to))))).ok; } catch (e) { k = 'err ' + e.message; }
       if (k !== true) kill.push(n + ':' + from.trim().slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k));
     }
-    T('P1 판14 ⑤ 결함 사본 ' + (MUT.A.length + MUT.B.length + MUT.C.length) + '개(승격 검사 걷음·인사 권한 403 걷음·확인 필요 calc 검사 걷음·스위치 못 읽음 통과·쓰기 가능을 관리자 전원으로 · 쓰기 관문을 읽기로·판 대조 느슨·낙관락 걷음·못 읽은 스위치 덮기·직전 값 없음·감사 없음·다른 칸 지움 · 콘솔 등급 R1) = 모두 ✗', kill.length === 0, kill.join(' | '));
+    T('P1 판14 ⑤ 결함 사본 ' + (MUT.A.length + MUT.B.length + MUT.C.length) + '개(승격 검사 걷음·인사 권한 403 걷음·확인 필요 calc 검사 걷음·스위치 못 읽음 통과·쓰기 가능을 관리자 전원으로·sha 없는 스위치 통과·내용 바뀜 못 봄 · 쓰기 관문을 읽기로·판 대조 느슨·낙관락 걷음·못 읽은 스위치 덮기·직전 값 없음·감사 없음·다른 칸 지움·sha 안 적음·같은 판 다시 승격 막힘 · 콘솔 등급 R1) = 모두 ✗', kill.length === 0, kill.join(' | '));
   } catch (e) { T('P1 판14 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
   finally { resetH14(); }
 }

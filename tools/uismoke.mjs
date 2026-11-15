@@ -15739,21 +15739,24 @@ try {
     && /\nPMCON_KINDS\.hrbg = \{ label: '인사 법령 근거 승격', grade: 'R2', fn: handleHrBgSet,/.test(gwdH14)
     && /\+ \(r\.k\.card \? ' <button type="button" class="link-btn" data-pc-open="' \+ esc\(r\.k\.card\) \+ '">카드 열기 ›<\/button>' : ''\) \+ '<\/div>'/.test(fnH14(H, 'renderPmcon'));
   // 한 줄 그리기·읽기(가짜 화면)
-  const ON14 = (cw, o) => ({ status: 200, body: Object.assign({ on: true, ver: 'v1-20261115', sum: { ver: 'v1-20261115', checked: '2026-11-15', n: 44, n_pending: 10, n_calc_false: 19 }, flag: { bg_ver: 'v1-20261115', updated_at: 77 }, can_write: cw }, o || {}) });
-  const OFF14 = { status: 200, body: { on: false, why: 'NOT_PROMOTED', flag: { bg_ver: '', updated_at: 0 }, avail: { ver: 'v1-20261115', checked: '2026-11-15', n: 44, n_pending: 10, n_calc_false: 19 }, can_write: true } };
-  const line14 = (H) => new Function(fnH14(H, 'esc') + '\n' + fnH14(H, 'hrLawLineHtml') + '\nreturn hrLawLineHtml;')();
+  const SHA14 = 'abcdef0123456789';
+  const ON14 = (cw, o) => ({ status: 200, body: Object.assign({ on: true, ver: 'v1-20261115', sum: { ver: 'v1-20261115', sha: SHA14, checked: '2026-11-15', n: 44, n_pending: 10, n_calc_false: 19 }, flag: { bg_ver: 'v1-20261115', bg_sha: SHA14, updated_at: 77 }, can_write: cw }, o || {}) });
+  const OFF14 = { status: 200, body: { on: false, why: 'NOT_PROMOTED', flag_ok: true, flag: { bg_ver: '', bg_sha: '', updated_at: 0 }, avail: { ver: 'v1-20261115', sha: SHA14, checked: '2026-11-15', n: 44, n_pending: 10, n_calc_false: 19 }, can_write: true } };
+  const line14 = (H) => new Function(fnH14(H, 'esc') + '\n' + fnH14(H, 'hrLawPromoted') + '\n' + fnH14(H, 'hrLawLineHtml') + '\nreturn hrLawLineHtml;')();
   const load14 = async (H, resList) => {   // resList = 차례로 돌려줄 응답(함수면 Promise 직접)
     const el = { id: 'hrLawLine', innerHTML: '옛 줄', style: { display: '' } }, calls = [];
     let i = 0;
     const gw = (fn, body) => { calls.push(body); const r = resList[i++]; return typeof r === 'function' ? r() : (r === 'reject' ? Promise.reject(new Error('net')) : Promise.resolve(r)); };
-    const f = new Function('document', 'gwCall', 'confirm', 'alert', [fnH14(H, 'esc'), 'var hrLawSeq = 0;', fnH14(H, 'hrLawLineHtml'), fnH14(H, 'hrLawLineLoad'), fnH14(H, 'hrLawOff'), 'return { load: hrLawLineLoad };'].join('\n'))(
+    const f = new Function('document', 'gwCall', 'confirm', 'alert', [fnH14(H, 'esc'), 'var hrLawSeq = 0;', fnH14(H, 'hrLawPromoted'), fnH14(H, 'hrLawLineHtml'), fnH14(H, 'hrLawLineLoad'), fnH14(H, 'hrLawOff'), 'return { load: hrLawLineLoad };'].join('\n'))(
       { getElementById: (id) => (id === 'hrLawLine' ? el : null) }, gw, () => true, () => {});
     return { el, calls, f };
   };
   const tick = () => new Promise((r) => setTimeout(r, 0));
   const chkLine14 = async (H) => {
     const L = line14(H), I = {};
-    const t1 = L(ON14(false)), t2 = L(ON14(true)), t3 = L(OFF14), t4 = L({ status: 500, body: {} }), t5 = L(ON14(false, { sum: { ver: '<img src=x>', checked: '2026-11-15', n_pending: 1 } })), t6 = L(ON14(false, { sum: { ver: 'v1-20261115', checked: '<b>', n_pending: 'x' } }));
+    const t1 = L(ON14(false)), t2 = L(ON14(true)), t3 = L(OFF14), t4 = L({ status: 500, body: {} }), t5 = L(ON14(false, { sum: { ver: '<img src=x>', checked: '2026-11-15', n_pending: 1 } })), t6 = L(ON14(false, { sum: { ver: 'v1-20261115', sha: SHA14, checked: '<b>', n_pending: 'x' } }));
+    I.sha = L(ON14(false, { flag: { bg_ver: 'v1-20261115', updated_at: 77 } })) === '' && L(ON14(false, { flag: { bg_ver: 'v1-20261115', bg_sha: 'ffff000011112222', updated_at: 77 } })) === ''
+      && L(ON14(false, { sum: { ver: 'v1-20261115', checked: '2026-11-15', n_pending: 1 } })) === '';   // 검토 ②: sha 없는 옛 스위치·다른 지문·지문 없는 요약 = 숨김(서버 on에 기대지 않음)
     I.html = t1 === '인사 법령 근거 판 <b>v1-20261115</b> · 확인일 2026-11-15 · 확인 필요 10건' && t2 === t1 + ' <button type="button" class="mini-btn" id="hrLawOffBtn" style="margin-left:6px;">승격 해제</button>'
       && t3 === '' && t4 === '' && t5 === '' && t6 === '인사 법령 근거 판 <b>v1-20261115</b> · 확인일 - · 확인 필요 0건'
       && L(ON14(false, { on: false })) === '' && L(ON14(false, { on: 'true' })) === '';   // 승격 아님(on true 아님)인데 요약이 붙어 와도 숨김
@@ -15762,7 +15765,7 @@ try {
     const b = await load14(H, [OFF14]); b.f.load(); await tick(); await tick();
     const c = await load14(H, ['reject']); c.f.load(); await tick(); await tick();
     I.off = b.el.style.display === 'none' && b.el.innerHTML === '' && c.el.style.display === 'none' && c.el.innerHTML === '';
-    let rel; const slow = () => new Promise((r) => { rel = () => r(ON14(false, { sum: { ver: 'v0-old', checked: '2026-10-01', n_pending: 9 } })); });
+    let rel; const slow = () => new Promise((r) => { rel = () => r(ON14(false)); });   // 늦게 온 응답은 승격 꼴(그리면 보임) — 버려야 함
     const d = await load14(H, [slow, OFF14]); d.f.load(); d.f.load(); await tick(); await tick(); rel(); await tick(); await tick();
     I.seq = d.el.style.display === 'none' && d.el.innerHTML === '';   // 늦게 온 옛 응답(먼저 부른 것)은 버림
     return { ok: Object.values(I).every((v) => v === true), info: I };
@@ -15779,7 +15782,7 @@ try {
       'var confirm = function(){ return true; }, prompt = function(){ return "x"; }, alert = function(){}, setTimeout = function(){};',
       fnH14(H, 'esc'), stH14(H, /var ASSIGN_PREFIX_ORDER = \[[^\]]+\];/), stH14(H, /var ASSIGN_PREFIX_TXT = \{[^}]+\};/), stH14(H, /var NOTIFY_EVENT_ORDER = \[[^\]]+\];/), stH14(H, /var AUTO_RULE_ORDER = \[[^\]]+\];/),
       stH14(H, /var PMCON_KINDS = \[[\s\S]*?\n  \];/), stH14(H, PUSH14), stH14(H, /var PMCON_PLAN = \{[^\n]+\};/), stH14(H, /var PMCON_CHECKS = \[\];/), stH14(H, /var PMCON_CHOICE_TXT = \{[^}]+\};/), stH14(H, /var pmconState = null, pmconBusy = false, pmconSeq = 0, pmconLogAll = false;/),
-      ...['pmconMd', 'pmconPlan', 'pmconRowsAssign', 'pmconRowsNotify', 'pmconRowsDoneif', 'pmconRowsAutotask', 'pmconRowsLearn', 'pmconRowsLearnHw', 'pmconRowsBrief', 'pmconRowsBg', 'pmconRowsHrBg', 'pmconDueTxt', 'renderPmcon', 'pmconLogRender', 'pmconChecksRender', 'pmconOpenCard', 'pmconAct'].map((n) => fnH14(H, n)),
+      ...['pmconMd', 'pmconPlan', 'pmconRowsAssign', 'pmconRowsNotify', 'pmconRowsDoneif', 'pmconRowsAutotask', 'pmconRowsLearn', 'pmconRowsLearnHw', 'pmconRowsBrief', 'pmconRowsBg', 'hrLawPromoted', 'pmconRowsHrBg', 'pmconDueTxt', 'renderPmcon', 'pmconLogRender', 'pmconChecksRender', 'pmconOpenCard', 'pmconAct'].map((n) => fnH14(H, n)),
       'return { render: renderPmcon, act: pmconAct, kinds: PMCON_KINDS };'].join('\n'))(doc, gw, o);
     api.render(); for (let i = 0; i < 5; i++) await tick();
     return { els, calls, api };
@@ -15788,8 +15791,12 @@ try {
     con_proc_get: { status: 200, body: { flag: { use_blob: true, bg_ver: 'v1-20261031', updated_at: 77 }, bg: { ver: 'v1-20261120', rows: [{ grade: '실측' }] } } }, hr_bg_get: hr });
   const chkPc14 = async (H) => {
     const I = {};
-    const rowsF = new Function(fnH14(H, 'pmconRowsHrBg') + '\nreturn pmconRowsHrBg;')();
-    const r1 = rowsF(OFF14.body), r2 = rowsF(ON14(true).body), r3 = rowsF({ flag: {}, avail: null }), r4 = rowsF({ flag: {}, avail: { ver: 'v1 bad', n: 1, n_pending: 1 } });
+    const rowsF = new Function(fnH14(H, 'hrLawPromoted') + '\n' + fnH14(H, 'pmconRowsHrBg') + '\nreturn pmconRowsHrBg;')();
+    const AV = OFF14.body.avail;
+    const r1 = rowsF(OFF14.body), r2 = rowsF({ flag_ok: true, flag: ON14().body.flag, avail: AV }), r3 = rowsF({ flag: {}, avail: null }), r4 = rowsF({ flag: {}, avail: { ver: 'v1 bad', n: 1, n_pending: 1 } });
+    const r5 = rowsF({ flag_ok: true, flag: { bg_ver: 'v1-20261115', bg_sha: 'ffff000011112222', updated_at: 3 }, avail: AV }), r6 = rowsF({ flag_ok: true, flag: { bg_ver: 'v1-20261115', updated_at: 3 }, avail: AV }), r7 = rowsF({ flag_ok: false, flag: { bg_ver: '', bg_sha: '', updated_at: 0 }, avail: AV });
+    I.sha = r5.length === 1 && r5[0].curTxt === '승격본 v1-20261115(내용 바뀜)' && !r5[0].block && r6.length === 1 && r6[0].setBase === 3
+      && r7.length === 1 && r7[0].curTxt === '상태를 읽지 못함' && /읽지 못해 지금은 승격할 수 없습니다/.test(r7[0].block) && /지금 상태를 읽지 못함\./.test(r7[0].why) && r1[0].block === '';
     I.rows = r1.length === 1 && r1[0].id === 'hrbg:v1-20261115' && r1[0].q === '인사 법령 근거를 승격할까요? (확인 필요 10건)' && r1[0].recTxt === '승격' && r1[0].curTxt === '미승격' && r1[0].def === 'keep'
       && JSON.stringify(r1[0].args) === '{"bg_ver":"v1-20261115"}' && r1[0].setBase === 0 && /확인 필요 10건은 노무사 회신 전이라 기한 계산에 쓰지 않습니다/.test(r1[0].why) && /연차·계약직 계산은 그대로/.test(r1[0].why)
       && r2.length === 0 && r3.length === 0 && r4.length === 0;
@@ -15802,7 +15809,7 @@ try {
     const sent = p.calls.filter((b) => b.action === 'pmcon_decide');
     I.press = sent.length === 2 && sent[0].kind === 'hrbg' && sent[0].choice === 'default' && sent[0].args === undefined && sent[0].def_is_rec === false && sent[0].grade === 'R2'
       && sent[1].choice === 'ok' && JSON.stringify(sent[1].args) === '{"bg_ver":"v1-20261115"}' && sent[1].set_base === 31 && sent[1].row === 'hrbg:v1-20261115';
-    const q = await runPc14(H, PCRES14(ON14(true)));
+    const q = await runPc14(H, PCRES14({ status: 200, body: Object.assign({}, ON14(true).body, { flag_ok: true, avail: AV }) }));
     I.promoted = q.els.pmconRows.innerHTML.indexOf('hrbg:') < 0 && /정할 것 없음: [^<]*인사 법령 근거 승격/.test(q.els.pmconRows.innerHTML);
     return { ok: Object.values(I).every((v) => v === true), info: I };
   };
@@ -15815,8 +15822,11 @@ try {
     ['      + (res.body.can_write ? \' <button type="button" class="mini-btn" id="hrLawOffBtn"', '      + (true ? \' <button type="button" class="mini-btn" id="hrLawOffBtn"'],
     ['    el.innerHTML = ""; el.style.display = "none";   // 읽는 동안·실패 = 안 보임', '    // 읽는 동안·실패 = 안 보임'],
     ['      if (seq !== hrLawSeq) return;\n      var h = hrLawLineHtml(res);', '      var h = hrLawLineHtml(res);'],
-    ['    if (!a || !a.ver || !/^[A-Za-z0-9_.-]{2,40}$/.test(String(a.ver)) || f.bg_ver === a.ver) return [];', '    if (!a || !a.ver) return [];'],
+    ['    if (!a || !a.ver || !/^[A-Za-z0-9_.-]{2,40}$/.test(String(a.ver)) || hrLawPromoted(f, a)) return [];', '    if (!a || !a.ver) return [];'],
     ['      args: { bg_ver: String(a.ver) }, def: "keep",', '      args: { bg_ver: String(a.ver) }, def: "rec",'],
+    ['f.bg_ver && f.bg_sha && f.bg_ver === a.ver && f.bg_sha === a.sha); }', 'f.bg_ver && f.bg_ver === a.ver); }'],   // 검토 ②: 지문 비교 걷음
+    [' || !hrLawPromoted(res.body.flag, s)) return "";', ') return "";'],   // 검토 ②: 한 줄이 서버 on만 믿음
+    ['    var cur = unread ? "상태를 읽지 못함" : ', '    var cur = unread ? "미승격" : '],   // 검토 ⑥: 못 읽음을 미승격으로 보임
     ['    if (name === "hr") hrLawLineLoad();   // P1 판14', '    // P1 판14'],
     ["          + (r.k.card ? ' <button type=\"button\" class=\"link-btn\" data-pc-open=\"' + esc(r.k.card) + '\">카드 열기 ›</button>' : '') + '</div>'", "          + ' <button type=\"button\" class=\"link-btn\" data-pc-open=\"' + esc(r.k.card) + '\">카드 열기 ›</button>' + '</div>'"],
   ];

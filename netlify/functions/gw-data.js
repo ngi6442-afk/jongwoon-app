@@ -5814,7 +5814,8 @@ async function handleRnoteGet(event, d, R) { const g = await pmconGate(event, R,
 async function handleRnoteSave(event, d, R) { const g = await pmconGate(event, R, true); if (g.res) return g.res; const o = await RNOTE.save(d, g.c.member); return jr(o.code, Object.assign(o.body, { request_id: R })); }
 
 // ---- P1 판14(착수설명서 판14 · 원장 T476·T354 · 11/20 승격 카드 ③) 인사 법령 근거 bg:hr:law:v1 ----
-//   근거 표 = appdata collectors/hr_bg.py → data/hr/bg_hr_v1.json(거울)을 오케스트레이터가 Blobs에 올린 것. 승격 = settings:hr.bg_ver 가 그 판 ver 와 같을 때만(차량 vehBgState와 같은 판정).
+//   근거 표 = appdata collectors/hr_bg.py → data/hr/bg_hr_v1.json(거울)을 오케스트레이터가 Blobs에 올린 것. 승격 = settings:hr.bg_ver 가 그 판 ver 와 같고 bg_sha 가 그 판 sha 와 같을 때만
+//   (검토 11/15 ②: 같은 판 이름으로 내용만 바꿔 올리면 꺼짐 SHA_CHANGED · sha 없는 옛 꼴 스위치 = 미승격 — 차량 vehBgState 판13 방식과 같은 꼴, 차량과 달리 sha 없으면 켜지 않음).
 //   이 판은 계산을 바꾸지 않는다 — 앱 연차·레이더 계산은 이 표를 읽지 않고, 승격됐을 때 인사 탭에 한 줄('인사 법령 근거 판 ○ · 확인일 ○ · 확인 필요 n건')만 보인다.
 //   확인 필요 행 = calc false(기한 계산에 쓰지 않음) — 서버도 다시 본다(어긴 행이 하나라도 있으면 꼴 틀림 = 승격 안 됨).
 //   읽기 hr_bg_get = 로그인 → 기기 승인 → 관리자 또는 인사 권한(perms.hr 보기·수행) · 쓰기 hr_bg_set = pmconGate 쓰기(PM) → 낙관락 → 직전 값(prev) → 감사 1줄(col hr)
@@ -5829,7 +5830,7 @@ function hrBgSum(bg) {   // 서버가 행에서 다시 셈(판 머리의 n_* 를
   const rows = bg.rows;
   let ck = '';
   rows.forEach(function (r) { const c = typeof r.checked === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.checked) ? r.checked : ''; if (c > ck) ck = c; });
-  return { ver: bg.ver, checked: ck, n: rows.length, n_pending: rows.filter(function (r) { return r.grade === '확인 필요'; }).length, n_calc_false: rows.filter(function (r) { return r.calc === false; }).length };
+  return { ver: bg.ver, sha: bg.sha, checked: ck, n: rows.length, n_pending: rows.filter(function (r) { return r.grade === '확인 필요'; }).length, n_calc_false: rows.filter(function (r) { return r.calc === false; }).length };
 }
 async function hrBgReadFlag(st) {   // { ok, flag } — 없음 = 빈 스위치 · 읽기 실패 = ok false(그 위에 쓰지 않음)
   const r = await blobGet(st, HR_BG_KEYS.flag);
@@ -5838,18 +5839,21 @@ async function hrBgReadFlag(st) {   // { ok, flag } — 없음 = 빈 스위치 �
   if (typeof r.data !== 'object' || Array.isArray(r.data)) return { ok: false, code: 'HR_FLAG_BAD' };
   return { ok: true, flag: r.data };
 }
-// 승격 판정 한 곳: 근거 표 꼴 맞음 ∧ settings:hr.bg_ver = 그 판 ver. 어느 쪽이든 못 읽으면 on false(fail-closed)
+// 승격 판정 한 곳: 근거 표 꼴 맞음 ∧ settings:hr.bg_ver = 그 판 ver ∧ settings:hr.bg_sha = 그 판 sha. 어느 쪽이든 못 읽으면 on false(fail-closed)
 async function hrBgState(st) {
   let fr = { ok: false }, bg = null;
   try { fr = await hrBgReadFlag(st); } catch (e) { fr = { ok: false }; }
   try { const rb = await blobGet(st, HR_BG_KEYS.bg); if (rb.ok && rb.data) bg = rb.data; } catch (e) {}
   const flag = fr.ok ? fr.flag : {};
   const ver = typeof flag.bg_ver === 'string' ? flag.bg_ver : '';
+  const hrFsha = typeof flag.bg_sha === 'string' ? flag.bg_sha : '';
   const good = hrBgOk(bg);
-  const base = { flag_ok: fr.ok, flag: { bg_ver: ver, updated_at: Number(flag.updated_at) || 0 }, avail: good ? hrBgSum(bg) : null };
+  const base = { flag_ok: fr.ok, flag: { bg_ver: ver, bg_sha: hrFsha, updated_at: Number(flag.updated_at) || 0 }, avail: good ? hrBgSum(bg) : null };
   if (!fr.ok) return Object.assign(base, { on: false, why: 'FLAG_READ_FAILED' });
   if (!good) return Object.assign(base, { on: false, why: bg ? 'BAD_BG' : 'NO_BG' });
   if (!ver || ver !== bg.ver) return Object.assign(base, { on: false, why: 'NOT_PROMOTED' });
+  if (!hrFsha) return Object.assign(base, { on: false, why: 'NOT_PROMOTED' });   // sha 없는 옛 꼴 스위치 = 미승격
+  if (hrFsha !== bg.sha) return Object.assign(base, { on: false, why: 'SHA_CHANGED' });   // 승격한 뒤 같은 판 이름으로 내용이 바뀌어 올라옴
   return Object.assign(base, { on: true, bg: bg });
 }
 async function handleHrBgGet(event, d, R) {
@@ -5873,22 +5877,23 @@ async function handleHrBgSet(event, d, R) {
   const st = store(DATA);
   const fr = await hrBgReadFlag(st);
   if (!fr.ok) return jr(503, { status: 'ERROR', error_code: 'HR_FLAG_READ_FAILED', request_id: R });   // 못 읽은 스위치 위에 쓰지 않음
-  const cur = fr.flag, curVer = typeof cur.bg_ver === 'string' ? cur.bg_ver : '';
+  const cur = fr.flag, curVer = typeof cur.bg_ver === 'string' ? cur.bg_ver : '', curSha = typeof cur.bg_sha === 'string' ? cur.bg_sha : '';
   if (d.base !== undefined && Number(d.base) !== Number(cur.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'HR_BG_STALE', request_id: R });
-  if (v === curVer) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
   let sum = null;
   if (v) {
     let bg = null; try { const rb = await blobGet(st, HR_BG_KEYS.bg); if (rb.ok && rb.data) bg = rb.data; } catch (e) {}
     if (!hrBgOk(bg) || bg.ver !== v) return jr(409, { status: 'CONFLICT', error_code: 'BG_MISSING', request_id: R });   // 올라온 판이 없거나 꼴 틀림·다른 판
     sum = hrBgSum(bg);
   }
+  const newSha = sum ? sum.sha : '';
+  if (v === curVer && newSha === curSha) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });   // 같은 판 이름이라도 내용(sha)이 바뀌었으면 다시 승격할 수 있음
   const now = Date.now();
-  const doc = Object.assign({}, cur, { schema: 1, bg_ver: v, prev: { bg_ver: curVer, updated_at: Number(cur.updated_at) || 0, updated_by: cur.updated_by || '' }, updated_by: c.member.id, updated_at: Math.max(now, (Number(cur.updated_at) || 0) + 1) });
-  const w = await blobSet(st, HR_BG_KEYS.flag, doc);
+  const hrDoc = Object.assign({}, cur, { schema: 1, bg_ver: v, bg_sha: newSha, prev: { bg_ver: curVer, bg_sha: curSha, updated_at: Number(cur.updated_at) || 0, updated_by: cur.updated_by || '' }, updated_by: c.member.id, updated_at: Math.max(now, (Number(cur.updated_at) || 0) + 1) });
+  const w = await blobSet(st, HR_BG_KEYS.flag, hrDoc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   let hrAu = false;
-  try { hrAu = await appendAudit({ ts: now, by: c.member.name, bid: c.member.id, col: 'hr', ev: [{ op: '인사근거', id: '', t: '인사 법령 근거 ' + (curVer || '미승격') + '→' + (v || '미승격(해제)') + (sum ? ' · 확인 필요 ' + sum.n_pending + '건' : '') }] }) !== false; } catch (e) { hrAu = false; }
-  return jr(200, { status: 'OK', bg_ver: v, prev: doc.prev, updated_at: doc.updated_at, audit: hrAu, request_id: R });
+  try { hrAu = await appendAudit({ ts: now, by: c.member.name, bid: c.member.id, col: 'hr', ev: [{ op: '인사근거', id: '', t: '인사 법령 근거 ' + (curVer || '미승격') + '→' + (v || '미승격(해제)') + (sum ? ' · sha ' + newSha + ' · 확인 필요 ' + sum.n_pending + '건' : '') }] }) !== false; } catch (e) { hrAu = false; }
+  return jr(200, { status: 'OK', bg_ver: v, bg_sha: newSha, prev: hrDoc.prev, updated_at: hrDoc.updated_at, audit: hrAu, request_id: R });
 }
 PMCON_KINDS.hrbg = { label: '인사 법령 근거 승격', grade: 'R2', fn: handleHrBgSet, args: { bg_ver: 's' }, row: function (a) { return 'hrbg:' + a.bg_ver; } };   // P1 판14 — 콘솔 줄(무응답 = 미승격)
 
