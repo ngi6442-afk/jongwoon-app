@@ -461,10 +461,21 @@ async function handleSave(event, d, R) {
   }
   if (col === 'tasks' && Array.isArray(doc.items)) {
     const oldByA = {}; oldItems.forEach(function (o) { if (o && o.id) oldByA[o.id] = o; });
+    // P1 판20(+검토 B3): 인허가 기한 지시의 키(auto_key)·단계(lic_stage)·묶은 회차(lic_rows)는 서버만 쓰는 칸 — 클라이언트가 못 바꾸고 못 뺀다.
+    //   서버 문서에 이 키 꼴로 있던 지시 = 키·두 칸 모두 서버 값(빼거나 바꿔 보내도 되돌림 — 키가 빠져 다음 실행에서 첫 회차 묶음이 다시 생기지 않게)
+    //   서버 문서에 없던 줄·다른 키였던 지시가 이 키 꼴을 달고 오면 = 종전 키로 되돌리고(없었으면 뗌) 두 칸은 버림(앱은 만들지 않음 — 서버 ingest만 만든다).
+    //   직전 문서를 못 읽은 저장에 이 키 꼴이나 두 칸이 있으면 500 PREV_READ_FAILED(서버 값을 모르고 덮지 않게 · 이 꼴이 없는 저장은 종전대로).
+    const ldTouch = function (t) { return !!t && typeof t === 'object' && (LD.isDutyKey(t.auto_key) || t.lic_stage !== undefined || t.lic_rows !== undefined); };
+    if (prevReadFailed && doc.items.some(ldTouch)) return jr(500, { status: 'ERROR', error_code: 'PREV_READ_FAILED', request_id: R });
+    doc.items.forEach(function (t) {
+      if (!t || typeof t !== 'object') return;
+      const o = oldByA[t.id];
+      if (o && LD.isDutyKey(o.auto_key)) { t.auto_key = o.auto_key; ['lic_stage', 'lic_rows'].forEach(function (f) { if (o[f] !== undefined) t[f] = o[f]; else delete t[f]; }); return; }
+      if (!ldTouch(t)) return;
+      if (LD.isDutyKey(t.auto_key)) { if (o && o.auto_key !== undefined) t.auto_key = o.auto_key; else delete t.auto_key; }
+      delete t.lic_stage; delete t.lic_rows;
+    });
     doc.items.forEach(function (t) { if (!t || !t.auto_key || t.who_id) return; const o = oldByA[t.id]; if (o && o.who_id && o.who_by === 'assign') { t.who_id = o.who_id; t.who = o.who || ''; t.who_by = 'assign'; } });
-    // P1 판20: 인허가 기한 지시의 단계(lic_stage)·묶은 회차(lic_rows)는 서버만 쓰는 칸 — 클라 사본 값은 버리고 서버 값 이월(낡은 사본이 지워 단계 알림이 다시 가거나 묶음이 풀리지 않게)
-    //   서버 문서에 없던 줄이 이 키 꼴을 달고 오면(앱은 만들지 않음 — 서버 ingest만 만든다) 키를 떼어 보통 지시로 둔다(가짜 키로 첫 회차 묶음·행별 지시를 막지 못하게).
-    doc.items.forEach(function (t) { if (!t || typeof t !== 'object' || !LD.isDutyKey(t.auto_key)) return; const o = oldByA[t.id]; if (!o || o.auto_key !== t.auto_key) { if (!prevReadFailed) { delete t.auto_key; delete t.lic_stage; delete t.lic_rows; } return; } ['lic_stage', 'lic_rows'].forEach(function (f) { if (o[f] !== undefined) t[f] = o[f]; else delete t[f]; }); });
     // v397 앱 기준 review 보호: 서버가 올린 review('앱 기준')를 클라 사본이 open으로 보내면 반려(doneif_off=1)가 아닌 한 서버 값을 이월(낡은 사본·로컬 우선 병합 방지). 승인(done)은 통과
     doc.items.forEach(function (t) {
       if (!t || !t.auto_key) return;
@@ -484,9 +495,10 @@ async function handleSave(event, d, R) {
     });
     if (clogRows.length) { try { await apprClogAppend(store(DATA), clogRows, Date.now()); } catch (e) {} }
     const blankBeforeS = {}; doc.items.forEach(function (t) { if (t && t.auto_key && !t.who_id) blankBeforeS[t.id] = 1; });
-    try { const at = await assignRead(store(DATA)); if (Object.keys(at.rules || {}).length) { const ms = await assignMembers(); if (ms) assignFill(doc.items, at.rules, assignNames(ms)); } } catch (e) {}
+    const notLdS = function (t) { return !(t && LD.isDutyKey(t.auto_key)); };   // P1 판20 검토 B2: 인허가 기한 지시의 담당은 정기 실행(licduty — 재직 확인·옮기기)만 채운다
+    try { const at = await assignRead(store(DATA)); if (Object.keys(at.rules || {}).length) { const ms = await assignMembers(); if (ms) assignFill(doc.items.filter(notLdS), at.rules, assignNames(ms)); } } catch (e) {}
     // v396 알림: 클라 생성기(runAutoTaskGen·recOverdueGen·runBidQualGen)가 만든 새 자동 지시 + 이번에 채워진 공란 → 담당자 본인 1발(설정 assignee일 때만)
-    const newAutoS = doc.items.filter(function (t) { return t && t.auto_key && t.who_id && (!oldByA[t.id] || blankBeforeS[t.id]); });
+    const newAutoS = doc.items.filter(function (t) { return t && t.auto_key && t.who_id && notLdS(t) && (!oldByA[t.id] || blankBeforeS[t.id]); });
     if (newAutoS.length) await notifyAutoCreated(store(DATA), newAutoS, c.member.name);
   }
   // 휴가: 신청 저장은 전 직원 필요하지만, 비관리자 저장은 서버가 재구성 — 타인 항목은 서버 원본 유지(클라이언트 사본으로 못 덮음),
@@ -950,8 +962,11 @@ function autotaskRuleOf(autoKey, today) {
 }
 async function handleAutotaskIngest(event, d, R) {
   if (!botKeyOk(d.key)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });   // v453 상수시간
-  const items = Array.isArray(d.items) ? d.items : [];
-  const hideKeys = Array.isArray(d.hide_keys) ? d.hide_keys.map(String) : [];
+  const items = (d.only !== 'lic_duty' && Array.isArray(d.items)) ? d.items : [];
+  // P1 판20 검토 B1: only 'lic_duty' = 봇이 보낼 항목 없이 인허가 기한 지시만 돌리려고 부른 호출 — 받은 항목·숨길 키·차량 다시 지시·배정 채움·일반 자동 지시 알림을 돌지 않는다
+  //   (종전 봇이면 ingest를 안 부르던 날에 다른 규칙·관리자 '정기업무 n건'이 새로 생기지 않게 — 인허가 스위치를 켜도 기존 자동 지시는 종전과 같음).
+  const only = d.only === 'lic_duty';
+  const hideKeys = (!only && Array.isArray(d.hide_keys)) ? d.hide_keys.map(String) : [];
   const st = store(DATA);
   const r = await blobGet(st, colKey('tasks'));
   const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
@@ -979,7 +994,7 @@ async function handleAutotaskIngest(event, d, R) {
   //   검토 P1-4: 이 갈래는 봇이 ingest를 부를 때만 돈다 — 지금 봇(appdata collectors/autotask.py)은 새 항목도 숨길 키도 없으면 ingest를 부르지 않으므로 매일 돈다는 보장이 없다.
   //     주 경로는 관리자 앱 접속(runAutoTaskGen — 세션 1회), 이 갈래는 보조. 봇이 매일 부르게 하는 것은 appdata 쪽 일(이 판 밖).
   let redo = 0;
-  try {
+  if (!only) try {
     const rvh = await blobGet(st, colKey('vehicles'));
     if (rvh.ok && rvh.data && Array.isArray(rvh.data.items)) {
       AR.vehRedo(rvh.data.items, doc.items, today).forEach(function (n) {
@@ -1002,7 +1017,7 @@ async function handleAutotaskIngest(event, d, R) {
         const p = LD.plan(li.input);
         const ar = LD.apply(p, doc.items, today, li.input.names, function () { return 't' + crypto.randomBytes(6).toString('hex'); });
         ar.ids.forEach(function (id) { licNew[id] = 1; });
-        lic = { mode: 'live', made: ar.made, bundled: ar.bundled, bumped: ar.bumped, redated: ar.redated, touched: ar.ids.length + p.bump.length, no_who: p.no_who.length, base: p.base.length, first: p.first, notify: ar.notify };
+        lic = { mode: 'live', made: ar.made, bundled: ar.bundled, bumped: ar.bumped, redated: ar.redated, moved: ar.moved, touched: ar.changed, no_who: p.no_who.length, base: p.base.length, first: p.first, notify: ar.notify };
       }
     } catch (e) { lic = { mode: 'live', skip: 'ERROR' }; }
   }
@@ -1012,14 +1027,15 @@ async function handleAutotaskIngest(event, d, R) {
   });
   // v395 배정표: 새 항목과 기존 공란 자동 지시에 담당 채움(사람 지정분 불변) — 매일 아침 ingest가 곧 일일 backfill
   let assigned = 0;
+  const notLd = function (t) { return !(t && LD.isDutyKey(t.auto_key)); };   // P1 판20: 인허가 기한 지시의 담당·알림은 licduty 한 길(재직 확인·옮기기) — 일반 배정 채움·알림에서 뺀다
   const blankBefore = {}; doc.items.forEach(function (t) { if (t && t.auto_key && !t.who_id) blankBefore[t.id] = 1; });
-  try { const at = await assignRead(st); if (Object.keys(at.rules || {}).length) { const ms = await assignMembers(); if (ms) assigned = assignFill(doc.items, at.rules, assignNames(ms)); } } catch (e) {}
+  if (!only) try { const at = await assignRead(st); if (Object.keys(at.rules || {}).length) { const ms = await assignMembers(); if (ms) assigned = assignFill(doc.items.filter(notLd), at.rules, assignNames(ms)); } } catch (e) {}
   // v396 알림: 이번에 생긴 항목 + 이번에 담당이 채워진 항목 → 담당자 본인 1발(설정 assignee일 때만)
-  const notifyItems = doc.items.filter(function (t) { return t && t.auto_key && t.who_id && !licNew[t.id] && (t.created === today && !have0[t.auto_key] || blankBefore[t.id]); });   // P1 판20 인허가 기한 지시는 아래 licDutyNotify 한 길
+  const notifyItems = only ? [] : doc.items.filter(function (t) { return t && t.auto_key && t.who_id && notLd(t) && !licNew[t.id] && (t.created === today && !have0[t.auto_key] || blankBefore[t.id]); });   // P1 판20 인허가 기한 지시는 아래 licDutyNotify 한 길
   let notified = 0;
   if (notifyItems.length) notified = await notifyAutoCreated(st, notifyItems, '정기봇');
   const blockTxt = blocked ? ' · 스위치 막음 ' + blocked + '(' + Object.keys(blockedBy).map(function (k) { return k + ' ' + blockedBy[k] + ' — ' + (k === 'unknown' ? '허용 꼴 밖' : sw.rules[k]); }).join(', ') + ')' : '';   // v453 규칙 이름·건수·스위치 값만(키·본문 없음)
-  const licTxt = !lic ? '' : (lic.skip ? ' · 인허가 기한 건너뜀(' + lic.skip + ')' : ((lic.bundled || lic.made || lic.bumped || lic.no_who) ? ' · 인허가 기한 ' + (lic.bundled ? '묶음 ' + lic.bundled + ' · ' : '') + '새 ' + lic.made + ' · 단계 올림 ' + lic.bumped + (lic.no_who ? ' · 담당 없음 ' + lic.no_who + '행' : '') : ''));   // P1 판20 수·행 수만
+  const licTxt = !lic ? '' : (lic.skip ? ' · 인허가 기한 건너뜀(' + lic.skip + ')' : ((lic.bundled || lic.made || lic.bumped || lic.moved || lic.no_who) ? ' · 인허가 기한 ' + (lic.bundled ? '묶음 ' + lic.bundled + ' · ' : '') + '새 ' + lic.made + ' · 단계 올림 ' + lic.bumped + (lic.moved ? ' · 담당 옮김 ' + lic.moved : '') + (lic.no_who ? ' · 담당 없음 ' + lic.no_who + '행' : '') : ''));   // P1 판20 수·행 수만
   if (made || fixed || assigned || (lic && lic.touched)) {
     doc.updated_by = '정기봇'; doc.updated_at = Date.now();
     const w = await blobSet(st, colKey('tasks'), doc);
@@ -1031,7 +1047,7 @@ async function handleAutotaskIngest(event, d, R) {
   let licSent = 0;
   if (lic && lic.notify) { licSent = await licDutyNotify(lic.notify, today); delete lic.notify; }   // 저장된 뒤에만(저장 실패면 위에서 500으로 끝남)
   if (lic) lic.notified = licSent;
-  return jr(200, Object.assign({ status: 'OK', made: made, redo: redo, fixed: fixed, assigned: assigned, notified: notified, blocked: blocked, blocked_rules: blockedBy, request_id: R }, lic ? { lic: lic } : {}));
+  return jr(200, Object.assign({ status: 'OK', made: made, redo: redo, fixed: fixed, assigned: assigned, notified: notified, blocked: blocked, blocked_rules: blockedBy, request_id: R }, lic ? { lic: lic } : {}, only ? { only: 'lic_duty' } : {}));
 }
 
 // P1 판20 인허가 기한 지시 — 입력 모으기(한 곳). 탭(lic_month_get)과 같은 원천: 근거 승격본 자동 회차 행(licBgRead → licBgOut 칸) · col:licenses duties·items · 배정표(엄격 — 못 읽으면 건너뜀, 빈 표로 보지 않음).
@@ -1047,8 +1063,10 @@ async function licDutyInput(st, tasks, today) {
   let items = tasks;
   if (!Array.isArray(items)) { const rt = await blobGet(st, colKey('tasks')); if (!rt.ok && rt.code !== 'NOT_FOUND') return { ok: false, why: 'TASKS_READ_FAILED' }; items = (rt.ok && rt.data && Array.isArray(rt.data.items)) ? rt.data.items : []; }
   const ms = await assignMembers();
+  if (!ms) return { ok: false, why: 'MEMBERS_UNAVAILABLE' };   // 판20 검토 B2: 명부를 못 읽으면 재직 여부를 모름 — 건너뜀(아무에게나 보내지 않음)
+  const names = assignNames(ms);
   return { ok: true, ver: bg.ver, input: { rows: bg.rows.map(licBgOut), duties: (rl.data && Array.isArray(rl.data.duties)) ? rl.data.duties : [], lics: (rl.data && Array.isArray(rl.data.items)) ? rl.data.items : [],
-    tasks: items, rules: as.rules, names: ms ? assignNames(ms) : {}, today: today } };
+    tasks: items, rules: as.rules, names: names, active: names, today: today } };
 }
 // 알림 — 담당 본인 1발(우선기기) · 이번 실행에서 그 사람에게 생긴 것(묶음·행별 새 지시·단계 오름)을 한 묶음으로. 관리자 전원 길(bot_notify auto-due)은 쓰지 않는다(11/13 담당 1발).
 async function licDutyNotify(byWho, today) {
@@ -1058,7 +1076,7 @@ async function licDutyNotify(byWho, today) {
   for (const who of whos) {
     const list = byWho[who] || []; if (!list.length) continue;
     const body = list.slice(0, 3).map(function (s) { return String(s).slice(0, 40); }).join(' · ') + (list.length > 3 ? ' 외 ' + (list.length - 3) + '건' : '') + " — 인허가 탭 '이번 달'";
-    try { await push.sendTo([who], { title: '인허가 기한 지시 ' + list.length + '건', body: body.slice(0, 200), url: './', tag: 'lic-duty-' + who + '-' + today }, { ctx: tc, primaryOnly: true, by: '정기봇' }); n++; } catch (e) {}
+    try { const rs = await push.sendTo([who], { title: '인허가 기한 지시 ' + list.length + '건', body: body.slice(0, 200), url: './', tag: 'lic-duty-' + who + '-' + today }, { ctx: tc, primaryOnly: true, by: '정기봇' }); if (rs && Number(rs.sent) > 0) n++; } catch (e) {}   // 판20 검토 B2: 실제 보낸 사람만 셈(구독 없음·실패 = 0)
   }
   return n;
 }

@@ -28091,11 +28091,16 @@ function dutyStartIdx(cands, done, anchor){
   if (anchor) return dutyFilledIdx(cands, anchor) + 1;
   return -1;
 }
+// P1 판20 검토 A: 기록이 없는 회차를 세기 시작한 날(판28 '이번 달' 탭이 운영에 들어온 날) — 기준(완료 기록·기준일)이 없는 행은 '오늘'이 아니라 이 날까지만 지난 회차를 걸러 낸다.
+//   그 뒤에 기한이 온 회차는 [완료+수령 올리기]·[해당 없음]으로 닫힐 때까지 해가 바뀌어도 '지남'으로 남는다(가장 오래된 것부터 — 종전엔 1월 1일·한 주기 뒤에 기록 없이 사라짐).
+//   이 날 이후 아무 날의 결과는 종전 규칙을 이 날에 멈춘 것과 같고, 이 날 이전 날짜(시험)는 종전 그대로(오늘).
+var DUTY_FROM = "2026-11-13";
 // d = 의무 행, lic = 붙는 허가증({issued}) 또는 null, today = 'YYYY-MM-DD'
 function dutyNext(d, lic, today){
   var s = d && d.sched;
   if (!s || !s.auto) return null;
   var done = dutyDoneSet(d), anchor = dutyAnchor(d), grace = Number(s.grace_days) || 0, k, j, due, cands = [], start = 0;
+  var lim = today < DUTY_FROM ? today : DUTY_FROM;   // 기준 없는 행의 '지난 회차 걸러 내기' 기준 날
   var out = { due: "", days: 0, overdue: false, kind: s.type, anchor: anchor, missing: null };
   if (s.type === "fixed"){
     // 매년 1~2개 고정일(fixed_month/day, 선택 fixed2_month/day — 예: 반기 보고 7/31·익년 1/31). 말일 = day 0.
@@ -28103,16 +28108,17 @@ function dutyNext(d, lic, today){
     if (mo < 1 || mo > 12){ out.missing = "sched"; return out; }
     dates.push([mo, isNaN(dy) ? 0 : dy]);
     if (mo2 >= 1 && mo2 <= 12) dates.push([mo2, isNaN(dy2) ? 0 : dy2]);
-    var y0 = dutyParse(anchor) ? dutyParse(anchor).y : dutyParse(today).y;
+    var y0 = dutyParse(anchor) ? dutyParse(anchor).y : dutyParse(lim).y;   // 판20 검토 A: 기준 없음 = DUTY_FROM 해부터(종전 오늘 해)
     var lastDue = ""; for (k in done){ if (done.hasOwnProperty(k) && dutyParse(k) && k > lastDue) lastDue = k; }
     if (lastDue && dutyParse(lastDue).y < y0) y0 = dutyParse(lastDue).y;   // P1 판28 검토 4: 후보 시작 연도 = 가장 늦은 완료 회차 연도와 제출일 연도 중 이른 쪽 — 몇 해 늦게 낸 회차도 후보 안에 들어 그다음 회차부터(여러 회차를 건너뛰지 않게)
-    for (k = -1; k < 6; k++){ for (j = 0; j < dates.length; j++) cands.push(dutyMake(y0 + k, dates[j][0], dates[j][1])); }
+    var yN = Math.max(y0 + 5, dutyParse(today).y + 1);   // 판20 검토 A: 오늘 다음 해까지는 늘 후보(시작 해가 오래돼도 '범위 밖'이 되지 않게)
+    for (k = y0 - 1; k <= yN; k++){ for (j = 0; j < dates.length; j++) cands.push(dutyMake(k, dates[j][0], dates[j][1])); }
     cands.sort();
     start = dutyStartIdx(cands, done, anchor);
-    if (start < 0){   // 기준 없음: 올해분부터 — 지난해 회차·한 주기(12/날짜 수 개월) 넘게 지난 회차는 안 보인다
+    if (start < 0){   // 기준 없음: DUTY_FROM 해분부터 — 그 전 해 회차·DUTY_FROM에 이미 한 주기(12/날짜 수 개월) 넘게 지난 회차는 안 보인다(그 뒤 회차는 닫힐 때까지 남음)
       start = 0;
-      var ty = dutyParse(today).y, gapM = Math.round(12 / dates.length);
-      while (start < cands.length && (dutyParse(cands[start]).y < ty || dutyAddMonths(cands[start], gapM) <= today)) start++;
+      var ly = dutyParse(lim).y, gapM = Math.round(12 / dates.length);
+      while (start < cands.length && (dutyParse(cands[start]).y < ly || dutyAddMonths(cands[start], gapM) <= lim)) start++;
     }
   } else if (s.type === "interval"){
     var per = dutyPeriodMonths(s);
@@ -28125,7 +28131,7 @@ function dutyNext(d, lic, today){
         cands.push(grace ? dutyAddDays(due, grace) : due);
       }
       start = dutyStartIdx(cands, done, anchor);
-      if (start < 0){ start = 0; while (start < cands.length && dutyAddMonths(cands[start], per) <= today) start++; }   // 기준 없음: 한 주기 넘게 지난 회차는 안 보인다
+      if (start < 0){ start = 0; while (start < cands.length && dutyAddMonths(cands[start], per) <= lim) start++; }   // 기준 없음: DUTY_FROM에 이미 한 주기 넘게 지난 회차는 안 보인다(그 뒤 회차는 닫힐 때까지 남음 — 판20 검토 A)
     } else {   // last_done · manual — 직전 이행일(runs) 또는 사람이 넣은 기준일부터 한 주기
       if (!anchor){ out.missing = "base"; return out; }
       due = dutyAddMonths(anchor, per);

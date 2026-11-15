@@ -5,24 +5,32 @@
 //   uismoke P1 판20이 같은 표본·여러 날짜에서 탭 묶음·기한과 이 결과를 대조한다(한 번이라도 다르면 실패).
 // 지시: 행·회차마다 키 하나 'lic:<허가증 id 또는 ->:duty:<번호>:<계산 기한(orig)>' — 기한 정정은 그 회차의 날짜만 바꾸므로 키는 그대로(같은 지시의 기한만 따라감).
 //   같은 회차가 30일 안 → 7일 안 → 지남으로 오르면 새 지시를 만들지 않고 그 지시의 단계(lic_stage)·제목만 올리고, 오를 때마다 담당에게 알림 1발(내려갔다 다시 오르면 그때 1발 — 지남이 매일 반복되지 않음).
-//   담당 = 배정표에서 그 행 키(lic:<허가증>:duty:<번호>)의 가장 긴 접두어 담당(이번 달 탭 단추 권한 licDutyGate와 같은 줄). 없으면 만들지 않고 no_who로 센다(관리자 폴백 없음).
+//   담당 = 배정표에서 그 행 키(lic:<허가증>:duty:<번호>)의 가장 긴 접두어 담당(이번 달 탭 단추 권한 licDutyGate와 같은 줄). 없거나 재직자가 아니면 만들지 않고 no_who로 센다(관리자 폴백 없음).
+//   열린 지시는 배정표 담당이 바뀌면 다음 실행에서 새 담당으로 옮긴다(판20 검토 B2 — 사람이 바꾼 담당은 그대로). 허가증 id의 ':'·빈칸은 키 안에서 %XX(keyId).
+//   기한 계산(_lib/duty.js)은 판20 검토 A부터 기록 없는 회차를 DUTY_FROM 뒤로는 해가 바뀌어도 지우지 않는다 — 지난 회차가 닫힐 때까지 같은 지시가 남는다.
 // 첫 회차 묶음(C117): 인허가 기한 지시가 하나도 없는 상태(지운 것 포함 — 켠 뒤 첫 실행)에서 이미 '지남'인 행들은 담당별로 '지난 기한 n건 정리' 지시 1건(lic_rows = 묶은 행·회차)으로 묶는다.
 //   묶음이 열려 있는(완료·삭제 아님) 동안 그 행·회차는 행별 지시를 만들지 않는다. 그 뒤 새로 기한이 오는 행부터 행별 지시.
 // 완료: _lib/doneif.js가 이 키를 읽어 그 회차 완료 기록(runs[].due = orig)·해당 없음이면 승인 대기(앱 기준)로 올린다(묶음은 묶은 행이 모두 그럴 때).
 const DUTY = require('./duty');
 
-const STAGE_TXT = { d30: '30일 안', d7: '7일 안', over: '기한 지남' };
+const STAGE_TXT = { d30: '30일 안', d7: '7일 안', over: '기한 지남', later: '30일 밖' };   // later = 기한 정정으로 30일 밖이 된 열린 지시의 제목
 const STAGE_RANK = { later: 0, d30: 1, d7: 2, over: 3 };
 const BUNDLE_MID = ':duty:over:';
-const KEY_RE = /^lic:([^:\s\x00-\x1f\x7f]{1,80}):duty:(\d{1,4}):(\d{4}-\d{2}-\d{2})$/;
+const KEY_RE = /^lic:([^:\s\x00-\x1f\x7f]{1,160}):duty:(\d{1,4}):(\d{4}-\d{2}-\d{2})$/;
 const BUNDLE_RE = /^lic:-:duty:over:(\d{4}-\d{2}-\d{2}):(\d{1,3})$/;
+function hasOwn(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
 
-function dutyKey(no, licId) { return 'lic:' + (licId || '-') + ':duty:' + no; }   // 배정표 줄 찾기(gw-data licDutyKey가 이 함수를 쓴다)
+// 허가증 id를 키 한 칸으로 — ':'·'%'·빈칸·제어문자는 %XX로(키 꼴이 깨지지 않게 · 판20 검토 B5). 보통 id(영문·숫자·한글)는 그대로라 지금 배정표 줄('lic:' 접두어)과 같다. 없으면 '-'.
+function keyId(id) {
+  const s = String(id == null ? '' : id);
+  return s ? s.replace(/[%:\s\x00-\x1f\x7f]/g, function (c) { const h = c.charCodeAt(0).toString(16).toUpperCase(); return '%' + (h.length < 2 ? '0' + h : h); }) : '-';
+}
+function dutyKey(no, licId) { return 'lic:' + keyId(licId) + ':duty:' + no; }   // 배정표 줄 찾기(gw-data licDutyKey가 이 함수를 쓴다)
 function taskKey(no, licId, orig) { return dutyKey(no, licId) + ':' + orig; }
 function bundleKey(today, i) { return 'lic:-' + BUNDLE_MID + today + ':' + i; }
-function isDutyKey(k) { const s = String(k || ''); return KEY_RE.test(s) || BUNDLE_RE.test(s); }
+function isDutyKey(k) { const s = typeof k === 'string' ? k : ''; return KEY_RE.test(s) || BUNDLE_RE.test(s); }
 function parse(k) {   // → {bundle:false, lic, no, due} | {bundle:true, day, i} | null
-  const s = String(k || ''); let m = BUNDLE_RE.exec(s);
+  const s = typeof k === 'string' ? k : ''; let m = BUNDLE_RE.exec(s);
   if (m) return { bundle: true, day: m[1], i: Number(m[2]) };
   m = KEY_RE.exec(s);
   return m ? { bundle: false, lic: m[1], no: Number(m[2]), due: m[3] } : null;
@@ -61,12 +69,14 @@ function bundleDetail(list) {
 }
 function openish(t) { return !!(t && t.del !== 1 && (t.status === 'open' || t.status === 'hold')); }
 
-// 계획 — input {rows(licBgOut 꼴), duties, lics, tasks, rules(배정표), names(id→이름), today}. 저장·알림 없음.
-// 반환 {today, first, states, create[{key,no,stage,who_id,title,detail,due,orig}], bump[{id,no,from,to,rise,due,title}], bundles[{key,who_id,title,detail,rows[{no,due}]}], no_who[no], base[no], na[no], later[no]}
+// 계획 — input {rows(licBgOut 꼴), duties, lics, tasks, rules(배정표), names(id→이름), active(재직 id 표 — 있으면 그 밖 담당 = 담당 없음), today}. 저장·알림 없음.
+// 반환 {today, first, states, create[{key,no,stage,who_id,title,detail,due,orig}], bump[{id,no,from,to,rise,due,title}], move[{id,no,from,to}], bundles[{key,who_id,title,detail,rows[{no,due}]}], no_who[no], base[no], na[no], later[no]}
 function plan(input) {
   const today = input.today, rules = input.rules || {}, rows = Array.isArray(input.rows) ? input.rows : [];
-  const tasks = Array.isArray(input.tasks) ? input.tasks : [];
-  const byKey = {}, covered = {};
+  const tasks = Array.isArray(input.tasks) ? input.tasks : [], act = input.active && typeof input.active === 'object' ? input.active : null;
+  const okWho = function (id) { return !!id && id !== '__all__' && (!act || hasOwn(act, id)); };
+  const target = function (no, licId) { const a = assignFor(dutyKey(no, licId), rules); return a && okWho(a.who_id) ? a.who_id : ''; };   // 배정표 그 행 담당(재직자만)
+  const byKey = {}, covered = {}, openBundles = [];
   let first = true;
   tasks.forEach(function (t) {
     if (!t || typeof t.auto_key !== 'string') return;
@@ -74,9 +84,25 @@ function plan(input) {
     first = false;   // 지운 것·완료 포함 — 한 번이라도 인허가 기한 지시가 있었으면 첫 실행 아님
     if (!p.bundle) { if (!byKey[t.auto_key]) byKey[t.auto_key] = t; return; }
     if (t.del === 1 || t.status === 'done') return;   // 묶음이 닫혔으면(사람이 완료·삭제) 남은 행은 행별 지시로
+    if (openish(t)) openBundles.push(t);
     (Array.isArray(t.lic_rows) ? t.lic_rows : []).forEach(function (x) { if (x && x.no != null && x.due) covered[x.no + ':' + x.due] = 1; });
   });
-  const out = { today: today, first: first, states: [], create: [], bump: [], bundles: [], no_who: [], base: [], na: [], later: [] };
+  const out = { today: today, first: first, states: [], create: [], bump: [], move: [], bundles: [], no_who: [], base: [], na: [], later: [] };
+  // 열린 지시의 담당 따라가기(판20 검토 B2): 배정표 담당이 바뀌면 새 담당으로 · 담당이 재직자가 아니고 배정표에도 재직 담당이 없으면 비움('담당 없음').
+  //   사람이 지시 창에서 바꾼 담당(who_by 'edit')·[내 것 아님]으로 빠진 같은 사람에게는 되돌리지 않는다(종전 배정 채움과 같은 원칙).
+  const follow = function (t, tw, no) {
+    if (t.who_by === 'edit') return;
+    if (tw) { if (t.who_id !== tw && !(t.who_by === 'notmine' && t.notmine && t.notmine.prev === tw)) out.move.push({ id: t.id, no: no, from: t.who_id || '', to: tw }); return; }
+    if (t.who_id && act && !hasOwn(act, t.who_id)) out.move.push({ id: t.id, no: no, from: t.who_id, to: '' });
+  };
+  const rowByNo = {}; rows.forEach(function (r) { if (r && r.no != null) rowByNo[r.no] = r; });
+  openBundles.forEach(function (t) {
+    const x0 = (Array.isArray(t.lic_rows) ? t.lic_rows : [])[0], r0 = x0 ? rowByNo[x0.no] : null;
+    if (!r0) return;
+    const tw = target(r0.no, r0.lic_id);
+    if (!tw) out.no_who.push(r0.no);
+    follow(t, tw, r0.no);
+  });
   const overBy = {}, whoOrder = [];
   rows.forEach(function (r) {
     const s = rowState(r, findDuty(input.duties, r.no), licOf(input.lics, r.lic_id), today);
@@ -88,55 +114,68 @@ function plan(input) {
     if (have) {
       if (!openish(have)) return;   // 승인 대기·완료·삭제 = 손대지 않음
       const from = have.lic_stage && STAGE_RANK[have.lic_stage] ? have.lic_stage : 'd30';
-      const to = s.stage === 'later' ? from : s.stage;   // 기한 정정으로 30일 밖이 되면 단계는 그대로 두고 기한만 따라감
-      if (from !== to || have.due !== s.due) out.bump.push({ id: have.id, no: s.no, from: from, to: to, rise: STAGE_RANK[to] > STAGE_RANK[from], due: s.due, title: rowTitle(r, to) });
+      const to = s.stage === 'later' ? from : s.stage;   // 기한 정정으로 30일 밖이 되면 단계는 그대로(다시 오를 때 알림 1)·제목은 '30일 밖'·기한은 따라감
+      const ti = rowTitle(r, s.stage === 'later' ? 'later' : to);
+      if (from !== to || have.due !== s.due || have.title !== ti) out.bump.push({ id: have.id, no: s.no, from: from, to: to, rise: STAGE_RANK[to] > STAGE_RANK[from], due: s.due, title: ti });
+      const tw = target(s.no, r.lic_id);
+      if (!tw) out.no_who.push(s.no);
+      follow(have, tw, s.no);
       return;
     }
     if (s.stage === 'later') { out.later.push(s.no); return; }
     if (covered[s.no + ':' + s.orig]) return;   // 열린 묶음 지시에 든 회차
-    const a = assignFor(dutyKey(s.no, r.lic_id), rules);
-    if (!a || !a.who_id) { out.no_who.push(s.no); return; }
+    const tw = target(s.no, r.lic_id);
+    if (!tw) { out.no_who.push(s.no); return; }   // 배정표에 없거나 재직자가 아님 — 만들지 않음(관리자 폴백 없음)
     if (first && s.stage === 'over') {
-      if (!overBy[a.who_id]) { overBy[a.who_id] = []; whoOrder.push(a.who_id); }
-      overBy[a.who_id].push({ no: s.no, due: s.orig, shown: s.due });
+      if (!overBy[tw]) { overBy[tw] = []; whoOrder.push(tw); }
+      overBy[tw].push({ no: s.no, due: s.orig, shown: s.due });
       return;
     }
-    out.create.push({ key: key, no: s.no, stage: s.stage, who_id: a.who_id, title: rowTitle(r, s.stage), detail: rowDetail(r, s), due: s.due, orig: s.orig });
+    out.create.push({ key: key, no: s.no, stage: s.stage, who_id: tw, title: rowTitle(r, s.stage), detail: rowDetail(r, s), due: s.due, orig: s.orig });
   });
   whoOrder.forEach(function (w, i) {
     const list = overBy[w];
     out.bundles.push({ key: bundleKey(today, i + 1), who_id: w, title: '인허가 지난 기한 ' + list.length + '건 정리', detail: bundleDetail(list.map(function (x) { return { no: x.no, due: x.shown }; })),
       rows: list.map(function (x) { return { no: x.no, due: x.due }; }) });
   });
+  out.no_who = out.no_who.filter(function (v, i, a) { return a.indexOf(v) === i; });
   return out;
 }
 
-// 적용 — tasks 배열에 넣고 고친다. mkId() = 새 지시 id. 반환 {made, bundled, bumped, redated, ids(새로 만든 id), notify{who_id:[제목]}}
+// 적용 — tasks 배열에 넣고 고친다. mkId() = 새 지시 id. 반환 {made, bundled, bumped, redated, moved, changed, ids(새로 만든 id), notify{who_id:[제목]}}
+//   알림 줄 = 새 지시(묶음·행별) · 새 담당으로 옮긴 지시 · 단계가 오른 지시(옮긴 뒤의 담당에게) — 같은 지시는 한 줄.
 function apply(p, tasks, today, names, mkId) {
-  const res = { made: 0, bundled: 0, bumped: 0, redated: 0, ids: [], notify: {} };
-  const nm = names || {};
-  const note = function (who, line) { (res.notify[who] = res.notify[who] || []).push(line); };
+  const res = { made: 0, bundled: 0, bumped: 0, redated: 0, moved: 0, changed: 0, ids: [], notify: {} };
+  const nm = names || {}, noted = {};
+  const note = function (who, id, line) { if (!who || who === '__all__' || noted[id]) return; noted[id] = 1; (res.notify[who] = res.notify[who] || []).push(line); };
   const base = function (key, who, title, detail, due) {
     return { id: mkId(), title: String(title).slice(0, 120), detail: String(detail).slice(0, 500), who_id: who, who: nm[who] || '', who_by: 'assign', scope: [],
       from: '자동', from_id: '', by: '자동', due: due || '', status: 'open', done_at: null, done_by: null, auto_key: key, created: today, updated: today };
   };
+  const byId = {}; tasks.forEach(function (t) { if (t && t.id) byId[t.id] = t; });
+  p.move.forEach(function (m) {
+    const t = byId[m.id]; if (!openish(t)) return;
+    t.who_id = m.to; t.who = m.to ? (nm[m.to] || '') : ''; if (m.to) t.who_by = 'assign';
+    t.updated = today; res.moved++; res.changed++;
+    note(m.to, t.id, t.title + (t.due ? ' ~' + t.due : ''));
+  });
+  p.bump.forEach(function (b) {
+    const t = byId[b.id]; if (!openish(t)) return;
+    if (t.due !== b.due) { t.due = b.due; res.redated++; }
+    t.lic_stage = b.to;
+    t.title = String(b.title).slice(0, 120);
+    t.updated = today; res.changed++;
+    if (b.rise) { res.bumped++; note(t.who_id, t.id, t.title + ' ~' + t.due); }
+  });
   p.bundles.forEach(function (b) {
     const t = base(b.key, b.who_id, b.title, b.detail, '');
     t.lic_rows = b.rows.map(function (x) { return { no: x.no, due: x.due }; });
-    tasks.push(t); res.ids.push(t.id); res.bundled++; note(b.who_id, b.title);
+    tasks.push(t); res.ids.push(t.id); res.bundled++; res.changed++; note(b.who_id, t.id, b.title);
   });
   p.create.forEach(function (c) {
     const t = base(c.key, c.who_id, c.title, c.detail, c.due);
     t.lic_stage = c.stage;
-    tasks.push(t); res.ids.push(t.id); res.made++; note(c.who_id, c.title + ' ~' + c.due);
-  });
-  const byId = {}; tasks.forEach(function (t) { if (t && t.id) byId[t.id] = t; });
-  p.bump.forEach(function (b) {
-    const t = byId[b.id]; if (!openish(t)) return;
-    if (t.due !== b.due) { t.due = b.due; res.redated++; }
-    if ((t.lic_stage || 'd30') !== b.to) { t.lic_stage = b.to; t.title = String(b.title).slice(0, 120); }
-    t.updated = today;
-    if (b.rise) { res.bumped++; if (t.who_id && t.who_id !== '__all__') note(t.who_id, t.title + ' ~' + t.due); }
+    tasks.push(t); res.ids.push(t.id); res.made++; res.changed++; note(c.who_id, t.id, c.title + ' ~' + c.due);
   });
   return res;
 }
@@ -170,4 +209,4 @@ function drySummary(input, days) {
     ahead: { days: days || 60, create: ahead, rise: rises, list: f.filter(function (e) { return e.day !== input.today; }).slice(0, 20).map(function (e) { return { day: e.day, nos: e.create.map(function (c) { return c.no; }), stage: e.create.map(function (c) { return c.stage; }), rise: e.rise.map(function (x) { return x.no; }) }; }) } };
 }
 
-module.exports = { STAGE_TXT, STAGE_RANK, KEY_RE, BUNDLE_RE, dutyKey, taskKey, bundleKey, isDutyKey, parse, assignFor, findDuty, licOf, rowState, states, rowTitle, plan, apply, isRunDay, forecast, drySummary };
+module.exports = { STAGE_TXT, STAGE_RANK, KEY_RE, BUNDLE_RE, keyId, dutyKey, taskKey, bundleKey, isDutyKey, parse, assignFor, findDuty, licOf, rowState, states, rowTitle, plan, apply, isRunDay, forecast, drySummary };

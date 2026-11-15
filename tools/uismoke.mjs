@@ -15974,8 +15974,8 @@ try {   // ---- P1 판20 인허가 기한 → 담당 자동 지시 — ① 탭 �
   const comp20 = (src) => { const m = new Mod20(LDF20); m.filename = LDF20; m.paths = Mod20._nodeModulePaths(dirname(LDF20)); m._compile(src, LDF20); return m.exports; };
   const mut20 = (src, a, b) => { if (src.split(a).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + a.slice(0, 60)); return src.replace(a, () => b); };
   const FX20 = JSON.parse(readFileSync(join(ROOT, 'tools', 'lic_month_fixture.json'), 'utf8')), SEED20 = JSON.parse(readFileSync(join(ROOT, 'data', 'duties_seed.json'), 'utf8')).items;
-  const mkTab20 = (duties, lics) => {   // 앱 lmGroups 그대로(상자 한 번 만들고 날짜만 바꿈) → (오늘) → { no: { g, due, orig } }
-    const pre = [fn20(html, 'esc'), fn20(html, 'isDate'), fn20(html, 'findDuty'), fn20(html, 'liveDuties'), sh20, 'var duties = ENV.duties, licenses = ENV.licenses;',
+  const mkTab20 = (duties, lics, shTxt) => {   // 앱 lmGroups 그대로(상자 한 번 만들고 날짜만 바꿈) → (오늘) → { no: { g, due, orig } } · shTxt = 같은 본문(결함 사본 때만 바꿈)
+    const pre = [fn20(html, 'esc'), fn20(html, 'isDate'), fn20(html, 'findDuty'), fn20(html, 'liveDuties'), shTxt || sh20, 'var duties = ENV.duties, licenses = ENV.licenses;',
       'function myId(){ return "u1"; } function isAdmin(){ return true; } function todayStr(){ return ENV.today; } function gwCall(){ throw new Error("서버 부르면 안 됨"); }'].join('\n');
     const ENV = { duties, licenses: lics, rows: JSON.parse(JSON.stringify(FX20.rows)), today: '' };
     const groups = new Function('ENV', 'document', pre + '\n' + blk20 + '\nlicMonth.rows = ENV.rows; return function(d){ ENV.today = d; return lmGroups(d); };')(ENV, { getElementById: () => null });
@@ -16022,9 +16022,24 @@ try {   // ---- P1 판20 인허가 기한 → 담당 자동 지시 — ① 탭 �
   const MC20 = [["  const nx = DUTY.dutyCur(Object.assign({}, d, { sched: r }), lic, today);\n  if (!nx || !nx.due) return { no: no, stage: 'base'", "  const nx = DUTY.dutyNext(Object.assign({}, d, { sched: r }), lic, today);\n  if (!nx || !nx.due) return { no: no, stage: 'base'"],   // 정정·해당 없음 안 봄
     ["  return { no: no, stage: DUTY.dutyStage(nx) || 'later', due: nx.due,", "  return { no: no, stage: (nx.days < 0 ? 'over' : nx.days <= 14 ? 'd7' : nx.days <= 30 ? 'd30' : '') || 'later', due: nx.due,"],   // 단계 경계를 따로 짬
     ["function findDuty(duties, no) { const a = Array.isArray(duties) ? duties : []; for (let i = 0; i < a.length; i++) { if (a[i] && a[i].no === no) return a[i]; } return null; }", "function findDuty(duties, no) { return null; }"],
-    ["    out.create.push({ key: key, no: s.no, stage: s.stage, who_id: a.who_id, title: rowTitle(r, s.stage), detail: rowDetail(r, s), due: s.due, orig: s.orig });", "    out.create.push({ key: key, no: s.no, stage: s.stage, who_id: a.who_id, title: rowTitle(r, s.stage), detail: rowDetail(r, s), due: s.orig, orig: s.orig });"]];   // 지시 기한 = 계산 기한(정정 무시)
+    ["    out.create.push({ key: key, no: s.no, stage: s.stage, who_id: tw, title: rowTitle(r, s.stage), detail: rowDetail(r, s), due: s.due, orig: s.orig });", "    out.create.push({ key: key, no: s.no, stage: s.stage, who_id: tw, title: rowTitle(r, s.stage), detail: rowDetail(r, s), due: s.orig, orig: s.orig });"]];   // 지시 기한 = 계산 기한(정정 무시)
   const kC20 = MC20.map(([a, b]) => { try { return cmp20(comp20(mut20(LDS20, a, b))).bad.length === 0; } catch (e) { return 'err ' + e.message; } });
   T('P1 판20 ① 결함 사본 ' + MC20.length + '개(서버가 정정·해당 없음을 안 봄 · 단계 경계를 따로 짬 · 의무 행 못 찾음 · 지시 기한을 정정 전 날짜로) = 모두 ✗', kC20.every((v) => v === false), JSON.stringify(kC20));
+  // ①-2 검토 A 해 넘김 — 앱 이번 달 탭(lmGroups + DUTY_SHARED)에서 기록 없는 지남 8행이 2027-01-01·03-01·2028-01-01에 사라지지 않고 같은 회차로 남음 · 12/31 회차(3행)가 2027-01-01에 지남 · 닫으면 다음 회차
+  const chkY20 = (shTxt) => {
+    const tab = mkTab20(JSON.parse(JSON.stringify(SEED20)), lics20, shTxt);
+    const over = (d) => { const t = tab(d); return Object.keys(t).filter((no) => t[no].g === 'over').map((no) => no + ':' + t[no].due).sort().join(); };
+    const o0 = over('2026-11-16'), o1 = over('2027-01-01'), o2 = over('2027-03-01'), o3 = over('2028-01-01');
+    const exp1 = o0.split(',').concat(['3:2026-12-31']).sort().join();
+    const du = JSON.parse(JSON.stringify(SEED20)); du.find((x) => x.no === 2).runs = [{ due: '2026-03-31', done_at: '2027-02-01', ref: 'A-1' }]; du.find((x) => x.no === 37).na = { on: true, reason: '해당 없음' };
+    const t4 = mkTab20(du, lics20, shTxt)('2027-03-01');
+    return { ok: o0.split(',').length === 8 && o1 === exp1 && o2 === exp1 && o3 === exp1 && t4[2].g === 'd30' && t4[2].due === '2027-03-31' && t4[37].g === 'na' && o1.indexOf('66:2026-07-31') >= 0, o0, o1, o3 };
+  };
+  const Y20 = chkY20();
+  T('P1 판20 ①-2 해 넘김(검토 A — 앱 이번 달 탭): 기록 없는 지남 8행이 2027-01-01·2027-03-01·2028-01-01에도 같은 지난 회차로 남음(+ 3행 2026-12-31 회차가 2027-01-01부터 지남 = 9행) · 완료(2행 2026-03-31 회차를 2027-02-01에 냄) = 다음 회차 2027-03-31(30일 안) · 해당 없음(37행) = 빠짐',
+    Y20.ok, JSON.stringify(Y20));
+  const kY20u = [chkY20(sh20.replace('  var lim = today < DUTY_FROM ? today : DUTY_FROM;', '  var lim = today;')).ok, chkY20(sh20.replace("    var y0 = dutyParse(anchor) ? dutyParse(anchor).y : dutyParse(lim).y;", '    var y0 = dutyParse(anchor) ? dutyParse(anchor).y : dutyParse(today).y;')).ok];
+  T('P1 판20 ①-2 결함 사본 ' + kY20u.length + '개(앱 본문 걸러 내기 기준을 오늘로 · 시작 해를 오늘 해로) = 모두 ✗', kY20u.every((v) => v === false) && sh20.split('  var lim = today < DUTY_FROM ? today : DUTY_FROM;').length === 2, JSON.stringify(kY20u));
   // ② PM 콘솔 줄
   const L20 = req20(LDF20);
   const dry20 = Object.assign({ mode: 'dry', ver: FX20.ver }, L20.drySummary({ rows: JSON.parse(JSON.stringify(FX20.rows)), duties: JSON.parse(JSON.stringify(SEED20)), lics: lics20, tasks: [], rules: { 'lic:': { who_id: 'u1' } }, names: {}, today: '2026-11-16' }, 60));
