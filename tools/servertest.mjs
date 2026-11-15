@@ -10838,4 +10838,110 @@ function J91a(x) { return JSON.stringify(x); }
   finally { const s = JSON.parse(snap13); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; }
 }
 
+{ // ---- P1 판14 인사 법령 근거 bg:hr:law:v1 — 읽기 hr_bg_get(관리자·인사 권한 · 승격본일 때만 on·행) · 승격 스위치 hr_bg_set(pmconGate 쓰기 = PM · 낙관락 · prev · 감사 1줄 col hr) · 콘솔 줄 hrbg(R2).
+  //   근거 표·스위치는 시험 값(가짜 행 — 실제 근거는 appdata data/hr/bg_hr_v1.json). 결함 사본(gw-data 한 곳을 바꿔 메모리에서 컴파일 — 파일은 쓰지 않음)에서는 실패해야 한다.
+  const fsH14 = require('fs'), ModH14 = require('module');
+  const FILEH14 = join(FN, 'gw-data.js'), SRCH14 = fsH14.readFileSync(FILEH14, 'utf8');
+  const loadH14 = (src) => { const m = new ModH14(FILEH14); m.filename = FILEH14; m.paths = ModH14._nodeModulePaths(dirname(FILEH14)); m._compile(src, FILEH14); return m.exports; };
+  const mutH14 = (from, to) => { if (SRCH14.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return SRCH14.replace(from, () => to); };
+  const callerH14 = (mod) => async (body, tok, dev) => { const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+  const snapH14 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  const resetH14 = () => { const s = JSON.parse(snapH14); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; };
+  const KB = 'bg:hr:law:v1', KF = 'settings:hr';
+  const MH14 = { id: 'uh14', name: '직원14', admin: false, perms: {} }, MV14 = { id: 'uv14', name: '인사보기14', admin: false, perms: { hr: 'view' } }, MN14 = { id: 'un14', name: '관리부14', role: '관리자', admin: true, perms: {} };
+  const tH14 = issueSession(MH14).token, tV14 = issueSession(MV14).token, tN14 = issueSession(MN14).token;
+  const BG14 = () => ({ schema: 1, layer: 'bg', domain: 'hr', ver: 'v1-20261115', sha: 'abcdef0123456789', rows: [{ id: 'law.t.1', kind: 'law', grade: '실측', calc: true, checked: '2026-11-15' }, { id: 'rule.t.2', kind: 'rule', grade: '확인 필요', calc: false, checked: '2026-11-14', why: '시험' }, { id: 'rule.t.3', kind: 'rule', grade: '실측', calc: false, checked: '2026-11-15' }] });
+  const seedH14 = (bg, flag) => { resetH14(); Object.assign(mem.gw_users, { 'member:uh14': MH14, 'member:uv14': MV14, 'member:un14': MN14, 'device:dev1': { status: 'approved' } });
+    if (bg === undefined) delete mem.gw_data[KB]; else mem.gw_data[KB] = bg;
+    if (flag === undefined) delete mem.gw_data[KF]; else mem.gw_data[KF] = flag;
+    delete mem.gw_data['status:decide']; };
+  const audH14 = () => auditMock.logs.filter((l) => l.col === 'hr');
+  const chkA = async (c) => {   // 읽기 — 거절·꺼짐 이유·승격·쓰기 가능 표시
+    const out = [];
+    seedH14(); out.push((await c({ action: 'hr_bg_get' }, null)).code, (await c({ action: 'hr_bg_get' }, tH14, 'dev1')).body.error_code, (await c({ action: 'hr_bg_get' }, tV14)).body.error_code);
+    const r0 = await c({ action: 'hr_bg_get' }, tV14, 'dev1'); out.push(r0.body.on + ':' + r0.body.why + ':' + r0.body.avail);
+    const bad = BG14(); bad.rows[1].calc = true;   // 확인 필요인데 계산에 씀 = 꼴 틀림
+    seedH14(bad, { bg_ver: 'v1-20261115' }); const r1 = await c({ action: 'hr_bg_get' }, tV14, 'dev1'); out.push(r1.body.on + ':' + r1.body.why);
+    seedH14(BG14()); const r2 = await c({ action: 'hr_bg_get' }, tV14, 'dev1'); out.push(r2.body.on + ':' + r2.body.why + ':' + JSON.stringify(r2.body.avail));
+    seedH14(BG14(), { bg_ver: 'v1-20261101', updated_at: 5 }); const r3 = await c({ action: 'hr_bg_get' }, tN14); out.push(r3.body.on + ':' + r3.body.why + ':' + r3.body.flag.bg_ver + ':' + r3.body.flag.updated_at + ':' + r3.body.can_write);
+    seedH14(BG14(), { bg_ver: 'v1-20261115' }); const r4 = await c({ action: 'hr_bg_get' }, tV14, 'dev1'), r5 = await c({ action: 'hr_bg_get' }, tokA);
+    out.push(r4.body.on + ':' + JSON.stringify(r4.body.sum) + ':' + (r4.body.rows || []).length + ':' + r4.body.can_write, r5.body.on + ':' + r5.body.can_write);
+    seedH14(BG14(), { bg_ver: 'v1-20261115' }); blobsMock.hooks.failGet = (k) => k === KF; let r6; try { r6 = await c({ action: 'hr_bg_get' }, tokA); } finally { blobsMock.hooks.failGet = null; }
+    out.push(r6.body.on + ':' + r6.body.why);
+    const off = [r0, r1, r2, r3, r6].every((r) => r.code === 200 && r.body.on === false && !('rows' in r.body) && !('sum' in r.body));
+    const want = '401|NO_ACCESS|DEVICE_NOT_APPROVED|false:NO_BG:null|false:BAD_BG|false:NOT_PROMOTED:{"ver":"v1-20261115","checked":"2026-11-15","n":3,"n_pending":1,"n_calc_false":2}|false:NOT_PROMOTED:v1-20261101:5:false'
+      + '|true:{"ver":"v1-20261115","checked":"2026-11-15","n":3,"n_pending":1,"n_calc_false":2}:3:false|true:true|false:FLAG_READ_FAILED';
+    return { ok: off && out.join('|') === want, info: out.join('|') };
+  };
+  const chkB = async (c) => {   // 승격 스위치 — PM만 · 값 검사 · 판 없음 409 · 낙관락 · 직전 값 · 다른 칸 보존 · 감사 1줄 · 해제 · 못 읽으면 503(덮지 않음)
+    const P = {}, I = {};
+    seedH14(BG14(), { bg_ver: '', updated_at: 7, keep_me: 1 });
+    const a1 = await c({ action: 'hr_bg_set', bg_ver: 'v1-20261115', base: 7 }, tN14), a2 = await c({ action: 'hr_bg_set', bg_ver: 'v1-20261115', base: 7 }, tV14, 'dev1'), a3 = await c({ action: 'hr_bg_set', bg_ver: 'v1-20261115', base: 7 }, null);
+    const b1 = await c({ action: 'hr_bg_set', bg_ver: 3, base: 7 }, tokA), b2 = await c({ action: 'hr_bg_set', bg_ver: 'v1 2026', base: 7 }, tokA), b3 = await c({ action: 'hr_bg_set', bg_ver: 'v1-20261101', base: 7 }, tokA), b4 = await c({ action: 'hr_bg_set', bg_ver: 'v1-20261115', base: 6 }, tokA);
+    P.deny = a1.code === 403 && a1.body.error_code === 'PM_ONLY' && a2.code === 403 && a3.code === 401 && b1.body.error_code === 'BAD_VALUE' && b2.body.error_code === 'BAD_VALUE' && b3.code === 409 && b3.body.error_code === 'BG_MISSING' && b4.code === 409 && b4.body.error_code === 'HR_BG_STALE'
+      && mem.gw_data[KF].bg_ver === '' && mem.gw_data[KF].updated_at === 7 && audH14().length === 0;
+    I.deny = [a1.body.error_code, a2.body.error_code, a3.code, b1.body.error_code, b2.body.error_code, b3.body.error_code, b4.body.error_code, audH14().length];
+    const au0 = audH14().length;
+    const s1 = await c({ action: 'hr_bg_set', bg_ver: 'v1-20261115', base: 7 }, tokA);
+    const f1 = JSON.parse(JSON.stringify(mem.gw_data[KF])), au1 = audH14().slice(au0);
+    const s2 = await c({ action: 'hr_bg_set', bg_ver: 'v1-20261115', base: f1.updated_at }, tokA);
+    P.on = s1.code === 200 && s1.body.bg_ver === 'v1-20261115' && f1.bg_ver === 'v1-20261115' && !!f1.prev && f1.prev.bg_ver === '' && f1.prev.updated_at === 7 && f1.updated_by === 'uadmin' && f1.keep_me === 1 && f1.updated_at > 7
+      && au1.length === 1 && au1[0].ev[0].op === '인사근거' && /미승격→v1-20261115 · 확인 필요 1건/.test(au1[0].ev[0].t) && au1[0].bid === 'uadmin' && s1.body.audit === true
+      && s2.code === 400 && s2.body.error_code === 'NO_CHANGE';
+    I.on = [s1.code, f1.bg_ver, f1.prev && f1.prev.bg_ver, f1.keep_me, au1.map((l) => l.ev[0].t).join('/'), s2.body.error_code];
+    blobsMock.hooks.failGet = (k) => k === KF; let s3; try { s3 = await c({ action: 'hr_bg_set', bg_ver: '', base: f1.updated_at }, tokA); } finally { blobsMock.hooks.failGet = null; }
+    const s4 = await c({ action: 'hr_bg_set', bg_ver: '', base: f1.updated_at }, tokA), f4 = mem.gw_data[KF];
+    P.off = s3.code === 503 && s3.body.error_code === 'HR_FLAG_READ_FAILED' && s4.code === 200 && f4.bg_ver === '' && !!f4.prev && f4.prev.bg_ver === 'v1-20261115' && f4.keep_me === 1;
+    I.off = [s3.code, s3.body.error_code, s4.code, f4.bg_ver, f4.prev && f4.prev.bg_ver];
+    return { ok: Object.values(P).every((v) => v === true), info: { P, I } };
+  };
+  const chkC = async (c) => {   // PM 콘솔 줄 hrbg — [ㄱ] = 기존 길(hr_bg_set)로 승격 + 누른 기록 · 등급·줄 id 검사 · [기본값] = 그대로(미승격 — 표시만)
+    seedH14(BG14(), { bg_ver: '', updated_at: 9 });
+    const body = (o) => Object.assign({ action: 'pmcon_decide', kind: 'hrbg', row: 'hrbg:v1-20261115', choice: 'ok', grade: 'R2', due: '', q: '인사 법령 근거를 승격할까요? (확인 필요 1건)', rec: '승격', args: { bg_ver: 'v1-20261115' }, set_base: 9, base: 0 }, o || {});
+    const g1 = await c(body({ grade: 'R1' }), tokA), g2 = await c(body({ row: 'hrbg:v1-20261101' }), tokA), g3 = await c(body(), tN14);
+    const d1 = await c(body({ choice: 'default', args: undefined, set_base: undefined, def_is_rec: false }), tokA);
+    const fD = JSON.parse(JSON.stringify(mem.gw_data[KF])), mk = (mem.gw_data['status:decide'] || {}).marks || {};
+    const k1 = await c(body({ base: d1.body.updated_at }), tokA), fK = mem.gw_data[KF], log = (mem.gw_data['status:decide'] || {}).log || [];
+    const ok = g1.code === 400 && g1.body.error_code === 'BAD_GRADE' && g2.code === 400 && g2.body.error_code === 'BAD_ROW' && g3.code === 403 && g3.body.error_code === 'PM_ONLY'
+      && d1.code === 200 && d1.body.applied === false && fD.bg_ver === '' && fD.updated_at === 9 && mk['hrbg:v1-20261115'] && mk['hrbg:v1-20261115'].st === 'keep'
+      && k1.code === 200 && k1.body.applied === true && fK.bg_ver === 'v1-20261115' && fK.updated_by === 'uadmin' && log.length === 2 && log[1].kind === 'hrbg' && log[1].applied === true && !mk2(mem);
+    function mk2(m) { return ((m.gw_data['status:decide'] || {}).marks || {})['hrbg:v1-20261115']; }
+    return { ok, info: [g1.body.error_code, g2.body.error_code, g3.body.error_code, d1.code, d1.body.applied, fD.bg_ver, k1.code, k1.body.error_code, fK.bg_ver, log.length] };
+  };
+  try {
+    const c0 = callerH14(gwd), RA = await chkA(c0), RB = await chkB(c0), RC = await chkC(c0);
+    T('P1 판14 ① hr_bg_get: 비로그인 401 · 인사 권한 없는 직원 403 NO_ACCESS · 인사 보기 직원 미승인 기기 403 · 근거 없음 = on false(NO_BG·avail 없음) · 확인 필요 행이 계산에 쓰이면(calc true) 꼴 틀림 BAD_BG · 스위치 없음·다른 판 = NOT_PROMOTED(올라온 판 요약 avail만 — 행·sum 안 보냄 · 확인 필요 1건 · 가장 늦은 확인일) · 승격 = on true·sum·행 · can_write = PM만 · 스위치 못 읽음 = on false(FLAG_READ_FAILED)', RA.ok, RA.info);
+    T('P1 판14 ② hr_bg_set: PM 아닌 관리자 403 PM_ONLY · 직원 403 · 비로그인 401 · 글자 아님·틀린 꼴 400 BAD_VALUE · 올라온 판과 다른 ver 409 BG_MISSING · 낡은 base 409 HR_BG_STALE(전부 스위치 그대로·감사 0) · 승격 = bg_ver·prev(직전 값)·updated_by·다른 칸 보존·감사 1줄 "미승격→판 · 확인 필요 1건" · 같은 값 400 NO_CHANGE · 스위치 못 읽음 503(덮지 않음) · 해제(\'\') = prev에 승격본', RB.ok, JSON.stringify(RB.info));
+    T('P1 판14 ③ PM 콘솔 줄 hrbg(R2): 등급 R1 400 BAD_GRADE · 줄 id와 값이 다르면 400 BAD_ROW · PM 아닌 관리자 403 · [기본값] = 그대로(미승격 — 스위치 그대로·보류함 keep 표시) · [ㄱ] = hr_bg_set 길로 승격(updated_by = 누른 PM)·누른 기록 hrbg 적용·keep 표시 지움', RC.ok, JSON.stringify(RC.info));
+    // ④ 계산은 그대로 — 인사 근거 키를 읽는 곳은 gw-data 이 블록뿐(연차·레이더 서버 계산 gw-duty-cron·gw-todo-cron·gw-auth는 이 표를 모름)
+    const others = fsH14.readdirSync(FN).filter((f) => /\.js$/.test(f) && f !== 'gw-data.js').filter((f) => /bg:hr:law|settings:hr|hr_bg_/.test(fsH14.readFileSync(join(FN, f), 'utf8')));
+    const libs = fsH14.readdirSync(join(FN, '_lib')).filter((f) => /\.js$/.test(f)).filter((f) => /bg:hr:law|settings:hr|hr_bg_/.test(fsH14.readFileSync(join(FN, '_lib', f), 'utf8')));
+    const inData = (SRCH14.match(/HR_BG_KEYS\.(bg|flag)/g) || []).length;
+    T('P1 판14 ④ 계산 그대로: 인사 근거 키(bg:hr:law·settings:hr)·동작(hr_bg_*)을 아는 서버 파일 = gw-data.js 하나(다른 함수 파일·_lib 0 — 연차·계약직 레이더 계산은 이 표를 읽지 않음) · gw-data 안에서도 HR_BG_KEYS 쓰는 자리 = 읽기 세 곳(스위치 1·표 2)·스위치 쓰기 한 곳뿐',
+      others.length === 0 && libs.length === 0 && inData === 4 && /PMCON_KINDS\.hrbg = \{ label: '인사 법령 근거 승격', grade: 'R2', fn: handleHrBgSet, args: \{ bg_ver: 's' \}/.test(SRCH14), JSON.stringify({ others, libs, inData }));
+    const MUT = {
+      A: [["  if (!ver || ver !== bg.ver) return Object.assign(base, { on: false, why: 'NOT_PROMOTED' });\n", ''],
+        ["  if (!c.member.admin && hp !== 'view' && hp !== 'do') return jr(403,", '  if (false) return jr(403,'],
+        [" && typeof r.calc === 'boolean' && !(r.grade === '확인 필요' && r.calc !== false); });", " && typeof r.calc === 'boolean'; });"],
+        ["  if (!fr.ok) return Object.assign(base, { on: false, why: 'FLAG_READ_FAILED' });\n", ''],
+        ["  const canWrite = !!(tc && !tc.unavailable && tc.tierOf(c.member) === 'pm');", '  const canWrite = !!c.member.admin;']],
+      B: [["async function handleHrBgSet(event, d, R) {\n  const g = await pmconGate(event, R, true);", "async function handleHrBgSet(event, d, R) {\n  const g = await pmconGate(event, R, false);"],
+        ["    if (!hrBgOk(bg) || bg.ver !== v) return jr(409, { status: 'CONFLICT', error_code: 'BG_MISSING', request_id: R });", '    if (!bg) return jr(409, { status: \'CONFLICT\', error_code: \'BG_MISSING\', request_id: R });'],
+        ["  if (d.base !== undefined && Number(d.base) !== Number(cur.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'HR_BG_STALE', request_id: R });\n", ''],
+        ["  if (!fr.ok) return jr(503, { status: 'ERROR', error_code: 'HR_FLAG_READ_FAILED', request_id: R });", '  if (false) return jr(503, {});'],
+        ["prev: { bg_ver: curVer, updated_at: Number(cur.updated_at) || 0, updated_by: cur.updated_by || '' }, ", ''],
+        ["  try { hrAu = await appendAudit({", '  try { hrAu = true || await appendAudit({'],
+        ["  const doc = Object.assign({}, cur, { schema: 1, bg_ver: v,", '  const doc = Object.assign({}, { schema: 1, bg_ver: v,']],
+      C: [["PMCON_KINDS.hrbg = { label: '인사 법령 근거 승격', grade: 'R2',", "PMCON_KINDS.hrbg = { label: '인사 법령 근거 승격', grade: 'R1',"]]
+    };
+    const kill = [];
+    for (const n of Object.keys(MUT)) for (const [from, to] of MUT[n]) {
+      let k; try { k = !(await ({ A: chkA, B: chkB, C: chkC })[n](callerH14(loadH14(mutH14(from, to))))).ok; } catch (e) { k = 'err ' + e.message; }
+      if (k !== true) kill.push(n + ':' + from.trim().slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k));
+    }
+    T('P1 판14 ⑤ 결함 사본 ' + (MUT.A.length + MUT.B.length + MUT.C.length) + '개(승격 검사 걷음·인사 권한 403 걷음·확인 필요 calc 검사 걷음·스위치 못 읽음 통과·쓰기 가능을 관리자 전원으로 · 쓰기 관문을 읽기로·판 대조 느슨·낙관락 걷음·못 읽은 스위치 덮기·직전 값 없음·감사 없음·다른 칸 지움 · 콘솔 등급 R1) = 모두 ✗', kill.length === 0, kill.join(' | '));
+  } catch (e) { T('P1 판14 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+  finally { resetH14(); }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

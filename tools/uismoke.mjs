@@ -15726,5 +15726,110 @@ try {
     real13.ok && kill13.length === 0, JSON.stringify({ w: real13.w, b: real13.b, c: real13.c, 안깨짐: kill13 }));
 } catch (e) { console.log('  (P1 판13 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ── P1 판14(착수설명서 판14 · 11/20 승격 카드 ③) 인사 법령 근거: PM 콘솔 줄 hrbg(R2 · 무응답 = 미승격) + 인사 탭 관리 카드 한 줄(승격됐을 때만) — 결함 사본은 실패해야 함
+try {
+  const fnH14 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) return ''; let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } return ''; };
+  const stH14 = (src, re) => { const m = src.match(re); return m ? m[0] : ''; };
+  const gwdH14 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8');
+  const secH14 = (H) => { const i = H.indexOf('<section class="view" id="view-hr">'); return i < 0 ? '' : H.slice(i, H.indexOf('</section>', i)); };
+  const PUSH14 = /\n  PMCON_KINDS\.push\(\{ kind: "hrbg", label: "인사 법령 근거 승격", grade: "R2", get: "hr_bg_get", card: "", revert: "[^"]+", rows: pmconRowsHrBg \}\);/;
+  const wire14 = (H) => /<div class="hw-note" id="hrLawLine" style="margin:12px 0 4px;display:none;"><\/div>/.test(secH14(H)) && secH14(H).indexOf('id="hrLawLine"') < secH14(H).indexOf('id="permMgmtBtn"')
+    && /\n    if \(name === "hr"\) hrLawLineLoad\(\);/.test(fnH14(H, 'switchTab')) && PUSH14.test(H) && H.indexOf('var PMCON_KINDS = [') < H.search(PUSH14)
+    && /if \(d && d\.action === 'hr_bg_get'\) return await handleHrBgGet\(event, d, R\);/.test(gwdH14) && /if \(d && d\.action === 'hr_bg_set'\) return await handleHrBgSet\(event, d, R\);/.test(gwdH14)
+    && /\nPMCON_KINDS\.hrbg = \{ label: '인사 법령 근거 승격', grade: 'R2', fn: handleHrBgSet,/.test(gwdH14)
+    && /\+ \(r\.k\.card \? ' <button type="button" class="link-btn" data-pc-open="' \+ esc\(r\.k\.card\) \+ '">카드 열기 ›<\/button>' : ''\) \+ '<\/div>'/.test(fnH14(H, 'renderPmcon'));
+  // 한 줄 그리기·읽기(가짜 화면)
+  const ON14 = (cw, o) => ({ status: 200, body: Object.assign({ on: true, ver: 'v1-20261115', sum: { ver: 'v1-20261115', checked: '2026-11-15', n: 44, n_pending: 10, n_calc_false: 19 }, flag: { bg_ver: 'v1-20261115', updated_at: 77 }, can_write: cw }, o || {}) });
+  const OFF14 = { status: 200, body: { on: false, why: 'NOT_PROMOTED', flag: { bg_ver: '', updated_at: 0 }, avail: { ver: 'v1-20261115', checked: '2026-11-15', n: 44, n_pending: 10, n_calc_false: 19 }, can_write: true } };
+  const line14 = (H) => new Function(fnH14(H, 'esc') + '\n' + fnH14(H, 'hrLawLineHtml') + '\nreturn hrLawLineHtml;')();
+  const load14 = async (H, resList) => {   // resList = 차례로 돌려줄 응답(함수면 Promise 직접)
+    const el = { id: 'hrLawLine', innerHTML: '옛 줄', style: { display: '' } }, calls = [];
+    let i = 0;
+    const gw = (fn, body) => { calls.push(body); const r = resList[i++]; return typeof r === 'function' ? r() : (r === 'reject' ? Promise.reject(new Error('net')) : Promise.resolve(r)); };
+    const f = new Function('document', 'gwCall', 'confirm', 'alert', [fnH14(H, 'esc'), 'var hrLawSeq = 0;', fnH14(H, 'hrLawLineHtml'), fnH14(H, 'hrLawLineLoad'), fnH14(H, 'hrLawOff'), 'return { load: hrLawLineLoad };'].join('\n'))(
+      { getElementById: (id) => (id === 'hrLawLine' ? el : null) }, gw, () => true, () => {});
+    return { el, calls, f };
+  };
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+  const chkLine14 = async (H) => {
+    const L = line14(H), I = {};
+    const t1 = L(ON14(false)), t2 = L(ON14(true)), t3 = L(OFF14), t4 = L({ status: 500, body: {} }), t5 = L(ON14(false, { sum: { ver: '<img src=x>', checked: '2026-11-15', n_pending: 1 } })), t6 = L(ON14(false, { sum: { ver: 'v1-20261115', checked: '<b>', n_pending: 'x' } }));
+    I.html = t1 === '인사 법령 근거 판 <b>v1-20261115</b> · 확인일 2026-11-15 · 확인 필요 10건' && t2 === t1 + ' <button type="button" class="mini-btn" id="hrLawOffBtn" style="margin-left:6px;">승격 해제</button>'
+      && t3 === '' && t4 === '' && t5 === '' && t6 === '인사 법령 근거 판 <b>v1-20261115</b> · 확인일 - · 확인 필요 0건'
+      && L(ON14(false, { on: false })) === '' && L(ON14(false, { on: 'true' })) === '';   // 승격 아님(on true 아님)인데 요약이 붙어 와도 숨김
+    const a = await load14(H, [ON14(false)]); const hid0 = a.el.style.display === 'none' && a.el.innerHTML === ''; a.f.load(); const mid = a.el.style.display === 'none' && a.el.innerHTML === ''; await tick(); await tick();
+    I.on = !hid0 && mid && a.el.style.display === '' && a.el.innerHTML === t1 && a.calls.length === 1 && a.calls[0].action === 'hr_bg_get';
+    const b = await load14(H, [OFF14]); b.f.load(); await tick(); await tick();
+    const c = await load14(H, ['reject']); c.f.load(); await tick(); await tick();
+    I.off = b.el.style.display === 'none' && b.el.innerHTML === '' && c.el.style.display === 'none' && c.el.innerHTML === '';
+    let rel; const slow = () => new Promise((r) => { rel = () => r(ON14(false, { sum: { ver: 'v0-old', checked: '2026-10-01', n_pending: 9 } })); });
+    const d = await load14(H, [slow, OFF14]); d.f.load(); d.f.load(); await tick(); await tick(); rel(); await tick(); await tick();
+    I.seq = d.el.style.display === 'none' && d.el.innerHTML === '';   // 늦게 온 옛 응답(먼저 부른 것)은 버림
+    return { ok: Object.values(I).every((v) => v === true), info: I };
+  };
+  // PM 콘솔 줄(줄 표 + push 한 줄로 renderPmcon 실행 — 판29 가짜 화면과 같은 꼴)
+  const mkEl14 = (id) => { const e = { id, innerHTML: '', textContent: '', style: {}, _cls: {}, addEventListener() {}, classList: { toggle(c, on) { e._cls[c] = on === undefined ? !e._cls[c] : !!on; }, contains(c) { return !!e._cls[c]; } } }; return e; };
+  const runPc14 = async (H, res) => {
+    const els = {}, calls = [];
+    const doc = { getElementById: (id) => els[id] || (els[id] = mkEl14(id)), querySelectorAll: () => [] };
+    const gw = (fn, body) => { calls.push(JSON.parse(JSON.stringify(body))); const r = res[body.action]; return Promise.resolve(r || { status: 500, body: { error_code: 'X' } }); };
+    const o = {};
+    const api = new Function('document', 'gwCall', '__o', [
+      'function todayStr(){ return "2026-11-20"; } function memberName(){ return ""; } function apprToastShow(){} function switchTab(n){ __o.sw = n; } function genLabel(k){ return k; }',
+      'var confirm = function(){ return true; }, prompt = function(){ return "x"; }, alert = function(){}, setTimeout = function(){};',
+      fnH14(H, 'esc'), stH14(H, /var ASSIGN_PREFIX_ORDER = \[[^\]]+\];/), stH14(H, /var ASSIGN_PREFIX_TXT = \{[^}]+\};/), stH14(H, /var NOTIFY_EVENT_ORDER = \[[^\]]+\];/), stH14(H, /var AUTO_RULE_ORDER = \[[^\]]+\];/),
+      stH14(H, /var PMCON_KINDS = \[[\s\S]*?\n  \];/), stH14(H, PUSH14), stH14(H, /var PMCON_PLAN = \{[^\n]+\};/), stH14(H, /var PMCON_CHECKS = \[\];/), stH14(H, /var PMCON_CHOICE_TXT = \{[^}]+\};/), stH14(H, /var pmconState = null, pmconBusy = false, pmconSeq = 0, pmconLogAll = false;/),
+      ...['pmconMd', 'pmconPlan', 'pmconRowsAssign', 'pmconRowsNotify', 'pmconRowsDoneif', 'pmconRowsAutotask', 'pmconRowsLearn', 'pmconRowsLearnHw', 'pmconRowsBrief', 'pmconRowsBg', 'pmconRowsHrBg', 'pmconDueTxt', 'renderPmcon', 'pmconLogRender', 'pmconChecksRender', 'pmconOpenCard', 'pmconAct'].map((n) => fnH14(H, n)),
+      'return { render: renderPmcon, act: pmconAct, kinds: PMCON_KINDS };'].join('\n'))(doc, gw, o);
+    api.render(); for (let i = 0; i < 5; i++) await tick();
+    return { els, calls, api };
+  };
+  const PCRES14 = (hr, cw) => ({ pmcon_get: { status: 200, body: { log: [], total: 0, folded: { n: 0 }, marks: {}, updated_at: 555, can_write: cw !== false } },
+    con_proc_get: { status: 200, body: { flag: { use_blob: true, bg_ver: 'v1-20261031', updated_at: 77 }, bg: { ver: 'v1-20261120', rows: [{ grade: '실측' }] } } }, hr_bg_get: hr });
+  const chkPc14 = async (H) => {
+    const I = {};
+    const rowsF = new Function(fnH14(H, 'pmconRowsHrBg') + '\nreturn pmconRowsHrBg;')();
+    const r1 = rowsF(OFF14.body), r2 = rowsF(ON14(true).body), r3 = rowsF({ flag: {}, avail: null }), r4 = rowsF({ flag: {}, avail: { ver: 'v1 bad', n: 1, n_pending: 1 } });
+    I.rows = r1.length === 1 && r1[0].id === 'hrbg:v1-20261115' && r1[0].q === '인사 법령 근거를 승격할까요? (확인 필요 10건)' && r1[0].recTxt === '승격' && r1[0].curTxt === '미승격' && r1[0].def === 'keep'
+      && JSON.stringify(r1[0].args) === '{"bg_ver":"v1-20261115"}' && r1[0].setBase === 0 && /확인 필요 10건은 노무사 회신 전이라 기한 계산에 쓰지 않습니다/.test(r1[0].why) && /연차·계약직 계산은 그대로/.test(r1[0].why)
+      && r2.length === 0 && r3.length === 0 && r4.length === 0;
+    const p = await runPc14(H, PCRES14(Object.assign({}, OFF14, { body: Object.assign({}, OFF14.body, { flag: { bg_ver: '', updated_at: 31 } }) })));
+    const h = p.els.pmconRows.innerHTML, seg = (id) => { const i = h.indexOf('data-pc-row="' + id + '"'); return i < 0 ? '' : h.slice(i, h.indexOf('<div class="pc-row"', i + 10) < 0 ? h.length : h.indexOf('<div class="pc-row"', i + 10)); };
+    const sH = seg('hrbg:v1-20261115'), sB = seg('bg:v1-20261120');
+    I.render = p.api.kinds.length === 9 && p.api.kinds[8].kind === 'hrbg' && !!sH && /<span class="g r2">R2<\/span><span>인사 법령 근거를 승격할까요\? \(확인 필요 10건\)<\/span>/.test(sH) && sH.indexOf('무응답이면 그대로(미승격)') > 0
+      && sH.indexOf('되돌리기 인사 탭 [승격 해제] 1클릭') > 0 && sH.indexOf('카드 열기') < 0 && sH.indexOf('data-pc-act="ok"') > 0 && sB.indexOf('data-pc-open="conProcCard">카드 열기') > 0;
+    p.api.act('default', 'hrbg:v1-20261115'); await tick(); p.api.act('ok', 'hrbg:v1-20261115'); await tick();
+    const sent = p.calls.filter((b) => b.action === 'pmcon_decide');
+    I.press = sent.length === 2 && sent[0].kind === 'hrbg' && sent[0].choice === 'default' && sent[0].args === undefined && sent[0].def_is_rec === false && sent[0].grade === 'R2'
+      && sent[1].choice === 'ok' && JSON.stringify(sent[1].args) === '{"bg_ver":"v1-20261115"}' && sent[1].set_base === 31 && sent[1].row === 'hrbg:v1-20261115';
+    const q = await runPc14(H, PCRES14(ON14(true)));
+    I.promoted = q.els.pmconRows.innerHTML.indexOf('hrbg:') < 0 && /정할 것 없음: [^<]*인사 법령 근거 승격/.test(q.els.pmconRows.innerHTML);
+    return { ok: Object.values(I).every((v) => v === true), info: I };
+  };
+  const w0 = wire14(html), L0 = await chkLine14(html), P0 = await chkPc14(html);
+  T('P1 판14 ① 배선: 인사 탭 관리 카드 자리에 숨긴 한 줄(#hrLawLine — 권한관리 버튼 위) · switchTab 인사 = hrLawLineLoad · 콘솔 줄은 줄 표 본문을 손대지 않고 PMCON_KINDS.push 한 줄(hrbg·R2·hr_bg_get·카드 없음) · 서버 hr_bg_get·hr_bg_set 디스패치 · 서버 PMCON_KINDS.hrbg 같은 이름·R2·handleHrBgSet · 카드 없는 줄은 [카드 열기] 없음', w0, '');
+  T('P1 판14 ② 인사 탭 한 줄: 승격 = "인사 법령 근거 판 v1-… · 확인일 … · 확인 필요 n건"(PM만 [승격 해제]) · 승격 전·읽기 실패·네트워크 실패 = 숨김(옛 줄도 지움) · 판 이름 꼴이 틀리면 숨김·확인일 꼴 틀림 "-" · 읽는 동안 숨김 · 늦게 온 옛 응답은 버림', L0.ok, JSON.stringify(L0.info));
+  T('P1 판14 ③ PM 콘솔 줄: 올라온 판 ≠ 승격본일 때만 "인사 법령 근거를 승격할까요? (확인 필요 n건)" R2 · 추천 승격 · 무응답이면 그대로(미승격) · 되돌리기 = 인사 탭 [승격 해제] · [기본값] = args 없음(def_is_rec false) · [ㄱ] = args{bg_ver}·set_base = 스위치 updated_at · 다른 줄 [카드 열기] 그대로 · 승격 뒤 = 정할 것 없음', P0.ok, JSON.stringify(P0.info));
+  const MUT14 = [
+    ['    if (!res || res.status !== 200 || !res.body || res.body.on !== true || !res.body.sum) return "";', '    if (!res || res.status !== 200 || !res.body || !res.body.sum) return "";'],
+    ['      + (res.body.can_write ? \' <button type="button" class="mini-btn" id="hrLawOffBtn"', '      + (true ? \' <button type="button" class="mini-btn" id="hrLawOffBtn"'],
+    ['    el.innerHTML = ""; el.style.display = "none";   // 읽는 동안·실패 = 안 보임', '    // 읽는 동안·실패 = 안 보임'],
+    ['      if (seq !== hrLawSeq) return;\n      var h = hrLawLineHtml(res);', '      var h = hrLawLineHtml(res);'],
+    ['    if (!a || !a.ver || !/^[A-Za-z0-9_.-]{2,40}$/.test(String(a.ver)) || f.bg_ver === a.ver) return [];', '    if (!a || !a.ver) return [];'],
+    ['      args: { bg_ver: String(a.ver) }, def: "keep",', '      args: { bg_ver: String(a.ver) }, def: "rec",'],
+    ['    if (name === "hr") hrLawLineLoad();   // P1 판14', '    // P1 판14'],
+    ["          + (r.k.card ? ' <button type=\"button\" class=\"link-btn\" data-pc-open=\"' + esc(r.k.card) + '\">카드 열기 ›</button>' : '') + '</div>'", "          + ' <button type=\"button\" class=\"link-btn\" data-pc-open=\"' + esc(r.k.card) + '\">카드 열기 ›</button>' + '</div>'"],
+  ];
+  const kill14 = [];
+  for (const [from, to] of MUT14) {
+    if (html.split(from).length !== 2) { kill14.push('자리 ' + html.split(from).length + ': ' + from.slice(0, 50)); continue; }
+    const Hx = html.replace(from, () => to);
+    let broken;
+    try { broken = !(wire14(Hx) && (await chkLine14(Hx)).ok && (await chkPc14(Hx)).ok); } catch (e) { broken = true; }
+    if (!broken) kill14.push(from.trim().slice(0, 60) + ' 안 깨짐');
+  }
+  T('P1 판14 ④ 결함 사본 ' + MUT14.length + '개(승격 검사 걷음·해제 버튼 늘 보임·읽기 전 숨김 걷음(실패 때 옛 줄 남음)·늦은 응답 검사 걷음·같은 판이어도 줄·무응답 기본 승격·인사 탭 진입 호출 걷음·카드 없는 줄 [카드 열기]) = 모두 ✗', kill14.length === 0, kill14.join(' | '));
+} catch (e) { console.log('  (P1 판14 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
