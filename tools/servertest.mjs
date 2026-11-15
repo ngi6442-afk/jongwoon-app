@@ -10554,7 +10554,8 @@ function J91a(x) { return JSON.stringify(x); }
     const a10 = await put({ period: PREV21, text: CLEAN21, rules_fp: '0000000000000000' }), a10s = st(), a11 = await put({ period: PREV21, text: CLEAN21, rules_fp: undefined });
     const fpX = comp21(P21, S21.replace("const NAME_SKIP = { '개인': 1,", () => "const NAME_SKIP = { '가짜낱말': 1, '개인': 1,")).RULES_FP;
     P.A2 = a10.code === 400 && a10.body.error_code === 'RNOTE_RULES_FP' && a10s && a10s.ok === false && /표 내용 다름/.test(a10s.note || '') && a11.code === 400 && a11.body.error_code === 'RNOTE_RULES_FP' && !doc()
-      && /^[0-9a-f]{16}$/.test(RM.RULES_FP) && RM.RULES_FP === RM.rulesFp() && fpX !== RN21.RULES_FP;
+      && /^[0-9a-f]{16}$/.test(RM.RULES_FP) && RM.RULES_FP === RM.rulesFp() && fpX !== RN21.RULES_FP
+      && RN21.RULES_FP === 'f9f87d93874f763f';   // 기대 지문 — appdata rnote.py selftest와 같은 값(표를 고치면 두 시험의 이 값을 같이 고친다 · 덧대기: 한쪽만 고치면 커밋 전에 드러남)
     I.A = [a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11].map((x) => x.code + '/' + x.body.error_code);
     // ② 서버 재검사(검토 11/15 ②⑥⑦ — 느슨한 꼴·핵심 이름·NFC·폭 없는 문자·금액·메일)
     const LEAKS = [['회원 실명', '- 가짜요원 확인\n', 'name'], ['띄어 쓴 3자 일용직 이름', '- 가짜 꾼 요청\n', 'name'], ['가운뎃점 섞은 이름', '- 가짜·꾼 요청\n', 'name'], ['풀어 쓴 한글(NFD)', '- ' + '가짜요원'.normalize('NFD') + '\n', 'name'],
