@@ -10236,27 +10236,26 @@ function J91a(x) { return JSON.stringify(x); }
       const dT = D.hwpxTokDiff(hwpx16(['머리 글'].concat(TPL16)), drB, hwpx16(FIN1));
       const r1 = D.hwpxTokRows(tplB, drB, hwpx16(FIN1), ['단위', '성상', '구분', '부가세구분']);
       const s1 = JSON.stringify(d1) + JSON.stringify(d2);
-      const ok = d1.ok && d1.kind === 'hwpx_tok' && d1.compared === 8 && d1.changed === 4 && d1.uncomparable === 3 && d1.ratio === 0.5 && d1.refs_changed.slice().sort().join() === ['금액한글', '단위', '성상', '수신처'].sort().join() && d1.refs_uncomparable.slice().sort().join() === ['단가', '수량', '품명'].sort().join()
+      // 2차 검토(11/15): 틀 없는 칸 문단(금액한글 '{{금액한글}}')은 값을 읽지 않음 = 비교 불가
+      const ok = d1.ok && d1.kind === 'hwpx_tok' && d1.compared === 7 && d1.changed === 3 && d1.uncomparable === 4 && d1.ratio === 0.429 && d1.refs_changed.slice().sort().join() === ['단위', '성상', '수신처'].sort().join() && d1.refs_uncomparable.slice().sort().join() === ['금액한글', '단가', '수량', '품명'].sort().join()
         && d2.ok && d2.changed === 2 && d2.refs_changed.slice().sort().join() === ['성상', '수신처'].sort().join() && d2.refs_uncomparable.indexOf('금액한글') >= 0 && d2.compared === 7
-        && d3.ok && d3.changed === 0 && d3.blank_both === 1 && d3.compared === 7
+        && d3.ok && d3.changed === 0 && d3.blank_both === 1 && d3.compared === 6
         && !dT.ok && dT.code === 'TPL_CHANGED'
         && s1.indexOf('포항') < 0 && s1.indexOf('이백만원') < 0 && s1.indexOf('ton') < 0
         && r1.ok && r1.rows.map((r) => r.ref).sort().join() === ['구분', '단위', '부가세구분', '성상'].sort().join() && r1.rows.some((r) => r.ref === '단위' && r.draft === '톤' && r.final === 'ton' && !r.same)
-        && r1.hidden_changed.slice().sort().join() === ['금액한글', '수신처'].sort().join() && JSON.stringify(r1).indexOf('포항시청') < 0 && JSON.stringify(r1).indexOf('이백만원') < 0
+        && r1.hidden_changed.join() === '수신처' && JSON.stringify(r1).indexOf('포항시청') < 0 && JSON.stringify(r1).indexOf('이백만원') < 0
         && D.hwpxTokDiff(hwpx16(['칸 없는 양식']), hwpx16(['칸 없는 양식']), hwpx16(['칸 없는 양식'])).code === 'NO_TOKENS';
       return { ok, info: { d1: [d1.compared, d1.changed, d1.uncomparable, d1.refs_changed, d1.refs_uncomparable], d2: [d2.ok, d2.compared, d2.changed, d2.refs_changed, d2.refs_uncomparable], d3: [d3.compared, d3.blank_both], dT: dT.code, r1: r1.rows && r1.rows.map((r) => r.ref) } };
     };
     const rDD = chkDD(DD);
-    T('P1 판16 ① docdiff 한글 양식 칸 비교: 양식 {{칸}} 틀로 초안 값 되읽기 · 고친 문단 = 같은 차례끼리(수신처·금액한글·단위·성상 바뀜 4/8) · 글상자 칸·글자 없이 붙은 칸 = 비교 불가 3 · 문단을 지워 구간 수가 다르면 틀 없는 칸 비교 불가·틀 있는 칸은 찾아 읽음 · 그대로면 바뀜 0·빈칸↔빈칸 분모 밖 · 양식 문단 수가 다르면 TPL_CHANGED · 칸 없는 양식 NO_TOKENS · 반환에 값 없음 · hwpxTokRows = 허용 칸만 값(단위 톤→ton)·허용 밖은 칸 이름만',
+    T('P1 판16 ① docdiff 한글 양식 칸 비교: 양식 {{칸}} 틀로 초안 값 되읽기 · 고친 틀 칸 문단(수신처·단위·성상 바뀜 3/7) · 틀 없는 칸(금액한글)·글상자 칸·글자 없이 붙은 칸 = 비교 불가 4 · 문단을 지워 구간 수가 다르면 틀 없는 칸 비교 불가·틀 있는 칸은 찾아 읽음 · 그대로면 바뀜 0·빈칸↔빈칸 분모 밖 · 양식 문단 수가 다르면 TPL_CHANGED · 칸 없는 양식 NO_TOKENS · 반환에 값 없음 · hwpxTokRows = 허용 칸만 값(단위 톤→ton)·허용 밖은 칸 이름만',
       rDD.ok, JSON.stringify(rDD.info));
     const MDD = [
       ["    if (T[i].box || D[i].box || !dv[i] || adj || s0.toks.length > TOK_PER_PARA) { unc(); continue; }", "    if (!dv[i] || adj || s0.toks.length > TOK_PER_PARA) { unc(); continue; }", '    if (ma[i] >= 0) { if (F[ma[i]].box) { unc(); continue; } fv = dv[i].slice(); }', '    if (ma[i] >= 0) { fv = dv[i].slice(); }'],   // 글상자 두 겹 다 걷음
-      ['      if (candF.length === gapD.length && gapD.every(function (x) { return !!sp[x]; })) pick = candF[gapD.indexOf(i)];', '      if (false) pick = candF[gapD.indexOf(i)];'],
-      ["    const adj = s0.lits.slice(1, -1).some(function (l) { return !stripWs(l); });", '    const adj = false;', '    else { if (!L[j]) return null; q = st.indexOf(L[j], p); if (q < 0) return null; }', '    else { q = st.indexOf(L[j], p); if (q < 0) return null; }'],   // 붙은 칸 두 겹 다 걷음
       ["  if (T.length !== D.length) return { ok: false, code: 'TPL_CHANGED' };", ''],
       ["      put(nm, stripWs(d) === stripWs(f) ? (stripWs(d) === '' ? 'blank' : 'same') : 'changed', d, f);", "      put(nm, stripWs(d) === stripWs(f) ? 'same' : 'changed', d, f);"],
       ["    if (A[t.name]) rows.push(", "    if (true) rows.push("]].map(([a, b, c, d]) => { try { let s = mut16(SDD, a, b); if (c) s = mut16(s, c, d); return chkDD(load16(FDD, s)).ok; } catch (e) { return 'err ' + e.message; } });
-    T('P1 판16 ① 결함 사본 ' + MDD.length + '개(글상자 걷음·같은 차례 짝 걷음·붙은 칸 검사 걷음·양식 바뀜 검사 걷음·빈칸↔빈칸 걷음·허용 밖 값 노출) = 모두 ✗', MDD.every((v) => v === false), JSON.stringify(MDD));
+    T('P1 판16 ① 결함 사본 ' + MDD.length + '개(글상자 걷음·양식 바뀜 검사 걷음·빈칸↔빈칸 걷음·허용 밖 값 노출) = 모두 ✗', MDD.every((v) => v === false), JSON.stringify(MDD));
     // ①-2 검토 반영(11/15) — 틀 없는 칸 문단(표 칸) · 사이 글자가 값 안에 · 빈 문단 폭탄. 원칙: 틀리게 세느니 비교 불가(틀린 값·사라짐 0)
     const zlib16 = require('zlib');
     const mkZipD = (entries) => { const locals = [], cds = []; let off = 0; for (const [name, text] of entries) { const nb = Buffer.from(name), raw = Buffer.from(text), db = zlib16.deflateRawSync(raw), crc = crc32(raw); const lh = Buffer.alloc(30); lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(8, 8); lh.writeUInt32LE(crc, 14); lh.writeUInt32LE(db.length, 18); lh.writeUInt32LE(raw.length, 22); lh.writeUInt16LE(nb.length, 26); const cd = Buffer.alloc(46); cd.writeUInt32LE(0x02014b50, 0); cd.writeUInt16LE(20, 4); cd.writeUInt16LE(20, 6); cd.writeUInt16LE(8, 10); cd.writeUInt32LE(crc, 16); cd.writeUInt32LE(db.length, 20); cd.writeUInt32LE(raw.length, 24); cd.writeUInt16LE(nb.length, 28); cd.writeUInt32LE(off, 42); locals.push(lh, nb, db); cds.push(cd, nb); off += 30 + nb.length + db.length; } const cdb = Buffer.concat(cds), eocd = Buffer.alloc(22); eocd.writeUInt32LE(0x06054b50, 0); eocd.writeUInt16LE(entries.length, 8); eocd.writeUInt16LE(entries.length, 10); eocd.writeUInt32LE(cdb.length, 12); eocd.writeUInt32LE(off, 16); return Buffer.concat([...locals, cdb, eocd]); };
@@ -10266,18 +10265,28 @@ function J91a(x) { return JSON.stringify(x); }
       // 재현 ① 틀 없는 칸 + 설명 문단을 지우고 새 문단 = 업체명 비교 불가(값이 안 나감)
       const a = run(['머리', '{{업체명}}', '설명 문단', '꼬리'], { 업체명: '주식회사 종운환경' }, ['머리', '새로 넣은 문단', '주식회사 바뀐회사', '꼬리'], ['업체명']);
       const okA = a.r.rows.length === 0 && JSON.stringify(a).indexOf('새로 넣은 문단') < 0 && (a.d.ok ? a.d.refs_uncomparable.indexOf('업체명') >= 0 : a.d.refs_uncomparable.indexOf('업체명') >= 0);
-      // 재현 ② 견적 품목 표 꼴 — 성상·구분·단위 빈칸, 직원이 성상 고상·단위 톤만 채움 = 맞게 읽음
+      // 2차 검토(11/15): 틀 없는 칸 문단(표 칸)은 값을 읽지 않음 — 아래 표 칸 꼴은 모두 '비교 불가'(틀린 값·값 노출 0)가 기대값
+      const allUnc = (x, names) => x.r.rows.length === 0 && names.every((nm) => (x.d.refs_uncomparable || []).indexOf(nm) >= 0) && (x.d.refs_changed || []).length === 0;
+      // 재현 ② 견적 품목 표 꼴 — 성상·구분·단위 빈칸, 직원이 성상 고상·단위 톤만 채움
       const TQ = ['품명', '성상', '구분', '단위', '수량', '{{품명}}', '{{성상}}', '{{구분}}', '{{단위}}', '{{수량}}'], VQ = { 품명: '슬러지', 성상: '', 구분: '', 단위: '', 수량: '5' };
       const FQ = TQ.map((p) => fillP(p, VQ)); FQ[6] = '고상'; FQ[8] = '톤';
       const b = run(TQ, VQ, FQ, ['성상', '구분', '단위']);
-      const okB = b.d.ok && b.d.changed === 2 && b.d.refs_changed.slice().sort().join() === ['단위', '성상'].sort().join() && val(b, '성상') === '고상' && val(b, '단위') === '톤' && val(b, '구분') === '' && b.d.uncomparable === 0;
-      // 표 칸 꼴: 같은 값 두 칸 중 하나만 고침 · 빈칸 셋 중 1·3 채움 · 빈 문단 앞에 두고 2번째만 · 구간에 칸 없는 빈 문단이 섞임 = 비교 불가(틀린 값 0)
+      const okB = allUnc(b, ['품명', '성상', '구분', '단위', '수량']);
       const c = run(['머리', '{{가}}', '{{나}}', '꼬리'], { 가: '톤', 나: '톤' }, ['머리', '톤', '식', '꼬리'], ['가', '나']);
-      const okC = c.d.ok && c.d.refs_changed.join() === '나' && val(c, '가') === '톤' && val(c, '나') === '식';
       const e = run(['머리', '{{가}}', '{{나}}', '{{다}}', '꼬리'], { 가: '', 나: '', 다: '' }, ['머리', 'x', '', 'y', '꼬리'], ['가', '나', '다']);
-      const okE = e.d.ok && val(e, '가') === 'x' && val(e, '나') === '' && val(e, '다') === 'y';
       const f = run(['머리', '', '{{가}}', '{{나}}', '꼬리'], { 가: '', 나: '' }, ['머리', '', '', 'y', '꼬리'], ['가', '나']);
-      const okF = f.d.ok && val(f, '가') === '' && val(f, '나') === 'y';
+      // 2차 재현 R2(빈 칸 뒤 빈 문단 + 앞에 넣은 이름) · R3(틀 칸 문단 지우고 새 문단) · R4(표 칸 두 개 차례 바뀜)
+      const r2 = run(['머리', '{{단위}}', '', '꼬리'], { 단위: '' }, ['머리', '홍길동 현장', '', '', '꼬리'], ['단위']);
+      const r3 = run(['머리', '{{가}}', '나칸: {{나}}', '꼬리'], { 가: '톤', 나: '1' }, ['머리', '새 문단', '톤', '꼬리'], ['가', '나']);
+      const r4 = run(['머리', '{{가}}', '{{나}}', '꼬리'], { 가: '톤', 나: '고상' }, ['머리', '고상', '톤', '꼬리'], ['가', '나']);
+      const okC = allUnc(c, ['가', '나']) && allUnc(e, ['가', '나', '다']) && allUnc(f, ['가', '나']) && allUnc(r2, ['단위']) && JSON.stringify(r2).indexOf('홍길동') < 0 && allUnc(r3, ['가', '나']) && JSON.stringify(r3).indexOf('새 문단') < 0 && allUnc(r4, ['가', '나']);
+      // 틀 칸은 계속 읽음: 틀 칸 둘의 차례가 바뀌고 값도 고침 = 각자 맞는 값 · 같은 틀 글자 둘(수량: {{a}} / 수량: {{b}}) = 비교 불가 · 한 글자 틀(~{{가}})도 같은 차례 짝 + 틀 읽기로 읽음
+      const s1 = run(['머리', '가칸: {{가}}', '나칸: {{나}}', '꼬리'], { 가: '톤', 나: '고상' }, ['머리', '나칸: 액상', '가칸: 식', '꼬리'], ['가', '나']);
+      const s2 = run(['머리', '수량: {{a}}', '수량: {{b}}', '꼬리'], { a: '1', b: '2' }, ['머리', '수량: 2', '수량: 1', '꼬리'], ['a', 'b']);
+      const s3 = run(['머리', '~{{가}}', '꼬리'], { 가: '톤' }, ['머리', '~식', '꼬리'], ['가']);
+      const s4 = run(['머리', '값 {{가}}{{나}} 끝', '다칸: {{다}}', '꼬리'], { 가: '1', 나: '2', 다: '3' }, ['머리', '값 13 끝', '다칸: 4', '꼬리'], ['가', '나', '다']);   // 칸 둘이 글자 없이 붙음 = 비교 불가
+      const okE = val(s1, '가') === '식' && val(s1, '나') === '액상' && allUnc(s2, ['a', 'b']) && val(s3, '가') === '식' && s4.r.rows.map((x) => x.ref).join() === '다' && val(s4, '다') === '4' && ['가', '나'].every((nm) => s4.d.refs_uncomparable.indexOf(nm) >= 0);
+      const okF = true;
       const g = run(['머리', '{{가}}', '{{나}}', '', '꼬리'], { 가: '', 나: '' }, ['머리', 'x', '', '', '꼬리'], ['가', '나']);
       const okG = g.r.rows.length === 0 && (g.d.refs_uncomparable || []).slice().sort().join() === '가,나';
       // 사이 글자가 값 안에 = 그 문단 못 읽음(잘린 값 0)
@@ -10290,14 +10299,60 @@ function J91a(x) { return JSON.stringify(x); }
       return { ok: okA && okB && okC && okE && okF && okG && okH && okI, info: { okA, okB, okC, okE, okF, okG, okH, okI, b: b.r.rows, a: a.d.code || a.d.refs_uncomparable, dmMB: Math.round(dm / 1048576) } };
     };
     const rB16 = chkB16(DD);
-    T('P1 판16 ①-2 틀 없는 칸 문단·사이 글자·빈 문단 폭탄(검토 11/15): 재현 ① 칸만 있는 문단 + 설명 문단 지우고 새 문단 = 업체명 비교 불가(새 문단 글이 값으로 안 나감) · 재현 ② 품목 표 꼴 성상 고상·단위 톤 = 맞게 읽음(구분 빈칸) · 같은 값 두 칸 중 하나만 고침 · 빈칸 셋 중 1·3 · 빈 문단 앞 + 2번째 · 구간에 칸 없는 빈 문단 섞임 = 비교 불가 · 값 안에 사이 글자(갑 및 을) = 그 문단 비교 불가·다른 문단은 읽음 · 빈 문단 300만 개 압축 = TOO_MANY_PARAS(힙 64MB 안)',
+    T('P1 판16 ①-2 틀 없는 칸 문단·사이 글자·빈 문단 폭탄(검토 11/15 · 2차): 재현 ① 칸만 있는 문단 + 설명 문단 지우고 새 문단 = 업체명 비교 불가(새 문단 글이 값으로 안 나감) · 재현 ② 품목 표 꼴·같은 값 두 칸·빈칸 셋·빈 문단 앞 · R2(빈 칸 뒤 빈 문단 + 넣은 이름)·R3(틀 칸 문단 지우고 새 문단)·R4(표 칸 차례 바뀜) = 모두 비교 불가(틀 없는 칸 문단은 읽지 않음 — 틀린 값·값 노출 0) · 틀 칸 둘의 차례 바뀜 + 값 고침 = 각자 맞는 값 · 같은 틀 글자 둘 = 비교 불가 · 한 글자 틀 = 같은 차례 짝 + 틀 읽기 · 구간에 칸 없는 빈 문단 섞임 = 비교 불가 · 값 안에 사이 글자(갑 및 을) = 그 문단 비교 불가·다른 문단은 읽음 · 빈 문단 300만 개 압축 = TOO_MANY_PARAS(힙 64MB 안)',
       rB16.ok, JSON.stringify(rB16.info));
+    // ①-3 씨앗 고정 퍼징(2차 검토 ⑤): 양식(틀 없는 칸·틀 칸·글 문단) → 무작위 편집(값 고침·빈 문단·새 문단·지움·글 고침·차례 바꿈) →
+    //   '값이 보인 칸(rows)의 최종 값 ≠ 실제 그 칸의 값' 횟수. 고정 난수(LCG)라 매번 같은 판. 비교 불가는 허용.
+    const fz16 = (D, N, seed0) => {
+      let seed = seed0; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+      const pk = (a) => a[Math.floor(rnd() * a.length)];
+      const PLAIN = ['', '', '', '구분', '원', '합계', '비고', '견 적 서', '위와 같이'], VALS = ['', '', '톤', '식', '고상', '운반', '슬러지', '주식회사 종운환경'];
+      const st = { runs: 0, wrong: 0, wrongSwap: 0, seen: 0 }; let ex = null;
+      const nz = (s) => String(s == null ? '' : s).replace(/\s+/g, '');
+      for (let r = 0; r < N; r++) {
+        const len = 4 + Math.floor(rnd() * 10), tpl = [], meta = []; let tn = 0;
+        // 칸 문단: 틀 없음 60% · 긴 틀('k0칸: ') 20% · 한 글자 틀(동그라미 숫자 — 칸마다 다름) 20%
+        for (let i = 0; i < len; i++) { if (rnd() < 0.5) { const nm = 'k' + tn, x = rnd(), fr = x < 0.6 ? '' : (x < 0.8 ? nm + '칸: ' : String.fromCharCode(0x2460 + tn)); tn++; tpl.push(fr + '{{' + nm + '}}'); meta.push({ nm, fr }); } else { tpl.push(pk(PLAIN)); meta.push(null); } }
+        if (!tn) continue;
+        const dv = {}; meta.forEach((m) => { if (m) dv[m.nm] = pk(VALS); });
+        const render = (m, v, i) => (m ? m.fr + v : tpl[i]);
+        const Dp = tpl.map((p, i) => render(meta[i], dv[meta[i] && meta[i].nm], i));
+        const F = Dp.map((s, i) => ({ s, o: i, v: meta[i] ? dv[meta[i].nm] : null })); let swapped = false;
+        const ops = 1 + Math.floor(rnd() * 4);
+        for (let k = 0; k < ops; k++) {
+          const x = rnd(), j = Math.floor(rnd() * F.length);
+          if (x < 0.4) { const e = F[j]; if (e && e.o !== null && meta[e.o]) { const nv = pk(VALS.concat(['새값' + k])); e.v = nv; e.s = render(meta[e.o], nv, e.o); } }
+          else if (x < 0.55) F.splice(j, 0, { s: '', o: null });
+          else if (x < 0.7) F.splice(j, 0, { s: pk(['새 문단', '홍길동 현장', '톤', '']), o: null });
+          else if (x < 0.82) { if (F.length > 2) F.splice(j, 1); }
+          else if (x < 0.92) { const e = F[j]; if (e && e.o !== null && !meta[e.o]) e.s = e.s + ' 고침'; }
+          else if (j + 1 < F.length) { const t = F[j]; F[j] = F[j + 1]; F[j + 1] = t; swapped = true; }
+        }
+        const truth = {}; meta.forEach((m, i) => { if (m) { const e = F.filter((y) => y.o === i)[0]; truth[m.nm] = e ? e.v : undefined; } });
+        const rr = D.hwpxTokRows(hwpx16(tpl), hwpx16(Dp), hwpx16(F.map((y) => y.s)), Object.keys(dv)); st.runs++;
+        if (!rr.ok) continue;
+        let bad = null;
+        rr.rows.forEach((row) => { st.seen++; const t = truth[row.ref]; if (t === undefined || nz(row.final) !== nz(t) || nz(row.draft) !== nz(dv[row.ref])) bad = bad || { ref: row.ref, got: row.final, truth: t }; });
+        if (bad) { st.wrong++; if (swapped) st.wrongSwap++; if (!ex) ex = { tpl, F: F.map((y) => y.s), bad }; }
+      }
+      st.ex = ex; return st;
+    };
+    const FZ = fz16(DD, 800, 16);
+    T('P1 판16 ①-3 씨앗 고정 퍼징 ' + FZ.runs + '회(값 보인 칸 ' + FZ.seen + '): 값이 보인 칸의 최종 값이 실제 그 칸 값과 다름 = ' + FZ.wrong + '(차례 바뀜 판 ' + FZ.wrongSwap + ') — 0이어야 함',
+      FZ.runs >= 700 && FZ.seen >= 300 && FZ.wrong === 0, JSON.stringify(FZ));
+    const R1Z = ['    if (bare[i] || frameN[frameOf[i]] > 1) { unc(); continue; }', '    if (frameN[frameOf[i]] > 1) { unc(); continue; }'];   // ① 틀 없는 칸 문단을 다시 읽음
+    const R2Z = ["return (bare[i] || !s) ? '\\u0000d' + i : s; }), b = F.map(function (x, j) { const s = stripWs(x.s); return s ? s : '\\u0000f' + j; });", "return bare[i] ? '\\u0000d' + i : s; }), b = F.map(function (x, j) { const s = stripWs(x.s); return s; });"];   // ② 빈 글 문단을 LCS 기준점으로
+    const R3Z = ['      if (!fv) { unc(); continue; }   // 2차 검토 ③', '      if (!fv) fv = s0.toks.map(function () { return F[pick].s; });   // 2차 검토 ③'];   // ③ 같은 차례 짝을 틀 확인 없이
+    const fzM = (muts) => { try { let s = SDD; muts.forEach(([x, y]) => { s = mut16(s, x, y); }); return fz16(load16(FDD, s), 800, 16).wrong; } catch (e) { return 'err ' + e.message; } };
+    const MZ = [fzM([R1Z]), fzM([R2Z]), fzM([R1Z, R2Z]), fzM([R3Z])];
+    // ①·② 하나씩은 다른 한 겹이 막아(서로 겹친 방어) 이 퍼징에서 0일 수 있다 — 둘 다 되돌린 사본(= 지난 판)과 ③은 반드시 0 아님. 하나씩 수는 기록만
+    T('P1 판16 ①-3 퍼징 결함 사본(틀 없는 칸 읽기 되돌림 ' + MZ[0] + ' · 빈 글 문단 기준점 되돌림 ' + MZ[1] + ' · 둘 다 되돌림 ' + MZ[2] + ' · 같은 차례 짝 틀 확인 되돌림 ' + MZ[3] + ') = 둘 다·③ 틀린 값 0 아님', typeof MZ[2] === 'number' && MZ[2] > 0 && typeof MZ[3] === 'number' && MZ[3] > 0 && typeof MZ[0] === 'number' && typeof MZ[1] === 'number', JSON.stringify(MZ));
     const MB16 = [
-      ["  const a = D.map(function (x, i) { return bare[i] ? '\\u0000칸' + i : stripWs(x.s); })", '  const a = D.map(function (x, i) { return stripWs(x.s); })'],
-      ['      if (candF.length === gapD.length && gapD.every(function (x) { return !!sp[x]; })) pick', '      if (candF.length === gapD.length) pick'],
+      ['    if (bare[i] || frameN[frameOf[i]] > 1) { unc(); continue; }', '    if (bare[i]) { unc(); continue; }'],   // 같은 틀 둘 검사 걷음
+      ["    const adj = s0.lits.slice(1, -1).some(function (l) { return !stripWs(l); });", '    const adj = false;', '    else { if (!L[j]) return null; q = st.indexOf(L[j], p); if (q < 0) return null; }', '    else { q = st.indexOf(L[j], p); if (q < 0) return null; }'],   // 붙은 칸 두 겹 다 걷음
       ['  for (let j = 1; j < k; j++) { if (L[j] && cnt(st, L[j]) > cnt(tplLit, L[j])) return null; }', ''],
-      ['      if (out.length + stack.length > TOK_PARA_CAP) return OVER;\n', '']].map(([x, y]) => { try { return chkB16(load16(FDD, mut16(SDD, x, y))).ok; } catch (e) { return 'err ' + e.message; } });
-    T('P1 판16 ①-2 결함 사본 ' + MB16.length + '개(칸만 있는 문단을 LCS에 넣음·같은 차례 짝에 칸 없는 문단 허용·사이 글자 횟수 검사 걷음·담는 중 상한 걷음) = 모두 ✗', MB16.every((v) => v === false), JSON.stringify(MB16));
+      ['      if (out.length + stack.length > TOK_PARA_CAP) return OVER;\n', '']].map(([x, y, x2, y2]) => { try { let s = mut16(SDD, x, y); if (x2) s = mut16(s, x2, y2); const M = load16(FDD, s); return chkB16(M).ok && fz16(M, 400, 7).wrong === 0; } catch (e) { return 'err ' + e.message; } });   // 고정 시험 또는 퍼징(400회) 어느 쪽이든 잡으면 ✗
+    T('P1 판16 ①-2 결함 사본 ' + MB16.length + '개(같은 틀 글자 둘 검사 걷음·붙은 칸 두 겹 걷음·사이 글자 횟수 검사 걷음·담는 중 상한 걷음 — 고정 시험 또는 퍼징 400회) = 모두 ✗', MB16.every((v) => v === false), JSON.stringify(MB16));
 
     // ② 추천값 — 앱의 토큰 만드는 곳과 칸 목록 대조(드리프트) · 추천 고정 · 정산합의서 전부 돈 칸
     const html16 = fs16.readFileSync(join(ROOT, 'index.html'), 'utf8');
@@ -10350,7 +10405,7 @@ function J91a(x) { return JSON.stringify(x); }
       let r = await cl({ action: 'cdoc_put', cid: 'c16', i: 0, doc_key: 'gen.quote_env', kind: 'draft', pii: 1, name: '견적서(환경).hwpx', data: b16(drB) }, tk); o.d = r.code;
       r = await cl({ action: 'cdoc_put', cid: 'c16', i: 0, doc_key: 'main.작성-0', kind: 'final', name: '견적서_고침.hwpx', data: b16(hwpx16(FIN1)), pii: 1, pair_tpl: 'quote_env' }, tk);
       const L1 = (r.body && r.body.learn) || {}, p1 = L1.id ? mem.gw_data['learn:contract:in:' + L1.id] : null;
-      o.p1 = L1.ok && L1.kind === 'hwpx_tok' && L1.status === 'done_nomodel' && L1.changed === 4 && L1.compared === 8 && p1 && JSON.stringify(p1).indexOf('포항시청') < 0 && JSON.stringify(p1).indexOf('이백만원') < 0;
+      o.p1 = L1.ok && L1.kind === 'hwpx_tok' && L1.status === 'done_nomodel' && L1.changed === 3 && L1.compared === 7 && p1 && JSON.stringify(p1).indexOf('포항시청') < 0 && JSON.stringify(p1).indexOf('이백만원') < 0;
       // 검토 ④: 초안 메타에 그때 빈 양식 지문
       const drK = Object.keys(mem.gw_files).filter((k) => k.indexOf('cdoc:c16:') === 0 && k.indexOf(':gen.quote_env:') > 0)[0];
       o.sha = !!drK && mem.gw_files[drK].tpl_sha === DD.tplFinger(b16(tplB)) && /^[0-9a-f]{16}$/.test(mem.gw_files[drK].tpl_sha);
@@ -10390,7 +10445,7 @@ function J91a(x) { return JSON.stringify(x); }
     };
     const tW16 = () => { mem.gw_users['member:u16a'] = { id: 'u16a', name: '관리부16', role: '관리자', admin: true, perms: {} }; return issueSession(mem.gw_users['member:u16a']).token; };
     const R16 = await run16(gwd);
-    T('P1 판16 ③ e2e: 한글 견적서 최종본 = 칸 비교 짝(hwpx_tok · 바뀜 4/8 · 짝 블롭에 값 없음 · 허용 전 done_nomodel) · learn_pairs_get rec2 · PM 콘솔 learnhw:on = 기존 learn_settings_set 길(낡은 set_base 409·PM 아닌 관리자 403·1차 asb_plan 그대로 + 추천 6양식 · 같은 양식 손 칸(견적 품명)은 남김(합집합) · 감사 학습설정·누른 기록) · 그 뒤 최종본 pending · 주입 잠금(서약서 돈 칸 금액숫자 뺌·견적서 {}·정산합의서 {}) · learnhw:off = 추천 양식 키만 뺌 · 초안 메타 양식 지문 tpl_sha · 칸 이름만 바꿔 다시 올린 양식 = 문단 비교 + tok_code TPL_CHANGED(워커도 TPL_CHANGED·호출 0)',
+    T('P1 판16 ③ e2e: 한글 견적서 최종본 = 칸 비교 짝(hwpx_tok · 바뀜 3/7 · 짝 블롭에 값 없음 · 허용 전 done_nomodel) · learn_pairs_get rec2 · PM 콘솔 learnhw:on = 기존 learn_settings_set 길(낡은 set_base 409·PM 아닌 관리자 403·1차 asb_plan 그대로 + 추천 6양식 · 같은 양식 손 칸(견적 품명)은 남김(합집합) · 감사 학습설정·누른 기록) · 그 뒤 최종본 pending · 주입 잠금(서약서 돈 칸 금액숫자 뺌·견적서 {}·정산합의서 {}) · learnhw:off = 추천 양식 키만 뺌 · 초안 메타 양식 지문 tpl_sha · 칸 이름만 바꿔 다시 올린 양식 = 문단 비교 + tok_code TPL_CHANGED(워커도 TPL_CHANGED·호출 0)',
       R16.ok, JSON.stringify(R16));
     // ④ 워커 — 허용 칸만 값 · 칸 이름 프롬프트 · 규칙 field = 칸 이름
     reset16();

@@ -32033,10 +32033,11 @@ function dutyStage(nx){
       return nm.join("·") + (ts.length > 1 ? " 각 " : " ") + c + "칸";
     });
     var none = tk.filter(function(t){ return !(R2.tpls[t].rec || []).length; }).map(genLabel);
-    var tip = rec.map(function(t){ return genLabel(t) + " " + R2.tpls[t].rec.length + "칸(" + R2.tpls[t].rec.join("·") + ")" + (R2.tpls[t].no_inject ? " — 재기만, 빈 칸 채움 없음" : ""); }).join(" · ")
+    // 2차 검토 ⑥: 업체명·상호는 앱이 늘 채우는 칸이라 빈 칸 채움이 일어나지 않고, 견적서는 채움을 막아 둠 — 콘솔 글은 '재기·학습만'
+    var tip = "모두 재기·학습만(업체명·상호는 앱이 늘 채우는 칸, 견적서는 빈 칸 채움을 막아 둠). " + rec.map(function(t){ return genLabel(t) + " " + R2.tpls[t].rec.length + "칸(" + R2.tpls[t].rec.join("·") + ")"; }).join(" · ")
       + ". 뺀 칸: 금액·요율 " + (dr.money || 0) + " · 날짜 " + (dr.date || 0) + " · 건마다 다른 값 " + (dr["case"] || 0) + " · 개인정보·연락처·계좌 " + (dr.pii || 0) + (none.length ? " · 추천 칸 없음: " + none.join("·") : "");
     return [{ id: "learnhw:on", q: "한글 양식 서류도 학습 허용 칸에 넣을까요?", recTxt: rec.length + "양식 " + cells + "칸", curTxt: "허용 전(간극만)", args: { on: true }, def: "rec", tip: tip,
-      why: seg.join(" · ") + " — 금액·날짜·건별 값·개인정보 칸은 뺌 · 표본 " + n + "건" + (s.on ? "" : " · 학습 꺼짐(켜야 배움)"), setBase: (b.settings && b.settings.updated_at) || 0 }];
+      why: seg.join(" · ") + " — 재기·학습만(빈 칸 채움 없음) · 금액·날짜·개인정보 칸 뺌 · 표본 " + n + "건" + (s.on ? "" : " · 학습 꺼짐(켜야 배움)"), setBase: (b.settings && b.settings.updated_at) || 0 }];
   }
   function pmconRowsBrief(b){
     var v = b.values || {};

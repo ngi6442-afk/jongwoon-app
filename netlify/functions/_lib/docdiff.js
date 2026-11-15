@@ -245,9 +245,10 @@ function hwpxParaDiff(draftBuf, finalBuf) {
 // 앱은 hwpx 양식 글자 안의 {{칸 이름}}을 값으로 바꿔 초안을 만든다(index.html fillHwpxTemplate — 칸이 든 문단만 고치고 문단 수는 그대로).
 // 서버에 남은 빈 양식(tpl:<양식>) · 초안 · 최종본 세 파일의 문단을 읽어
 //   ① 양식 문단 ↔ 초안 문단(같은 차례)으로 초안의 칸 값을 되읽고 — 문단 수가 다르거나 칸 없는 문단이 1할 넘게 다르면 양식이 초안 때와 다름(TPL_CHANGED, 칸 비교 전체 불가)
-//   ② 초안 ↔ 최종본 문단을 LCS로 맞춘다 — 그대로 남은 문단의 칸은 '안 바뀜'. 맞지 않은 칸 문단은 앞뒤로 맞은 문단 사이 구간에서 찾는다:
-//      구간의 안 맞은 문단 수가 양쪽 같으면 같은 차례끼리, 다르면 양식 글자 틀(칸 앞뒤 글자 2자↑)이 맞는 첫 문단. 찾은 문단에서 틀 글자 사이를 칸 값으로 읽는다.
-// 비교 불가(칸 단위): 글상자 안 칸 · 틀 글자 없이 칸만 있는 문단을 구간에서 하나로 못 정함 · 두 칸이 글자 없이 붙음 · 틀을 못 찾음(문단을 고쳐 씀·지움·표 구조 변경) · 같은 칸이 문단마다 다른 값.
+//   ② 초안 ↔ 최종본 문단을 LCS로 맞춘다(빈 글 문단·칸만 있는 문단은 기준점에서 뺌) — 그대로 남은 문단의 칸은 '안 바뀜'. 맞지 않은 틀 칸 문단은 앞뒤로 맞은 문단 사이 구간에서 찾는다:
+//      틀 글자 2자↑ = 그 틀로 읽히는 첫 문단 · 틀이 짧으면 구간이 전부 칸 문단이고 수가 같을 때 같은 차례끼리 — 어느 쪽이든 그 틀대로 읽혀야 칸 값으로 인정.
+// 비교 불가(칸 단위): 틀 글자 없이 칸만 있는 문단(표 칸 — 셀 주소로 짝지을 때까지 읽지 않음) · 같은 틀 글자가 양식에 둘 이상 · 글상자 안 칸 · 두 칸이 글자 없이 붙음 ·
+//   틀을 못 찾음(문단을 고쳐 씀·지움·표 구조 변경) · 칸 사이 글자가 값 안에도 있음 · 같은 칸이 문단마다 다른 값. 원칙: 틀리게 세느니 비교 불가(판16 2차 검토 — 씨앗 고정 퍼징 servertest P1 판16 ①-3).
 // 띄어쓰기만 다른 것은 같은 값으로 본다(normS와 같은 뜻). 반환에는 칸 이름·횟수만(값 없음) — 값은 hwpxTokRows(허용 칸만)가 워커에만 준다.
 // 외부 npm 없음(내장 zlib만 — 이 파일 머리말). 문단 수 상한 TOK_PARA_CAP(LCS 표 Uint16 — 1500×1500 = 4.5MB).
 const TOK_PARA_CAP = 1500, TOK_PARA_LEN = 2000, TOK_PER_PARA = 12;
@@ -331,8 +332,12 @@ function hwpxTokCore(tplBuf, draftBuf, finalBuf) {
   if ((plain && plainSame / plain < 0.9) || tokOk * 2 < tokP) return { ok: false, code: 'TPL_CHANGED' };
   // ② 초안 ↔ 최종본 맞추기
   // 판16 검토 ①: 틀 글자 없이 칸만 있는 문단(표 칸 '{{품명}}')은 LCS 짝에서 뺀다 — 빈 값이면 다른 빈 문단과, 값이 같으면 다른 칸과 짝이 되어 값이 엉뚱한 칸에 붙거나 사라졌다. 구간 짝으로만 읽는다.
+  // 판16 2차 검토(11/15): 칸만 있는 문단은 값을 아예 읽지 않는다(아래 bare → 비교 불가 — 표 칸은 셀 주소로 짝지을 때까지). 빈 글 문단도 LCS 기준점에서 뺀다
+  //   (빈 문단끼리 짝이 되면 옆 칸의 최종 문단을 기준점이 가져가 직원이 넣은 문단이 칸에 붙었다). 같은 틀 글자가 양식에 둘 이상인 칸 문단도 비교 불가(서로 값이 바뀌어 읽힘).
   const bare = sp.map(function (x) { return !!x && !stripWs(x.lits.join('')); });
-  const a = D.map(function (x, i) { return bare[i] ? '\u0000칸' + i : stripWs(x.s); }), b = F.map(function (x) { return stripWs(x.s); });
+  const frameN = {}, frameOf = sp.map(function (x) { return x ? stripWs(x.lits.join('\u0001')) : ''; });
+  frameOf.forEach(function (k, i) { if (sp[i]) frameN[k] = (frameN[k] || 0) + 1; });
+  const a = D.map(function (x, i) { const s = stripWs(x.s); return (bare[i] || !s) ? '\u0000d' + i : s; }), b = F.map(function (x, j) { const s = stripWs(x.s); return s ? s : '\u0000f' + j; });
   const ma = lcsPairs(a, b), lcsF = {}, usedF = {};   // lcsF = LCS로 맞은 최종 문단 · usedF = 이 돌기에서 칸 문단으로 집은 최종 문단
   for (let i = 0; i < ma.length; i++) if (ma[i] >= 0) lcsF[ma[i]] = 1;
   const occ = {};   // 칸 이름 → [{st, d, f}]
@@ -342,6 +347,7 @@ function hwpxTokCore(tplBuf, draftBuf, finalBuf) {
     const unc = function () { s0.toks.forEach(function (nm, k) { put(nm, 'unc', dv[i] ? dv[i][k] : '', ''); }); };
     const adj = s0.lits.slice(1, -1).some(function (l) { return !stripWs(l); });   // 칸 둘이 글자 없이 붙음
     if (T[i].box || D[i].box || !dv[i] || adj || s0.toks.length > TOK_PER_PARA) { unc(); continue; }
+    if (bare[i] || frameN[frameOf[i]] > 1) { unc(); continue; }   // 2차 검토 ①: 틀 없는 칸 문단 = 읽지 않음 · 같은 틀이 둘 이상 = 어느 칸인지 가를 수 없음
     let fv = null;   // 같은 칸이 여러 번 나오면 초안 값이 모두 같아야 한다(아래 모음에서 검사)
     if (ma[i] >= 0) { if (F[ma[i]].box) { unc(); continue; } fv = dv[i].slice(); }
     else {
@@ -353,11 +359,12 @@ function hwpxTokCore(tplBuf, draftBuf, finalBuf) {
       for (let x = ilo + 1; x < ihi; x++) if (ma[x] < 0) gapD.push(x);
       let pick = -1;
       // 같은 차례 짝 = 구간의 안 맞은 초안 문단이 **전부 칸 문단이고** 수가 양쪽 같을 때만(판16 검토 ① — 칸 없는 문단이 섞이면 지우고 더한 문단과 칸을 가를 수 없다). 틀리게 세느니 비교 불가.
-      if (candF.length === gapD.length && gapD.every(function (x) { return !!sp[x]; })) pick = candF[gapD.indexOf(i)];
-      else if (stripWs(s0.lits.join('')).length >= 2) { for (const y of candF) { if (!usedF[y] && tokRead(s0, F[y].s)) { pick = y; break; } } }
+      //   2차 검토: 틀 글자가 2자 이상이면(양식 안에 같은 틀이 없음은 위에서 확인) 구간에서 그 틀로 읽히는 문단을 먼저 찾는다 — 차례가 바뀐 틀 칸도 제 값. 틀이 짧으면 같은 차례 짝(틀 읽기로 확인)
+      if (stripWs(s0.lits.join('')).length >= 2) { for (const y of candF) { if (!usedF[y] && tokRead(s0, F[y].s)) { pick = y; break; } } }
+      else if (candF.length === gapD.length && gapD.every(function (x) { return !!sp[x]; })) pick = candF[gapD.indexOf(i)];
       if (pick === undefined || pick < 0 || usedF[pick] || F[pick].box) { unc(); continue; }
       fv = tokRead(s0, F[pick].s);
-      if (!fv) { unc(); continue; }
+      if (!fv) { unc(); continue; }   // 2차 검토 ③: 같은 차례로 짝지은 최종 문단도 그 틀대로 읽혀야 인정(틀 글자가 안 맞으면 비교 불가)
       usedF[pick] = 1;
     }
     s0.toks.forEach(function (nm, k) {

@@ -15374,10 +15374,10 @@ try {
     const b2 = R({ settings: { contract: { on: true, allow: Object.assign({}, allRec, { adv_pay: ['담당자'] }) }, updated_at: 79 }, rec2: REC16 });   // 선금 상호가 빠짐 = 줄
     const c = R({ settings: { contract: { on: false, allow: {} } } }), d = R({ settings: { contract: { on: false, allow: {} }, updated_at: 5 }, rec2: REC16 });
     const r = a[0] || {}, w = r.why || '', tp = r.tip || '';
-    const W = '서약서·인감계·채권포기각서·선금 각 1칸 · 견적서 2종 각 4칸 — 금액·날짜·건별 값·개인정보 칸은 뺌 · 표본 2건';
+    const W = '서약서·인감계·채권포기각서·선금 각 1칸 · 견적서 2종 각 4칸 — 재기·학습만(빈 칸 채움 없음) · 금액·날짜·개인정보 칸 뺌 · 표본 2건';   // 2차 검토 ⑥: '채움' 암시 없음 · 폰에서도 보이는 한 줄
     const ok = a.length === 1 && r.id === 'learnhw:on' && r.q === '한글 양식 서류도 학습 허용 칸에 넣을까요?' && r.recTxt === '6양식 12칸' && r.def === 'rec' && JSON.stringify(r.args) === '{"on":true}' && r.setBase === 77
       && w === W.replace('표본 2건', '표본 3건') && w.length <= 90
-      && tp.indexOf('견적서(환경) 4칸(부가세구분·성상·구분·단위) — 재기만, 빈 칸 채움 없음') >= 0 && tp.indexOf('선금지급신청 세트 1칸(상호)') >= 0 && tp.indexOf('선금지급신청 세트 1칸(상호) —') < 0 && tp.indexOf('뺀 칸: 금액·요율 46 · 날짜 21 · 건마다 다른 값 19 · 개인정보·연락처·계좌 22') >= 0 && tp.indexOf('추천 칸 없음: 적격심사 패킷·준공 정산합의서') >= 0
+      && tp.indexOf('모두 재기·학습만(업체명·상호는 앱이 늘 채우는 칸, 견적서는 빈 칸 채움을 막아 둠). ') === 0 && tp.indexOf('견적서(환경) 4칸(부가세구분·성상·구분·단위)') >= 0 && tp.indexOf('선금지급신청 세트 1칸(상호)') >= 0 && !/채워집니다|미리 채움/.test(w + tp) && tp.indexOf('뺀 칸: 금액·요율 46 · 날짜 21 · 건마다 다른 값 19 · 개인정보·연락처·계좌 22') >= 0 && tp.indexOf('추천 칸 없음: 적격심사 패킷·준공 정산합의서') >= 0
       && !/quote_|settle_doc|qual_packet|adv_pay|contract_pledge/.test(w + tp + r.q + r.recTxt)
       && b.length === 0 && b2.length === 1 && c.length === 0 && d.length === 1 && / · 표본 0건 · 학습 꺼짐\(켜야 배움\)$/.test(d[0].why);
     return { ok, info: { a: a.map((x) => x.id), b: b.length, b2: b2.length, c: c.length, w, n: w.length, d: d[0] && d[0].why } };
@@ -15385,7 +15385,7 @@ try {
   const r16c = chkR16(html);
   const m16c = [sm16(html, '    if (rec.every(function(t){ return isArr(al[t]) && R2.tpls[t].rec.every(function(f){ return al[t].indexOf(f) >= 0; }); })) return [];', '    if (rec.every(function(t){ return isArr(al[t]) && al[t].length === R2.tpls[t].rec.length; })) return [];'),
     sm16(html, 'n += Math.max(k, Number((les[t] || {}).pairs) || 0);', 'n += Number((les[t] || {}).pairs) || 0;'), sm16(html, 'p.tpl === t && p.status !== "superseded"', 'p.tpl === t'),
-    sm16(html, 'recTxt: rec.length + "양식 " + cells + "칸"', 'recTxt: "추천 " + rec.length + "양식 " + cells + "칸"'), sm16(html, '+ (R2.tpls[t].no_inject ? " — 재기만, 빈 칸 채움 없음" : "")', ''),
+    sm16(html, 'recTxt: rec.length + "양식 " + cells + "칸"', 'recTxt: "추천 " + rec.length + "양식 " + cells + "칸"'), sm16(html, '" — 재기·학습만(빈 칸 채움 없음) · 금액·날짜·개인정보 칸 뺌 · 표본 "', '" — 금액·날짜·건별 값·개인정보 칸은 뺌 · 표본 "'), sm16(html, 'var tip = "모두 재기·학습만(업체명·상호는 앱이 늘 채우는 칸, 견적서는 빈 칸 채움을 막아 둠). " + rec.map', 'var tip = rec.map'),
     sm16(html, 'map(function(t){ return PMCON_HW_SHORT[t] || genLabel(t); })', 'map(function(t){ return genLabel(t); })'), sm16(html, '추천 칸 없음: " + none.join("·")', '추천 칸 없음: " + tk.join("·")')].map((h) => safe16(() => chkR16(h)).ok);
   const ttl16 = (h) => f16(h, 'renderPmcon').indexOf(`'<div class="pc-why"' + (r.tip ? ' title="' + esc(r.tip) + '"' : '') + '>' + esc(r.why || "")`) > 0;
   const plan16 = ttl16(html) && !ttl16(sm16(html, `'<div class="pc-why"' + (r.tip ? ' title="' + esc(r.tip) + '"' : '') + '>'`, `'<div class="pc-why">'`)) && /var PMCON_PLAN = \{[^\n]*learnhw: \{ due: "2026-11-22", def: "rec",/.test(html) && /var once = \{\};[^\n]*\n\s*var calls = \[soft\(gwCall\("gw-data", \{ action: "pmcon_get" \}\)\)\]\.concat\(PMCON_KINDS\.map\(function\(k\)\{ return once\[k\.get\] \|\| \(once\[k\.get\] = soft\(gwCall\("gw-data", \{ action: k\.get \}\)\)\); \}\)\);/.test(html)
