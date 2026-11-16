@@ -475,6 +475,12 @@ async function handleSave(event, d, R) {
       if (LD.isDutyKey(t.auto_key)) { if (o && o.auto_key !== undefined) t.auto_key = o.auto_key; else delete t.auto_key; }
       delete t.lic_stage; delete t.lic_rows; delete t.lic_next;
     });
+    // P1 판20b: 다시 연 기록(lic_reopen — 하루 한 번·단계 오를 때만 다시 열게 하는 칸)도 서버만 씀 — 서버 문서의 인허가 기한 지시면 서버 값, 그 밖이면 뗌
+    doc.items.forEach(function (t) {
+      if (!t || typeof t !== 'object') return;
+      const o = oldByA[t.id];
+      if (o && LD.isDutyKey(o.auto_key) && o.lic_reopen !== undefined) t.lic_reopen = o.lic_reopen; else delete t.lic_reopen;
+    });
     doc.items.forEach(function (t) { if (!t || !t.auto_key || t.who_id) return; const o = oldByA[t.id]; if (o && o.who_id && o.who_by === 'assign') { t.who_id = o.who_id; t.who = o.who || ''; t.who_by = 'assign'; } });
     // v397 앱 기준 review 보호: 서버가 올린 review('앱 기준')를 클라 사본이 open으로 보내면 반려(doneif_off=1)가 아닌 한 서버 값을 이월(낡은 사본·로컬 우선 병합 방지). 승인(done)은 통과
     doc.items.forEach(function (t) {
@@ -1024,9 +1030,9 @@ async function handleAutotaskIngest(event, d, R) {
       if (!li.ok) lic = { mode: 'live', skip: li.why };
       else {
         const p = LD.plan(li.input);
-        const ar = LD.apply(p, doc.items, today, li.input.names, function () { return 't' + crypto.randomBytes(6).toString('hex'); });
+        const ar = LD.apply(p, doc.items, today, li.input.names, function () { return 't' + crypto.randomBytes(6).toString('hex'); }, Date.now());
         ar.ids.forEach(function (id) { licNew[id] = 1; });
-        lic = { mode: 'live', made: ar.made, bundled: ar.bundled, bumped: ar.bumped, redated: ar.redated, moved: ar.moved, next: ar.next_rise, touched: ar.changed, no_who: p.no_who.length, base: p.base.length, first: p.first, notify: ar.notify };
+        lic = { mode: 'live', made: ar.made, bundled: ar.bundled, bumped: ar.bumped, redated: ar.redated, moved: ar.moved, next: ar.next_rise, touched: ar.changed, no_who: p.no_who.length, base: p.base.length, first: p.first, notify: ar.notify, reopened: ar.reopened };
       }
     } catch (e) { lic = { mode: 'live', skip: 'ERROR' }; }
   }
@@ -1044,7 +1050,7 @@ async function handleAutotaskIngest(event, d, R) {
   let notified = 0;
   if (notifyItems.length) notified = await notifyAutoCreated(st, notifyItems, '정기봇');
   const blockTxt = blocked ? ' · 스위치 막음 ' + blocked + '(' + Object.keys(blockedBy).map(function (k) { return k + ' ' + blockedBy[k] + ' — ' + (k === 'unknown' ? '허용 꼴 밖' : sw.rules[k]); }).join(', ') + ')' : '';   // v453 규칙 이름·건수·스위치 값만(키·본문 없음)
-  const licTxt = !lic ? '' : (lic.skip ? ' · 인허가 기한 건너뜀(' + lic.skip + ')' : ((lic.bundled || lic.made || lic.bumped || lic.moved || lic.next || lic.no_who) ? ' · 인허가 기한 ' + (lic.bundled ? '묶음 ' + lic.bundled + ' · ' : '') + '새 ' + lic.made + ' · 단계 올림 ' + lic.bumped + (lic.moved ? ' · 담당 옮김 ' + lic.moved : '') + (lic.next ? ' · 다음 회차 ' + lic.next : '') + (lic.no_who ? ' · 담당 없음 ' + lic.no_who + '행' : '') : ''));   // P1 판20 수·행 수만
+  const licTxt = !lic ? '' : (lic.skip ? ' · 인허가 기한 건너뜀(' + lic.skip + ')' : ((lic.bundled || lic.made || lic.bumped || lic.moved || lic.next || lic.no_who || lic.reopened) ? ' · 인허가 기한 ' + (lic.bundled ? '묶음 ' + lic.bundled + ' · ' : '') + '새 ' + lic.made + ' · 단계 올림 ' + lic.bumped + (lic.moved ? ' · 담당 옮김 ' + lic.moved : '') + (lic.next ? ' · 다음 회차 ' + lic.next : '') + (lic.reopened ? ' · 다시 엶 ' + lic.reopened : '') + (lic.no_who ? ' · 담당 없음 ' + lic.no_who + '행' : '') : ''));   // P1 판20 수·행 수만
   if (made || fixed || assigned || (lic && lic.touched)) {
     doc.updated_by = '정기봇'; doc.updated_at = Date.now();
     const w = await blobSet(st, colKey('tasks'), doc);

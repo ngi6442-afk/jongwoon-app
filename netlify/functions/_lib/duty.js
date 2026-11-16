@@ -82,9 +82,10 @@ function dutyStartIdx(cands, done, anchor){
 var DUTY_FROM = "2026-11-13";
 // 판20 재검토 2: 그 행의 세기 시작일 — 근거 표 행(sched.count_from)·의무 대장 행(count_from)·허가증 등록일(created — 앱 허가증 등록 두 길이 늘 적음) 가운데 가장 늦은 날,
 //   DUTY_FROM보다 이르거나 없으면 DUTY_FROM. 나중에 근거 표에 오르는 행·새로 등록하는 허가증이 DUTY_FROM 해 회차부터 '지남'으로 보이지 않게(지금 98행·허가증 13개 = 칸 없음·등록 2026-07-08 → 결과 같음).
-function dutyFrom(d, lic){
+// 판20b: today를 주면 그날보다 늦은(미래) 값은 무시한다 — 미래 세기 시작일이 그날까지 '오늘' 기준(해 넘김 전 규칙)으로 돌아가지 않게. 그날이 오면 그 값부터 셈.
+function dutyFrom(d, lic, today){
   var f = DUTY_FROM, c = [d && d.sched && d.sched.count_from, d && d.count_from, lic && lic.created], i, x;
-  for (i = 0; i < c.length; i++){ x = String(c[i] || "").slice(0, 10); if (dutyParse(x) && x > f) f = x; }
+  for (i = 0; i < c.length; i++){ x = String(c[i] || "").slice(0, 10); if (today && x > today) x = ""; if (dutyParse(x) && x > f) f = x; }
   return f;
 }
 // d = 의무 행, lic = 붙는 허가증({issued}) 또는 null, today = 'YYYY-MM-DD'
@@ -93,6 +94,8 @@ function dutyNext(d, lic, today){
   if (!s || !s.auto) return null;
   var done = dutyDoneSet(d), anchor = dutyAnchor(d), grace = Number(s.grace_days) || 0, k, j, due, cands = [], start = 0;
   var from = dutyFrom(d, lic), lim = today < from ? today : from;   // 기준 없는 행의 '지난 회차 걸러 내기' 기준 날
+  // 판20b: 세기 시작일이 오늘보다 늦으면(미래) 그 값은 무시하고 고정 날짜로(DUTY_FROM 전 날짜는 종전 그대로 오늘)
+  if (dutyFrom(d, lic) > today){ lim = dutyFrom(d, lic, today); if (today < lim) lim = today; }
   var out = { due: "", days: 0, overdue: false, kind: s.type, anchor: anchor, missing: null };
   if (s.type === "fixed"){
     // 매년 1~2개 고정일(fixed_month/day, 선택 fixed2_month/day — 예: 반기 보고 7/31·익년 1/31). 말일 = day 0.

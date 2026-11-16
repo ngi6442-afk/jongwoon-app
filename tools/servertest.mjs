@@ -11862,4 +11862,190 @@ function J91a(x) { return JSON.stringify(x); }
   finally { pushMock.sendTo = sendSave20; require.cache[rpDI20] = keepDI20; const s = JSON.parse(snap20); mem.gw_users = s.u; mem.gw_data = s.d; mem.gw_files = s.f; blobsMock.hooks.failGet = null; }
 }
 
+{ // ---- P1 판20b 인허가 기한 지시 남은 것(원장 C187 ② — 켠 뒤 고칠 것) — ① 탭 기록 없이 지우거나 손으로 완료(승인)된 지금 회차 지시 = 다음 실행에서 다시 엶
+  //   (알림 1 · 하루 한 번 · 한 번 연 뒤 다시 닫혔으면 지금 회차·다음 회차 단계가 오를 때만 · 승인 대기·30일 밖·담당 없음은 안 엶) ② 닫은 회차 다음 날 생기는 행별 지시는
+  //   '다음 회차' 줄로 이미 알린 단계면 알림 안 함(단계 기록 이어받음) ③ 지시의 다음 회차 기록(lic_next)에서 닫힌 회차 걷음 ④ 미래 세기 시작일 무시(_lib/duty.js — 앱 같은 본문)
+  //   ⑤ e2e(gw-data): 지움 → 다음 실행 다시 엶 · 다시 연 기록 칸(lic_reopen)은 서버만 · 퇴사 = 감사 줄 '담당 없음 n행'·알림 0 · 연습 = 0. 결함 사본(한 곳씩 메모리 컴파일)마다 깨짐.
+  const fsB = require('fs'), ModB = require('module');
+  const LDPb = join(FN, '_lib', 'licduty.js'), DYPb = join(FN, '_lib', 'duty.js'), GWPb = join(FN, 'gw-data.js');
+  const SRCb = { ld: fsB.readFileSync(LDPb, 'utf8'), dy: fsB.readFileSync(DYPb, 'utf8'), gw: fsB.readFileSync(GWPb, 'utf8') };
+  const compB = (file, src) => { const m = new ModB(file); m.filename = file; m.paths = ModB._nodeModulePaths(dirname(file)); m._compile(src, file); return m.exports; };
+  const mutB = (src, from, to) => { if (src.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return src.replace(from, () => to); };
+  const clB = (mod) => async (body, tok, dev) => { const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+  const RFb = (no, m, dd) => ({ no: no, auto: true, type: 'fixed', fixed_month: m, fixed_day: dd, base: 'none', lic_id: 'L1', duty: '고정일 의무 ' + no, lic: '시험 허가', cycle: '연 1회', badge: '', cites: [] });
+  const RUb = { 'lic:': { who_id: 'u1' } };
+  // ① ② ③ 순수 함수(_lib/licduty plan·apply)
+  const chkRb = (L) => {
+    const o = {}; let n = 0; const mk = () => 'r' + (++n);
+    const run = (rows, duties, tk, day, extra) => { const p = L.plan(Object.assign({ rows: rows, duties: duties, lics: [], tasks: tk, rules: RUb, names: { u1: '담당' }, today: day }, extra || {})); const a = L.apply(p, tk, day, { u1: '담당', u2: '새담당' }, mk, 777); return { p: p, a: a }; };
+    // A 지금 회차 지시를 지움 → 다음 실행 다시 엶(알림 1 · 안내 글 · del 0 · updated_ts) · 같은 날 다시 지워도 0 · 다음 날 같은 단계 0 · 7일 안 = 다시 엶(단계 오름과 한 줄)
+    const rA = [RFb(611, 12, 31)], dA = [{ no: 611 }], tA = [];
+    const a0 = run(rA, dA, tA, '2026-12-01'); const t = tA[0];
+    o.a0 = a0.a.made === 1 && !!t && t.lic_stage === 'd30';
+    t.del = 1;
+    const a1 = run(rA, dA, tA, '2026-12-02');
+    o.a1 = a1.p.reopen.length === 1 && a1.a.reopened === 1 && t.del === 0 && t.status === 'open' && t.updated_ts === 777 && t.lic_reopen.day === '2026-12-02' && t.lic_reopen.n === 1
+      && /\(12\/2 다시 열림 — /.test(t.detail) && JSON.stringify(a1.a.notify) === JSON.stringify({ u1: ['다시 엶 611행 — 탭에서 [완료+수령 올리기]로 닫아야 끝납니다'] });
+    const a1b = run(rA, dA, tA, '2026-12-02'); o.a1b = a1b.p.reopen.length === 0 && Object.keys(a1b.a.notify).length === 0;
+    t.del = 1;
+    const a1c = run(rA, dA, tA, '2026-12-02'), a2 = run(rA, dA, tA, '2026-12-03');
+    o.a2 = a1c.p.reopen.length === 0 && a2.p.reopen.length === 0 && t.del === 1 && Object.keys(a2.a.notify).length === 0;
+    const a3 = run(rA, dA, tA, '2026-12-24');
+    o.a3 = a3.p.reopen.length === 1 && a3.a.bumped === 1 && t.lic_stage === 'd7' && t.del === 0 && t.lic_reopen.n === 2 && (a3.a.notify.u1 || []).length === 1 && t.detail.split('다시 열림').length === 2 && /\(12\/24 다시 열림/.test(t.detail);
+    // 같은 날 다시 연 지시를 또 지우고 [기한 정정]으로 단계가 올라도 그날은 다시 안 엶(하루 한 번)
+    const a4 = L.plan({ rows: rA, duties: [{ no: 611, due_fix: { '2026-12-31': { to: '2026-12-05' } } }], lics: [], tasks: [{ id: 'a4', auto_key: L.taskKey(611, 'L1', '2026-12-31'), status: 'open', del: 1, lic_stage: 'd30', lic_reopen: { day: '2026-12-02', n: 1 } }], rules: RUb, today: '2026-12-02' });
+    const a4b = L.plan({ rows: rA, duties: [{ no: 611, due_fix: { '2026-12-31': { to: '2026-12-05' } } }], lics: [], tasks: [{ id: 'a4', auto_key: L.taskKey(611, 'L1', '2026-12-31'), status: 'open', del: 1, lic_stage: 'd30', lic_reopen: { day: '2026-12-01', n: 1 } }], rules: RUb, today: '2026-12-02' });
+    o.a4 = a4.reopen.length === 0 && a4b.reopen.length === 1;
+    // B 담당이 손으로 [완료] = 승인 대기 → 단계가 올라도 그대로 · 승인(완료) → 다시 엶(완료·승인 칸 비움)
+    t.status = 'review'; t.done_at = '2026-12-28'; t.done_by = '담당';
+    const b1 = run(rA, dA, tA, '2027-01-04');
+    o.b1 = b1.p.reopen.length === 0 && b1.p.bump.length === 0 && t.status === 'review' && t.lic_stage === 'd7' && Object.keys(b1.a.notify).length === 0;
+    t.status = 'done'; t.approved_by = '승인'; t.approved_at = '2027-01-04'; t.done_src = 'x';
+    const b2 = run(rA, dA, tA, '2027-01-05');
+    o.b2 = b2.a.reopened === 1 && t.status === 'open' && t.done_at === null && t.done_by === null && t.approved_by === null && t.approved_at === null && t.done_src === undefined && t.lic_stage === 'over' && b2.a.bumped === 1;
+    // C 안 여는 때 — 30일 밖(기한 정정) · 배정표 담당 없음(담당 없음으로 셈) · 지운 승인 대기·처음 닫힌 완료(다시 연 적 없음)는 엶
+    const tC = { id: 'c1', auto_key: L.taskKey(611, 'L1', '2026-12-31'), status: 'open', del: 1, lic_stage: 'd30', detail: 'x' };
+    const c1 = L.plan({ rows: rA, duties: [{ no: 611, due_fix: { '2026-12-31': { to: '2027-03-01' } } }], lics: [], tasks: [Object.assign({}, tC)], rules: RUb, today: '2026-12-02' });
+    const c2 = L.plan({ rows: rA, duties: dA, lics: [], tasks: [Object.assign({}, tC)], rules: {}, today: '2026-12-02' });
+    const c3 = L.plan({ rows: rA, duties: dA, lics: [], tasks: [Object.assign({}, tC, { status: 'review' })], rules: RUb, today: '2026-12-02' });
+    const c4 = L.plan({ rows: rA, duties: dA, lics: [], tasks: [Object.assign({}, tC, { del: 0, status: 'done' })], rules: RUb, today: '2026-12-02' });
+    o.c = c1.reopen.length === 0 && c2.reopen.length === 0 && c2.no_who.join() === '611' && c3.reopen.length === 1 && c4.reopen.length === 1;
+    // D 한 번 연 뒤 다시 지운 지시 — 지난 회차 그대로여도 다음 회차가 30일 안에 들어오면(단계 오름) 엶 · 이미 그 단계로 알렸으면 안 엶
+    const rD = [RFb(612, 2, 15)], kD = L.taskKey(612, 'L1', '2026-02-15');
+    const tD = (nx) => [{ id: 'd1', auto_key: kD, status: 'open', del: 1, lic_stage: 'over', lic_reopen: { day: '2027-01-10', n: 1 }, lic_next: nx, detail: 'x' }];
+    const d1 = L.plan({ rows: rD, duties: [{ no: 612 }], lics: [], tasks: tD({}), rules: RUb, today: '2027-01-18' }), d2 = L.plan({ rows: rD, duties: [{ no: 612 }], lics: [], tasks: tD({ '612:2027-02-15': 'd30' }), rules: RUb, today: '2027-01-18' });
+    o.d = d1.reopen.length === 1 && d2.reopen.length === 0;
+    // H 같은 실행에서 담당이 바뀌고 다시 엶 = 새 담당에게 '다시 엶' 한 줄
+    const tH = [{ id: 'h1', auto_key: L.taskKey(611, 'L1', '2026-12-31'), status: 'open', del: 1, who_id: 'u1', who_by: 'assign', lic_stage: 'd30', title: 't', detail: 'x', due: '2026-12-31' }];
+    const pH = L.plan({ rows: rA, duties: dA, lics: [], tasks: tH, rules: { 'lic:': { who_id: 'u2' } }, active: { u1: 1, u2: 1 }, today: '2026-12-02' }); const aH = L.apply(pH, tH, '2026-12-02', { u2: '새담당' }, mk, 1);
+    o.h = aH.reopened === 1 && aH.moved === 1 && tH[0].who_id === 'u2' && JSON.stringify(aH.notify) === JSON.stringify({ u2: ['다시 엶 611행 — 탭에서 [완료+수령 올리기]로 닫아야 끝납니다'] });
+    // E ② 지난 회차(묶음 안)를 닫은 다음 날 생기는 행별 지시 — 묶음 '다음 회차' 줄로 30일 안을 이미 알렸으면 지시만 만들고 알림 0 · 7일 안이 되면 알림 1 · 처음부터 7일 안이면 알림
+    const rE = [RFb(621, 2, 15), RFb(622, 2, 15)], dE = [{ no: 621, runs: [{ due: '2026-02-15', done_at: '2027-01-20' }] }, { no: 622 }];
+    const bunE = () => ({ id: 'e0', auto_key: L.bundleKey('2026-11-19', 1), status: 'open', who_id: 'u1', title: '인허가 지난 기한 2건 정리', detail: '묶음', lic_rows: [{ no: 621, due: '2026-02-15' }, { no: 622, due: '2026-02-15' }], lic_next: { '621:2027-02-15': 'd30', '622:2027-02-15': 'd30' } });
+    const tE = [bunE()];
+    const e1 = run(rE, dE, tE, '2027-01-21');
+    o.e1 = e1.p.create.length === 1 && e1.p.create[0].no === 621 && e1.p.create[0].quiet === true && e1.a.made === 1 && Object.keys(e1.a.notify).length === 0 && tE[1].lic_stage === 'd30';
+    const e2 = run(rE, dE, tE, '2027-02-08');
+    o.e2 = e2.a.bumped === 1 && (e2.a.notify.u1 || []).some((x) => /^인허가 기한 7일 안 — 621\./.test(x));
+    const tE2 = [bunE()]; const e3 = run(rE, dE, tE2, '2027-02-08');
+    o.e3 = e3.p.create.length === 1 && !e3.p.create[0].quiet && (e3.a.notify.u1 || []).some((x) => /621\./.test(x));
+    // F ③ 다음 회차 기록에서 닫힌 회차 걷음 — 지금 회차보다 이른 회차 · 해당 없음 행 · 완료 기록 회차 = 걷음 / 아직 안 닫힌 회차·모르는 행 = 둠 · 다 걷히면 칸 지움
+    const rF = [RFb(631, 2, 15), RFb(632, 3, 31), RFb(633, 6, 30)], dF = [{ no: 631 }, { no: 632, na: { on: true } }, { no: 633, runs: [{ due: '2026-06-30', done_at: '2026-07-01' }] }];
+    const tF = [{ id: 'f1', auto_key: L.taskKey(631, 'L1', '2026-02-15'), status: 'open', who_id: 'u1', who_by: 'assign', title: L.rowTitle(rF[0], 'over'), lic_stage: 'over', due: '2026-02-15', detail: '기한',
+      lic_next: { '631:2025-02-15': 'over', '631:2027-02-15': 'd30', '632:2027-03-31': 'd30', '633:2026-06-30': 'over', '999:2027-01-01': 'd7' } }];
+    const f1 = run(rF, dF, tF, '2027-01-19');
+    o.f1 = JSON.stringify(tF[0].lic_next) === JSON.stringify({ '631:2027-02-15': 'd30', '999:2027-01-01': 'd7' }) && f1.a.next_rise === 0;
+    tF[0].lic_next = { '633:2026-06-30': 'over' }; const f2 = run(rF, dF, tF, '2026-11-20');
+    o.f2 = tF[0].lic_next === undefined && f2.a.changed >= 1;
+    o.ok = Object.keys(o).every((k) => o[k] === true); return o;
+  };
+  // ④ 미래 세기 시작일 무시(_lib/duty.js)
+  const chkFb = (D) => {
+    const F = (m, dd) => ({ auto: true, type: 'fixed', fixed_month: m, fixed_day: dd, base: 'none' });
+    const due = (s, day, d, lic) => { const nx = D.dutyCur(Object.assign({ no: 1 }, d || {}, { sched: s }), lic || null, day); return nx && nx.due ? nx.due : ''; };
+    const cf = (v) => Object.assign({ count_from: v }, F(3, 31));
+    const o = { bg: due(cf('2028-06-01'), '2027-12-31') === '2026-03-31' && due(cf('2028-06-01'), '2028-01-01') === '2026-03-31' && due(cf('2028-06-01'), '2028-06-01') === '2028-03-31',
+      duty: due(F(3, 31), '2028-01-01', { count_from: '2028-06-01' }) === '2026-03-31' && due(F(3, 31), '2028-07-01', { count_from: '2028-06-01' }) === '2028-03-31',
+      lic: due(F(3, 31), '2028-01-01', null, { created: '2028-02-01' }) === '2026-03-31' && due(F(3, 31), '2028-02-01', null, { created: '2028-02-01' }) === '2028-03-31',
+      fn: D.dutyFrom({ count_from: '2028-06-01' }, null, '2027-01-01') === '2026-11-13' && D.dutyFrom({ count_from: '2028-06-01' }, null) === '2028-06-01' && D.dutyFrom({ count_from: '2026-12-01' }, null, '2027-01-01') === '2026-12-01',
+      old: due(F(3, 31), '2026-01-10') === '2026-03-31' && due(cf('2026-12-01'), '2027-03-01') === '2026-03-31' };
+    o.ok = Object.keys(o).every((k) => o[k] === true); return o;
+  };
+  // ⑤ e2e(gw-data) — 서버 시계를 날짜별로 옮겨 가며 실제 ingest·save
+  const snapB = JSON.stringify({ u: mem.gw_users, d: mem.gw_data, f: mem.gw_files || {} });
+  const MAb = { id: 'u20ba', name: '인허가담당b', admin: false, perms: { lic: 'do', tasks: 'do' } };
+  const seedB = (live) => { const s = JSON.parse(snapB); blobsMock.hooks.failGet = null;
+    mem.gw_users = Object.assign(s.u, { 'member:u20ba': MAb, 'device:devb': { status: 'approved' } }); mem.gw_data = s.d; mem.gw_files = s.f;
+    mem.gw_data['bg:lic:law:v1'] = { schema: 1, ver: 'v1-test20b', status: 'promoted', rows: [RFb(711, 12, 31)] };
+    mem.gw_data['col:licenses'] = { schema: 1, items: [{ id: 'L1', name: '시험 허가' }], duties: [{ no: 711, updated_ts: 1 }], updated_at: 9000, updated_by: 'x' };
+    mem.gw_data['settings:assign'] = { schema: 1, rules: { 'lic:': { who_id: 'u20ba' } }, approver_id: '', prev: null, updated_at: 5, updated_by: 'x' };
+    mem.gw_data['col:tasks'] = { schema: 1, items: [], updated_at: 100 };
+    ['settings:autotask', 'it:autotask:dry', 'settings:doneif', 'it:doneif:last', 'col:vehicles'].forEach((k) => { delete mem.gw_data[k]; });
+    Object.keys(mem.gw_data).filter((k) => k.indexOf('ver:') === 0 || k.indexOf('veridx:') === 0).forEach((k) => { delete mem.gw_data[k]; });
+    if (live) mem.gw_data['settings:autotask'] = { schema: 1, rules: { lic_duty: 'live' }, prev: null, updated_at: 7, updated_by: 'uadmin' };
+  };
+  const pushesB = [], sendSaveB = pushMock.sendTo, realNowB = Date.now;
+  const atB = (day) => { const ms = Date.parse(day + 'T08:10:00+09:00'); Date.now = () => ms; };
+  const tasksB = () => mem.gw_data['col:tasks'].items, tB = () => tasksB().find((x) => /:duty:711:/.test(String(x.auto_key || '')));
+  const audB = (n0) => auditMock.logs.slice(n0).map((e) => e.ev && e.ev[0] && e.ev[0].t).join(' | ');
+  const chkEb = async (gw) => {
+    const c = clB(gw), o = {}, I = {};
+    try {
+      seedB(true); pushesB.length = 0;
+      const ing = () => c({ action: 'autotask_ingest', key: 'test-ingest-key', items: [], only: 'lic_duty' });
+      const save = (fn, mbr) => { const sv = JSON.parse(JSON.stringify(mem.gw_data['col:tasks'])); sv.items.forEach(fn); return c({ action: 'save', collection: 'tasks', base: mem.gw_data['col:tasks'].updated_at, doc: sv }, issueSession(mbr || MAb).token, 'devb'); };
+      atB('2026-12-01'); const e0 = await ing();
+      o.e0 = e0.code === 200 && e0.body.lic.made === 1 && pushesB.length === 1 && !!tB() && tB().lic_stage === 'd30';
+      // 담당이 지움(+ 다시 연 기록 칸을 앞질러 적어 다시 열림을 막으려 함) → 서버 값만(없음)
+      const id = tB().id;
+      const s1 = await save((x) => { if (x.id === id) { x.del = 1; x.updated = '2026-12-01'; x.updated_ts = Date.now(); x.lic_reopen = { day: '2026-12-02', n: 9 }; } });
+      o.s1 = s1.code === 200 && tB().del === 1 && tB().lic_reopen === undefined;
+      atB('2026-12-02'); const n1 = auditMock.logs.length; const e1 = await ing();
+      o.e1 = e1.body.lic.reopened === 1 && tB().del === 0 && tB().status === 'open' && tB().lic_reopen.day === '2026-12-02' && tB().updated_ts === Date.now() && /다시 열림/.test(tB().detail)
+        && pushesB.length === 2 && JSON.stringify(pushesB[1].ids) === '["u20ba"]' && /^다시 엶 711행/.test(pushesB[1].p.body) && /다시 엶 1/.test(audB(n1));
+      // 다시 지우고 다시 연 기록 칸을 옛 날로 바꿔 보냄 → 서버 값 그대로 · 같은 날 다시 = 0 · 다음 날 같은 단계 = 0
+      const s2 = await save((x) => { if (x.id === id) { x.del = 1; x.updated_ts = Date.now() + 1; x.lic_reopen = { day: '1999-01-01', n: 0 }; } });
+      const e2 = await ing(); atB('2026-12-03'); const e3 = await ing();
+      o.e2 = s2.code === 200 && tB().lic_reopen.day === '2026-12-02' && e2.body.lic.reopened === 0 && e3.body.lic.reopened === 0 && tB().del === 1 && pushesB.length === 2;
+      // 7일 안 = 다시 엶 + 단계 올림(알림 1)
+      atB('2026-12-24'); const e4 = await ing();
+      o.e4 = e4.body.lic.reopened === 1 && e4.body.lic.bumped === 1 && tB().lic_stage === 'd7' && tB().del === 0 && pushesB.length === 3;
+      // 담당이 손으로 [완료] → 승인 대기 = 지남이 돼도 그대로 · 승인 → 다음 실행 다시 엶
+      const s3 = await save((x) => { if (x.id === id) { x.status = 'review'; x.done_at = '2026-12-28'; x.done_by = '인허가담당b'; x.updated = '2026-12-28'; } });
+      atB('2027-01-04'); const e5 = await ing();
+      o.e5 = s3.code === 200 && e5.body.lic.reopened === 0 && tB().status === 'review' && tB().lic_stage === 'd7' && pushesB.length === 3;
+      const s4 = await save((x) => { if (x.id === id) { x.status = 'done'; x.approved_by = '관리자'; x.approved_at = '2027-01-04'; } }, ADMIN);
+      atB('2027-01-05'); const e6 = await ing();
+      o.e6 = s4.code === 200 && e6.body.lic.reopened === 1 && tB().status === 'open' && tB().approved_by === null && tB().done_at === null && tB().lic_stage === 'over' && pushesB.length === 4;
+      // 담당 퇴사(명부에서 빠짐) = 열린 지시 담당 비움·알림 0 · 실행 요약(감사 '정기업무' 줄·응답)에 '담당 없음 1행' — 다음 날도
+      delete mem.gw_users['member:u20ba'];
+      atB('2027-01-06'); const n7 = auditMock.logs.length; const e7 = await ing(); const a7 = audB(n7);
+      atB('2027-01-07'); const n8 = auditMock.logs.length; const e8 = await ing(); const a8 = audB(n8);
+      o.e7 = e7.body.lic.moved === 1 && e7.body.lic.no_who === 1 && tB().who_id === '' && /담당 없음 1행/.test(a7) && e8.body.lic.no_who === 1 && /담당 없음 1행/.test(a8) && pushesB.length === 4;
+      I.E = [e0.body.lic, e1.body.lic, e2.body.lic, e4.body.lic, e5.body.lic, e6.body.lic, e7.body.lic, a7];
+      // 연습(스위치 없음) = 지운 지시가 있어도 손대지 않음·알림 0
+      seedB(false); pushesB.length = 0;
+      mem.gw_data['col:tasks'].items.push({ id: 'tz', auto_key: 'lic:L1:duty:711:2026-12-31', status: 'open', del: 1, lic_stage: 'd30', title: 'x', detail: 'x' });
+      const before = JSON.stringify(mem.gw_data['col:tasks'].items);
+      atB('2026-12-02'); const d1 = await ing();
+      o.dry = d1.code === 200 && d1.body.lic === undefined && JSON.stringify(mem.gw_data['col:tasks'].items) === before && pushesB.length === 0;
+    } catch (e) { o.err = String((e && e.message) || e).slice(0, 160); }
+    finally { Date.now = realNowB; blobsMock.hooks.failGet = null; }
+    o.ok = ['e0', 's1', 'e1', 'e2', 'e4', 'e5', 'e6', 'e7', 'dry'].every((k) => o[k] === true);
+    return { o, I };
+  };
+  try {
+    pushMock.sendTo = async (ids, p) => { pushesB.push({ ids: ids.slice(), p: p }); return { sent: ids.length, removed: 0 }; };
+    const LDb = require(LDPb), R0b = chkRb(LDb);
+    T('P1 판20b ①②③ 다시 엶·이어받기·걷음(_lib/licduty): 지운 지금 회차 지시 = 다음 실행 다시 엶(del 0·open·updated_ts·안내 글·알림 "다시 엶 n행 — 탭에서 [완료+수령 올리기]로 닫아야 끝납니다" 1줄) · 열린 동안 0 · 같은 날 다시 지움 0(정정으로 단계가 올라도 그날은 0) · 다음 날 같은 단계 0 · 7일 안 = 다시 엶+단계 올림 한 줄 · 승인 대기 = 그대로(지남이 돼도) · 승인 = 다시 엶(완료·승인 칸 비움) · 30일 밖·담당 없음 = 안 엶(담당 없음으로 셈) · 지운 승인 대기·처음 닫힌 완료 = 엶 · 다음 회차가 30일 안에 들어오면 엶(이미 알린 단계면 안 엶) · 같은 실행 담당 바뀜 = 새 담당에게 다시 엶 줄 · 닫은 회차 다음 날 행별 지시 = 이미 알린 단계면 알림 0·7일 안 1·처음부터 7일 안 1 · 닫힌 회차 기록 걷음·다 걷히면 칸 지움',
+      R0b.ok, JSON.stringify(R0b));
+    const MRb = [["  if (t.del !== 1 && t.status === 'review') return false;\n", ''], ["  if (ro && ro.day === today) return false;\n", ''], ["  if (!ro) return true;\n", ''],
+      ["  if (STAGE_RANK[s.stage] > (STAGE_RANK[t.lic_stage] || 0)) return true;\n", ''], ['  return aheadItems.some(', '  return false && aheadItems.some('],
+      ['        if (!reopenNeed(have, s, aheadOf(s), today)) return;', '        return;'], ["  if (s.stage === 'later') return false;\n", ''],
+      ['    if (seen && STAGE_RANK[seen] >= STAGE_RANK[s.stage]) out.create', '    if (false) out.create'], ['    Object.keys(nx).forEach(function (k) { if (nextClosed(p.cur, k)) delete nx[k]; });\n', ''],
+      ['    if (!Object.keys(nx).length && t.lic_next !== undefined) { delete t.lic_next; ch = true; }\n', ''], ['  return !!(c.na || c.runs[m[2]] || (c.orig && m[2] < c.orig));', '  return !!(c.na || c.runs[m[2]]);'],
+      ["    t.status = 'open'; if (t.del === 1) t.del = 0;", "    t.status = 'open';"], ['  Object.keys(reo).forEach(function (id) { const t = byId[id]; note(', '  Object.keys(reo).forEach(function (id) { const t = byId[id]; if (0) note('],
+      ['        if (!target(s.no, r.lic_id)) { out.no_who.push(s.no); return; }\n', ''], ['const seen = p.seen || {}, loud = !c.quiet ||', 'const seen = p.seen || {}, loud = true ||'],
+      ['    t.done_at = null; t.done_by = null; t.approved_by = null; t.approved_at = null; delete t.done_src;\n', ''], ['    if (!hasOwn(reo, t.id)) note(m.to,', '    note(m.to,']];
+    const kRb = MRb.map(([a, b]) => { try { return chkRb(compB(LDPb, mutB(SRCb.ld, a, b))).ok; } catch (e) { return 'err ' + e.message; } });
+    T('P1 판20b ①②③ 결함 사본 ' + MRb.length + '개(승인 대기도 엶 · 같은 날 또 엶 · 첫 다시 엶 없음 · 단계 오름 안 봄 · 다음 회차 오름 안 봄 · 다시 엶 걷음(종전) · 30일 밖도 엶 · 이어받기 없음 · 걷음 없음 · 빈 칸 남김 · 이른 회차 안 걷음 · 지움 표시 그대로 · 다시 엶 알림 없음 · 담당 없이 엶 · 이어받아도 알림 · 완료 칸 그대로 · 옮김 줄이 다시 엶 줄을 가림) = 모두 ✗',
+      kRb.every((v) => v === false), JSON.stringify(kRb));
+    const F0b = chkFb(require(DYPb));
+    T('P1 판20b ④ 미래 세기 시작일 무시(_lib/duty.js — 앱 DUTY_SHARED 같은 본문): 근거 표 행·의무 대장 행 count_from·허가증 등록일이 오늘보다 늦으면 고정 날짜(DUTY_FROM)로 — 2027-12-31·2028-01-01 모두 같은 지난 회차(해 넘김으로 사라지지 않음) · 그날이 오면 그 값부터(2028-03-31) · 지난 값은 종전대로 · DUTY_FROM 전 날짜 종전 그대로',
+      F0b.ok, JSON.stringify(F0b));
+    const MFb = [['  if (dutyFrom(d, lic) > today){ lim = dutyFrom(d, lic, today); if (today < lim) lim = today; }\n', ''], ['if (today && x > today) x = ""; ', '']];
+    const kFb = MFb.map(([a, b]) => { try { return chkFb(compB(DYPb, mutB(SRCb.dy, a, b))).ok; } catch (e) { return 'err ' + e.message; } });
+    T('P1 판20b ④ 결함 사본 ' + MFb.length + '개(미래 값 다시 세기 걷음 · 미래 값 거르기 걷음) = 모두 ✗', kFb.every((v) => v === false), JSON.stringify(kFb));
+    const E0b = await chkEb(gwd);
+    T('P1 판20b ⑤ e2e(gw-data · 서버 시계 12/1~1/7): 켬 → 30일 안 지시 1·알림 1 · 담당이 지움(+ 다시 연 기록 칸 위조) = 서버 값만 · 다음 날 다시 엶(알림 1 "다시 엶 711행"·updated_ts = 서버 시각·감사 "다시 엶 1") · 다시 지움 + 칸 위조 = 서버 값 · 같은 날·다음 날 0 · 7일 안 = 다시 엶 + 단계 올림 알림 1 · 손으로 [완료] 승인 대기 = 지남이 돼도 그대로 · 승인 = 다음 실행 다시 엶(승인 칸 비움) · 담당 퇴사 = 담당 비움·알림 0·감사 줄 "담당 없음 1행"(이틀 다) · 연습 = 지운 지시 그대로·알림 0',
+      E0b.o.ok, JSON.stringify(E0b.o.ok ? E0b.o : E0b));
+    const MGb = [['if (o && LD.isDutyKey(o.auto_key) && o.lic_reopen !== undefined) t.lic_reopen = o.lic_reopen; else delete t.lic_reopen;', ''],
+      ["return 't' + crypto.randomBytes(6).toString('hex'); }, Date.now());", "return 't' + crypto.randomBytes(6).toString('hex'); });"], ["(lic.reopened ? ' · 다시 엶 ' + lic.reopened : '')", "''"]];
+    const kGb = [];
+    for (const [a, b] of MGb) { let v; try { v = (await chkEb(compB(GWPb, mutB(SRCb.gw, a, b)))).o.ok; } catch (e) { v = 'err ' + e.message; } kGb.push(v); }
+    T('P1 판20b ⑤ 결함 사본 ' + MGb.length + '개(다시 연 기록 칸 클라이언트 값 허용 · 다시 연 시각 안 찍음 · 감사 줄에 다시 엶 빠짐) = 모두 ✗', kGb.every((v) => v === false), JSON.stringify(kGb));
+  } catch (e) { T('P1 판20b 검사 실행', false, String(e && e.stack || e).slice(0, 500)); }
+  finally { pushMock.sendTo = sendSaveB; Date.now = realNowB; const s = JSON.parse(snapB); mem.gw_users = s.u; mem.gw_data = s.d; mem.gw_files = s.f; blobsMock.hooks.failGet = null; }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

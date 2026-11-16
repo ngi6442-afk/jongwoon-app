@@ -16182,5 +16182,68 @@ try {
     r483.ok && M483.every((v) => v === false), JSON.stringify({ r: r483.info, mut: M483 }));
 } catch (e) { console.log('  (v483 검사 생략 — ' + e.message + ')'); fails++; }
 
+try {   // ---- P1 판20b 인허가 기한 지시 — 탭 '다음 회차' 단계 = 지시 단계(원장 C187 ② 검사 공백: 서버 쪽 다음 회차 단계를 하루 어긋나게 바꾼 변이를 못 잡던 것)
+  //   앱 @lic-month 구간 lmGroups(작은 상자 — 단계는 상자 안 앱 dutyStage)와 서버 _lib/licduty를 같은 입력(표본 2벌 × 2026-11-13부터 414일)으로 날짜별 대조:
+  //   ① 서버 판정의 다음 회차 단계(states ahead[].stage) = 탭 다음 회차(due·days)에 앱 dutyStage ② 날마다 plan·apply를 되풀이한 지시 — 열린 지시(행별·묶음)의 단계(lic_stage)·기한 = 탭 묶음·기한, 다음 회차 기록(lic_next) = 탭 다음 회차 단계.
+  //   결함 사본(서버 다음 회차 단계를 하루 어긋나게 · 지시에 적는 다음 회차 단계를 고정) = 깨짐.
+  const reqB = createRequire(import.meta.url), ModB = reqB('module');
+  const oneB = (src, a, b) => { const i = src.indexOf(a), j = src.indexOf(b); if (i < 0 || j < i || src.indexOf(a, i + 1) >= 0) throw new Error(a + ' 구간 없음·둘'); return src.slice(i, j); };
+  const fnB = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0 || src.indexOf('function ' + name + '(', i + 1) >= 0) throw new Error('함수 없음·둘: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('함수 끝 없음: ' + name); };
+  const blkB = oneB(html, '// @lic-month-start', '// @lic-month-end');
+  const shB = oneB(html, '// ==== DUTY_SHARED_BEGIN ====', '// ==== DUTY_SHARED_END ====') + '// ==== DUTY_SHARED_END ====';
+  const LDFb = join(ROOT, 'netlify', 'functions', '_lib', 'licduty.js'), LDSb = readFileSync(LDFb, 'utf8');
+  const compB = (src) => { const m = new ModB(LDFb); m.filename = LDFb; m.paths = ModB._nodeModulePaths(dirname(LDFb)); m._compile(src, LDFb); return m.exports; };
+  const mutB = (src, a, b) => { if (src.split(a).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + a.slice(0, 60)); return src.replace(a, () => b); };
+  const FXb = JSON.parse(readFileSync(join(ROOT, 'tools', 'lic_month_fixture.json'), 'utf8')), SEEDb = JSON.parse(readFileSync(join(ROOT, 'data', 'duties_seed.json'), 'utf8')).items;
+  const licsB = [{ id: 'lseed07', name: '화물', issued: FXb.issued.lseed07 }];
+  const mkTabB = (duties) => {   // 앱 lmGroups + 앱 dutyStage(같은 상자)
+    const pre = [fnB(html, 'esc'), fnB(html, 'isDate'), fnB(html, 'findDuty'), fnB(html, 'liveDuties'), shB, 'var duties = ENV.duties, licenses = ENV.licenses;',
+      'function myId(){ return "u1"; } function isAdmin(){ return true; } function todayStr(){ return ENV.today; } function gwCall(){ throw new Error("서버 부르면 안 됨"); }'].join('\n');
+    const ENV = { duties, licenses: licsB, rows: JSON.parse(JSON.stringify(FXb.rows)), today: '' };
+    const api = new Function('ENV', 'document', pre + '\n' + blkB + '\nlicMonth.rows = ENV.rows; return { groups: function(d){ ENV.today = d; return lmGroups(d); }, stage: dutyStage };')(ENV, { getElementById: () => null });
+    return (today) => { const g = api.groups(today), out = {}; Object.keys(g).forEach((k) => g[k].forEach((it) => { out[it.r.no] = { g: k, due: it.nx && it.nx.due ? it.nx.due : '', orig: it.nx && it.nx.orig ? it.nx.orig : '', lic_id: it.r.lic_id,
+      ahead: ((it.nx && it.nx.ahead) || []).map((a) => ({ due: a.due, stage: api.stage(a) })) }; })); return out; };
+  };
+  const dutiesB2 = () => { const d = JSON.parse(JSON.stringify(SEEDb)), f = (no) => d.find((x) => x.no === no);
+    f(37).runs = [{ due: '2026-02-28', done_at: '2026-11-10', ref: 'A-1' }]; f(44).due_fix = { '2026-02-15': { to: '2026-12-20', reason: '공고 연장' } }; f(2).na = { on: true, reason: '해당 없음' };
+    f(22).base_date = '2026-06-01'; f(16).base_date = '2025-01-10'; f(1).runs = [{ due: '2025-06-22', done_at: '2025-06-01' }]; return d; };
+  const setsB = [JSON.parse(JSON.stringify(SEEDb)), dutiesB2()];
+  const daysB = []; for (let k = 0; k < 414; k++) daysB.push(new Date(Date.UTC(2026, 10, 13 + k)).toISOString().slice(0, 10));
+  const tabsB = setsB.map((du) => { const f = mkTabB(JSON.parse(JSON.stringify(du))); const o = {}; daysB.forEach((d) => { o[d] = f(d); }); return o; });
+  const cmpB = (L) => {
+    const bad = []; let aheadN = 0, taskN = 0, nextN = 0;
+    setsB.forEach((du, si) => {
+      const tk = []; let n = 0; const mk = () => 'b' + (++n);
+      daysB.forEach((day) => {
+        const tab = tabsB[si][day], rows = JSON.parse(JSON.stringify(FXb.rows)), duties = JSON.parse(JSON.stringify(du));
+        const st = {}; L.states(rows, duties, licsB, day).forEach((s) => { st[s.no] = s; });
+        const p = L.plan({ rows, duties, lics: licsB, tasks: tk, rules: { 'lic:': { who_id: 'u1' } }, names: {}, today: day }); L.apply(p, tk, day, {}, mk);
+        const openish = (t) => t && t.del !== 1 && (t.status === 'open' || t.status === 'hold');
+        Object.keys(tab).forEach((no) => {
+          const x = tab[no], y = st[no];
+          const sa = JSON.stringify(x.ahead), sb = JSON.stringify(((y && y.ahead) || []).map((a) => ({ due: a.due, stage: a.stage })));
+          if (sa !== sb) { bad.push(si + ':' + day + ':' + no + ' 다음 회차 탭 ' + sa + ' / 서버 ' + sb); return; }
+          if (x.ahead.length) aheadN++;
+          if (!(x.g === 'over' || x.g === 'd7' || x.g === 'd30')) return;
+          const t = tk.find((q) => q.auto_key === L.taskKey(Number(no), x.lic_id, x.orig));
+          const b = tk.find((q) => q.lic_rows && openish(q) && q.lic_rows.some((r) => r.no === Number(no) && r.due === x.orig));
+          const h = (t && openish(t)) ? t : b;
+          if (!h) { bad.push(si + ':' + day + ':' + no + ' 열린 지시 없음 ' + x.g); return; }
+          if (h === t) { taskN++; if (t.lic_stage !== x.g || t.due !== x.due) bad.push(si + ':' + day + ':' + no + ' 지시 단계·기한 ' + t.lic_stage + ' ' + t.due + ' / 탭 ' + x.g + ' ' + x.due); }
+          x.ahead.forEach((a) => { nextN++; const v = h.lic_next && h.lic_next[no + ':' + a.due]; if (v !== a.stage) bad.push(si + ':' + day + ':' + no + ' 지시 다음 회차 ' + a.due + ' ' + v + ' / 탭 ' + a.stage); });
+        });
+      });
+    });
+    return { bad, aheadN, taskN, nextN };
+  };
+  const CB = cmpB(reqB(LDFb));
+  T('P1 판20b 탭 다음 회차 단계 = 지시 단계: 앱 이번 달 탭(lmGroups·앱 dutyStage)과 서버 판정(_lib/licduty states)의 다음 회차 기한·단계 · 날마다 plan·apply로 쌓은 지시의 단계·기한·다음 회차 기록이 표본 2벌 × 414일 동안 한 번도 다르지 않음(다음 회차 대조 ' + CB.aheadN + ' · 행별 지시 대조 ' + CB.taskN + ' · 지시 다음 회차 대조 ' + CB.nextN + ')',
+    CB.bad.length === 0 && CB.aheadN > 0 && CB.taskN > 0 && CB.nextN > 0, JSON.stringify(CB.bad.slice(0, 5)));
+  const MCB = [['stage: DUTY.dutyStage(a) };', 'stage: DUTY.dutyStage({ due: a.due, days: a.days - 1 }) };'], ['{ return { no: s.no, due: a.due, stage: a.stage }; }', "{ return { no: s.no, due: a.due, stage: 'd30' }; }"],
+    ['  return { no: no, stage: DUTY.dutyStage(nx) || \'later\', due: nx.due,', "  return { no: no, stage: DUTY.dutyStage({ due: nx.due, days: nx.days - 1 }) || 'later', due: nx.due,"]];
+  const kCB = MCB.map(([a, b]) => { try { return cmpB(compB(mutB(LDSb, a, b))).bad.length === 0; } catch (e) { return 'err ' + e.message; } });
+  T('P1 판20b 결함 사본 ' + MCB.length + '개(서버 다음 회차 단계를 하루 어긋나게 · 지시에 적는 다음 회차 단계 고정 · 지금 회차 단계를 하루 어긋나게) = 모두 ✗', kCB.every((v) => v === false), JSON.stringify(kCB));
+} catch (e) { console.log('  (P1 판20b 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

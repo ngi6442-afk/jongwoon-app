@@ -75,6 +75,27 @@ function bundleDetail(list) {
     "인허가 탭 '이번 달'의 '지남' 묶음에서 행마다 [완료+수령 올리기]·[기한 정정]·[해당 없음]으로 정리하면, 모두 정리됐을 때 이 지시가 승인 대기로 넘어갑니다. 이 지시가 열려 있는 동안 이 건들은 따로 지시가 오지 않습니다.").slice(0, 500);
 }
 function openish(t) { return !!(t && t.del !== 1 && (t.status === 'open' || t.status === 'hold')); }
+// 판20b(원장 C187 ②) 다시 엶: 이번 달 탭에 그 회차 완료·해당 없음 기록이 없는데 지시만 닫히거나(완료 승인) 지워졌으면 다음 실행에서 그 지시를 다시 연다.
+//   지금 회차 지시가 닫힌 채면 그 행은 단계 오름·다음 회차 알림이 붙을 곳이 없어 조용해진다(탭은 계속 '지남') — 지시를 지우는 것 자체는 막지 않는다.
+//   안 여는 때: 승인 대기(담당이 손으로 [완료] → 승인권자 대기) · 30일 밖 · 같은 날 이미 엶 · 한 번 연 뒤 다시 닫혔는데 단계(지금 회차·다음 회차)가 오르지 않음.
+function reopenNeed(t, s, aheadItems, today) {
+  if (t.del !== 1 && t.status === 'review') return false;
+  if (s.stage === 'later') return false;
+  const ro = (t.lic_reopen && typeof t.lic_reopen === 'object') ? t.lic_reopen : null;
+  if (ro && ro.day === today) return false;
+  if (!ro) return true;
+  if (STAGE_RANK[s.stage] > (STAGE_RANK[t.lic_stage] || 0)) return true;
+  const nx = (t.lic_next && typeof t.lic_next === 'object') ? t.lic_next : {};
+  return aheadItems.some(function (x) { return STAGE_RANK[x.stage] > (STAGE_RANK[nx[x.no + ':' + x.due]] || 0); });
+}
+function reopenTxt(day) { const p = DUTY.dutyParse(day); return '(' + (p ? p.m + '/' + p.d : day) + ' 다시 열림 — 이번 달 탭에 이 회차 완료 기록이 없어 지시만 닫을 수 없습니다. 탭에서 [완료+수령 올리기]나 [해당 없음]으로 닫아야 끝납니다.)'; }
+const REOPEN_RE = / ?\(\d{1,2}\/\d{1,2} 다시 열림 — [^)]*\)/g;
+// 판20b: 지시의 다음 회차 기록(lic_next '행:기한')이 닫힌 회차인지 — 그 행이 해당 없음 · 그 회차 완료 기록 있음 · 그 행 지금 회차보다 이른 회차(cur = plan이 낸 행별 지금 회차·완료 회차)
+function nextClosed(cur, k) {
+  const m = /^(\d{1,4}):(\d{4}-\d{2}-\d{2})$/.exec(String(k)); if (!m || !cur) return false;
+  const c = cur[m[1]]; if (!c) return false;
+  return !!(c.na || c.runs[m[2]] || (c.orig && m[2] < c.orig));
+}
 
 // 계획 — input {rows(licBgOut 꼴), duties, lics, tasks, rules(배정표), names(id→이름), active(재직 id 표 — 있으면 그 밖 담당 = 담당 없음), today}. 저장·알림 없음.
 // 반환 {today, first, states, create[{key,no,stage,who_id,title,detail,due,orig}], bump[{id,no,from,to,rise,due,title}], move[{id,no,from,to}], bundles[{key,who_id,title,detail,rows[{no,due}]}], no_who[no], base[no], na[no], later[no]}
@@ -83,18 +104,20 @@ function plan(input) {
   const tasks = Array.isArray(input.tasks) ? input.tasks : [], act = input.active && typeof input.active === 'object' ? input.active : null;
   const okWho = function (id) { return !!id && id !== '__all__' && (!act || hasOwn(act, id)); };
   const target = function (no, licId) { const a = assignFor(dutyKey(no, licId), rules); return a && okWho(a.who_id) ? a.who_id : ''; };   // 배정표 그 행 담당(재직자만)
-  const byKey = {}, covered = {}, openBundles = [];
+  const byKey = {}, covered = {}, openBundles = [], seenNext = {};
   let first = true;
   tasks.forEach(function (t) {
     if (!t || typeof t.auto_key !== 'string') return;
     const p = parse(t.auto_key); if (!p) return;
     first = false;   // 지운 것·완료 포함 — 한 번이라도 인허가 기한 지시가 있었으면 첫 실행 아님
+    // 판20b: 어느 지시(닫힌 것·지운 것 포함)든 '다음 회차' 줄로 이미 알린 단계 — 그 회차가 지금 회차가 되어 행별 지시가 생길 때 같은 단계 알림을 또 보내지 않게
+    if (t.lic_next && typeof t.lic_next === 'object') Object.keys(t.lic_next).forEach(function (k) { const v = t.lic_next[k]; if (hasOwn(STAGE_RANK, v) && STAGE_RANK[v] > (STAGE_RANK[seenNext[k]] || 0)) seenNext[k] = v; });
     if (!p.bundle) { if (!byKey[t.auto_key]) byKey[t.auto_key] = t; return; }
     if (t.del === 1 || t.status === 'done') return;   // 묶음이 닫혔으면(사람이 완료·삭제) 남은 행은 행별 지시로
     if (openish(t)) openBundles.push(t);
     (Array.isArray(t.lic_rows) ? t.lic_rows : []).forEach(function (x) { if (x && x.no != null && x.due) covered[x.no + ':' + x.due] = t; });
   });
-  const out = { today: today, first: first, states: [], create: [], bump: [], move: [], bundles: [], ahead: [], no_who: [], base: [], na: [], later: [] };
+  const out = { today: today, first: first, states: [], create: [], bump: [], move: [], bundles: [], ahead: [], no_who: [], base: [], na: [], later: [], reopen: [], cur: {}, seen: seenNext };
   const aheadOf = function (s) { return s.stage === 'over' ? s.ahead.map(function (a) { return { no: s.no, due: a.due, stage: a.stage }; }) : []; };
   // 열린 지시의 담당 따라가기(판20 검토 B2): 배정표 담당이 바뀌면 새 담당으로 · 담당이 재직자가 아니고 배정표에도 재직 담당이 없으면 비움('담당 없음').
   //   사람이 지시 창에서 바꾼 담당(who_by 'edit')·[내 것 아님]으로 빠진 같은 사람에게는 되돌리지 않는다(종전 배정 채움과 같은 원칙).
@@ -116,11 +139,18 @@ function plan(input) {
     const s = rowState(r, findDuty(input.duties, r.no), licOf(input.lics, r.lic_id), today);
     if (!s) return;
     out.states.push(s);
+    // 판20b: 행별 지금 회차·완료 회차 — apply가 지시의 다음 회차 기록(lic_next)에서 닫힌 회차를 걷을 때 씀
+    out.cur[s.no] = { na: s.stage === 'na', orig: s.orig, runs: DUTY.dutyDoneSet(findDuty(input.duties, r.no)) };
     if (s.stage === 'na') { out.na.push(s.no); return; }
     if (s.stage === 'base') { out.base.push(s.no); return; }
     const key = taskKey(s.no, r.lic_id, s.orig), have = byKey[key];
     if (have) {
-      if (!openish(have)) return;   // 승인 대기·완료·삭제 = 손대지 않음
+      if (!openish(have)) {
+        // 판20b: 탭 기록 없이 닫히거나 지워진 지금 회차 지시 = 다시 엶(reopenNeed) · 그 밖(승인 대기 등)은 손대지 않음
+        if (!reopenNeed(have, s, aheadOf(s), today)) return;
+        if (!target(s.no, r.lic_id)) { out.no_who.push(s.no); return; }
+        out.reopen.push({ id: have.id, no: s.no, stage: s.stage });
+      }
       const from = have.lic_stage && STAGE_RANK[have.lic_stage] ? have.lic_stage : 'd30';
       const to = s.stage === 'later' ? from : s.stage;   // 기한 정정으로 30일 밖이 되면 단계는 그대로(다시 오를 때 알림 1)·제목은 '30일 밖'·기한은 따라감
       const ti = rowTitle(r, s.stage === 'later' ? 'later' : to);
@@ -142,6 +172,9 @@ function plan(input) {
       return;
     }
     out.create.push({ key: key, no: s.no, stage: s.stage, who_id: tw, title: rowTitle(r, s.stage), detail: rowDetail(r, s), due: s.due, orig: s.orig, ahead: aheadOf(s) });
+    // 판20b: 이 회차가 '다음 회차' 줄로 이미 같은 단계(이상) 알림을 받았으면 지시는 만들되 알림은 다시 안 보냄(단계 기록 이어받음)
+    const seen = seenNext[s.no + ':' + s.orig];
+    if (seen && STAGE_RANK[seen] >= STAGE_RANK[s.stage]) out.create[out.create.length - 1].quiet = true;
   });
   whoOrder.forEach(function (w, i) {
     const list = overBy[w];
@@ -154,18 +187,22 @@ function plan(input) {
 
 // 적용 — tasks 배열에 넣고 고친다. mkId() = 새 지시 id. 반환 {made, bundled, bumped, redated, moved, changed, ids(새로 만든 id), notify{who_id:[제목]}}
 //   알림 줄 = 새 지시(묶음·행별) · 새 담당으로 옮긴 지시 · 단계가 오른 지시(옮긴 뒤의 담당에게) — 같은 지시는 한 줄.
-function apply(p, tasks, today, names, mkId) {
-  const res = { made: 0, bundled: 0, bumped: 0, redated: 0, moved: 0, changed: 0, next_rise: 0, next: [], ids: [], notify: {} };
+//   판20b: nowMs(선택) = 다시 연 지시의 updated_ts(앱 병합이 직원의 지운 사본보다 이 열림을 늦은 것으로 보게) · 다시 연 지시 = res.reopened·알림 줄 '다시 엶 n행 — …'
+function apply(p, tasks, today, names, mkId, nowMs) {
+  const res = { made: 0, bundled: 0, bumped: 0, redated: 0, moved: 0, changed: 0, next_rise: 0, next: [], ids: [], notify: {}, reopened: 0 };
   const nm = names || {}, noted = {};
   const note = function (who, id, line) { if (!who || who === '__all__' || noted[id]) return; noted[id] = 1; (res.notify[who] = res.notify[who] || []).push(line); };
   // 판20 재검토 1: 지시의 '다음 회차' 칸(lic_next {'행:기한': 단계} — 서버만 씀)·글 끝 한 줄을 맞추고, 단계가 오른 것이 있으면 true(같은 단계로 다시 안 보냄 — 기록은 지우지 않음)
   const setNext = function (t, items) {
     const nx = Object.assign({}, (t.lic_next && typeof t.lic_next === 'object') ? t.lic_next : {});
+    // 판20b: 닫힌 회차(완료 기록·해당 없음·그 행 지금 회차보다 이른 회차)의 기록은 걷음 — 칸이 끝없이 쌓이지 않게
+    Object.keys(nx).forEach(function (k) { if (nextClosed(p.cur, k)) delete nx[k]; });
     let rise = false;
     items.forEach(function (x) { const k = x.no + ':' + x.due, prev = nx[k]; if (prev !== x.stage) { if (STAGE_RANK[x.stage] > (STAGE_RANK[prev] || 0)) { rise = true; res.next.push({ no: x.no, due: x.due, stage: x.stage }); } nx[k] = x.stage; } });
     const base = String(t.detail || '').split(NEXT_SEP)[0], line = aheadLine(items), det = (line ? base + NEXT_SEP + line : base).slice(0, 900);
     let ch = false;
     if (Object.keys(nx).length && JSON.stringify(nx) !== JSON.stringify(t.lic_next || {})) { t.lic_next = nx; ch = true; }
+    if (!Object.keys(nx).length && t.lic_next !== undefined) { delete t.lic_next; ch = true; }
     if (det !== t.detail) { t.detail = det; ch = true; }
     return { rise: rise, ch: ch, line: line };
   };
@@ -174,12 +211,27 @@ function apply(p, tasks, today, names, mkId) {
       from: '자동', from_id: '', by: '자동', due: due || '', status: 'open', done_at: null, done_by: null, auto_key: key, created: today, updated: today };
   };
   const byId = {}; tasks.forEach(function (t) { if (t && t.id) byId[t.id] = t; });
+  // 판20b: 다시 엶 — 옮김·단계 오름·다음 회차보다 먼저(그 셋이 열린 지시로 보게). 알림 줄은 옮긴 뒤의 담당에게(아래)
+  const reo = {};
+  (p.reopen || []).forEach(function (o) {
+    const t = byId[o.id]; if (!t || openish(t)) return;
+    t.status = 'open'; if (t.del === 1) t.del = 0;
+    t.done_at = null; t.done_by = null; t.approved_by = null; t.approved_at = null; delete t.done_src;
+    const ro = (t.lic_reopen && typeof t.lic_reopen === 'object') ? t.lic_reopen : {};
+    t.lic_reopen = { day: today, n: (Number(ro.n) || 0) + 1 };
+    const parts = String(t.detail || '').split(NEXT_SEP), b0 = parts[0].replace(REOPEN_RE, '');
+    parts[0] = b0 + ' ' + reopenTxt(today);
+    t.detail = parts.join(NEXT_SEP).slice(0, 900);
+    t.updated = today; if (typeof nowMs === 'number') t.updated_ts = nowMs;
+    reo[t.id] = o.no; res.reopened++; res.changed++;
+  });
   p.move.forEach(function (m) {
     const t = byId[m.id]; if (!openish(t)) return;
     t.who_id = m.to; t.who = m.to ? (nm[m.to] || '') : ''; if (m.to) t.who_by = 'assign';
     t.updated = today; res.moved++; res.changed++;
-    note(m.to, t.id, t.title + (t.due ? ' ~' + t.due : ''));
+    if (!hasOwn(reo, t.id)) note(m.to, t.id, t.title + (t.due ? ' ~' + t.due : ''));
   });
+  Object.keys(reo).forEach(function (id) { const t = byId[id]; note(t.who_id, id, '다시 엶 ' + reo[id] + '행 — 탭에서 [완료+수령 올리기]로 닫아야 끝납니다'); });
   p.bump.forEach(function (b) {
     const t = byId[b.id]; if (!openish(t)) return;
     if (t.due !== b.due) { t.due = b.due; res.redated++; }
@@ -207,7 +259,10 @@ function apply(p, tasks, today, names, mkId) {
     const t = base(c.key, c.who_id, c.title, c.detail, c.due);
     t.lic_stage = c.stage;
     if ((c.ahead || []).length) setNext(t, c.ahead);
-    tasks.push(t); res.ids.push(t.id); res.made++; res.changed++; note(c.who_id, t.id, c.title + ' ~' + c.due);
+    tasks.push(t); res.ids.push(t.id); res.made++; res.changed++;
+    // 판20b: 이어받은 지시(quiet)는 다음 회차 줄에 아직 안 알린 단계가 있을 때만 알림
+    const seen = p.seen || {}, loud = !c.quiet || (c.ahead || []).some(function (x) { return STAGE_RANK[x.stage] > (STAGE_RANK[seen[x.no + ':' + x.due]] || 0); });
+    if (loud) note(c.who_id, t.id, c.title + ' ~' + c.due);
   });
   return res;
 }
