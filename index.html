@@ -14360,25 +14360,27 @@
   }
   function mergeContracts(local, remote){
     var byId={}; (local||[]).forEach(function(c){ if(c&&c.id) byId[c.id]=c; });
-    (remote||[]).forEach(function(x){ if(!x||!x.id) return; var cur=byId[x.id]; if(!cur){ byId[x.id]=x; } else { var w=(x.updated||"")>(cur.updated||"")?x:cur; var m=Object.assign({},(w===x?cur:x),w); if(cur.del===1||x.del===1) m.del=mergeDel(cur,x); csKeepApproved(m, x); byId[x.id]=m; } });   // P1 판24 5차: 결재로 승인·반영된 변경계약 차수는 서버 쪽(같은 날이면 로컬이 통째로 이기던 것)
+    (remote||[]).forEach(function(x){ if(!x||!x.id) return; var cur=byId[x.id]; if(!cur){ byId[x.id]=x; } else { var w=(x.updated||"")>(cur.updated||"")?x:cur; var m=Object.assign({},(w===x?cur:x),w); if(cur.del===1||x.del===1) m.del=mergeDel(cur,x); csKeepApproved(m, x); if (typeof csValMerge === "function") csValMerge(m, x); byId[x.id]=m; } });   // P1 판24 5차: 결재로 승인·반영된 변경계약 차수는 서버 쪽(같은 날이면 로컬이 통째로 이기던 것)
     return Object.keys(byId).map(function(k){ return byId[k]; });
   }
   function doSaveContracts(){
     var token=getToken(); if(!token) return;
     var body=JSON.stringify({schema:1, items:contracts});
+    // 판24e: 이 저장에 실린 단계 칸 고침 번호 — 200이면 그 번호까지 고침 기록을 지움(그 뒤 고침은 남김)
+    var sentSeq = (typeof csValEditSeq !== "undefined") ? csValEditSeq : 0;
     var payload={message:"contracts: 업데이트", content:b64EncodeUnicode(body), branch:"main"};
     if(contractSha) payload.sha=contractSha;
     fetch(CONTRACT_API, {method:"PUT", headers:Object.assign({"Content-Type":"application/json"}, ghHeaders()), body:JSON.stringify(payload)}).then(function(resp){
       if(resp.status===401) return;
-      if(resp.status===409||resp.status===422){ return fetch(CONTRACT_API,{headers:ghHeaders()}).then(function(r){return r.status===404?null:r.json();}).then(function(j){ if(j){ var up={}; try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} contracts=mergeContracts(contracts, up.items||[]); contractSha=j.sha; } return doSaveContracts(); }); }
+      if(resp.status===409||resp.status===422){ return fetch(CONTRACT_API,{headers:ghHeaders()}).then(function(r){return r.status===404?null:r.json();}).then(function(j){ if(j){ var up={}; try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} contracts=mergeContracts(contracts, up.items||[]); contractSha=j.sha; if (typeof renderContracts === "function") renderContracts(); } return doSaveContracts(); }); }
       // P1 판24-③: 서버가 결재 없는 단계 완료·결재함에 없는 승인·상신 사본 바뀜을 거절(400 CON_APPR_REQUIRED) — 조용히 넘기지 않고 알린 뒤 서버 값으로 다시 읽는다(이 저장에 같이 들어간 다른 고침도 서버에 없음)
-      if(resp.status===400){ return resp.json().then(function(json){ var ec=(json&&json.error_code)||""; contractSha=json&&json.content&&json.content.sha; contractsPending=false; if(ec==="CON_APPR_REQUIRED"){ alert(CON_APPR_REJECT_MSG); loadContracts(); } else if(ec==="CON_APPR_REVOKED"){ alert(CON_APPR_REVOKED_MSG); loadContracts(); } else if(ec==="CON_DUP_ID"){ alert(CON_DUP_ID_MSG); loadContracts(); } }); }   // 5차 B: 승인된 변경계약 되돌리기 거절은 그 까닭의 글
+      if(resp.status===400){ return resp.json().then(function(json){ var ec=(json&&json.error_code)||""; contractSha=json&&json.content&&json.content.sha; contractsPending=false; if (typeof csValEditsDone === "function") csValEditsDone(sentSeq); if(ec==="CON_APPR_REQUIRED"){ alert(CON_APPR_REJECT_MSG); loadContracts(); } else if(ec==="CON_APPR_REVOKED"){ alert(CON_APPR_REVOKED_MSG); loadContracts(); } else if(ec==="CON_DUP_ID"){ alert(CON_DUP_ID_MSG); loadContracts(); } }); }   // 5차 B: 승인된 변경계약 되돌리기 거절은 그 까닭의 글
       // P1 판24-③ 검토(11/15 B9): 서버 오류(5xx — 결재함 못 읽음 APPROVALS_READ_FAILED 포함)도 조용히 넘기지 않는다(종전: 저장 대기 표시만 풀려 결재한 기기엔 '진행됨'으로 보이고 서버엔 없음)
-      if(resp.status>=500){ return resp.json().catch(function(){ return {}; }).then(function(json){ contractsPending=false; alert(CON_SAVE_FAIL_MSG + (json && json.error_code ? " (" + json.error_code + ")" : "")); loadContracts(); }); }
+      if(resp.status>=500){ return resp.json().catch(function(){ return {}; }).then(function(json){ contractsPending=false; if (typeof csValEditsDone === "function") csValEditsDone(sentSeq); alert(CON_SAVE_FAIL_MSG + (json && json.error_code ? " (" + json.error_code + ")" : "")); loadContracts(); }); }
       // 11/16(남은 것 2 — 재현됨): 이월 응답 뒤 다시 읽을 때, 이 저장을 보낸 뒤 고친 내용(디바운스로 아직 안 나간 것)이 있으면 대기 표시를 다시 세워
       //   다시 읽기가 통째로 덮지 않고 병합(mergeContracts — 로컬 고침은 남고 승인 차수만 서버 값 csKeepApproved)하게 한다. 그 고침은 걸려 있는 디바운스 저장이 보낸다
       //   11/16 검토 B2: 저장 함수 밖(결재 동기화 등)이 예약 없이 목록을 바꿨으면 저장도 예약(이미 예약돼 있으면 대기 표시만)
-      return resp.json().then(function(json){ contractSha=json.content&&json.content.sha; contractsPending=false; if(json&&json.con_kept&&json.con_kept.length&&JSON.stringify({schema:1, items:contracts})!==body){ if(contractSaveTimer) contractsPending=true; else scheduleContractSave(); } if(json&&json.con_kept&&json.con_kept.length) loadContracts(); });   // 5차: 서버가 승인 차수를 지켰으면(낡은 사본) 화면을 서버 값으로
+      return resp.json().then(function(json){ if (typeof csValEditsDone === "function") csValEditsDone(sentSeq); contractSha=json.content&&json.content.sha; contractsPending=false; if(json&&json.con_kept&&json.con_kept.length&&JSON.stringify({schema:1, items:contracts})!==body){ if(contractSaveTimer) contractsPending=true; else scheduleContractSave(); } if(json&&json.con_kept&&json.con_kept.length) loadContracts(); });   // 5차: 서버가 승인 차수를 지켰으면(낡은 사본) 화면을 서버 값으로
     }).catch(function(){});
   }
   var WASTE_BACKBONE = [
@@ -15829,6 +15831,8 @@
       if ((base.cur || 0) !== (lq.cur || 0) || JSON.stringify(stages) !== JSON.stringify(lq.stages)){ lq.cur = base.cur || 0; lq.stages = stages; changed = true; }
     });
     c.pipes = lp;
+    // 판24e(결함 2 원천): 서버 사본은 아직 안 나간(디바운스 중·요청 중) 이 기기의 단계 칸 고침을 모른다 — 그 칸만 로컬 값을 다시 얹음(결재·진행·다른 칸은 위 접목 그대로)
+    if (typeof csValEditsApply === "function" && csValEditsApply(c)) changed = true;
     if (c.status === "done" || c.status === "active"){ var st = lp.length && lp.every(function(p){ return p.cur >= p.stages.length; }) ? "done" : "active"; if (st !== c.status){ c.status = st; changed = true; } }
     if (chgPush){ c.updated = todayStr(); scheduleContractSave(); }   // v402 검토 5: 병합 결과(새 차수·지시)를 서버에 남김
     if (changed && typeof loadTasks === "function") loadTasks();
@@ -16865,12 +16869,44 @@
     if (t === "num"){ var n = s.replace(/[,\s원]/g, ""); return /^-?\d+(\.\d+)?$/.test(n) ? n : ""; }
     return s;
   }
+  // 판24e(원천 — 결함 1·2): 아직 서버에 안 들어간(디바운스 중·요청 중) 단계 칸 고침 기록. 결재 동기화 접목(csSyncFromServer)과 409 병합(mergeContracts → csValMerge)이
+  //   서버 사본을 얹은 뒤 이 칸만 로컬 값을 다시 얹는다 — 사람이 고친 칸은 로컬, 고치지 않은 칸은 서버(다른 기기) 값. 저장 응답(200·거절·서버 오류)이면 그 저장에 실린 번호까지 지움
+  var csValEdits = {}, csValEditSeq = 0;
+  function csValEditNote(c, p, i, k){
+    var s = p && p.stages && p.stages[i]; if (!c || !s) return;
+    var vals = s.vals || {}, e = { seq: ++csValEditSeq, pk: p.key, i: i, name: s.name || "", round: s.round || 0, k: k, has: Object.prototype.hasOwnProperty.call(vals, k), v: vals[k] };
+    if (k === "settle_amount") e.top = { has: c.settle_amount !== undefined, v: c.settle_amount };
+    (csValEdits[c.id] = csValEdits[c.id] || []).push(e);
+  }
+  function csValEditsApply(c){
+    var list = c && csValEdits[c.id], ch = false; if (!list || !list.length) return false;
+    list.forEach(function(e){
+      var p = (c.pipes || []).filter(function(q){ return q && q.key === e.pk; })[0]; if (!p || !Array.isArray(p.stages)) return;
+      var same = function(x){ return x && (x.name || "") === e.name && (x.round || 0) === e.round; }, s = same(p.stages[e.i]) ? p.stages[e.i] : p.stages.filter(same)[0]; if (!s) return;
+      var vals = Object.assign({}, s.vals || {}), was = JSON.stringify(s.vals || {});
+      if (e.has) vals[e.k] = e.v; else delete vals[e.k];
+      if (JSON.stringify(vals) !== was){ s.vals = vals; ch = true; }
+      if (e.top){ if (e.top.has){ if (c.settle_amount !== e.top.v){ c.settle_amount = e.top.v; ch = true; } } else if (c.settle_amount !== undefined){ delete c.settle_amount; ch = true; } }
+    });
+    return ch;
+  }
+  function csValEditsDone(seq){ Object.keys(csValEdits).forEach(function(id){ csValEdits[id] = csValEdits[id].filter(function(e){ return e.seq > seq; }); if (!csValEdits[id].length) delete csValEdits[id]; }); }
+  // 409 병합 결과 m에서 단계 칸(vals)·정산액만: 서버(r) 값을 바탕으로 이 기기의 안 나간 고침을 얹는다(종전엔 계약 한 건을 날짜로 통째 골라 같은 날이면 로컬 — 다른 기기가 고친 칸이 옛 값으로 되돌아감)
+  function csValMerge(m, r){
+    if (!m || !r || m === r || !Array.isArray(m.pipes) || !Array.isArray(r.pipes)) return;
+    m.pipes = m.pipes.map(function(p){
+      var rp = p && r.pipes.filter(function(q){ return q && q.key === p.key; })[0]; if (!rp || !Array.isArray(p.stages) || !Array.isArray(rp.stages)) return p;
+      return Object.assign({}, p, { stages: p.stages.map(function(s, i){ var rs = rp.stages[i]; if (!s || !rs || (s.name || "") !== (rs.name || "") || (s.round || 0) !== (rs.round || 0)) return s; var x = Object.assign({}, s); if (rs.vals && Object.keys(rs.vals).length) x.vals = JSON.parse(JSON.stringify(rs.vals)); else delete x.vals; return x; }) });
+    });
+    if (r.settle_amount !== undefined) m.settle_amount = r.settle_amount; else delete m.settle_amount;
+    csValEditsApply(m);
+  }
   function csSaveFields(c, p, i, panel){
     var s = p.stages[i]; if (!s || !panel) return;
     s.vals = s.vals || {};
     if (conDueOn()){ (c.pipes || []).forEach(function(pp){ (pp.stages || []).forEach(function(x){ if (!(x && x.due_badge === "기산일 필요" && x.task_id)) return; var tt = findTask(x.task_id); if (!tt || tt.due || tt.status === "done") return; var dd2 = conStageDue(x, c, pp); if (dd2 && dd2.due){ tt.due = dd2.due; tt.updated = todayStr(); x.due_src = dd2.src || ""; delete x.due_badge; saveTasksCache(); scheduleTasksSave(); } }); }); }   // v404 검토 S1 (입력 칸 저장 뒤 — 아래 forEach가 vals를 먼저 쓰도록 setTimeout 없이 두 번째 패스에서)
     // 판24d: 사람이 바꾼 칸만 모델에 씀(바꾸지 않은 칸 = 그린 값 그대로 — 다른 기기의 새 값·브라우저가 못 받는 꼴의 값을 덮거나 지우지 않게)
-    Array.prototype.forEach.call(panel.querySelectorAll("[data-cs-fld]"), function(el){ if (el.defaultValue !== undefined && el.value === el.defaultValue) return; var k = el.getAttribute("data-cs-fld"), v = el.value; if (v === "") delete s.vals[k]; else s.vals[k] = (el.type === "number") ? Number(v) : v; if (k === "settle_amount"){ if (v === "") delete c.settle_amount; else c.settle_amount = Number(v); } });
+    Array.prototype.forEach.call(panel.querySelectorAll("[data-cs-fld]"), function(el){ if (el.defaultValue !== undefined && el.value === el.defaultValue) return; var k = el.getAttribute("data-cs-fld"), v = el.value; if (v === "") delete s.vals[k]; else s.vals[k] = (el.type === "number") ? Number(v) : v; if (k === "settle_amount"){ if (v === "") delete c.settle_amount; else c.settle_amount = Number(v); } if (typeof csValEditNote === "function") csValEditNote(c, p, i, k); });
     c.updated = todayStr(); scheduleContractSave(); renderContracts();
   }
   function csWlAdd(c, row){
