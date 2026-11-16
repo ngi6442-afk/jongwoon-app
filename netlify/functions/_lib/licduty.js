@@ -13,7 +13,7 @@
 // 완료: _lib/doneif.js가 이 키를 읽어 그 회차 완료 기록(runs[].due = orig)·해당 없음이면 승인 대기(앱 기준)로 올린다(묶음은 묶은 행이 모두 그럴 때).
 const DUTY = require('./duty');
 
-const STAGE_TXT = { d30: '30일 안', d7: '7일 안', over: '기한 지남', later: '30일 밖' };   // later = 기한 정정으로 30일 밖이 된 열린 지시의 제목
+const STAGE_TXT = { d30: '30일 안', d7: '7일 안', over: '지남', later: '30일 밖' };   // later = 기한 정정으로 30일 밖이 된 열린 지시의 제목
 const STAGE_RANK = { later: 0, d30: 1, d7: 2, over: 3 };
 const BUNDLE_MID = ':duty:over:';
 const KEY_RE = /^lic:([^:\s\x00-\x1f\x7f]{1,160}):duty:(\d{1,4}):(\d{4}-\d{2}-\d{2})$/;

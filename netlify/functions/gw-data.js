@@ -1104,7 +1104,9 @@ async function licDutyNotify(byWho, today) {
   let n = 0;
   for (const who of whos) {
     const list = byWho[who] || []; if (!list.length) continue;
-    const body = list.slice(0, 3).map(function (s) { return String(s).slice(0, 40); }).join(' · ') + (list.length > 3 ? ' 외 ' + (list.length - 3) + '건' : '') + " — 인허가 탭 '이번 달'";
+    // 판20b 추가(11/16 화면 확인): 줄마다 40자로 자르면 날짜·낱말 중간('~2026-'·'2월 15일도 다')에서 끊김 — 줄 수에 따라 몫(150자 ÷ 줄 수)을 정하고, 넘치면 낱말 경계에서 자르고 '…'
+    const per = Math.floor(150 / Math.min(list.length, 3)), cut = function (s) { s = String(s); if (s.length <= per) return s; const t = s.slice(0, per - 1), i = t.lastIndexOf(' '); return (i > per / 2 ? t.slice(0, i) : t) + '…'; };
+    const body = list.slice(0, 3).map(cut).join(' · ') + (list.length > 3 ? ' 외 ' + (list.length - 3) + '건' : '') + " — 인허가 탭 '이번 달'";
     try { const rs = await push.sendTo([who], { title: '인허가 기한 지시 ' + list.length + '건', body: body.slice(0, 200), url: './', tag: 'lic-duty-' + who + '-' + today }, { ctx: tc, primaryOnly: true, by: '정기봇' }); if (rs && Number(rs.sent) > 0) n++; } catch (e) {}   // 판20 검토 B2: 실제 보낸 사람만 셈(구독 없음·실패 = 0)
   }
   return n;

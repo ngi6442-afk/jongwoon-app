@@ -11535,7 +11535,7 @@ function J91a(x) { return JSON.stringify(x); }
     const at = (d, extra) => L.plan(Object.assign({}, base, { tasks: tk, today: d }, extra || {}));
     const p1 = at(plus20(1)); o.p1 = !p1.first && p1.bundles.length === 0 && p1.create.length === 0 && p1.bump.length === 0;   // 다음 날 = 아무것도 없음(같은 단계)
     const p6 = at(plus20(6)); const r6 = L.apply(p6, tk, plus20(6), {}, mk);
-    o.p6 = p6.create.length === 0 && p6.bump.length === 1 && p6.bump[0].no === 104 && p6.bump[0].rise && p6.bump[0].to === 'over' && r6.bumped === 1 && tk[2].lic_stage === 'over' && /^인허가 기한 기한 지남 — 104\./.test(tk[2].title);   // 101·102는 묶음 안
+    o.p6 = p6.create.length === 0 && p6.bump.length === 1 && p6.bump[0].no === 104 && p6.bump[0].rise && p6.bump[0].to === 'over' && r6.bumped === 1 && tk[2].lic_stage === 'over' && /^인허가 기한 지남 — 104\./.test(tk[2].title);   // 101·102는 묶음 안
     const p7 = at(plus20(7)); o.p7 = p7.bump.length === 0 && p7.create.length === 0;   // 지남 다음 날 = 다시 안 감
     const p17 = at(plus20(17)); o.p17 = p17.bump.some((b) => b.no === 103 && b.to === 'd7' && b.rise) && p17.create.some((c) => c.no === 105 && c.stage === 'd30');
     tk[0].status = 'done'; const p8 = at(plus20(8)); o.p8 = p8.create.map((c) => c.no + c.stage).join() === '101over,102over' && p8.bundles.length === 0;   // 사람이 묶음을 닫음 = 남은 지남은 행별로
@@ -11977,7 +11977,7 @@ function J91a(x) { return JSON.stringify(x); }
       const ing = () => c({ action: 'autotask_ingest', key: 'test-ingest-key', items: [], only: 'lic_duty' });
       const save = (fn, mbr) => { const sv = JSON.parse(JSON.stringify(mem.gw_data['col:tasks'])); sv.items.forEach(fn); return c({ action: 'save', collection: 'tasks', base: mem.gw_data['col:tasks'].updated_at, doc: sv }, issueSession(mbr || MAb).token, 'devb'); };
       atB('2026-12-01'); const e0 = await ing();
-      o.e0 = e0.code === 200 && e0.body.lic.made === 1 && pushesB.length === 1 && !!tB() && tB().lic_stage === 'd30';
+      o.e0 = e0.code === 200 && e0.body.lic.made === 1 && pushesB.length === 1 && !!tB() && tB().lic_stage === 'd30' && pushesB[0].p.body === "인허가 기한 30일 안 — 711. 고정일 의무 711 ~2026-12-31 — 인허가 탭 '이번 달'";
       // 담당이 지움(+ 다시 연 기록 칸을 앞질러 적어 다시 열림을 막으려 함) → 서버 값만(없음)
       const id = tB().id;
       const s1 = await save((x) => { if (x.id === id) { x.del = 1; x.updated = '2026-12-01'; x.updated_ts = Date.now(); x.lic_reopen = { day: '2026-12-02', n: 9 }; } });
@@ -12042,10 +12042,31 @@ function J91a(x) { return JSON.stringify(x); }
     T('P1 판20b ⑤ e2e(gw-data · 서버 시계 12/1~1/7): 켬 → 30일 안 지시 1·알림 1 · 담당이 지움(+ 다시 연 기록 칸 위조) = 서버 값만 · 다음 날 다시 엶(알림 1 "다시 엶 711행"·updated_ts = 서버 시각·감사 "다시 엶 1") · 다시 지움 + 칸 위조 = 서버 값 · 같은 날·다음 날 0 · 7일 안 = 다시 엶 + 단계 올림 알림 1 · 손으로 [완료] 승인 대기 = 지남이 돼도 그대로 · 승인 = 다음 실행 다시 엶(승인 칸 비움) · 담당 퇴사 = 담당 비움·알림 0·감사 줄 "담당 없음 1행"(이틀 다) · 연습 = 지운 지시 그대로·알림 0',
       E0b.o.ok, JSON.stringify(E0b.o.ok ? E0b.o : E0b));
     const MGb = [['if (o && LD.isDutyKey(o.auto_key) && o.lic_reopen !== undefined) t.lic_reopen = o.lic_reopen; else delete t.lic_reopen;', ''],
-      ["return 't' + crypto.randomBytes(6).toString('hex'); }, Date.now());", "return 't' + crypto.randomBytes(6).toString('hex'); });"], ["(lic.reopened ? ' · 다시 엶 ' + lic.reopened : '')", "''"]];
+      ["return 't' + crypto.randomBytes(6).toString('hex'); }, Date.now());", "return 't' + crypto.randomBytes(6).toString('hex'); });"], ["(lic.reopened ? ' · 다시 엶 ' + lic.reopened : '')", "''"], ['const per = Math.floor(150 / Math.min(list.length, 3)),', 'const per = 40,']];
     const kGb = [];
     for (const [a, b] of MGb) { let v; try { v = (await chkEb(compB(GWPb, mutB(SRCb.gw, a, b)))).o.ok; } catch (e) { v = 'err ' + e.message; } kGb.push(v); }
-    T('P1 판20b ⑤ 결함 사본 ' + MGb.length + '개(다시 연 기록 칸 클라이언트 값 허용 · 다시 연 시각 안 찍음 · 감사 줄에 다시 엶 빠짐) = 모두 ✗', kGb.every((v) => v === false), JSON.stringify(kGb));
+    T('P1 판20b ⑤ 결함 사본 ' + MGb.length + '개(다시 연 기록 칸 클라이언트 값 허용 · 다시 연 시각 안 찍음 · 감사 줄에 다시 엶 빠짐 · 알림 줄을 40자로 날짜 중간에서 자름) = 모두 ✗', kGb.every((v) => v === false), JSON.stringify(kGb));
+    // ⑥ 글(화면 확인 세션 11/16 — 제목 '인허가 기한 기한 지남'): 단계 3가지 × 행별(새·단계 오름)·묶음·다음 회차 줄·다시 엶·30일 밖 — 제목·지시 글·알림 줄에 낱말 겹침 0
+    const chkTb = (L) => {
+      const out = []; let n = 0; const mk = () => 'w' + (++n);
+      const go = (rows, duties, tk, day, extra) => { const p = L.plan(Object.assign({ rows: rows, duties: duties, lics: [], tasks: tk, rules: RUb, names: {}, today: day }, extra || {})); const a = L.apply(p, tk, day, {}, mk, 1); (a.notify.u1 || []).forEach((x) => out.push(x)); tk.forEach((t) => { out.push(t.title); out.push(t.detail); }); return a; };
+      const tR = []; ['2026-12-01', '2026-12-24', '2027-01-04'].forEach((d) => go([RFb(801, 12, 31)], [{ no: 801 }], tR, d));
+      const tB = []; ['2027-01-18', '2027-02-08', '2027-02-16'].forEach((d) => go([RFb(802, 2, 15), RFb(803, 2, 15)], [{ no: 802 }, { no: 803 }], tB, d));
+      const tN = [{ id: 'z', auto_key: 'lic:L1:duty:999:2026-01-01', del: 1, status: 'open' }]; ['2027-03-02', '2027-03-24', '2027-04-01'].forEach((d) => go([RFb(804, 3, 31)], [{ no: 804 }], tN, d));
+      const tO = []; go([RFb(805, 12, 31)], [{ no: 805 }], tO, '2026-12-01'); tO[0].del = 1; go([RFb(805, 12, 31)], [{ no: 805 }], tO, '2026-12-02');
+      go([RFb(805, 12, 31)], [{ no: 805, due_fix: { '2026-12-31': { to: '2027-03-01' } } }], tO, '2026-12-03');
+      const all = out.join('\n');
+      const dup = all.split('\n').filter((s) => /(^|[\s(])(\S+) \2(?=$|[\s)—·~(])/.test(s) || /기한 기한|지남 지남|안 안|밖 밖/.test(s));
+      const want = ['인허가 기한 30일 안 — 801.', '인허가 기한 7일 안 — 801.', '인허가 기한 지남 — 801.', '인허가 지난 기한 2건 정리', '802행 다음 회차 기한 2월 15일도 다가옵니다(30일 안)', '802행 다음 회차 기한 2월 15일도 다가옵니다(7일 안)',
+        '802행 다음 회차 기한 2월 15일도 지났습니다', '804행 다음 회차 기한 3월 31일도 다가옵니다(30일 안)', '804행 다음 회차 기한 3월 31일도 지났습니다', '다시 엶 805행 — 탭에서 [완료+수령 올리기]로 닫아야 끝납니다', '인허가 기한 30일 밖 — 805.'];
+      const miss = want.filter((w) => all.indexOf(w) < 0);
+      return { ok: dup.length === 0 && miss.length === 0, dup: dup.slice(0, 3), miss };
+    };
+    const W0b = chkTb(LDb);
+    T('P1 판20b ⑥ 지시 글 낱말 겹침 0: 행별 제목 "인허가 기한 30일 안·7일 안·지남 — n. …"(새 지시·단계 오름 알림) · 묶음 "인허가 지난 기한 n건 정리" · 다음 회차 줄 30일 안·7일 안·"도 지났습니다"(묶음·행별) · 다시 엶 알림 · 30일 밖 제목 — 제목·지시 글·알림 줄에 "기한 기한"·"지남 지남"·"안 안"·같은 낱말 연달아 0',
+      W0b.ok, JSON.stringify(W0b));
+    const kWb = [["over: '지남', later:", "over: '기한 지남', later:"]].map(([a, b]) => { try { return chkTb(compB(LDPb, mutB(SRCb.ld, a, b))).ok; } catch (e) { return 'err ' + e.message; } });
+    T('P1 판20b ⑥ 결함 사본 ' + kWb.length + '개(지남 단계 글을 "기한 지남"으로 되돌림 = 제목 "인허가 기한 기한 지남") = 모두 ✗', kWb.every((v) => v === false), JSON.stringify(kWb));
   } catch (e) { T('P1 판20b 검사 실행', false, String(e && e.stack || e).slice(0, 500)); }
   finally { pushMock.sendTo = sendSaveB; Date.now = realNowB; const s = JSON.parse(snapB); mem.gw_users = s.u; mem.gw_data = s.d; mem.gw_files = s.f; blobsMock.hooks.failGet = null; }
 }
