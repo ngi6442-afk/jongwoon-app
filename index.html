@@ -15877,9 +15877,12 @@
   function csApprSync(c, force){
     if (!c || !c.scen || typeof gwCall !== "function" || !csApprPending(c)) return;
     var now = Date.now(); if (!force && csApprSyncAt[c.id] && now - csApprSyncAt[c.id] < 60000) return; csApprSyncAt[c.id] = now;
-    var id = c.id;
+    var id = c.id, seq0 = (typeof csSaveDoneSeq !== "undefined") ? csSaveDoneSeq : 0;
     csFetchServerContract(id).then(function(sc){
       c = findProc(id) || c;   // 응답 대기 중 409 병합이 객체를 바꿨을 수 있다(F6)
+      // 판24e 검토 ①: 사본을 요청한 뒤 그 사이 저장이 끝났으면 사본이 낡음(방금 저장한 고침을 모름 — 고침 기록은 저장 응답 때 지워짐) → 접목하지 않고 버림 · 다음 그리기에서 다시 동기화(60초 제한 되돌림)
+      //   결재함 목록 반영(아래)은 그대로 — 로컬 단계의 상신 번호로 결재 상태만 옮기므로 낡은 사본과 무관
+      if (sc && typeof csSaveDoneSeq !== "undefined" && csSaveDoneSeq !== seq0){ sc = null; csApprSyncAt[id] = 0; }
       if (sc && csSyncFromServer(c, sc)) renderContracts();
       if (!csApprPending(c)) return null;
       return gwCall("gw-data", { action: "approvals_list" });
@@ -15916,8 +15919,11 @@
   function csApprOnDecided(it){
     var cp = String(it && it.ref || "").slice(4).split("|"), id = cp[0], c0 = findProc(id);
     if (!c0){ if (typeof apprToastShow === "function") apprToastShow("계약을 이 기기에서 찾지 못했습니다 — 계약 탭에서 동기화됩니다"); return; }
+    var seq0 = (typeof csSaveDoneSeq !== "undefined") ? csSaveDoneSeq : 0;
     csFetchServerContract(id).then(function(sc){
       var c = findProc(id) || c0;
+      // 판24e 검토 ①: 사본을 요청한 뒤 저장이 끝났으면 낡은 사본 — 접목하지 않음(결재 반영은 로컬 단계에 그대로)
+      if (sc && typeof csSaveDoneSeq !== "undefined" && csSaveDoneSeq !== seq0) sc = null;
       if (sc) csSyncFromServer(c, sc);
       var p = (c.pipes || []).filter(function(q){ return q.key === cp[1]; })[0], i = Number(cp[2]);
       if (!p || !p.stages[i] || !p.stages[i].appr){ if (typeof apprToastShow === "function") apprToastShow("계약 단계에 상신 기록이 없습니다 — 계약 탭 단계·서류 탭에서 동기화됩니다"); return; }
@@ -16890,13 +16896,16 @@
     });
     return ch;
   }
-  function csValEditsDone(seq){ Object.keys(csValEdits).forEach(function(id){ csValEdits[id] = csValEdits[id].filter(function(e){ return e.seq > seq; }); if (!csValEdits[id].length) delete csValEdits[id]; }); }
+  // 판24e 검토 ①: 저장 응답 번호(저장이 끝날 때마다 하나씩) — 결재 동기화가 서버 사본을 요청한 뒤 그 사이 저장이 끝났으면 그 사본은 낡았으므로 접목하지 않음(csApprSync·csApprOnDecided)
+  var csSaveDoneSeq = 0;
+  function csValEditsDone(seq){ csSaveDoneSeq++; Object.keys(csValEdits).forEach(function(id){ csValEdits[id] = csValEdits[id].filter(function(e){ return e.seq > seq; }); if (!csValEdits[id].length) delete csValEdits[id]; }); }
   // 409 병합 결과 m에서 단계 칸(vals)·정산액만: 서버(r) 값을 바탕으로 이 기기의 안 나간 고침을 얹는다(종전엔 계약 한 건을 날짜로 통째 골라 같은 날이면 로컬 — 다른 기기가 고친 칸이 옛 값으로 되돌아감)
   function csValMerge(m, r){
     if (!m || !r || m === r || !Array.isArray(m.pipes) || !Array.isArray(r.pipes)) return;
-    m.pipes = m.pipes.map(function(p){
-      var rp = p && r.pipes.filter(function(q){ return q && q.key === p.key; })[0]; if (!rp || !Array.isArray(p.stages) || !Array.isArray(rp.stages)) return p;
-      return Object.assign({}, p, { stages: p.stages.map(function(s, i){ var rs = rp.stages[i]; if (!s || !rs || (s.name || "") !== (rs.name || "") || (s.round || 0) !== (rs.round || 0)) return s; var x = Object.assign({}, s); if (rs.vals && Object.keys(rs.vals).length) x.vals = JSON.parse(JSON.stringify(rs.vals)); else delete x.vals; return x; }) });
+    // 판24e 검토 ②: 줄·단계 객체는 그대로 두고 vals만 제자리에서 — 병합 전에 잡아 둔 단계 객체(넣기 박스 cbxPlace가 응답 뒤 서류 체크를 켜는 ref.p 등)에 쓴 값이 병합 결과에 남게(종전 객체 동일성 그대로)
+    m.pipes.forEach(function(p){
+      var rp = p && r.pipes.filter(function(q){ return q && q.key === p.key; })[0]; if (!rp || !Array.isArray(p.stages) || !Array.isArray(rp.stages)) return;
+      p.stages.forEach(function(s, i){ var rs = rp.stages[i]; if (!s || !rs || s === rs || (s.name || "") !== (rs.name || "") || (s.round || 0) !== (rs.round || 0)) return; if (rs.vals && Object.keys(rs.vals).length) s.vals = JSON.parse(JSON.stringify(rs.vals)); else delete s.vals; });
     });
     if (r.settle_amount !== undefined) m.settle_amount = r.settle_amount; else delete m.settle_amount;
     csValEditsApply(m);
@@ -16988,6 +16997,24 @@
     (b || []).forEach(function(x){ var id = (x.c || "") + "\u0002" + x.p + "\u0001" + x.k; if (!Object.prototype.hasOwnProperty.call(at, id)){ at[id] = out.length; out.push(x); } else if ((x.s || 0) > (out[at[id]].s || 0)) out[at[id]] = x; });
     return out;
   }
+  // 판24e 검토 ③: 다시 그리기 전 포커스 칸(계약 id·패널·칸·커서) — 단계 칸(data-cs-fld)·작업현황 새 줄(data-cs-wl)·서류 추가(data-cs-dnew)만
+  function csFocusTake(el){
+    if (!el || !el.getAttribute) return null;
+    var ka = el.getAttribute("data-cs-fld") != null ? "data-cs-fld" : (el.getAttribute("data-cs-wl") != null ? "data-cs-wl" : (el.getAttribute("data-cs-dnew") != null ? "data-cs-dnew" : "")); if (!ka) return null;
+    var pan = csPanelOf(el); if (!pan) return null;
+    var pa = pan.getAttribute("data-cs-fpanel") != null ? "data-cs-fpanel" : (pan.getAttribute("data-cs-wlform") != null ? "data-cs-wlform" : "data-cs-dpanel");
+    var f = { pa: pa, pv: pan.getAttribute(pa), cid: pan.getAttribute("data-cs-cid") || pan.getAttribute("data-cs-wlform") || "", ka: ka, kv: el.getAttribute(ka), s: null, e: null };
+    try { f.s = el.selectionStart; f.e = el.selectionEnd; } catch (x) {}
+    return f;
+  }
+  function csFocusPut(roots, f){
+    if (!f) return;
+    var hit = null;
+    roots.forEach(function(r){ if (hit || !r || !r.querySelectorAll) return; Array.prototype.forEach.call(r.querySelectorAll("[" + f.pa + "]"), function(p){ if (hit || p.getAttribute(f.pa) !== f.pv || (f.cid && (p.getAttribute("data-cs-cid") || p.getAttribute("data-cs-wlform") || "") !== f.cid)) return; if (p.getClientRects && !p.getClientRects().length) return; var el = Array.prototype.filter.call(p.querySelectorAll("[" + f.ka + "]"), function(x){ return x.getAttribute(f.ka) === f.kv; })[0]; if (el) hit = el; }); });
+    if (!hit || document.activeElement === hit) return;
+    try { hit.focus({ preventScroll: true }); } catch (x) { try { hit.focus(); } catch (y) {} }
+    if (f.s != null){ try { hit.setSelectionRange(f.s, f.e == null ? f.s : f.e); } catch (x) {} }
+  }
   function csRestoreInputs(root, snap){
     if (!root || !snap.length) return;
     // 45-1 묶음 2(11/16): 같은 열쇠의 패널이 두 벌(표 펼침 + 숨은 사본)이면 화면에 그려진 쪽에 되살림
@@ -17048,9 +17075,12 @@
     });
     h += '</tr></tfoot></table></div>';
     var snap = csSnapJoin(csSnapInputs(host), csSnapInputs(dcard));   // v382 검토 10: 백그라운드 재그리기(판독 폴링·승인·폭 변경)에도 입력 중인 값 유지
+    // 판24e 검토 ③: 단계·작업현황·서류 추가 칸에 치는 중이면 다시 그린 뒤 같은 계약·같은 칸으로 포커스·커서를 되돌림(값은 위 모음이 지킴)
+    var fcs = csFocusTake(act);
     host.innerHTML = h;
     if (dcard) dcard.innerHTML = csDetailHtml(openC);
     csRestoreInputs(host, snap); csRestoreInputs(dcard, snap);
+    csFocusPut([host, dcard], fcs);
     var wrap = host.querySelector(".vs-wrap");
     if (wrap){
       wrap.scrollLeft = sl; wrap.scrollTop = st0;

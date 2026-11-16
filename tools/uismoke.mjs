@@ -16674,17 +16674,19 @@ try {
   const FNS = ['mTime', 'mergeDel', 'csKeepApproved', 'mergeContracts', 'doSaveContracts', 'scheduleContractSave', 'loadContracts', 'liveContracts', 'csValEditNote', 'csValEditsApply', 'csValEditsDone', 'csValMerge', 'csSaveFields',
     'csFetchServerContract', 'csEmpty', 'csApprRank', 'csMergeDocs', 'csChgRank', 'csChgMerge', 'csSyncFromServer', 'csApprPending', 'csApprFind', 'csApprSync', 'csApprTake', 'csApprApply', 'csApprRef'];
   const mkE = (H, srv) => {
-    const env = { puts: [], gets: 0, timers: [], now: 1794900000000, alerts: 0, srv };
+    const env = { puts: [], gets: 0, timers: [], now: 1794900000000, alerts: 0, srv, hold: false, held: [], force: [] };
     const fakeDate = { now: () => env.now, parse: (s) => Date.parse(s) };
     const fetchE = (url, opts) => {
-      if (!opts || !opts.method || opts.method === 'GET') { env.gets++; return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ sha: env.srv.sha, content: JSON.stringify({ schema: 1, items: env.srv.items }) }) }); }
+      // 읽기: 요청한 그때의 서버 사본(hold면 응답을 붙잡아 두었다가 나중에 — 낡은 사본 경합)
+      if (!opts || !opts.method || opts.method === 'GET') { env.gets++; const sha = env.srv.sha, content = JSON.stringify({ schema: 1, items: env.srv.items }), ans = { status: 200, ok: true, json: () => Promise.resolve({ sha, content }) }; if (env.hold) return new Promise((res) => env.held.push(() => res(ans))); return Promise.resolve(ans); }
       const pl = JSON.parse(opts.body), body = JSON.parse(pl.content); env.puts.push(body);
+      if (env.force.length) { const st = env.force.shift(); return Promise.resolve({ status: st, ok: false, json: () => Promise.resolve({ error_code: st === 400 ? 'CON_APPR_REQUIRED' : 'STORAGE_WRITE_FAILED' }) }); }
       if (pl.sha !== env.srv.sha) return Promise.resolve({ status: 409, ok: false, json: () => Promise.resolve({}) });
       env.srv.items = JSON.parse(JSON.stringify(body.items)); env.srv.sha = 'v' + (Number(env.srv.sha.slice(1)) + 1);
       return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ content: { sha: env.srv.sha } }) });
     };
     const gwCallE = (fn, b) => Promise.resolve(b && b.action === 'approvals_list' ? { status: 200, body: { items: env.srv.approvals || [] } } : { status: 200, body: {} });
-    const src = [varE(H, 'CON_APPR_REJECT_MSG'), varE(H, 'CON_APPR_REVOKED_MSG'), varE(H, 'CON_SAVE_FAIL_MSG'), varE(H, 'CON_DUP_ID_MSG'), varE(H, 'CON_APPR_OLD_MSG'), varE(H, 'csApprSyncAt'), varE(H, 'csValEdits'),
+    const src = [varE(H, 'CON_APPR_REJECT_MSG'), varE(H, 'CON_APPR_REVOKED_MSG'), varE(H, 'CON_SAVE_FAIL_MSG'), varE(H, 'CON_DUP_ID_MSG'), varE(H, 'CON_APPR_OLD_MSG'), varE(H, 'csApprSyncAt'), varE(H, 'csValEdits'), varE(H, 'csSaveDoneSeq'),
       'var contracts = [], contractSha = "v1", contractSaveTimer = null, contractsPending = false, CONTRACT_API = "x", autoGenReady = {}, apprPendingCreates = [];',
       'function getToken(){ return "t"; } function ghHeaders(){ return {}; } function b64EncodeUnicode(s){ return s; } function b64DecodeUnicode(s){ return s; } function alert(){ ENV.alerts++; } function renderTasks(){} function renderSummary(){} function runAwardAutoCon(){} function conBldgAutoTry(){}',
       'function todayStr(){ return "2026-11-16"; } function conDueOn(){ return false; } function findTask(){ return null; } function saveTasksCache(){} function scheduleTasksSave(){} function advanceProc(){} function materializeStage(){} function csOnDone(){} function conBillToRec(){} function loadTasks(){} function apprToastShow(){} function csChgOpenAt(){ return 0; }',
@@ -16724,10 +16726,15 @@ try {
       const srvItems = [JSON.parse(JSON.stringify(S0))]; srvItems[0].pipes[0].stages[0].vals.q_no = 'FROM-A'; srvItems[0].settle_amount = 200;   // 다른 기기가 칸 X(번호)·정산액을 저장한 서버
       const E = mkE(H, { sha: 'v2', items: srvItems, approvals: [] });
       E.api.set([JSON.parse(JSON.stringify(S0))]); E.api.setSha('v1'); E.openId = 'kE'; E.tab = 'ov';
-      let c = E.api.get()[0]; E.api.save(c, c.pipes[0], 0, panelE(c.pipes[0].stages[0].vals, { paid: '2031-01-01', bill: '' })); await E.fire();
-      const v1 = E.srv.items[0].pipes[0].stages[0].vals;
-      R.d1 = { puts: E.puts.length, q_no: v1.q_no, paid: v1.paid, bill: v1.bill === undefined ? '(비움)' : v1.bill, settle: E.srv.items[0].settle_amount };
-      R.d1ok = E.puts.length === 2 && v1.q_no === 'FROM-A' && v1.paid === '2031-01-01' && v1.bill === undefined && E.srv.items[0].settle_amount === 200;
+      let c = E.api.get()[0]; E.api.save(c, c.pipes[0], 0, panelE(c.pipes[0].stages[0].vals, { paid: '2031-01-01', bill: '' }));
+      // 검토 ②: 병합 전에 잡아 둔 단계 객체(넣기 박스가 응답 뒤 서류 체크를 켜는 꼴) — 병합 뒤에도 같은 객체여야 거기 쓴 값이 계약에 남음 · 검토 ④: 409 병합 뒤 다시 그리기 1번
+      const held = c.pipes[0].stages[0], r0 = E.renders;
+      await E.fire();
+      held.docs = [{ k: 'x', st: 'done' }];
+      const v1 = E.srv.items[0].pipes[0].stages[0].vals, after = E.api.get()[0].pipes[0].stages[0];
+      R.d1 = { puts: E.puts.length, q_no: v1.q_no, paid: v1.paid, bill: v1.bill === undefined ? '(비움)' : v1.bill, settle: E.srv.items[0].settle_amount, sameStage: after === held, renders409: E.renders - r0 };
+      R.d1ok = E.puts.length === 2 && v1.q_no === 'FROM-A' && v1.paid === '2031-01-01' && v1.bill === undefined && E.srv.items[0].settle_amount === 200
+        && after === held && !!(after.docs && after.docs.length) && E.renders - r0 === 1;
       // 그 뒤 다른 기기가 이 기기가 저장했던 입금일·번호를 또 바꿈 → 이 기기(옛 sha)가 정산액만 저장 → 입금일·번호는 다른 기기 값(저장된 고침 기록은 지워짐) · 정산액은 이 기기
       E.srv.items[0].pipes[0].stages[0].vals.q_no = 'LATER'; E.srv.items[0].pipes[0].stages[0].vals.paid = '2032-02-02'; E.srv.sha = 'v9'; E.api.setSha('v3');
       c = E.api.get()[0]; E.api.save(c, c.pipes[0], 0, panelE({ settle_amount: 200 }, { settle_amount: '300' })); await E.fire();
@@ -16735,7 +16742,49 @@ try {
       R.d1b = { q_no: v2.q_no, paid: v2.paid, settle: E.srv.items[0].settle_amount };
       R.d1bok = v2.q_no === 'LATER' && v2.paid === '2032-02-02' && E.srv.items[0].settle_amount === 300;
     }
-    R.ok = R.d2ok && R.d1ok && R.d1bok;
+    // 검토 ①: 결재 동기화가 서버 사본을 요청한 뒤(응답 붙잡음) [입력 저장]이 200으로 끝남 → 낡은 사본 도착 → 접목하지 않음 · 다음 그리기에서 다시 동기화 · 다른 칸 저장 뒤에도 새 값
+    {
+      const S = conE({ q_no: 'OLD', paid: '2026-11-01' }, '대기');
+      const E = mkE(H, { sha: 'v1', items: [JSON.parse(JSON.stringify(S))], approvals: [{ id: 'a1', cid: 'cE1', ref: 'con:kE|main|1', kind: '청구 검수', status: '대기', created: '2026-11-10T00:00:00Z' }] });
+      E.api.set([JSON.parse(JSON.stringify(S))]); E.openId = 'kE';
+      E.api.render(); await E.flush();
+      E.now += 61000; E.hold = true; E.api.render(); await E.flush();   // 사본 요청이 나감(붙잡음)
+      let c = E.api.get()[0]; E.api.save(c, c.pipes[0], 0, panelE(c.pipes[0].stages[0].vals, { q_no: 'NEW' })); E.hold = false; await E.fire();
+      const g0 = E.gets; E.held.forEach((f) => f()); E.held = []; await E.flush();   // 낡은 사본 도착
+      const local = E.api.get()[0].pipes[0].stages[0].vals.q_no;
+      E.api.render(); await E.flush(); const resync = E.gets > g0;   // 60초 제한이 되돌려져 다음 그리기에서 다시 동기화
+      c = E.api.get()[0]; E.api.save(c, c.pipes[0], 0, panelE(c.pipes[0].stages[0].vals, { paid: '2031-01-01' })); await E.fire();
+      const v = E.srv.items[0].pipes[0].stages[0].vals;
+      R.race = { local, resync, q_no: v.q_no, paid: v.paid };
+      R.raceok = local === 'NEW' && resync && v.q_no === 'NEW' && v.paid === '2031-01-01';
+    }
+    // 검토 ④: 거절(400)·서버 오류(5xx) 뒤 고침 기록 지움 — 다시 읽은 서버 값 뒤에 다른 기기가 바꾼 값을 그 버린 고침이 덮지 않음
+    for (const st of [400, 500]) {
+      const S = conE({ q_no: 'OLD', paid: '2026-11-01' }, '승인'); S.pipes[0].stages[1].status = 'done'; S.pipes[0].cur = 2;
+      const E = mkE(H, { sha: 'v1', items: [JSON.parse(JSON.stringify(S))], approvals: [] });
+      E.api.set([JSON.parse(JSON.stringify(S))]); E.openId = 'kE'; E.tab = 'ov'; E.force = [st];
+      let c = E.api.get()[0]; E.api.save(c, c.pipes[0], 0, panelE(c.pipes[0].stages[0].vals, { q_no: 'DROPPED' })); await E.fire();   // 거절·오류 → 알림 → 서버 값 다시 읽기
+      E.srv.items[0].pipes[0].stages[0].vals.q_no = 'OTHER'; E.srv.sha = 'v7';
+      c = E.api.get()[0]; E.api.save(c, c.pipes[0], 0, panelE(c.pipes[0].stages[0].vals, { paid: '2031-02-02' })); await E.fire();
+      const v = E.srv.items[0].pipes[0].stages[0].vals;
+      R['f' + st] = { alerts: E.alerts, q_no: v.q_no, paid: v.paid };
+      R['f' + st + 'ok'] = E.alerts === 1 && v.q_no === 'OTHER' && v.paid === '2031-02-02';
+    }
+    // 검토 ④: 단계 찾기 = 이름·차수 대조(자리만이면 서버 쪽에 단계가 하나 끼어든 사본에서 다른 단계에 얹힘)
+    {
+      const S = conE({ q_no: 'OLD' }, '대기'); S.pipes[0].stages[2].vals = { paid: 'P0' };
+      const E = mkE(H, { sha: 'v1', items: [JSON.parse(JSON.stringify(S))], approvals: [{ id: 'a1', cid: 'cE1', ref: 'con:kE|main|1', kind: '청구 검수', status: '대기', created: '2026-11-10T00:00:00Z' }] });
+      E.api.set([JSON.parse(JSON.stringify(S))]); E.openId = 'kE';
+      E.api.render(); await E.flush();
+      // 첫 동기화 뒤 다른 기기가 서버 줄에 단계 하나를 끼워 넣음(이 기기 단계 2 '수금확인'이 서버에선 3번째 자리)
+      const sv = E.srv.items[0]; sv.pipes[0].stages.splice(1, 0, { name: '추가 단계', due: 'manual', status: 'done', vals: { x: '1' } }); sv.pipes[0].stages[2].vals = { y: '1' };
+      E.now += 61000;
+      const c = E.api.get()[0]; E.api.save(c, c.pipes[0], 2, panelE(c.pipes[0].stages[2].vals, { paid: 'P-NEW' })); await E.flush();
+      const st = E.api.get()[0].pipes[0].stages, byName = (n) => st.filter((x) => x.name === n)[0] || {};
+      R.idx = { 수금확인: (byName('수금확인').vals || {}).paid, 청구: JSON.stringify(byName('청구').vals || {}) };
+      R.idxok = (byName('수금확인').vals || {}).paid === 'P-NEW' && !('paid' in (byName('청구').vals || {}));
+    }
+    R.ok = R.d2ok && R.d1ok && R.d1bok && R.raceok && R.f400ok && R.f500ok && R.idxok;
     return R;
   };
   const RE = await runE(html);
@@ -16746,10 +16795,16 @@ try {
     [' if (typeof csValMerge === "function") csValMerge(m, x);', ''],   // 결함 1 409 병합 칸 단위 걷음(종전 — 계약 통째)
     [' if (typeof csValEditNote === "function") csValEditNote(c, p, i, k);', ''],   // 고침 기록 안 남김
     ['      return resp.json().then(function(json){ if (typeof csValEditsDone === "function") csValEditsDone(sentSeq); ', '      return resp.json().then(function(json){ '],   // 저장 200 뒤 기록 안 지움(다른 기기 뒤 값을 계속 덮음)
-    ['if (rs.vals && Object.keys(rs.vals).length) x.vals = JSON.parse(JSON.stringify(rs.vals)); else delete x.vals; return x;', 'return x;']]) {   // 병합이 서버 칸 값을 안 씀
+    ['if (rs.vals && Object.keys(rs.vals).length) s.vals = JSON.parse(JSON.stringify(rs.vals)); else delete s.vals; });', '});'],   // 병합이 서버 칸 값을 안 씀
+    ['if (sc && typeof csSaveDoneSeq !== "undefined" && csSaveDoneSeq !== seq0){ sc = null; csApprSyncAt[id] = 0; }', ''],   // 검토 ① 낡은 사본 버리기 걷음
+    ['      p.stages.forEach(function(s, i){ var rs = rp.stages[i]; if (!s || !rs || s === rs ||', '      p.stages = p.stages.map(function(s){ return Object.assign({}, s); }); p.stages.forEach(function(s, i){ var rs = rp.stages[i]; if (!s || !rs || s === rs ||'],   // 검토 ② 병합이 단계 객체를 새로 만듦
+    ['contractsPending=false; if (typeof csValEditsDone === "function") csValEditsDone(sentSeq); if(ec===', 'contractsPending=false; if(ec==='],   // 검토 ④ 400 뒤 기록 안 지움
+    ['.then(function(json){ contractsPending=false; if (typeof csValEditsDone === "function") csValEditsDone(sentSeq); alert(CON_SAVE_FAIL_MSG', '.then(function(json){ contractsPending=false; alert(CON_SAVE_FAIL_MSG'],   // 검토 ④ 5xx 뒤 기록 안 지움
+    ['contractSha=j.sha; if (typeof renderContracts === "function") renderContracts(); }', 'contractSha=j.sha; }'],   // 검토 ④ 409 병합 뒤 다시 그리기 걷음
+    ['s = same(p.stages[e.i]) ? p.stages[e.i] : p.stages.filter(same)[0];', 's = p.stages[e.i];']]) {   // 검토 ④ 단계 찾기를 자리만으로
     let k; try { k = (await runE(mutE(from, to))).ok; } catch (e) { k = 'err ' + e.message; } KE.push(k);
   }
-  T('P1 판24e 단계 칸 저장 덮임 2건(실행 — 실제 csSaveFields·csApprSync·csSyncFromServer·mergeContracts·doSaveContracts · 가짜 fetch·시계): 결함 2 결재 대기 계약 61초 뒤 [입력 저장] = 결재 동기화 뒤에도 로컬 새 값·서버 새 값(다른 칸 그대로)·결재 승인 → 단계 진행 반영 · 결함 1 옛 화면이 칸 Y만 저장(409) = 다른 기기 칸 X·정산액 남음·Y 새 값·비운 칸 비운 채 · 저장 뒤 기록 지움 = 그 뒤 다른 기기 새 값 남음 · 결함 사본 ' + KE.length + '개(접목 뒤 다시 얹기 걷음·병합 칸 단위 걷음·고침 기록 안 남김·200 뒤 기록 안 지움·병합이 서버 칸 값 안 씀) = 모두 ✗',
+  T('P1 판24e 단계 칸 저장 덮임 2건(실행 — 실제 csSaveFields·csApprSync·csSyncFromServer·mergeContracts·doSaveContracts · 가짜 fetch·시계): 결함 2 결재 대기 계약 61초 뒤 [입력 저장] = 결재 동기화 뒤에도 로컬 새 값·서버 새 값(다른 칸 그대로)·결재 승인 → 단계 진행 반영 · 결함 1 옛 화면이 칸 Y만 저장(409) = 다른 기기 칸 X·정산액 남음·Y 새 값·비운 칸 비운 채·병합 전에 잡은 단계 객체 그대로·병합 뒤 다시 그리기 1번 · 저장 뒤 기록 지움 = 그 뒤 다른 기기 새 값 남음 · (검토) 동기화 사본 요청 뒤 저장이 끝나면 낡은 사본 버림·다음 그리기에서 다시 동기화 · 거절 400·오류 5xx 뒤 기록 지움 · 단계 찾기 이름·차수 대조 · 결함 사본 ' + KE.length + '개(접목 뒤 다시 얹기 걷음·병합 칸 단위 걷음·고침 기록 안 남김·200 뒤 기록 안 지움·병합이 서버 칸 값 안 씀·낡은 사본 버리기 걷음·병합이 단계 객체 새로 만듦·400 뒤·5xx 뒤 기록 안 지움·409 뒤 다시 그리기 걷음·단계 찾기 자리만) = 모두 ✗',
     RE.ok && KE.every((v) => v === false), JSON.stringify({ r: RE, mut: KE }));
 } catch (e) { console.log('  (P1 판24e 검사 생략 — ' + e.message + ')'); fails++; }
 
