@@ -16166,10 +16166,10 @@ try {
     const FT = ['_lib/licduty.js`', '`lic_duty`', '`DUTY_FROM`', '`_lib/conappr.js`', '`CON_APPR_REQUIRED`', ' zipCheck`', ' lockKey`', '`PUSH_LOG_MAX`', '#### 판20', '#### 판24-②③', '원장 C184', '연습 모드', '무응답 = 연습 그대로'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = ['<b>기한 지시(켜진 뒤)</b>', '<b>지난 기한은 닫을 때까지 남습니다</b>', '(계약 › 단계)', '(계약 › 넣기 박스)', '(관리 › 감사 기록)', '(알림함) 알림 기록은 최근 1000건'];
-    const ok = /기준: v483 \(2026-11-15\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 27 && gate.length === 3 && scr.length === 24 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 483 /* v484: 기준 줄·sw = 이 판 이상 */ && ftv.length > 0 && mF.length === 0 && cb.length === 27 && gate.length === 3 && scr.length === 24 && !cb.some((l) => /\(PM/.test(l))
       && MAN.every((s) => d.man.indexOf(s) > 0) && !/lic_duty|licduty|conappr|CON_APPR|zipCheck|PUSH_LOG|settings:|auto_key/.test(MAN.map((s) => cut(d.man, s, '\n')).join(' '))
       && d.cl.indexOf('**P1 판20(v483') > 0 && d.cl.indexOf('**P1 판24-②③ 재감사 수리(v483') > 0
-      && /SHELL_CACHE = 'jw-shell-v483'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 483;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r483 = chk483(D483);
@@ -16339,6 +16339,33 @@ try {
   T('P1 남은 것 ④ 앱 한글 양식 산출(실행 — 실제 fillHwpxTemplate·genMarkBlob·genStoreCopy · 압축 항목 섞인 양식) = 서버 zip 검증(docdiff zipCheck hwpx) 세 판 모두 통과·채운 글 읽힘 · 결함 사본(앱 zip 목록의 항목 위치 1 어긋남) = ✗',
     RHZ16.ok && KHZ16 === false, JSON.stringify({ r: RHZ16.info, mut: KHZ16 }));
 } catch (e) { console.log('  (P1 남은 것 화면 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v484(Phase 1 남은 것 정리 판20b·판24b — PM 11/16 11:00 "다음"): 실행 검사는 위 'P1 판20b'·'P1 남은 것' 블록 · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '484 이상'으로 풀 것
+try {
+  const rd484 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D484 = { ft: rd484('FEATURES.md'), tl: rd484('TESTLIST.md'), sw: rd484('sw.js'), man: rd484('MANUAL.html'), cl: rd484('CLAUDE.md') };
+  const chk484 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v484 (11/16)', '\n### '), tlv = cut(d.tl, '\n## v484 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`reopenNeed`", "`lic_reopen`", "`CON_DUP_ID`", "#### 판20b", "#### 판24b", "원장 C190", "연습 모드"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = ["<b>지시만 지우거나 [완료]해도 끝나지 않습니다</b>", "(2026-11 v484) (계약 › 단계) 결재로 승인·반영된 변경계", "(2026-11 v484) (계약) 다른 기기에서 승인된 변경계약을 이"];
+    const ok = /기준: v484 \(2026-11-16\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 16 && gate.length === 3 && scr.length === 13 && !cb.some((l) => /\(PM/.test(l))
+      && MAN.every((s) => d.man.indexOf(s) > 0) && !/lic_duty|licduty|lic_reopen|conappr|CON_APPR|CON_DUP|carryStale|settings:|auto_key/.test(MAN.map((s) => cut(d.man, s, '\n')).join(' '))
+      && d.cl.indexOf('**P1 판20b(v484') > 0 && d.cl.indexOf('**P1 판24b(v484') > 0
+      && /SHELL_CACHE = 'jw-shell-v484'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r484 = chk484(D484);
+  const mu484 = (k, f) => chk484(Object.assign({}, D484, { [k]: f(D484[k]) })).ok;
+  const M484 = [mu484('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v483 (')), mu484('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v483'")),
+    mu484('ft', (s) => s.split('#### 판24b').join('판24b')),
+    mu484('man', (s) => s.replace('<b>지시만 지우거나 [완료]해도 끝나지 않습니다</b>', '지시만 지우거나 완료해도')), mu484('cl', (s) => s.replace('**P1 판20b(v484', 'P1 판20b(')),
+    mu484('tl', (s) => s.replace('\n- [x] (AI) `servertest` \'P1 판20b\'', '\n- (AI) `servertest` \'P1 판20b\''))];
+  T('v484 문서·판 번호(정확 검사): FEATURES 기준 v484 (2026-11-16)·v484 절(판20b·판24b) · TESTLIST v484 칸 16(화면·운영 확인 13 · 게이트 [x] 3) · MANUAL 인허가 지시·계약(내부 이름 0) · CLAUDE.md 두 줄 · sw jw-shell-v484 · 결함 사본 ' + M484.length + '개 = 모두 ✗',
+    r484.ok && M484.every((v) => v === false), JSON.stringify({ r: r484.info, mut: M484 }));
+} catch (e) { console.log('  (v484 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
