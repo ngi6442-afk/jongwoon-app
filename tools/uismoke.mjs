@@ -16544,10 +16544,10 @@ try {
     const FT = ["`csSnapJoin`", "`csKeepApproved`", "`APPR_REVOKED`", "원장 C193", "'P1 판24c'"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = "<p>(2026-11 v486) (계약 › 단계) 단계 칸을 고쳐 [입력 저장]하면 그 자리에서 고친 값이 ";
-    const ok = /기준: v486 \(2026-11-16\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 3 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 486 && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 3 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
       && d.man.indexOf(MAN) > 0 && !/csSnap|csKeep|APPR_|conappr|mergeContracts|renderContracts/.test(cut(d.man, MAN, '\n'))
       && d.cl.indexOf('**P1 판24c(v486') > 0
-      && /SHELL_CACHE = 'jw-shell-v486'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 486;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r486 = chk486(D486);
@@ -16635,6 +16635,34 @@ try {
   T('P1 판24d 계약 단계 칸 되살리기(실행 — PC·폰): 저장 뒤 다른 칸 저장 = 두 고침 · 빈 값으로 지움 = 지워짐·화면 빈 칸 · 다른 기기 새 값 = 화면·저장 모두 새 값 · 다른 계약 펼침 = 그 계약 값(앞 계약 값이 안 들어감·저장 안 됨) · 치던 값을 둔 채 다른 계약 = 버림(돌아와도 저장값) · 계약 탭 숨김·백그라운드 다시 그리기·폰↔PC 전환 = 치던 값 유지 · 연속 3번 저장 · 저장 실패 다시 읽기 = 화면도 서버 값 · 2026.12.31·1,500 = 2026-12-31·1500으로 보이고 다른 칸 저장에 안 지워짐 · 날짜를 사람이 지움 = 지워짐 · 결함 사본 ' + KD.length + '개(종전 모음·계약 id 대조 걷음·계약 id 안 남김·패널 칸 전부 씀·다른 꼴 날짜 그대로·점수 안 남김) = 모두 ✗',
     RD.ok && KD.every((v) => v === false), JSON.stringify({ r: RD.r, mut: KD }));
 } catch (e) { console.log('  (P1 판24d 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v487(판24d — 계약 단계 칸 되살리기 옛 결함 3꼴 · 원장 C193): 실행 검사는 위 'P1 판24d' 블록 · 여기는 문서·판 번호 정확 검사 + 단계 칸 그리기 줄이 보여 줄 값 함수를 부르는지(독립 검토: 그 호출을 빼도 실행 검사가 통과하던 공백) — 다음 판은 기준 줄·sw를 '487 이상'으로 풀 것
+try {
+  const rd487 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D487 = { ft: rd487('FEATURES.md'), tl: rd487('TESTLIST.md'), sw: rd487('sw.js'), man: rd487('MANUAL.html'), cl: rd487('CLAUDE.md'), ix: rd487('index.html') };
+  const chk487 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v487 (11/16)', '\n### '), tlv = cut(d.tl, '\n## v487 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`csSnapInputs`", "`csRestoreInputs`", "`csSaveFields`", "`csFldShow`", "원장 C193"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = "<p>(2026-11 v487) (계약 › 단계) 칸에 치던 값은 화면이 다시 그려져도 남지만, 저장하지 않";
+    const ok = /기준: v487 \(2026-11-16\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 7 && gate.length === 3 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf(MAN) > 0 && !/csSnap|csRestore|csSave|csFld|data-cs|defaultValue/.test(cut(d.man, MAN, '\n'))
+      && d.cl.indexOf('**P1 판24d(v487') > 0
+      && d.ix.split('v = csFldShow(f[2], v);').length === 2
+      && /SHELL_CACHE = 'jw-shell-v487'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r487 = chk487(D487);
+  const mu487 = (k, f) => chk487(Object.assign({}, D487, { [k]: f(D487[k]) })).ok;
+  const M487 = [mu487('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v486 (')), mu487('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v486'")),
+    mu487('ft', (s) => s.split('`csFldShow`').join('csFldShow')), mu487('ix', (s) => s.replace('v = csFldShow(f[2], v);', '')),
+    mu487('man', (s) => s.replace('(2026-11 v487) (계약', '(계약')), mu487('cl', (s) => s.replace('**P1 판24d(v487', 'P1 판24d(')),
+    mu487('tl', (s) => s.replace('\n- [x] (AI) `uismoke` \'P1 판24d\'', '\n- (AI) `uismoke` \'P1 판24d\''))];
+  T('v487 문서·판 번호(정확 검사): FEATURES 기준 v487 (2026-11-16)·v487 절(판24d) · TESTLIST v487 칸 7(화면 확인 4 · 게이트 [x] 3) · MANUAL 계약 단계 칸(내부 이름 0) · CLAUDE.md 한 줄 · sw jw-shell-v487 · 결함 사본 ' + M487.length + '개 = 모두 ✗',
+    r487.ok && M487.every((v) => v === false), JSON.stringify({ r: r487.info, mut: M487 }));
+} catch (e) { console.log('  (v487 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

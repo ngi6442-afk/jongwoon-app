@@ -1450,3 +1450,12 @@
 - [x] (AI) `servertest` 'P1 판24c'(낡은 사본 병합 뒤 다시 보내기 200 · 병합 없이 보내면 400 · 결함 사본) — ✓ AI 11/16
 - [x] (AI) `uismoke` 'P1 판24c'(가짜 화면 두 곳 + 실제 [입력 저장]·그리기 줄 — PC·폰·빈 칸 · 병합 3꼴 · 결함 사본) · 'P1 판24 앱 스크립트 전체 문법' · v485 문서 검사를 이 판 이상으로 풀고 v486 문서·판 번호 정확 검사 — ✓ AI 11/16
 - [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · 원본 읽기 검사 4종(stmtread a·b·c·d) 전부 통과 + node --check(함수·_lib·sw) + 앱 스크립트 전체 파싱 오류 0 + 시험 서버에서 앱 뜸 — 숫자는 커밋 메시지
+
+## v487 — 판24d: 계약 단계 칸 — 계약을 바꿔 펼치면 앞 계약 값이 넘어감 · 비운 칸 되돌아옴 · 다른 기기 새 값 덮음
+- [ ] (AI 시험 화면 대상 — 판24d) 계약 A 단계 칸을 펼친 채 계약 B 행 → B 칸에 A 값이 없음 · B에서 한 칸 [입력 저장] → B 저장값에 A 값 없음 · A로 돌아오면 A 저장값(치던 값 버림)
+- [ ] (AI 시험 화면 대상 — 판24d) 값이 든 칸을 비우고 [입력 저장] → 빈 칸 그대로·닫았다 열어도 빈 칸 · 같은 패널 다른 칸 저장 뒤에도 빈 칸
+- [ ] (AI 시험 화면 대상 — 판24d) 날짜 칸에 2026.12.31이 든 계약(시험 서버로 넣음) → 2026-12-31로 보임 · 같은 패널 다른 칸 저장 뒤 저장값 2026.12.31 그대로 · 폰 폭에서도
+- [ ] (AI 시험 화면 대상 — 판24d) 두 기기: B가 패널을 연 채 A가 같은 칸을 고쳐 저장 → B에서 결재 동기화(단계 탭 60초)·다시 읽기 뒤 그 칸 = A 값 · B가 다른 칸 저장해도 A 값 남음
+- [x] (AI) `uismoke` 'P1 판24d'(가짜 화면 두 곳 + 실제 함수 — PC·폰 여러 꼴 · 결함 사본) · v485·판24c 칸 검사 · 'P1 판24 앱 스크립트 전체 문법' — ✓ AI 11/16
+- [x] (AI) `servertest` 전 항목(서버 코드 무변) · v486 문서 검사를 이 판 이상으로 풀고 v487 문서·판 번호 정확 검사 — ✓ AI 11/16
+- [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · 원본 읽기 검사 4종(stmtread a·b·c·d) 전부 통과 + node --check(함수·_lib·sw) + 앱 스크립트 전체 파싱 오류 0 + 시험 서버에서 앱 뜸 — 숫자는 커밋 메시지
