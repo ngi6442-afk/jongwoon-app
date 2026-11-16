@@ -16647,11 +16647,11 @@ try {
     const FT = ["`csSnapInputs`", "`csRestoreInputs`", "`csSaveFields`", "`csFldShow`", "원장 C193"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = "<p>(2026-11 v487) (계약 › 단계) 칸에 치던 값은 화면이 다시 그려져도 남지만, 저장하지 않";
-    const ok = /기준: v487 \(2026-11-16\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 7 && gate.length === 3 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 487 && ftv.length > 0 && mF.length === 0 && cb.length === 7 && gate.length === 3 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
       && d.man.indexOf(MAN) > 0 && !/csSnap|csRestore|csSave|csFld|data-cs|defaultValue/.test(cut(d.man, MAN, '\n'))
       && d.cl.indexOf('**P1 판24d(v487') > 0
       && d.ix.split('v = csFldShow(f[2], v);').length === 2
-      && /SHELL_CACHE = 'jw-shell-v487'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 487;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r487 = chk487(D487);
@@ -16807,6 +16807,34 @@ try {
   T('P1 판24e 단계 칸 저장 덮임 2건(실행 — 실제 csSaveFields·csApprSync·csSyncFromServer·mergeContracts·doSaveContracts · 가짜 fetch·시계): 결함 2 결재 대기 계약 61초 뒤 [입력 저장] = 결재 동기화 뒤에도 로컬 새 값·서버 새 값(다른 칸 그대로)·결재 승인 → 단계 진행 반영 · 결함 1 옛 화면이 칸 Y만 저장(409) = 다른 기기 칸 X·정산액 남음·Y 새 값·비운 칸 비운 채·병합 전에 잡은 단계 객체 그대로·병합 뒤 다시 그리기 1번 · 저장 뒤 기록 지움 = 그 뒤 다른 기기 새 값 남음 · (검토) 동기화 사본 요청 뒤 저장이 끝나면 낡은 사본 버림·다음 그리기에서 다시 동기화 · 거절 400·오류 5xx 뒤 기록 지움 · 단계 찾기 이름·차수 대조 · 결함 사본 ' + KE.length + '개(접목 뒤 다시 얹기 걷음·병합 칸 단위 걷음·고침 기록 안 남김·200 뒤 기록 안 지움·병합이 서버 칸 값 안 씀·낡은 사본 버리기 걷음·병합이 단계 객체 새로 만듦·400 뒤·5xx 뒤 기록 안 지움·409 뒤 다시 그리기 걷음·단계 찾기 자리만) = 모두 ✗',
     RE.ok && KE.every((v) => v === false), JSON.stringify({ r: RE, mut: KE }));
 } catch (e) { console.log('  (P1 판24e 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v488(판24e — 계약 단계 칸 저장 덮임 2건 · 원장 C195): 실행 검사는 위 'P1 판24e' 블록 · 여기는 문서·판 번호 정확 검사 + 접목 끝·병합·포커스 되돌림·결재 즉시 반영 쪽 사본 버림의 네 줄이 그대로 있는지(뒤 둘은 독립 재검토: 빼도 실행 검사가 통과하던 공백) — 다음 판은 기준 줄·sw를 '488 이상'으로 풀 것
+try {
+  const rd488 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D488 = { ft: rd488('FEATURES.md'), tl: rd488('TESTLIST.md'), sw: rd488('sw.js'), man: rd488('MANUAL.html'), cl: rd488('CLAUDE.md'), ix: rd488('index.html') };
+  const chk488 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v488 (11/16)', '\n### '), tlv = cut(d.tl, '\n## v488 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`csValEditNote`", "`csValEditsApply`", "`csValMerge`", "`csValEditsDone`", "`csSaveDoneSeq`", "`csFocusTake`", "원장 C195"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = "<p>(2026-11 v488) (계약 › 단계) 단계 칸을 저장하는 사이 결재 결과를 가져오거나 다른 기기";
+    const ok = /기준: v488 \(2026-11-16\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 7 && gate.length === 3 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf(MAN) > 0 && !/csVal|csSync|csAppr|mergeContracts|data-cs|409/.test(cut(d.man, MAN, '\n'))
+      && d.cl.indexOf('**P1 판24e(v488') > 0
+      && d.ix.split("if (typeof csValEditsApply === \"function\" && csValEditsApply(c)) changed = true;").length === 2 && d.ix.split("if (typeof csValMerge === \"function\") csValMerge(m, x);").length === 2 && d.ix.split("csFocusPut([host, dcard], fcs);").length === 2 && d.ix.split("if (sc && typeof csSaveDoneSeq !== \"undefined\" && csSaveDoneSeq !== seq0) sc = null;").length === 2
+      && /SHELL_CACHE = 'jw-shell-v488'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r488 = chk488(D488);
+  const mu488 = (k, f) => chk488(Object.assign({}, D488, { [k]: f(D488[k]) })).ok;
+  const M488 = [mu488('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v487 (')), mu488('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v487'")),
+    mu488('ft', (s) => s.split('`csValMerge`').join('csValMerge')), mu488('ix', (s) => s.replace("if (typeof csValEditsApply === \"function\" && csValEditsApply(c)) changed = true;", '')), mu488('ix', (s) => s.replace("if (typeof csValMerge === \"function\") csValMerge(m, x);", '')), mu488('ix', (s) => s.replace("csFocusPut([host, dcard], fcs);", '')), mu488('ix', (s) => s.replace("if (sc && typeof csSaveDoneSeq !== \"undefined\" && csSaveDoneSeq !== seq0) sc = null;", '')),
+    mu488('man', (s) => s.replace('(2026-11 v488) (계약', '(계약')), mu488('cl', (s) => s.replace('**P1 판24e(v488', 'P1 판24e(')),
+    mu488('tl', (s) => s.replace('\n- [x] (AI) `uismoke` \'P1 판24e\'', '\n- (AI) `uismoke` \'P1 판24e\''))];
+  T('v488 문서·판 번호(정확 검사): FEATURES 기준 v488 (2026-11-16)·v488 절(판24e) · TESTLIST v488 칸 7(화면 확인 4 · 게이트 [x] 3) · MANUAL 계약 단계 칸(내부 이름 0) · CLAUDE.md 한 줄 · sw jw-shell-v488 · 결함 사본 ' + M488.length + '개 = 모두 ✗',
+    r488.ok && M488.every((v) => v === false), JSON.stringify({ r: r488.info, mut: M488 }));
+} catch (e) { console.log('  (v488 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

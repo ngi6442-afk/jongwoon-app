@@ -1459,3 +1459,12 @@
 - [x] (AI) `uismoke` 'P1 판24d'(가짜 화면 두 곳 + 실제 함수 — PC·폰 여러 꼴 · 결함 사본) · v485·판24c 칸 검사 · 'P1 판24 앱 스크립트 전체 문법' — ✓ AI 11/16
 - [x] (AI) `servertest` 전 항목(서버 코드 무변) · v486 문서 검사를 이 판 이상으로 풀고 v487 문서·판 번호 정확 검사 — ✓ AI 11/16
 - [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · 원본 읽기 검사 4종(stmtread a·b·c·d) 전부 통과 + node --check(함수·_lib·sw) + 앱 스크립트 전체 파싱 오류 0 + 시험 서버에서 앱 뜸 — 숫자는 커밋 메시지
+
+## v488 — 판24e: 계약 단계 칸 — 결재 대기 계약의 저장이 옛 값으로 · 옛 화면 저장이 다른 기기 칸을 되돌림
+- [x] (AI 시험 화면 대상 — 판24e) 결재 대기 단계가 있는 시험 계약의 단계 탭을 70초 열어 둔 뒤 칸 하나 [입력 저장] → 화면·서버 새 값 · 다른 칸 그대로 — ✓ AI 11/16 시험 서버 PC 1400·폰 420
+- [x] (AI 시험 화면 대상 — 판24e) 탭 둘로 같은 계약 청구 패널 → 탭1 세금계산서 번호 저장 → 탭2에서 입금일만 저장(청구일 비움) → 서버 번호 = 탭1 값 · 입금일 새 값 · 청구일 빈 칸 · 탭2 화면 번호 = 탭1 값 — ✓ AI 11/16 PC 1400·폰 420
+- [x] (AI 시험 화면 대상 — 판24e) 탭2가 칸 저장 직후 다른 칸에 치는 중 409 병합 → 치던 글자·커서가 끊기지 않음 — ✓ AI 11/16 PC 1400(36자 · 포커스 잃음 0)
+- [ ] (AI 운영 확인 — 판24e) 배포 뒤 결재 대기 계약이 생기면 그 계약 단계 탭에서 60초 넘긴 [입력 저장] 한 번(직원 화면 — 값이 남는지)
+- [x] (AI) `uismoke` 'P1 판24e'(실제 저장·결재 동기화·접목·병합 함수 + 가짜 통신·시계 · 결함 사본 11 · 늦게 온 결재 동기화 사본 경합은 화면에서 시각을 맞추기 어려워 이 검사로만) · 판24c·판24d 칸 검사 · 'P1 판24 앱 스크립트 전체 문법' — ✓ AI 11/16
+- [x] (AI) `servertest` 전 항목(서버 코드 무변) · v487 문서 검사를 이 판 이상으로 풀고 v488 문서·판 번호 정확 검사 — ✓ AI 11/16
+- [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · 원본 읽기 검사 4종(stmtread a·b·c·d) 전부 통과 + node --check(함수·_lib·sw) + 앱 스크립트 전체 파싱 오류 0 + 시험 서버에서 앱 뜸 — 숫자는 커밋 메시지
