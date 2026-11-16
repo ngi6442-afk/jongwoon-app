@@ -16452,9 +16452,9 @@ try {
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = ['<p>(2026-11 v485) (차량) 법정 검사 제안과 넣은 검사 만기가 다를 때', '<p>(2026-11 v485) (관리 › 감사 기록) 인사 근거'];
     const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check'];
-    const ok = /기준: v485 \(2026-11-16\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 6 && scr.length === 4 && gate.length === 2 && scr.every((l) => /^- \[x\]/.test(l)) && !cb.some((l) => /PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 485 && ftv.length > 0 && mF.length === 0 && cb.length === 6 && scr.length === 4 && gate.length === 2 && scr.every((l) => /^- \[x\]/.test(l)) && !cb.some((l) => /PM/.test(l))
       && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && MAN.every((s) => d.man.indexOf(s) > 0) && !/vehLaw|AUDIT_|csSnap|byHand|ceq|flex/.test(MAN.map((s) => cut(d.man, s, '\n')).join(' '))
-      && d.cl.indexOf('**45-1 묶음 2(v485') > 0 && /SHELL_CACHE = 'jw-shell-v485'/.test(d.sw);
+      && d.cl.indexOf('**45-1 묶음 2(v485') > 0 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 485;
     return { ok, info: { mF, cb: cb.length, scr: scr.length, gate: gate.length } };
   };
   const r84 = chk84(D84);
@@ -16529,6 +16529,33 @@ try {
   T('P1 판24c 화면(H1·H2·H3 — 실행): ①② 상세 두 뿌리 칸 모음 하나로 — PC(표 펼침 보임·폰 카드 숨음)·폰(반대)·빈 칸 모두 [입력 저장] 직후 보이는 칸·숨은 사본 = 새 값 · 이어 같은 단계 다른 칸 저장 = 두 고침 모두 모델에 · 저장 전 다시 그리기에도 치던 값 유지(v382) ③ 변경 차수를 모르던 낡은 사본 병합 = 서버의 승인된 차수 붙임(줄 없음·빈 줄·2차만 모름) · 로컬 고침 남음 · 이미 있으면 그대로 · 결함 사본 ' + KC.length + '개(종전 그리기 줄·점수 안 남김·같은 열쇠 둘 다·줄 없는 사본·모자란 차수) = 모두 ✗',
     okC(RC) && RM.ok && KC.every((v) => v === false), JSON.stringify({ c: RC, m: RM.info, mut: KC }));
 } catch (e) { console.log('  (P1 판24c 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v486(판24c — v484 화면 확인 결함 수리 · 원장 C193): 실행 검사는 위 'P1 판24c' 블록 · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '486 이상'으로 풀 것
+try {
+  const rd486 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D486 = { ft: rd486('FEATURES.md'), tl: rd486('TESTLIST.md'), sw: rd486('sw.js'), man: rd486('MANUAL.html'), cl: rd486('CLAUDE.md') };
+  const chk486 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v486 (11/16)', '\n### '), tlv = cut(d.tl, '\n## v486 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`csSnapJoin`", "`csKeepApproved`", "`APPR_REVOKED`", "원장 C193", "'P1 판24c'"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = "<p>(2026-11 v486) (계약 › 단계) 단계 칸을 고쳐 [입력 저장]하면 그 자리에서 고친 값이 ";
+    const ok = /기준: v486 \(2026-11-16\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 3 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf(MAN) > 0 && !/csSnap|csKeep|APPR_|conappr|mergeContracts|renderContracts/.test(cut(d.man, MAN, '\n'))
+      && d.cl.indexOf('**P1 판24c(v486') > 0
+      && /SHELL_CACHE = 'jw-shell-v486'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r486 = chk486(D486);
+  const mu486 = (k, f) => chk486(Object.assign({}, D486, { [k]: f(D486[k]) })).ok;
+  const M486 = [mu486('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v485 (')), mu486('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v485'")),
+    mu486('ft', (s) => s.split('`csSnapJoin`').join('csSnapJoin')),
+    mu486('man', (s) => s.replace('(2026-11 v486) (계약', '(계약')), mu486('cl', (s) => s.replace('**P1 판24c(v486', 'P1 판24c(')),
+    mu486('tl', (s) => s.replace('\n- [x] (AI) `servertest` \'P1 판24c\'', '\n- (AI) `servertest` \'P1 판24c\''))];
+  T('v486 문서·판 번호(정확 검사): FEATURES 기준 v486 (2026-11-16)·v486 절(판24c) · TESTLIST v486 칸 6(화면 확인 3 · 게이트 [x] 3) · MANUAL 계약 단계 칸(내부 이름 0) · CLAUDE.md 한 줄 · sw jw-shell-v486 · 결함 사본 ' + M486.length + '개 = 모두 ✗',
+    r486.ok && M486.every((v) => v === false), JSON.stringify({ r: r486.info, mut: M486 }));
+} catch (e) { console.log('  (v486 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
