@@ -12081,17 +12081,35 @@ function J91a(x) { return JSON.stringify(x); }
       return { codes: codes.join(' '), eff: k ? effZ16(k) : 'gone', del: k ? (k.del === 1 ? 1 : 0) : '-', st: s ? s.status + '/' + (s.appr ? s.appr.status : '-') : '-' };
     };
     const au0 = auditMock.logs.length;
-    // 거절 — 지우면서 승인 차수 끄기(열림·상신 기록 지움 → 복구) · 건너뜀 · 반려로 · 사본 바꿈 · 목록에서 뺌 · 정상 삭제 뒤 복구하면서 끄기
-    I.offDel = await seq([APZ16()], [(n) => { n[0].del = 1; n[0].updated_ts = 1; S1Z16(n).status = 'open'; delete S1Z16(n).appr; n[0].pipes[1].cur = 0; }, (n) => { n[0].del = 0; n[0].updated_ts = 2; }]);
+    // 거절 — 지우면서 건너뜀 · 반려로 · 사본 바꿈 · 목록에서 뺌 · (검토 A — 낡은 사본으로 설명 안 되는 꼴) 상태만 열림·승인 표시는 둠 · 다른 번호 대기 · 끝남인데 상신 기록 없음
     I.skipDel = await seq([APZ16()], [(n) => { n[0].del = 1; S1Z16(n).status = 'skipped'; }]);
     I.rejDel = await seq([APZ16()], [(n) => { n[0].del = 1; S1Z16(n).appr.status = '반려'; }]);
     I.snapDel = await seq([APZ16()], [(n) => { n[0].del = 1; S1Z16(n).appr.snap = { chg_amt: 99999, chg_end: '2027-03-31' }; }]);
     I.omit = await seq([APZ16()], [(n) => n.slice(1)]);
-    I.restoreOff = await seq([APZ16()], [(n) => { n[0].del = 1; n[0].updated_ts = 1; }, (n) => { n[0].del = 0; n[0].updated_ts = 2; S1Z16(n).status = 'open'; delete S1Z16(n).appr; }]);
+    I.openKeep = await seq([APZ16()], [(n) => { n[0].del = 1; S1Z16(n).status = 'open'; n[0].pipes[1].cur = 0; }]);
+    I.otherCid = await seq([APZ16()], [(n) => { n[0].memo = 'x'; S1Z16(n).status = 'open'; S1Z16(n).appr = { cid: 'zz9', kind: '계약 단계', status: '대기', snap: cpZ16(SNZ16) }; }]);
+    I.doneBare = await seq([APZ16()], [(n) => { n[0].del = 1; delete S1Z16(n).appr; }]);
+    I.dup = await seq([APZ16()], [(n) => { const f = cpZ16(n[0]); f.pipes[1].stages[0].status = 'skipped'; return [f].concat(n); }]);
     const auRej = auditMock.logs.slice(au0).filter((l) => l.col === 'contracts' && l.ev && l.ev[0] && l.ev[0].op === '결재 없는 단계 거절');
-    const deny = I.offDel.codes === '400:CON_APPR_REVOKED 200' && I.offDel.eff === 1500 && I.offDel.del === 0 && I.skipDel.codes === '400:CON_APPR_REVOKED' && I.rejDel.codes === '400:CON_APPR_REVOKED'
-      && /^400:CON_APPR_/.test(I.snapDel.codes) && I.snapDel.eff === 1500 && I.omit.codes === '400:CON_APPR_REVOKED' && I.omit.eff === 1500 && I.restoreOff.codes === '200 400:CON_APPR_REVOKED' && I.restoreOff.del === 1 && I.restoreOff.eff === 1500
-      && auRej.length === 6 && auRej.some((l) => l.ev[0].id === 'kz1|chg|0') && !/변경계약|1500/.test(JSON.stringify(auRej));
+    const deny = I.skipDel.codes === '400:CON_APPR_REVOKED' && I.rejDel.codes === '400:CON_APPR_REVOKED' && /^400:CON_APPR_/.test(I.snapDel.codes) && I.snapDel.eff === 1500
+      && I.omit.codes === '400:CON_APPR_REVOKED' && I.omit.eff === 1500 && I.openKeep.codes === '400:CON_APPR_REVOKED' && I.otherCid.codes === '400:CON_APPR_REVOKED' && I.doneBare.codes === '400:CON_APPR_REVOKED'
+      && I.dup.codes === '400:CON_DUP_ID' && I.dup.eff === 1500 && mem.gw_data['col:contracts'].items.length === 2
+      && [I.skipDel, I.rejDel, I.omit, I.openKeep, I.otherCid, I.doneBare].every((x) => x.eff === 1500 && x.del === 0 && x.st === 'done/승인')
+      && auRej.length === 7 && auRej.some((l) => l.ev[0].id === 'kz1|chg|0') && !/변경계약|1500/.test(JSON.stringify(auRej));
+    // (검토 A) 상신 기록이 없는 낡은 사본 = 이월(그 단계 서버 승인 값 · 다른 고침·삭제는 반영 · 감사 1줄) — 지워 보낸 것도 같은 결과(유효 금액 그대로 = 얻는 것 없음)
+    const au1 = auditMock.logs.length;
+    const bare = (n) => { const s = S1Z16(n); s.status = 'open'; delete s.appr; delete s.done_at; n[0].pipes[1].cur = 0; };
+    I.offDel = await seq([APZ16()], [(n) => { n[0].del = 1; n[0].updated_ts = 1; bare(n); }, (n) => { n[0].del = 0; n[0].updated_ts = 2; }]);
+    I.restoreOff = await seq([APZ16()], [(n) => { n[0].del = 1; n[0].updated_ts = 1; }, (n) => { n[0].del = 0; n[0].updated_ts = 2; bare(n); }]);
+    I.bareEdit = await seq([APZ16()], [(n) => { bare(n); S1Z16(n).status = 'pending'; n[0].memo = 'B'; }]);
+    const bareMemo = (mem.gw_data['col:contracts'].items[0].memo === 'B');
+    const auKept = auditMock.logs.slice(au1).filter((l) => l.col === 'contracts' && (l.ev || []).some((e) => e.op === '낡은 사본의 승인 차수 이월')).length;
+    blobsMock.hooks.failGet = (k) => k === 'col:approvals';
+    try { I.bareApFail = await seq([APZ16()], [(n) => { bare(n); n[0].memo = 'C'; }]); } finally { blobsMock.hooks.failGet = null; }
+    const keep = I.offDel.codes === '200:kept1 200' && I.offDel.eff === 1500 && I.offDel.del === 0 && I.offDel.st === 'done/승인'
+      && I.restoreOff.codes === '200 200:kept1' && I.restoreOff.eff === 1500 && I.restoreOff.del === 0 && I.restoreOff.st === 'done/승인'
+      && I.bareEdit.codes === '200:kept1' && I.bareEdit.st === 'done/승인' && I.bareEdit.eff === 1500 && bareMemo && auKept === 3
+      && I.bareApFail.codes === '500:APPROVALS_READ_FAILED' && I.bareApFail.st === 'done/승인';
     // 허용 — 앱 [삭제](단계 그대로) → 복구 · 낡은 사본(같은 번호·같은 사본 대기)으로 지움 = 이월(그 단계 서버 승인 값) → 복구 · 승인 차수 없는 계약 지우며 단계 손질 · 옛 화면 카드(사본 없음) 차수는 지우며 상신 기록 지움 · 다른 계약 지움
     I.del = await seq([APZ16()], [(n) => { n[0].del = 1; n[0].updated_ts = 1; }, (n) => { n[0].del = 0; n[0].updated_ts = 2; }]);
     const stale = (n) => { const s = S1Z16(n); s.status = 'open'; delete s.done_at; s.appr.status = '대기'; n[0].pipes[1].cur = 0; n[0].memo = 'x'; n[0].del = 1; n[0].updated_ts = 1; };
@@ -12101,9 +12119,29 @@ function J91a(x) { return JSON.stringify(x); }
     I.oldCard = await seq([APZ16({ snap: undefined })], [(n) => { n[0].del = 1; S1Z16(n).status = 'open'; delete S1Z16(n).appr; }]);
     I.other = await seq([APZ16()], [(n) => { n[1].del = 1; n[1].updated_ts = 1; S1Z16(n).vals = { chg_amt: 1500, chg_end: '2027-03-31', memo: 'm' }; }]);
     const allow = I.del.codes === '200 200' && I.del.eff === 1500 && I.del.del === 0 && I.staleDel.codes === '200:kept1' && I.staleDel.del === 1 && I.staleDel.st === 'done/승인' && I.staleDel.eff === 1500
-      && I.staleDelRestore.codes === '200:kept1 200' && I.staleDelRestore.del === 0 && I.staleDelRestore.eff === 1500 && I.noAppr.codes === '200' && I.oldCard.codes === '200' && I.other.codes === '200';
-    return { ok: deny && allow, info: { deny, allow, I, au: auRej.length } };
+      && I.staleDelRestore.codes === '200:kept1 200' && I.staleDelRestore.del === 0 && I.staleDelRestore.eff === 1500 && I.noAppr.codes === '200' && I.oldCard.codes === '200' && I.oldCard.st === 'open/-' && I.other.codes === '200';
+    // (검토 A 재현 꼴) 상신 전에 연 기기가 같은 날 그 계약을 고침·지움 — 실제 앱 mergeContracts(409 → 다시 읽어 병합 → 다시 저장) + 서버 핸들러
+    const m409 = async (edit) => {
+      mem.gw_users['member:uwz16'] = WZ16; mem.gw_data['col:contracts'] = { schema: 1, items: [KZ16('kz1', true), KZ16('kz2', true)], updated_at: 31 }; mem.gw_data['col:approvals'] = { schema: 1, items: [APZ16()], updated_at: 5 };
+      let items = [KZ16('kz1', false), KZ16('kz2', true)]; edit(items); let base = 30; const codes = [];
+      for (let k = 0; k < 3; k++) {
+        const r = await c({ action: 'save', collection: 'contracts', base, doc: { schema: 1, items } }, tWZ16, 'dev1'); codes.push(r.code + (r.body.error_code ? ':' + r.body.error_code : ''));
+        if (r.code !== 409) break;
+        const sv = cpZ16(mem.gw_data['col:contracts']); items = mergeAppZ16(items, sv.items); base = sv.updated_at;
+      }
+      const kk = mem.gw_data['col:contracts'].items.find((x) => x.id === 'kz1'), s = kk.pipes[1].stages[0];
+      return { codes: codes.join(' '), eff: effZ16(kk), del: kk.del === 1 ? 1 : 0, memo: kk.memo || '', st: s.status + '/' + (s.appr ? s.appr.status : '-') };
+    };
+    I.m409edit = await m409((n) => { n[0].memo = 'B'; });
+    I.m409del = await m409((n) => { n[0].del = 1; n[0].updated_ts = Date.now(); });
+    const mOk = I.m409edit.codes === '409:STALE_BASE 200' && I.m409edit.memo === 'B' && I.m409edit.st === 'done/승인' && I.m409edit.eff === 1500
+      && I.m409del.codes === '409:STALE_BASE 200' && I.m409del.del === 1 && I.m409del.st === 'done/승인' && I.m409del.eff === 1500;
+    return { ok: deny && keep && allow && mOk, info: { deny, keep, allow, mOk, I, au: auRej.length } };
   };
+  // 앱 실제 병합(index.html mTime·mergeDel·csKeepApproved·mergeContracts) — 409 재시도 길
+  const HZ16 = fsZ16.readFileSync(join(FN, '..', '..', 'index.html'), 'utf8');
+  const pickZ16 = (name) => { const i = HZ16.indexOf('\n  function ' + name + '('); if (i < 0) throw new Error('함수 없음 ' + name); const rest = HZ16.slice(i + 1); const m = /\n  (?:async )?function |\n  var |\n  \/\//.exec(rest.slice(5)); return rest.slice(0, m ? m.index + 5 : rest.length); };
+  const mergeAppZ16 = new Function(['mTime', 'mergeDel', 'csKeepApproved', 'mergeContracts'].map(pickZ16).join('\n') + '\nreturn mergeContracts;')();
   // ② 직접 올리기 최종본 hwpx zip 검증 — 가짜(10바이트)·mimetype 없는 zip = 400 BAD_ZIP · 실제 꼴 최소 hwpx(최종본·초안·받은 서류) = 200
   const zipZ16 = (ents) => { const parts = [], cen = []; let off = 0;
     const crc = (b) => { let x = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) { x ^= b[i]; for (let k = 0; k < 8; k++) x = (x & 1) ? (0xEDB88320 ^ (x >>> 1)) : (x >>> 1); } return (x ^ 0xFFFFFFFF) >>> 0; };
@@ -12128,7 +12166,7 @@ function J91a(x) { return JSON.stringify(x); }
   try {
     resetZ16();
     const D0 = await chkDelZ16(gwd);
-    T('P1 남은 것 ① 계약 삭제·목록 빠짐도 승인 차수 대조 — 거절(400 CON_APPR_REVOKED·서버 그대로·유효 금액 1500 유지): 지우면서 차수 끄기(열림·상신 기록 지움) 뒤 복구 · 지우면서 건너뜀·반려로 · 지우면서 사본 바꿈 · 목록에서 뺌 · 정상 삭제 뒤 복구하면서 끄기 · 감사 "결재 없는 단계 거절" 6줄(자리만) / 허용: 앱 [삭제] → 복구 200·유효 금액 그대로 · 낡은 대기 사본으로 지움 = 이월 200(con_kept·그 단계 서버 승인 값) → 복구 200 · 승인 차수 없는 계약 · 옛 화면 카드(사본 없음) 차수 상신 기록 지움 · 다른 계약 지움',
+    T('P1 남은 것 ① 계약 삭제·목록 빠짐도 승인 차수 대조 — 거절(400·서버 그대로·유효 금액 1500 유지): 지우면서 건너뜀·반려로·사본 바꿈 · 목록에서 뺌 · (검토 A) 상태만 열림·승인 표시는 둠 · 다른 번호 대기 · 끝남인데 상신 기록 없음 · (검토 B1) 같은 id 두 줄 = 400 CON_DUP_ID · 감사 "결재 없는 단계 거절" 7줄(자리만) / (검토 A) 상신 기록 없는 낡은 사본(열림·대기 전) = 이월 200(지우며 끔 → 복구 · 삭제 뒤 복구하며 끔 · 고침 — 그 단계 서버 승인 값·유효 금액 그대로·감사 이월 3줄) · 결재함 못 읽음 500 · 409 → 앱 mergeContracts 병합 → 200(상신 전 기기의 고침·삭제 남음) / 허용: 앱 [삭제] → 복구 · 낡은 대기 사본으로 지움 = 이월 → 복구 · 승인 차수 없는 계약 · 옛 화면 카드(사본 없음) 차수 상신 기록 지움(이월 안 함 — 다시 상신 길) · 다른 계약 지움',
       D0.ok, JSON.stringify(D0.info));
     resetZ16();
     const H0 = await chkHwZ16(gwd);
@@ -12138,14 +12176,18 @@ function J91a(x) { return JSON.stringify(x); }
       ['ca', '    const o = oldBy[id], c = newBy[id] || null;\n    if (!isObj(o)) return;', '    const o = oldBy[id], c = newBy[id] || null;\n    if (!isObj(o) || !c || c.del === 1) return;', chkDelZ16],   // ① 종전(지운 계약·빠진 계약 대상 아님)
       ['ca', '    const o = oldBy[id], c = newBy[id] || null;\n    if (!isObj(o)) return;', '    const o = oldBy[id], c = newBy[id] || null;\n    if (!isObj(o) || !c) return;', chkDelZ16],   // ① 목록 빠짐만 대상 아님
       ['ca', '    if (!isObj(c) || c.id == null) return;\n    const o = oldBy[String(c.id)]; if (!isObj(o) || !Array.isArray(o.pipes) || !Array.isArray(c.pipes)) return;', '    if (!isObj(c) || c.id == null || c.del === 1) return;\n    const o = oldBy[String(c.id)]; if (!isObj(o) || !Array.isArray(o.pipes) || !Array.isArray(c.pipes)) return;', chkDelZ16],   // ① 지우는 저장 이월 걷음
-      ['data', '    const zcP = cdocZipOk(ext, b64);', "    const zcP = (kind === 'final' && ext === 'hwpx') ? { ok: true } : cdocZipOk(ext, b64);", chkHwZ16]];   // ④ 최종본 hwpx 예외 되살림
+      ['data', '    const zcP = cdocZipOk(ext, b64);', "    const zcP = (kind === 'final' && ext === 'hwpx') ? { ok: true } : cdocZipOk(ext, b64);", chkHwZ16],   // ④ 최종본 hwpx 예외 되살림
+      ['ca', " || !STALE_BARE[s.status == null ? '' : String(s.status)]) return;", ') return;', chkDelZ16],   // 검토 A 상신 기록 없는 사본의 상태 대조 걷음(끝남도 이월)
+      ['ca', '    if (!(card && isObj(card.snap) && snapKey(card) === snapKey(os.appr))) return;\n', '', chkDelZ16],   // 검토 A 카드 묶음 대조 걷음(옛 카드 다시 상신 길 막힘)
+      ['data', '    if (CONAPPR.bareCand(oldItems, doc.items)) {', '    if (false) {', chkDelZ16],   // 검토 A 상신 기록 없는 사본 이월 걷음(종전 = 거절)
+      ['data', '    if (conDup) return jr(400,', '    if (false) return jr(400,', chkDelZ16]];   // 검토 B1 같은 id 두 줄 받음
     const kZ16 = [];
     for (const [w, from, to, fn] of MZ16) {
       let k;
       try { const r = await withCAZ16(w === 'ca' ? mutZ16(SCAZ16, from, to) : SCAZ16, w === 'data' ? mutZ16(SDATAZ16, from, to) : SDATAZ16, fn); k = !r.ok; } catch (e) { k = 'err ' + e.message; }
       kZ16.push(k);
     }
-    T('P1 남은 것 결함 사본 ' + MZ16.length + '개(지운 계약·빠진 계약 대조 걷음 · 빠진 계약만 걷음 · 지우는 저장 이월 걷음 · 최종본 hwpx 예외 되살림) = 모두 ✗', kZ16.every((v) => v === true), JSON.stringify(kZ16));
+    T('P1 남은 것 결함 사본 ' + MZ16.length + '개(지운 계약·빠진 계약 대조 걷음 · 빠진 계약만 걷음 · 지우는 저장 이월 걷음 · 최종본 hwpx 예외 되살림 · 검토: 상신 기록 없는 사본 상태 대조 걷음·카드 묶음 대조 걷음·그 이월 걷음·같은 id 두 줄 받음) = 모두 ✗', kZ16.every((v) => v === true), JSON.stringify(kZ16));
   } catch (e) { T('P1 남은 것 검사 실행', false, String(e && e.stack || e).slice(0, 500)); }
   finally { require.cache[RPZ16] = savedCAZ16; resetZ16(); }
 }

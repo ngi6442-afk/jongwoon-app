@@ -128,6 +128,46 @@ function carryStale(oldItems, newItems) {
   });
   return out;
 }
+// 11/16 검토 A(원천): 상신 기록이 아예 없는 낡은 사본 — 상신 전에 화면을 연 기기가 같은 날 그 계약을 고치거나 지우면(409 병합에서 로컬이 이김) 그 단계는
+//   '열림·대기 전(pending)·상태 없음' + 상신 기록 없음으로 온다. 종전엔 되돌리기(APPR_REVOKED)로 거절돼 그 기기의 다른 고침·삭제가 사라졌다 → 그 단계만 서버 승인 값으로 이월.
+//   지워 보낸 것과 낡은 사본은 가를 수 없지만 이월은 서버 값을 지키므로 얻는 것이 없다(유효 금액 불변). 단 결재함 카드가 그 승인 사본과 묶여 있을 때만 —
+//   사본 없는·다른 옛 카드의 승인은 상신 기록을 지워 다시 상신하는 길(scan release)을 그대로 둔다. 상태가 끝남·건너뜀이거나 상신 기록이 있는데 꼴이 다르면 이월 아님(거절 그대로)
+const STALE_BARE = { '': 1, 'open': 1, 'pending': 1 };
+function bareEach(oldItems, newItems, fn) {
+  const oldBy = {};
+  (Array.isArray(oldItems) ? oldItems : []).forEach(function (o) { if (o && o.id != null) oldBy[String(o.id)] = o; });
+  (Array.isArray(newItems) ? newItems : []).forEach(function (c) {
+    if (!isObj(c) || c.id == null || !Array.isArray(c.pipes)) return;
+    const o = oldBy[String(c.id)]; if (!isObj(o) || !Array.isArray(o.pipes)) return;
+    o.pipes.forEach(function (op) {
+      if (!isObj(op) || !Array.isArray(op.stages)) return;
+      const p = c.pipes.find(function (q) { return isObj(q) && q.key === op.key; });
+      if (!p || !Array.isArray(p.stages)) return;
+      op.stages.forEach(function (os, i) {
+        if (!(isObj(os) && os.aw === 'amt' && os.status === 'done' && isObj(os.appr) && os.appr.status === '승인' && isObj(os.appr.snap) && os.appr.cid)) return;
+        const s = p.stages[i];
+        if (!isObj(s) || s.appr != null || stageId(s) !== stageId(os) || !STALE_BARE[s.status == null ? '' : String(s.status)]) return;
+        fn(c, o, p, op, s, os, i);
+      });
+    });
+  });
+}
+// 이번 저장에 상신 기록 없는 낡은 사본 후보가 있는가(있으면 결재함을 읽어 carryBare에 넘김)
+function bareCand(oldItems, newItems) { let n = 0; bareEach(oldItems, newItems, function () { n++; }); return n > 0; }
+function carryBare(oldItems, newItems, apItems) {
+  const out = [];
+  bareEach(oldItems, newItems, function (c, o, p, op, s, os, i) {
+    const ref = 'con:' + c.id + '|' + op.key + '|' + i, cid = String(os.appr.cid);
+    const card = (apItems || []).find(function (x) { return x && x.ref === ref && x.cid === cid && x.status === '승인'; });
+    if (!(card && isObj(card.snap) && snapKey(card) === snapKey(os.appr))) return;
+    const kept = Object.assign({}, s, { status: os.status, appr: JSON.parse(JSON.stringify(os.appr)) });
+    if (os.done_at !== undefined) kept.done_at = os.done_at; else delete kept.done_at;
+    p.stages[i] = kept;
+    p.cur = Math.max(Number(p.cur) || 0, Number(op.cur) || 0);
+    out.push({ cid: String(c.id), pipe: String(op.key || ''), i: i });
+  });
+  return out;
+}
 // 3차 재검토 B1(덧대기 — 막지 않음): 승인된 변경계약 차수가 있는 계약에서 원계약 금액·준공일 칸(contract_info.amount·d3)이 바뀐 계약 — 감사 줄용(값 없음). 반환 [{cid, f:['amount'|'d3']}]
 function origChanged(oldItems, newItems) {
   const oldBy = {}, out = [];
@@ -160,4 +200,4 @@ function judge(rows, apItems) {
   });
   return out;
 }
-module.exports = { CON_APPR_KINDS, apprKind, apprKindOf, ownKind, chgAmtMoved, chgTermMoved, scan, judge, approvedItem, origChanged, carryStale };
+module.exports = { CON_APPR_KINDS, apprKind, apprKindOf, ownKind, chgAmtMoved, chgTermMoved, scan, judge, approvedItem, origChanged, carryStale, bareCand, carryBare };

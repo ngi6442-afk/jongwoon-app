@@ -689,12 +689,26 @@ async function handleSave(event, d, R) {
   //   직전 문서를 못 읽었으면 빈 문서로 보고 센다(더 닫힌 쪽 — 결재된 단계는 결재함 항목으로 통과). 결재함을 못 읽으면 500(통과시키지 않음)
   let conKept = [];   // P1 판24 5차: 낡은 사본에서 서버 승인 값으로 되돌려 둔 변경계약 단계(응답 con_kept · 감사 줄)
   let conOrig = [];   // 3차 재검토 B1(덧대기): 승인된 변경계약이 있는 계약의 원계약 금액·준공일 칸 바뀜 — 감사 줄만(값 없음 · 막지 않음)
+  // 11/16 검토 B1: 같은 id의 계약이 두 줄이면 거절 — 결재 대조는 id당 한 줄만 보므로(승인 차수를 끈 줄을 같은 id로 앞에 끼우면 대조를 비켜 감). 앱은 id 한 줄씩만 만든다(새 계약 genId · 병합 id 묶음)
+  if (col === 'contracts' && Array.isArray(doc.items)) {
+    const conIdSeen = {};
+    let conDup = 0;
+    doc.items.forEach(function (x) { if (x && typeof x === 'object' && x.id != null) { const k = String(x.id); if (conIdSeen[k]) conDup++; conIdSeen[k] = 1; } });
+    if (conDup) return jr(400, { status: 'REJECTED', error_code: 'CON_DUP_ID', n: conDup, request_id: R });
+  }
+  let conAp0 = null;
   if (col === 'contracts') {
     try { conKept = CONAPPR.carryStale(oldItems, doc.items); } catch (e) { conKept = []; }   // 5차: 낡은 사본의 승인 차수 이월(거절하지 않음 — 그 단계만 서버 값)
+    // 11/16 검토 A: 상신 기록이 없는 낡은 사본(상신 전 화면)도 이월 — 결재함 카드가 그 승인 사본과 묶여 있을 때만(_lib/conappr carryBare). 후보가 있을 때만 결재함을 읽음
+    if (CONAPPR.bareCand(oldItems, doc.items)) {
+      conAp0 = await approvalsDoc(store(DATA));
+      if (!conAp0.ok) return jr(500, { status: 'ERROR', error_code: 'APPROVALS_READ_FAILED', request_id: R });
+      try { conKept = conKept.concat(CONAPPR.carryBare(oldItems, doc.items, conAp0.doc.items)); } catch (e) {}
+    }
     try { conOrig = CONAPPR.origChanged(oldItems, doc.items); } catch (e) { conOrig = []; }
     const caRows = CONAPPR.scan(oldItems, doc.items);   // 직전을 못 읽었으면 oldItems = [](위 읽기) — 모든 결재 대상 끝남·승인을 결재함과 대조
     if (caRows.length) {
-      const rdCa = await approvalsDoc(store(DATA));
+      const rdCa = conAp0 || await approvalsDoc(store(DATA));
       if (!rdCa.ok) return jr(500, { status: 'ERROR', error_code: 'APPROVALS_READ_FAILED', request_id: R });
       const caBad = CONAPPR.judge(caRows, rdCa.doc.items);
       if (caBad.length) {

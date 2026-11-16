@@ -14329,7 +14329,9 @@
   var CON_APPR_OLD_MSG = "이 변경계약 상신은 옛 화면에서 올라와 승인돼도 계약에 반영할 수 없습니다 — 단계 카드에서 다시 상신해 주세요(결재함의 그 카드는 효과 없음).";   // P1 판24-③ 3차 재검토
   var SNAP_REQUIRED_MSG = "변경계약 상신이 받아지지 않았습니다 — 화면을 새로 고친 뒤 단계 카드에서 다시 상신해 주세요(변경 금액·종료일 사본이 없는 옛 화면의 상신).";   // 3차 재검토(서버 400 SNAP_REQUIRED)
   var CON_SAVE_FAIL_MSG = "계약이 서버에 저장되지 않았습니다(서버 오류) — 서버에 저장된 값으로 다시 불러옵니다. 방금 고친 내용은 잠시 뒤 다시 입력해 주세요.";   // P1 판24-③ 검토 B9
-  function scheduleContractSave(){ contractsPending=true; if(contractSaveTimer) clearTimeout(contractSaveTimer); contractSaveTimer=setTimeout(doSaveContracts, 1400); }
+  var CON_DUP_ID_MSG = "계약 저장이 거절됐습니다 — 같은 계약이 목록에 두 번 들어 있습니다. 서버에 저장된 값으로 다시 불러옵니다. 방금 고친 내용이 있으면 다시 입력해 주세요.";
+  // 11/16 검토 B2: 디바운스가 끝나 저장이 나가면 타이머 표시를 비운다(저장 요청 중 바뀐 목록에 '예약된 저장이 있는가'를 doSaveContracts가 알게)
+  function scheduleContractSave(){ contractsPending=true; if(contractSaveTimer) clearTimeout(contractSaveTimer); contractSaveTimer=setTimeout(function(){ contractSaveTimer=null; doSaveContracts(); }, 1400); }
   // P1 판24 5차: 병합 결과 m에서, 서버(r) 쪽에 승인·반영된 변경계약 차수(aw amt · 끝남 · 승인 · 사본)가 있고 m의 같은 자리가 같은 상신 번호의 승인 전 사본이면 그 단계만 서버 값(상태·완료일·상신 기록)으로 — 서버 carryStale과 같은 조건
   function csKeepApproved(m, r){
     if (!m || !r || m === r || !Array.isArray(m.pipes) || !Array.isArray(r.pipes)) return;
@@ -14338,8 +14340,10 @@
       var mp = m.pipes.filter(function(q){ return q && q.key === rp.key; })[0]; if (!mp || !Array.isArray(mp.stages)) return;
       rp.stages.forEach(function(rs, i){
         if (!(rs && rs.aw === "amt" && rs.status === "done" && rs.appr && rs.appr.status === "승인" && rs.appr.snap && rs.appr.cid)) return;
-        var ms = mp.stages[i]; if (!ms || !ms.appr || ms.name !== rs.name || ms.appr.cid !== rs.appr.cid || (ms.status === "done" && ms.appr.status === "승인")) return;
-        if (!{ "대기": 1, "보류": 1, "미전송": 1 }[ms.appr.status]) return;
+        var ms = mp.stages[i]; if (!ms || ms.name !== rs.name) return;
+        // 11/16 검토 A: 상신 기록이 아예 없는 사본(상신 전에 연 화면 — 열림·대기 전)도 서버 승인 값으로(서버 carryBare와 같은 조건 · 끝남·건너뜀은 아님)
+        if (ms.appr == null){ if (!{ "": 1, "open": 1, "pending": 1 }[ms.status == null ? "" : String(ms.status)]) return; }
+        else { if (ms.appr.cid !== rs.appr.cid || (ms.status === "done" && ms.appr.status === "승인")) return; if (!{ "대기": 1, "보류": 1, "미전송": 1 }[ms.appr.status]) return; }
         mp.stages[i] = Object.assign({}, ms, { status: rs.status, done_at: rs.done_at, appr: rs.appr });
         mp.cur = Math.max(Number(mp.cur) || 0, Number(rp.cur) || 0);
       });
@@ -14359,12 +14363,13 @@
       if(resp.status===401) return;
       if(resp.status===409||resp.status===422){ return fetch(CONTRACT_API,{headers:ghHeaders()}).then(function(r){return r.status===404?null:r.json();}).then(function(j){ if(j){ var up={}; try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} contracts=mergeContracts(contracts, up.items||[]); contractSha=j.sha; } return doSaveContracts(); }); }
       // P1 판24-③: 서버가 결재 없는 단계 완료·결재함에 없는 승인·상신 사본 바뀜을 거절(400 CON_APPR_REQUIRED) — 조용히 넘기지 않고 알린 뒤 서버 값으로 다시 읽는다(이 저장에 같이 들어간 다른 고침도 서버에 없음)
-      if(resp.status===400){ return resp.json().then(function(json){ var ec=(json&&json.error_code)||""; contractSha=json&&json.content&&json.content.sha; contractsPending=false; if(ec==="CON_APPR_REQUIRED"){ alert(CON_APPR_REJECT_MSG); loadContracts(); } else if(ec==="CON_APPR_REVOKED"){ alert(CON_APPR_REVOKED_MSG); loadContracts(); } }); }   // 5차 B: 승인된 변경계약 되돌리기 거절은 그 까닭의 글
+      if(resp.status===400){ return resp.json().then(function(json){ var ec=(json&&json.error_code)||""; contractSha=json&&json.content&&json.content.sha; contractsPending=false; if(ec==="CON_APPR_REQUIRED"){ alert(CON_APPR_REJECT_MSG); loadContracts(); } else if(ec==="CON_APPR_REVOKED"){ alert(CON_APPR_REVOKED_MSG); loadContracts(); } else if(ec==="CON_DUP_ID"){ alert(CON_DUP_ID_MSG); loadContracts(); } }); }   // 5차 B: 승인된 변경계약 되돌리기 거절은 그 까닭의 글
       // P1 판24-③ 검토(11/15 B9): 서버 오류(5xx — 결재함 못 읽음 APPROVALS_READ_FAILED 포함)도 조용히 넘기지 않는다(종전: 저장 대기 표시만 풀려 결재한 기기엔 '진행됨'으로 보이고 서버엔 없음)
       if(resp.status>=500){ return resp.json().catch(function(){ return {}; }).then(function(json){ contractsPending=false; alert(CON_SAVE_FAIL_MSG + (json && json.error_code ? " (" + json.error_code + ")" : "")); loadContracts(); }); }
       // 11/16(남은 것 2 — 재현됨): 이월 응답 뒤 다시 읽을 때, 이 저장을 보낸 뒤 고친 내용(디바운스로 아직 안 나간 것)이 있으면 대기 표시를 다시 세워
       //   다시 읽기가 통째로 덮지 않고 병합(mergeContracts — 로컬 고침은 남고 승인 차수만 서버 값 csKeepApproved)하게 한다. 그 고침은 걸려 있는 디바운스 저장이 보낸다
-      return resp.json().then(function(json){ contractSha=json.content&&json.content.sha; contractsPending=false; if(json&&json.con_kept&&json.con_kept.length&&JSON.stringify({schema:1, items:contracts})!==body) contractsPending=true; if(json&&json.con_kept&&json.con_kept.length) loadContracts(); });   // 5차: 서버가 승인 차수를 지켰으면(낡은 사본) 화면을 서버 값으로
+      //   11/16 검토 B2: 저장 함수 밖(결재 동기화 등)이 예약 없이 목록을 바꿨으면 저장도 예약(이미 예약돼 있으면 대기 표시만)
+      return resp.json().then(function(json){ contractSha=json.content&&json.content.sha; contractsPending=false; if(json&&json.con_kept&&json.con_kept.length&&JSON.stringify({schema:1, items:contracts})!==body){ if(contractSaveTimer) contractsPending=true; else scheduleContractSave(); } if(json&&json.con_kept&&json.con_kept.length) loadContracts(); });   // 5차: 서버가 승인 차수를 지켰으면(낡은 사본) 화면을 서버 값으로
     }).catch(function(){});
   }
   var WASTE_BACKBONE = [

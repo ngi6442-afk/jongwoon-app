@@ -16254,51 +16254,62 @@ try {
   // 시험 계약 — 서버 = 승인·반영된 변경 1차 · 낡은 사본 = 같은 상신 번호·같은 사본의 승인 전(대기)
   const conZ16 = (stale) => ({ id: 'kz', updated: '2026-11-16', pipes: [{ key: 'main', cur: 1, stages: [{ name: '계약서', status: 'done' }, { name: '착공', status: 'open' }] },
     { key: 'chg', cur: stale ? 0 : 1, stages: [Object.assign({ name: '변경계약', aid: 'change_contract', ak: '계약 단계', aw: 'amt', vals: { chg_amt: 1500 } }, stale ? { status: 'open', appr: { cid: 'cz', status: '대기', snap: { chg_amt: 1500, chg_end: '' } } } : { status: 'done', done_at: '2026-11-16', appr: { cid: 'cz', status: '승인', snap: { chg_amt: 1500, chg_end: '' } } })] }] });
-  // mode: inflight = 첫 저장 요청이 나가 있는 동안 고침(응답 con_kept) · none = 고침 없음 · c409 = 같은 날 409 → 다시 읽어 병합 → 다시 저장
+  // mode: inflight = 첫 저장 요청이 나가 있는 동안 고침(응답 con_kept) · outside = 요청 중 저장 함수 밖이 예약 없이 목록을 바꿈(검토 B2) · none = 고침 없음 ·
+  //   c409 = 같은 날 409 → 다시 읽어 병합 → 다시 저장 · bare409 = 상신 기록 없는 사본(상신 전 화면)으로 같은 날 409 병합(검토 A) · dup = 서버 400 CON_DUP_ID(검토 B1)
   const runZ16 = async (H, mode) => {
     const env = { puts: [], gets: 0, timers: [], alerts: 0 }, server = { items: [conZ16(false), { id: 'kz2', updated: '2026-11-16', pipes: [] }] };
     let gate = null;
     const fetchZ = (url, opts) => {
       if (!opts || !opts.method || opts.method === 'GET') { env.gets++; const s = JSON.stringify({ schema: 1, items: server.items }); return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ sha: 'gw', content: s }) }); }
       const body = JSON.parse(JSON.parse(opts.body).content); env.puts.push(body);
-      if (mode === 'c409' && env.puts.length === 1) return Promise.resolve({ status: 409, ok: false, json: () => Promise.resolve({}) });
+      if ((mode === 'c409' || mode === 'bare409') && env.puts.length === 1) return Promise.resolve({ status: 409, ok: false, json: () => Promise.resolve({}) });
+      if (mode === 'dup') return Promise.resolve({ status: 400, ok: false, json: () => Promise.resolve({ error_code: 'CON_DUP_ID' }) });
       const kc = body.items.find((c) => c.id === 'kz'), kept = !!kc && kc.pipes[1].stages[0].status !== 'done';
       server.items = body.items.map((c) => (c.id === 'kz' ? Object.assign({}, c, { pipes: [c.pipes[0], conZ16(false).pipes[1]] }) : c));
       const res = { status: 200, ok: true, json: () => Promise.resolve({ content: { sha: 'gw' }, con_kept: kept ? [{ cid: 'kz', pipe: 'chg', i: 0 }] : null }) };
-      if (mode === 'inflight' && env.puts.length === 1) return new Promise((r) => { gate = () => r(res); });
+      if ((mode === 'inflight' || mode === 'outside') && env.puts.length === 1) return new Promise((r) => { gate = () => r(res); });
       return Promise.resolve(res);
     };
-    const A = new Function('ENV', 'fetch', 'setTimeout', 'clearTimeout', [varZ16(H, 'CON_APPR_REJECT_MSG'), varZ16(H, 'CON_APPR_REVOKED_MSG'), varZ16(H, 'CON_SAVE_FAIL_MSG'),
+    const A = new Function('ENV', 'fetch', 'setTimeout', 'clearTimeout', [varZ16(H, 'CON_APPR_REJECT_MSG'), varZ16(H, 'CON_APPR_REVOKED_MSG'), varZ16(H, 'CON_SAVE_FAIL_MSG'), varZ16(H, 'CON_DUP_ID_MSG'),
       'var contracts = [], contractSha = "gw", contractSaveTimer = null, contractsPending = false, CONTRACT_API = "x", autoGenReady = {};',
       'function getToken(){ return "t"; } function ghHeaders(){ return {}; } function b64EncodeUnicode(s){ return s; } function b64DecodeUnicode(s){ return s; } function alert(){ ENV.alerts++; } function renderContracts(){} function renderTasks(){} function runAwardAutoCon(){} function conBldgAutoTry(){} function todayStr(){ return "2026-11-16"; }']
       .concat(['mTime', 'mergeDel', 'liveContracts', 'loadContracts', 'scheduleContractSave', 'csKeepApproved', 'mergeContracts', 'doSaveContracts'].map((n) => fnZ16(H, n)))
       .concat(['return { set: function(v){ contracts = v; }, get: function(){ return contracts; }, pend: function(){ return contractsPending; }, sched: scheduleContractSave };']).join('\n'))(env, fetchZ, (fn) => { env.timers.push(fn); return env.timers.length; }, (id) => { if (id) env.timers[id - 1] = null; });
     const fire = async () => { const i = env.timers.findIndex((x) => x); if (i < 0) return false; const fn = env.timers[i]; env.timers[i] = null; fn(); for (let k = 0; k < 12; k++) await tickZ16(); return true; };
     const L = conZ16(true); L.memo = 'A';
+    if (mode === 'bare409') delete L.pipes[1].stages[0].appr;
     A.set([L, { id: 'kz2', updated: '2026-11-16', pipes: [] }]); A.sched(); await fire();
     if (mode === 'inflight') { A.get()[0].memo2 = 'B'; A.sched(); gate(); for (let k = 0; k < 12; k++) await tickZ16(); }
+    if (mode === 'outside') { A.get()[0].memo2 = 'O'; gate(); for (let k = 0; k < 12; k++) await tickZ16(); }
     const loc = JSON.parse(JSON.stringify(A.get())), pend = A.pend();
     while (await fire()) { /* 남은 디바운스 저장 */ }
-    const st = (c) => { const s = c.pipes[1].stages[0]; return s.status + '/' + s.appr.status + '/' + c.pipes[1].cur; };
+    const st = (c) => { const s = c.pipes[1].stages[0]; return s.status + '/' + (s.appr ? s.appr.status : '-') + '/' + c.pipes[1].cur; };
     const last = env.puts[env.puts.length - 1].items.find((c) => c.id === 'kz');
     return { loc: st(loc[0]) + '/' + (loc[0].memo || '') + (loc[0].memo2 || ''), pend, puts: env.puts.length, gets: env.gets, last: st(last) + '/' + (last.memo || '') + (last.memo2 || ''), alerts: env.alerts };
   };
   const chkZ16 = async (H) => {
-    const a = await runZ16(H, 'inflight'), b = await runZ16(H, 'none'), c = await runZ16(H, 'c409');
+    const a = await runZ16(H, 'inflight'), o = await runZ16(H, 'outside'), b = await runZ16(H, 'none'), c = await runZ16(H, 'c409'), d = await runZ16(H, 'bare409'), e = await runZ16(H, 'dup');
     const ok = a.loc === 'done/승인/1/AB' && a.puts === 2 && a.gets === 1 && a.last === 'done/승인/1/AB' && a.alerts === 0
+      && o.loc === 'done/승인/1/AO' && o.pend === true && o.puts === 2 && o.last === 'done/승인/1/AO'
       && b.loc === 'done/승인/1/A' && b.pend === false && b.puts === 1 && b.gets === 1
-      && c.puts === 2 && c.last === 'done/승인/1/A' && c.alerts === 0;
-    return { ok, info: { a, b, c } };
+      && c.puts === 2 && c.last === 'done/승인/1/A' && c.alerts === 0
+      && d.puts === 2 && d.last === 'done/승인/1/A' && d.alerts === 0
+      && e.puts === 1 && e.alerts === 1 && e.gets === 1 && e.pend === false;
+    return { ok, info: { a, o, b, c, d, e } };
   };
   const RZ16 = await chkZ16(html);
   const KZ16 = [];
   for (const [from, to] of [
-    ['if(json&&json.con_kept&&json.con_kept.length&&JSON.stringify({schema:1, items:contracts})!==body) contractsPending=true; ', ''],   // ② 요청 중 고침 지킴 걷음
+    ['if(json&&json.con_kept&&json.con_kept.length&&JSON.stringify({schema:1, items:contracts})!==body){ if(contractSaveTimer) contractsPending=true; else scheduleContractSave(); } ', ''],   // ② 요청 중 고침 지킴 걷음
+    ['{ if(contractSaveTimer) contractsPending=true; else scheduleContractSave(); }', 'contractsPending=true;'],   // 검토 B2 예약 없는 바뀜에 저장 예약 걷음
+    ['contractSaveTimer=setTimeout(function(){ contractSaveTimer=null; doSaveContracts(); }, 1400);', 'contractSaveTimer=setTimeout(doSaveContracts, 1400);'],   // 검토 B2 저장이 나가도 타이머 표시가 남음
     ['csKeepApproved(m, x); ', ''],   // ③ 병합의 서버 맞춤 호출 걷음(5차 — 종전 uismoke는 이 결함 사본에 안 깨졌음)
-    ['        mp.cur = Math.max(Number(mp.cur) || 0, Number(rp.cur) || 0);\n', '']]) {   // ③ 다음 단계 번호 맞춤 걷음
+    ['        mp.cur = Math.max(Number(mp.cur) || 0, Number(rp.cur) || 0);\n', ''],   // ③ 다음 단계 번호 맞춤 걷음
+    ['        if (ms.appr == null){ if (!{ "": 1, "open": 1, "pending": 1 }[ms.status == null ? "" : String(ms.status)]) return; }', '        if (ms.appr == null){ return; }'],   // 검토 A 상신 기록 없는 사본 병합 걷음
+    [' else if(ec==="CON_DUP_ID"){ alert(CON_DUP_ID_MSG); loadContracts(); }', '']]) {   // 검토 B1 같은 id 거절 안내 걷음
     try { KZ16.push((await chkZ16(mutZ16(from, to))).ok); } catch (e) { KZ16.push('err ' + e.message); }
   }
-  T('P1 남은 것 ②·③ 화면(실행 — 실제 doSaveContracts·loadContracts·mergeContracts·csKeepApproved): 낡은 사본 저장 요청이 나가 있는 동안 고친 내용 = 이월 응답(con_kept) 뒤 다시 읽어도 남음(대기 표시 다시 섬 → 병합)·승인 차수는 서버 값·다음 디바운스 저장이 그 고침을 보냄 · 고침 없으면 종전대로 서버 값으로 바꿈(대기 표시 내림) · 같은 날 409 병합 = 로컬 고침 남고 승인 차수·다음 단계 번호는 서버 값 · 결함 사본 ' + KZ16.length + '개(요청 중 고침 지킴 걷음·병합의 csKeepApproved 호출 걷음·단계 번호 맞춤 걷음) = 모두 ✗',
+  T('P1 남은 것 ②·③ 화면(실행 — 실제 doSaveContracts·loadContracts·mergeContracts·csKeepApproved): 낡은 사본 저장 요청이 나가 있는 동안 고친 내용 = 이월 응답(con_kept) 뒤 다시 읽어도 남음(대기 표시 다시 섬 → 병합)·승인 차수는 서버 값·다음 디바운스 저장이 그 고침을 보냄 · (검토 B2) 요청 중 저장 함수 밖이 예약 없이 바꾼 목록 = 저장 예약·그 바뀜이 다음 저장에 · 고침 없으면 종전대로 서버 값으로 바꿈(대기 표시 내림) · 같은 날 409 병합 = 로컬 고침 남고 승인 차수·다음 단계 번호는 서버 값 · (검토 A) 상신 기록 없는 사본도 병합에서 서버 승인 값 · (검토 B1) 400 CON_DUP_ID = 알림 1번·다시 읽기 · 결함 사본 ' + KZ16.length + '개(요청 중 고침 지킴 걷음·예약 없는 바뀜 저장 예약 걷음·타이머 표시 안 비움·병합의 csKeepApproved 호출 걷음·단계 번호 맞춤 걷음·상신 기록 없는 사본 병합 걷음·같은 id 안내 걷음) = 모두 ✗',
     RZ16.ok && KZ16.every((v) => v === false), JSON.stringify({ r: RZ16.info, mut: KZ16 }));
   // ④ 앱이 만드는 한글 양식 초안(fillHwpxTemplate → 표식 genMarkBlob → 서버 사본 genStoreCopy)의 zip 꼴 = 서버 zip 검증(_lib/docdiff zipCheck) 통과 — 직접 올리기 최종본 hwpx에도 검증을 건 뒤 앱 산출이 막히지 않게
   const zlibZ16 = (await import('zlib')).default, DDZ16 = createRequire(import.meta.url)(join(ROOT, 'netlify', 'functions', '_lib', 'docdiff.js'));
