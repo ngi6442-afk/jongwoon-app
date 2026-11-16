@@ -11424,7 +11424,10 @@ function J91a(x) { return JSON.stringify(x); }
     const au0 = auditMock.logs.length;
     const R0 = await chkCon(gwd);
     const auLines = auditMock.logs.slice(au0).filter((l) => l.col === 'contracts' && l.ev && l.ev[0] && l.ev[0].op === '결재 없는 단계 거절');
-    const auOk = auLines.length === R0.nRej && R0.nRej >= 40 && auLines.some((l) => /^계약 저장 거절 1건\(결재 없이 완료 1 · 결재함에 없는 승인 0 · 상신 사본 바뀜 0\)$/.test(l.ev[0].t) && l.ev[0].id === 'k3|main|1') && auLines[0].by === '공무C24' && auLines.some((l) => l.bid === 'uadmin') && !/계약서|견적|착공/.test(JSON.stringify(auLines));
+    // 11/16: 까닭별 셈에 '결재함 사본과 다름'·'승인된 변경계약 되돌리기' 칸 · 모든 줄의 까닭별 수 합 = 거절 건수
+    const auSum = (t) => { const m = /^계약 저장 거절 (\d+)건\(결재 없이 완료 (\d+) · 결재함에 없는 승인 (\d+) · 상신 사본 바뀜 (\d+) · 결재함 사본과 다름 (\d+) · 승인된 변경계약 되돌리기 (\d+)\)$/.exec(t || ''); return !!m && Number(m[1]) === [2, 3, 4, 5, 6].reduce((a, i) => a + Number(m[i]), 0); };
+    const auOk = auLines.length === R0.nRej && R0.nRej >= 40 && auLines.every((l) => auSum(l.ev[0].t)) && auLines.some((l) => /^계약 저장 거절 1건\(결재 없이 완료 1 · 결재함에 없는 승인 0 · 상신 사본 바뀜 0 · 결재함 사본과 다름 0 · 승인된 변경계약 되돌리기 0\)$/.test(l.ev[0].t) && l.ev[0].id === 'k3|main|1')
+      && auLines.some((l) => / · 승인된 변경계약 되돌리기 [1-9]\d*\)$/.test(l.ev[0].t)) && auLines.some((l) => / · 결재함 사본과 다름 [1-9]\d* · /.test(l.ev[0].t)) && auLines[0].by === '공무C24' && auLines.some((l) => l.bid === 'uadmin') && !/계약서|견적|착공/.test(JSON.stringify(auLines));
     T('P1 판24-③ ① 계약 단계 결재 서버 강제 — 거절(400 CON_APPR_REQUIRED·서버 문서 그대로): 결재 없이 계약서 단계 완료 · 결재함에 없는 승인 표시(변경계약) · 변경 금액 바뀐 변경계약 대기 중 완료 · 결재함 항목 대기인데 승인 표시 · 다른 상신 번호의 승인 · 종류 다른 승인 항목 · 승인 뒤 상신 사본(금액) 바꿔치기 · 새 계약에 결재 단계 완료로 · 직전 문서 못 읽음(빈 문서로 보고 대조) / 결재함 못 읽음 = 500 APPROVALS_READ_FAILED · 거절 이유 표식(STAGE_DONE·APPR_CLAIM·SNAP_CHANGED)·자리 k3|main|1 · (검토 A1) 승인 뒤 상신 번호 빼기·비우기 + 사본 고침·번호만 빼기·대기 중 번호 빼고 사본 고침·번호 없는 새 승인 · (B2) 단계 ref를 단 \'일반\' 카드로 금액 칸 그대로·사본만 큰 금액 · (B3) 끝난 단계 이름을 \'계약서…\'로 · (B4) 사본 종료일만 바꿈·관리자 저장도 거절 · (재검토 A — 결재함 항목 사본 묶음) 승인된 변경 1차 금액 사본 바꾸기: 이름 뒤 공백·전각 공백(한 번) · 상신 기록 지움 → 다시 넣음 · 다른 번호 대기 → 원래 번호 · 단계 지움 → 다시 넣음 · 이름 바꿈 → 되돌림 · 세 번 나눠 · 반려 뒤 옛 승인 번호 다시 씀 · 1차 승인 항목을 2차에 끌어 씀 · 사본 없는 옛 항목 지웠다 다시 넣음 = 마지막 저장만 400(앞 저장 200)·저장된 사본에 바꾼 금액 0 · 서버 끝까지: 직원 상신 사본 → 같은 번호 재전송 사본 그대로 → 관리자 승인 사본 그대로 → 사본 바꾼 계약 저장 400 · 계약서 단계에 \'일반\' 카드 승인 표시 · (3차) 승인된 변경 1차 지움·건너뜀·다른 단계로·관리자 줄 지움 = 400 · 사본 없는 변경계약 상신 400 SNAP_REQUIRED(카드 안 생김)·본 줄 aw amt도·계약서 상신은 200 · 남의 번호·다른 대상 409 CID_TAKEN · 결정 요청에 사본 실어도 카드 사본 그대로 · (4차) 승인 차수 끄기: 상태 열림·상신 기록 지움·반려로·낡은 대기 사본 = 400 · 승인 뒤 같은 번호 재전송은 카드 사본 그대로 · (5차) 낡은 사본처럼 꾸몄지만 사본이 다름 = 거절 · 되돌리기만인 거절 = CON_APPR_REVOKED · 감사 "결재 없는 단계 거절" 줄 수 = 거절 수(자리만 — 단계 이름 없음)',
       R0.ok && auOk, JSON.stringify({ info: R0.info, au: auLines.length, t: auLines[0] && auLines[0].ev[0].t }));
     T('P1 판24-③ ② 허용(200 — 정상 흐름이 하나도 막히지 않음): 상신 → 결재함 승인 → 단계 완료·다음 단계 열림 · 상신(대기·사본) 저장 · 금액·기간 그대로인 변경계약 결재 없이 완료 · 시나리오 없는 옛 계약의 계약서 단계 완료 · 결재 단계 건너뜀 · 서버에 이미 있던 어긋남은 다른 칸 고침에 통과 · 청구 검수 승인 → 청구 완료 · PM 전결 승인 · 반려 뒤 재상신(새 번호 대기)·반려 표시 저장 · 승인된 변경계약 반영·같은 승인본 다시 저장 · 결재 대상 아닌 단계 손질 · 끝나지 않은 단계 이름 고침 · 서버에 이미 있던 번호 없는 옛 승인 그대로 다시 저장 · (재검토) 반려 뒤 금액 고쳐 재상신 → 승인 · 2차 변경계약 · 승인 뒤 입력 칸만 고침 · 사본 묶인 승인본 그대로 다시 저장 · (4차) 반영될 수 없던 승인(카드 사본 없음·다름)은 상신 기록 지우고 다시 상신 가능 · (5차) 낡은 기기의 같은 번호·같은 사본 대기 사본 = 이월 200(그 단계 서버 승인 값·다른 칸 고침 남음·con_kept·감사) · base 없는 옛 판 저장도 · 재현 409 → 앱 mergeContracts 병합 → 200(고침 남음·승인 그대로 — 병합이 승인 차수를 서버 쪽으로) · (3차) 원계약 금액 칸 고침 = 200 + 감사 "원계약 칸 바뀜" 1줄(값 없음) · 계약 삭제 200',
@@ -12116,7 +12119,12 @@ function J91a(x) { return JSON.stringify(x); }
       && I.omit.codes === '400:CON_APPR_REVOKED' && I.omit.eff === 1500 && I.openKeep.codes === '400:CON_APPR_REVOKED' && I.otherCid.codes === '400:CON_APPR_REVOKED' && I.doneBare.codes === '400:CON_APPR_REVOKED'
       && I.dup.codes === '400:CON_DUP_ID' && I.dup.eff === 1500 && mem.gw_data['col:contracts'].items.length === 2
       && [I.skipDel, I.rejDel, I.omit, I.openKeep, I.otherCid, I.doneBare].every((x) => x.eff === 1500 && x.del === 0 && x.st === 'done/승인')
-      && auRej.length === 7 && auRej.some((l) => l.ev[0].id === 'kz1|chg|0') && !/변경계약|1500/.test(JSON.stringify(auRej));
+      && auRej.length === 7 && auRej.some((l) => l.ev[0].id === 'kz1|chg|0') && !/1500|2027-03-31|공무Z16/.test(JSON.stringify(auRej.map((l) => l.ev)))
+      // 11/16 감사 글 까닭별 셈: 되돌리기 거절 6줄 = '승인된 변경계약 되돌리기 1'(다른 칸 0) · 사본 바꿈 1줄 = 사본 칸만 · 같은 id 두 줄 = 따로 '같은 계약 두 줄 거절' 1줄(계약 id만)
+      && auRej.filter((l) => / · 승인된 변경계약 되돌리기 1\)$/.test(l.ev[0].t) && /\(결재 없이 완료 0 · 결재함에 없는 승인 0 · 상신 사본 바뀜 0 · 결재함 사본과 다름 0 · /.test(l.ev[0].t)).length === 6
+      && auRej.filter((l) => / · 상신 사본 바뀜 [1-9]/.test(l.ev[0].t)).length === 1
+      && auRej.every((l) => { const m = /^계약 저장 거절 (\d+)건\(결재 없이 완료 (\d+) · 결재함에 없는 승인 (\d+) · 상신 사본 바뀜 (\d+) · 결재함 사본과 다름 (\d+) · 승인된 변경계약 되돌리기 (\d+)\)$/.exec(l.ev[0].t || ''); return !!m && Number(m[1]) === [2, 3, 4, 5, 6].reduce((a, i) => a + Number(m[i]), 0); })
+      && auditMock.logs.slice(au0).filter((l) => l.col === 'contracts' && l.ev && l.ev[0] && l.ev[0].op === '같은 계약 두 줄 거절' && l.ev[0].id === 'kz1' && /두 번 든 줄 1건/.test(l.ev[0].t)).length === 1;
     // (검토 A) 상신 기록이 없는 낡은 사본 = 이월(그 단계 서버 승인 값 · 다른 고침·삭제는 반영 · 감사 1줄) — 지워 보낸 것도 같은 결과(유효 금액 그대로 = 얻는 것 없음)
     const au1 = auditMock.logs.length;
     const bare = (n) => { const s = S1Z16(n); s.status = 'open'; delete s.appr; delete s.done_at; n[0].pipes[1].cur = 0; };
@@ -12201,14 +12209,16 @@ function J91a(x) { return JSON.stringify(x); }
       ['ca', " || !STALE_BARE[s.status == null ? '' : String(s.status)]) return;", ') return;', chkDelZ16],   // 검토 A 상신 기록 없는 사본의 상태 대조 걷음(끝남도 이월)
       ['ca', '    if (!(card && isObj(card.snap) && snapKey(card) === snapKey(os.appr))) return;\n', '', chkDelZ16],   // 검토 A 카드 묶음 대조 걷음(옛 카드 다시 상신 길 막힘)
       ['data', '    if (CONAPPR.bareCand(oldItems, doc.items)) {', '    if (false) {', chkDelZ16],   // 검토 A 상신 기록 없는 사본 이월 걷음(종전 = 거절)
-      ['data', '    if (conDup) return jr(400,', '    if (false) return jr(400,', chkDelZ16]];   // 검토 B1 같은 id 두 줄 받음
+      ['data', '    if (conDup) return jr(400,', '    if (false) return jr(400,', chkDelZ16],   // 검토 B1 같은 id 두 줄 받음
+      ['data', " + ' · 승인된 변경계약 되돌리기 ' + caN('APPR_REVOKED')", '', chkDelZ16],   // 감사 글 되돌리기 칸 걷음(종전 = 까닭 전부 0)
+      ['data', '    if (conDup) { try { await appendAudit(', '    if (false) { try { await appendAudit(', chkDelZ16]];   // 같은 id 두 줄 거절 감사 줄 걷음
     const kZ16 = [];
     for (const [w, from, to, fn] of MZ16) {
       let k;
       try { const r = await withCAZ16(w === 'ca' ? mutZ16(SCAZ16, from, to) : SCAZ16, w === 'data' ? mutZ16(SDATAZ16, from, to) : SDATAZ16, fn); k = !r.ok; } catch (e) { k = 'err ' + e.message; }
       kZ16.push(k);
     }
-    T('P1 남은 것 결함 사본 ' + MZ16.length + '개(지운 계약·빠진 계약 대조 걷음 · 빠진 계약만 걷음 · 지우는 저장 이월 걷음 · 최종본 hwpx 예외 되살림 · 검토: 상신 기록 없는 사본 상태 대조 걷음·카드 묶음 대조 걷음·그 이월 걷음·같은 id 두 줄 받음) = 모두 ✗', kZ16.every((v) => v === true), JSON.stringify(kZ16));
+    T('P1 남은 것 결함 사본 ' + MZ16.length + '개(지운 계약·빠진 계약 대조 걷음 · 빠진 계약만 걷음 · 지우는 저장 이월 걷음 · 최종본 hwpx 예외 되살림 · 검토: 상신 기록 없는 사본 상태 대조 걷음·카드 묶음 대조 걷음·그 이월 걷음·같은 id 두 줄 받음 · 감사 글 되돌리기 칸 걷음·같은 id 거절 감사 줄 걷음) = 모두 ✗', kZ16.every((v) => v === true), JSON.stringify(kZ16));
   } catch (e) { T('P1 남은 것 검사 실행', false, String(e && e.stack || e).slice(0, 500)); }
   finally { require.cache[RPZ16] = savedCAZ16; resetZ16(); }
 }

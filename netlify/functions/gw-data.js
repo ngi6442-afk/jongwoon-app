@@ -693,7 +693,10 @@ async function handleSave(event, d, R) {
   if (col === 'contracts' && Array.isArray(doc.items)) {
     const conIdSeen = {};
     let conDup = 0;
-    doc.items.forEach(function (x) { if (x && typeof x === 'object' && x.id != null) { const k = String(x.id); if (conIdSeen[k]) conDup++; conIdSeen[k] = 1; } });
+    const conDupIds = [];
+    doc.items.forEach(function (x) { if (x && typeof x === 'object' && x.id != null) { const k = String(x.id); if (conIdSeen[k]) { conDup++; if (conDupIds.indexOf(k) < 0) conDupIds.push(k); } conIdSeen[k] = 1; } });
+    // 11/16 감사 글: 같은 id 두 줄 거절도 줄을 남김(계약 id만 — 이름·금액 없음)
+    if (conDup) { try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'contracts', ev: [{ op: '같은 계약 두 줄 거절', id: conDupIds.join(',').slice(0, 200), t: '계약 저장 거절 — 같은 계약 id가 두 번 든 줄 ' + conDup + '건(저장 안 함)' }] }); } catch (e) {} }
     if (conDup) return jr(400, { status: 'REJECTED', error_code: 'CON_DUP_ID', n: conDup, request_id: R });
   }
   let conAp0 = null;
@@ -713,7 +716,7 @@ async function handleSave(event, d, R) {
       const caBad = CONAPPR.judge(caRows, rdCa.doc.items);
       if (caBad.length) {
         const caN = function (w) { return caBad.filter(function (x) { return x.why === w; }).length; };
-        try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'contracts', ev: [{ op: '결재 없는 단계 거절', id: caBad.map(function (x) { return x.cid + '|' + x.pipe + '|' + x.i; }).join(',').slice(0, 200), t: '계약 저장 거절 ' + caBad.length + '건(결재 없이 완료 ' + caN('STAGE_DONE') + ' · 결재함에 없는 승인 ' + caN('APPR_CLAIM') + ' · 상신 사본 바뀜 ' + caN('SNAP_CHANGED') + ')' }] }); } catch (e) {}
+        try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'contracts', ev: [{ op: '결재 없는 단계 거절', id: caBad.map(function (x) { return x.cid + '|' + x.pipe + '|' + x.i; }).join(',').slice(0, 200), t: '계약 저장 거절 ' + caBad.length + '건(결재 없이 완료 ' + caN('STAGE_DONE') + ' · 결재함에 없는 승인 ' + caN('APPR_CLAIM') + ' · 상신 사본 바뀜 ' + caN('SNAP_CHANGED') + ' · 결재함 사본과 다름 ' + caN('SNAP_UNBOUND') + ' · 승인된 변경계약 되돌리기 ' + caN('APPR_REVOKED') + ')' }] }); } catch (e) {}
         // 5차 B: 거절이 전부 '승인된 변경계약 되돌리기'(APPR_REVOKED)면 그 까닭의 코드(앱이 맞는 안내 글을 고름) — 그 밖은 종전 코드
         const caCode = caBad.every(function (x) { return x.why === 'APPR_REVOKED'; }) ? 'CON_APPR_REVOKED' : 'CON_APPR_REQUIRED';
         return jr(400, { status: 'REJECTED', error_code: caCode, n: caBad.length, rows: caBad.slice(0, 20), request_id: R });
