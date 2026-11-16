@@ -16411,8 +16411,10 @@ try {
     const s2 = api.snap(mkRoot([[false, 'TYPED', 'OLD'], [false, 'OLD', 'OLD']])), s2b = api.snap(mkRoot([[false, 'OLD', 'OLD'], [false, 'TYPED', 'OLD']]));
     // 결함 B 꼴: 숨은 사본도 앞선 되살리기로 값이 바뀌어(value ≠ defaultValue) 둘 다 '바꾼 칸' = 그려진 칸이 이김(숨은 쪽이 앞에 와도)
     const s1c = api.snap(mkRoot([[false, 'STALE', 'OLD'], [true, 'NEW', 'OLD']]));
+    // 판24d(11/16): 사람이 바꾸지 않은 칸(value = defaultValue)은 모으지 않음 — 보이는 칸이어도 0개(종전 '비어 있지 않으면 모음'의 결함 사본을 잡는 꼴)
+    const s4 = api.snap(mkRoot([[true, 'SAME', 'SAME']]));
     R.snap = s1.length === 1 && s1[0].v === 'NEW' && s1[0].p === 'c1|main|6' && s1[0].k === 'tax_no' && s1b.length === 1 && s1b[0].v === 'NEW' && s1c.length === 1 && s1c[0].v === 'NEW'
-      && s2.length === 1 && s2[0].v === 'TYPED' && s2b.length === 1 && s2b[0].v === 'TYPED';
+      && s2.length === 1 && s2[0].v === 'TYPED' && s2b.length === 1 && s2b[0].v === 'TYPED' && s4.length === 0;
     const r2 = mkRoot([[false, 'OLD'], [true, 'OLD']]);
     api.rest(r2, [{ p: 'c1|main|6', k: 'tax_no', v: 'NEW' }]);
     R.rest = r2.pans[1].fields[0].value === 'NEW' && r2.pans[0].fields[0].value === 'OLD';
@@ -16432,7 +16434,8 @@ try {
     ['  .vs-due.vl-due .vl-n{flex-basis:100%;}', ''],
     [', hr:"인사", files:"파일"', ''],
     ['return (el.getClientRects && el.getClientRects().length ? 2 : 0) + ', 'return 0 + '],
-    [' + (el.defaultValue !== undefined && el.value !== el.defaultValue ? 1 : 0); };', ' + 0; };'],
+    // 판24d(11/16): 모음이 '사람이 바꾼 칸만'이 되어 점수의 '바꾼 칸' 가산은 둘 다 바꾼 칸끼리일 때만 같은 값 — 그 결함 사본 대신 모음 거르기를 종전(비어 있지 않으면 모음)으로 되돌린 사본(뜻 = 바꾼 칸을 앞세움 그대로)
+    ['      if (el.defaultValue !== undefined ? el.value === el.defaultValue : el.value === "") return;', '      if (el.value === "") return;'],
     ['      else if (sc > seen[id].s){ out[seen[id].i] = x; seen[id].s = sc; }', '      else out.push(x);'],
     ['if (!all[i].getClientRects || all[i].getClientRects().length) return all[i];', 'return all[i];'],
     ['it.st = "proof"; it.byHand = true;', 'it.st = "proof";'],
@@ -16556,6 +16559,82 @@ try {
   T('v486 문서·판 번호(정확 검사): FEATURES 기준 v486 (2026-11-16)·v486 절(판24c) · TESTLIST v486 칸 6(화면 확인 3 · 게이트 [x] 3) · MANUAL 계약 단계 칸(내부 이름 0) · CLAUDE.md 한 줄 · sw jw-shell-v486 · 결함 사본 ' + M486.length + '개 = 모두 ✗',
     r486.ok && M486.every((v) => v === false), JSON.stringify({ r: r486.info, mut: M486 }));
 } catch (e) { console.log('  (v486 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── P1 판24d(11/16 — 독립 검토가 찾은 v382부터의 칸 되살리기 결함 3꼴): 사람이 바꾼 칸만 모음·되살림 · 패널 계약 id(data-cs-cid)로 같은 계약에만 · [입력 저장]은 바꾼 칸만 씀 · 날짜·숫자 칸 보여 줄 값(csFldShow)
+//   (실행 — 실제 csPanelOf·csSnapInputs·csSnapJoin·csRestoreInputs·csSaveFields·csFldShow·conChgDate + renderContracts의 모음·되살림 줄 · 가짜 DOM 두 뿌리 · 날짜·숫자 칸은 브라우저처럼 못 받는 꼴이면 value 빈 칸)
+try {
+  const fnD = (src, name) => { const i = src.search(new RegExp('\\n  function ' + name + '\\(')); if (i < 0) throw new Error('함수 없음 ' + name); let d = 0, st = false; for (let j = i + 1; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i + 1, j + 1); } } throw new Error('중괄호 ' + name); };
+  const FLD = [['q_no', 'text'], ['q_date', 'date'], ['q_amt', 'num']];
+  const okType = (t, v) => (t === 'date' ? /^\d{4}-\d{2}-\d{2}$/.test(v) : (t === 'num' ? /^-?\d+(\.\d+)?$/.test(v) : true));
+  const worldD = (H, mode) => {
+    const snapLine = (H.match(/\n    (var snap = [^\n]*?;)/) || [])[1], restLine = 'csRestoreInputs(host, snap); csRestoreInputs(dcard, snap);';
+    if (!snapLine || H.indexOf(restLine) < 0) throw new Error('그리기 줄 없음');
+    const A = new Function('ENV', ['csPanelOf', 'csSnapInputs', 'csSnapJoin', 'csRestoreInputs', 'csSaveFields', 'csFldShow', 'conChgDate'].map((n) => fnD(H, n)).join('\n') + '\n' +
+      'function conDueOn(){ return false; } function findTask(){ return null; } function todayStr(){ return "2026-11-16"; } function scheduleContractSave(){ ENV.saves++; }\n' +
+      'function renderContracts(){ var host = ENV.host, dcard = ENV.dcard; ' + snapLine + ' ENV.build(csFldShow); ' + restLine + ' }\nreturn { save: csSaveFields, render: renderContracts };');
+    const ag = function (k) { return Object.prototype.hasOwnProperty.call(this.attrs, k) ? this.attrs[k] : null; };
+    const mkRoot = () => { const r = { vis: false, panels: [] }; r.querySelectorAll = (sel) => { const m = /data-cs-fpanel="([^"]+)"/.exec(sel); if (m) return r.panels.filter((p) => p.attrs['data-cs-fpanel'] === m[1]); if (/data-cs-wlform="|data-cs-dpanel="/.test(sel)) return []; return r.panels.flatMap((p) => p.inputs); }; r.querySelector = (sel) => r.querySelectorAll(sel)[0] || null; return r; };
+    const E = { saves: 0, host: mkRoot(), dcard: mkRoot(), open: 'A' };
+    const mkC = (id, vals) => ({ id, pipes: [{ key: 'main', cur: 6, stages: [0, 1, 2, 3, 4, 5].map((i) => ({ name: 's' + i })).concat([{ name: '착공', vals: Object.assign({}, vals) }]) }] });
+    E.cons = { A: mkC('A', { q_no: 'OLD1', q_date: '2026-01-01' }), B: mkC('B', { q_no: 'B1' }) };
+    E.setMode = (m) => { E.mode = m; E.host.vis = m === 'pc'; E.dcard.vis = m === 'phone'; };
+    E.build = (show) => { const c = E.open ? E.cons[E.open] : null; [E.host, E.dcard].forEach((r) => {
+      if (!c) { r.panels = []; return; }
+      const vals = c.pipes[0].stages[6].vals, pan = { attrs: { 'data-cs-fpanel': 'main|6', 'data-cs-cid': c.id }, parentNode: null, getAttribute: ag, getClientRects() { return r.vis ? [1] : []; } };
+      pan.inputs = FLD.map(([k, t]) => { const a = show(t, vals[k] == null ? '' : vals[k]); return { type: t === 'num' ? 'number' : t, attrs: { 'data-cs-fld': k }, value: okType(t, a) ? a : '', defaultValue: a, parentNode: pan, getAttribute: ag, getClientRects() { return r.vis ? [1] : []; } }; });
+      pan.querySelectorAll = (sel) => (/data-cs-fld/.test(sel) ? pan.inputs : []); pan.querySelector = (sel) => { const m = /data-cs-fld="([^"]+)"/.exec(sel); return m ? pan.inputs.find((i) => i.attrs['data-cs-fld'] === m[1]) || null : null; };
+      r.panels = [pan]; }); };
+    E.setMode(mode);
+    const api = A(E);
+    E.render = api.render; E.save = () => { const c = E.cons[E.open]; api.save(c, c.pipes[0], 6, (E.mode === 'phone' ? E.dcard : E.host).panels[0]); };
+    E.f = (k) => (E.mode === 'phone' ? E.dcard : E.host).panels[0].inputs.find((i) => i.attrs['data-cs-fld'] === k);
+    E.hid = (k) => (E.mode === 'phone' ? E.host : E.dcard).panels[0].inputs.find((i) => i.attrs['data-cs-fld'] === k);
+    E.m = (k, id) => { const v = E.cons[id || E.open].pipes[0].stages[6].vals[k]; return v === undefined ? '(없음)' : String(v); };
+    api.render();
+    return E;
+  };
+  const casesD = (H, mode) => {
+    const o = {}; let E;
+    E = worldD(H, mode); E.f('q_no').value = 'NEW1'; E.save(); const a1 = E.f('q_no').value; E.f('q_date').value = '2031-02-02'; E.save();
+    o.T1 = a1 === 'NEW1' && E.m('q_no') === 'NEW1' && E.m('q_date') === '2031-02-02' && E.hid('q_no').value === 'NEW1';
+    E = worldD(H, mode); E.f('q_no').value = ''; E.save(); const a2 = E.f('q_no').value; E.f('q_date').value = '2031-02-02'; E.save();
+    o.T2 = a2 === '' && E.m('q_no') === '(없음)' && E.f('q_no').value === '';   // 빈 값으로 지우기
+    E = worldD(H, mode); E.cons.A.pipes[0].stages[6].vals.q_no = 'SRV'; E.render(); const a3 = E.f('q_no').value; E.f('q_date').value = '2031-02-02'; E.save();
+    o.T3 = a3 === 'SRV' && E.m('q_no') === 'SRV';   // 다른 기기의 새 값
+    E = worldD(H, mode); E.open = 'B'; E.render(); const b1 = E.f('q_no').value, b2 = E.f('q_date').value; E.f('q_amt').value = '7'; E.save();
+    o.T4 = b1 === 'B1' && b2 === '' && E.m('q_date', 'B') === '(없음)' && E.m('q_no', 'B') === 'B1';   // 다른 계약 펼침
+    E = worldD(H, mode); E.f('q_no').value = 'TYPA'; E.open = 'B'; E.render(); const c1 = E.f('q_no').value; E.f('q_amt').value = '7'; E.save(); E.open = 'A'; E.render();
+    o.T4c = c1 === 'B1' && E.m('q_no', 'B') === 'B1' && E.f('q_no').value === 'OLD1' && E.m('q_no', 'A') === 'OLD1';   // 치던 값을 둔 채 다른 계약 → 버림(다른 계약에 안 감·돌아와도 저장값)
+    E = worldD(H, mode); E.f('q_no').value = 'TYPING'; E.setMode('hidden'); E.render(); E.setMode(mode); E.render();
+    o.T5 = E.f('q_no').value === 'TYPING' && E.m('q_no') === 'OLD1';   // 계약 탭 숨은 동안 다시 그리기
+    E = worldD(H, mode); E.f('q_no').value = 'TYP1'; E.render(); E.f('q_no').value = 'TYP2'; E.render(); const d1 = E.f('q_no').value; E.save();
+    o.T5b = d1 === 'TYP2' && E.m('q_no') === 'TYP2' && E.hid('q_no').value === 'TYP2';   // 백그라운드 다시 그리기 사이 더 침(두 사본 다 바꾼 칸)
+    E = worldD(H, mode); E.f('q_no').value = 'TX'; E.setMode(mode === 'pc' ? 'phone' : 'pc'); E.render(); o.T5c = E.f('q_no').value === 'TX';   // 폰↔PC 전환
+    E = worldD(H, mode); E.f('q_no').value = 'N1'; E.save(); E.f('q_date').value = '2031-03-03'; E.save(); E.f('q_amt').value = '33'; E.save();
+    o.T6 = E.m('q_no') === 'N1' && E.m('q_date') === '2031-03-03' && E.m('q_amt') === '33' && E.saves === 3;
+    E = worldD(H, mode); E.f('q_no').value = 'NEW1'; E.save(); E.cons.A = JSON.parse(JSON.stringify(E.cons.A)); E.cons.A.pipes[0].stages[6].vals.q_no = 'OLD1'; E.render();
+    o.T7 = E.f('q_no').value === 'OLD1';   // 저장 실패 → 서버 값으로 다시 읽기 = 화면도 서버 값(안내 '다시 입력'과 같음)
+    E = worldD(H, mode); Object.assign(E.cons.A.pipes[0].stages[6].vals, { q_date: '2026.12.31', q_amt: '1,500' }); E.render(); const f1 = E.f('q_date').value, f2 = E.f('q_amt').value; E.f('q_no').value = 'NX'; E.save();
+    o.T8 = f1 === '2026-12-31' && f2 === '1500' && E.m('q_date') === '2026.12.31' && E.m('q_amt') === '1,500' && E.m('q_no') === 'NX';   // 다른 꼴 날짜·숫자 = 보여 주고 손대지 않음
+    E = worldD(H, mode); E.f('q_date').value = ''; E.save(); o.T9 = E.m('q_date') === '(없음)';   // 날짜를 사람이 지움 = 지워짐
+    return o;
+  };
+  const allOk = (H) => { const r = { pc: casesD(H, 'pc'), phone: casesD(H, 'phone') }; return { ok: Object.values(r.pc).concat(Object.values(r.phone)).every((v) => v === true), r }; };
+  const RD = allOk(html);
+  const mutD = (from, to) => { if (html.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); return html.replace(from, () => to); };
+  const KD = [];
+  for (const [from, to] of [
+    ['      if (el.defaultValue !== undefined ? el.value === el.defaultValue : el.value === "") return;', '      if (el.value === "") return;'],   // 종전 모음(비어 있지 않으면 다)
+    ['return !cid || !e.getAttribute || (e.getAttribute("data-cs-cid") || e.getAttribute("data-cs-wlform") || "") === cid;', 'return true;'],   // 계약 id 대조 걷음
+    ['      x.c = pan.getAttribute("data-cs-cid") || pan.getAttribute("data-cs-wlform") || "";\n', ''],   // 계약 id 안 남김
+    ['if (el.defaultValue !== undefined && el.value === el.defaultValue) return; ', ''],   // [입력 저장]이 패널 칸 전부를 씀
+    ['    if (t === "date") return s === "" ? "" : conChgDate(s);', '    if (t === "date") return s;'],   // 다른 꼴 날짜를 그대로 그림(브라우저가 빈 칸으로)
+    ['      x.s = sc;\n', '']]) {   // 점수 안 남김(두 사본 다 바꾼 칸일 때 숨은 쪽이 이김)
+    let k; try { k = allOk(mutD(from, to)).ok; } catch (e) { k = 'err ' + e.message; } KD.push(k);
+  }
+  T('P1 판24d 계약 단계 칸 되살리기(실행 — PC·폰): 저장 뒤 다른 칸 저장 = 두 고침 · 빈 값으로 지움 = 지워짐·화면 빈 칸 · 다른 기기 새 값 = 화면·저장 모두 새 값 · 다른 계약 펼침 = 그 계약 값(앞 계약 값이 안 들어감·저장 안 됨) · 치던 값을 둔 채 다른 계약 = 버림(돌아와도 저장값) · 계약 탭 숨김·백그라운드 다시 그리기·폰↔PC 전환 = 치던 값 유지 · 연속 3번 저장 · 저장 실패 다시 읽기 = 화면도 서버 값 · 2026.12.31·1,500 = 2026-12-31·1500으로 보이고 다른 칸 저장에 안 지워짐 · 날짜를 사람이 지움 = 지워짐 · 결함 사본 ' + KD.length + '개(종전 모음·계약 id 대조 걷음·계약 id 안 남김·패널 칸 전부 씀·다른 꼴 날짜 그대로·점수 안 남김) = 모두 ✗',
+    RD.ok && KD.every((v) => v === false), JSON.stringify({ r: RD.r, mut: KD }));
+} catch (e) { console.log('  (P1 판24d 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

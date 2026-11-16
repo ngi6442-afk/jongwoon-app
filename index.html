@@ -16676,8 +16676,10 @@
     h += '<div class="cs-sb" id="' + bid + '">';
     var flds = csStageFieldsOf(s), vals = s.vals || {};
     if (flds.length){
-      h += '<div class="cs-fld" data-cs-fpanel="' + esc(key) + '">' + flds.map(function(f){
+      // 판24d: 패널에 계약 id(칸 되살리기가 다른 계약 패널에 옮겨 붙지 않게) · 날짜·숫자 칸은 브라우저가 받는 꼴로 보여 줌(2026.12.31·1,500처럼 다른 꼴이면 브라우저가 빈 칸으로 바꿔 보이던 것)
+      h += '<div class="cs-fld" data-cs-fpanel="' + esc(key) + '" data-cs-cid="' + esc(c.id) + '">' + flds.map(function(f){
         var v = (f[0] === "settle_amount" && c.settle_amount) ? c.settle_amount : (vals[f[0]] == null ? "" : vals[f[0]]);
+        v = csFldShow(f[2], v);
         return '<label>' + esc(f[1]) + '<input type="' + (f[2] === "date" ? "date" : (f[2] === "num" ? "number" : "text")) + '" data-cs-fld="' + esc(f[0]) + '" value="' + esc(String(v)) + '"' + (can ? '' : ' disabled') + '></label>';
       }).join("") + '</div>';
     }
@@ -16721,7 +16723,7 @@
     fm = fm || csFlow(c);
     var rows = fm.st[p.key + "|" + i] || [];
     rows.forEach(function(r){ var x = csRowState(c, r, fm); if (x === "done") nDone++; else if (x === "na") nNa++; if (r.add) nAdd++; });
-    var h = '<div class="cs-docs" data-cs-dpanel="' + esc(key) + '"><div class="cs-pipe-h">서류 ' + rows.length + '건 · 완료 ' + nDone + (nNa ? ' · 해당없음 ' + nNa : '') + (nAdd ? ' · 추가 ' + nAdd : '') + (fixed ? '' : ' <small style="font-weight:400;">(골조 목록 — 체크하면 이 계약의 목록으로 굳습니다)</small>') + '</div>';
+    var h = '<div class="cs-docs" data-cs-dpanel="' + esc(key) + '" data-cs-cid="' + esc(c.id) + '"><div class="cs-pipe-h">서류 ' + rows.length + '건 · 완료 ' + nDone + (nNa ? ' · 해당없음 ' + nNa : '') + (nAdd ? ' · 추가 ' + nAdd : '') + (fixed ? '' : ' <small style="font-weight:400;">(골조 목록 — 체크하면 이 계약의 목록으로 굳습니다)</small>') + '</div>';
     if (!rows.length) h += '<div class="vs-empty" style="font-size:12px;">이 단계에 등록된 서류 목록이 없습니다.</div>';
     if (csDocsLost(s)) h += '<div class="vs-empty" style="font-size:12px;color:#B00020;">서류 목록 원천을 불러오지 못했습니다 — 새로고침 뒤 체크해 주세요(지금 체크하면 표준 항목이 빠진 채 굳습니다).</div>';   // v402 R1
     h += rows.map(function(r){ return csDocRowHtml(c, r, fm, can); }).join("");
@@ -16856,11 +16858,19 @@
     else if (r === "none") alert("이 단계의 지시를 찾지 못했습니다 — 지시 탭에서 확인하세요.");
     renderContracts();
   }
+  // 판24d: 단계 칸 보여 줄 값 — 날짜 칸은 YYYY-MM-DD(2026.12.31·2026-1-5도 conChgDate로), 숫자 칸은 쉼표·띄어쓰기·'원'을 걷은 숫자. 그래도 못 받는 꼴이면 빈 칸(모델 값은 손대지 않음 — 그 칸을 사람이 고칠 때만 바뀜)
+  function csFldShow(t, v){
+    var s = String(v == null ? "" : v);
+    if (t === "date") return s === "" ? "" : conChgDate(s);
+    if (t === "num"){ var n = s.replace(/[,\s원]/g, ""); return /^-?\d+(\.\d+)?$/.test(n) ? n : ""; }
+    return s;
+  }
   function csSaveFields(c, p, i, panel){
     var s = p.stages[i]; if (!s || !panel) return;
     s.vals = s.vals || {};
     if (conDueOn()){ (c.pipes || []).forEach(function(pp){ (pp.stages || []).forEach(function(x){ if (!(x && x.due_badge === "기산일 필요" && x.task_id)) return; var tt = findTask(x.task_id); if (!tt || tt.due || tt.status === "done") return; var dd2 = conStageDue(x, c, pp); if (dd2 && dd2.due){ tt.due = dd2.due; tt.updated = todayStr(); x.due_src = dd2.src || ""; delete x.due_badge; saveTasksCache(); scheduleTasksSave(); } }); }); }   // v404 검토 S1 (입력 칸 저장 뒤 — 아래 forEach가 vals를 먼저 쓰도록 setTimeout 없이 두 번째 패스에서)
-    Array.prototype.forEach.call(panel.querySelectorAll("[data-cs-fld]"), function(el){ var k = el.getAttribute("data-cs-fld"), v = el.value; if (v === "") delete s.vals[k]; else s.vals[k] = (el.type === "number") ? Number(v) : v; if (k === "settle_amount"){ if (v === "") delete c.settle_amount; else c.settle_amount = Number(v); } });
+    // 판24d: 사람이 바꾼 칸만 모델에 씀(바꾸지 않은 칸 = 그린 값 그대로 — 다른 기기의 새 값·브라우저가 못 받는 꼴의 값을 덮거나 지우지 않게)
+    Array.prototype.forEach.call(panel.querySelectorAll("[data-cs-fld]"), function(el){ if (el.defaultValue !== undefined && el.value === el.defaultValue) return; var k = el.getAttribute("data-cs-fld"), v = el.value; if (v === "") delete s.vals[k]; else s.vals[k] = (el.type === "number") ? Number(v) : v; if (k === "settle_amount"){ if (v === "") delete c.settle_amount; else c.settle_amount = Number(v); } });
     c.updated = todayStr(); scheduleContractSave(); renderContracts();
   }
   function csWlAdd(c, row){
@@ -16919,11 +16929,16 @@
     //   (계약 탭이 숨은 동안엔 두 벌 다 안 그려져도 치던 값을 지킴 — 독립 검토 11/16)
     var seen = {}, score = function(el){ return (el.getClientRects && el.getClientRects().length ? 2 : 0) + (el.defaultValue !== undefined && el.value !== el.defaultValue ? 1 : 0); };
     Array.prototype.forEach.call(root.querySelectorAll("[data-cs-fld], [data-cs-wl], [data-cs-dnew]"), function(el){
-      if (el.value === "") return;
+      // 판24d: 사람이 바꾼 칸만(value ≠ defaultValue — 빈 값으로 지운 것 포함). 바꾸지 않은 칸은 새로 그린 값(서버·모델)이 이김 — 종전엔 비어 있지 않은 칸을 다 모아
+      //   빈 값으로 지운 칸·다른 기기의 새 값·다른 계약 칸에 옛 값이 되살아났다(v382부터). 그리기 정보(defaultValue)가 없는 칸은 종전대로 빈 값만 뺌
+      if (el.defaultValue !== undefined ? el.value === el.defaultValue : el.value === "") return;
       var pan = csPanelOf(el); if (!pan) return;
       var x = { p: pan.getAttribute("data-cs-fpanel") || (pan.getAttribute("data-cs-wlform") ? "wl:" + pan.getAttribute("data-cs-wlform") : "dp:" + pan.getAttribute("data-cs-dpanel")), k: el.getAttribute("data-cs-fld") || el.getAttribute("data-cs-wl") || "dnew", v: el.value }, id = x.p + "\u0001" + x.k, sc = score(el);
       // 판24c: 점수를 같이 남김 — 두 뿌리(표 펼침·폰 카드)의 모음을 csSnapJoin이 같은 규칙으로 하나로
       x.s = sc;
+      // 판24d: 그 칸의 계약 id(패널 data-cs-cid · 작업현황 줄은 wlform 값) — 되살릴 때 같은 계약 패널에만
+      x.c = pan.getAttribute("data-cs-cid") || pan.getAttribute("data-cs-wlform") || "";
+      id = x.c + "\u0002" + id;
       if (!Object.prototype.hasOwnProperty.call(seen, id)){ seen[id] = { i: out.length, s: sc }; out.push(x); }
       else if (sc > seen[id].s){ out[seen[id].i] = x; seen[id].s = sc; }
     });
@@ -16933,15 +16948,16 @@
   //   되살릴 때 뒤(숨은 카드의 옛 값)가 앞(그려진 칸의 새 값)을 덮었다 — [입력 저장] 직후 화면이 옛 값·다음 저장이 그 옛 값을 다시 씀(비어 있지 않던 칸만, 결재와 무관). 같은 열쇠는 점수 높은 쪽 하나(같으면 앞)
   function csSnapJoin(a, b){
     var out = (a || []).slice(), at = {};
-    out.forEach(function(x, i){ at[x.p + "\u0001" + x.k] = i; });
-    (b || []).forEach(function(x){ var id = x.p + "\u0001" + x.k; if (!Object.prototype.hasOwnProperty.call(at, id)){ at[id] = out.length; out.push(x); } else if ((x.s || 0) > (out[at[id]].s || 0)) out[at[id]] = x; });
+    out.forEach(function(x, i){ at[(x.c || "") + "\u0002" + x.p + "\u0001" + x.k] = i; });
+    (b || []).forEach(function(x){ var id = (x.c || "") + "\u0002" + x.p + "\u0001" + x.k; if (!Object.prototype.hasOwnProperty.call(at, id)){ at[id] = out.length; out.push(x); } else if ((x.s || 0) > (out[at[id]].s || 0)) out[at[id]] = x; });
     return out;
   }
   function csRestoreInputs(root, snap){
     if (!root || !snap.length) return;
     // 45-1 묶음 2(11/16): 같은 열쇠의 패널이 두 벌(표 펼침 + 숨은 사본)이면 화면에 그려진 쪽에 되살림
-    var visPan = function(sel){ var all = root.querySelectorAll(sel), i; for (i = 0; i < all.length; i++){ if (!all[i].getClientRects || all[i].getClientRects().length) return all[i]; } return all[0] || null; };
-    snap.forEach(function(x){ var pan = x.p.indexOf("wl:") === 0 ? visPan('[data-cs-wlform="' + x.p.slice(3) + '"]') : (x.p.indexOf("dp:") === 0 ? visPan('[data-cs-dpanel="' + x.p.slice(3) + '"]') : visPan('[data-cs-fpanel="' + x.p + '"]')); if (!pan) return; var el = x.k === "dnew" ? pan.querySelector('[data-cs-dnew]') : pan.querySelector('[data-cs-fld="' + x.k + '"], [data-cs-wl="' + x.k + '"]'); if (el && el.value !== x.v) el.value = x.v; });
+    // 판24d: 모을 때 남긴 계약 id(x.c)가 있으면 같은 계약 패널에만(다른 계약을 펼쳤으면 그 값은 버림 — 다른 계약의 같은 줄·단계 번호 칸에 들어가 저장되던 것)
+    var visPan = function(sel, cid){ var all = Array.prototype.filter.call(root.querySelectorAll(sel), function(e){ return !cid || !e.getAttribute || (e.getAttribute("data-cs-cid") || e.getAttribute("data-cs-wlform") || "") === cid; }), i; for (i = 0; i < all.length; i++){ if (!all[i].getClientRects || all[i].getClientRects().length) return all[i]; } return all[0] || null; };
+    snap.forEach(function(x){ var pan = x.p.indexOf("wl:") === 0 ? visPan('[data-cs-wlform="' + x.p.slice(3) + '"]', x.c) : (x.p.indexOf("dp:") === 0 ? visPan('[data-cs-dpanel="' + x.p.slice(3) + '"]', x.c) : visPan('[data-cs-fpanel="' + x.p + '"]', x.c)); if (!pan) return; var el = x.k === "dnew" ? pan.querySelector('[data-cs-dnew]') : pan.querySelector('[data-cs-fld="' + x.k + '"], [data-cs-wl="' + x.k + '"]'); if (el && el.value !== x.v) el.value = x.v; });
   }
   function conSetPaneW(wrap){ try { wrap.style.setProperty("--vs-panew", wrap.clientWidth + "px"); } catch(e){} }
   function renderContracts(){
