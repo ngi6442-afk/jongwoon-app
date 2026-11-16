@@ -74,15 +74,17 @@ function scan(oldItems, newItems) {
     });
   });
   // 3차 재검토 B1: 유효 금액·종료일을 내던 승인된 변경계약 차수(직전 서버 값)를 지우거나 '건너뜀'으로 바꾸거나 그 자리를 다른 단계로 바꾸면 결재 없이 원계약 값으로 돌아간다 — 거절(관리자도).
-  //   되돌리려면 새 변경계약을 상신. 계약 자체를 지운 것(del 1·목록에서 빠짐)은 대상 아님
+  //   되돌리려면 새 변경계약을 상신.
+  // 11/16(남은 것 1 — 원천): 계약을 지우는 저장(del 1)도 같은 대조 — 종전엔 지우면서 승인 차수를 끄고 복구(del 0)하면 유효 금액이 원계약 값으로 돌아갔다(재현됨).
+  //   앱의 [삭제]는 단계를 건드리지 않으므로(그대로 = kept) 통과 · 낡은 사본의 승인 전 꼴은 carryStale이 서버 값으로 이월 · 목록에서 아예 빠진 계약(앱에 없는 길 — 다시 넣으면 새 계약으로 대조를 비켜 감)도 그 차수마다 같은 거절
   const newBy = {};
   (Array.isArray(newItems) ? newItems : []).forEach(function (c) { if (isObj(c) && c.id != null) newBy[String(c.id)] = c; });
   Object.keys(oldBy).forEach(function (id) {
-    const o = oldBy[id], c = newBy[id];
-    if (!isObj(o) || !c || c.del === 1) return;
+    const o = oldBy[id], c = newBy[id] || null;
+    if (!isObj(o)) return;
     (Array.isArray(o.pipes) ? o.pipes : []).forEach(function (op) {
       if (!isObj(op) || !Array.isArray(op.stages)) return;
-      const p = Array.isArray(c.pipes) ? c.pipes.find(function (q) { return isObj(q) && q.key === op.key; }) : null;
+      const p = (c && Array.isArray(c.pipes)) ? c.pipes.find(function (q) { return isObj(q) && q.key === op.key; }) : null;
       op.stages.forEach(function (os, i) {
         if (!(isObj(os) && os.aw === 'amt' && os.status === 'done' && isObj(os.appr) && os.appr.status === '승인' && isObj(os.appr.snap))) return;
         const s = (p && Array.isArray(p.stages)) ? p.stages[i] : null;
@@ -100,12 +102,13 @@ function scan(oldItems, newItems) {
 //   다시 보내면(같은 날 409 병합에서 로컬 계약이 통째로 이김 · 옛 판 캐시 앱 · base 없는 저장) 거절하지 않고 그 단계만 서버 값(상태·완료일·상신 기록)으로 되돌려 둔다 —
 //   그 계약의 다른 칸·그 단계의 다른 칸(서류·입력 칸)은 들어온 값. 차량 만기일 보호(vehDueGuard)와 같은 꼴. 서버 값이 그대로 남으므로 이 길로 얻는 것은 없다(유효 금액 불변).
 //   그 밖의 끄기(상신 기록 지움·반려로·번호·사본 다름·승인 표시는 그대로인데 상태만 열림 등)는 scan의 APPR_REVOKED 그대로. 반환 [{cid, pipe, i}] — newItems를 고쳐 씀
+//   11/16(남은 것 1): 지우는 저장(del 1)의 낡은 사본도 이월 — 지운 계약에도 승인 차수가 서버 값으로 남아 복구(del 0) 때 그대로 대조된다
 const STALE_PRE = { '대기': 1, '보류': 1, '미전송': 1 };
 function carryStale(oldItems, newItems) {
   const oldBy = {}, out = [];
   (Array.isArray(oldItems) ? oldItems : []).forEach(function (o) { if (o && o.id != null) oldBy[String(o.id)] = o; });
   (Array.isArray(newItems) ? newItems : []).forEach(function (c) {
-    if (!isObj(c) || c.id == null || c.del === 1) return;
+    if (!isObj(c) || c.id == null) return;
     const o = oldBy[String(c.id)]; if (!isObj(o) || !Array.isArray(o.pipes) || !Array.isArray(c.pipes)) return;
     o.pipes.forEach(function (op) {
       if (!isObj(op) || !Array.isArray(op.stages)) return;

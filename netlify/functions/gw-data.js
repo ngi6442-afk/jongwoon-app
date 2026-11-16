@@ -3635,9 +3635,9 @@ async function handleCdocPut(event, d, R) {
     if (!docAttExtOk(ext)) return jr(400, { status: 'REJECTED', error_code: 'BAD_EXT', request_id: R });
     if (b64.length > CDOC_MAX) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', hint: '파일은 오프라인 보관, 채움 맵(fill)만 올리기', request_id: R });
     if (!docAttMagicOk(ext, b64)) return jr(400, { status: 'REJECTED', error_code: 'BAD_MAGIC', request_id: R });
-    // P1 판24-② 검토(11/15 B5): 직접 올리기에도 zip 내부 검증 — 단 '최종본(final) hwpx'만 빼 둔다: servertest 58(v406)이 10바이트 가짜 hwpx를 최종본으로 올려 200을 고정하고 있어서(남의 블록).
-    //   그 고정값을 실제 꼴 hwpx로 바꾸면 아래 조건의 예외(kind·확장자)를 걷을 것. 넣기 박스 길(cdoc_attach)은 예외 없음
-    if (!(kind === 'final' && ext === 'hwpx')) { const zcP = cdocZipOk(ext, b64); if (!zcP.ok) return jr(400, { status: 'REJECTED', error_code: 'BAD_ZIP', why: zcP.why, request_id: R }); }
+    // P1 판24-② 검토(11/15 B5): 직접 올리기에도 zip 내부 검증 — 넣기 박스 길(cdoc_attach)과 같은 검증.
+    //   11/16(남은 것 4): 빼 두었던 '최종본(final) hwpx' 한 칸도 검증(servertest 58의 10바이트 가짜 hwpx 고정값을 실제 꼴 최소 hwpx로 바꿈) — 종류·형식 예외 없음
+    const zcP = cdocZipOk(ext, b64); if (!zcP.ok) return jr(400, { status: 'REJECTED', error_code: 'BAD_ZIP', why: zcP.why, request_id: R });
   }
   return cdocCommit(c, d, R, ref, kind, pii, orig, ext, b64, fill, null);
 }

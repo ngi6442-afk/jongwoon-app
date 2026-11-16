@@ -14362,7 +14362,9 @@
       if(resp.status===400){ return resp.json().then(function(json){ var ec=(json&&json.error_code)||""; contractSha=json&&json.content&&json.content.sha; contractsPending=false; if(ec==="CON_APPR_REQUIRED"){ alert(CON_APPR_REJECT_MSG); loadContracts(); } else if(ec==="CON_APPR_REVOKED"){ alert(CON_APPR_REVOKED_MSG); loadContracts(); } }); }   // 5차 B: 승인된 변경계약 되돌리기 거절은 그 까닭의 글
       // P1 판24-③ 검토(11/15 B9): 서버 오류(5xx — 결재함 못 읽음 APPROVALS_READ_FAILED 포함)도 조용히 넘기지 않는다(종전: 저장 대기 표시만 풀려 결재한 기기엔 '진행됨'으로 보이고 서버엔 없음)
       if(resp.status>=500){ return resp.json().catch(function(){ return {}; }).then(function(json){ contractsPending=false; alert(CON_SAVE_FAIL_MSG + (json && json.error_code ? " (" + json.error_code + ")" : "")); loadContracts(); }); }
-      return resp.json().then(function(json){ contractSha=json.content&&json.content.sha; contractsPending=false; if(json&&json.con_kept&&json.con_kept.length) loadContracts(); });   // 5차: 서버가 승인 차수를 지켰으면(낡은 사본) 화면을 서버 값으로
+      // 11/16(남은 것 2 — 재현됨): 이월 응답 뒤 다시 읽을 때, 이 저장을 보낸 뒤 고친 내용(디바운스로 아직 안 나간 것)이 있으면 대기 표시를 다시 세워
+      //   다시 읽기가 통째로 덮지 않고 병합(mergeContracts — 로컬 고침은 남고 승인 차수만 서버 값 csKeepApproved)하게 한다. 그 고침은 걸려 있는 디바운스 저장이 보낸다
+      return resp.json().then(function(json){ contractSha=json.content&&json.content.sha; contractsPending=false; if(json&&json.con_kept&&json.con_kept.length&&JSON.stringify({schema:1, items:contracts})!==body) contractsPending=true; if(json&&json.con_kept&&json.con_kept.length) loadContracts(); });   // 5차: 서버가 승인 차수를 지켰으면(낡은 사본) 화면을 서버 값으로
     }).catch(function(){});
   }
   var WASTE_BACKBONE = [

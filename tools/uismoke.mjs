@@ -16245,5 +16245,89 @@ try {   // ---- P1 판20b 인허가 기한 지시 — 탭 '다음 회차' 단계
   T('P1 판20b 결함 사본 ' + MCB.length + '개(서버 다음 회차 단계를 하루 어긋나게 · 지시에 적는 다음 회차 단계 고정 · 지금 회차 단계를 하루 어긋나게) = 모두 ✗', kCB.every((v) => v === false), JSON.stringify(kCB));
 } catch (e) { console.log('  (P1 판20b 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ── P1 남은 것 정리(11/16 — 원장 C187 ③): ② 이월 응답(con_kept) 뒤 다시 읽기가 요청 중 고친 내용을 지킴 · ③ 병합의 승인 차수 서버 맞춤(csKeepApproved) 실행 검사 · ④ 앱이 만드는 한글 양식 zip = 서버 zip 검증 통과
+try {
+  const fnZ16 = (src, name) => { const i = src.search(new RegExp('\\n  (?:async )?function ' + name + '\\(')); if (i < 0) throw new Error('함수 없음 ' + name); const rest = src.slice(i + 1); const m = /\n  (?:async )?function |\n  var /.exec(rest.slice(5)); return rest.slice(0, m ? m.index + 5 : rest.length); };
+  const varZ16 = (src, name) => { const m = new RegExp('\\n  var ' + name + ' ?=[^\\n]*').exec(src); if (!m) throw new Error('변수 없음 ' + name); return m[0].slice(1); };
+  const tickZ16 = () => new Promise((r) => setTimeout(r, 0));
+  const mutZ16 = (from, to) => { if (html.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); return html.replace(from, () => to); };
+  // 시험 계약 — 서버 = 승인·반영된 변경 1차 · 낡은 사본 = 같은 상신 번호·같은 사본의 승인 전(대기)
+  const conZ16 = (stale) => ({ id: 'kz', updated: '2026-11-16', pipes: [{ key: 'main', cur: 1, stages: [{ name: '계약서', status: 'done' }, { name: '착공', status: 'open' }] },
+    { key: 'chg', cur: stale ? 0 : 1, stages: [Object.assign({ name: '변경계약', aid: 'change_contract', ak: '계약 단계', aw: 'amt', vals: { chg_amt: 1500 } }, stale ? { status: 'open', appr: { cid: 'cz', status: '대기', snap: { chg_amt: 1500, chg_end: '' } } } : { status: 'done', done_at: '2026-11-16', appr: { cid: 'cz', status: '승인', snap: { chg_amt: 1500, chg_end: '' } } })] }] });
+  // mode: inflight = 첫 저장 요청이 나가 있는 동안 고침(응답 con_kept) · none = 고침 없음 · c409 = 같은 날 409 → 다시 읽어 병합 → 다시 저장
+  const runZ16 = async (H, mode) => {
+    const env = { puts: [], gets: 0, timers: [], alerts: 0 }, server = { items: [conZ16(false), { id: 'kz2', updated: '2026-11-16', pipes: [] }] };
+    let gate = null;
+    const fetchZ = (url, opts) => {
+      if (!opts || !opts.method || opts.method === 'GET') { env.gets++; const s = JSON.stringify({ schema: 1, items: server.items }); return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ sha: 'gw', content: s }) }); }
+      const body = JSON.parse(JSON.parse(opts.body).content); env.puts.push(body);
+      if (mode === 'c409' && env.puts.length === 1) return Promise.resolve({ status: 409, ok: false, json: () => Promise.resolve({}) });
+      const kc = body.items.find((c) => c.id === 'kz'), kept = !!kc && kc.pipes[1].stages[0].status !== 'done';
+      server.items = body.items.map((c) => (c.id === 'kz' ? Object.assign({}, c, { pipes: [c.pipes[0], conZ16(false).pipes[1]] }) : c));
+      const res = { status: 200, ok: true, json: () => Promise.resolve({ content: { sha: 'gw' }, con_kept: kept ? [{ cid: 'kz', pipe: 'chg', i: 0 }] : null }) };
+      if (mode === 'inflight' && env.puts.length === 1) return new Promise((r) => { gate = () => r(res); });
+      return Promise.resolve(res);
+    };
+    const A = new Function('ENV', 'fetch', 'setTimeout', 'clearTimeout', [varZ16(H, 'CON_APPR_REJECT_MSG'), varZ16(H, 'CON_APPR_REVOKED_MSG'), varZ16(H, 'CON_SAVE_FAIL_MSG'),
+      'var contracts = [], contractSha = "gw", contractSaveTimer = null, contractsPending = false, CONTRACT_API = "x", autoGenReady = {};',
+      'function getToken(){ return "t"; } function ghHeaders(){ return {}; } function b64EncodeUnicode(s){ return s; } function b64DecodeUnicode(s){ return s; } function alert(){ ENV.alerts++; } function renderContracts(){} function renderTasks(){} function runAwardAutoCon(){} function conBldgAutoTry(){} function todayStr(){ return "2026-11-16"; }']
+      .concat(['mTime', 'mergeDel', 'liveContracts', 'loadContracts', 'scheduleContractSave', 'csKeepApproved', 'mergeContracts', 'doSaveContracts'].map((n) => fnZ16(H, n)))
+      .concat(['return { set: function(v){ contracts = v; }, get: function(){ return contracts; }, pend: function(){ return contractsPending; }, sched: scheduleContractSave };']).join('\n'))(env, fetchZ, (fn) => { env.timers.push(fn); return env.timers.length; }, (id) => { if (id) env.timers[id - 1] = null; });
+    const fire = async () => { const i = env.timers.findIndex((x) => x); if (i < 0) return false; const fn = env.timers[i]; env.timers[i] = null; fn(); for (let k = 0; k < 12; k++) await tickZ16(); return true; };
+    const L = conZ16(true); L.memo = 'A';
+    A.set([L, { id: 'kz2', updated: '2026-11-16', pipes: [] }]); A.sched(); await fire();
+    if (mode === 'inflight') { A.get()[0].memo2 = 'B'; A.sched(); gate(); for (let k = 0; k < 12; k++) await tickZ16(); }
+    const loc = JSON.parse(JSON.stringify(A.get())), pend = A.pend();
+    while (await fire()) { /* 남은 디바운스 저장 */ }
+    const st = (c) => { const s = c.pipes[1].stages[0]; return s.status + '/' + s.appr.status + '/' + c.pipes[1].cur; };
+    const last = env.puts[env.puts.length - 1].items.find((c) => c.id === 'kz');
+    return { loc: st(loc[0]) + '/' + (loc[0].memo || '') + (loc[0].memo2 || ''), pend, puts: env.puts.length, gets: env.gets, last: st(last) + '/' + (last.memo || '') + (last.memo2 || ''), alerts: env.alerts };
+  };
+  const chkZ16 = async (H) => {
+    const a = await runZ16(H, 'inflight'), b = await runZ16(H, 'none'), c = await runZ16(H, 'c409');
+    const ok = a.loc === 'done/승인/1/AB' && a.puts === 2 && a.gets === 1 && a.last === 'done/승인/1/AB' && a.alerts === 0
+      && b.loc === 'done/승인/1/A' && b.pend === false && b.puts === 1 && b.gets === 1
+      && c.puts === 2 && c.last === 'done/승인/1/A' && c.alerts === 0;
+    return { ok, info: { a, b, c } };
+  };
+  const RZ16 = await chkZ16(html);
+  const KZ16 = [];
+  for (const [from, to] of [
+    ['if(json&&json.con_kept&&json.con_kept.length&&JSON.stringify({schema:1, items:contracts})!==body) contractsPending=true; ', ''],   // ② 요청 중 고침 지킴 걷음
+    ['csKeepApproved(m, x); ', ''],   // ③ 병합의 서버 맞춤 호출 걷음(5차 — 종전 uismoke는 이 결함 사본에 안 깨졌음)
+    ['        mp.cur = Math.max(Number(mp.cur) || 0, Number(rp.cur) || 0);\n', '']]) {   // ③ 다음 단계 번호 맞춤 걷음
+    try { KZ16.push((await chkZ16(mutZ16(from, to))).ok); } catch (e) { KZ16.push('err ' + e.message); }
+  }
+  T('P1 남은 것 ②·③ 화면(실행 — 실제 doSaveContracts·loadContracts·mergeContracts·csKeepApproved): 낡은 사본 저장 요청이 나가 있는 동안 고친 내용 = 이월 응답(con_kept) 뒤 다시 읽어도 남음(대기 표시 다시 섬 → 병합)·승인 차수는 서버 값·다음 디바운스 저장이 그 고침을 보냄 · 고침 없으면 종전대로 서버 값으로 바꿈(대기 표시 내림) · 같은 날 409 병합 = 로컬 고침 남고 승인 차수·다음 단계 번호는 서버 값 · 결함 사본 ' + KZ16.length + '개(요청 중 고침 지킴 걷음·병합의 csKeepApproved 호출 걷음·단계 번호 맞춤 걷음) = 모두 ✗',
+    RZ16.ok && KZ16.every((v) => v === false), JSON.stringify({ r: RZ16.info, mut: KZ16 }));
+  // ④ 앱이 만드는 한글 양식 초안(fillHwpxTemplate → 표식 genMarkBlob → 서버 사본 genStoreCopy)의 zip 꼴 = 서버 zip 검증(_lib/docdiff zipCheck) 통과 — 직접 올리기 최종본 hwpx에도 검증을 건 뒤 앱 산출이 막히지 않게
+  const zlibZ16 = (await import('zlib')).default, DDZ16 = createRequire(import.meta.url)(join(ROOT, 'netlify', 'functions', '_lib', 'docdiff.js'));
+  const crcZ16 = (b) => { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) { c ^= b[i]; for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); } return (c ^ 0xFFFFFFFF) >>> 0; };
+  const zipZ16 = (ents) => { const parts = [], cen = []; let off = 0;
+    for (const [n, s, defl] of ents) { const nb = Buffer.from(n), d = Buffer.from(s), cd = defl ? zlibZ16.deflateRawSync(d) : d, crc = crcZ16(d);
+      const lh = Buffer.alloc(30); lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(defl ? 8 : 0, 8); lh.writeUInt32LE(crc, 14); lh.writeUInt32LE(cd.length, 18); lh.writeUInt32LE(d.length, 22); lh.writeUInt16LE(nb.length, 26);
+      const ch = Buffer.alloc(46); ch.writeUInt32LE(0x02014b50, 0); ch.writeUInt16LE(20, 4); ch.writeUInt16LE(20, 6); ch.writeUInt16LE(defl ? 8 : 0, 10); ch.writeUInt32LE(crc, 16); ch.writeUInt32LE(cd.length, 20); ch.writeUInt32LE(d.length, 24); ch.writeUInt16LE(nb.length, 28); ch.writeUInt32LE(off, 42);
+      parts.push(lh, nb, cd); cen.push(ch, nb); off += 30 + nb.length + cd.length; }
+    const cdb = Buffer.concat(cen), eo = Buffer.alloc(22); eo.writeUInt32LE(0x06054b50, 0); eo.writeUInt16LE(ents.length, 8); eo.writeUInt16LE(ents.length, 10); eo.writeUInt32LE(cdb.length, 12); eo.writeUInt32LE(off, 16);
+    return Buffer.concat(parts.concat([cdb, eo])); };
+  const TPLZ16 = zipZ16([['version.xml', '<hv:HCFVersion/>', true], ['Contents/content.hpf', '<opf:package><opf:metadata><opf:title/></opf:metadata></opf:package>', true],
+    ['Contents/section0.xml', '<hs:sec><hp:p><hp:run><hp:t>계약명 {{계약명}}</hp:t></hp:run><hp:linesegarray><hp:lineseg textpos="0"/><hp:lineseg textpos="9"/></hp:linesegarray></hp:p><hp:p><hp:run><hp:t>대리인 {{대리인}}</hp:t></hp:run></hp:p></hs:sec>', true],
+    ['mimetype', 'application/hwp+zip', false]]).toString('base64');
+  const runHwZ16 = async (H) => {
+    const A = new Function([varZ16(H, 'CRC_T'), varZ16(H, 'GEN_MARK_RE'), varZ16(H, 'GEN_RRN_RE'), varZ16(H, 'GEN_BLANK_PNG')].concat(['dataUrlToBytes', 'inflateRaw', 'unzip', 'crc32', 'zipStore', 'xmlEsc', 'fillHwpxTemplate', 'genMarkHpf', 'genMarkCore', 'genMarkBlob', 'genScrubText', 'genStoreCopy'].map((n) => fnZ16(H, n)))
+      .concat(['return { fillHwpxTemplate: fillHwpxTemplate, genMarkBlob: genMarkBlob, genStoreCopy: genStoreCopy };']).join('\n'))();
+    const zc = async (b) => DDZ16.zipCheck('hwpx', Buffer.from(await b.arrayBuffer())), z = [];
+    let sec = [];
+    const b1 = await A.fillHwpxTemplate(TPLZ16, { '계약명': '시험 공사 & <가>', '대리인': '홍 900101-1234567' }); z.push(await zc(b1));
+    // 표식·서버 사본은 앞 판을 다시 풀어 만든다 — 앞 판 zip이 깨졌으면 여기서 멈출 수 있음(그 판정은 위 z[0])
+    try { const b2 = await A.genMarkBlob(b1, 'JWG1.kz.work_start.abc123def0'); z.push(await zc(b2)); const b3 = await A.genStoreCopy(b2, false); z.push(await zc(b3)); sec = DDZ16.hwpxParas(Buffer.from(await b3.arrayBuffer())) || []; } catch (e) { z.push({ ok: false, why: 'THREW' }); }
+    return { ok: z.length === 3 && z.every((x) => x.ok) && JSON.stringify(sec).indexOf('시험 공사') > 0, info: { z: z.map((x) => x.ok ? 'ok' : x.why), paras: sec.length } };
+  };
+  const RHZ16 = await runHwZ16(html);
+  let KHZ16; try { KHZ16 = (await runHwZ16(mutZ16('      ch.setUint32(42,off,true);\n', '      ch.setUint32(42,off+1,true);\n'))).ok; } catch (e) { KHZ16 = 'err ' + e.message; }
+  T('P1 남은 것 ④ 앱 한글 양식 산출(실행 — 실제 fillHwpxTemplate·genMarkBlob·genStoreCopy · 압축 항목 섞인 양식) = 서버 zip 검증(docdiff zipCheck hwpx) 세 판 모두 통과·채운 글 읽힘 · 결함 사본(앱 zip 목록의 항목 위치 1 어긋남) = ✗',
+    RHZ16.ok && KHZ16 === false, JSON.stringify({ r: RHZ16.info, mut: KHZ16 }));
+} catch (e) { console.log('  (P1 남은 것 화면 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

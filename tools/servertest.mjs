@@ -3704,7 +3704,8 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   mem.gw_data['map:contract:v1'] = { schema: 1, scen: { 'asbestos:pub': [{ i: 0, name: '석면 조사', co: 'con' }, { i: 3, name: '배출신고', co: 'env' }] } };
   mem.gw_files = mem.gw_files || {};
   const b58 = (x) => Buffer.from(x).toString('base64');
-  const PDF58 = b58('%PDF-1.4 cdoc test'), ZIP58 = b58(Buffer.from([0x50, 0x4B, 0x03, 0x04, 0x14, 0x00, 0x63, 0x64, 0x6F, 0x63])), HTML58 = b58('<html>x</html>');
+  // 11/16(P1 남은 것 4): ZIP58 = 실제 꼴 최소 hwpx(무압축 zip 260바이트 — mimetype 첫 항목 + Contents/section0.xml) · 종전 10바이트 가짜는 직접 올리기 zip 검증(최종본 hwpx 포함)에 걸림
+  const PDF58 = b58('%PDF-1.4 cdoc test'), ZIP58 = 'UEsDBBQAAAAAAAAAAACC8EFHEwAAABMAAAAIAAAAbWltZXR5cGVhcHBsaWNhdGlvbi9od3AremlwUEsDBBQAAAAAAAAAAACKvwV+CQAAAAkAAAAVAAAAQ29udGVudHMvc2VjdGlvbjAueG1sPGhzOnNlYy8+UEsBAhQAFAAAAAAAAAAAAILwQUcTAAAAEwAAAAgAAAAAAAAAAAAAAAAAAAAAAG1pbWV0eXBlUEsBAhQAFAAAAAAAAAAAAIq/BX4JAAAACQAAABUAAAAAAAAAAAAAAAAAOQAAAENvbnRlbnRzL3NlY3Rpb24wLnhtbFBLBQYAAAAAAgACAHkAAAB1AAAAAAA=', HTML58 = b58('<html>x</html>');
   const base58 = { action: 'cdoc_put', cid: 'c58', i: 0, doc_key: 'asb_survey', kind: 'received', name: '석면조사결과서.pdf', data: PDF58 };
   let r58 = await call(Object.assign({}, base58), tokV, 'dev1'); const p1 = r58.code === 403 && r58.body.error_code === 'NO_WRITE';
   r58 = await call(Object.assign({}, base58), tokW, 'dev1'); const p2 = r58.code === 403;
@@ -11130,14 +11131,15 @@ function J91a(x) { return JSON.stringify(x); }
       I.r = [b1.code, b1.body.why, b2.code, b2.body.why, g1.code, g1.body.error_code, g2.code, g2.body.error_code, g3.code, g3.body.error_code, IX().length];
       return { ok: P.deny && P.allow, info: { P, I } };
     };
-    // 검토 B5·B6: 직접 올리기(cdoc_put) zip 검증(최종본 hwpx만 servertest 58 고정값 때문에 뺌) · 같은 바이트를 더 낮은 등급으로 다시 올리기 = 관리자만
+    // 검토 B5·B6: 직접 올리기(cdoc_put) zip 검증(11/16부터 최종본 hwpx 포함 — 예외 없음) · 같은 바이트를 더 낮은 등급으로 다시 올리기 = 관리자만
     const chkPut = async (mod) => {
       const c = callB24(mod), P = {}, I = {};
       seedCdoc();
       const put = (o, tok) => c(Object.assign({ action: 'cdoc_put', cid: 'k24', i: 5, doc_key: 'e', kind: 'received' }, o), tok || tCW24, 'dev1');
       const z1 = await put({ name: '가짜.docx', data: ZBAD24.nodir.toString('base64') }), z2 = await put({ name: '가짜.xlsx', kind: 'final', data: ZBAD24.macro.toString('base64') });
       const z3 = await put({ name: '정상.docx', data: ZOK24.docx.toString('base64') }), z4 = await put({ name: '빈틈.hwpx', kind: 'final', data: ZBAD24.fake.toString('base64') });
-      P.zip = z1.code === 400 && z1.body.error_code === 'BAD_ZIP' && z2.code === 400 && z2.body.why === 'MACRO' && z3.code === 200 && z4.code === 200;   // z4 = 남긴 범위(최종본 hwpx — servertest 58)
+      // z4: 11/16(P1 남은 것 4) 최종본 hwpx 가짜도 거절(종전 남긴 범위 — servertest 58 고정값을 실제 꼴로 바꿈)
+      P.zip = z1.code === 400 && z1.body.error_code === 'BAD_ZIP' && z2.code === 400 && z2.body.why === 'MACRO' && z3.code === 200 && z4.code === 400 && z4.body.error_code === 'BAD_ZIP';
       I.zip = [z1.code, z1.body.why, z2.code, z2.body.why, z3.code, z4.code];
       const pdf = Buffer.from('%PDF-1.4 같은 바이트 24').toString('base64');
       const g1 = await put({ name: 'a.pdf', data: pdf, pii: 1 }), g2 = await put({ name: 'b.pdf', data: pdf, pii: 0, allow_dup: true }), g3 = await put({ name: 'c.pdf', data: pdf, pii: 1, allow_dup: true });
@@ -11154,7 +11156,7 @@ function J91a(x) { return JSON.stringify(x); }
       return { ok: P.zip && P.lower, info: { P, I } };
     };
     const U0 = await chkPut(gwd);
-    T('P1 판24-② ③-3 직접 올리기(cdoc_put) — zip 검증: 앞 4바이트만 PK인 docx(받은 서류)·매크로 xlsx(최종본) = 400 BAD_ZIP · 정상 docx 200 · 최종본 hwpx 가짜 = 200(남긴 범위 — servertest 58 고정값) · 등급(B6): 같은 바이트가 등급 1로 있으면 직원이 등급 0으로 다시 올려도 등급 1로 들어감(200·pii_raised 1·감사 "같은 내용 등급 1 따름")·보관한 뒤에도 따름 · 같은 등급 그대로 · 관리자는 고른 등급 0 · AI 초안(등급 1) 바이트를 최종본 등급 0으로 = 등급 0 그대로(정상 흐름)', U0.ok, JSON.stringify(U0.info));
+    T('P1 판24-② ③-3 직접 올리기(cdoc_put) — zip 검증: 앞 4바이트만 PK인 docx(받은 서류)·매크로 xlsx(최종본) = 400 BAD_ZIP · 정상 docx 200 · 최종본 hwpx 가짜 = 400 BAD_ZIP(11/16 — 남긴 범위 걷음) · 등급(B6): 같은 바이트가 등급 1로 있으면 직원이 등급 0으로 다시 올려도 등급 1로 들어감(200·pii_raised 1·감사 "같은 내용 등급 1 따름")·보관한 뒤에도 따름 · 같은 등급 그대로 · 관리자는 고른 등급 0 · AI 초안(등급 1) 바이트를 최종본 등급 0으로 = 등급 0 그대로(정상 흐름)', U0.ok, JSON.stringify(U0.info));
     const A0 = await chkAttach(gwd);
     T('P1 판24-② ③-2 넣기 박스 → 서류함(cdoc_attach): 앞 4바이트만 PK인 docx = 400 BAD_ZIP(NO_DIR)·매크로 든 xlsx = 400 BAD_ZIP(MACRO)·색인 그대로 · 허용 = 정상 docx·hwpx·pdf 200(색인 +3)', A0.ok, JSON.stringify(A0.info));
     // ④ 체크 감사 줄 = 바뀐 항목 키(값 없음)
@@ -11213,7 +11215,7 @@ function J91a(x) { return JSON.stringify(x); }
       ['dd', '    if (p + 22 + buf.readUInt16LE(p + 20) === buf.length) { eocd = p; break; }', '    { eocd = p; break; }', chkZip],   // B10 주석 안 가짜 끝 서명
       ['dd', "    const nm = name.replace(/\\\\/g, '/').toLowerCase();", '    const nm = name.toLowerCase();', chkZip],   // B10 역슬래시
       ['dd', "docx: [/^\\[content_types\\]\\.xml$/, /^word\\/[^/]+\\.xml$/]", "docx: [/^\\[content_types\\]\\.xml$/, /^word\\/document\\.xml$/]", chkZip],   // B10 본문 이름
-      ['data', "    if (!(kind === 'final' && ext === 'hwpx')) { const zcP = cdocZipOk(ext, b64); if (!zcP.ok) return jr(400,", "    if (false) { const zcP = cdocZipOk(ext, b64); if (!zcP.ok) return jr(400,", chkPut],   // B5
+      ['data', "    const zcP = cdocZipOk(ext, b64); if (!zcP.ok) return jr(400,", "    const zcP = cdocZipOk(ext, b64); if (false) return jr(400,", chkPut],   // B5
       ['data', '    if (piiHi) { piiRaised = piiHi; pii = piiHi; }', '    if (false) { piiRaised = piiHi; pii = piiHi; }', chkPut],   // B6
       ['auth', "    if (mr2.ok && mr2.data && mr2.data.until && mr2.data.until > now) return jr(429,", '    if (false) return jr(429,', chkLock],   // B7 회원 칸 확인
       ['auth', "    if (mlk && (mlk.r.ok || mlk.r.code === 'NOT_FOUND')) { const mf =", '    if (false) { const mf =', chkLock],   // B7 회원 칸 셈
@@ -12046,6 +12048,106 @@ function J91a(x) { return JSON.stringify(x); }
     T('P1 판20b ⑤ 결함 사본 ' + MGb.length + '개(다시 연 기록 칸 클라이언트 값 허용 · 다시 연 시각 안 찍음 · 감사 줄에 다시 엶 빠짐) = 모두 ✗', kGb.every((v) => v === false), JSON.stringify(kGb));
   } catch (e) { T('P1 판20b 검사 실행', false, String(e && e.stack || e).slice(0, 500)); }
   finally { pushMock.sendTo = sendSaveB; Date.now = realNowB; const s = JSON.parse(snapB); mem.gw_users = s.u; mem.gw_data = s.d; mem.gw_files = s.f; blobsMock.hooks.failGet = null; }
+}
+
+{ // ---- P1 남은 것 정리(11/16 — 원장 C187 ③): ① 계약 삭제(del 1)·목록 빠짐도 승인된 변경계약 차수 대조(_lib/conappr scan APPR_REVOKED · carryStale 이월) — 지우면서 차수를 끄고 복구해 원계약 값으로 되돌리던 길(재현됨)
+  //   ② 직접 올리기(cdoc_put) 최종본 hwpx도 zip 내부 검증(servertest 58 고정값을 실제 꼴 최소 hwpx로 바꾼 뒤 예외 걷음) · ⑤ 되돌리기 거절의 감사 줄(옛 판 앱은 알림 없이 넘어감 — 서버 기록은 남음)
+  //   결함 사본 = _lib/conappr·gw-data 한 곳씩 되돌려 메모리에서 컴파일
+  const fsZ16 = require('fs'), ModZ16 = require('module');
+  const loadZ16 = (file, src) => { const m = new ModZ16(file); m.filename = file; m.paths = ModZ16._nodeModulePaths(dirname(file)); m._compile(src, file); return m.exports; };
+  const mutZ16 = (src, from, to) => { if (src.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return src.replace(from, () => to); };
+  const FDATAZ16 = join(FN, 'gw-data.js'), SDATAZ16 = fsZ16.readFileSync(FDATAZ16, 'utf8'), FCAZ16 = join(FN, '_lib', 'conappr.js'), SCAZ16 = fsZ16.readFileSync(FCAZ16, 'utf8');
+  const callZ16 = (mod) => async (body, tok, dev) => { const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+  const snapZ16 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data, f: mem.gw_files || {} });
+  const resetZ16 = () => { const s = JSON.parse(snapZ16); mem.gw_users = s.u; mem.gw_data = s.d; mem.gw_files = s.f; blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; };
+  const WZ16 = { id: 'uwz16', name: '공무Z16', admin: false, perms: { con: 'do' }, dept: '운영부' }, tWZ16 = issueSession(WZ16).token;
+  const cpZ16 = (x) => JSON.parse(JSON.stringify(x));
+  const stZ16 = (name, status, x) => Object.assign({ name, due: 'manual', status }, x || {});
+  const SNZ16 = { chg_amt: 1500, chg_end: '2027-03-31' };
+  const KZ16 = (id, approved) => ({ id, scen: { type: 'dredge', pub: true, ver: 1 }, status: 'active', updated: '2026-11-16', contract_info: { amount: 1000, d3: '2026-12-31' },
+    pipes: [{ key: 'main', cur: 2, stages: [stZ16('견적', 'done'), stZ16('계약서 작성·날인', 'done'), stZ16('착공', 'open')] },
+      { key: 'chg', cur: approved ? 1 : 0, stages: [stZ16('변경계약', approved ? 'done' : 'open', Object.assign({ aid: 'change_contract', ak: '계약 단계', aw: 'amt', round: 1, amt0: 1000, eff0: 1000, term0: '2026-12-31', vals: cpZ16(SNZ16) }, approved ? { done_at: '2026-11-16', appr: { cid: 'cz1', kind: '계약 단계', status: '승인', snap: cpZ16(SNZ16) } } : {}))] }] });
+  const APZ16 = (o) => Object.assign({ id: 'apz16', kind: '계약 단계', title: 't', ref: 'con:kz1|chg|0', cid: 'cz1', status: '승인', by: { id: 'uwz16', name: '공무Z16' }, created: '2026-11-16T00:00:00Z', snap: { chg_amt: '1500', chg_end: '2027-03-31' } }, o || {});
+  // 유효 금액 = 승인·끝남·사본 있는 변경계약 차수의 금액(앱 conChgEff가 읽는 꼴), 없으면 원계약
+  const effZ16 = (c) => { let a = 0; (c.pipes || []).forEach((p) => (p.stages || []).forEach((s) => { if (s && s.aw === 'amt' && s.status === 'done' && s.appr && s.appr.status === '승인' && s.appr.snap) a = Number(String(s.appr.snap.chg_amt).replace(/[^0-9]/g, '')) || a; })); return a || c.contract_info.amount; };
+  const S1Z16 = (n) => n[0].pipes[1].stages[0];
+  const chkDelZ16 = async (mod) => {
+    const c = callZ16(mod), I = {};
+    const seq = async (aps, edits, start) => {
+      mem.gw_users['member:uwz16'] = WZ16; mem.gw_data['col:contracts'] = { schema: 1, items: start || [KZ16('kz1', true), KZ16('kz2', true)], updated_at: 31 }; mem.gw_data['col:approvals'] = { schema: 1, items: aps, updated_at: 5 };
+      const codes = [];
+      for (const ed of edits) { const nd = cpZ16(mem.gw_data['col:contracts'].items); const items = ed(nd) || nd; const r = await c({ action: 'save', collection: 'contracts', base: mem.gw_data['col:contracts'].updated_at, doc: { schema: 1, items } }, tWZ16, 'dev1'); codes.push(r.code + (r.body.error_code ? ':' + r.body.error_code : '') + (r.body.con_kept ? ':kept' + r.body.con_kept.length : '')); }
+      const k = mem.gw_data['col:contracts'].items.find((x) => x.id === 'kz1'), s = k && k.pipes[1].stages[0];
+      return { codes: codes.join(' '), eff: k ? effZ16(k) : 'gone', del: k ? (k.del === 1 ? 1 : 0) : '-', st: s ? s.status + '/' + (s.appr ? s.appr.status : '-') : '-' };
+    };
+    const au0 = auditMock.logs.length;
+    // 거절 — 지우면서 승인 차수 끄기(열림·상신 기록 지움 → 복구) · 건너뜀 · 반려로 · 사본 바꿈 · 목록에서 뺌 · 정상 삭제 뒤 복구하면서 끄기
+    I.offDel = await seq([APZ16()], [(n) => { n[0].del = 1; n[0].updated_ts = 1; S1Z16(n).status = 'open'; delete S1Z16(n).appr; n[0].pipes[1].cur = 0; }, (n) => { n[0].del = 0; n[0].updated_ts = 2; }]);
+    I.skipDel = await seq([APZ16()], [(n) => { n[0].del = 1; S1Z16(n).status = 'skipped'; }]);
+    I.rejDel = await seq([APZ16()], [(n) => { n[0].del = 1; S1Z16(n).appr.status = '반려'; }]);
+    I.snapDel = await seq([APZ16()], [(n) => { n[0].del = 1; S1Z16(n).appr.snap = { chg_amt: 99999, chg_end: '2027-03-31' }; }]);
+    I.omit = await seq([APZ16()], [(n) => n.slice(1)]);
+    I.restoreOff = await seq([APZ16()], [(n) => { n[0].del = 1; n[0].updated_ts = 1; }, (n) => { n[0].del = 0; n[0].updated_ts = 2; S1Z16(n).status = 'open'; delete S1Z16(n).appr; }]);
+    const auRej = auditMock.logs.slice(au0).filter((l) => l.col === 'contracts' && l.ev && l.ev[0] && l.ev[0].op === '결재 없는 단계 거절');
+    const deny = I.offDel.codes === '400:CON_APPR_REVOKED 200' && I.offDel.eff === 1500 && I.offDel.del === 0 && I.skipDel.codes === '400:CON_APPR_REVOKED' && I.rejDel.codes === '400:CON_APPR_REVOKED'
+      && /^400:CON_APPR_/.test(I.snapDel.codes) && I.snapDel.eff === 1500 && I.omit.codes === '400:CON_APPR_REVOKED' && I.omit.eff === 1500 && I.restoreOff.codes === '200 400:CON_APPR_REVOKED' && I.restoreOff.del === 1 && I.restoreOff.eff === 1500
+      && auRej.length === 6 && auRej.some((l) => l.ev[0].id === 'kz1|chg|0') && !/변경계약|1500/.test(JSON.stringify(auRej));
+    // 허용 — 앱 [삭제](단계 그대로) → 복구 · 낡은 사본(같은 번호·같은 사본 대기)으로 지움 = 이월(그 단계 서버 승인 값) → 복구 · 승인 차수 없는 계약 지우며 단계 손질 · 옛 화면 카드(사본 없음) 차수는 지우며 상신 기록 지움 · 다른 계약 지움
+    I.del = await seq([APZ16()], [(n) => { n[0].del = 1; n[0].updated_ts = 1; }, (n) => { n[0].del = 0; n[0].updated_ts = 2; }]);
+    const stale = (n) => { const s = S1Z16(n); s.status = 'open'; delete s.done_at; s.appr.status = '대기'; n[0].pipes[1].cur = 0; n[0].memo = 'x'; n[0].del = 1; n[0].updated_ts = 1; };
+    I.staleDel = await seq([APZ16()], [stale]);
+    I.staleDelRestore = await seq([APZ16()], [stale, (n) => { n[0].del = 0; n[0].updated_ts = 2; }]);
+    I.noAppr = await seq([], [(n) => { n[0].del = 1; S1Z16(n).status = 'skipped'; }], [KZ16('kz1', false)]);
+    I.oldCard = await seq([APZ16({ snap: undefined })], [(n) => { n[0].del = 1; S1Z16(n).status = 'open'; delete S1Z16(n).appr; }]);
+    I.other = await seq([APZ16()], [(n) => { n[1].del = 1; n[1].updated_ts = 1; S1Z16(n).vals = { chg_amt: 1500, chg_end: '2027-03-31', memo: 'm' }; }]);
+    const allow = I.del.codes === '200 200' && I.del.eff === 1500 && I.del.del === 0 && I.staleDel.codes === '200:kept1' && I.staleDel.del === 1 && I.staleDel.st === 'done/승인' && I.staleDel.eff === 1500
+      && I.staleDelRestore.codes === '200:kept1 200' && I.staleDelRestore.del === 0 && I.staleDelRestore.eff === 1500 && I.noAppr.codes === '200' && I.oldCard.codes === '200' && I.other.codes === '200';
+    return { ok: deny && allow, info: { deny, allow, I, au: auRej.length } };
+  };
+  // ② 직접 올리기 최종본 hwpx zip 검증 — 가짜(10바이트)·mimetype 없는 zip = 400 BAD_ZIP · 실제 꼴 최소 hwpx(최종본·초안·받은 서류) = 200
+  const zipZ16 = (ents) => { const parts = [], cen = []; let off = 0;
+    const crc = (b) => { let x = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) { x ^= b[i]; for (let k = 0; k < 8; k++) x = (x & 1) ? (0xEDB88320 ^ (x >>> 1)) : (x >>> 1); } return (x ^ 0xFFFFFFFF) >>> 0; };
+    for (const [n, s] of ents) { const nb = Buffer.from(n), d = Buffer.from(s), cr = crc(d);
+      const lh = Buffer.alloc(30); lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt32LE(cr, 14); lh.writeUInt32LE(d.length, 18); lh.writeUInt32LE(d.length, 22); lh.writeUInt16LE(nb.length, 26);
+      const ch = Buffer.alloc(46); ch.writeUInt32LE(0x02014b50, 0); ch.writeUInt16LE(20, 4); ch.writeUInt16LE(20, 6); ch.writeUInt32LE(cr, 16); ch.writeUInt32LE(d.length, 20); ch.writeUInt32LE(d.length, 24); ch.writeUInt16LE(nb.length, 28); ch.writeUInt32LE(off, 42);
+      parts.push(lh, nb, d); cen.push(ch, nb); off += 30 + nb.length + d.length; }
+    const cd = Buffer.concat(cen), eo = Buffer.alloc(22); eo.writeUInt32LE(0x06054b50, 0); eo.writeUInt16LE(ents.length, 8); eo.writeUInt16LE(ents.length, 10); eo.writeUInt32LE(cd.length, 12); eo.writeUInt32LE(off, 16);
+    return Buffer.concat(parts.concat([cd, eo])).toString('base64'); };
+  const HWOK16 = zipZ16([['mimetype', 'application/hwp+zip'], ['Contents/section0.xml', '<hs:sec/>']]), HWNOMIME16 = zipZ16([['Contents/section0.xml', '<hs:sec/>']]);
+  const HWFAKE16 = Buffer.from([0x50, 0x4B, 0x03, 0x04, 0x14, 0x00, 0x63, 0x64, 0x6F, 0x63]).toString('base64');
+  const chkHwZ16 = async (mod) => {
+    const c = callZ16(mod);
+    mem.gw_users['member:uwz16'] = WZ16; mem.gw_data['col:contracts'] = { schema: 1, items: [{ id: 'kzd16', client: '시험' }], updated_at: 3 };
+    const put = (o) => c(Object.assign({ action: 'cdoc_put', cid: 'kzd16', i: 1, doc_key: 'z16', kind: 'final', name: '최종.hwpx' }, o), tWZ16, 'dev1');
+    const r = [await put({ data: HWFAKE16 }), await put({ data: HWNOMIME16, doc_key: 'z16b' }), await put({ data: HWOK16, doc_key: 'z16c' }), await put({ data: HWOK16, kind: 'draft', doc_key: 'gen.z16', pii: 1, allow_dup: true }), await put({ data: HWOK16, kind: 'received', doc_key: 'z16d', name: '받음.hwpx', allow_dup: true }), await put({ data: HWFAKE16, kind: 'draft', doc_key: 'gen.z16b', pii: 1 })];
+    const f = (x) => x.code + (x.body.error_code ? ':' + x.body.error_code : '') + (x.body.why ? ':' + x.body.why : '');
+    const got = r.map(f);
+    return { ok: got.join(',') === '400:BAD_ZIP:SHORT,400:BAD_ZIP:NOT_HWPX,200,200,200,400:BAD_ZIP:SHORT', info: got };
+  };
+  const RPZ16 = require.resolve(FCAZ16), savedCAZ16 = require.cache[RPZ16];
+  try {
+    resetZ16();
+    const D0 = await chkDelZ16(gwd);
+    T('P1 남은 것 ① 계약 삭제·목록 빠짐도 승인 차수 대조 — 거절(400 CON_APPR_REVOKED·서버 그대로·유효 금액 1500 유지): 지우면서 차수 끄기(열림·상신 기록 지움) 뒤 복구 · 지우면서 건너뜀·반려로 · 지우면서 사본 바꿈 · 목록에서 뺌 · 정상 삭제 뒤 복구하면서 끄기 · 감사 "결재 없는 단계 거절" 6줄(자리만) / 허용: 앱 [삭제] → 복구 200·유효 금액 그대로 · 낡은 대기 사본으로 지움 = 이월 200(con_kept·그 단계 서버 승인 값) → 복구 200 · 승인 차수 없는 계약 · 옛 화면 카드(사본 없음) 차수 상신 기록 지움 · 다른 계약 지움',
+      D0.ok, JSON.stringify(D0.info));
+    resetZ16();
+    const H0 = await chkHwZ16(gwd);
+    T('P1 남은 것 ④ 직접 올리기(cdoc_put) 최종본 hwpx zip 검증: 10바이트 가짜 = 400 BAD_ZIP(SHORT) · mimetype 없는 zip = 400 BAD_ZIP(NOT_HWPX) · 실제 꼴 최소 hwpx = 최종본·초안·받은 서류 200 · 초안 가짜 = 400(종전대로)', H0.ok, JSON.stringify(H0.info));
+    const withCAZ16 = async (caSrc, dataSrc, fn) => { const caMod = loadZ16(FCAZ16, caSrc); require.cache[RPZ16] = { id: RPZ16, filename: RPZ16, loaded: true, exports: caMod }; try { resetZ16(); return await fn(loadZ16(FDATAZ16, dataSrc)); } finally { require.cache[RPZ16] = savedCAZ16; } };
+    const MZ16 = [
+      ['ca', '    const o = oldBy[id], c = newBy[id] || null;\n    if (!isObj(o)) return;', '    const o = oldBy[id], c = newBy[id] || null;\n    if (!isObj(o) || !c || c.del === 1) return;', chkDelZ16],   // ① 종전(지운 계약·빠진 계약 대상 아님)
+      ['ca', '    const o = oldBy[id], c = newBy[id] || null;\n    if (!isObj(o)) return;', '    const o = oldBy[id], c = newBy[id] || null;\n    if (!isObj(o) || !c) return;', chkDelZ16],   // ① 목록 빠짐만 대상 아님
+      ['ca', '    if (!isObj(c) || c.id == null) return;\n    const o = oldBy[String(c.id)]; if (!isObj(o) || !Array.isArray(o.pipes) || !Array.isArray(c.pipes)) return;', '    if (!isObj(c) || c.id == null || c.del === 1) return;\n    const o = oldBy[String(c.id)]; if (!isObj(o) || !Array.isArray(o.pipes) || !Array.isArray(c.pipes)) return;', chkDelZ16],   // ① 지우는 저장 이월 걷음
+      ['data', '    const zcP = cdocZipOk(ext, b64);', "    const zcP = (kind === 'final' && ext === 'hwpx') ? { ok: true } : cdocZipOk(ext, b64);", chkHwZ16]];   // ④ 최종본 hwpx 예외 되살림
+    const kZ16 = [];
+    for (const [w, from, to, fn] of MZ16) {
+      let k;
+      try { const r = await withCAZ16(w === 'ca' ? mutZ16(SCAZ16, from, to) : SCAZ16, w === 'data' ? mutZ16(SDATAZ16, from, to) : SDATAZ16, fn); k = !r.ok; } catch (e) { k = 'err ' + e.message; }
+      kZ16.push(k);
+    }
+    T('P1 남은 것 결함 사본 ' + MZ16.length + '개(지운 계약·빠진 계약 대조 걷음 · 빠진 계약만 걷음 · 지우는 저장 이월 걷음 · 최종본 hwpx 예외 되살림) = 모두 ✗', kZ16.every((v) => v === true), JSON.stringify(kZ16));
+  } catch (e) { T('P1 남은 것 검사 실행', false, String(e && e.stack || e).slice(0, 500)); }
+  finally { require.cache[RPZ16] = savedCAZ16; resetZ16(); }
 }
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);
