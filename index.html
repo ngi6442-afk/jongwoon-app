@@ -971,7 +971,8 @@
   .vl-b.am{background:#FFF6E0;border-color:#F0D48A;color:#8A5A00;}
   .vl-b.pre{background:#F4F5F7;border-color:#D9DCE1;color:#555;}
   .vl-b.hold{background:#EEF0EF;border-color:#DDE0DE;color:#888;}
-  .vs-due.vl-due{padding:0;border:0;background:none;}
+  .vs-due.vl-due{padding:0;border:0;background:none;flex-wrap:wrap;}
+  .vs-due.vl-due .vl-n{flex-basis:100%;}
   .vs-due.vl-due .vl-b{padding:6px 10px;font-size:12.5px;white-space:normal;}
   .vl-sub{font-weight:400;color:var(--sub);font-size:11.5px;}
   @media (max-width:859px){
@@ -10644,12 +10645,14 @@
       prev = d;
     }
     if (!best) return { st: "none", why: "rule" };
-    return Object.assign({ st: "ok", date: best, diff: v.insp_due ? vehDayNum(v.insp_due) - vehDayNum(best) : null, rule: bestRow.id, cite: vehLawCite(bestRow) }, bestItp ? { interp: true } : {});
+    // 45-1 묶음 2(11/16): 건설기계(ceq)는 차령 기산 문구가 다름 — 안내 글이 고르도록 ceq 표시
+    return Object.assign({ st: "ok", date: best, diff: v.insp_due ? vehDayNum(v.insp_due) - vehDayNum(best) : null, rule: bestRow.id, cite: vehLawCite(bestRow) }, bestItp ? { interp: true } : {}, (bestItp && cls === "ceq") ? { ceq: true } : {});
   }
   // P1 판13: 차이 안내(시행규칙 74조② 후단·75조·77조③ · 차령 기산일 = 시행령 3조) — 제안과 운영부 날짜가 다를 때만. 칩 마우스 글 + 펼침·수정 창은 글로(폰)
   function vehLawNote(r){
     if (!r || r.st !== "ok" || !r.diff) return "";
-    return "제안은 모든 회차를 검사 기간 안에 받았다고 보고 센 날 — 기간 밖 수검·연장·유예·이전등록이 있었으면 넣은 날짜가 맞을 수 있음" + (r.interp ? " · 제작연도에 등록하지 않은 차(차령 기산일 = 제작연도 말일)는 차령 경계 근처 회차가 다를 수 있음" : "");
+    // 45-1 묶음 2(11/16): 건설기계 연식은 별표 7 비고 2 — 수입 중고 건설기계만 제작연도 12월 31일(자동차의 '제작연도 말일' 문구를 쓰지 않음)
+    return "제안은 모든 회차를 검사 기간 안에 받았다고 보고 센 날 — 기간 밖 수검·연장·유예·이전등록이 있었으면 넣은 날짜가 맞을 수 있음" + (r.interp ? (r.ceq ? " · 수입 중고 건설기계는 연식을 제작연도 12월 31일부터 셉니다(별표 7 비고 2) — 연식 경계 근처 회차가 다를 수 있음" : " · 제작연도에 등록하지 않은 차(차령 기산일 = 제작연도 말일)는 차령 경계 근처 회차가 다를 수 있음") : "");
   }
   function vehLawOf(v){ return vehLawOn() ? vehLawCalc(v, VEH_LAW.rows, todayStr()) : null; }
   function vehLawTag(r){ if (!r) return ""; if (r.st === "na") return "대상 아님"; if (r.st !== "ok") return "기준 없음"; return r.diff === null ? "제안만" : (r.diff === 0 ? "차이 0" : "차이 있음"); }
@@ -15154,7 +15157,8 @@
       h += '<div class="cbx-row"><select data-cbx-f="' + it.id + '|tpl"><option value="">어느 양식인가요…</option>' + Object.keys(TPL_LABELS).map(function(k){ return '<option value="' + k + '"' + (it.tpl === k ? " selected" : "") + '>' + esc(TPL_LABELS[k]) + (csTplKeys && csTplKeys[k] ? " (등록됨 → 교체)" : "") + '</option>'; }).join("") + '</select>' + cbxBtn(it, "tpl", "양식으로 등록", "cbx-go") + cbxBtn(it, "asdoc", "양식 아님, 계약 서류로") + '</div>';
     }
     else if (it.st === "proof"){
-      h = head("🗂 " + nm + " 회사 증빙으로 판단했습니다(" + esc(r.doc_name || "") + ").", "drop");
+      // 45-1 묶음 2(11/16): 사람이 [증빙 보관함에 넣기]를 고른 카드(toproof)는 '판단했습니다' 대신 고른 대로 · 서류 이름이 없으면 빈 괄호를 안 씀
+      h = head("🗂 " + nm + (it.byHand ? " 회사 증빙으로 고르셨습니다." : " 회사 증빙으로 판단했습니다" + (r.doc_name ? "(" + esc(r.doc_name) + ")" : "") + "."), "drop");
       h += '<div class="cbx-row">' + cbxBtn(it, "proof", "적격심사 증빙 보관함에 넣기", "cbx-go") + cbxBtn(it, "asdoc", "증빙 아님, 계약 서류로") + '</div>';
     }
     else if (it.st === "move"){
@@ -15234,7 +15238,7 @@
     else if (act === "tpl") cbxTplGo(it);
     else if (act === "proof") cbxProofGo(it);
     else if (act === "toblank"){ it.tpl = (it.res && it.res.tpl_key) || ""; it.st = "blank"; if (csTplKeys === null) csLoadTpl(); cbxRedraw(it.scope); }
-    else if (act === "toproof"){ it.st = "proof"; cbxRedraw(it.scope); }
+    else if (act === "toproof"){ it.st = "proof"; it.byHand = true; cbxRedraw(it.scope); }
     else if (act === "asdoc"){ it.res = Object.assign({}, it.res, { cls: "received" }); cbxToPick(it, it.scope !== "top" ? findProc(it.scope) : null); }   // 등급은 그대로 둔다
     else if (act === "moveopen"){ if (c){ it.fromLabel = cbxLabel(c, it.tgt); it.st = "move"; cbxRedraw(it.scope); } }
     else if (act === "move") cbxMoveGo(it);
@@ -16905,12 +16909,23 @@
   function csPanelOf(el){ var e = el; while (e && e.getAttribute && !(e.getAttribute("data-cs-fpanel") || e.getAttribute("data-cs-wlform") || e.getAttribute("data-cs-dpanel"))) e = e.parentNode; return (e && e.getAttribute) ? e : null; }
   function csSnapInputs(root){
     var out = []; if (!root) return out;
-    Array.prototype.forEach.call(root.querySelectorAll("[data-cs-fld], [data-cs-wl], [data-cs-dnew]"), function(el){ if (el.value === "") return; var pan = csPanelOf(el); if (!pan) return; out.push({ p: pan.getAttribute("data-cs-fpanel") || (pan.getAttribute("data-cs-wlform") ? "wl:" + pan.getAttribute("data-cs-wlform") : "dp:" + pan.getAttribute("data-cs-dpanel")), k: el.getAttribute("data-cs-fld") || el.getAttribute("data-cs-wl") || "dnew", v: el.value }); });
+    // 45-1 묶음 2(11/16): 상세가 두 벌(표 펼침 + 숨은 사본)이면 같은 패널 열쇠·칸에서 한 벌만 — 그려진 칸 > 사람이 바꾼 칸(value ≠ defaultValue) > 먼저 나온 칸
+    //   (계약 탭이 숨은 동안엔 두 벌 다 안 그려져도 치던 값을 지킴 — 독립 검토 11/16)
+    var seen = {}, score = function(el){ return (el.getClientRects && el.getClientRects().length ? 2 : 0) + (el.defaultValue !== undefined && el.value !== el.defaultValue ? 1 : 0); };
+    Array.prototype.forEach.call(root.querySelectorAll("[data-cs-fld], [data-cs-wl], [data-cs-dnew]"), function(el){
+      if (el.value === "") return;
+      var pan = csPanelOf(el); if (!pan) return;
+      var x = { p: pan.getAttribute("data-cs-fpanel") || (pan.getAttribute("data-cs-wlform") ? "wl:" + pan.getAttribute("data-cs-wlform") : "dp:" + pan.getAttribute("data-cs-dpanel")), k: el.getAttribute("data-cs-fld") || el.getAttribute("data-cs-wl") || "dnew", v: el.value }, id = x.p + "\u0001" + x.k, sc = score(el);
+      if (!Object.prototype.hasOwnProperty.call(seen, id)){ seen[id] = { i: out.length, s: sc }; out.push(x); }
+      else if (sc > seen[id].s){ out[seen[id].i] = x; seen[id].s = sc; }
+    });
     return out;
   }
   function csRestoreInputs(root, snap){
     if (!root || !snap.length) return;
-    snap.forEach(function(x){ var pan = x.p.indexOf("wl:") === 0 ? root.querySelector('[data-cs-wlform="' + x.p.slice(3) + '"]') : (x.p.indexOf("dp:") === 0 ? root.querySelector('[data-cs-dpanel="' + x.p.slice(3) + '"]') : root.querySelector('[data-cs-fpanel="' + x.p + '"]')); if (!pan) return; var el = x.k === "dnew" ? pan.querySelector('[data-cs-dnew]') : pan.querySelector('[data-cs-fld="' + x.k + '"], [data-cs-wl="' + x.k + '"]'); if (el && el.value !== x.v) el.value = x.v; });
+    // 45-1 묶음 2(11/16): 같은 열쇠의 패널이 두 벌(표 펼침 + 숨은 사본)이면 화면에 그려진 쪽에 되살림
+    var visPan = function(sel){ var all = root.querySelectorAll(sel), i; for (i = 0; i < all.length; i++){ if (!all[i].getClientRects || all[i].getClientRects().length) return all[i]; } return all[0] || null; };
+    snap.forEach(function(x){ var pan = x.p.indexOf("wl:") === 0 ? visPan('[data-cs-wlform="' + x.p.slice(3) + '"]') : (x.p.indexOf("dp:") === 0 ? visPan('[data-cs-dpanel="' + x.p.slice(3) + '"]') : visPan('[data-cs-fpanel="' + x.p + '"]')); if (!pan) return; var el = x.k === "dnew" ? pan.querySelector('[data-cs-dnew]') : pan.querySelector('[data-cs-fld="' + x.k + '"], [data-cs-wl="' + x.k + '"]'); if (el && el.value !== x.v) el.value = x.v; });
   }
   function conSetPaneW(wrap){ try { wrap.style.setProperty("--vs-panew", wrap.clientWidth + "px"); } catch(e){} }
   function renderContracts(){
@@ -31473,7 +31488,7 @@ function dutyStage(nx){
 
   var MOD_LABEL = {tasks:"지시", veh:"차량", hw:"화관법", rec:"기성·수금", stmt:"월말명세서", lic:"인허가", safety:"안전", site:"현장", check:"주기 체크", con:"계약", cli:"거래처", doc:"문서함", bid:"입찰", wk:"일용직", quote:"견적서", promo:"홍보"};   // check 권한은 주기 체크리스트 영역만 제어(내게 온 지시·내 할 일은 전원) — 탭 이름(내 업무)과 구분 · hw = 화관법 탭(v431 열 · v434 탭 숨김·폐기물 제출 수행 검사)
   // ---- 감사 로그 뷰어(관리자 전용, 서버 기록 열람) ----
-  var AUDIT_COL_LABEL = {tasks:"지시", vehicles:"차량", receivables:"기성", licenses:"인허가", checklist:"업무", documents:"문서함", clients:"거래처", contracts:"계약", leaves:"휴가", family:"가족친화", member:"회원", login:"로그인", progress:"진척도", pmcon:"PM 콘솔", mchk:"월 점검", corp_reg:"법인 등기", stmt:"월말명세서", rnote:"연구노트", safety:"안전 설정"};   // v436 safety = 현황 ⑤ 안전 설정(settings:safety) 고침(uismoke v436 ⑧이 safety를 끝으로 대조) · 29 판② stmt = gw-stmt 감사(거래처 목록·저장·되돌리기·차량 별칭)
+  var AUDIT_COL_LABEL = {tasks:"지시", vehicles:"차량", receivables:"기성", licenses:"인허가", checklist:"업무", documents:"문서함", clients:"거래처", contracts:"계약", leaves:"휴가", family:"가족친화", member:"회원", login:"로그인", progress:"진척도", pmcon:"PM 콘솔", mchk:"월 점검", corp_reg:"법인 등기", stmt:"월말명세서", rnote:"연구노트", hr:"인사", files:"파일", safety:"안전 설정"};   // v436 safety = 현황 ⑤ 안전 설정(settings:safety) 고침(uismoke v436 ⑧이 safety를 끝으로 대조) · 29 판② stmt = gw-stmt 감사(거래처 목록·저장·되돌리기·차량 별칭)
   var AUDIT_FIELD_LABEL = {status:"상태", title:"제목", who:"담당", who_id:"담당", due:"기한", amount:"금액", paid:"입금", del:"삭제", scope:"공개범위", stage:"단계", cancel_req:"취소요청", name:"이름", role:"직책", rank:"직급", dept:"부서", admin:"관리자", perms:"권한", hire_date:"입사일", leave_date:"퇴사일", seq:"연번", annual_base:"잔여연차기준", annual_base_date:"기준일", annual_days:"연차수동", loa_days:"휴직누적", on_loa:"휴직중", loa_start:"휴직시작", loa_end:"휴직종료", annual_paid:"연차수당포함", emp_type:"고용형태", birth:"생년월일", annual_basis:"연차기준", reason:"사유", approver:"승인자", done_by:"완료자", detail:"상세", recur:"반복", hl:"하이라이트", mismatch:"불일치", PIN:"PIN", tier:"관리자등급", deleted_at:"삭제일", deleted_by:"삭제자", restored_at:"복구일", restored_by:"복구자",
     "kosha.stage":"KOSHA 단계", "kosha.apply_no":"접수번호", "kosha.applied_on":"접수일", "kosha.review_on":"심사일", "kosha.decided_on":"인정일(결정일)", "kosha.expires_on":"만료일", "kosha.rate_year":"요율 연도", "kosha.checks":"사후점검", "headcount.env":"상시근로자 종운환경", "headcount.con":"상시근로자 종운건설"};   // v436 검토: 안전 설정 감사 줄의 바뀐 칸(f) — 서버 gw-data SAFETY_FIELD_LABEL과 같은 글(uismoke v436 ⑧이 대조), 없으면 감사 화면에 영어 경로(kosha.stage)가 그대로 나왔다
   var auditMonthCur = "";

@@ -15653,6 +15653,8 @@ try {
       && a.badge(a.calc(V({ reg_date: '2018-03-10', insp_due: '2026-09-09' }), RI, '2026-11-15'), 'det').indexOf('vl-n') < 0 && !('interp' in a.calc(V({ reg_date: '2019-03-10', insp_due: '2026-10-20' }), ROWS13, '2026-11-15'));
     R.regMin = [sh(a.calc(V({ size: '중형 승합', reg_date: '2000-12-20', insp_due: '2026-12-19' }), RI, '2026-11-15')), sh(a.calc(V({ size: '중형 승합', reg_date: '2001-01-02', insp_due: '2027-01-01' }), RI, '2026-11-15'))].join(',')
       + '|' + [a.ok(RI[2]), a.ok(Object.assign({}, RI[2], { reg_min: '2001-13-01' }))].join(',');
+    // 45-1 묶음 2(원장 C183 ②): reg_min 경계 — 그날 등록 = 행 안 · 하루 전 = 행 밖
+    R.regEdge = [sh(a.calc(V({ size: '중형 승합', reg_date: '2001-01-01', insp_due: '2026-12-31' }), RI, '2026-11-15')), sh(a.calc(V({ size: '중형 승합', reg_date: '2000-12-31', insp_due: '2026-12-30' }), RI, '2026-11-15'))].join(',');
     R.kindsOff = a.kinds() === null && a.eg() === '굴착기';
     Object.assign(a.VEH_LAW, { on: true, ver: 'v', rows: [base, { id: 'e', grade: '실측', cites: [{ law: 'x' }], cls: 'ceq', ceq_kind: ['로더(타이어식)', '덤프트럭'], every_m: 12 }], attr: { size: ['대형 화물', '건설기계'] } });
     R.sizesOn = a.sizes().join(',') === '대형 화물,건설기계';
@@ -15663,7 +15665,7 @@ try {
   };
   const EXP13 = { calc: 'ok/2026-09-27/0/t13.a,none///day,none///day,none///rule',
     dayBadge: ['<span class="vl-b pre">기준 없음 — 월말 등록</span>', '<span class="vl-b pre">법정 검사 제안 <b>기준 없음</b> — 최초등록일이 29일 이후(월말)라 법정 계산 확인 필요</span>', '<span class="vl-b pre">법정 제안: 기준 없음 — 월말 등록(계산 확인 필요)</span>'].join('\n'),
-    tag: '기준 없음', note: true, rowOk: 'true,false,false,false,true,false', sizes: true, interp: true, regMin: 'none///rule,ok/2027-01-01/0/t13.bus|true,false', kindsOff: true, sizesOn: true, kindsRows: true, kindsAttr: true };
+    tag: '기준 없음', note: true, rowOk: 'true,false,false,false,true,false', sizes: true, interp: true, regMin: 'none///rule,ok/2027-01-01/0/t13.bus|true,false', regEdge: 'ok/2026-12-31/0/t13.bus,none///rule', kindsOff: true, sizesOn: true, kindsRows: true, kindsAttr: true };
   const ok13b = (R) => Object.keys(EXP13).every((k) => JSON.stringify(R[k]) === JSON.stringify(EXP13[k]));
   // ③ 콘솔 줄·카드 실행 — 콘솔 줄 종류는 이 판 한 줄만(판29 표는 비워 둠)
   const BG13 = { ver: 'veh-v1-20261115', sha: 'f9704a7435491472', n: 67, n_sil: 62, n_cyc: 52, n_chk: 5, groups: 7, n_rules: 8, checked: '2026-11-15', status: 'draft',
@@ -15728,6 +15730,15 @@ try {
     R.reSha = R.reSha && JSON.stringify(rb.args) === '{"bg_ver":"veh-v1-20261115"}' && rb.set_base === 600;
     const bb = await runC13(src, { res: { pmcon_get: LOG13(true), veh_bg_pm_get: PMG13({}, null, { bad_bg: true }) } });
     R.badBg = bb.els['pmconChk-vehbg'].style.display === '' && /올라온 근거 표 꼴이 틀림 — 제안 꺼짐/.test(bb.els['pmconChk-vehbg'].innerHTML);
+    // 45-1 묶음 2(원장 C183 ②): ① 카드 그리기 회차 대조 — 앞 그리기는 성공·이번 그리기 조회 실패 = 카드는 앞 응답을 쓰지 않고 '불러오지 못했습니다'
+    const sq = await runC13(src, { res: { pmcon_get: LOG13(true), veh_bg_pm_get: PMG13({}, BG13) } });
+    const sq1 = /<b>미승격<\/b>/.test(sq.els['pmconChk-vehbg'].innerHTML);
+    sq.o.res = { pmcon_get: LOG13(true), veh_bg_pm_get: { status: 503, body: { error_code: 'FLAG_READ_FAILED' } } };
+    sq.api.render(); for (let i = 0; i < 6; i++) await new Promise((r) => setTimeout(r, 0));
+    R.seqStale = sq1 && /불러오지 못했습니다 \(콘솔 조회 실패 — 새로고침\)/.test(sq.els['pmconChk-vehbg'].innerHTML) && sq.els['pmconChk-vehbg'].innerHTML.indexOf('미승격') < 0;
+    // ② 옛 꼴 스위치(sha 칸 없이 승격된 판) = 같은 판이면 '다시 승격' 줄·'내용이 바뀌어' 글 없음
+    const of13 = await runC13(src, { res: { pmcon_get: LOG13(true), veh_bg_pm_get: PMG13({ bg_ver: 'veh-v1-20261115', bg_sha: '', updated_at: 500 }, BG13, { on: true }) } });
+    R.oldFlag = of13.els.pmconRows.innerHTML.indexOf('data-pc-row="vehbg:') < 0 && of13.els['pmconChk-vehbg'].innerHTML.indexOf('내용이 바뀌어') < 0 && /<b>승격됨<\/b>/.test(of13.els['pmconChk-vehbg'].innerHTML);
     return R;
   };
   const ok13c = (R) => Object.keys(R).every((k) => R[k] === true);
@@ -15753,6 +15764,10 @@ try {
     ['    gwCall("gw-data", { action: "veh_bg_set", bg_ver: "", base: Number(f.updated_at) || 0 })', '    gwCall("gw-data", { action: "veh_bg_set", bg_ver: "" })'],
     ['    if (/^pmconChk-/.test(String(id))){ var ce = document.getElementById(id); if (ce && ce.scrollIntoView) ce.scrollIntoView({ block: "start" }); return; }', ''],
     [' (확인 필요 " + n + "건 표시)"', '"'],
+    // 45-1 묶음 2(원장 C183 ② 실행 검사 공백 3): 카드 그리기 회차 대조 걷음 · 옛 꼴 스위치(sha 없음)를 '내용 바뀜'으로 · reg_min 경계 >= → >
+    ['    var b = vehBgLast && vehBgLast.seq === pmconSeq ? vehBgLast.b : null;', '    var b = vehBgLast ? vehBgLast.b : null;'],
+    ['f.bg_ver === s.ver && f.bg_sha && s.sha && f.bg_sha !== s.sha', 'f.bg_ver === s.ver && s.sha && f.bg_sha !== s.sha'],
+    [' && (x.reg_min == null || v.reg_date >= x.reg_min)){ r = x; break; }', ' && (x.reg_min == null || v.reg_date > x.reg_min)){ r = x; break; }'],
   ];
   const kill13 = [];
   for (const [from, to] of MUT13) { let r; try { r = await all13(sm13(from, to)); } catch (e) { r = { ok: false }; } if (r.ok) kill13.push(from.trim().slice(0, 60)); }
@@ -16351,10 +16366,11 @@ try {
     const FT = ["`reopenNeed`", "`lic_reopen`", "`CON_DUP_ID`", "#### 판20b", "#### 판24b", "원장 C190", "연습 모드"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = ["<b>지시만 지우거나 [완료]해도 끝나지 않습니다</b>", "(2026-11 v484) (계약 › 단계) 결재로 승인·반영된 변경계", "(2026-11 v484) (계약) 다른 기기에서 승인된 변경계약을 이"];
-    const ok = /기준: v484 \(2026-11-16\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 16 && gate.length === 3 && scr.length === 13 && !cb.some((l) => /\(PM/.test(l))
+    // v485: 기준 줄·sw = 이 판 이상
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 484 && ftv.length > 0 && mF.length === 0 && cb.length === 16 && gate.length === 3 && scr.length === 13 && !cb.some((l) => /\(PM/.test(l))
       && MAN.every((s) => d.man.indexOf(s) > 0) && !/lic_duty|licduty|lic_reopen|conappr|CON_APPR|CON_DUP|carryStale|settings:|auto_key/.test(MAN.map((s) => cut(d.man, s, '\n')).join(' '))
       && d.cl.indexOf('**P1 판20b(v484') > 0 && d.cl.indexOf('**P1 판24b(v484') > 0
-      && /SHELL_CACHE = 'jw-shell-v484'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 484;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r484 = chk484(D484);
@@ -16366,6 +16382,89 @@ try {
   T('v484 문서·판 번호(정확 검사): FEATURES 기준 v484 (2026-11-16)·v484 절(판20b·판24b) · TESTLIST v484 칸 16(화면·운영 확인 13 · 게이트 [x] 3) · MANUAL 인허가 지시·계약(내부 이름 0) · CLAUDE.md 두 줄 · sw jw-shell-v484 · 결함 사본 ' + M484.length + '개 = 모두 ✗',
     r484.ok && M484.every((v) => v === false), JSON.stringify({ r: r484.info, mut: M484 }));
 } catch (e) { console.log('  (v484 검사 생략 — ' + e.message + ')'); fails++; }
+// ── v485(45-1 묶음 2 — 원장 C183 ②③·C189 · 오케스트레이터 11/16 배정): 화면 작은 고침 실행 검사 + 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '485 이상'으로 풀 것
+//   ① 차량 안내 글(실제 @veh-law 구간 · 가짜 근거 행) ② 칩 아래 CSS ③ 감사 기록 갈래 이름 ④ 계약 칸 모으기·되살리기(실제 csPanelOf·csSnapInputs·csRestoreInputs · 가짜 DOM 두 벌) ⑤ 넣기 박스 고른 증빙 카드 글 · 결함 사본 = 모두 ✗
+try {
+  const f84 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('중괄호 짝: ' + name); };
+  const run84 = (src) => {
+    const R = {};
+    const blk = src.slice(src.indexOf('// @veh-law-start'), src.indexOf('// @veh-law-end'));
+    const pre = [f84(src, 'esc'), f84(src, 'isDate'), f84(src, 'isGreyState'), 'var VEH_COLS = [];', 'function todayStr(){ return "2026-11-16"; } function myId(){ return "u1"; } function renderVehicles(){} function gwCall(){ return { then: function(){ return { catch: function(){} }; } }; } function findVeh(){ return null; } function liveVehicles(){ return []; }'].join('\n');
+    const a = new Function('document', pre + '\n' + blk + '\nreturn { calc: vehLawCalc, note: vehLawNote };')({ getElementById: () => null });
+    const ROWS = [{ id: 't84.ceq', grade: '실측', cites: [{ law: '시험법' }], cls: 'ceq', ceq_kind: ['덤프트럭'], every_m: 12, age_max: 20, interp: '연식 해석' },
+      { id: 't84.car', grade: '실측', cites: [{ law: '시험법' }], cls: 'car', biz: ['사업용'], size: ['대형 화물'], every_m: 12, interp: '차령 해석' }];
+    const rc = a.calc({ state: '운행', own: '자차', biz: '사업용', size: '건설기계', ceq_kind: '덤프트럭', ceq_year: '2014', reg_date: '2014-06-10', insp_due: '2027-02-01' }, ROWS, '2026-11-16');
+    const rv = a.calc({ state: '운행', own: '자차', biz: '사업용', size: '대형 화물', reg_date: '2020-03-10', insp_due: '2027-05-20' }, ROWS, '2026-11-16');
+    const nc = a.note(rc), nv = a.note(rv);
+    R.ceq = !!rc && rc.st === 'ok' && rc.ceq === true && /수입 중고 건설기계는 연식을 제작연도 12월 31일부터 셉니다\(별표 7 비고 2\) — 연식 경계 근처 회차가 다를 수 있음$/.test(nc) && nc.indexOf('제작연도 말일') < 0;
+    R.car = !!rv && rv.st === 'ok' && !('ceq' in rv) && rv.interp === true && /제작연도에 등록하지 않은 차\(차령 기산일 = 제작연도 말일\)는 차령 경계 근처 회차가 다를 수 있음$/.test(nv) && nv.indexOf('수입 중고') < 0;
+    R.css = /\.vs-due\.vl-due\{padding:0;border:0;background:none;flex-wrap:wrap;\}/.test(src) && /\.vs-due\.vl-due \.vl-n\{flex-basis:100%;\}/.test(src);
+    R.audit = /var AUDIT_COL_LABEL = \{[^}]*rnote:"연구노트", hr:"인사", files:"파일", safety:"안전 설정"\};/.test(src);
+    const api = new Function([f84(src, 'csPanelOf'), f84(src, 'csSnapInputs'), f84(src, 'csRestoreInputs'), 'return { snap: csSnapInputs, rest: csRestoreInputs };'].join('\n'))();
+    const el = (attrs, vis, parent, value, def) => { const o = { attrs, value: value || '', parentNode: parent, getAttribute(k) { return Object.prototype.hasOwnProperty.call(this.attrs, k) ? this.attrs[k] : null; } }; if (def !== undefined) o.defaultValue = def; if (vis !== null) o.getClientRects = () => (vis ? [1] : []); return o; };
+    const mkRoot = (order) => {
+      const pans = order.map(([vis, val, def]) => { const p = el({ 'data-cs-fpanel': 'c1|main|6' }, vis, null); p.fields = [el({ 'data-cs-fld': 'tax_no' }, vis, p, val, def)]; p.querySelector = (sel) => { const m = /data-cs-fld="([^"]+)"/.exec(sel); return p.fields.find((f) => m && f.attrs['data-cs-fld'] === m[1]) || null; }; return p; });
+      return { pans, querySelectorAll(sel) { const m = /data-cs-fpanel="([^"]+)"/.exec(sel); if (m) return pans.filter((p) => p.attrs['data-cs-fpanel'] === m[1]); if (/data-cs-wlform|data-cs-dpanel/.test(sel)) return []; return pans.flatMap((p) => p.fields); }, querySelector(sel) { return this.querySelectorAll(sel)[0] || null; } };
+    };
+    const s1 = api.snap(mkRoot([[true, 'NEW', 'OLD'], [false, 'OLD', 'OLD']])), s1b = api.snap(mkRoot([[false, 'OLD', 'OLD'], [true, 'NEW', 'OLD']]));
+    // 독립 검토 11/16: 계약 탭이 숨은 동안(두 벌 다 안 그려짐) = 사람이 바꾼 칸(value ≠ defaultValue)을 지킴(앞·뒤 어느 쪽이든)
+    const s2 = api.snap(mkRoot([[false, 'TYPED', 'OLD'], [false, 'OLD', 'OLD']])), s2b = api.snap(mkRoot([[false, 'OLD', 'OLD'], [false, 'TYPED', 'OLD']]));
+    // 결함 B 꼴: 숨은 사본도 앞선 되살리기로 값이 바뀌어(value ≠ defaultValue) 둘 다 '바꾼 칸' = 그려진 칸이 이김(숨은 쪽이 앞에 와도)
+    const s1c = api.snap(mkRoot([[false, 'STALE', 'OLD'], [true, 'NEW', 'OLD']]));
+    R.snap = s1.length === 1 && s1[0].v === 'NEW' && s1[0].p === 'c1|main|6' && s1[0].k === 'tax_no' && s1b.length === 1 && s1b[0].v === 'NEW' && s1c.length === 1 && s1c[0].v === 'NEW'
+      && s2.length === 1 && s2[0].v === 'TYPED' && s2b.length === 1 && s2b[0].v === 'TYPED';
+    const r2 = mkRoot([[false, 'OLD'], [true, 'OLD']]);
+    api.rest(r2, [{ p: 'c1|main|6', k: 'tax_no', v: 'NEW' }]);
+    R.rest = r2.pans[1].fields[0].value === 'NEW' && r2.pans[0].fields[0].value === 'OLD';
+    const s3 = api.snap(mkRoot([[null, 'X1']])), r4 = mkRoot([[null, 'old']]); api.rest(r4, [{ p: 'c1|main|6', k: 'tax_no', v: 'X2' }]);
+    R.plain = s3.length === 1 && s3[0].v === 'X1' && r4.pans[0].fields[0].value === 'X2';   // 그리기 정보가 없는 칸(종전 꼴)은 종전처럼
+    R.proof = src.split('else if (act === "toproof"){ it.st = "proof"; it.byHand = true; cbxRedraw(it.scope); }').length === 2
+      && src.indexOf('(it.byHand ? " 회사 증빙으로 고르셨습니다." : " 회사 증빙으로 판단했습니다" + (r.doc_name ? "(" + esc(r.doc_name) + ")" : "") + ".")') > 0 && src.indexOf('판단했습니다(" + esc(r.doc_name || "") + ")') < 0;
+    return R;
+  };
+  const ok84 = (R) => ['ceq', 'car', 'css', 'audit', 'snap', 'rest', 'plain', 'proof'].every((k) => R[k] === true);
+  let real84; try { real84 = run84(html); } catch (e) { real84 = { x: e.message }; }
+  const sm84 = (from, to) => { if (html.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); return html.replace(from, () => to); };
+  const MUT84 = [
+    [' (bestItp && cls === "ceq") ? { ceq: true } : {});', ' {});'],
+    ['(r.ceq ? " · 수입 중고', '(false ? " · 수입 중고'],
+    ['background:none;flex-wrap:wrap;}', 'background:none;}'],
+    ['  .vs-due.vl-due .vl-n{flex-basis:100%;}', ''],
+    [', hr:"인사", files:"파일"', ''],
+    ['return (el.getClientRects && el.getClientRects().length ? 2 : 0) + ', 'return 0 + '],
+    [' + (el.defaultValue !== undefined && el.value !== el.defaultValue ? 1 : 0); };', ' + 0; };'],
+    ['      else if (sc > seen[id].s){ out[seen[id].i] = x; seen[id].s = sc; }', '      else out.push(x);'],
+    ['if (!all[i].getClientRects || all[i].getClientRects().length) return all[i];', 'return all[i];'],
+    ['it.st = "proof"; it.byHand = true;', 'it.st = "proof";'],
+  ];
+  const kill84 = [];
+  for (const [from, to] of MUT84) { let r; try { r = run84(sm84(from, to)); } catch (e) { r = { x: 1 }; } if (ok84(r)) kill84.push(from.trim().slice(0, 50)); }
+  T('45-1 묶음 2(v485) 화면 작은 고침(실행 — 실제 vehLawCalc·vehLawNote·csSnapInputs·csRestoreInputs): 건설기계 차 = 결과 ceq·"수입 중고 건설기계는 연식을 제작연도 12월 31일부터 셉니다(별표 7 비고 2)"(자동차 문구 없음) · 자동차 = 종전 "제작연도에 등록하지 않은 차" 문구 · 펼침·폰 칩 아래 CSS(flex-wrap·flex-basis 100%) · 감사 갈래 hr "인사"·files "파일"(끝 칸 safety 그대로) · 계약 칸 두 벌 = 그려진 칸만 모음·그려진 패널에 되살림(그리기 정보 없는 칸은 종전대로) · 넣기 박스 고른 증빙 = "고르셨습니다"·빈 괄호 없음 · 결함 사본 ' + MUT84.length + '개 = 모두 ✗',
+    ok84(real84) && kill84.length === 0, JSON.stringify({ r: real84, 안깨짐: kill84 }));
+  // 문서·판 번호 정확 검사
+  const rd84 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D84 = { ft: rd84('FEATURES.md'), tl: rd84('TESTLIST.md'), sw: rd84('sw.js'), man: rd84('MANUAL.html'), cl: rd84('CLAUDE.md') };
+  const chk84 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v485 (11/16)', '\n### '), tlv = cut(d.tl, '\n## v485 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
+    const FT = ['`vehLawNote`', '`ceq: true`', '`flex-wrap:wrap`', '`AUDIT_COL_LABEL`', '`csSnapInputs`', '`csRestoreInputs`', '`it.byHand`', '원장 C183', '공백 3', '별표 7 비고 2'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = ['<p>(2026-11 v485) (차량) 법정 검사 제안과 넣은 검사 만기가 다를 때', '<p>(2026-11 v485) (관리 › 감사 기록) 인사 근거'];
+    const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check'];
+    const ok = /기준: v485 \(2026-11-16\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 6 && scr.length === 4 && gate.length === 2 && scr.every((l) => /^- \[x\]/.test(l)) && !cb.some((l) => /PM/.test(l))
+      && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && MAN.every((s) => d.man.indexOf(s) > 0) && !/vehLaw|AUDIT_|csSnap|byHand|ceq|flex/.test(MAN.map((s) => cut(d.man, s, '\n')).join(' '))
+      && d.cl.indexOf('**45-1 묶음 2(v485') > 0 && /SHELL_CACHE = 'jw-shell-v485'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, scr: scr.length, gate: gate.length } };
+  };
+  const r84 = chk84(D84);
+  const mu84 = (k, f) => chk84(Object.assign({}, D84, { [k]: f(D84[k]) })).ok;
+  const M84 = [mu84('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v484 (')), mu84('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v484'")),
+    mu84('ft', (s) => s.split('`it.byHand`').join('it.byHand')), mu84('man', (s) => s.replace('<p>(2026-11 v485) (관리 › 감사 기록)', '<p>(관리 › 감사 기록)')),
+    mu84('cl', (s) => s.replace('**45-1 묶음 2(v485', '45-1 묶음 2(')), mu84('tl', (s) => s.replace('\n- [x] (AI) `uismoke` \'45-1 묶음 2', '\n- (AI) `uismoke` \'45-1 묶음 2'))];
+  T('v485 문서·판 번호(정확 검사): FEATURES 기준 v485 (2026-11-16)·v485 절(차량 안내 글·감사 이름·계약 칸·증빙 카드·판13 공백 3) · TESTLIST v485 칸 6(화면 4 [x] · 게이트 [x] 2) · MANUAL 차량 안내 글·감사 기록(내부 이름 0) · CLAUDE.md 줄 · sw jw-shell-v485 · 결함 사본 ' + M84.length + '개 = 모두 ✗',
+    r84.ok && M84.every((v) => v === false), JSON.stringify({ r: r84.info, mut: M84 }));
+} catch (e) { console.log('  (v485 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
