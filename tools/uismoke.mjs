@@ -14365,13 +14365,14 @@ try {
     const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
     const ftv = cut(d.ft, '\n### v468 (11/14)', '\n### '), tlv = cut(d.tl, '\n## v468 ', '\n## ');
     const m1 = cut(d.man, '<h2 id="s1">', '<h2'), m218 = cut(d.man, '<h3>21-8. 직원 카드와 기기 승인</h3>', '<h3'), m25 = cut(d.man, '<h2 id="s25">', '<h2');
-    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), scr = cb.filter((l) => /^- \[ \] \(AI 시험 화면 대상/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
+    // 11/16: 시험 서버 확인 뒤 닫은 화면 칸([x])도 셈
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
     const FT = ['C142', 'T476', '`notifyNewPending`', '`runDaily`', '`devauto:pend:<회원>`', '`pend_note`', '`CFG.sendCapMs`', '`CFG.runCapMs`', '`timeoutMs`', '`devauto:state.stale`', '`devauto:state.rev[회원]`', '`left`', '`subs_left`', '`auto_rev{at,why,ld}`',
       '`devAutoChips`', '`device_approve`', '`push_sub_mine`', '`pushResync`', '`SUBS_READ_FAILED`', '`push.readSubs`', '`BAD_LEAVE_DATE`', '`settings:notify`', '배포 첫날 회수 0건', '0.2초 → 1.8초', 'a961b35', '909626c', '3a78afb', "'P1 판22' 14항목(결함 사본 44)"];
     const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check', 'stmtread_a_check', 'stmtread_b_check', 'stmtread_c_check', 'stmtread_d_check'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 468 && ftv.length > 0 && mF.length === 0   // v469: 기준 줄·sw = 이 판 이상
-      && tlv.length > 0 && cb.length === 14 && scr.length === 11 && gate.length === 3 && cb.every((l) => /^- \[x\] \(AI\) /.test(l) || /^- \[ \] \(AI 시험 화면 대상/.test(l)) && !cb.some((l) => /PM/.test(l))
+      && tlv.length > 0 && cb.length === 14 && scr.length === 11 && gate.length === 3 && cb.every((l) => /^- \[x\] \(AI\) /.test(l) || /^- \[[ x]\] \(AI 시험 화면 대상/.test(l)) && !cb.some((l) => /PM/.test(l))
       && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && ["'P1 판22' 14항목", "'P1 판22' 5항목", "'7일 넘은 대기'", "'퇴사 회수'", "'삭제 회수'"].every((s) => tlv.indexOf(s) > 0)
       && d.man.indexOf('승인 요청은 자동으로 가지 않습니다') < 0 && m1.indexOf('새 기기 승인 대기</b> 알림이 자동으로 갑니다') > 0 && m1.indexOf('2026-11 v468') > 0
       && ['<b>퇴사 회수</b>', '<b>삭제 회수</b>', '<b>7일 넘은 대기</b>', '<b>퇴사 다음 날 자동 정리</b> (2026-11 v468)', '<b>퇴사일 칸</b>', '<b>다시 입사하면</b>', '저절로 다시 등록됩니다'].every((s) => m218.indexOf(s) > 0)
@@ -14384,7 +14385,7 @@ try {
   const M68 = [mu68('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v467 (')),
     mu68('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v467'")),
     mu68('ft', (s) => s.split('`push.readSubs`').join('push.readSubs')),
-    mu68('tl', (s) => s.replace('- [ ] (AI 시험 화면 대상 — 판22 검토 반영) 표시가 붙은 기기에서 [승인]', '- [ ] (PM 확인 — 판22) 표시가 붙은 기기에서 [승인]')),
+    mu68('tl', (s) => s.replace(/- \[[ x]\] \(AI 시험 화면 대상 — 판22 검토 반영\) 표시가 붙은 기기에서 \[승인\]/, '- [ ] (PM 확인 — 판22) 표시가 붙은 기기에서 [승인]')),   // 11/16: 닫은 칸([x])도 바꿈
     mu68('tl', (s) => { const e = s.indexOf('\n## v469 '); const k = s.lastIndexOf('`stmtread_d_check`', e < 0 ? s.length : e); return s.slice(0, k) + 'stmtread_d_check' + s.slice(k + 18); }),
     mu68('man', (s) => s.replace('새 기기로 처음 로그인하면 기기 승인을 맡은 분', '승인 요청은 자동으로 가지 않습니다. 새 기기로 처음 로그인하면 기기 승인을 맡은 분')),
     mu68('man', (s) => s.replace('<b>퇴사 다음 날 자동 정리</b>', '퇴사 다음 날 자동 정리')),
