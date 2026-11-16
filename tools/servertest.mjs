@@ -12223,4 +12223,45 @@ function J91a(x) { return JSON.stringify(x); }
   finally { require.cache[RPZ16] = savedCAZ16; resetZ16(); }
 }
 
+{ // ---- P1 판24c(11/16 — v484 화면 확인 H3): 변경 차수를 아직 모르던 낡은 화면(변경계약 줄 없음·빈 줄)이 같은 날 그 계약을 고쳐 저장 — 실제 서버 핸들러 + 앱 mergeContracts 409 재시도
+  //   = 200 · 고침 남음 · 승인된 변경 차수·유효 금액 그대로(종전: 409 → 병합 → 400 CON_APPR_REVOKED, 고침 사라짐) · 서버 규칙은 그대로(그 사본을 병합 없이 보내면 거절)
+  const fsY = require('fs'), HY = fsY.readFileSync(join(FN, '..', '..', 'index.html'), 'utf8');
+  const pickY = (src, name) => { const i = src.search(new RegExp('\\n  function ' + name + '\\(')); if (i < 0) throw new Error('함수 없음 ' + name); let d = 0, st = false; for (let j = i + 1; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i + 1, j + 1); } } throw new Error('중괄호 ' + name); };
+  const mergeOfY = (H) => new Function(['mTime', 'mergeDel', 'csKeepApproved', 'mergeContracts'].map((n) => pickY(H, n)).join('\n') + '\nreturn mergeContracts;')();
+  const callY = async (body, tok, dev) => { const r = await gwd.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: 'Bearer ' + tok }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+  const snapY = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  const WY = { id: 'uwy16', name: '공무Y16', admin: false, perms: { con: 'do' }, dept: '운영부' }, tWY = issueSession(WY).token;
+  const SNY = { chg_amt: 1500, chg_end: '2027-03-31' }, cpY = (x) => JSON.parse(JSON.stringify(x));
+  const stY = (name, status, x) => Object.assign({ name, due: 'manual', status }, x || {});
+  const mainY = () => ({ key: 'main', cur: 2, stages: [stY('견적', 'done'), stY('계약서 작성·날인', 'done'), stY('착공', 'open', { vals: { q_no: 'A' } })] });
+  const chgY = () => ({ key: 'chg', cur: 1, stages: [stY('변경계약', 'done', { aid: 'change_contract', ak: '계약 단계', aw: 'amt', round: 1, amt0: 1000, eff0: 1000, term0: '2026-12-31', vals: cpY(SNY), done_at: '2026-11-16', appr: { cid: 'cy1', kind: '계약 단계', status: '승인', snap: cpY(SNY) } })] });
+  const KY = (pipes) => ({ id: 'ky1', scen: { type: 'dredge', pub: true, ver: 1 }, status: 'active', updated: '2026-11-16', contract_info: { amount: 1000, d3: '2026-12-31' }, pipes });
+  const effY = (c) => { let a = 0; (c.pipes || []).forEach((p) => (p.stages || []).forEach((s) => { if (s && s.aw === 'amt' && s.status === 'done' && s.appr && s.appr.status === '승인' && s.appr.snap) a = Number(s.appr.snap.chg_amt) || a; })); return a || c.contract_info.amount; };
+  const runY = async (merge, localPipes, viaMerge) => {
+    mem.gw_users['member:uwy16'] = WY; mem.gw_data['col:contracts'] = { schema: 1, items: [KY([mainY(), chgY()])], updated_at: 41 };
+    mem.gw_data['col:approvals'] = { schema: 1, items: [{ id: 'apy1', kind: '계약 단계', title: 't', ref: 'con:ky1|chg|0', cid: 'cy1', status: '승인', by: { id: 'uwy16' }, created: '2026-11-16T00:00:00Z', snap: { chg_amt: '1500', chg_end: '2027-03-31' } }], updated_at: 5 };
+    let items = [KY(localPipes)]; items[0].pipes[0].stages[2].vals = { q_no: 'B' }; let base = viaMerge ? 40 : 41; const codes = [];
+    for (let k = 0; k < 3; k++) { const r = await callY({ action: 'save', collection: 'contracts', base, doc: { schema: 1, items } }, tWY, 'dev1'); codes.push(r.code + (r.body.error_code ? ':' + r.body.error_code : '')); if (r.code !== 409) break; const sv = cpY(mem.gw_data['col:contracts']); items = merge(items, sv.items); base = sv.updated_at; }
+    const c = mem.gw_data['col:contracts'].items[0];
+    return { codes: codes.join(' '), qno: c.pipes[0].stages[2].vals.q_no, eff: effY(c), chg: (c.pipes.find((p) => p.key === 'chg') || { stages: [] }).stages.map((s) => s.status + '/' + (s.appr ? s.appr.status : '-')).join(',') };
+  };
+  const chkY = async (merge) => {
+    const a = await runY(merge, [mainY()], true), b = await runY(merge, [mainY(), { key: 'chg', cur: 0, stages: [] }], true), d = await runY(merge, [mainY()], false);
+    const ok = a.codes === '409:STALE_BASE 200' && a.qno === 'B' && a.eff === 1500 && a.chg === 'done/승인' && b.codes === '409:STALE_BASE 200' && b.qno === 'B' && b.eff === 1500 && b.chg === 'done/승인'
+      && d.codes === '400:CON_APPR_REVOKED' && d.qno === 'A' && d.eff === 1500;   // 병합 없이 바로 보낸 같은 사본 = 서버가 종전대로 거절(서버 규칙 그대로)
+    return { ok, info: { a, b, d } };
+  };
+  try {
+    const Y0 = await chkY(mergeOfY(HY));
+    T('P1 판24c H3 변경 차수를 모르던 낡은 화면의 같은 날 저장(실행 — 실제 핸들러 + 앱 mergeContracts 409 재시도): 변경계약 줄 없음·빈 줄 = 409 → 병합(서버 승인 차수 붙임) → 200 · 고침 남음 · 승인 차수·유효 금액 1500 그대로 · 같은 사본을 병합 없이 보내면 400 CON_APPR_REVOKED(서버 규칙 그대로)', Y0.ok, JSON.stringify(Y0.info));
+    const mY = (from, to) => { if (HY.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); return HY.replace(from, () => to); };
+    const KY0 = [];
+    for (const [from, to] of [['      if (!mp){ if (rp.stages.some(apOf)) m.pipes = m.pipes.concat([JSON.parse(JSON.stringify(rp))]); return; }\n', '      if (!mp) return;\n'], ['      if (lastAp >= mp.stages.length){', '      if (false){']]) {
+      let k; try { k = (await chkY(mergeOfY(mY(from, to)))).ok; } catch (e) { k = 'err ' + e.message; } KY0.push(k);
+    }
+    T('P1 판24c H3 결함 사본 ' + KY0.length + '개(줄 없는 사본에 서버 차수 안 붙임·모자란 차수 안 채움) = 모두 ✗', KY0.every((v) => v === false), JSON.stringify(KY0));
+  } catch (e) { T('P1 판24c 검사 실행', false, String(e && e.stack || e).slice(0, 500)); }
+  finally { const s = JSON.parse(snapY); mem.gw_users = s.u; mem.gw_data = s.d; }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

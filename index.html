@@ -14340,9 +14340,15 @@
     if (!m || !r || m === r || !Array.isArray(m.pipes) || !Array.isArray(r.pipes)) return;
     r.pipes.forEach(function(rp){
       if (!rp || !Array.isArray(rp.stages)) return;
-      var mp = m.pipes.filter(function(q){ return q && q.key === rp.key; })[0]; if (!mp || !Array.isArray(mp.stages)) return;
+      var apOf = function(x){ return !!(x && x.aw === "amt" && x.status === "done" && x.appr && x.appr.status === "승인" && x.appr.snap && x.appr.cid); };
+      var mp = m.pipes.filter(function(q){ return q && q.key === rp.key; })[0];
+      // 판24c(H3): 변경 차수를 아직 모르던 낡은 화면(그 줄이 없음·차수가 모자람) — 서버의 승인된 차수까지 서버 값을 붙여 보낸다(종전엔 그대로 보내 서버가 되돌리기로 거절 → 그 기기 고침 사라짐)
+      if (!mp){ if (rp.stages.some(apOf)) m.pipes = m.pipes.concat([JSON.parse(JSON.stringify(rp))]); return; }
+      if (!Array.isArray(mp.stages)) return;
+      var lastAp = -1; rp.stages.forEach(function(x, j){ if (apOf(x)) lastAp = j; });
+      if (lastAp >= mp.stages.length){ for (var j = mp.stages.length; j <= lastAp; j++) mp.stages.push(JSON.parse(JSON.stringify(rp.stages[j]))); mp.cur = Math.max(+mp.cur || 0, +rp.cur || 0); }
       rp.stages.forEach(function(rs, i){
-        if (!(rs && rs.aw === "amt" && rs.status === "done" && rs.appr && rs.appr.status === "승인" && rs.appr.snap && rs.appr.cid)) return;
+        if (!apOf(rs)) return;
         var ms = mp.stages[i]; if (!ms || ms.name !== rs.name) return;
         // 11/16 검토 A: 상신 기록이 아예 없는 사본(상신 전에 연 화면 — 열림·대기 전)도 서버 승인 값으로(서버 carryBare와 같은 조건 · 끝남·건너뜀은 아님)
         if (ms.appr == null){ if (!{ "": 1, "open": 1, "pending": 1 }[ms.status == null ? "" : String(ms.status)]) return; }
@@ -16916,9 +16922,19 @@
       if (el.value === "") return;
       var pan = csPanelOf(el); if (!pan) return;
       var x = { p: pan.getAttribute("data-cs-fpanel") || (pan.getAttribute("data-cs-wlform") ? "wl:" + pan.getAttribute("data-cs-wlform") : "dp:" + pan.getAttribute("data-cs-dpanel")), k: el.getAttribute("data-cs-fld") || el.getAttribute("data-cs-wl") || "dnew", v: el.value }, id = x.p + "\u0001" + x.k, sc = score(el);
+      // 판24c: 점수를 같이 남김 — 두 뿌리(표 펼침·폰 카드)의 모음을 csSnapJoin이 같은 규칙으로 하나로
+      x.s = sc;
       if (!Object.prototype.hasOwnProperty.call(seen, id)){ seen[id] = { i: out.length, s: sc }; out.push(x); }
       else if (sc > seen[id].s){ out[seen[id].i] = x; seen[id].s = sc; }
     });
+    return out;
+  }
+  // 판24c(H1·H2 원천): 상세는 다른 두 뿌리(#conList 표 펼침 · #conDetailCard 폰 카드 — PC에선 숨김)에 한 벌씩 그려진다. 뿌리마다 모은 것을 그냥 이으면 같은 칸이 두 번 들어가
+  //   되살릴 때 뒤(숨은 카드의 옛 값)가 앞(그려진 칸의 새 값)을 덮었다 — [입력 저장] 직후 화면이 옛 값·다음 저장이 그 옛 값을 다시 씀(비어 있지 않던 칸만, 결재와 무관). 같은 열쇠는 점수 높은 쪽 하나(같으면 앞)
+  function csSnapJoin(a, b){
+    var out = (a || []).slice(), at = {};
+    out.forEach(function(x, i){ at[x.p + "\u0001" + x.k] = i; });
+    (b || []).forEach(function(x){ var id = x.p + "\u0001" + x.k; if (!Object.prototype.hasOwnProperty.call(at, id)){ at[id] = out.length; out.push(x); } else if ((x.s || 0) > (out[at[id]].s || 0)) out[at[id]] = x; });
     return out;
   }
   function csRestoreInputs(root, snap){
@@ -16979,7 +16995,7 @@
       h += '<td class="' + conColCls(c) + (c.k === "amount" ? ' cs-num' : '') + '">' + t + '</td>';
     });
     h += '</tr></tfoot></table></div>';
-    var snap = csSnapInputs(host).concat(csSnapInputs(dcard));   // v382 검토 10: 백그라운드 재그리기(판독 폴링·승인·폭 변경)에도 입력 중인 값 유지
+    var snap = csSnapJoin(csSnapInputs(host), csSnapInputs(dcard));   // v382 검토 10: 백그라운드 재그리기(판독 폴링·승인·폭 변경)에도 입력 중인 값 유지
     host.innerHTML = h;
     if (dcard) dcard.innerHTML = csDetailHtml(openC);
     csRestoreInputs(host, snap); csRestoreInputs(dcard, snap);

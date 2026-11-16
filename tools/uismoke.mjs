@@ -16466,5 +16466,69 @@ try {
     r84.ok && M84.every((v) => v === false), JSON.stringify({ r: r84.info, mut: M84 }));
 } catch (e) { console.log('  (v485 검사 생략 — ' + e.message + ')'); fails++; }
 
-console.log(fails ? '\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
+// ── P1 판24c(11/16 — v484 화면 확인 결함 H1·H2·H3): ①② 상세 두 뿌리(#conList 표 펼침 · #conDetailCard 폰 카드)의 칸 모음 → 하나로(csSnapJoin) — [입력 저장] 직후 화면 칸 = 새 값 · 이어 다른 칸 저장 = 두 고침 모두
+//   (실행 — 실제 csPanelOf·csSnapInputs·csSnapJoin·csRestoreInputs·csSaveFields + renderContracts의 모음·되살림 줄 그대로 · 가짜 DOM 두 뿌리) ③ 변경 차수를 모르던 낡은 사본의 병합 = 서버 승인 차수 붙임(실제 mergeContracts·csKeepApproved)
+try {
+  const fnC = (src, name) => { const i = src.search(new RegExp('\\n  function ' + name + '\\(')); if (i < 0) throw new Error('함수 없음 ' + name); let d = 0, st = false; for (let j = i + 1; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i + 1, j + 1); } } throw new Error('중괄호 ' + name); };
+  const runC = (H) => {
+    const snapLine = (H.match(/\n    (var snap = [^\n]*?;)/) || [])[1], restLine = 'csRestoreInputs(host, snap); csRestoreInputs(dcard, snap);';
+    if (!snapLine || H.indexOf(restLine) < 0) throw new Error('그리기 줄 없음');
+    const A = new Function('ENV', [fnC(H, 'csPanelOf'), fnC(H, 'csSnapInputs'), /function csSnapJoin\(/.test(H) ? fnC(H, 'csSnapJoin') : '', fnC(H, 'csRestoreInputs'), fnC(H, 'csSaveFields'),
+      'function conDueOn(){ return false; } function findTask(){ return null; } function todayStr(){ return "2026-11-16"; } function scheduleContractSave(){ ENV.saves++; }',
+      'function renderContracts(){ var host = ENV.host, dcard = ENV.dcard; ' + snapLine + ' ENV.build(); ' + restLine + ' }',
+      'return { save: csSaveFields, render: renderContracts };'].join('\n'));
+    const one = (phone, oldVals) => {
+      const mkIn = (fld, v, vis, par) => ({ type: 'text', attrs: { 'data-cs-fld': fld }, value: v, defaultValue: v, disabled: false, parentNode: par, getAttribute(k) { return Object.prototype.hasOwnProperty.call(this.attrs, k) ? this.attrs[k] : null; }, getClientRects() { return vis ? [1] : []; } });
+      const mkRoot = (vis) => ({ vis, panels: [], querySelectorAll(sel) { const m = /data-cs-fpanel="([^"]+)"/.exec(sel); if (m) return this.panels.filter((p) => p.attrs['data-cs-fpanel'] === m[1]); if (/data-cs-wlform="|data-cs-dpanel="/.test(sel)) return []; return this.panels.flatMap((p) => p.inputs); }, querySelector(sel) { return this.querySelectorAll(sel)[0] || null; } });
+      const ENV = { saves: 0, host: mkRoot(!phone), dcard: mkRoot(phone) };
+      const c = { id: 'kc', pipes: [{ key: 'main', cur: 6, stages: [0, 1, 2, 3, 4, 5].map((i) => ({ name: 's' + i })).concat([{ name: '착공', vals: Object.assign({}, oldVals) }]) }] }, p = c.pipes[0], s = p.stages[6];
+      ENV.build = () => { [ENV.host, ENV.dcard].forEach((r) => { const pan = { attrs: { 'data-cs-fpanel': 'main|6' }, parentNode: null, getAttribute(k) { return Object.prototype.hasOwnProperty.call(this.attrs, k) ? this.attrs[k] : null; }, getClientRects() { return r.vis ? [1] : []; } };
+        pan.inputs = ['q_no', 'q_date'].map((k) => mkIn(k, s.vals && s.vals[k] != null ? String(s.vals[k]) : '', r.vis, pan));
+        pan.querySelectorAll = (sel) => (/data-cs-fld/.test(sel) ? pan.inputs : []); pan.querySelector = (sel) => { const m = /data-cs-fld="([^"]+)"/.exec(sel); return m ? pan.inputs.find((i) => i.attrs['data-cs-fld'] === m[1]) || null : null; };
+        r.panels = [pan]; }); };
+      const api = A(ENV); api.render();
+      const vis = () => (phone ? ENV.dcard : ENV.host).panels[0], hid = () => (phone ? ENV.host : ENV.dcard).panels[0], fld = (pan, k) => pan.inputs.find((i) => i.attrs['data-cs-fld'] === k);
+      // v382 본래 뜻: 저장 전 백그라운드 다시 그리기에도 치던 값 유지
+      fld(vis(), 'q_no').value = 'TYPING'; api.render(); const keepTyping = fld(vis(), 'q_no').value === 'TYPING';
+      fld(vis(), 'q_no').value = 'NEW1'; api.save(c, p, 6, vis());
+      const h2 = fld(vis(), 'q_no').value === 'NEW1' && fld(hid(), 'q_no').value === 'NEW1';   // H2: 저장 직후 화면 칸 = 새 값(숨은 사본도)
+      fld(vis(), 'q_date').value = '2031-02-02'; api.save(c, p, 6, vis());
+      const h1 = s.vals.q_no === 'NEW1' && s.vals.q_date === '2031-02-02' && fld(vis(), 'q_no').value === 'NEW1' && fld(vis(), 'q_date').value === '2031-02-02';   // H1: 이어 다른 칸 저장 = 두 고침 모두
+      return { ok: keepTyping && h2 && h1 && ENV.saves === 2, keepTyping, h2, h1 };
+    };
+    return { pc: one(false, { q_no: 'OLD1', q_date: '2026-01-01' }), phone: one(true, { q_no: 'OLD1', q_date: '2026-01-01' }), pcEmpty: one(false, {}) };
+  };
+  const okC = (r) => r.pc.ok && r.phone.ok && r.pcEmpty.ok;
+  const RC = runC(html);
+  // ③ 변경 차수를 모르던 낡은 사본(같은 날 409 병합 — 로컬이 통째로 이김)
+  const runM = (H) => {
+    const merge = new Function(['mTime', 'mergeDel', 'csKeepApproved', 'mergeContracts'].map((n) => fnC(H, n)).join('\n') + '\nreturn mergeContracts;')();
+    const ap = { name: '변경계약', aid: 'change_contract', ak: '계약 단계', aw: 'amt', status: 'done', done_at: '2026-11-16', vals: { chg_amt: 1500 }, appr: { cid: 'cz', status: '승인', snap: { chg_amt: 1500, chg_end: '' } } };
+    const srv = () => ({ id: 'k', updated: '2026-11-16', pipes: [{ key: 'main', cur: 1, stages: [{ name: '계약서', status: 'done' }, { name: '착공', status: 'open' }] }, { key: 'chg', cur: 1, stages: [JSON.parse(JSON.stringify(ap))] }] });
+    const st = (m) => { const q = (m.pipes || []).filter((x) => x.key === 'chg')[0]; const s = q && q.stages[0]; return (s ? s.status + '/' + (s.appr ? s.appr.status : '-') : 'none') + '/' + (q ? q.cur : '-') + '/' + (m.memo || ''); };
+    const noPipe = merge([{ id: 'k', updated: '2026-11-16', memo: 'B', pipes: [srv().pipes[0]] }], [srv()])[0];
+    const emptyPipe = merge([{ id: 'k', updated: '2026-11-16', memo: 'B', pipes: [srv().pipes[0], { key: 'chg', cur: 0, stages: [] }] }], [srv()])[0];
+    const r2 = srv(); r2.pipes[1].stages = [Object.assign({}, ap, { appr: undefined, vals: { chg_amt: 1000 } }), Object.assign({}, ap, { appr: { cid: 'cz2', status: '승인', snap: { chg_amt: 2000, chg_end: '' } } })]; r2.pipes[1].cur = 2; delete r2.pipes[1].stages[0].appr;
+    const oneOfTwo = merge([{ id: 'k', updated: '2026-11-16', memo: 'B', pipes: [srv().pipes[0], { key: 'chg', cur: 1, stages: [JSON.parse(JSON.stringify(r2.pipes[1].stages[0]))] }] }], [r2])[0];
+    const q2 = oneOfTwo.pipes.filter((x) => x.key === 'chg')[0];
+    const same = merge([{ id: 'k', updated: '2026-11-16', memo: 'B', pipes: srv().pipes }], [srv()])[0];
+    return { ok: st(noPipe) === 'done/승인/1/B' && st(emptyPipe) === 'done/승인/1/B' && q2.stages.length === 2 && q2.stages[1].appr.status === '승인' && q2.cur === 2 && st(same) === 'done/승인/1/B' && same.pipes.length === 2, info: [st(noPipe), st(emptyPipe), q2.stages.length, q2.cur] };
+  };
+  const RM = runM(html);
+  const mutC = (from, to) => { if (html.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); return html.replace(from, () => to); };
+  const KC = [];
+  for (const [from, to, which] of [
+    ['var snap = csSnapJoin(csSnapInputs(host), csSnapInputs(dcard));', 'var snap = csSnapInputs(host).concat(csSnapInputs(dcard));', 'c'],   // 종전 그리기 줄(두 뿌리 그냥 이음)
+    ['      x.s = sc;\n', '', 'c'],   // 점수 안 남김(폰 카드 새 값을 숨은 표 펼침 옛 값이 덮음)
+    ['else if ((x.s || 0) > (out[at[id]].s || 0)) out[at[id]] = x;', 'else out.push(x);', 'c'],   // 같은 열쇠 둘 다 넣음
+    ['      if (!mp){ if (rp.stages.some(apOf)) m.pipes = m.pipes.concat([JSON.parse(JSON.stringify(rp))]); return; }\n', '      if (!mp) return;\n', 'm'],   // 변경계약 줄이 없던 사본
+    ['      if (lastAp >= mp.stages.length){', '      if (false){', 'm']]) {   // 차수가 모자란 사본
+    let k; try { const H = mutC(from, to); k = which === 'c' ? okC(runC(H)) : runM(H).ok; } catch (e) { k = 'err ' + e.message; }
+    KC.push(k);
+  }
+  T('P1 판24c 화면(H1·H2·H3 — 실행): ①② 상세 두 뿌리 칸 모음 하나로 — PC(표 펼침 보임·폰 카드 숨음)·폰(반대)·빈 칸 모두 [입력 저장] 직후 보이는 칸·숨은 사본 = 새 값 · 이어 같은 단계 다른 칸 저장 = 두 고침 모두 모델에 · 저장 전 다시 그리기에도 치던 값 유지(v382) ③ 변경 차수를 모르던 낡은 사본 병합 = 서버의 승인된 차수 붙임(줄 없음·빈 줄·2차만 모름) · 로컬 고침 남음 · 이미 있으면 그대로 · 결함 사본 ' + KC.length + '개(종전 그리기 줄·점수 안 남김·같은 열쇠 둘 다·줄 없는 사본·모자란 차수) = 모두 ✗',
+    okC(RC) && RM.ok && KC.every((v) => v === false), JSON.stringify({ c: RC, m: RM.info, mut: KC }));
+} catch (e) { console.log('  (P1 판24c 검사 생략 — ' + e.message + ')'); fails++; }
+
+console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
