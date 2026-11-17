@@ -3848,6 +3848,7 @@
     if (typeof sessReadReset === "function") sessReadReset();   // 로그아웃 길
     if (typeof conBaseSet === "function") conBaseSet([]);
     if (typeof conSaveOut !== "undefined") conSaveOut = 0;
+    if (typeof imBaseDrop === "function") imBaseDrop("tasks");   // 판24i: 지시 배열을 비우므로 지시 기준 사본도(세대 +1 — 앞사람의 늦은 저장 200이 기준을 세우지 못하게 · 나가 있는 저장 수 0) · 로그인 창 '전환'은 배열을 안 비워 기준도 짝으로 남김
     bids = []; onbids = []; quotes = []; promoItems = []; clients = []; myTodos = []; members = []; apprItems = []; myApprItems = []; fam = []; edu = [];
     cliLoaded = false; cliDirty = {};   // v441 검토: 비운 거래처 대장은 '아직 못 읽음'(빈 목록을 저장하지 않게 — loadClients가 200에서 다시 켬)
     wkLoaded = false;   // v442: 일용직 명부도 '아직 못 읽음'으로(loadWorkers가 200에서 다시 켬 — 빈 명부 저장 막음)
@@ -5957,6 +5958,7 @@
     gwCall("gw-data", { action: "task_notmine", id: id }).then(function(res){
       if (res.status !== 200){ alert("처리 실패: " + ((res.body && res.body.error_code) || res.status)); return; }
       var b = res.body; t.who_id = ""; t.who = ""; t.who_by = "notmine"; t.notmine = b.task && b.task.notmine; t.updated = (b.task && b.task.updated) || todayStr();
+      if (typeof imBaseAdvance === "function") imBaseAdvance("tasks", t.id, { who_id: "", who: "", who_by: "notmine", notmine: t.notmine });   // 판24i: 서버가 한 일 — 기준 사본도 그 값(다음 병합에서 '이 화면이 고친 담당'으로 세어 다른 기기의 새 배정을 되돌리지 않게)
       // v421: 여기서 낙관락 base를 올리지 않는다 — 낡은 사본을 든 탭이 다음 저장으로 문서를 덮었다. 다음 저장은 409 → 재조회·병합으로 간다.
       saveTasksCache(); renderTasks(); renderMyTasks(); renderSummary();
       apprToastShow(b.signal && b.signal.recard ? "담당에서 빠졌습니다 — 이달 " + b.signal.prefix + " 접두어 " + b.signal.notmine + "건, 배정표 재검토 신호가 관리자에게 표시됩니다" : "담당에서 빠졌습니다 — 배정표 재검토 신호로 집계됩니다");
@@ -6529,30 +6531,18 @@
     }, 1500);
   }
 
+  // 판24i(원장 C209): 종전엔 지시 한 건을 updated(하루 단위)가 늦은 쪽으로 통째 고르고 같은 날이면 이 화면 것 — 다른 기기가 '끝남'으로 닫은 지시가, 옛 화면이 그 지시의 다른 칸을 저장하거나
+  //   그날 한 번 고쳤던 지시가 있는 채로 다른 지시를 저장하면 알림 없이 '열림'으로 되돌아갔다(45-1 재현) → 공용 칸 단위 병합(imMerge — 받은 사본 imSt("tasks").base와 칸마다 견줌 · 겹친 지시는 이 화면 객체 제자리)
   function mergeTasks(local, remote){
-    var byId = {};
-    (local || []).forEach(function(t){ if (t && t.id) byId[t.id] = t; });
-    (remote || []).forEach(function(r){
-      if (!r || !r.id) return;
-      var cur = byId[r.id];
-      if (!cur){
-        byId[r.id] = r;
-      } else {
-        var winner = (r.updated || "") > (cur.updated || "") ? r : cur;   // 동률=로컬(cur) 우선(방금 한 변경 보존)
-        var loser = winner === r ? cur : r;
-        var merged = Object.assign({}, loser, winner);                    // 승자 값 우선 + 패자 고유 필드 보존
-        if (cur.del === 1 || r.del === 1) merged.del = mergeDel(cur, r);
-        byId[r.id] = merged;
+    return imMerge("tasks", local, remote, {
+      name: function(t){ return t.title || "지시"; },
+      lbl: { title: "제목", detail: "내용", who: "담당", who_id: "담당", who_by: "담당", scope: "공개 범위", due: "기한", status: "상태", done_at: "완료", done_by: "완료", done_src: "완료", approved_by: "승인", approved_at: "승인", recur: "반복" },
+      sort: function(a, b){
+        var ac = a.created || "", bc = b.created || "";
+        if (ac !== bc) return ac < bc ? -1 : 1;
+        return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0);
       }
     });
-    var out = [];
-    Object.keys(byId).forEach(function(id){ out.push(byId[id]); });
-    out.sort(function(a, b){
-      var ac = a.created || "", bc = b.created || "";
-      if (ac !== bc) return ac < bc ? -1 : 1;
-      return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0);
-    });
-    return out;
   }
 
   function loadTasks(){
@@ -6568,6 +6558,7 @@
         // 아직 파일이 없으면 빈 목록으로 시작(첫 저장 때 생성)
         tasksSha = null;
         tasks = [];
+        if (typeof imBaseSet === "function") imBaseSet("tasks", []);   // 판24i: 받은 사본 0건
         saveTasksCache();
         renderTasks();
         renderSummary();
@@ -6579,11 +6570,16 @@
         throw new Error("HTTP " + resp.status);
       }
       return resp.json().then(function(json){
-        tasksSha = json.sha;
         var parsed = JSON.parse(b64DecodeUnicode(json.content));
         var remoteItems = (parsed && parsed.items) || [];
-        // 저장 대기 중이면 로컬 낙관적 변경을 보존하기 위해 머지(통째 덮어쓰기 금지)
-        tasks = (tasksPending || pendingSave) ? mergeTasks(tasks, remoteItems) : remoteItems;
+        // 판24i: 저장 200이 이미 더 새 판을 기준으로 세웠으면 이 읽기는 그보다 옛 판(저장보다 먼저 나간 읽기가 늦게 옴) — 화면·기준에 들이지 않고 버림
+        //   (들이면 방금 저장해 서버에 든 고침이 화면에서 옛 값으로 돌아가고, 기준이 옛 판이라 다음 저장 병합이 그 옛 값을 '이 화면 고침'으로 서버에 다시 씀)
+        var imS = (typeof imSt === "function") ? imSt("tasks") : null, rAt = (typeof _colBase !== "undefined" && _colBase && Number(_colBase.tasks)) || 0;
+        if (imS && imS.has && imS.at && rAt && rAt < imS.at) return;
+        tasksSha = json.sha;
+        // 저장 대기 중이면 로컬 낙관적 변경을 보존하기 위해 머지(통째 덮어쓰기 금지) · 판24i: 저장이 나가 있는 동안(앞 저장 200이 대기 표시를 풀었어도 뒤 저장이 나가 있음)도 병합
+        tasks = (tasksPending || pendingSave || (imS && imS.out > 0)) ? mergeTasks(tasks, remoteItems) : remoteItems;
+        if (imS) imBaseSet("tasks", remoteItems);   // 판24i: 병합은 옛 기준으로 한 뒤 기준을 새로 받은 것으로
         if (typeof csAlignTasksAll === "function"){ try { csAlignTasksAll(); } catch(e){} }   // v384 2차 F7·F11: 단계가 끝난 지시는 닫는다(동률 병합으로 review로 남거나 도착 전 진행된 고아)
         setOffline(false);
         markLoadedForAutoGen("tasks");
@@ -6619,12 +6615,18 @@
       branch: "main"
     };
     if (tasksSha) payload.sha = tasksSha;
+    // 판24i: 보낼 때의 기준 세대 · 나가 있는 저장 수(응답·끊김에 뺌)
+    var imG = (typeof imSt === "function") ? imSt("tasks").gen : 0;
+    if (typeof imOut === "function") imOut("tasks", 1);
 
     fetch(TASKS_API, {
       method: "PUT",
       headers: Object.assign({"Content-Type":"application/json"}, ghHeaders()),
       body: JSON.stringify(payload)
     }).then(function(resp){
+      if (typeof imOut === "function") imOut("tasks", -1);
+      return resp;
+    }, function(e){ if (typeof imOut === "function") imOut("tasks", -1); throw e; }).then(function(resp){
       if (resp.status === 401){
         clearToken();
         showTokenScreen(true);
@@ -6638,6 +6640,8 @@
       }
       return resp.json().then(function(json){
         tasksSha = json.content && json.content.sha;
+        // 판24i: 저장 200 = 보낸 목록이 서버 사본 — 세대가 같으면 통째로, 그사이 기준을 새로 세웠으면(다시 읽기·409) 이 200의 판이 더 새로울 때만 · 쓰기 거절은 서버에 안 들어가 세우지 않음
+        if (!json.write_denied && typeof imBaseSet === "function"){ var sent = JSON.parse(body).items; if (imSt("tasks").gen === imG) imBaseSet("tasks", sent); else imBaseLate("tasks", sent); }
         setOffline(false);
         saveTasksCache();
         tasksPending = false;
@@ -6651,12 +6655,16 @@
   function resolveTasksConflictAndRetry(){
     return fetch(TASKS_API, {headers: ghHeaders()}).then(function(resp){
       if (resp.status === 404) return null;
+      if (!resp.ok) return { gwReadFail: 1 };   // 판24i: 다시 읽기 실패(5xx)는 병합·기준 세우기 없이 다시 저장만(종전엔 빈 응답을 '읽음'으로 병합 — 기준을 빈 목록으로 세우면 다음 병합이 통째 고르기)
       return resp.json();
     }).then(function(json){
-      if (json){
-        var remoteParsed = {};
+      if (json && !json.gwReadFail){
+        var remoteParsed = null;
         try{ remoteParsed = JSON.parse(b64DecodeUnicode(json.content)) || {}; }catch(e){}
-        tasks = mergeTasks(tasks, remoteParsed.items || []);
+        if (remoteParsed){
+          tasks = mergeTasks(tasks, remoteParsed.items || []);
+          if (typeof imBaseSet === "function") imBaseSet("tasks", remoteParsed.items || []);   // 판24i: 옛 기준으로 병합한 뒤 새 기준
+        }
         tasksSha = json.sha;
       }
       saveTasksCache();
@@ -14593,6 +14601,71 @@
     if (!list.length || typeof apprToastShow !== "function") return;
     apprToastShow("다른 기기도 고친 칸을 이 화면 값으로 저장했습니다 — " + list[0].name + " · " + list[0].lbl + (list.length > 1 ? "(외 " + (list.length - 1) + ")" : ""));
   }
+  // ── 판24i(원장 C209): 항목 배열 자료 공용 칸 단위 병합 — 계약(판24f conMerge3)의 '받은 사본과 견줘 이 화면이 고친 칸만 이 화면 값'을 계약 밖 자료에(1판 = 지시 · 2판 = 나머지 14곳이 자료 이름만 바꿔 씀)
+  //   쓰는 법: ① 목록 전부를 화면에 들인 읽기 200·409 다시 읽기 200 = 병합(imMerge — 옛 기준으로) 뒤 imBaseSet(col, 받은 목록) · 404 = imBaseSet(col, []) · 읽기 실패 = 둘 다 안 함
+  //     ② 저장: 보내기 전 g = imSt(col).gen · imOut(col, 1) — 응답(어떤 것이든)·끊김에 imOut(col, -1) · 200(쓰기 거절 아님)이면 세대가 같으면 imBaseSet(col, 보낸 목록) 아니면 imBaseLate(col, 보낸 목록)
+  //     ③ 읽기 200 때 imSt(col).out > 0이면 저장 대기처럼 병합(통째 바꿈 금지) · 판 시각이 기준 판보다 옛 판이면 그 읽기는 버림 · 세션을 비울 때 배열을 비우면 imBaseDrop(col)
+  //   규칙: 이 화면만 고친 칸 = 이 화면 · 다른 기기만 고친 칸 = 다른 기기 · 양쪽이 다르게 고친 칸 = 이 화면 + 알림 한 줄(계약과 같은 글) · 한쪽에만 있는 항목 = 남음 · del = mergeDel 그대로
+  //     · id·updated·updated_ts·del은 칸으로 걷지 않음(updated·updated_ts는 늦은 쪽) · 기준 사본 없는 항목·병합 예외 = 종전 통째 고르기(imWhole) · 겹친 항목은 이 화면 객체 제자리(응답 뒤 잡고 쓰는 값이 남게)
+  //   상태는 함수 속성(imSt.s)에 둠 — 검사 틀이 함수만 떼어 돌려도 따로 둘 변수가 없게
+  //   세대 번호(gen): 통째로 세울 때마다 +1 — 저장 200이 '보낼 때와 같은 기준'인지 가름(다르면 판 시각으로만 — imBaseLate) · 판 시각(at)은 공통 길 기준 시각(_colBase[col] — 읽기·저장 200과 같은 마이크로 작업 줄)
+  //   나가 있는 저장 수(out): 저장이 둘 겹쳐 앞 것의 200이 대기 표시를 풀어도 뒤 것이 나가 있는 동안 온 읽기가 화면을 통째로 바꾸지 않게
+  function imSt(col){ var S = imSt.s || (imSt.s = {}); return S[col] || (S[col] = { base: {}, at: 0, gen: 0, out: 0, has: false }); }
+  function imBaseSet(col, items){ var st = imSt(col); st.gen++; st.has = true; st.at = (typeof _colBase !== "undefined" && _colBase && Number(_colBase[col])) || 0; st.base = {}; (items || []).forEach(function(x){ if (x && x.id) st.base[x.id] = mgCopy(x); }); }
+  // 세대가 바뀐 저장 200: 그 판(공통 길이 막 세운 기준 시각)이 기준 판보다 새로우면 보낸 목록이 서버 사본 · 기준을 비운 뒤(로그아웃)는 세우지 않음
+  function imBaseLate(col, items){ var st = imSt(col), at = (typeof _colBase !== "undefined" && _colBase && Number(_colBase[col])) || 0; if (!st.has || !at || at <= st.at) return; imBaseSet(col, items); }
+  function imBaseDrop(col){ var st = imSt(col); st.gen++; st.has = false; st.at = 0; st.base = {}; st.out = 0; }
+  function imBaseKnown(col){ return imSt(col).has; }
+  function imOut(col, d){ var st = imSt(col); st.out = Math.max(0, st.out + d); }
+  // 서버 동작(저장 말고)이 그 항목의 칸을 바꿔 이 화면에도 같은 값을 쓴 뒤 — 기준 사본의 그 칸들도 그 값으로(서버가 한 일을 '이 화면이 고친 칸'으로 세지 않게)
+  function imBaseAdvance(col, id, part){ var b = imSt(col).base[id]; if (!b || !part) return; Object.keys(part).forEach(function(k){ if (part[k] === undefined) delete b[k]; else b[k] = mgCopy(part[k]); }); }
+  // 종전 규칙(항목 통째 — updated 날짜가 늦은 쪽, 같으면 이 화면 · 패자에만 있는 칸은 남김) — 이 화면 객체 제자리
+  function imWhole(cur, r){
+    var w = (r.updated || "") > (cur.updated || "") ? r : cur, m = Object.assign({}, w === r ? cur : r, w);
+    if (cur.del === 1 || r.del === 1) m.del = mergeDel(cur, r);
+    Object.assign(cur, m);
+    return cur;
+  }
+  // 한 항목 칸 단위(b 기준 · l 이 화면 — 제자리 · s 서버) · 예외면 이 항목을 되돌리고 null(종전 규칙으로)
+  function imMerge3(b, l, s, cfs, opt){
+    var cf = [], keep = JSON.stringify(l), skip = { id: 1, updated: 1, updated_ts: 1, del: 1 };   // 칸으로 걷지 않는 것
+    try {
+      var pick = function(v, path){ var t = v[0], bb = v[1], o = v[2]; if (mgEq(t, o)) return null; if (mgEq(t, bb)) return { v: o }; if (!mgEq(o, bb)) cf.push(path); return null; };
+      var del2 = (l.del === 1 || s.del === 1) ? mergeDel(l, s) : null, cons = [l, b, s, undefined], su = String(s.updated || "");   // 지움은 고치기 전 두 쪽으로(mergeDel)
+      mgKeysOf(cons).forEach(function(k){ if (!skip[k] && !(opt && opt.skip && opt.skip[k])) mgWalkKey(cons, k, pick, [k], 0); });
+      if (su > String(l.updated || "")) l.updated = s.updated;
+      var ts = Math.max(Number(l.updated_ts) || 0, Number(s.updated_ts) || 0); if (ts) l.updated_ts = ts;
+      if (del2 !== null) l.del = del2;
+    } catch(e){
+      if (typeof console !== "undefined" && console.warn) console.warn("판24i 칸 단위 병합 실패 — 종전 규칙으로", l && l.id, e && e.message);
+      for (var k0 in l){ if (Object.prototype.hasOwnProperty.call(l, k0)) delete l[k0]; } Object.assign(l, JSON.parse(keep));   // 고친 칸을 되돌림(제자리)
+      return null;
+    }
+    cf.forEach(function(path){ cfs.push({ id: l.id, path: path }); });
+    return l;
+  }
+  function imAt(o, path){ for (var i = 0; i < path.length; i++){ if (!mgPlain(o)) return undefined; o = o[path[i]]; } return o; }
+  // opt: name(항목) → 알림 이름 · lbl { 칸: 이름 } · after(합친 항목, 서버 항목) 자료별 뒷손질 · sort(가, 나) · skip { 칸: 1 }
+  function imMerge(col, local, remote, opt){
+    opt = opt || {};
+    var st = imSt(col), byId = {}, cfs = [], cfOut = [];
+    (local || []).forEach(function(t){ if (t && t.id) byId[t.id] = t; });
+    (remote || []).forEach(function(r){
+      if (!r || !r.id) return;
+      var cur = byId[r.id];
+      if (!cur){ byId[r.id] = r; return; }
+      var b = st.base[r.id], c0 = cfs.length, m = b ? imMerge3(b, cur, r, cfs, opt) : null;
+      if (!m) m = imWhole(cur, r);
+      if (opt.after) opt.after(m, r);
+      // 뒷손질 뒤 서버 값이 그대로 남은 칸은 '이 화면 값으로 저장' 알림에서 뺌
+      cfs.slice(c0).forEach(function(e){ if (!mgEq(imAt(m, e.path), imAt(r, e.path))) cfOut.push({ id: m.id, name: (opt.name ? opt.name(m) : m.title) || "항목", lbl: (opt.lbl && opt.lbl[e.path[0]]) || "그 밖의 칸", path: e.path }); });
+      byId[r.id] = m;
+    });
+    if (cfOut.length && typeof conConflictToast === "function") conConflictToast(cfOut);
+    var out = Object.keys(byId).map(function(id){ return byId[id]; });
+    if (opt.sort) out.sort(opt.sort);
+    return out;
+  }
   // 결재 동기화 접목 뒤(csSyncFromServer): ① 이 화면이 기준과 다르게 고쳐 둔 칸(진행 덩어리 — 결재 기록 포함 — ·진행 상태 제외)은 접목 전 이 화면 값(pre)을 다시 얹음
   function conSyncKeep(b, c, pre){
     var ch = false;
@@ -17219,7 +17292,9 @@
   function csSaveFields(c, p, i, panel){
     var s = p.stages[i]; if (!s || !panel) return;
     s.vals = s.vals || {};
-    if (conDueOn()){ (c.pipes || []).forEach(function(pp){ (pp.stages || []).forEach(function(x){ if (!(x && x.due_badge === "기산일 필요" && x.task_id)) return; var tt = findTask(x.task_id); if (!tt || tt.due || tt.status === "done") return; var dd2 = conStageDue(x, c, pp); if (dd2 && dd2.due){ tt.due = dd2.due; tt.updated = todayStr(); x.due_src = dd2.src || ""; delete x.due_badge; saveTasksCache(); scheduleTasksSave(); } }); }); }   // v404 검토 S1 (입력 칸 저장 뒤 — 아래 forEach가 vals를 먼저 쓰도록 setTimeout 없이 두 번째 패스에서)
+    // 판24i(가-3 · D6): 지시를 서버에서 한 번도 받지 못한 화면(오프라인 캐시로 부팅)은 이 자동 기한 쓰기를 건너뜀 — 기준 사본이 없어 병합이 통째 고르기로 떨어지면 같은 날 다른 기기가 결재로 닫은 지시를
+    //   이 기한 쓰기가 다시 열었다(C208). 지시를 받은 화면은 칸 단위 병합이 기한 칸만 이 화면 값으로 하고 끝남은 남김 · 건너뛴 기한은 지시를 받은 뒤 다음 [입력 저장]이 채움
+    if (conDueOn() && !(typeof imBaseKnown === "function" && !imBaseKnown("tasks"))){ (c.pipes || []).forEach(function(pp){ (pp.stages || []).forEach(function(x){ if (!(x && x.due_badge === "기산일 필요" && x.task_id)) return; var tt = findTask(x.task_id); if (!tt || tt.due || tt.status === "done") return; var dd2 = conStageDue(x, c, pp); if (dd2 && dd2.due){ tt.due = dd2.due; tt.updated = todayStr(); x.due_src = dd2.src || ""; delete x.due_badge; saveTasksCache(); scheduleTasksSave(); } }); }); }   // v404 검토 S1 (입력 칸 저장 뒤 — 아래 forEach가 vals를 먼저 쓰도록 setTimeout 없이 두 번째 패스에서)
     // 판24d: 사람이 바꾼 칸만 모델에 씀(바꾸지 않은 칸 = 그린 값 그대로 — 다른 기기의 새 값·브라우저가 못 받는 꼴의 값을 덮거나 지우지 않게)
     Array.prototype.forEach.call(panel.querySelectorAll("[data-cs-fld]"), function(el){ if (el.defaultValue !== undefined && el.value === el.defaultValue) return; var k = el.getAttribute("data-cs-fld"), v = el.value; if (v === "") delete s.vals[k]; else s.vals[k] = (el.type === "number") ? Number(v) : v; if (k === "settle_amount"){ if (v === "") delete c.settle_amount; else c.settle_amount = Number(v); } if (typeof csValEditNote === "function") csValEditNote(c, p, i, k); });
     c.updated = todayStr(); scheduleContractSave(); renderContracts();

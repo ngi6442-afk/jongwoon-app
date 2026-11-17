@@ -17988,6 +17988,187 @@ try {
     RH.ok && KHr.every((x) => x), JSON.stringify({ RH, KHr }));
 } catch (e) { console.log('  (P1 판24h 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ── P1 판24i(11/17 — 원장 C209): 지시 병합을 칸 단위로 — 공용 imMerge(받은 사본과 견줘 이 화면이 고친 칸만 이 화면 값) + 끝난 지시에 쓰는 자리(csSaveFields 기한 루프) · 전수 표 09_조사_문서\판24_재감사수리_자료_20261115\지시병합_전수표_1117.md
+//   (실행 — 실제 공통 길 window.fetch(기준 시각·base 0·409 셈) + 낙관락 가짜 서버(읽기 사본은 요청 때 떠서 뒤에 돌려줄 수 있음 · 저장은 요청째 붙잡아 뒤에 처리하거나 응답만 붙잡음)
+//    + 실제 loadTasks·doSaveTasks·resolveTasksConflictAndRetry·scheduleTasksSave·mergeTasks·im*·mg*·conConflictToast·addTask·openTaskModal·saveTaskModal·toggleTaskDone·approveTask·deleteTask·taskNotMine·csSaveFields·saveTasksCache·loadTasksCache와 그들이 부르는 함수 닫힘
+//    · 대역은 그리기·푸시·계약 진행(advanceProc)·차량 완료 창(vehDueAsk)·기한 엔진 값(conDueOn·conStageDue)·화면 요소·이름·시계만 — 저장·병합·읽기 함수는 빈 함수로 두지 않음)
+//   ① 브리핑 ⑦ 문항 1 ② 문항 2 ③ 같은 칸 충돌 = 이 화면 값 + 알림 1 ④ 지움·새 항목 ⑤ 받은 사본 없음(캐시 부팅)·병합 예외 = 종전 규칙 ⑥ 저장이 나가 있는 동안의 읽기(옛 판 버림·나가 있는 저장 수)·늦게 온 200·다시 읽기 실패·기준 비운 뒤
+//   ⑦ 닫힌 지시에 쓰는 자리(csSaveFields 기한 루프 — 지시를 받은 화면·캐시 부팅 화면) ⑧ 혼자 쓰는 화면의 추가·수정·완료 요청·승인·되엶·지움 저장 본문 = 종전 병합 사본과 같음 ⑨ 서버 동작(내 것 아님) 뒤 기준 전진
+try {
+  const fnI = (src, name) => { const i = src.search(new RegExp('\\n  function ' + name + '\\(')); if (i < 0) throw new Error('함수 없음 ' + name); let d = 0, st = false; for (let j = i + 1; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i + 1, j + 1); } } throw new Error('중괄호 ' + name); };
+  const varI = (src, name) => { const m = new RegExp('\\n  var ' + name + ' ?=[^\\n]*').exec(src); if (!m) throw new Error('변수 없음 ' + name); return m[0].slice(1); };
+  const wrapI = (src) => { const a = '  window.fetch = function(url, opts){'; const i = src.indexOf(a); if (i < 0) throw new Error('fetch 대역 없음'); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 2); } } throw new Error('대역 짝'); };
+  const tickI = () => new Promise((r) => setImmediate(r));
+  const cloneI = (x) => (x === undefined ? undefined : JSON.parse(JSON.stringify(x)));
+  const STUB_I = /^(render[A-Z]\w*|markLoadedForAutoGen|apprFlushCreates|apprSavePending|pushNotify|vehDueAsk|advanceProc|resetTaskScope|scheduleContractSave|csValEditNote|runBidQualGen|runAutoTaskGen|populateMemberNames)$/;
+  const OWN_I = { gwToast: 1, apprToastShow: 1, alert: 1, confirm: 1, setOffline: 1, getToken: 1, ghHeaders: 1, clearToken: 1, showTokenScreen: 1, onSessionInvalid: 1, isAdmin: 1, canSee: 1, canDo: 1, myId: 1, myName: 1, getUser: 1, todayStr: 1, genId: 1, gwCall: 1, setTimeout: 1, clearTimeout: 1, fetch: 1, memberName: 1, getCheckedMembers: 1, fillMemberSelect: 1, renderMemberChecks: 1, conDueOn: 1, conStageDue: 1, _rawFetch: 1 };
+  const closeI = (H, roots) => { const all = new Set([...H.matchAll(/\n  function ([A-Za-z_$][\w$]*)\(/g)].map((m) => m[1])); const got = new Map(), stub = new Set(); const q = roots.slice(); while (q.length) { const n = q.shift(); if (got.has(n) || stub.has(n) || OWN_I[n] || !all.has(n)) continue; if (STUB_I.test(n) && roots.indexOf(n) < 0) { stub.add(n); continue; } const b = fnI(H, n); got.set(n, b); for (const m of b.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g)) q.push(m[1]); } return { real: [...got.keys()], stub: [...stub] }; };
+  const ROOTS_I = ['_ghResp', 'emptyDoc', '_urlCollection', 'b64EncodeUnicode', 'b64DecodeUnicode', 'saveConflictStop', 'saveConflictToast', 'mTime', 'mergeDel', 'findTask',
+    'loadTasks', 'doSaveTasks', 'resolveTasksConflictAndRetry', 'scheduleTasksSave', 'mergeTasks', 'saveTasksCache', 'loadTasksCache', 'conConflictToast',
+    'imSt', 'imBaseSet', 'imBaseLate', 'imBaseDrop', 'imBaseKnown', 'imOut', 'imBaseAdvance', 'imWhole', 'imMerge3', 'imAt', 'imMerge', 'mgWalkKey',
+    'addTask', 'openTaskModal', 'saveTaskModal', 'toggleTaskDone', 'approveTask', 'deleteTask', 'taskNotMine', 'csSaveFields'];
+  const srcI = new Map();
+  const D0 = '2026-11-10', DN = '2026-11-17';
+  const tk = (id, x) => Object.assign({ id, title: id.slice(1), detail: '', who_id: 'u1', who: 'N:u1', scope: [], from: '관리', from_id: 'uB', by: '관리', due: '', status: 'open', done_at: null, done_by: null, created: D0, updated: D0 }, x || {});
+  const seedI = () => [tk('tX'), tk('tY'), tk('tV'), tk('tS', { proc_id: 'c1', pipe: 'main', stage_i: 1 }), tk('tS2', { proc_id: 'c1', pipe: 'main', stage_i: 2 }), tk('tN', { who_id: 'uA', who: 'N:uA', auto_key: 'veh:v1:ins:2026-12-01', from: '자동', by: '자동' })];
+  const closeT = (t) => { t.status = 'done'; t.done_at = DN; t.done_by = 'B'; t.approved_by = 'B'; t.approved_at = DN; };
+  const mkI = (H, opt) => {
+    opt = opt || {};
+    const env = { clock: 1000, timers: [], toasts: [], warns: 0, log: [], seq: [], gen: 0, dom: {}, scope: {}, getFail: 0, holdGet: 0, holdPut: [], held: [], dueOn: false, offline: false, me: 'uA',
+      S: { schema: 1, items: seedI(), updated_at: 1000 } };
+    env.el = (id) => env.dom[id] || (env.dom[id] = { id, value: '', checked: false, textContent: '', innerHTML: '', style: {}, classList: { add() {}, remove() {}, contains() { return false; } }, focus() {}, addEventListener() {} });
+    const procSave = (b) => { if (b.base !== undefined && Number(b.base) !== Number(env.S.updated_at)) { env.seq.push('409'); return { status: 409, body: { error_code: 'STALE_BASE' } }; } env.S = Object.assign({}, cloneI(b.doc), { updated_at: ++env.clock }); env.seq.push('200'); return { status: 200, body: { updated_at: env.clock } }; };
+    const gwCallI = (fn, b) => {
+      if (b.action === 'task_notmine') { const t = env.S.items.find((x) => x.id === b.id); t.who_id = ''; t.who = ''; t.who_by = 'notmine'; t.notmine = 1; t.updated = DN; env.S.updated_at = ++env.clock; return Promise.resolve({ status: 200, body: { status: 'OK', updated_at: env.clock, task: { id: t.id, who_id: '', who: '', who_by: 'notmine', notmine: 1, updated: DN } } }); }
+      if (b.collection !== 'tasks') return Promise.resolve({ status: 200, body: {} });
+      if (b.action === 'get') {
+        let ans; if (env.getFail > 0) { env.getFail--; env.log.push('GET 500'); ans = { status: 500, body: {} }; } else { env.log.push('GET ' + env.S.updated_at); ans = { status: 200, body: { doc: cloneI(env.S) } }; }
+        if (env.holdGet > 0) { env.holdGet--; return new Promise((res) => env.held.push({ k: 'GET', go: () => res(ans) })); }
+        return Promise.resolve(ans);
+      }
+      if (b.action === 'save') {
+        const mode = env.holdPut.shift();
+        if (mode === 'req') return new Promise((res) => env.held.push({ k: 'PUT요청', go: () => res(procSave(b)) }));
+        const ans = procSave(b);
+        if (mode === 'resp') return new Promise((res) => env.held.push({ k: 'PUT응답', go: () => res(ans) }));
+        return Promise.resolve(ans);
+      }
+      return Promise.resolve({ status: 200, body: {} });
+    };
+    let src = srcI.get(H);
+    if (!src) {
+      const cl = closeI(H, ROOTS_I);
+      const apis = (H.match(/\n  var [A-Z_]+_(?:ROOT|PATH|API) = [^\n]*/g) || []).map((s) => s.slice(1)).join('\n');
+      src = ['var window = {}, DATA_OWNER = "o", DATA_REPO = "r", isOffline = false;',
+        'var _colBase = {}, _col409 = {}, _col409t = {}, _COL409_MS = 30000, _colRead403 = {};',
+        apis, varI(H, 'TASKS_CACHE_KEY'),
+        'var tasks = [], tasksSha = null, tasksPending = false, tasksSaveTimer = null, pendingSave = false, contracts = [], autoGenReady = {}, apprPendingCreates = [], editingTaskId = null, selSets = { tasks: {} }, vehDuePass = null;',
+        'var LS = {}; var localStorage = { getItem: function(k){ return Object.prototype.hasOwnProperty.call(LS, k) ? LS[k] : null; }, setItem: function(k, v){ LS[k] = String(v); }, removeItem: function(k){ delete LS[k]; } };',
+        'function gwToast(m){ ENV.toasts.push(String(m)); } function apprToastShow(m){ ENV.toasts.push(String(m)); } function alert(m){ ENV.toasts.push("alert:" + m); } function confirm(){ return true; } function setOffline(s){ ENV.offline = s; isOffline = s; }',
+        'function getToken(){ return "t"; } function ghHeaders(){ return {}; } function clearToken(){} function showTokenScreen(){} function onSessionInvalid(){} function _rawFetch(){ throw new Error("raw"); }',
+        'function isAdmin(){ return true; } function canSee(){ return true; } function canDo(){ return true; } function myId(){ return ENV.me; } function myName(){ return "시험A"; } function getUser(){ return "시험A"; } function todayStr(){ return "' + DN + '"; } function genId(p){ return p + "N" + (++ENV.gen); }',
+        'function memberName(id){ return id ? "N:" + id : ""; } function getCheckedMembers(id){ return (ENV.scope[id] || []).slice(); } function renderMemberChecks(id, arr){ ENV.scope[id] = (arr || []).slice(); } function fillMemberSelect(el, v){ el.value = v || ""; }',
+        'function conDueOn(){ return ENV.dueOn; } function conStageDue(){ return { due: "2026-12-01", src: "계약일" }; }',
+        'var document = { getElementById: function(id){ return ENV.el(id); } };',
+        'var console = { warn: function(){ ENV.warns++; }, log: function(){} };',
+        cl.stub.map((n) => 'function ' + n + '(){}').join('\n'),
+        cl.real.map((n) => fnI(H, n)).join('\n'), wrapI(H), 'var fetch = window.fetch;',
+        'return { ex: function(s){ return eval(s); } };'].join('\n');
+      srcI.set(H, src);
+    }
+    env.api = new Function('ENV', 'gwCall', 'setTimeout', 'clearTimeout', 'btoa', 'atob', 'TextEncoder', 'TextDecoder', src)(env, gwCallI, (fn) => { env.timers.push(fn); return env.timers.length; }, (id) => { if (id) env.timers[id - 1] = null; },
+      (s) => Buffer.from(s, 'binary').toString('base64'), (s) => Buffer.from(s, 'base64').toString('binary'), TextEncoder, TextDecoder);
+    env.ex = (s) => env.api.ex(s);
+    if (opt.cache) env.ex('localStorage.setItem(TASKS_CACHE_KEY, ' + JSON.stringify(JSON.stringify({ sha: 'gw', items: seedI() })) + ')');
+    env.flush = async () => { for (let k = 0; k < 40; k++) await tickI(); };
+    env.fire = async () => { for (let n = 0; n < 60; n++) { const i = env.timers.findIndex((x) => x); if (i < 0) break; const fn = env.timers[i]; env.timers[i] = null; fn(); await env.flush(); } };
+    env.release = async (k) => { const i = env.held.findIndex((h) => h && h.k === k); if (i < 0) throw new Error('붙잡은 것 없음 ' + k); const h = env.held[i]; env.held[i] = null; h.go(); await env.flush(); };
+    env.other = (id, fn) => { const t = env.S.items.find((x) => x.id === id); fn(t); t.updated = DN; env.S.updated_at = ++env.clock; };
+    env.sv = (id) => env.S.items.find((x) => x.id === id) || {};
+    env.loc = (id) => env.ex('findTask(' + JSON.stringify(id) + ')') || {};
+    env.cft = () => env.toasts.filter((s) => s.indexOf('다른 기기도 고친 칸') === 0);
+    env.modal = (id, f) => { env.ex('openTaskModal(' + JSON.stringify(id) + ')'); Object.keys(f).forEach((k) => { env.el(k).value = f[k]; }); env.ex('saveTaskModal()'); };
+    env.load = async () => { env.ex('loadTasks()'); await env.flush(); };
+    return env;
+  };
+  const conI = () => ({ id: 'c1', scen: 1, pipes: [{ key: 'main', cur: 1, stages: [{ name: '계약', status: 'done' }, { name: '착공', status: 'open', task_id: 'tS', due_badge: '기산일 필요' }, { name: '작업', status: 'pending', task_id: 'tS2', due_badge: '기산일 필요' }] }] });
+  const csSaveI = 'var __c = ' + JSON.stringify(conI()) + '; csSaveFields(__c, __c.pipes[0], 0, { querySelectorAll: function(){ return []; } })';
+  const runI = async (H) => {
+    const R = {}, I = {};
+    // ① 문항 1: 옛 화면이 메모만 고쳐 저장 + 다른 기기가 같은 지시를 끝남(같은 날) → 끝남·메모 둘 다 · 알림 0
+    { const E = mkI(H); await E.load(); E.other('tX', closeT); E.modal('tX', { teDetail: '메모A' }); await E.fire();
+      I.r1 = [E.sv('tX').status, E.sv('tX').detail, E.sv('tX').approved_by, E.loc('tX').status, E.seq.join(','), E.cft().length].join('|'); R.r1 = I.r1 === 'done|메모A|B|done|409,200|0'; }
+    // ② 문항 2: 아침에 X 메모 저장(200) → 다른 기기가 X 끝남 → 오후에 Y만 저장 → X 끝남 남음
+    { const E = mkI(H); await E.load(); E.modal('tX', { teDetail: '아침' }); await E.fire(); E.other('tX', closeT); E.modal('tY', { teDetail: '오후' }); await E.fire();
+      I.r2 = [E.sv('tX').status, E.sv('tX').detail, E.sv('tY').detail, E.loc('tX').status, E.seq.join(','), E.cft().length].join('|'); R.r2 = I.r2 === 'done|아침|오후|done|200,409,200|0'; }
+    // ③ 같은 칸(기한)을 양쪽이 다르게 = 이 화면 값 + 알림 한 줄(계약과 같은 글) · 다른 기기만 고친 칸(제목) = 다른 기기 값
+    { const E = mkI(H); await E.load(); E.other('tX', (t) => { t.due = '2026-12-01'; t.title = 'X2'; }); E.modal('tX', { teDue: '2026-12-05' }); await E.fire();
+      I.r3 = [E.sv('tX').due, E.sv('tX').title, E.cft().length, E.cft()[0] || ''].join('|'); R.r3 = I.r3 === '2026-12-05|X2|1|다른 기기도 고친 칸을 이 화면 값으로 저장했습니다 — X2 · 기한'; }
+    // ④ 다른 기기 새 지시 Z·지움 V + 이 화면 새 지시 W·지움 Y → 넷 다 남음(지움은 지움)
+    { const E = mkI(H); await E.load(); E.S.items.push(tk('tZ', { created: DN, updated: DN })); E.S.updated_at = ++E.clock; E.other('tV', (t) => { t.del = 1; t.updated_ts = 1794900000000; });
+      E.el('taskTitle').value = 'W'; E.el('taskWho').value = 'u2'; E.el('taskDue').value = '2026-12-10'; E.ex('addTask()'); E.ex('deleteTask("tY")'); await E.fire();
+      const ids = E.S.items.map((x) => x.id + (x.del === 1 ? '-' : '')).sort().join(',');
+      I.r4 = [ids, (E.S.items.find((x) => x.title === 'W') || {}).due, E.seq.join(','), E.cft().length].join('|'); R.r4 = I.r4 === 'tN,tN1,tS,tS2,tV-,tX,tY-,tZ|2026-12-10|409,200|0'; }
+    // ⑤-가 받은 사본 없음(목록 읽기 실패 → 캐시로 부팅) = 종전 규칙(같은 날 이 화면 통째 · 서버에만 있는 칸은 남김) · ⑤-나 칸 병합 예외 = 그 지시를 되돌린 뒤 종전 규칙
+    { const E = mkI(H, { cache: true }); E.getFail = 1; await E.load(); E.other('tX', closeT); E.modal('tX', { teDetail: '메모' }); await E.fire();
+      I.r5a = [E.sv('tX').status, E.sv('tX').detail, E.sv('tX').approved_by, E.seq.join(','), E.cft().length, E.offline].join('|'); R.r5a = I.r5a === 'open|메모|B|409,200|0|false'; }
+    { const E = mkI(H); await E.load(); E.ex('var __w = mgWalkKey, __n = 0; mgWalkKey = function(){ if (++__n === 12) throw new Error("시험"); return __w.apply(null, arguments); };');
+      E.other('tX', closeT); E.modal('tX', { teDetail: '메모' }); await E.fire();
+      I.r5b = [E.sv('tX').status, E.sv('tX').done_at, E.sv('tX').detail, E.sv('tX').approved_by, E.warns > 0, E.cft().length].join('|'); R.r5b = I.r5b === 'open||메모|B|true|0'; }
+    // ⑥-1 저장보다 먼저 나간 읽기가 저장 200 뒤에 옴(옛 판) → 버림(화면 메모 그대로)
+    { const E = mkI(H); await E.load(); E.modal('tX', { teDetail: 'M1' }); E.holdGet = 1; E.ex('loadTasks()'); await E.flush(); await E.fire(); await E.release('GET');
+      I.r61 = [E.loc('tX').detail, E.sv('tX').detail, E.seq.join(',')].join('|'); R.r61 = I.r61 === 'M1|M1|200'; }
+    // ⑥-2 저장 둘이 겹침: 앞 저장 200이 대기 표시를 푼 뒤, 뒤 저장이 나가 있는 동안 온 읽기(뒤 저장 전 판) → 병합(통째 바꿈이면 뒤 저장의 고침이 화면·서버에서 사라짐)
+    { const E = mkI(H); await E.load(); E.modal('tX', { teDetail: 'M1' }); E.holdPut.push('resp'); await E.fire(); E.modal('tY', { teDetail: 'Y1' }); E.holdPut.push('req'); await E.fire();
+      await E.release('PUT응답'); await E.load(); const midY = E.loc('tY').detail; await E.release('PUT요청'); await E.fire();
+      I.r62 = [midY, E.loc('tY').detail, E.sv('tY').detail, E.sv('tX').detail, E.seq.join(',')].join('|'); R.r62 = I.r62 === 'Y1|Y1|Y1|M1|200,409,200'; }
+    // ⑥-3 저장이 나가 있는 동안 저장 전 판 읽기가 먼저 옴(기준 = 옛 판) → 늦게 온 200의 판이 더 새로우니 기준 = 보낸 목록 → 그 뒤 다른 기기가 메모를 지운 것이 남음
+    { const E = mkI(H); await E.load(); E.modal('tX', { teDetail: 'M1' }); E.holdGet = 1; E.ex('loadTasks()'); await E.flush(); E.holdPut.push('resp'); await E.fire();
+      await E.release('GET'); await E.release('PUT응답'); E.other('tX', (t) => { t.detail = ''; }); E.modal('tY', { teDetail: 'Y1' }); await E.fire();
+      I.r63 = [E.sv('tX').detail, E.loc('tX').detail, E.seq.join(','), E.cft().length].join('|'); R.r63 = I.r63 === '||200,409,200|0';
+      E.ex('imBaseDrop("tasks"); _colBase.tasks = 999999; imBaseLate("tasks", [{ id: "q" }])');
+      R.r63d = E.ex('imBaseKnown("tasks")') === false && E.ex('Object.keys(imSt("tasks").base).length') === 0 && E.ex('imSt("tasks").out') === 0; }
+    // ⑥-4 409 뒤 다시 읽기 실패(500) → 병합·기준 세우기 없이 다시 저장 → 409 → 다시 읽어 칸 단위 병합
+    { const E = mkI(H); await E.load(); E.other('tX', closeT); E.modal('tX', { teDetail: '메모' }); E.getFail = 1; await E.fire();
+      I.r64 = [E.sv('tX').status, E.sv('tX').detail, E.seq.join(','), E.log.filter((l) => l === 'GET 500').length].join('|'); R.r64 = I.r64 === 'done|메모|409,409,200|1'; }
+    // ⑦-가 기한 엔진 켬 · 다른 기기가 결재로 닫은 단계 지시(tS) · 옛 화면 [입력 저장](실제 csSaveFields — 기산일 필요 단계 지시에 기한) → tS 끝남 남음 + 기한 · 열린 tS2 기한
+    { const E = mkI(H); await E.load(); E.dueOn = true; E.other('tS', closeT); E.ex(csSaveI); await E.fire();
+      I.r7a = [E.sv('tS').status, E.sv('tS').due, E.sv('tS2').due, E.seq.join(',')].join('|'); R.r7a = I.r7a === 'done|2026-12-01|2026-12-01|409,200'; }
+    // ⑦-나 캐시 부팅 화면(받은 사본 없음)은 자동 기한 쓰기를 건너뜀(저장 0 · tS 끝남 남음) → 지시를 받은 뒤 [입력 저장]은 열린 tS2에 기한(정상 흐름)
+    { const E = mkI(H, { cache: true }); E.getFail = 1; await E.load(); E.dueOn = true; E.other('tS', closeT); E.ex(csSaveI); await E.fire();
+      const a = [E.sv('tS').status, E.sv('tS').due, E.sv('tS2').due, E.seq.join(',') || '-'].join('|'); await E.load(); E.ex(csSaveI); await E.fire();
+      I.r7b = a + '/' + [E.sv('tS').status, E.sv('tS').due, E.sv('tS2').due, E.seq.join(',')].join('|'); R.r7b = I.r7b === 'done|||-/done||2026-12-01|200'; }
+    // ⑧ 혼자 쓰는 화면: 추가 → 수정(메모) → 완료 요청 → 승인 → 되엶 → 지움 — 저장마다 200 한 번 · 알림 0 · 저장 본문(그 지시)은 종전 병합 사본(결함 사본 0)과 같음
+    { const E = mkI(H); await E.load(); const steps = [], snap = () => JSON.stringify(E.S.items.filter((x) => x.title === 'W'));
+      E.el('taskTitle').value = 'W'; E.el('taskWho').value = 'u2'; E.el('taskDue').value = '2026-12-10'; E.ex('addTask()'); await E.fire(); steps.push(snap());
+      const wid = JSON.stringify(E.ex('tasks.filter(function(t){ return t.title === "W"; })[0].id'));
+      E.modal(JSON.parse(wid), { teDetail: 'D' }); await E.fire(); steps.push(snap());
+      for (const f of ['toggleTaskDone', 'approveTask', 'toggleTaskDone', 'deleteTask']) { E.ex(f + '(' + wid + ')'); await E.fire(); steps.push(snap()); }
+      const st = steps.map((s) => { const w = JSON.parse(s)[0] || {}; return (w.status || '?') + (w.del === 1 ? '-' : '') + (w.detail ? ':' + w.detail : ''); }).join(',');
+      I.r8 = [st, E.seq.join(','), E.cft().length, E.S.items.length].join('|'); I.snap8 = steps; R.r8 = I.r8 === 'open,open:D,review:D,done:D,open:D,open-:D|200,200,200,200,200,200|0|7'; }
+    // ⑨ 서버 동작 '내 것 아님'(담당 비움) 뒤 관리자가 다른 기기에서 다시 배정 → 옛 화면이 다른 지시 저장 → 새 배정 남음 · 알림 0
+    { const E = mkI(H); await E.load(); E.ex('taskNotMine("tN")'); await E.flush(); E.other('tN', (t) => { t.who_id = 'u2'; t.who = 'N:u2'; t.who_by = 'edit'; }); E.modal('tY', { teDetail: 'Y1' }); await E.fire();
+      I.r9 = [E.sv('tN').who_id, E.sv('tN').who_by, E.loc('tN').who_id, E.cft().length, E.seq.join(',')].join('|'); R.r9 = I.r9 === 'u2|edit|u2|0|409,200'; }
+    return { R, I, ok: Object.keys(R).every((k) => R[k]) };
+  };
+  const onceI = (src, a, b) => { const n = src.split(a).length - 1; if (n !== 1) throw new Error('변이 자리 ' + n + '곳: ' + a.slice(0, 60)); return src.replace(a, () => b); };
+  // 종전(v494) mergeTasks — 결함 사본 0(수리 전 병합)
+  const OLD_MT = ['  function mergeTasks(local, remote){', '    var byId = {};', '    (local || []).forEach(function(t){ if (t && t.id) byId[t.id] = t; });',
+    '    (remote || []).forEach(function(r){', '      if (!r || !r.id) return;', '      var cur = byId[r.id];', '      if (!cur){ byId[r.id] = r; } else {',
+    '        var winner = (r.updated || "") > (cur.updated || "") ? r : cur;', '        var loser = winner === r ? cur : r;', '        var merged = Object.assign({}, loser, winner);',
+    '        if (cur.del === 1 || r.del === 1) merged.del = mergeDel(cur, r);', '        byId[r.id] = merged;', '      }', '    });',
+    '    var out = []; Object.keys(byId).forEach(function(id){ out.push(byId[id]); });',
+    '    out.sort(function(a, b){ var ac = a.created || "", bc = b.created || ""; if (ac !== bc) return ac < bc ? -1 : 1; return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0); });', '    return out;', '  }'].join('\n');
+  const RI = await runI(html);
+  // 결함 사본: [이름, 바꿀 글, 바꾼 글, 반드시 ✗가 될 검사]
+  const KI = [
+    ['종전 병합(수리 전)', null, null, ['r1', 'r2', 'r3', 'r7a']],
+    ['칸 고르기가 늘 이 화면', 'if (mgEq(t, o)) return null; if (mgEq(t, bb)) return { v: o }; if (!mgEq(o, bb)) cf.push(path); return null; };', 'if (mgEq(t, o)) return null; if (!mgEq(o, bb)) cf.push(path); return null; };', ['r1', 'r2']],
+    ['읽기 200에서 기준 안 세움', '        if (imS) imBaseSet("tasks", remoteItems);', '', ['r1', 'r3']],
+    ['저장 200에서 기준 안 세움', 'if (!json.write_denied && typeof imBaseSet === "function"){', 'if (false){', ['r63']],
+    ['나가 있는 저장 수 안 봄', 'tasks = (tasksPending || pendingSave || (imS && imS.out > 0)) ?', 'tasks = (tasksPending || pendingSave) ?', ['r62']],
+    ['옛 판 읽기를 들임', '        if (imS && imS.has && imS.at && rAt && rAt < imS.at) return;', '', ['r61']],
+    ['늦게 온 200 기준 안 세움', 'if (imSt("tasks").gen === imG) imBaseSet("tasks", sent); else imBaseLate("tasks", sent);', 'if (imSt("tasks").gen === imG) imBaseSet("tasks", sent);', ['r63']],
+    ['같은 칸 알림 없음', '    if (cfOut.length && typeof conConflictToast === "function") conConflictToast(cfOut);', '', ['r3']],
+    ['기준 없음 = 이 화면 통째', '      if (!m) m = imWhole(cur, r);', '      if (!m) m = cur;', ['r5a']],
+    ['예외 뒤 되돌리지 않음', '      for (var k0 in l){ if (Object.prototype.hasOwnProperty.call(l, k0)) delete l[k0]; } Object.assign(l, JSON.parse(keep));', '', ['r5b']],
+    ['서버에만 있는 항목 버림', '      if (!cur){ byId[r.id] = r; return; }', '      if (!cur) return;', ['r4']],
+    ['캐시 부팅 화면도 자동 기한', 'if (conDueOn() && !(typeof imBaseKnown === "function" && !imBaseKnown("tasks"))){', 'if (conDueOn()){', ['r7b']],
+    ['다시 읽기 실패를 빈 목록으로', '      if (!resp.ok) return { gwReadFail: 1 };', '      if (!resp.ok) return { sha: "gw", content: b64EncodeUnicode(JSON.stringify({ items: [] })) };', ['r64']],
+    ['기준 비운 뒤에도 늦은 200', 'if (!st.has || !at || at <= st.at) return;', 'if (!at || at <= st.at) return;', ['r63d']],
+    ['내 것 아님 뒤 기준 전진 없음', '      if (typeof imBaseAdvance === "function") imBaseAdvance("tasks", t.id,', '      if (false) imBaseAdvance("tasks", t.id,', ['r9']]];
+  const KIr = [];
+  let snapSame = false;
+  for (const [nm, a, b, want] of KI) {
+    let r;
+    try { const H = a === null ? onceI(html, fnI(html, 'mergeTasks'), OLD_MT) : onceI(html, a, b); r = await runI(H); if (a === null) snapSame = JSON.stringify(r.I.snap8) === JSON.stringify(RI.I.snap8) && r.R.r8 === true; }
+    catch (e) { r = { R: {}, threw: e.message }; }
+    KIr.push({ nm, ok: want.every((k) => r.R[k] === false), got: want.map((k) => k + ':' + r.R[k]).join(' '), threw: r.threw });
+  }
+  T('P1 판24i 지시 병합 칸 단위(실행 — 실제 공통 길 window.fetch·낙관락 가짜 서버·실제 읽기·저장·병합·지시 처리·csSaveFields): ① 옛 화면 메모 저장 + 다른 기기 끝남 = 끝남·메모 둘 다 · ② 아침에 고친 X·다른 기기 X 끝남·오후 Y 저장 = X 끝남 · ③ 같은 칸 = 이 화면 값 + "다른 기기도 고친 칸을 이 화면 값으로 저장했습니다 — 이름 · 기한" 1 · 다른 기기만 고친 칸 = 다른 기기 · ④ 새 지시·지움 양쪽 남음 · ⑤ 캐시 부팅(받은 사본 없음)·병합 예외 = 종전 규칙(예외는 되돌린 뒤) · ⑥ 옛 판 읽기 버림·나가 있는 저장 중 읽기 = 병합·늦은 200 기준·다시 읽기 실패 = 기준 그대로·기준 비운 뒤 늦은 200 무시 · ⑦ csSaveFields 기한 = 닫힌 지시 끝남 남음 + 기한 · 캐시 부팅 화면은 자동 기한 건너뜀 → 받은 뒤 채움 · ⑧ 혼자 쓰는 화면 추가·수정·완료 요청·승인·되엶·지움 저장 6번 200·본문 = 종전 병합 사본과 같음 · ⑨ 내 것 아님 뒤 새 배정 남음 · 결함 사본 ' + KI.length + '개 = 각자 맡은 검사 ✗',
+    RI.ok && snapSame && KIr.every((x) => x.ok), JSON.stringify({ R: RI.R, I: Object.assign({}, RI.I, { snap8: undefined }), snapSame, bad: KIr.filter((x) => !x.ok) }));
+} catch (e) { console.log('  (P1 판24i 검사 생략 — ' + e.message + ')'); fails++; }
+
 // ── v489(판24f — 계약 저장 충돌 병합을 칸 단위로 · 원장 C196): 실행 검사는 위 'P1 판24f' 블록 · 여기는 문서·판 번호 정확 검사 + 칸 단위 병합을 부르는 줄·기준 사본을 세우는 줄 등 고정 글 12줄이 그대로 한 번씩 있는지 — 다음 판은 기준 줄·sw를 '489 이상'으로 풀 것
 try {
   const rd489 = (p) => readFileSync(join(ROOT, p), 'utf8');
