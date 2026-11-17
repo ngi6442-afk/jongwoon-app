@@ -30015,6 +30015,7 @@ function dutyStage(nx){
   }
   var AB_MAN_WAIT = "그날 입력분을 불러오는 중입니다 — 잠시 뒤 다시 눌러 주세요(불러오기 전에 누른 것은 저장하지 않습니다).";
   var AB_MAN_CONFLICT = "다른 기기(또는 앞서 응답을 못 받은 이 화면의 저장)가 그날 직접 추가분을 먼저 저장해 다시 읽었습니다 — 방금 누른 것은 반영되지 않았습니다. 회수·수량을 확인하고 다시 눌러 주세요.";
+  var AB_MAN_REREAD_FAIL = "다른 기기(또는 앞서 응답을 못 받은 이 화면의 저장)가 그날 직접 추가분을 먼저 저장했는데, 다시 읽지 못했습니다 — 방금 누른 것은 반영되지 않았고 화면의 회수가 서버와 다를 수 있습니다. [새로고침]을 눌러 확인한 뒤 다시 눌러 주세요.";
   // 판24h: 그날 입력분을 읽기 전(읽는 중 포함)이면 카드 고침을 받지 않고 안내(내 할 일·견적·단골 노선과 같은 방식) — 돌려줌 = 막았으면 true
   function abManWait(){ if (abManual.loaded) return false; if (!abManual.err) abManual.err = AB_MAN_WAIT; abSetSaveState(); return true; }
   function loadAbManual(day){
@@ -30029,12 +30030,12 @@ function dutyStage(nx){
       } else if (res.status === 404){
         abSetManual(day, []);
       } else {
-        abManual.err = abErrText(res, "직접 추가분을 불러오지 못했습니다");
+        abManual.err = abManual.reread ? AB_MAN_REREAD_FAIL : abErrText(res, "직접 추가분을 불러오지 못했습니다");   // 판24h 검토 3차: 409 뒤 다시 읽기마저 실패하면 '방금 누른 것은 반영되지 않았습니다'가 사라지지 않게
       }
       renderAbManual(true);
     }).catch(function(){
       if (abManual.day !== day) return;
-      abManual.err = "직접 추가분을 불러오지 못했습니다(네트워크).";
+      abManual.err = abManual.reread ? AB_MAN_REREAD_FAIL : "직접 추가분을 불러오지 못했습니다(네트워크).";
       renderAbManual(true);
     });
   }
