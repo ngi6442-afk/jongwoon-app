@@ -1481,3 +1481,11 @@
 - [x] (AI) `uismoke` 'P1 판24f'(실제 병합·저장·읽기·결재 동기화 접목 함수 + 가짜 통신·시계 · 결함 사본은 그 검사 이름에 · 줄 지움·단계 구조가 바뀌는 꼴은 화면에 조작이 없어 이 검사로만) · 판24c·판24d·판24e 검사 그대로 · 'P1 판24 앱 스크립트 전체 문법' — ✓ AI 11/17
 - [x] (AI) `servertest` 전 항목(서버 코드 무변) · v488 문서 검사를 이 판 이상으로 풀고 v489 문서·판 번호 정확 검사 — ✓ AI 11/17
 - [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · 원본 읽기 검사 4종(stmtread a·b·c·d) 전부 통과 + node --check(함수·_lib·sw) + 앱 스크립트 전체 파싱 오류 0 + 시험 서버에서 앱 뜸 — 숫자는 커밋 메시지
+
+## v490 — 체크 29 월말명세서 판⑦: 메일 에이전트 — 회사 메일함(읽기 전용)에서 거래처 첨부를 월 목록 첨부로(새 예약 함수 · 계정 넣기 전엔 꺼짐)
+- [ ] (PM) 계산서·명세서가 들어오는 회사 메일에서 IMAP 사용 켜기 + 앱 비밀번호 받기 → Netlify 환경변수 `STMT_MAIL_USER`(메일 주소)·`STMT_MAIL_PASS`(앱 비밀번호)에 직접 넣기(다음 메일이 아니면 `STMT_MAIL_HOST`도)
+- [ ] (AI 운영 확인) 계정이 들어간 뒤 관리자 [지금 받기] 1회 → 월 목록 📧 줄이 실패 없이 '마지막 …'으로 바뀌는지 · 메일함 읽음 표시가 그대로인지 · appdata cron_map `gw-stmtmail-cron` watch true로
+- [ ] (권민지) 12월 초 11월 목록에서 메일로 들어온 원본(📧 표시)을 확인 · '거래처를 골라 주세요' 줄은 거래처를 고르기(다음 메일부터 그 보낸 사람은 자동)
+- [x] (AI) `stmtmail_check` 29(귀속 월·첨부 파트·한 번 돌기·멱등·지운 원본 안 돌아옴·시간 모자람·보낸 사람 기억·오류 이름·묶음·읽기 전용) · 실제 imapflow로 닫힌 포트·없는 주소 연결 → MAIL_CONNECT_FAILED·MAIL_HOST_NOT_FOUND — ✓ AI 11/17
+- [x] (AI) `servertest` 90 결함 사본 줄 맞춤 · `uismoke` 판⑤ 동작 순서에서 메일 상태 호출 걸러냄 · v399 감시 목록에 rnote · v489 문서 검사를 이 판 이상으로 풀고 v490 문서·판 번호 정확 검사 — ✓ AI 11/17
+- [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` 통과 — ✓ AI 11/17

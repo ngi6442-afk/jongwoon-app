@@ -1,6 +1,6 @@
 # 종운 그룹웨어 — 기능 대장 (사용자 매뉴얼 원천)
 
-> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v489 (2026-11-17).
+> 살아있는 문서. 기능 추가·변경 시 이 파일을 함께 갱신한다. 기준: v490 (2026-11-17).
 > 세부 변경 이력은 git 커밋 메시지(한글) 참조.
 
 ## 1. 전체 구조
@@ -742,6 +742,20 @@ PM 지시 "문서함 일단 다 올리고 등재결재랑 공개범위 만들어
 - 게이트 `tools/promo_post_check.mjs`(신설): index의 `// @promo-post-start ~ end`를 떼어 node에서 돌림 — 프로필 없음/ok/문턱 아래 3경로 + 낱말 보존. servertest 48(v394) 6항(layoutGap·pl_layout·copy_save).
 - 남은 실험 1: `<hr>`을 네이버 에디터가 붙여넣기에서 구분선 모듈로 받는지(권민지 임시저장 글 1회). 안 받으면 PROMO_HR를 빈 줄로 바꾼다.
 - sw v394.
+
+### v490 (11/17) — 체크 29 월말명세서 판⑦: 메일 에이전트 — 회사 메일함에서 거래처 첨부를 월 목록 첨부로 (PM 11/17 'A안 ㄱ' · 브리핑 09_조사_문서/29_명세표정리_자료_20261110/메일에이전트_브리핑_20261117.md)
+
+- 하는 일: 매일 KST 07:00 `gw-stmtmail-cron` → `gw-stmtmail-run-background`(15분 · 잠금 `stmt:mail:lock` 14분)가 회사 메일함을 IMAP **읽기 전용**(`mailboxOpen readOnly` = EXAMINE · BODY.PEEK)으로 열어 첨부(pdf·xls·xlsx·html·htm·xml·jpg·png)를 판⑥ 첨부 목록(`stmtdrop:<ym>:<id>` · `stmtfile:<id>`)에 넣는다. 메일 보내기·지우기·표시 바꾸기 없음 · 본문 안 받음.
+- 계정: 환경변수 `STMT_MAIL_USER`·`STMT_MAIL_PASS`(앱 비밀번호 — PM이 Netlify에 직접) · `STMT_MAIL_HOST`(기본 imap.daum.net)·`STMT_MAIL_PORT`(993). 없으면 워커가 `MAIL_NOT_SET`만 남김.
+- 귀속 월 `ymOf`: KST 20일부터 그 달, 19일까지 앞달. 볼 기간 = 2026-11-20(`START_DAY` — 10월분은 손으로 이미 넣음)과 40일 전 중 늦은 쪽.
+- 거래처 찾기: ① `guessVendor`(파일 이름·글자 내용 — 보안 계산서는 대행 주소가 여러 거래처 것을 보내므로 내용이 먼저) ② 사람이 한 번 고른 보낸 사람(주소 해시 `senderHash` → `stmt:mail:senders`, 다른 거래처로 고른 적 있으면 '여럿' = 안 씀) ③ 보낸 이 표시 이름·제목에 거래처 이름 ④ 못 찾았어도 명세·계산서로 보이면(`looksStmt`) 거래처 고르기 ⑤ 그 밖은 저장 안 함.
+- 판독: 글자 파일은 바로, 그림·스캔은 워커가 AI로 바로(10분까지) · 넘으면 판⑥ 배경 판독 맡김(맡긴 이 `__stmtmail__` — `gw-stmt-read-background`가 수행 권한이면 부르게). 처리한 첨부는 `stmt:mail:seen`(메시지 id 해시+파트) — 사람이 지운 원본이 다시 안 들어옴 · 같은 달 같은 파일(sha)은 건너뜀.
+- 저장하지 않는 것: 메일 주소·보낸 이 이름·제목·본문. 목록 줄 `mail{at, dom}`(받은 시각·보낸 쪽 도메인)만.
+- 서버 `gw-stmt`: `stmt_mail_status`(보기 — 계정 있음 여부·마지막 요약 `stmt:mail:last`·기억한 보낸 사람 수) · `stmt_mail_run`(관리자 — [지금 받기]) · `stmt_drop_set`이 메일 원본이면 `learnSender`. 수동 킥 `gw-cron-kick` target `stmtmail`.
+- 앱: 월 목록 첨부 칸 맨 위 📧 상태 한 줄(꺼짐·실패 까닭·마지막 시각·새 원본·고르기 수·2일 넘게 안 돎) · 관리자 [지금 받기] · 메일로 온 줄에 '📧 메일 받은 시각(도메인)'. `ALERT_WATCH_IDS`에 `rnote`(appdata cron_map watch와 맞춤 — 11/15 편입분).
+- 의존성: `imapflow` 2.10.0 정확 고정(Postal Systems OÜ · 하위 24개 원산지 11/17 확인 — 중국계 없음) · `_lib/stmtimap.js`만 부름 · netlify.toml 워커 `external_node_modules`.
+- appdata `data/cron_map.json` `gw-stmtmail-cron`(stamp · watch false — 계정이 들어가고 첫 실행이 ok면 true).
+- 검사: `stmtmail_check` 29(가짜 메일함·저장소) · servertest·uismoke 기대값.
 
 ### v489 (11/17) — 판24f: 계약 저장이 겹칠 때 계약 한 건을 통째로 고르던 것을 칸 단위로 — 다른 기기가 고친 계약명·서류 체크·작업현황 줄·첨부가 옛 화면의 저장에 되돌아가던 것 (원장 C196 ③ · PM 11/17 착수)
 

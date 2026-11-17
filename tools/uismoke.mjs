@@ -17199,11 +17199,11 @@ try {
     const FT = ["`conBase`", "`conMerge3`", "`conSyncKeep`", "`conBaseAdvance`", "`conConflictToast`", "원장 C196"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = "<p>(2026-11 v489) (계약) 두 화면에서 같은 계약을 고쳐 저장이 겹쳐도, 이 화면에서 고친 칸";
-    const ok = /기준: v489 \(2026-11-17\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 11 && gate.length === 3 && scr.length === 8 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 489 /* v490: 기준 줄·sw = 이 판 이상 */ && ftv.length > 0 && mF.length === 0 && cb.length === 11 && gate.length === 3 && scr.length === 8 && !cb.some((l) => /\(PM/.test(l))
       && d.man.indexOf(MAN) > 0 && !/conBase|conMerge|conSync|mgWalk|csVal|csSync|csAppr|mergeContracts|data-cs|409/.test(cut(d.man, MAN, '\n'))
       && d.cl.indexOf('**P1 판24f(v489') > 0
       && FIX489.every((x) => d.ix.split(x).length === 2)
-      && /SHELL_CACHE = 'jw-shell-v489'/.test(d.sw);
+      && Number((d.sw.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 489;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX489.map((x) => d.ix.split(x).length - 1) } };
   };
   const r489 = chk489(D489);
@@ -17216,6 +17216,37 @@ try {
   T('v489 문서·판 번호(정확 검사): FEATURES 기준 v489 (2026-11-17)·v489 절(판24f) · TESTLIST v489 칸 11(화면 확인 8 · 게이트 [x] 3) · MANUAL 계약 저장 겹침 글(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 12줄 · sw jw-shell-v489 · 결함 사본 ' + M489.length + '개 = 모두 ✗',
     r489.ok && M489.every((v) => v === false), JSON.stringify({ r: r489.info, mut: M489 }));
 } catch (e) { console.log('  (v489 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v490(29 판⑦ 메일 에이전트 — PM 11/17 'A안 ㄱ'): 실행 검사는 tools/stmtmail_check.mjs · 여기는 문서·판 번호 정확 검사 + 앱 상태 줄·[지금 받기] 고정 글 — 다음 판은 기준 줄·sw를 '490 이상'으로 풀 것
+try {
+  const rd490 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D490 = { ft: rd490('FEATURES.md'), tl: rd490('TESTLIST.md'), sw: rd490('sw.js'), man: rd490('MANUAL.html'), cl: rd490('CLAUDE.md'), ix: rd490('index.html') };
+  const FIX490 = ['h += \'<div class="card st-files" id="stmtDropList">\' + stmtMailLine();', 'gwCall("gw-stmt", { action: "stmt_mail_status" })', 'gwCall("gw-stmt", { action: "stmt_mail_run" })', 'else if (act === "mailrun") stmtMailRun();', "(x.mail ? ' · 📧 메일 ' + esc(stmtMailWhen(x.mail.at))"];
+  const chk490 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v490 (11/17)', '\n### '), tlv = cut(d.tl, '\n## v490 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
+    const FT = ['`gw-stmtmail-cron`', '`gw-stmtmail-run-background`', '`STMT_MAIL_USER`', '`ymOf`', '`senderHash`', '`looksStmt`', '`stmt_mail_status`', '`stmt_mail_run`', '`learnSender`', '`imapflow` 2.10.0', '`stmtmail_check`'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = '<li><b>메일로 원본 자동 받기</b> (2026-11 v490)';
+    const ok = /기준: v490 \(2026-11-17\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 3 && cb.filter((l) => /^- \[ \] \(PM\)/.test(l)).length === 1
+      && /`stmtmail_check` 통과/.test(tlv)
+      && d.man.indexOf(MAN) > 0 && !/stmt_|imap|STMT_|__stmtmail__/i.test(cut(d.man, MAN, '</li>'))
+      && d.cl.indexOf('**월말명세서 메일 에이전트(v490') > 0
+      && FIX490.every((x) => d.ix.split(x).length === 2)
+      && /SHELL_CACHE = 'jw-shell-v490'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, fix: FIX490.map((x) => d.ix.split(x).length - 1) } };
+  };
+  const r490 = chk490(D490);
+  const mu490 = (k, f) => chk490(Object.assign({}, D490, { [k]: f(D490[k]) })).ok;
+  const M490 = [mu490('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v489 (')), mu490('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v489'")),
+    mu490('ft', (s) => s.split('`learnSender`').join('learnSender')), mu490('man', (s) => s.replace('(2026-11 v490) — 회사', '— 회사')),
+    mu490('cl', (s) => s.replace('**월말명세서 메일 에이전트(v490', '월말명세서 메일 에이전트(')),
+    mu490('tl', (s) => s.replace('`stmtmail_check` 통과', 'stmtmail_check 통과'))]
+    .concat(FIX490.map((x) => mu490('ix', (s) => s.replace(x, ''))));
+  T('v490 문서·판 번호(정확 검사): FEATURES 기준 v490 (2026-11-17)·v490 절(메일 에이전트) · TESTLIST v490 칸 6(PM 1 · 게이트 [x] 3 · stmtmail_check) · MANUAL 메일 자동 받기(내부 이름 0) · CLAUDE.md 한 줄 · 앱 고정 글 5줄 · sw jw-shell-v490 · 결함 사본 ' + M490.length + '개 = 모두 ✗',
+    r490.ok && M490.every((v) => v === false), JSON.stringify({ r: r490.info, mut: M490 }));
+} catch (e) { console.log('  (v490 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
