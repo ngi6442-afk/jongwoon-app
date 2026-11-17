@@ -1503,3 +1503,8 @@
 - [x] (AI) `uismoke` 'P1 판24g'(실제 읽기 공통 길 + 충돌 판정을 하는 가짜 서버 + 실제 저장·병합·결재 동기화 함수 · 전수 표의 길을 하나씩 · 결함 사본은 그 검사 이름에) · 판24c~판24f 검사 그대로(판24f 기대값·꼴 바꾼 것은 FEATURES) · 'P1 판24 앱 스크립트 전체 문법' — ✓ AI 11/17
 - [x] (AI) `servertest` 전 항목(서버 코드 무변) · v491 문서 검사를 이 판 이상으로 풀고 v492 문서·판 번호 정확 검사 — ✓ AI 11/17
 - [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · 원본 읽기 검사 4종(stmtread a·b·c·d) 전부 통과 + node --check(함수·_lib·sw) + 앱 스크립트 전체 파싱 오류 0 + 시험 서버에서 앱 뜸 — 숫자는 커밋 메시지
+
+## v493 — 월말명세서 메일 받기를 멈춤 경보 대상으로(감시 목록 한 낱말 · appdata watch true)
+- [ ] (AI 운영 확인 — v493) 11/18 07:00 예약 실행 뒤 `stmt:mail:last` ok · 도장 `it:cron:gw-stmtmail-cron:last` 갱신 · 감시 경보 카드에 이 예약 경보 없음
+- [x] (AI) `uismoke` v399 감시 id 목록 = cron_map watch(appdata 같은 때 갱신) · v492 문서 검사를 이 판 이상으로 풀고 v493 문서·판 번호 정확 검사 — ✓ AI 11/17
+- [x] (AI) `servertest` 등 게이트 전부 통과 + node --check(sw) + 앱 스크립트 전체 파싱 오류 0 — 숫자는 커밋 메시지

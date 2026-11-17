@@ -17691,10 +17691,10 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ["`gwPeek`", "`conSaveOut`", "`conBaseAt`", "`CON_STG_SIDE`", "`conCfKept`", "원장 C201"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v492 \(2026-11-17\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 3 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 492 /* v493: 기준 줄·sw = 이 판 이상 */ && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 3 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
       && d.cl.indexOf('**P1 판24g(v492') > 0
       && FIX492.every((x) => d.ix.split(x).length === 2)
-      && /SHELL_CACHE = 'jw-shell-v492'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 492;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX492.map((x) => d.ix.split(x).length - 1) } };
   };
   const r492 = chk492(D492);
@@ -17707,6 +17707,34 @@ try {
   T('v492 문서·판 번호(정확 검사): FEATURES 기준 v492 (2026-11-17)·v492 절(판24g) · TESTLIST v492 칸 6(화면 확인 3 · 게이트 [x] 3) · CLAUDE.md 한 줄 · 고정 글 25줄 · sw jw-shell-v492 · 결함 사본 ' + M492.length + '개 = 모두 ✗',
     r492.ok && M492.every((v) => v === false), JSON.stringify({ r: r492.info, mut: M492 }));
 } catch (e) { console.log('  (v492 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v493(29 판⑦ 뒤 — 원장 C203): 월말명세서 메일 받기 감시 켬. 감시 id 목록 대조는 위 v399 · 여기는 문서·판 번호 정확 검사 + 감시 목록 한 낱말 — 다음 판은 기준 줄·sw를 '493 이상'으로 풀 것
+try {
+  const rd493 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D493 = { ft: rd493('FEATURES.md'), tl: rd493('TESTLIST.md'), sw: rd493('sw.js'), cl: rd493('CLAUDE.md'), ix: rd493('index.html') };
+  const chk493 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v493 (11/17)', '\n### '), tlv = cut(d.tl, '\n## v493 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
+    const FT = ['`ALERT_WATCH_IDS`', '`gw-stmtmail-cron`', '`SECRETS_SCAN_OMIT_KEYS=STMT_MAIL_USER`', '원장 C203'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ids = (d.ix.match(/var ALERT_WATCH_IDS = \[([^\]]*)\]/) || [0, ''])[1];
+    const ok = /기준: v493 \(2026-11-17\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**v493**: 멈춤 감시 켬') > 0
+      && ids.split('"gw-stmtmail-cron"').length === 2
+      && /SHELL_CACHE = 'jw-shell-v493'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, ids: ids.split(',').length } };
+  };
+  const r493 = chk493(D493);
+  const mu493 = (k, f) => chk493(Object.assign({}, D493, { [k]: f(D493[k]) })).ok;
+  const M493 = [mu493('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v492 (')), mu493('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v492'")),
+    mu493('ft', (s) => s.split('`SECRETS_SCAN_OMIT_KEYS=STMT_MAIL_USER`').join('SECRETS_SCAN_OMIT_KEYS')),
+    mu493('cl', (s) => s.replace('**v493**: 멈춤 감시 켬', 'v493: 감시')),
+    mu493('ix', (s) => s.replace(',"gw-stmtmail-cron"]', ']')),
+    mu493('tl', (s) => s.replace('\n- [x] (AI) `uismoke` v399', '\n- (AI) `uismoke` v399'))];
+  T('v493 문서·판 번호(정확 검사): FEATURES 기준 v493 (2026-11-17)·v493 절 · TESTLIST v493 칸 3(운영 확인 1 · 게이트 [x] 2) · CLAUDE.md 한 줄 · 감시 목록 gw-stmtmail-cron 한 번 · sw jw-shell-v493 · 결함 사본 ' + M493.length + '개 = 모두 ✗',
+    r493.ok && M493.every((v) => v === false), JSON.stringify({ r: r493.info, mut: M493 }));
+} catch (e) { console.log('  (v493 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
