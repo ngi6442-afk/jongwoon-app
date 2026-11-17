@@ -17661,12 +17661,12 @@ try {
     const FT = ['`chem`', '`chem_edu`', '`QUAL_KEYS`', '`src`', '`eduScopeLine`'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = '<p><b>유해화학물질관리자 교육</b> (2026-11 v491)';
-    const ok = /기준: v491 \(2026-11-17\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && cb.filter((l) => /^- \[ \] \(PM\)/.test(l)).length === 1
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 491 && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && cb.filter((l) => /^- \[ \] \(PM\)/.test(l)).length === 1
       && d.man.indexOf(MAN) > 0 && !/chem|quals|QUAL_|meQ_/.test(cut(d.man, MAN, '</p>'))
       && d.cl.indexOf('**유해화학물질관리자 대상 표시(v491') > 0
       && FIX491.every((x) => d.ix.split(x).length === 2)
       && /const QUAL_KEYS = \['drv', 'cm', 'wst', 'env', 'tech', 'elec', 'chem'\];/.test(d.au)
-      && /SHELL_CACHE = 'jw-shell-v491'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 491;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, fix: FIX491.map((x) => d.ix.split(x).length - 1) } };
   };
   const r491 = chk491(D491);
@@ -17679,6 +17679,34 @@ try {
   T('v491 문서·판 번호(정확 검사): FEATURES 기준 v491 (2026-11-17)·v491 절 · TESTLIST v491 칸 4(PM 1 · 게이트 [x] 2) · MANUAL 유해화학물질관리자 교육 글(내부 이름 0) · CLAUDE.md 한 줄 · 앱 고정 글 3줄 · 서버 허용 키 · sw jw-shell-v491 · 결함 사본 ' + M491.length + '개 = 모두 ✗',
     r491.ok && M491.every((v) => v === false), JSON.stringify({ r: r491.info, mut: M491 }));
 } catch (e) { console.log('  (v491 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v492(판24g — 계약 저장 덮임길 전수 수리 · 원장 C201): 실행 검사는 위 'P1 판24g' 블록 · 여기는 문서·판 번호 정확 검사 + 고정 글 25줄(읽기 공통 길의 기준 시각 줄·결재 동기화 읽기 표시·저장과 겹친 동기화 사본 버림 등)이 그대로 한 번씩 있는지 — 다음 판은 기준 줄·sw를 '492 이상'으로 풀 것
+try {
+  const rd492 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D492 = { ft: rd492('FEATURES.md'), tl: rd492('TESTLIST.md'), sw: rd492('sw.js'), cl: rd492('CLAUDE.md'), ix: rd492('index.html') };
+  const FIX492 = ["if (!opts.gwPeek) _colBase[col] = doc.updated_at || 0;", "if (col === \"contracts\" && _colBase[col] === undefined) saveBase = 0;", "fetch(CONTRACT_API, { headers: ghHeaders(), gwPeek: 1 })", "if(r.status!==404&&!r.ok) return { gwReadFail: 1 };", "if(j&&j.gwReadFail){ scheduleContractSave(); return; }", "if (typeof conSaveOut !== \"undefined\") conSaveOut++;", "if (sc && typeof conSaveOut !== \"undefined\" && conSaveOut > 0){ sc = null; csApprSyncAt[id] = 0; }", "if (sc && typeof conSaveOut !== \"undefined\" && conSaveOut > 0) sc = null;", "else if (resp.ok && typeof conBaseLate === \"function\") conBaseLate(body);", "if (scGot && !sc) return null;", "if (!at || at <= conBaseAt) return;", "conBaseAt = (typeof _colBase !== \"undefined\" && _colBase && Number(_colBase.contracts)) || 0;", "if (typeof _colBase !== \"undefined\") delete _colBase.contracts;", "if (typeof conSaveOut !== \"undefined\") conSaveOut = 0;", "      if (typeof conSaveOut !== \"undefined\" && conSaveOut > 0) conSaveOut--;\n      if(resp.status===401) return;", "}, function(){ if (typeof conSaveOut !== \"undefined\" && conSaveOut > 0) conSaveOut--; }).catch(function(){});", "if (sc && sc.gwReadFail) return null;", "if (!resp || !resp.ok) return { gwReadFail: 1 };", "}).catch(function(){ return { gwReadFail: 1 }; });", "if (sc && sc.gwReadFail) sc = null;", "    if (typeof conBaseSet === \"function\") conBaseSet([]);\n", "CON_STG_SIDE = { due_src: 1, due_badge: 1 }", "if (!CON_STG_OWN[k] && !CON_STG_SIDE[k]) x[k] = s[k];", "Object.keys(CON_STG_SIDE).forEach(function(k){ mgWalkKey(ss, k, pick, path.concat([k]), 0, \"whole\"); });", "if (m3 && typeof conCfKept === \"function\"){ try { conCfKept(cfs, cf0, m, x, cb); } catch(e){} }"];
+  const chk492 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v492 (11/17)', '\n### '), tlv = cut(d.tl, '\n## v492 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`gwPeek`", "`conSaveOut`", "`conBaseAt`", "`CON_STG_SIDE`", "`conCfKept`", "원장 C201"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v492 \(2026-11-17\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 3 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**P1 판24g(v492') > 0
+      && FIX492.every((x) => d.ix.split(x).length === 2)
+      && /SHELL_CACHE = 'jw-shell-v492'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX492.map((x) => d.ix.split(x).length - 1) } };
+  };
+  const r492 = chk492(D492);
+  const mu492 = (k, f) => chk492(Object.assign({}, D492, { [k]: f(D492[k]) })).ok;
+  const M492 = [mu492('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v491 (')), mu492('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v491'")),
+    mu492('ft', (s) => s.split('`gwPeek`').join('gwPeek')),
+    mu492('cl', (s) => s.replace('**P1 판24g(v492', 'P1 판24g(')),
+    mu492('tl', (s) => s.replace('\n- [x] (AI) `uismoke` \'P1 판24g\'', '\n- (AI) `uismoke` \'P1 판24g\''))]
+    .concat(FIX492.map((x) => mu492('ix', (s) => s.replace(x, ''))));
+  T('v492 문서·판 번호(정확 검사): FEATURES 기준 v492 (2026-11-17)·v492 절(판24g) · TESTLIST v492 칸 6(화면 확인 3 · 게이트 [x] 3) · CLAUDE.md 한 줄 · 고정 글 25줄 · sw jw-shell-v492 · 결함 사본 ' + M492.length + '개 = 모두 ✗',
+    r492.ok && M492.every((v) => v === false), JSON.stringify({ r: r492.info, mut: M492 }));
+} catch (e) { console.log('  (v492 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
