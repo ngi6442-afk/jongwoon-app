@@ -16819,11 +16819,11 @@ try {
     const FT = ["`csValEditNote`", "`csValEditsApply`", "`csValMerge`", "`csValEditsDone`", "`csSaveDoneSeq`", "`csFocusTake`", "원장 C195"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = "<p>(2026-11 v488) (계약 › 단계) 단계 칸을 저장하는 사이 결재 결과를 가져오거나 다른 기기";
-    const ok = /기준: v488 \(2026-11-16\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 7 && gate.length === 3 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 488 && ftv.length > 0 && mF.length === 0 && cb.length === 7 && gate.length === 3 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
       && d.man.indexOf(MAN) > 0 && !/csVal|csSync|csAppr|mergeContracts|data-cs|409/.test(cut(d.man, MAN, '\n'))
       && d.cl.indexOf('**P1 판24e(v488') > 0
       && d.ix.split("if (typeof csValEditsApply === \"function\" && csValEditsApply(c)) changed = true;").length === 2 && d.ix.split("if (typeof csValMerge === \"function\") csValMerge(m, x);").length === 2 && d.ix.split("csFocusPut([host, dcard], fcs);").length === 2 && d.ix.split("if (sc && typeof csSaveDoneSeq !== \"undefined\" && csSaveDoneSeq !== seq0) sc = null;").length === 2
-      && /SHELL_CACHE = 'jw-shell-v488'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 488;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r488 = chk488(D488);
@@ -17175,6 +17175,36 @@ try {
   T('P1 판24f 계약 저장 충돌 칸 단위 병합(실행 — 실제 mergeContracts·conMerge3·loadContracts·doSaveContracts·csSyncFromServer·csApprSync · 가짜 fetch·시계): 재현 4꼴(서류 줄 대 서류 줄·작업현황 대 계약명·준공일·손대지 않은 계약·밤새 연 화면) 모두 남음 · 대조 단계 칸 그대로 · 같은 칸 충돌 = 이 화면 값 + 알림 한 줄(충돌 없으면 0) · 줄 지움·양쪽 추가 · 구조 서버만/이 화면만/양쪽(날짜) · 기준 없는 계약·예외 = 종전 규칙 · 제자리(계약·줄·단계 배열·단계 객체) · 배열 아닌 서류 체크 · 접목 뒤 안 나간 작업현황 줄·개요 고침 남음 · 기준 전진 뒤 다른 기기의 더 새 값 남음(칸마다 — 통째 아님) · 기준 세우는 자리 셋(읽기·409·200) · 결함 사본 ' + KF.length + '개 = 모두 ✗',
     RF.ok && KF.every((v) => v === false), JSON.stringify({ r: RF, mut: KF }));
 } catch (e) { console.log('  (P1 판24f 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v489(판24f — 계약 저장 충돌 병합을 칸 단위로 · 원장 C196): 실행 검사는 위 'P1 판24f' 블록 · 여기는 문서·판 번호 정확 검사 + 칸 단위 병합을 부르는 줄·기준 사본을 세우는 줄 등 고정 글 12줄이 그대로 한 번씩 있는지 — 다음 판은 기준 줄·sw를 '489 이상'으로 풀 것
+try {
+  const rd489 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D489 = { ft: rd489('FEATURES.md'), tl: rd489('TESTLIST.md'), sw: rd489('sw.js'), man: rd489('MANUAL.html'), cl: rd489('CLAUDE.md'), ix: rd489('index.html') };
+  const FIX489 = ["if(cb&&typeof conMerge3===\"function\") m=conMerge3(cb, cur, x, cfs);", "contracts = contractsPending ? mergeContracts(contracts, cr) : cr; if (typeof conBaseSet === \"function\") conBaseSet(cr);", "if (typeof conBaseSet === \"function\") conBaseSet(up.items||[]);", "if (resp.ok && typeof conBaseSet === \"function\" && conBaseGen === sentGen) conBaseSet(JSON.parse(body).items);", "CON_STG_OWN = { vals: 1, docs: 1 };", "if (m3 && typeof conStatusFix === \"function\") conStatusFix(m);", "if (sc && typeof conBaseGen !== \"undefined\" && conBaseGen !== gen0){ sc = null; csApprSyncAt[id] = 0; }", "if (sc && typeof conBaseGen !== \"undefined\" && conBaseGen !== gen0) sc = null;", "if (w3pre && typeof conSyncKeep === \"function\"){", "if (w3pre && typeof conBaseAdvance === \"function\"){ try { conBaseAdvance(c, w3sc); }", "if (!lp.length || (c.status !== \"done\" && c.status !== \"active\")) return;", "c.status = lp.every(function(p){ return (p.cur || 0) >= ((p.stages || []).length); }) ? \"done\" : \"active\";"];
+  const chk489 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v489 (11/17)', '\n### '), tlv = cut(d.tl, '\n## v489 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`conBase`", "`conMerge3`", "`conSyncKeep`", "`conBaseAdvance`", "`conConflictToast`", "원장 C196"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = "<p>(2026-11 v489) (계약) 두 화면에서 같은 계약을 고쳐 저장이 겹쳐도, 이 화면에서 고친 칸";
+    const ok = /기준: v489 \(2026-11-17\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 11 && gate.length === 3 && scr.length === 8 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf(MAN) > 0 && !/conBase|conMerge|conSync|mgWalk|csVal|csSync|csAppr|mergeContracts|data-cs|409/.test(cut(d.man, MAN, '\n'))
+      && d.cl.indexOf('**P1 판24f(v489') > 0
+      && FIX489.every((x) => d.ix.split(x).length === 2)
+      && /SHELL_CACHE = 'jw-shell-v489'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX489.map((x) => d.ix.split(x).length - 1) } };
+  };
+  const r489 = chk489(D489);
+  const mu489 = (k, f) => chk489(Object.assign({}, D489, { [k]: f(D489[k]) })).ok;
+  const M489 = [mu489('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v488 (')), mu489('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v488'")),
+    mu489('ft', (s) => s.split('`conMerge3`').join('conMerge3')),
+    mu489('man', (s) => s.replace('(2026-11 v489) (계약', '(계약')), mu489('cl', (s) => s.replace('**P1 판24f(v489', 'P1 판24f(')),
+    mu489('tl', (s) => s.replace('\n- [x] (AI) `uismoke` \'P1 판24f\'', '\n- (AI) `uismoke` \'P1 판24f\''))]
+    .concat(FIX489.map((x) => mu489('ix', (s) => s.replace(x, ''))));
+  T('v489 문서·판 번호(정확 검사): FEATURES 기준 v489 (2026-11-17)·v489 절(판24f) · TESTLIST v489 칸 11(화면 확인 8 · 게이트 [x] 3) · MANUAL 계약 저장 겹침 글(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 12줄 · sw jw-shell-v489 · 결함 사본 ' + M489.length + '개 = 모두 ✗',
+    r489.ok && M489.every((v) => v === false), JSON.stringify({ r: r489.info, mut: M489 }));
+} catch (e) { console.log('  (v489 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
