@@ -3844,9 +3844,8 @@
     // 판24g 검토 X6: 계약의 충돌 기준 시각·기준 사본도 비움(새로 고침 없는 로그아웃 — 승인 대기 화면 [다른 계정으로 로그인]) — 남기면 다음 로그인에서 계약 읽기가 실패한 화면의 새 계약 저장이
     //   앞사람의 기준 시각으로 나가 base 0 가드(J3)를 비켜 감 · conBaseSet은 세대 번호도 올려 나가 있던 동기화 사본·늦은 200이 기준을 세우지 못하게 함 · 나가 있는 저장 수도 0
     if (typeof _colBase !== "undefined") delete _colBase.contracts;
-    // P1 판24h(C206): 다른 컬렉션의 기준 시각·403 표시도 비움 — 남기면 다음 로그인에서 읽기가 실패한 화면의 저장(비운 배열 + 새 줄)이 앞사람 기준 시각으로 나가 base 0 가드를 비켜 감(계약은 바로 위 줄)
-    if (typeof _colBase !== "undefined") Object.keys(_colBase).forEach(function(k){ if (k !== "contracts") delete _colBase[k]; });
-    _colRead403 = {}; myTodoLoaded = false; quoteLoaded = false;   // 판24h: 비운 내 할 일·견적은 '아직 못 읽음'(loadMyTasks·loadQuotes가 200에서 다시 켬)
+    // P1 판24h(C206): 다른 컬렉션의 기준 시각·403 표시·읽음 표시·가족친화 기준도 비움(아래 sessReadReset — 로그인 창 '전환'의 sessViewerSwap과 한 묶음 · 계약은 바로 위·아래 줄)
+    if (typeof sessReadReset === "function") sessReadReset(false);
     if (typeof conBaseSet === "function") conBaseSet([]);
     if (typeof conSaveOut !== "undefined") conSaveOut = 0;
     bids = []; onbids = []; quotes = []; promoItems = []; clients = []; myTodos = []; members = []; apprItems = []; myApprItems = []; fam = []; edu = [];
@@ -3868,12 +3867,23 @@
   //   (저장 대기·저장 타이머·고친 줄 표시·표 선택·생성 창 읽기 상태도), 새로 보는 사람에게 권한이 있으면 다시 읽는다 = 새로 로그인한 것과 같은 상태(그리는 쪽을 하나씩 거르지 않아도 됨).
   //   두 원장만 비운다: 둘 다 '읽기 전 저장 막기'(wkLoaded·eduLoaded)가 있어 비운 배열이 서버를 덮지 않는다 — 그 가드가 없는 원장(지시·차량 등)은 여기서 비우지 않는다(afterLogin이 새로 읽어 덮음).
   //   같은 사람의 재로그인(세션 만료 뒤)은 비우지 않는다(저장 대기 보존) · 첫 로그인(부팅)은 비울 것이 없다. 돌려줌 = 비웠으면 true
+  // P1 판24h 검토(C206): 세션을 비우는 길이 둘(clearSessionData — 새로고침 없는 로그아웃 · sessViewerSwap — 로그인 창 '전환'·세션 만료 뒤 다른 사람)이라 읽기 상태를 한 함수로 —
+  //   기준 시각(_colBase — 계약 밖 · withCon이면 계약도)·403 읽기 표시·내 할 일(개인 목록 + 읽음)·견적 읽음·가족친화 기준(famBase — 목록만 비우고 기준을 남기면 다음 로그인의 읽기 실패 화면 저장이 앞사람 기준으로 200 = 대장 통째 바뀜).
+  //   남기면 다음 사람의 읽기가 실패한 화면의 저장이 앞사람 기준 시각으로 나가 base 0 가드를 비켜 가고(서버 목록이 이 화면 목록으로), 내 할 일은 앞사람 목록 + 새 1건이 다음 사람 개인 목록이 됐다.
+  //   읽기 상태를 새로 두는 자료(base·읽음 표시)는 여기에 같이 넣을 것. 명부·교육·현장 대장·단골 노선·그날 직접 추가는 제 '읽음' 표시로 막혀 있음(clearSessionData·sessViewerSwap이 각자 비움)
+  function sessReadReset(withCon){
+    if (typeof _colBase !== "undefined") Object.keys(_colBase).forEach(function(k){ if (withCon || k !== "contracts") delete _colBase[k]; });
+    _colRead403 = {}; myTodos = []; myTodoSha = null; myTodoLoaded = false; quoteLoaded = false; famBase = 0;
+    if (withCon && typeof conBaseSet === "function") conBaseSet([]);
+    if (withCon && typeof conSaveOut !== "undefined") conSaveOut = 0;   // 로그인 창 '전환'은 clearSessionData의 계약 줄을 거치지 않음 — 같은 것을 여기서
+  }
   var sessViewerId = null;
   function sessViewerSwap(){
     var who = myId();
     if (sessViewerId === who) return false;
     if (sessViewerId === null){ sessViewerId = who; return false; }
     sessViewerId = who;
+    if (typeof sessReadReset === "function") sessReadReset(true);   // P1 판24h 검토: 기준 시각·403 표시·읽음 표시·개인 목록(위)
     if (wkSaveTimer){ clearTimeout(wkSaveTimer); wkSaveTimer = null; }
     if (eduSaveTimer){ clearTimeout(eduSaveTimer); eduSaveTimer = null; }
     workers = []; wkLoaded = false; wkPending = false; wkDirty = {}; wkBase = 0;
@@ -3910,7 +3920,7 @@
         if (res.status === 401){ onSessionInvalid(); return _ghResp(401, {}); }
         // 403(권한 hide)만 빈 문서로 — 탭도 숨겨져 있고 쓰기도 서버가 막으므로 무해.
         // 그 외 실패(500 등)를 빈 문서+200으로 위조하면 화면·캐시가 비고 다음 저장이 원본을 통째로 덮는다 → 오류는 오류로 전달(각 load*가 캐시 폴백)
-        if (res.status === 403){ if (typeof _colRead403 !== "undefined") _colRead403[col] = 1; return _ghResp(200, { sha: "gw", content: b64EncodeUnicode(JSON.stringify(emptyDoc(col))) }); }
+        if (res.status === 403){ if (typeof _colRead403 !== "undefined") _colRead403[col] = 1; delete _colBase[col]; return _ghResp(200, { sha: "gw", content: b64EncodeUnicode(JSON.stringify(emptyDoc(col))) }); }
         var doc = (res.status === 200 && res.body && res.body.doc) ? res.body.doc : null;
         if (!doc) return _ghResp(res.status >= 400 ? res.status : 502, {});
         // P1 판24g(C201 — D3): 목록 일부만 화면에 들이는 읽기(opts.gwPeek — 계약 결재 동기화)는 기준 시각을 바꾸지 않는다. 바꾸면 화면이 흡수하지 않은 서버 판을 '본 것'으로 쳐서
@@ -4054,9 +4064,18 @@
   function saveConflictToast(){ setTimeout(function(){ gwToast("저장 충돌 — 새로고침해 주세요. 같은 저장이 연달아 충돌해 더 보내지 않았습니다(고친 내용은 아직 서버에 들어가지 않았습니다).", true); }, 0); }
   function saveConflictStop(n){ if ((n || 0) + 1 < 3) return false; saveConflictToast(); return true; }
   // P1 판24h(C206 D5): 서버가 받지 않은 저장(5xx·412·그 밖 거절·끊김)을 성공처럼 넘기지 않는다 — 저장 대기 표시는 남기고(다음 저장·다시 읽기 병합이 이 화면의 고침을 지킴) 다시 보내지는 않으며 알림 한 번(지금 토스트 그대로).
-  //   st = 응답 코드(없으면 끊김) · 412 = 같은 저장이 연달아 충돌해 멈춤 — 충돌 알림(saveConflictToast)이 이미 뜨므로 건너뜀
-  function saveFailToast(what, st){ if (st === 412) return; gwToast(what + " 저장에 실패했습니다" + (st ? "(서버 응답 " + st + ")" : "(연결 끊김)") + " — 방금 고친 내용은 이 화면에만 있고 서버에는 들어가지 않았습니다.\n잠시 뒤 다시 해 보시고, 계속 이러면 관리자에게 알려 주세요(새로고침하면 이 화면에서 고친 내용은 사라집니다).", true); }
-  function saveDeniedToast(what){ gwToast(what + " 저장 권한이 없어 서버가 이 변경을 받지 않았습니다.\n화면 값은 새로고침하면 서버 값으로 돌아갑니다.", true); }
+  //   st = 응답 코드(없으면 끊김) · 412 = 같은 저장이 연달아 충돌해 멈춤 — 충돌 알림(saveConflictToast)이 이미 뜨므로 건너뜀 · 401 = 세션 만료 — 로그인 창으로(공통 길과 같음 · 알림 없음)
+  //   판24h 검토: 실패한 고침은 저장 대기로 남아 그 탭의 다음 저장에 함께 나간다 — 같은 내용을 다시 넣으면 두 번 들어가므로 그렇게 알린다.
+  //   redo = 대기로 남지 않는 자료(문서함 — 다시 읽으면 화면에서 빠짐)는 새로고침 뒤 없으면 다시 하라고
+  function saveFailToast(what, st, redo){
+    if (st === 412) return;
+    if (st === 401){ onSessionInvalid(); return; }
+    gwToast(what + " 저장에 실패했습니다" + (st ? "(서버 응답 " + st + ")" : "(연결 끊김)") + (redo
+      ? " — 방금 고친 내용은 서버에 들어가지 않았습니다.\n새로고침한 뒤 그 내용이 없으면 다시 해 주세요(계속 실패하면 관리자에게 알려 주세요)."
+      : " — 방금 고친 내용은 이 화면에만 남아 있고 서버에는 아직 들어가지 않았습니다.\n같은 내용을 다시 넣지 마세요(두 번 들어갑니다) — 이 탭에서 다음에 저장할 때 함께 올라갑니다. 계속 실패하면 관리자에게 알려 주세요(새로고침하면 이 고친 내용은 사라집니다)."), true);
+  }
+  //   판24h 검토: 공통 길은 403을 모두 write_denied로 넘겨(권한 없음·기기 미승인을 가르지 않음) 까닭을 단정하지 않는다
+  function saveDeniedToast(what){ gwToast(what + " 변경을 서버가 받지 않았습니다(저장 권한이나 기기 승인을 확인해 주세요).\n화면 값은 새로고침하면 서버 값으로 돌아갑니다.", true); }
 
   // ── 저장 ↔ 화면 갱신 분리 (v336 — PM 2026-09-10 "저장됐으면 저장됐다고만 나오게, 갱신은 실패할 수 없게")
   // 9/9 석면 사고의 진짜 원인은 렌더 코드가 아니라 데이터 모양이었다. 9/2 일괄 입력분 130건이
@@ -11439,14 +11458,14 @@
         });
       }
       docSaveRetried = false;
-      if (!resp.ok){ saveFailToast("문서함", resp.status); return; }   // P1 판24h(C206): 500·두 번째 409 등을 알림(종전엔 catch가 삼켜 화면에만 남았다가 새로고침 뒤 사라짐)
+      if (!resp.ok){ saveFailToast("문서함", resp.status, true); return; }   // P1 판24h(C206): 500·두 번째 409 등을 알림(종전엔 catch가 삼켜 화면에만 남았다가 새로고침 뒤 사라짐 · 문서함은 다시 읽으면 화면에서 빠져 '다시 해 주세요' 글)
       // 저장 직후 재조회 — 서버 스탬프(등재자 by·게이트 상태 대기/등재·비관리자 재구성분)를 화면에 반영. 응답엔 updated_at만 온다
       return resp.json().then(function(json){
         docSha = json.content && json.content.sha;
         if (json.register_warn) alert("등재 요청이 아직 결재함에 못 갔습니다 — 자동 재시도됩니다(관리자가 결재함을 열면 카드가 만들어집니다).");
         loadDocuments();
       });
-    }).catch(function(){ docSaveRetried = false; saveFailToast("문서함"); });
+    }).catch(function(){ docSaveRetried = false; saveFailToast("문서함", 0, true); });
   }
   // ---- 문서함 2층 분류(문서체계 설계안 v2 2026-09-04 §2·§6, v317) — 1층 대분류 = 업무 영역 12 + 99 미분류(앱 전용), 2층 중분류 = 문서 성격 6(전 대분류 공통). 인허가는 여기 안 끼움(원장=인허가 탭) ----
   // 라벨·키는 서버 DOC_MAJOR_LABEL·DOC_MINOR_LABEL과 동일(uismoke 대조). 순회 순서는 리터럴 배열(Object.keys는 "10"·"99" 같은 정수형 키를 앞으로 올린다)
@@ -29953,7 +29972,7 @@ function dutyStage(nx){
       // 그날 수동분: ab_day가 함께 실어 주면 왕복 1회로 끝내고, 없으면 따로 읽는다
       if (abManual.day === day && !abManual.loaded){
         var man = (res.status === 200 && res.body && Array.isArray(res.body.manual)) ? res.body.manual : null;
-        if (man) abSetManual(day, man); else loadAbManual(day);
+        if (man) abSetManual(day, man, res.body.manual_ts); else loadAbManual(day);
       }
       renderAbSheet(); renderAbManual(true); renderAbFoot();
     }).catch(function(){
@@ -29981,11 +30000,32 @@ function dutyStage(nx){
     return out;
   }
   // 로컬 편집이 진행 중이면 서버 값으로 덮지 않는다(저장 왕복 사이에 들어온 응답이 입력을 되돌리는 사고 방지).
-  function abSetManual(day, list){
+  // P1 판24h 검토(C206): 그날 목록은 통째 교체라 ① 읽기 전에 누른 ＋/−·수량(abManual.pre)을 버리지 않고 서버 목록 위에 다시 얹는다 — 종전엔 고친 표시가 있으면
+  //   서버 수동분을 버린 채 '읽음'으로 해 다음 저장이 이 기기 목록만 보냈다(다른 기기 입력 사라짐 · 알림 0) ② 읽은 판 시각(ts — 저장 때 base_ts)을 담는다.
+  //   저장이 나가 있는 동안 온 응답은 종전대로 건드리지 않음(보낸 고침이 아직 서버 목록에 없을 수 있음)
+  function abSetManual(day, list, ts){
     if (abManual.day !== day) return;
-    if (abManual.dirty || abManual.saving || abManual.timer){ abManual.loaded = true; return; }
-    abManual.items = abNormManual(list);
+    if (abManual.saving){ abManual.loaded = true; return; }
+    var items = abNormManual(list), pre = abManual.pre || {}, ids = Object.keys(pre);
+    ids.forEach(function(id){ abManPreApply(items, id, pre[id]); });
+    abManual.items = items;
+    abManual.ts = (ts === undefined || ts === null) ? null : (Number(ts) || 0);
     abManual.loaded = true;
+    if (ids.length || abManual.dirty){ if (abManual.err === AB_MAN_UNREAD) abManual.err = ""; abScheduleManualSave(); }   // 얹은 고침은 새 판 시각으로 다시 보냄
+  }
+  // 판24h 검토: 서버에 아직 안 들어간 이 기기 고침 — 카드(route_id)마다 회수 증감 dn·수량 q(마지막 입력 값). 저장을 보낼 때 떼어 두고(sent) 200이면 버림 · 실패·409면 되돌려 놓음
+  var AB_MAN_UNREAD = "그날 입력분을 불러오는 중이라 아직 저장하지 않았습니다 — 불러오면 그 위에 더해 저장합니다.";
+  function abManPre(card){ var p = abManual.pre || (abManual.pre = {}); var id = String(card.id); return p[id] || (p[id] = { dn: 0, q: null, from: card.from, to: card.to, item: card.item }); }
+  function abManPreApply(items, id, d){
+    var e = null, i;
+    for (i = 0; i < items.length; i++){ if (items[i] && String(items[i].route_id) === id){ e = items[i]; break; } }
+    if (!e){ e = { route_id: id, from: String(d.from || ""), to: String(d.to || ""), item: String(d.item || ""), n: 0, qty_ton: 0, memo: "" }; items.push(e); }
+    var v = abInt(e.n) + (d.dn || 0); e.n = v < 0 ? 0 : (v > 999 ? 999 : v);
+    if (d.q !== null && d.q !== undefined) e.qty_ton = d.q;
+  }
+  function abManPreBack(sent){
+    var p = abManual.pre || (abManual.pre = {});
+    Object.keys(sent || {}).forEach(function(id){ var s = sent[id], c = p[id]; if (!c){ p[id] = s; return; } c.dn = (c.dn || 0) + (s.dn || 0); if (c.q === null || c.q === undefined) c.q = s.q; });
   }
   function loadAbManual(day){
     if (!abDayOk(day) || abManual.day !== day) return;   // 빈 날짜·범위 밖으로는 요청 자체를 만들지 않는다
@@ -29994,8 +30034,8 @@ function dutyStage(nx){
       if (res.status === 401){ onSessionInvalid(); return; }
       if (res.status === 200){
         var b = res.body || {};
-        abSetManual(day, Array.isArray(b.items) ? b.items : (Array.isArray(b.manual) ? b.manual : []));
         abManual.err = "";
+        abSetManual(day, Array.isArray(b.items) ? b.items : (Array.isArray(b.manual) ? b.manual : []), b.ts);
       } else if (res.status === 404){
         abSetManual(day, []);
       } else {
@@ -30155,7 +30195,7 @@ function dutyStage(nx){
   function abDoManualSave(day){
     if (!day || !abDayOk(day) || abManual.day !== day) return;
     // 아직 그날 입력분을 못 읽었으면 저장하지 않는다 — 빈 목록으로 남의 입력을 덮어써 버린다
-    if (!abManual.loaded){ abManual.err = "그날 입력분을 아직 불러오지 못했습니다 — ‘새로고침’ 뒤 다시 입력하세요(덮어쓰기 방지로 저장을 막았습니다)."; abSetSaveState(); return; }
+    if (!abManual.loaded){ if (!abManual.err) abManual.err = AB_MAN_UNREAD; abSetSaveState(); return; }   // P1 판24h 검토: 읽기 전 고침은 남겨 두고(abManual.pre) 읽히면 서버 목록 위에 얹어 저장(abSetManual) · 읽기 실패 글이 떠 있으면 그 글 그대로
     if (abManual.bad > 0){ abManual.err = "수량 입력이 올바르지 않습니다 — 고칠 때까지 저장을 보류합니다."; abManual.errBad = true; abSetSaveState(); return; }
     if (abManual.saving){ abManual.dirty = true; abSetSaveState(); return; }   // 진행 중이면 끝난 뒤 이어서
     var items = abManualPayload();
@@ -30165,21 +30205,33 @@ function dutyStage(nx){
     }
     abManual.saving = true; abManual.dirty = false; abManual.err = "";
     abSetSaveState();
-    gwCall("gw-allbaro", { action: "ab_manual_put", day: day, items: items }).then(function(res){
+    // P1 판24h 검토(C206): 읽은 판 시각(base_ts)을 보내 그사이 다른 기기가 그날을 저장했으면 서버가 409(종전엔 안 보내 늦게 저장한 쪽이 앞 기기 입력을 지움) ·
+    //   보내는 고침(sent)은 떼어 두고 200이면 버림 · 409면 되돌려 놓고 서버 목록을 다시 읽어 그 위에 얹어 다시 저장(abSetManual) · 그 밖 실패는 되돌려 놓음
+    var sent = abManual.pre || {}; abManual.pre = {};
+    gwCall("gw-allbaro", { action: "ab_manual_put", day: day, items: items, base_ts: (typeof abManual.ts === "number") ? abManual.ts : null }).then(function(res){
       if (abManual.day !== day) return;                                     // 그 사이 날짜가 바뀌었으면 상태·플래그를 건드리지 않는다(다른 날의 saving을 끄면 그 날 저장이 잠긴다)
       abManual.saving = false;
-      if (res.status === 401){ abManual.dirty = true; abSetSaveState(); onSessionInvalid(); return; }
+      if (res.status === 401){ abManPreBack(sent); abManual.dirty = true; abSetSaveState(); onSessionInvalid(); return; }
       if (res.status === 200 && res.body && res.body.ok !== false){
         abManual.savedTs = Date.now();
         abManual.err = "";
+        if (res.body.ts) abManual.ts = Number(res.body.ts) || abManual.ts;   // 판24h 검토: 저장한 판 시각 = 다음 base_ts
+        abManual.c409 = 0;
         if (abManual.dirty) abDoManualSave(day);                            // 저장 중에 또 고쳤으면 한 번 더
+      } else if (res.status === 409 && (abManual.c409 || 0) < 2){
+        abManPreBack(sent); abManual.c409 = (abManual.c409 || 0) + 1;
+        abManual.loaded = false; abManual.dirty = true;
+        abManual.err = "다른 기기에서 그날 직접 추가분을 먼저 저장했습니다 — 다시 읽어 그 위에 이 화면에서 고친 것을 더해 저장합니다.";
+        loadAbManual(day);
       } else {
+        abManPreBack(sent);
         abManual.dirty = true;                                              // 실패를 조용히 넘기면 입력이 유실된다
-        abManual.err = abErrText(res, "저장 실패");
+        abManual.err = (res.status === 409) ? "다른 기기에서 그날 직접 추가분이 계속 바뀌어 저장하지 못했습니다 — 새로고침한 뒤 확인해 주세요(이 화면에서 고친 것은 아직 서버에 없습니다)." : abErrText(res, "저장 실패");
       }
       abSetSaveState();
     }).catch(function(){
       if (abManual.day !== day) return;
+      abManPreBack(sent);
       abManual.saving = false;
       abManual.dirty = true;
       abManual.err = "저장 실패(네트워크) — 다시 고치면 재시도합니다.";
@@ -30881,10 +30933,11 @@ function dutyStage(nx){
     function bump(id, delta){
       var card = abCardById(id); if (!card) return;
       var e = abManEnsure(card);
-      var v = abInt(e.n) + delta;
+      var v0 = abInt(e.n), v = v0 + delta;
       if (v < 0) v = 0;
       if (v > 999) v = 999;
       e.n = v;
+      abManPre(card).dn += (v - v0);   // P1 판24h 검토: 서버에 아직 안 들어간 증감(읽기 전·409 뒤 서버 목록 위에 다시 얹음)
       refreshCard(id); abUpdateTotals(); abScheduleManualSave();
     }
     Array.prototype.forEach.call(host.querySelectorAll("[data-ab-minus]"), function(b){
@@ -30914,6 +30967,7 @@ function dutyStage(nx){
           if (abManual.bad === 0){ abManual.err = ""; abManual.errBad = false; }
         }
         e.qty_ton = (raw === "") ? 0 : Math.round(Number(raw) * 1000) / 1000;
+        abManPre(card).q = e.qty_ton;   // P1 판24h 검토: 수량은 마지막 입력 값으로 다시 얹음
         refreshCard(id); abUpdateTotals(); abScheduleManualSave();
       });
     });

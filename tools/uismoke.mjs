@@ -7406,6 +7406,7 @@ try {
     'function confirm(msg){ ENV.log.push("confirm:" + msg); return ENV.confirmAns !== false; }',
     'function alert(msg){ ENV.log.push("alert:" + msg); }',
     'function gwToast(msg){ ENV.log.push("toast:" + msg); }',
+    'function saveFailToast(w, st){ ENV.log.push("fail:" + w + ":" + st); }',   // 판24h: 명부 저장 실패 갈래를 타도 틀 전체가 멈추지 않게(알림 글은 'P1 판24h' 블록)
     'function xgToggle(){ ENV.log.push("xgToggle"); } function findProc(){ return null; } function xgAgentAuto(){}',
     'var eduPersonFrom = ""; function eduPersonSaved(k, id){ ENV.edp = (ENV.edp || []).concat([k + ":" + id + ":" + eduPersonFrom]); }',   // v448: 일용직 창 [저장]이 부르는 체크 칸 훅(창 처리기는 그대로 돌림 — 실행 검사는 v448 묶음)
     'function gwCall(fn, body){ ENV.gw.push(body.action + ":" + body.collection + (body.base !== undefined ? ":base=" + body.base : "") + (body.doc ? ":" + body.doc.items.map(function(w){ return w.id + (w.note ? "=" + w.note : "") + (w.del === 1 ? "(del)" : ""); }).join(",") : "")); var r = ENV.gwQ.shift() || { status: 599 }; return Promise.resolve({ status: r.status, body: r.body || {} }); }'].join('\n');
@@ -17605,20 +17606,21 @@ try {
   const cloneH = (x) => (x === undefined ? undefined : JSON.parse(JSON.stringify(x)));
   // 닫힘: 뿌리 함수가 부르는 앱 함수를 끝까지 실제 본문으로 — 그리기·캐시·자동 생성·외부 전송·화면 알림만 대역(STUB_H — 이름 기록만)
   const STUB_H = /^(render[A-Z]\w*|markLoadedForAutoGen|save\w*Cache|load\w*Cache|saveCache|loadCache|recOverdueGen|lmKeptNotice|paKick|maskKick|galleryRelaySend|mapRelaySend|apprFlushCreates|runBidQualGen|runAwardAutoCon|bidCorpGateRevert|loadSiteEduGap|loadDocSettings|bindTodoDueInputs|csAlignTasksAll|loadWorkers|abSetSaveState|abUpdateTotals|csSiteHooksRetry|stmtReset|bidSheetShowNew|vsSheetRender|switchTab|scheduleContractSave|conBaseSet|loadContracts|askClear)$/;
-  const OWN_H = { gwToast: 1, alert: 1, confirm: 1, setOffline: 1, getToken: 1, ghHeaders: 1, clearToken: 1, showTokenScreen: 1, onSessionInvalid: 1, isAdmin: 1, canSee: 1, canDo: 1, myId: 1, getMemberId: 1, myName: 1, todayStr: 1, genId: 1, gwCall: 1, setTimeout: 1, clearTimeout: 1, fetch: 1 };
+  const OWN_H = { gwToast: 1, alert: 1, confirm: 1, setOffline: 1, getToken: 1, ghHeaders: 1, clearToken: 1, showTokenScreen: 1, onSessionInvalid: 1, isAdmin: 1, canSee: 1, canDo: 1, myId: 1, getMemberId: 1, myName: 1, todayStr: 1, genId: 1, gwCall: 1, setTimeout: 1, clearTimeout: 1, fetch: 1, abDayOk: 1 };
   const closeH = (H, roots) => { const all = new Set([...H.matchAll(/\n  function ([A-Za-z_$][\w$]*)\(/g)].map((m) => m[1])); const got = new Map(), stub = new Set(); const q = roots.slice(); while (q.length) { const n = q.shift(); if (got.has(n) || stub.has(n) || OWN_H[n] || !all.has(n)) continue; if (STUB_H.test(n) && roots.indexOf(n) < 0) { stub.add(n); continue; } const b = fnH(H, n); got.set(n, b); for (const m of b.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g)) q.push(m[1]); } return { real: [...got.keys()], stub: [...stub] }; };
   const ROOTS_H = ['_ghResp', 'emptyDoc', '_urlCollection', 'b64EncodeUnicode', 'b64DecodeUnicode', 'saveConflictStop', 'saveConflictToast', 'saveFailToast', 'saveDeniedToast',
     'loadVehicles', 'doSaveVeh', 'resolveVehConflictAndRetry', 'loadReceivables', 'doSaveRec', 'resolveRecConflictAndRetry', 'loadLicenses', 'doSaveLic', 'resolveLicConflictAndRetry',
     'doLoad', 'doSave', 'resolveConflictAndRetry', 'loadLeaves', 'doSaveLeaves', 'loadQuotes', 'doSaveQuotes', 'openQuoteEdit', 'loadPromo', 'doSavePromo', 'loadOnbid', 'doSaveOnbid',
     'loadBids', 'doSaveBids', 'loadClients', 'saveClients', 'loadDocuments', 'saveDocuments', 'loadMyTasks', 'addMyTodo', 'saveMyTasks', 'myTodoUnread',
-    'doSaveWorkers', 'doSaveFam', 'doSaveAsb', 'doSaveEdu', 'loadAbPresets', 'abSavePresets'];
+    'doSaveWorkers', 'doSaveFam', 'doSaveAsb', 'doSaveEdu', 'loadAbPresets', 'abSavePresets',
+    'sessReadReset', 'sessViewerSwap', 'loadAbManual', 'abSetManual', 'abDoManualSave', 'abFlushManualSave', 'abScheduleManualSave', 'abManEnsure', 'abManPre', 'abWireManual', 'abPresetAdd'];   // 검토 반영(abPresetAdd는 abWireManual이 이름으로만 넘김)
   const srcH = new Map();
   const D0 = '2026-11-01', DN = '2026-11-17';
   const items3 = () => [{ id: 's1', updated: D0, created: D0 }, { id: 's2', updated: D0, created: D0 }, { id: 's3', updated: D0, created: D0 }];
   const mkH = (H) => {
     const env = { clock: 1000, timers: [], toasts: [], alerts: [], calls: [], log: [], seq: [], offline: false, gen: 0, dom: {},
-      getFail: {}, getRej: {}, get403: {}, saveFail: {}, saveRej: {}, save403: {}, pgFail: 0,
-      S: { pre: { items: [{ id: 'p1', from: 'a', to: 'b', item: 'c', unit: '톤' }], ts: 500 } } };
+      getFail: {}, getRej: {}, get403: {}, get404: {}, saveFail: {}, saveRej: {}, save403: {}, save401: {}, saveOrphan: {}, pgFail: 0, manPuts: [], manSeq: [], manConflict: 0, me: 'uA',
+      S: { pre: { items: [{ id: 'p1', from: 'a', to: 'b', item: 'c', unit: '톤' }], ts: 500 }, man: { items: [{ route_id: 'p1', from: 'a', to: 'b', item: 'c', n: 3, qty_ton: 0, memo: '' }], ts: 700 } } };
     ['vehicles', 'receivables', 'licenses', 'leaves', 'quotes', 'promo', 'onbid', 'bids', 'clients', 'documents', 'mytasks', 'workers', 'family', 'asbestos', 'edu'].forEach((c) => { env.S[c] = { schema: 1, items: items3(), updated_at: 1000 }; });
     env.S.licenses.duties = [];
     env.S.checklist = { records: { daily: { [DN]: { c1: DN + 'T01' } } }, custom: {}, updated_at: 1000 };
@@ -17629,10 +17631,14 @@ try {
       if (fn === 'gw-allbaro') {
         if (b.action === 'ab_presets_get') { if (env.pgFail > 0) { env.pgFail--; return R(500, { ok: false, code: 'X' }); } return R(200, { ok: true, items: cloneH(env.S.pre.items), ts: env.S.pre.ts }); }
         if (b.action === 'ab_presets_put') { env.preBase = b.base_ts; if (b.base_ts !== undefined && b.base_ts !== null && Number(b.base_ts) !== env.S.pre.ts) return R(409, { ok: false, code: 'CONFLICT', ts: env.S.pre.ts }); env.S.pre = { items: cloneH(b.items), ts: ++env.clock }; return R(200, { ok: true, items: cloneH(b.items), ts: env.S.pre.ts }); }
+        // 그날 직접 추가(gw-allbaro handleManualGet·handleManualPut 꼴): base_ts가 오면 대조, 안 오면 통째 교체 · manConflict = 저장마다 다른 기기가 먼저 저장(409)
+        if (b.action === 'ab_manual_get') return R(200, { ok: true, day: b.day, items: cloneH(env.S.man.items), ts: env.S.man.ts });
+        if (b.action === 'ab_manual_put') { env.manPuts.push(b.base_ts === undefined ? 'u' : b.base_ts); if (env.manConflict > 0) { env.manConflict--; env.S.man = { items: env.S.man.items, ts: env.S.man.ts + 1 }; } if (b.base_ts !== undefined && b.base_ts !== null && Number(b.base_ts) !== env.S.man.ts) { env.manSeq.push(409); return R(409, { ok: false, code: 'CONFLICT', ts: env.S.man.ts }); } env.S.man = { items: cloneH(b.items), ts: ++env.clock }; env.manSeq.push(200); return R(200, { ok: true, ts: env.S.man.ts }); }
         return R(200, {});
       }
       if (b.action === 'get') {
         if (env.get403[col]) return R(403, { error_code: 'NO_ACCESS' });
+        if (env.get404[col]) return R(404, { error_code: 'X' });
         if (env.getRej[col] > 0) { env.getRej[col]--; return Promise.reject(new Error('net')); }
         if (env.getFail[col] > 0) { env.getFail[col]--; return R(500, { error_code: 'X' }); }
         return R(200, { doc: cloneH(env.S[col]) });
@@ -17641,6 +17647,8 @@ try {
         if (env.saveRej[col] > 0) { env.saveRej[col]--; env.seq.push(col + ':끊김'); return Promise.reject(new Error('net')); }
         if (env.saveFail[col] > 0) { env.saveFail[col]--; env.seq.push(col + ':500'); return R(500, { error_code: 'X' }); }
         if (env.save403[col]) { env.seq.push(col + ':403'); return R(403, { error_code: 'NO_WRITE' }); }
+        if (env.save401[col]) { env.seq.push(col + ':401'); return R(401, { error_code: 'TOKEN_EXPIRED' }); }
+        if (env.saveOrphan[col]) { env.seq.push(col + ':400'); return R(400, { error_code: 'ORPHAN_WORKER', n: 1, ids: [] }); }
         const prev = env.S[col];
         if (col !== 'mytasks' && b.base !== undefined && prev && prev.updated_at && Number(b.base) !== Number(prev.updated_at)) { env.seq.push(col + ':409'); return R(409, { error_code: 'STALE_BASE' }); }
         env.S[col] = Object.assign({}, cloneH(b.doc), { updated_at: ++env.clock }); env.seq.push(col + ':200'); return R(200, { updated_at: env.clock });
@@ -17666,11 +17674,13 @@ try {
         'var myTodos=[], myTodoSha=null, myTodoLoaded=false, myTodoLoading=0;',
         'var workers=[], wkLoaded=true, wkDirty={}, wkBase=1000, wkSaveTimer=null, wkPending=false, fam=[], famBase=1000, famPending=false, famSaveTimer=null;',
         'var asb=[], asbBase=1000, asbPending=false, asbSaveTimer=null, asbOrphTry=0, edu=[], eduLoaded=true, eduBase=1000, eduPending=false, eduSaveTimer=null, abPresetFormOpen=false;',
-        ['MYTODO_UNREAD_MSG', 'QT_UNREAD_MSG', 'CLI_BIZ13_MSG', 'abPresets'].map((v) => varH(H, v)).join('\n'),
+        'var conSaveOut = 0, sessViewerId = null, wkEduSt = "", eduSel = {}, abPresetEdit = false, abCardEls = {}, abManual = { day: "' + DN + '", items: [], loaded: false, timer: null, saving: false, dirty: false, savedTs: 0, bad: 0, err: "", errBad: false, pendingRender: false };',
+        'function abDayOk(){ return true; }',
+        ['MYTODO_UNREAD_MSG', 'QT_UNREAD_MSG', 'CLI_BIZ13_MSG', 'abPresets', 'AB_MAN_UNREAD'].map((v) => varH(H, v)).join('\n'),
         'function gwToast(m){ ENV.toasts.push(String(m)); } function alert(m){ ENV.alerts.push(String(m)); } function confirm(){ return true; } function setOffline(s){ ENV.offline = s; isOffline = s; }',
         'function getToken(){ return "t"; } function ghHeaders(){ return {}; } function clearToken(){} function showTokenScreen(){} function onSessionInvalid(){ ENV.calls.push("onSessionInvalid"); }',
-        'function isAdmin(){ return true; } function canSee(){ return true; } function canDo(){ return true; } function myId(){ return "uA"; } function getMemberId(){ return "uA"; } function myName(){ return "시험A"; } function todayStr(){ return "' + DN + '"; } function genId(p){ return p + "N" + (++ENV.gen); }',
-        'var document = { getElementById: function(id){ if (!ENV.dom[id]) ENV.dom[id] = { id: id, value: "", textContent: "", innerHTML: "", style: {}, dataset: {}, classList: { add: function(c){ ENV.calls.push("show:" + id + ":" + c); }, remove: function(){}, contains: function(){ return false; } }, focus: function(){} }; return ENV.dom[id]; } };',
+        'function isAdmin(){ return true; } function canSee(){ return true; } function canDo(){ return true; } function myId(){ return ENV.me; } function getMemberId(){ return ENV.me; } function myName(){ return "시험A"; } function todayStr(){ return "' + DN + '"; } function genId(p){ return p + "N" + (++ENV.gen); }',
+        'var document = { getElementById: function(id){ if (!ENV.dom[id]) ENV.dom[id] = { id: id, value: "", textContent: "", innerHTML: "", style: {}, dataset: {}, classList: { add: function(c){ ENV.calls.push("show:" + id + ":" + c); }, remove: function(){}, contains: function(){ return false; } }, focus: function(){}, addEventListener: function(){} }; return ENV.dom[id]; } };',
         'var console = { warn: function(){}, log: function(){} };',
         cl.stub.map((n) => 'function ' + n + '(){ ENV.calls.push("' + n + '"); }').join('\n'),
         cl.real.map((n) => fnH(H, n)).join('\n'), wrapH(H), 'var fetch = window.fetch;',
@@ -17705,14 +17715,14 @@ try {
       const C = COLS_H[c], want = c === 'checklist' ? 'c1,n1' : 'n1,s1,s2,s3';
       // A: 앱을 켤 때 목록 읽기 500 → 고침 → 저장 = base 0 → 409 → 다시 읽기(이번엔 됨)·병합 → 200 · 서버 = 옛 3 + 새 1(종전: 새 1만 — 53→1 꼴)
       { const E = mkH(H); E.getFail[c] = 1; E.ex(C.load); await E.flush(); E.ex(C.add); E.ex(C.save); await E.flush(); await E.fire();
-        R[c + 'A'] = keysH(E, c) + '|' + E.cs(c) + '|' + E.ex(C.pend); R[c + 'Aok'] = R[c + 'A'] === want + '|409,200|false'; }
+        R[c + 'A'] = keysH(E, c) + '|' + E.cs(c) + '|' + E.ex(C.pend) + '|' + E.calls.filter((x) => x === 'paKick').length; R[c + 'Aok'] = R[c + 'A'] === want + '|409,200|false|' + (c === 'promo' ? 1 : 0); }   // 검토: 홍보는 저장 200 뒤 기다리던 초안 생성이 그때 1번
       // A2: 다시 읽기도 계속 실패 → 409 셋째에서 멈춤(412 — 충돌 알림) · 서버 그대로 · 대기 남음 · 요청 끝없이 되풀이 없음(저장 3·읽기 1+2)
       { const E = mkH(H); E.getFail[c] = 99; E.ex(C.load); await E.flush(); E.ex(C.add); E.ex(C.save); await E.flush(); await E.fire();
         R[c + 'A2'] = keysH(E, c) + '|' + E.cs(c) + '|' + E.ex(C.pend) + '|' + E.gets(c) + '|' + E.toasts.filter((t) => t.indexOf('저장 충돌') === 0).length + '|' + E.toasts.filter((t) => t.indexOf('저장에 실패했습니다') >= 0 && t.indexOf('주기업무') < 0).length;
         R[c + 'A2ok'] = R[c + 'A2'] === (c === 'checklist' ? 'c1' : 's1,s2,s3') + '|409,409,409|true|3|1|0'; }
       // B: 읽기 됨 → 저장 500 = 성공으로 넘기지 않음(대기 남음) + 알림(토스트 '… 저장에 실패했습니다(서버 응답 500)' 또는 오프라인 띠) · 서버 그대로
       { const E = mkH(H); E.ex(C.load); await E.flush(); E.saveFail[c] = 1; E.ex(C.add); E.ex(C.save); await E.flush(); await E.fire();
-        const note = C.fail === 'toast' ? E.toasts.filter((t) => t.indexOf(C.label + ' 저장에 실패했습니다(서버 응답 500) — 방금 고친 내용은 이 화면에만') === 0).length : (E.offline ? 1 : 0);
+        const note = C.fail === 'toast' ? E.toasts.filter((t) => t.indexOf(C.label + ' 저장에 실패했습니다(서버 응답 500) — 방금 고친 내용은 이 화면에만 남아 있고 서버에는 아직 들어가지 않았습니다.\n같은 내용을 다시 넣지 마세요(두 번 들어갑니다) — 이 탭에서 다음에 저장할 때 함께 올라갑니다.') === 0).length : (E.offline ? 1 : 0);
         R[c + 'B'] = keysH(E, c) + '|' + E.ex(C.pend) + '|' + note + '|' + E.calls.filter((x) => x === 'paKick').length + '|' + E.ex('paAutoWait');
         R[c + 'Bok'] = R[c + 'B'] === (c === 'checklist' ? 'c1' : 's1,s2,s3') + '|true|1|0|' + (c === 'promo' ? 'n1' : ''); }
       if (C.fail !== 'toast') continue;
@@ -17721,7 +17731,7 @@ try {
         R[c + 'C'] = E.ex(C.pend) + '|' + E.toasts.filter((t) => t.indexOf(C.label + ' 저장에 실패했습니다(연결 끊김)') === 0).length; R[c + 'Cok'] = R[c + 'C'] === 'true|1'; }
       // D: 쓰기 거절(403 → 대역 write_denied 200) = 대기 내림 + 권한 알림(종전: 소리 없이 '저장됨')
       { const E = mkH(H); E.ex(C.load); await E.flush(); E.save403[c] = 1; E.ex(C.add); E.ex(C.save); await E.flush();
-        R[c + 'D'] = E.ex(C.pend) + '|' + E.toasts.filter((t) => t.indexOf(C.label + ' 저장 권한이 없어 서버가 이 변경을 받지 않았습니다') === 0).length; R[c + 'Dok'] = R[c + 'D'] === 'false|1'; }
+        R[c + 'D'] = E.ex(C.pend) + '|' + E.toasts.filter((t) => t.indexOf(C.label + ' 변경을 서버가 받지 않았습니다(저장 권한이나 기기 승인을 확인해 주세요)') === 0).length; R[c + 'Dok'] = R[c + 'D'] === 'false|1'; }
     }
     // 휴가 권한 숨김(읽기 403 — 빈 문서) 직원의 신청 = base 없음(종전대로 — 서버가 재구성) · 409 되풀이 없음(base 0이면 409 → 다시 읽기도 403 → 412로 영영 막힘)
     { const E = mkH(H); E.get403.leaves = 1; E.ex('loadLeaves()'); await E.flush(); E.ex(COLS_H.leaves.add); E.ex('doSaveLeaves()'); await E.flush(); await E.fire();
@@ -17729,16 +17739,20 @@ try {
     // 일감: 읽은 뒤 저장 500·끊김 = 대기 남음 + 알림(종전: 대기를 풀어 '저장됨')
     { const E = mkH(H); E.ex('loadBids()'); await E.flush(); E.saveFail.bids = 1; E.ex('bids.push({ id: "n1", updated: "' + DN + '" }); bidsPending = true; doSaveBids();'); await E.flush();
       E.saveRej.bids = 1; E.ex('doSaveBids()'); await E.flush();
-      R.bids = E.ex('bidsPending') + '|' + E.toasts.filter((t) => t.indexOf('입찰 공고 저장에 실패했습니다(서버 응답 500)') === 0).length + '|' + E.toasts.filter((t) => t.indexOf('입찰 공고 저장에 실패했습니다(연결 끊김)') === 0).length + '|' + E.ids('bids'); R.bidsok = R.bids === 'true|1|1|s1,s2,s3'; }
+      R.bids = E.ex('bidsPending') + '|' + E.toasts.filter((t) => t.indexOf('입찰 공고 저장에 실패했습니다(서버 응답 500)') === 0).length + '|' + E.toasts.filter((t) => t.indexOf('입찰 공고 저장에 실패했습니다(연결 끊김)') === 0).length + '|' + E.ids('bids');
+      E.save403.bids = 1; E.ex('doSaveBids()'); await E.flush();   // 검토: 쓰기 거절 = 대기 내림 + 알림
+      R.bids += '|' + E.ex('bidsPending') + '|' + E.toasts.filter((t) => t.indexOf('입찰 공고 변경을 서버가 받지 않았습니다') === 0).length; R.bidsok = R.bids === 'true|1|1|s1,s2,s3|false|1'; }
     // 거래처: 저장 500·끊김 = 알림 · 고친 표시 남음
     { const E = mkH(H); E.ex('loadClients()'); await E.flush(); E.saveFail.clients = 1; E.ex('clients.push({ id: "n1", name: "새" }); cliDirty.n1 = 1; saveClients();'); await E.flush();
       E.saveRej.clients = 1; E.ex('saveClients()'); await E.flush();
-      R.cli = E.ex('cliDirty.n1') + '|' + E.toasts.filter((t) => t.indexOf('거래처 대장 저장에 실패했습니다(서버 응답 500)') === 0).length + '|' + E.toasts.filter((t) => t.indexOf('거래처 대장 저장에 실패했습니다(연결 끊김)') === 0).length; R.cliok = R.cli === '1|1|1'; }
+      R.cli = E.ex('cliDirty.n1') + '|' + E.toasts.filter((t) => t.indexOf('거래처 대장 저장에 실패했습니다(서버 응답 500)') === 0).length + '|' + E.toasts.filter((t) => t.indexOf('거래처 대장 저장에 실패했습니다(연결 끊김)') === 0).length;
+      E.save403.clients = 1; E.ex('saveClients()'); await E.flush();   // 검토: 쓰기 거절 알림
+      R.cli += '|' + E.toasts.filter((t) => t.indexOf('거래처 대장 변경을 서버가 받지 않았습니다') === 0).length; R.cliok = R.cli === '1|1|1|1'; }
     // 문서함: 저장 500·끊김·409 두 번째(다시 읽기 실패) = 알림(종전 0 — 화면에만 있다가 새로고침 뒤 사라짐)
     { const E = mkH(H); E.ex('loadDocuments()'); await E.flush(); E.saveFail.documents = 1; E.ex('documents.push({ id: "n1" }); saveDocuments();'); await E.flush();
       E.saveRej.documents = 1; E.ex('saveDocuments()'); await E.flush();
       E.S.documents.updated_at = 1500; E.getFail.documents = 1; E.ex('saveDocuments()'); await E.flush();
-      R.doc = [500, '연결 끊김', 409].map((k) => E.toasts.filter((t) => t.indexOf('문서함 저장에 실패했습니다(' + (typeof k === 'number' ? '서버 응답 ' + k : k) + ')') === 0).length).join(',') + '|' + E.cs('documents'); R.docok = R.doc === '1,1,1|500,끊김,409,409'; }
+      R.doc = [500, '연결 끊김', 409].map((k) => E.toasts.filter((t) => t.indexOf('문서함 저장에 실패했습니다(' + (typeof k === 'number' ? '서버 응답 ' + k : k) + ') — 방금 고친 내용은 서버에 들어가지 않았습니다.\n새로고침한 뒤 그 내용이 없으면 다시 해 주세요') === 0).length).join(',') + '|' + E.cs('documents'); R.docok = R.doc === '1,1,1|500,끊김,409,409'; }   // 검토: 문서함은 다시 읽으면 화면에서 빠져 '다시 해 주세요' 글
     // 내 할 일: 읽기 실패 화면에서 더하기 = 막고 알림 + 다시 읽기 · 서버 3건 그대로 → 읽힌 뒤 더하기 = 서버 4건 · 못 읽은 채 저장 함수 = 보내지 않음 · 저장 500·끊김 = 알림
     { const E = mkH(H); E.getFail.mytasks = 1; E.ex('loadMyTasks()'); await E.flush();
       E.ex('document.getElementById("myTodoInput").value = "할 일 하나"; addMyTodo();');
@@ -17754,7 +17768,12 @@ try {
     for (const [fnN, col, lbl, pend] of [['doSaveWorkers', 'workers', '일용직 명부', 'wkPending'], ['doSaveFam', 'family', '가족친화 대장', 'famPending'], ['doSaveAsb', 'asbestos', '현장 대장', 'asbPending'], ['doSaveEdu', 'edu', '안전 › 체크 칸 기록', 'eduPending']]) {
       const E = mkH(H); E.ex(pend + ' = true;'); E.saveFail[col] = 1; E.ex(fnN + '()'); await E.flush(); E.saveRej[col] = 1; E.ex(fnN + '()'); await E.flush();
       R['d_' + col] = E.ex(pend) + '|' + E.toasts.filter((t) => t.indexOf(lbl + ' 저장에 실패했습니다(서버 응답 500)') === 0).length + '|' + E.toasts.filter((t) => t.indexOf(lbl + ' 저장에 실패했습니다(연결 끊김)') === 0).length;
-      R['d_' + col + 'ok'] = R['d_' + col] === 'true|1|1';
+      // 검토: 401(세션 만료) = 로그인 창으로·실패 알림 없음(공통 길과 같음) · 명부·교육 403 = 권한 알림만 · 현장 대장 명부 밖 일용직 400 = 그 알림만(실패 알림 겹침 없음)
+      E.save401[col] = 1; E.ex(fnN + '()'); await E.flush(); E.save401[col] = 0;
+      if (col === 'workers' || col === 'edu') { E.save403[col] = 1; E.ex(fnN + '()'); await E.flush(); E.save403[col] = 0; }
+      if (col === 'asbestos') { E.saveOrphan[col] = 1; E.ex('asbOrphTry = 0; ' + fnN + '()'); await E.flush(); E.saveOrphan[col] = 0; }
+      R['d_' + col] += '|' + E.calls.filter((x) => x === 'onSessionInvalid').length + '|' + E.toasts.filter((t) => t.indexOf('저장에 실패했습니다') >= 0).length + '|' + E.toasts.filter((t) => /저장 권한이 없어|현장 대장을 저장하지 못했습니다/.test(t)).length;
+      R['d_' + col + 'ok'] = R['d_' + col] === 'true|1|1|1|2|' + (col === 'family' ? 0 : 1);
     }
     // 단골 노선: 읽기 실패 화면의 [＋ 노선 추가] = 보내지 않고 다시 읽음 · 읽힌 뒤 = 읽은 판 시각(base_ts)으로 저장 → 2개 · 그사이 다른 기기가 바꿈 = 409 → 다시 읽기·알림 · 서버 그대로
     { const E = mkH(H); E.pgFail = 1; E.ex('loadAbPresets()'); await E.flush();
@@ -17777,11 +17796,66 @@ try {
     { const E = mkH(H); E.ex('loadVehicles(); loadLeaves();'); await E.flush(); E.get403.leaves = 1; E.ex('loadLeaves()'); await E.flush(); E.get403.leaves = 0;
       const H2 = fnH(H, 'clearSessionData').split('\n').map((l) => l.replace(/\/\/.*$/, '')).join('\n').trim(); const nm = new Set(); for (const m of H2.matchAll(/(?:^|[;{\s])([A-Za-z_$][\w$]*)\s*=(?!=)/g)) nm.add(m[1]);
       ['_colBase', '_colRead403', 'myTodoLoaded', 'quoteLoaded', 'vehicles', 'leaves', 'quotes', 'myTodos', 'abPresets', 'records', 'documents', 'clients', 'bids', 'onbids', 'promoItems', 'licenses', 'duties', 'receivables', 'cliLoaded', 'cliDirty', 'wkLoaded', 'wkPending', 'wkDirty', 'eduLoaded', 'eduPending', 'bidsLoaded', 'bidsSaveHeld', 'edu', 'fam', 'workers'].forEach((n) => nm.delete(n));
-      E.ex('myTodoLoaded = true; quoteLoaded = true; _colBase.contracts = 7;');
+      E.ex('myTodoLoaded = true; quoteLoaded = true; _colBase.contracts = 7; famBase = 1000;');
       E.ex('var ' + [...nm].join(', ') + '; (function(){ var stmtReset = function(){}; ' + H2.replace(/^function clearSessionData\(\)\{/, '').replace(/\}$/, '') + ' })();');
-      const k1 = Object.keys(E.ex('_colBase')).join(',') + '|' + Object.keys(E.ex('_colRead403')).join(',') + '|' + E.ex('myTodoLoaded') + '|' + E.ex('quoteLoaded');
+      const k1 = Object.keys(E.ex('_colBase')).join(',') + '|' + Object.keys(E.ex('_colRead403')).join(',') + '|' + E.ex('myTodoLoaded') + '|' + E.ex('quoteLoaded') + '|' + E.ex('famBase');
       E.getFail.vehicles = 1; E.ex('loadVehicles()'); await E.flush(); E.ex(COLS_H.vehicles.add + ' doSaveVeh();'); await E.flush(); await E.fire();
-      R.clr = k1 + '|' + E.ids('vehicles') + '|' + E.cs('vehicles'); R.clrok = R.clr === '||false|false|n1,s1,s2,s3|409,200'; }
+      R.clr = k1 + '|' + E.ids('vehicles') + '|' + E.cs('vehicles'); R.clrok = R.clr === '||false|false|0|n1,s1,s2,s3|409,200'; }
+    // ── 독립 검토 반영 ──
+    // 단골 노선 409 뒤 다시 읽기가 실패 = '못 읽음'으로 남아 다음 저장을 보내지 않음(옛 판 시각으로 또 409를 내지 않게)
+    { const E = mkH(H); E.ex('loadAbPresets()'); await E.flush(); E.S.pre = { items: [{ id: 'p1' }, { id: 'pO' }], ts: 9000 }; E.pgFail = 1;
+      E.ex('abSavePresets(abPresets.items.slice(0, 1))'); await E.flush();
+      E.ex('abSavePresets([{ id: "pZ", from: "x", to: "y", item: "z", unit: "톤" }])'); await E.flush();
+      R.pre2 = E.log.filter((s) => s === 'gw-allbaro:ab_presets_put').length + '|' + E.S.pre.items.length + '|' + E.alerts.filter((t) => t.indexOf('단골 노선을 아직 읽지 못했습니다') === 0).length; R.pre2ok = R.pre2 === '1|2|1'; }
+    // 견적·내 할 일 다시 읽기가 404(대역이 '못 읽음'으로 넘김) = 읽음 표시 내림 → 발행 창·더하기 막음
+    { const E = mkH(H); E.ex('loadQuotes(); loadMyTasks();'); await E.flush(); const a = E.ex('quoteLoaded') + '|' + E.ex('myTodoLoaded');
+      E.get404.quotes = 1; E.get404.mytasks = 1; E.ex('loadQuotes(); loadMyTasks();'); await E.flush();
+      E.ex('openQuoteEdit(null); document.getElementById("myTodoInput").value = "x"; addMyTodo();'); await E.flush();
+      R.r404 = a + '|' + E.ex('quoteLoaded') + '|' + E.ex('myTodoLoaded') + '|' + E.alerts.filter((t) => /아직 읽지 못했습니다/.test(t)).length + '|' + E.calls.filter((x) => x === 'show:qtEditBackdrop:show').length + '|' + E.cs('mytasks');
+      R.r404ok = R.r404 === 'true|true|false|false|2|0|'; }
+    // 같은 사람의 휴가가 보임 → 숨김(읽기 403)으로 바뀐 뒤 신청 = 앞서 읽은 기준 시각을 버림 → base 없음 → 한 번에 200(종전: 409 → 다시 읽기 403 → 412에서 멈춤)
+    { const E = mkH(H); E.ex('loadLeaves()'); await E.flush(); E.S.leaves = Object.assign({}, E.S.leaves, { updated_at: 1001 });
+      E.get403.leaves = 1; E.ex('loadLeaves()'); await E.flush();
+      E.ex(COLS_H.leaves.add + ' doSaveLeaves();'); await E.flush(); await E.fire();
+      R.s5 = E.cs('leaves') + '|' + E.ex('leavesPending'); R.s5ok = R.s5 === '200|false'; }
+    // 로그인 창 '전환'(sessViewerSwap — clearSessionData 안 거침): 앞사람 내 할 일·읽음 표시·403 표시·기준 시각(계약 포함)을 비움
+    { const E = mkH(H); E.ex('sessViewerSwap()'); E.ex('loadMyTasks(); loadVehicles();'); await E.flush();
+      E.get403.leaves = 1; E.ex('loadLeaves()'); await E.flush(); E.get403.leaves = 0; E.ex('_colBase.contracts = 7; conSaveOut = 2;'); const cb0 = E.calls.filter((x) => x === 'conBaseSet').length;
+      E.S.mytasks = { schema: 1, items: [{ id: 'b1' }, { id: 'b2' }], updated_at: 1000 };   // 이제부터 서버 개인 컬렉션 = 다음 사람 것
+      E.me = 'uB'; const sw = E.ex('sessViewerSwap()');
+      const k1 = sw + '|' + E.ex('myTodos.length') + '|' + E.ex('myTodoLoaded') + '|' + Object.keys(E.ex('_colBase')).join(',') + '|' + Object.keys(E.ex('_colRead403')).join(',');
+      R.swapCon = E.ex('conSaveOut') + '|' + (E.calls.filter((x) => x === 'conBaseSet').length - cb0); R.swapConok = R.swapCon === '0|1';   // 계약 기준 사본·나가 있는 저장 수도(clearSessionData의 계약 줄과 같은 것)
+      E.getFail.mytasks = 1; E.ex('loadMyTasks()'); await E.flush();
+      E.ex('document.getElementById("myTodoInput").value = "B 할 일"; addMyTodo();'); await E.flush(); E.ex('addMyTodo()'); await E.flush();
+      E.getFail.leaves = 1; E.ex('loadLeaves()'); await E.flush(); E.ex('leaves.push({ id: "n1", member_id: "uB", updated: "' + DN + '" }); leavesPending = true; doSaveLeaves();'); await E.flush(); await E.fire();
+      R.swap = k1 + '|' + E.ids('mytasks') + '|' + E.ids('leaves') + '|' + E.cs('leaves'); R.swapok = R.swap.indexOf('true|0|false|||') === 0 && /\|b1,b2,tdN\d+\|n1,s1,s2,s3\|409,200$/.test(R.swap); }
+    // 새로고침 없는 로그아웃 뒤 가족친화: 대장만 비우고 기준(famBase)을 남기면 다음 로그인의 읽기 실패 화면 저장이 앞사람 기준으로 200 = 대장 통째(S16) → 기준도 0 → 409 → 다시 읽어 병합
+    { const E = mkH(H); E.ex('fam = ' + JSON.stringify(E.S.family.items) + '; famBase = 1000;');
+      E.ex('sessReadReset(false); fam = [];');   // clearSessionData가 부르는 것과 같은 묶음(세션 비우기 전체는 아래 clr 검사)
+      E.ex('fam.push({ id: "n1", updated: "' + DN + '" }); famPending = true; doSaveFam();'); await E.flush(); await E.fire();
+      R.fam = E.ids('family') + '|' + E.cs('family'); R.famok = R.fam === 'n1,s1,s2,s3|409,200'; }
+    // 그날 직접 추가(운반일지 — 그날 목록 통째 교체 · 실제 카드 단추 배선 abWireManual): 읽기 전 ＋ = 막고 남겨 둠 → 읽히면 서버 목록 위에 얹어 base_ts로 저장 · 다른 기기가 먼저 저장 = 409 → 다시 읽어 얹음 · 계속 409 = 3번에서 멈춤·알림
+    { const E = mkH(H);
+      E.ex('abPresets = { items: [{ id: "p1", from: "a", to: "b", item: "c" }, { id: "p2", from: "x", to: "y", item: "z" }], loading: false, saving: false, error: "", ok: true, ts: 500 };');
+      // 카드 자리(가짜 요소 — 단추에 붙은 실제 처리기를 누름)
+      const els = [], mkEl = (attrs) => { const L = {}, cl = {}; const e = { attrs, value: '', textContent: '', className: '', L, getAttribute: (n) => (attrs[n] === undefined ? null : attrs[n]), addEventListener: (t, f) => { (L[t] = L[t] || []).push(f); }, classList: { contains: (c) => !!cl[c], add: (c) => { cl[c] = 1; }, remove: (c) => { delete cl[c]; } } }; els.push(e); return e; };
+      ['p1', 'p2'].forEach((id) => ['data-ab-card', 'data-ab-n', 'data-ab-q', 'data-ab-plus', 'data-ab-minus'].forEach((k) => mkEl({ [k]: id })));
+      E.host = { querySelectorAll: (sel) => { const m = /^\[(data-[\w-]+)\]$/.exec(sel); return els.filter((e) => m && e.attrs[m[1]] !== undefined); } };
+      E.ex('abWireManual(ENV.host)');
+      E.ex('ENV.click = function(id){ ENV.host.querySelectorAll("[data-ab-plus]").filter(function(e){ return e.attrs["data-ab-plus"] === id; })[0].L.click[0](); }');
+      E.ex('ENV.click("p2")'); await E.fire();
+      const m1 = E.manPuts.length + '|' + E.ex('abManual.err.slice(0, 22)');
+      E.ex('loadAbManual("' + DN + '")'); await E.flush(); await E.fire();
+      const ser = () => E.S.man.items.map((x) => x.route_id + ':' + x.n).join(',');
+      const m2 = ser() + '|' + E.manPuts.join(',') + '|' + E.manSeq.join(',');
+      E.ex('ENV.click("p1")'); await E.fire();   // 다른 기기 없음 = 저장한 판 시각으로 한 번에 200
+      const m3 = ser() + '|' + E.manSeq.join(',');
+      E.manConflict = 1; E.ex('ENV.click("p2")'); await E.fire(); await E.flush(); await E.fire();   // 다른 기기가 먼저 저장 = 409 → 다시 읽어 얹음 → 200
+      const m4 = ser() + '|' + E.manSeq.join(',') + '|' + E.ex('abManual.err');
+      E.manConflict = 9; E.ex('ENV.click("p1")'); await E.fire(); await E.flush(); await E.fire(); await E.flush(); await E.fire();   // 계속 409 = 3번에서 멈춤
+      const m5 = E.manSeq.slice(-3).join(',') + '|' + E.ex('abManual.dirty') + '|' + E.ex('abManual.err.slice(0, 36)');
+      R.man = [m1, m2, m3, m4, m5].join(' / ');
+      R.manok = R.man === '0|그날 입력분을 불러오는 중이라 아직 저장 / p1:3,p2:1|700|200 / p1:4,p2:1|200,200 / p1:4,p2:2|200,200,409,200| / 409,409,409|true|다른 기기에서 그날 직접 추가분이 계속 바뀌어 저장하지 못했습니다'; }
     // 정적: 직원 홈 할 일 더하기(dashAddTodo — 홈 그리기 안의 닫힌 함수)도 같은 막이
     { const i = H.indexOf('function dashAddTodo(){'), seg = i < 0 ? '' : H.slice(i, i + 400); R.dash = seg.indexOf('if (myTodoUnread()) return;') > 0 && seg.indexOf('if (myTodoUnread()) return;') < seg.indexOf('myTodos.push('); }
     R.ok = Object.keys(R).filter((k) => /ok$/.test(k)).every((k) => R[k] === true) && R.dash === true;
@@ -17809,8 +17883,9 @@ try {
     ['}).catch(function(){ saveFailToast("입찰 공고"); });', '}).catch(function(){});'],
     ['      if (!resp.ok){ saveFailToast("거래처 대장", resp.status); return; }', ''],
     ['}).catch(function(){ saveFailToast("거래처 대장"); });', '}).catch(function(){});'],
-    ['if (!resp.ok){ saveFailToast("문서함", resp.status); return; }', 'if (!resp.ok) throw new Error("HTTP " + resp.status);'],
-    ['docSaveRetried = false; saveFailToast("문서함"); });', 'docSaveRetried = false; });'],
+    ['if (!resp.ok){ saveFailToast("문서함", resp.status, true); return; }', 'if (!resp.ok) throw new Error("HTTP " + resp.status);'],
+    ['docSaveRetried = false; saveFailToast("문서함", 0, true); });', 'docSaveRetried = false; });'],
+    ['saveFailToast("문서함", resp.status, true)', 'saveFailToast("문서함", resp.status)'],   // 검토: 문서함은 대기로 남지 않음 — '다시 넣지 마세요' 글이면 사라진 채 둠
     ['    if (myTodoUnread()) return;   // P1 판24h: 목록을 못 읽은 채', '    // P1 판24h: 목록을 못 읽은 채'],   // 내 할 일 더하기 막이
     ['      if (myTodoUnread()) return;   // P1 판24h: 위 addMyTodo와 같은 막이', '      // P1 판24h: 위 addMyTodo와 같은 막이'],   // 직원 홈 더하기 막이(정적)
     ['myTodos = (p && p.items) || []; myTodoLoaded = true;', 'myTodos = (p && p.items) || [];'],   // 읽은 뒤에도 영영 막힘
@@ -17826,7 +17901,8 @@ try {
     ['}).catch(function(){ saveFailToast("현장 대장"); });', '}).catch(function(){});'],
     ['      if(res.status!==200&&res.status!==403) saveFailToast("안전 › 체크 칸 기록", res.status);', ''],
     ['}).catch(function(){ saveFailToast("안전 › 체크 칸 기록"); });', '}).catch(function(){});'],
-    ['function saveFailToast(what, st){ if (st === 412) return; ', 'function saveFailToast(what, st){ '],   // 3번째 충돌 멈춤에 실패 알림이 겹침
+    ['    if (st === 412) return;\n', ''],   // 3번째 충돌 멈춤에 실패 알림이 겹침
+    ['    if (st === 401){ onSessionInvalid(); return; }\n', ''],   // 검토: 직접 저장 401에 실패 알림·로그인 창 안 띄움
     ['abPresets.ok = true; abPresets.ts = Number(b.ts) || 0;', 'abPresets.ts = Number(b.ts) || 0;'],   // 단골 노선 읽은 뒤에도 막힘
     ['    if (!abPresets.ok){', '    if (false){'],   // 단골 노선 읽기 실패 화면 저장이 통째 교체
     ['items: list, base_ts: abPresets.ts || 0 }', 'items: list }'],   // base_ts 안 보냄 = 동시 저장 덮음
@@ -17834,9 +17910,35 @@ try {
     ['        if (b.ts) abPresets.ts = Number(b.ts) || abPresets.ts;', ''],   // 저장한 판 시각 안 담음 = 다음 저장이 409
     ['    if(!id && !quoteLoaded){ alert(QT_UNREAD_MSG); loadQuotes(); return; }', ''],   // 견적 읽기 전 발행 창
     ['        quoteLoaded=true;\n', ''],
-    ['    if (typeof _colBase !== "undefined") Object.keys(_colBase).forEach(function(k){ if (k !== "contracts") delete _colBase[k]; });\n', ''],   // 세션 비울 때 앞사람 기준 시각
-    ['_colRead403 = {}; myTodoLoaded = false; quoteLoaded = false;', 'myTodoLoaded = false; quoteLoaded = false;'],
-    ['_colRead403 = {}; myTodoLoaded = false; quoteLoaded = false;', '_colRead403 = {};'],
+    ['    if (typeof sessReadReset === "function") sessReadReset(false);\n', ''],   // 세션 비울 때 앞사람 기준 시각·표시
+    ['if (withCon || k !== "contracts") delete _colBase[k];', 'if (withCon) delete _colBase[k];'],   // 로그아웃 길에서 계약 밖 기준 시각 남음
+    ['_colRead403 = {}; myTodos = []; myTodoSha = null; myTodoLoaded = false; quoteLoaded = false; famBase = 0;', 'myTodos = []; myTodoSha = null; myTodoLoaded = false; quoteLoaded = false; famBase = 0;'],
+    ['myTodoLoaded = false; quoteLoaded = false; famBase = 0;', 'quoteLoaded = false; famBase = 0;'],
+    ['quoteLoaded = false; famBase = 0;', 'famBase = 0;'],
+    ['; famBase = 0;\n', ';\n'],   // 검토 S16: 가족친화 기준 남음
+    // ── 독립 검토 반영 ──
+    ['if(json&&json.write_denied){ bidsPending=false; saveDeniedToast("입찰 공고"); return; } ', ''],   // M1
+    ['if (json && json.write_denied) saveDeniedToast("거래처 대장"); ', ''],   // M2
+    ['if(paAutoWait){ var w=paAutoWait; paAutoWait=""; paKick(w, true); }', ''],   // M18 성공 뒤 초안 생성
+    ['if (res.status === 409){ abPresets.ok = false; abPresets.items = null;', 'if (res.status === 409){ abPresets.items = null;'],   // M4
+    ['if(resp.status===404){ quoteSha=null; quotes=[]; quoteLoaded=false; renderQuotes(); return; }', 'if(resp.status===404){ quoteSha=null; quotes=[]; renderQuotes(); return; }'],   // M6
+    ['if (resp.status === 404){ myTodoSha = null; myTodos = []; myTodoLoaded = false; renderMyTodos(); return; }', 'if (resp.status === 404){ myTodoSha = null; myTodos = []; renderMyTodos(); return; }'],   // M7
+    ['if(res.status!==200&&res.status!==403) saveFailToast("일용직 명부"', 'if(res.status!==200) saveFailToast("일용직 명부"'],   // M11
+    ['if(res.status!==200&&res.status!==403) saveFailToast("안전 › 체크 칸 기록"', 'if(res.status!==200) saveFailToast("안전 › 체크 칸 기록"'],
+    ['else if(!(res.status===400&&res.body&&res.body.error_code==="ORPHAN_WORKER")) saveFailToast("현장 대장"', 'else saveFailToast("현장 대장"'],   // M13
+    ['_colRead403[col] = 1; delete _colBase[col]; return', '_colRead403[col] = 1; return'],   // S5 403 읽기 뒤 앞서 읽은 기준 시각으로 409 → 412
+    ['    if (typeof sessReadReset === "function") sessReadReset(true);   // P1 판24h 검토', '    // P1 판24h 검토'],   // S1·S4 로그인 창 전환
+    ['if (withCon || k !== "contracts")', 'if (k !== "contracts")'],   // 전환 길에서 계약 기준 시각 남음
+    ['    if (withCon && typeof conBaseSet === "function") conBaseSet([]);\n', ''],   // 전환 길에서 계약 기준 사본 남음
+    ['    if (withCon && typeof conSaveOut !== "undefined") conSaveOut = 0;', ''],   // 전환 길에서 나가 있는 저장 수 남음
+    ['abManPre(card).dn += (v - v0);', ''],   // S2 읽기 전 ＋를 서버 목록 위에 안 얹음
+    ['ids.forEach(function(id){ abManPreApply(items, id, pre[id]); });', ''],
+    ['items: items, base_ts: (typeof abManual.ts === "number") ? abManual.ts : null }', 'items: items }'],   // S3 base_ts 안 보냄
+    ['        if (res.body.ts) abManual.ts = Number(res.body.ts) || abManual.ts;', ''],   // 저장한 판 시각 안 담음
+    ['abManPreBack(sent); abManual.c409 = (abManual.c409 || 0) + 1;', 'abManual.c409 = (abManual.c409 || 0) + 1;'],   // 409 뒤 이 기기 고침 잃음
+    ['        loadAbManual(day);\n      } else {', '      } else {'],   // 409 뒤 다시 안 읽음
+    ['} else if (res.status === 409 && (abManual.c409 || 0) < 2){', '} else if (res.status === 409){'],   // 계속 409면 끝없이
+    ['    abManual.ts = (ts === undefined || ts === null) ? null : (Number(ts) || 0);\n', ''],   // 읽은 판 시각 안 담음
   ];
   const KHr = [];
   for (const [a, b] of KH) { let r; try { r = await runH(onceH(html, a, b)); } catch (e) { r = { ok: false, threw: e.message }; } KHr.push(!r.ok); }
