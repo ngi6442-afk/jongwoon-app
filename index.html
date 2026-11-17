@@ -3765,6 +3765,7 @@
   var _colBase = {};   // 컬렉션별 낙관적 락 base(마지막으로 본 서버 문서의 updated_at)
   var _col409 = {};    // v456(C079) 컬렉션별 연달아 받은 저장 409 수(200·그 밖 응답이면 0 — 3번째에서 멈춤, saveConflictStop)
   var _col409t = {}, _COL409_MS = 30000;   // v456 검토: 마지막 409 시각 — 30초가 지나면 새 저장 줄기로 보고 다시 셈
+  var _colRead403 = {};   // P1 판24h(C206): 읽기가 403(권한 숨김 — 대역이 빈 문서로 넘김)이었던 컬렉션 — 저장 base 0을 걸지 않음(아래 대역 저장 갈래)
   function deviceId(){
     try{ var d = localStorage.getItem(DEVICE_KEY); if(!d){ d = "d" + Math.random().toString(36).slice(2,10) + Date.now().toString(36); localStorage.setItem(DEVICE_KEY, d); } return d; }catch(e){ return "d0"; }
   }
@@ -3843,6 +3844,9 @@
     // 판24g 검토 X6: 계약의 충돌 기준 시각·기준 사본도 비움(새로 고침 없는 로그아웃 — 승인 대기 화면 [다른 계정으로 로그인]) — 남기면 다음 로그인에서 계약 읽기가 실패한 화면의 새 계약 저장이
     //   앞사람의 기준 시각으로 나가 base 0 가드(J3)를 비켜 감 · conBaseSet은 세대 번호도 올려 나가 있던 동기화 사본·늦은 200이 기준을 세우지 못하게 함 · 나가 있는 저장 수도 0
     if (typeof _colBase !== "undefined") delete _colBase.contracts;
+    // P1 판24h(C206): 다른 컬렉션의 기준 시각·403 표시도 비움 — 남기면 다음 로그인에서 읽기가 실패한 화면의 저장(비운 배열 + 새 줄)이 앞사람 기준 시각으로 나가 base 0 가드를 비켜 감(계약은 바로 위 줄)
+    if (typeof _colBase !== "undefined") Object.keys(_colBase).forEach(function(k){ if (k !== "contracts") delete _colBase[k]; });
+    _colRead403 = {}; myTodoLoaded = false; quoteLoaded = false;   // 판24h: 비운 내 할 일·견적은 '아직 못 읽음'(loadMyTasks·loadQuotes가 200에서 다시 켬)
     if (typeof conBaseSet === "function") conBaseSet([]);
     if (typeof conSaveOut !== "undefined") conSaveOut = 0;
     bids = []; onbids = []; quotes = []; promoItems = []; clients = []; myTodos = []; members = []; apprItems = []; myApprItems = []; fam = []; edu = [];
@@ -3906,7 +3910,7 @@
         if (res.status === 401){ onSessionInvalid(); return _ghResp(401, {}); }
         // 403(권한 hide)만 빈 문서로 — 탭도 숨겨져 있고 쓰기도 서버가 막으므로 무해.
         // 그 외 실패(500 등)를 빈 문서+200으로 위조하면 화면·캐시가 비고 다음 저장이 원본을 통째로 덮는다 → 오류는 오류로 전달(각 load*가 캐시 폴백)
-        if (res.status === 403) return _ghResp(200, { sha: "gw", content: b64EncodeUnicode(JSON.stringify(emptyDoc(col))) });
+        if (res.status === 403){ if (typeof _colRead403 !== "undefined") _colRead403[col] = 1; return _ghResp(200, { sha: "gw", content: b64EncodeUnicode(JSON.stringify(emptyDoc(col))) }); }
         var doc = (res.status === 200 && res.body && res.body.doc) ? res.body.doc : null;
         if (!doc) return _ghResp(res.status >= 400 ? res.status : 502, {});
         // P1 판24g(C201 — D3): 목록 일부만 화면에 들이는 읽기(opts.gwPeek — 계약 결재 동기화)는 기준 시각을 바꾸지 않는다. 바꾸면 화면이 흡수하지 않은 서버 판을 '본 것'으로 쳐서
@@ -3925,6 +3929,10 @@
     if (col === "documents" && _colBase[col] === undefined) saveBase = 0;
     // P1 판24g(C201 J3): 계약도 — 부팅 때 계약 목록을 못 읽은 화면에서 새 계약을 만들면 base 없이 나가 서버가 낙관락을 건너뛰고 계약 목록을 새 1건으로 통째로 바꿨다 → base 0 → 409 → 다시 읽어 병합
     if (col === "contracts" && _colBase[col] === undefined) saveBase = 0;
+    // P1 판24h(C206): 나머지 컬렉션도 자료 구분 없이 — 목록을 못 읽은 화면(5xx·끊김으로 기준 시각이 없음)의 저장은 base 0 → 서버에 문서가 있으면 409 → 각 저장 함수의 다시 읽기·병합 길(3번째 409는 위 412 멈춤).
+    //   종전엔 차량·기성·인허가·체크리스트·휴가·견적·홍보·공매가 base 없이 나가 서버 낙관락을 건너뛰고 목록을 이 화면 목록(빈 목록 또는 옛 캐시 + 새 1건)으로 통째로 바꿨다(시험 서버 재현 53→1 등 · 알림 0).
+    //   지시·문서함·계약은 위 제 줄이 맡는다 · 읽기가 403(권한 숨김)이었던 컬렉션은 종전대로 base 없음(쓰기도 서버가 403 — 휴가만 숨김 직원 신청을 서버가 재구성하므로 base 0이면 409가 끝나지 않음)
+    if (_colBase[col] === undefined && col !== "tasks" && col !== "documents" && col !== "contracts" && !(typeof _colRead403 !== "undefined" && _colRead403[col])) saveBase = 0;
     return gwCall("gw-data", { action: "save", collection: col, doc: doc, base: saveBase }).then(function(res){
       if (res.status === 401){ onSessionInvalid(); return _ghResp(401, {}); }
       // 쓰기권한 없음: 서버가 이미 막았고 재시도해도 결과가 같아 200으로 흘린다(무한 재시도 방지). 단 v331부터 조용히 넘기지 않고 표시한다 —
@@ -4045,6 +4053,10 @@
   //   알림은 다음 차례에 띄운다(같은 차례의 저장 실패 안내 토스트가 이 글을 덮지 않게). 고친 내용은 화면(메모리)에 남고, 다음에 고치면 다시 3번까지 보낸다.
   function saveConflictToast(){ setTimeout(function(){ gwToast("저장 충돌 — 새로고침해 주세요. 같은 저장이 연달아 충돌해 더 보내지 않았습니다(고친 내용은 아직 서버에 들어가지 않았습니다).", true); }, 0); }
   function saveConflictStop(n){ if ((n || 0) + 1 < 3) return false; saveConflictToast(); return true; }
+  // P1 판24h(C206 D5): 서버가 받지 않은 저장(5xx·412·그 밖 거절·끊김)을 성공처럼 넘기지 않는다 — 저장 대기 표시는 남기고(다음 저장·다시 읽기 병합이 이 화면의 고침을 지킴) 다시 보내지는 않으며 알림 한 번(지금 토스트 그대로).
+  //   st = 응답 코드(없으면 끊김) · 412 = 같은 저장이 연달아 충돌해 멈춤 — 충돌 알림(saveConflictToast)이 이미 뜨므로 건너뜀
+  function saveFailToast(what, st){ if (st === 412) return; gwToast(what + " 저장에 실패했습니다" + (st ? "(서버 응답 " + st + ")" : "(연결 끊김)") + " — 방금 고친 내용은 이 화면에만 있고 서버에는 들어가지 않았습니다.\n잠시 뒤 다시 해 보시고, 계속 이러면 관리자에게 알려 주세요(새로고침하면 이 화면에서 고친 내용은 사라집니다).", true); }
+  function saveDeniedToast(what){ gwToast(what + " 저장 권한이 없어 서버가 이 변경을 받지 않았습니다.\n화면 값은 새로고침하면 서버 값으로 돌아갑니다.", true); }
 
   // ── 저장 ↔ 화면 갱신 분리 (v336 — PM 2026-09-10 "저장됐으면 저장됐다고만 나오게, 갱신은 실패할 수 없게")
   // 9/9 석면 사고의 진짜 원인은 렌더 코드가 아니라 데이터 모양이었다. 9/2 일괄 입력분 130건이
@@ -11087,6 +11099,7 @@
     var ti = document.getElementById("dashTodoInput"), tb = document.getElementById("dashTodoAdd");
     function dashAddTodo(){
       var v = (ti.value || "").trim(); if (!v) return;
+      if (myTodoUnread()) return;   // P1 판24h: 위 addMyTodo와 같은 막이
       myTodos.push({ id: genId("td"), title: v, done: false, created: todayStr() });
       saveMyTasks(); renderMyTodos(); renderDashboard();
     }
@@ -11426,14 +11439,14 @@
         });
       }
       docSaveRetried = false;
-      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      if (!resp.ok){ saveFailToast("문서함", resp.status); return; }   // P1 판24h(C206): 500·두 번째 409 등을 알림(종전엔 catch가 삼켜 화면에만 남았다가 새로고침 뒤 사라짐)
       // 저장 직후 재조회 — 서버 스탬프(등재자 by·게이트 상태 대기/등재·비관리자 재구성분)를 화면에 반영. 응답엔 updated_at만 온다
       return resp.json().then(function(json){
         docSha = json.content && json.content.sha;
         if (json.register_warn) alert("등재 요청이 아직 결재함에 못 갔습니다 — 자동 재시도됩니다(관리자가 결재함을 열면 카드가 만들어집니다).");
         loadDocuments();
       });
-    }).catch(function(){ docSaveRetried = false; });
+    }).catch(function(){ docSaveRetried = false; saveFailToast("문서함"); });
   }
   // ---- 문서함 2층 분류(문서체계 설계안 v2 2026-09-04 §2·§6, v317) — 1층 대분류 = 업무 영역 12 + 99 미분류(앱 전용), 2층 중분류 = 문서 성격 6(전 대분류 공통). 인허가는 여기 안 끼움(원장=인허가 탭) ----
   // 라벨·키는 서버 DOC_MAJOR_LABEL·DOC_MINOR_LABEL과 동일(uismoke 대조). 순회 순서는 리터럴 배열(Object.keys는 "10"·"99" 같은 정수형 키를 앞으로 올린다)
@@ -12693,7 +12706,8 @@
           loadWorkers();
         }
       }
-    }).catch(function(){});
+      if(res.status!==200&&res.status!==403) saveFailToast("일용직 명부", res.status);   // P1 판24h(C206): 500 등도 알림(대기·고친 줄 표시는 남김 — 종전엔 알림 0)
+    }).catch(function(){ saveFailToast("일용직 명부"); });
   }
   function liveWorkers(){ return workers.filter(function(w){ return w && w.del!==1; }); }
   function sortedWorkers(){ return liveWorkers().sort(function(a,b){ return ((a.role==="반장"?0:1)-(b.role==="반장"?0:1)) || (a.name||"").localeCompare(b.name||""); }); }
@@ -17802,8 +17816,9 @@
     fetch(LEAVES_API,{method:"PUT",headers:Object.assign({"Content-Type":"application/json"},ghHeaders()),body:JSON.stringify(payload)}).then(function(resp){
       if(resp.status===401) return;
       if(resp.status===409||resp.status===422){ return fetch(LEAVES_API,{headers:ghHeaders()}).then(function(r){return r.status===404?null:r.json();}).then(function(j){ if(j){var up={};try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} leaves=mergeLeaves(leaves,up.items||[]); leavesSha=j.sha;} return doSaveLeaves(); }); }
-      return resp.json().then(function(json){ leavesSha=json.content&&json.content.sha; leavesPending=false; });
-    }).catch(function(){});
+      if(!resp.ok){ saveFailToast("휴가", resp.status); return; }   // P1 판24h(C206 D5): 500·412 등을 성공으로 넘기지 않음(대기 남김 — 종전엔 대기를 풀어 새로고침 뒤 사라짐)
+      return resp.json().then(function(json){ if(json&&json.write_denied){ leavesPending=false; saveDeniedToast("휴가"); return; } leavesSha=json.content&&json.content.sha; leavesPending=false; });
+    }).catch(function(){ saveFailToast("휴가"); });
   }
   function leaveDays(type,start,end){
     if(isPartialLeave(type)) return LEAVE_PARTIAL[type];
@@ -18205,7 +18220,8 @@
         });
       }
       if(res.status===200){ famBase=(res.body&&res.body.updated_at)||Date.now(); famPending=false; }
-    }).catch(function(){});
+      else saveFailToast("가족친화 대장", res.status);   // P1 판24h(C206): 실패 알림(대기는 남김 — 종전엔 알림 0)
+    }).catch(function(){ saveFailToast("가족친화 대장"); });
   }
   // 분기 선택 상태 + 기간 계산
   var famQ = null;   // {y,q}
@@ -18294,7 +18310,8 @@
         gwToast("현장 대장을 저장하지 못했습니다 — 넣은 일용직이 아직 서버 명부에 없습니다(일용직 명부 저장이 끝나지 않음).\n일용직 명부가 저장된 뒤 그 현장 [근로자 추가]에서 [이 현장에 넣기]를 다시 눌러 주세요.", true);
       }
       if(res.status===200){ asbBase=(res.body&&res.body.updated_at)||Date.now(); asbPending=false; if(!canSee("safety")) loadSiteEduGap(sent); }   // v433: 저장한 대장(보낸 서명)으로 특별교육 줄 다시 확인 — 응답 전에 또 고친 줄은 다음 저장 뒤까지 '확인 못 함'(화면 대장으로 서명하면 옛 이름이 확인된 것처럼 그려짐 — v433 검토)
-    }).catch(function(){});
+      else if(!(res.status===400&&res.body&&res.body.error_code==="ORPHAN_WORKER")) saveFailToast("현장 대장", res.status);   // P1 판24h(C206): 500 등도 알림(대기는 남김 — 종전엔 알림 0 · 명부 밖 일용직 거절은 위 제 알림)
+    }).catch(function(){ saveFailToast("현장 대장"); });
   }
   function asbWorkerNames(r){
     var out=[];
@@ -20072,7 +20089,8 @@
         if((res.body&&res.body.error_code)==="DEVICE_NOT_APPROVED") gwToast("승인되지 않은 기기입니다 — 관리자에게 기기 승인을 요청하세요.\n안전 › 체크 칸 기록 변경은 아직 서버에 저장되지 않았습니다.", true);
         else { eduPending=false; gwToast("안전 › 체크 칸 기록 저장 권한이 없어 서버가 이 변경을 받지 않았습니다.\n화면 값은 새로고침하면 서버 값으로 돌아갑니다.", true); }
       }
-    }).catch(function(){});
+      if(res.status!==200&&res.status!==403) saveFailToast("안전 › 체크 칸 기록", res.status);   // P1 판24h(C206): 500 등도 알림(대기는 남김 — 종전엔 알림 0)
+    }).catch(function(){ saveFailToast("안전 › 체크 칸 기록"); });
   }
   // v430 교육·검진 쓰기 가드(openEdu·saveEdu·deleteEdu 첫 줄) — 안전 '수행'만. 보기 권한 칸은 [+ 이력 추가]·[수정]이 숨지만(.sf-pane.readonly) 창이 열린 사이 권한이 바뀌어도 알린다
   var EDU_NO_WRITE = "안전 › 체크 칸 기록을 추가·수정·삭제할 권한이 없습니다 — 권한관리 [안전] 열이 '수행'이어야 합니다.";
@@ -21176,23 +21194,28 @@
     fetch(BIDS_API,{method:"PUT",headers:Object.assign({"Content-Type":"application/json"},ghHeaders()),body:JSON.stringify(payload)}).then(function(resp){
       if(resp.status===401) return;
       if(resp.status===409||resp.status===422){ return fetch(BIDS_API,{headers:ghHeaders()}).then(function(r){return r.status===404?null:r.json();}).then(function(j){ if(j){var up={};try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} bids=mergeBidsLocal(bids,up.items||[]); if(up.health) bidsHealth=up.health; if(up.awards) bidsAwards=up.awards; bidsSha=j.sha;} return doSaveBids(); }); }
-      return resp.json().then(function(json){ if(resp.status===400&&json&&json.error_code==="GATE_CORP_REG"){ bidCorpGateRevert(json); return; } bidsSha=json.content&&json.content.sha; bidsPending=false; });   // P1 판1: 투찰 잠금 거절은 그 줄만 되돌려 다시 저장(@corp-reg)
-    }).catch(function(){});
+      return resp.json().then(function(json){ if(resp.status===400&&json&&json.error_code==="GATE_CORP_REG"){ bidCorpGateRevert(json); return; } if(!resp.ok){ saveFailToast("입찰 공고", resp.status); return; } if(json&&json.write_denied){ bidsPending=false; saveDeniedToast("입찰 공고"); return; } bidsSha=json.content&&json.content.sha; bidsPending=false; });   // P1 판1: 투찰 잠금 거절은 그 줄만 되돌려 다시 저장(@corp-reg) · P1 판24h(C206): 그 밖 실패(500·412 등)는 성공으로 넘기지 않음(대기 남김 · 종전엔 대기를 풀었다)
+    }).catch(function(){ saveFailToast("입찰 공고"); });
   }
   function bidNewCount(){ return liveBids().filter(function(b){ return b.status==="new" && !bidExpired(b); }).length; }
 
   // ---- 견적서 탭 (파이프라인과 별개 발행 · 문서번호 채번·이력) ----
   var quotes=[], quoteSha=null, quoteSaveTimer=null, quotePending=false, qtEditId=null;
+  // P1 판24h(C206): quoteLoaded = 서버 견적 목록을 읽었나(GET 200에서만 켬 — 실패·로그아웃이면 끔). 못 읽은 채 [+ 견적서 발행] 창을 열면 번호를 빈 목록 기준(이 달 01)으로 매겨
+  //   기존 번호와 겹쳤다 — 읽기 전에는 발행 창을 열지 않고 알린 뒤 다시 읽음(거래처 cliLoaded v441과 같은 꼴 · 저장 덮어쓰기 자체는 공통 길 base 0이 막음)
+  var quoteLoaded = false;
+  var QT_UNREAD_MSG = "견적서 목록을 아직 읽지 못했습니다 — 잠시 뒤 다시 해 보시고, 계속 이러면 새로고침한 뒤 다시 해 주세요. (읽기 전에 발행하면 견적번호가 기존 번호와 겹칠 수 있어 막습니다)";
   function liveQuotes(){ return quotes.filter(function(q){ return q && q.del!==1; }); }
   function loadQuotes(){
     var token=getToken(); if(!token) return;
     fetch(QUOTE_API,{headers:ghHeaders()}).then(function(resp){
-      if(resp.status===404){ quoteSha=null; quotes=[]; renderQuotes(); return; }
+      if(resp.status===404){ quoteSha=null; quotes=[]; quoteLoaded=false; renderQuotes(); return; }
       if(!resp.ok) throw new Error("HTTP "+resp.status);
       return resp.json().then(function(json){
         quoteSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content));
         var ri=(p&&p.items)||[];
         quotes = quotePending ? mergeQuotes(quotes, ri) : ri;
+        quoteLoaded=true;
         renderQuotes();
       });
     }).catch(function(){});
@@ -21211,8 +21234,9 @@
     fetch(QUOTE_API,{method:"PUT",headers:Object.assign({"Content-Type":"application/json"},ghHeaders()),body:JSON.stringify(payload)}).then(function(resp){
       if(resp.status===401) return;
       if(resp.status===409||resp.status===422){ return fetch(QUOTE_API,{headers:ghHeaders()}).then(function(r){ return r.status===404?null:r.json(); }).then(function(j){ if(j){ var up={}; try{ up=JSON.parse(b64DecodeUnicode(j.content))||{}; }catch(e){} quotes=mergeQuotes(quotes,up.items||[]); quoteSha=j.sha; } return doSaveQuotes(); }); }
-      return resp.json().then(function(json){ quoteSha=json.content&&json.content.sha; quotePending=false; renderQuotes(); });
-    }).catch(function(){});
+      if(!resp.ok){ saveFailToast("견적서", resp.status); return; }   // P1 판24h(C206 D5): 실패는 실패로(대기 남김)
+      return resp.json().then(function(json){ if(json&&json.write_denied){ quotePending=false; saveDeniedToast("견적서"); return; } quoteSha=json.content&&json.content.sha; quotePending=false; renderQuotes(); });
+    }).catch(function(){ saveFailToast("견적서"); });
   }
   // 채번: YYYYMM-NN (해당 월 발행분 중 최대 일련 +1). 수동 수정도 허용.
   function quoteNextNo(dateIso){
@@ -21256,6 +21280,7 @@
     }); });
   }
   function openQuoteEdit(id){
+    if(!id && !quoteLoaded){ alert(QT_UNREAD_MSG); loadQuotes(); return; }   // P1 판24h: 읽기 전 발행 창 막음(위 quoteLoaded)
     qtEditId=id||null;
     var q=id?liveQuotes().filter(function(x){return x.id===id;})[0]:null;
     document.getElementById("qtEditTitle").textContent = q?"견적서 수정":"견적서 발행";
@@ -23430,13 +23455,14 @@
     fetch(PROMO_API,{method:"PUT",headers:Object.assign({"Content-Type":"application/json"},ghHeaders()),body:JSON.stringify(payload)}).then(function(resp){
       if(resp.status===401) return;
       if(resp.status===409||resp.status===422){ return fetch(PROMO_API,{headers:ghHeaders()}).then(function(r){ return r.status===404?null:r.json(); }).then(function(j){ if(j){ var up={}; try{ up=JSON.parse(b64DecodeUnicode(j.content))||{}; }catch(e){} promoItems=mergePromo(promoItems,up.items||[]); promoSha=j.sha; } return doSavePromo(); }); }
-      return resp.json().then(function(json){ promoSha=json.content&&json.content.sha; promoPending=false; renderPromo();
+      if(!resp.ok){ saveFailToast("홍보 기록", resp.status); return; }   // P1 판24h(C206 D5): 실패는 실패로 — 대기 남김 · 서버에 없는 기록으로 초안 생성·사진 가리기·갤러리 전송을 이어 가지 않음(기다리는 일은 다음 저장 200 뒤)
+      return resp.json().then(function(json){ if(json&&json.write_denied){ promoPending=false; saveDeniedToast("홍보 기록"); return; } promoSha=json.content&&json.content.sha; promoPending=false; renderPromo();
         if(paAutoWait){ var w=paAutoWait; paAutoWait=""; paKick(w, true); }   // 새 기록이 서버에 실린 뒤에만 자동 생성
         if(maskAutoWait){ var mw=maskAutoWait; maskAutoWait=""; maskKick(mw, false); }   // v354: 사진 가리기 자동 감지도 저장 뒤에
         if(galWait){ var g=galWait; galWait=""; galleryRelaySend(g); }        // 혁신⑥ — posted 저장이 서버에 실린 뒤에만 갤러리 전송
         if(mapWait){ mapWait=false; mapRelaySend(); }                         // 혁신⑦ — posted 저장이 서버에 실린 뒤 시공 지도 재빌드(무음)
       });
-    }).catch(function(){});
+    }).catch(function(){ saveFailToast("홍보 기록"); });
   }
 
   var PROMO_COLS=[["review","검수 대기"],["rejected","반려"],["approved","게시 대기"],["posted","게시 완료"]];
@@ -25995,8 +26021,9 @@
     fetch(ONBID_API,{method:"PUT",headers:Object.assign({"Content-Type":"application/json"},ghHeaders()),body:JSON.stringify(payload)}).then(function(resp){
       if(resp.status===401) return;
       if(resp.status===409||resp.status===422){ return fetch(ONBID_API,{headers:ghHeaders()}).then(function(r){return r.status===404?null:r.json();}).then(function(j){ if(j){var up={};try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} onbids=mergeBidsLocal(onbids,up.items||[]); onbidSha=j.sha;} return doSaveOnbid(); }); }
-      return resp.json().then(function(json){ onbidSha=json.content&&json.content.sha; onbidPending=false; });
-    }).catch(function(){});
+      if(!resp.ok){ saveFailToast("공매·부동산", resp.status); return; }   // P1 판24h(C206 D5): 실패는 실패로(대기 남김)
+      return resp.json().then(function(json){ if(json&&json.write_denied){ onbidPending=false; saveDeniedToast("공매·부동산"); return; } onbidSha=json.content&&json.content.sha; onbidPending=false; });
+    }).catch(function(){ saveFailToast("공매·부동산"); });
   }
   function setObStatus(id, st){
     if(!isAdmin()) return;
@@ -26355,8 +26382,9 @@
       if (resp.status === 409) return cliSaveConflict(retried);   // v441 검토: 종전엔 409를 소리 없이 삼켜 이 저장과 그 뒤 이 기기 저장이 새로고침 때까지 모두 버려졌다
       // v456(원장 C080): 서버도 새로 바뀐 사업자번호 칸의 13자리(주민·법인등록번호 꼴)를 400 CLI_BIZ13으로 막는다(옛 캐시 앱·콘솔 길) — 지금 토스트로 같은 안내(저장 안 됨 · 고친 표시는 남김)
       if (resp.status === 400) return resp.json().then(function(j){ if (j && j.error_code === "CLI_BIZ13") gwToast(CLI_BIZ13_MSG + "\n(이번 저장은 서버에 들어가지 않았습니다 — 그 거래처를 [수정]에서 고쳐 주세요.)", true); });
-      return resp.json().then(function(json){ cliSha = json.content && json.content.sha; if (resp.ok) Object.keys(sent).forEach(function(id){ if (cliDirty[id] === sent[id]) delete cliDirty[id]; }); });
-    }).catch(function(){});
+      if (!resp.ok){ saveFailToast("거래처 대장", resp.status); return; }   // P1 판24h(C206): 500 등은 알림(고친 표시는 남겨 다음 저장이 보냄 — 종전엔 알림 없이 판 표식만 비웠다)
+      return resp.json().then(function(json){ cliSha = json.content && json.content.sha; if (json && json.write_denied) saveDeniedToast("거래처 대장"); if (resp.ok) Object.keys(sent).forEach(function(id){ if (cliDirty[id] === sent[id]) delete cliDirty[id]; }); });
+    }).catch(function(){ saveFailToast("거래처 대장"); });
   }
   // v441 검토: 저장이 409 — 서버 대장을 다시 읽어(낙관락 base도 새로) 이 기기에서 고친 거래처(cliDirty)만 이 기기 것으로 합친 뒤 한 번 더 저장. 또 튕기거나 다시 읽기에 실패하면 알림(새로고침).
   //   그사이 다른 기기가 같은 거래처(상호 열쇠·사업자번호 — cliTwinOf)를 먼저 넣었으면 둘 다 남기고 알림(중복·삭제는 사람 확인 — 자동으로 빼거나 합치지 않음)
@@ -26958,23 +26986,31 @@
   // ---- 내가 할 일(mytasks) — 사용자별 비공개(서버가 본인 것만 저장/반환) ----
   var myTodos = [];
   var myTodoSha = null;
+  // P1 판24h(C206): 내 할 일은 서버 개인 컬렉션이라 낙관락이 없다 — 앱을 켤 때 목록을 못 읽은 화면(빈 목록)에서 하나 더하면 저장이 서버의 내 할 일 전체를 새 1건으로 바꿨다(알림 0).
+  //   myTodoLoaded = 서버 목록을 읽었나(GET 200에서만 켬 — 실패·로그아웃이면 끔) · 못 읽었으면 더하기·저장을 막고 알린 뒤 다시 읽음(거래처 cliLoaded v441과 같은 꼴) · myTodoLoading = 읽는 중인 수(겹쳐 읽지 않게)
+  var myTodoLoaded = false, myTodoLoading = 0;
+  var MYTODO_UNREAD_MSG = "내 할 일 목록을 아직 읽지 못했습니다 — 잠시 뒤 다시 해 보시고, 계속 이러면 새로고침한 뒤 다시 해 주세요. (읽기 전에 저장하면 서버의 내 할 일이 이 화면 목록으로 바뀔 수 있어 막습니다)";
+  function myTodoUnread(){ if (myTodoLoaded) return false; alert(MYTODO_UNREAD_MSG); if (!myTodoLoading) loadMyTasks(); return true; }
   function loadMyTasks(){
     var token = getToken(); if (!token) return;
+    myTodoLoading++;
     fetch(MYTASKS_API, {headers: ghHeaders()}).then(function(resp){
-      if (resp.status === 404){ myTodoSha = null; myTodos = []; renderMyTodos(); return; }
+      if (resp.status === 404){ myTodoSha = null; myTodos = []; myTodoLoaded = false; renderMyTodos(); return; }
       if (!resp.ok) throw new Error("HTTP " + resp.status);
-      return resp.json().then(function(json){ myTodoSha = json.sha; var p = JSON.parse(b64DecodeUnicode(json.content)); myTodos = (p && p.items) || []; renderMyTodos(); });
-    }).catch(function(){ renderMyTodos(); });
+      return resp.json().then(function(json){ myTodoSha = json.sha; var p = JSON.parse(b64DecodeUnicode(json.content)); myTodos = (p && p.items) || []; myTodoLoaded = true; renderMyTodos(); });
+    }).catch(function(){ renderMyTodos(); }).then(function(){ myTodoLoading--; }, function(){ myTodoLoading--; });
   }
   function saveMyTasks(){
     var token = getToken(); if (!token) return;
+    if (!myTodoLoaded){ gwToast(MYTODO_UNREAD_MSG, true); return; }   // 판24h: 못 읽은 목록은 보내지 않음(더하기는 위 myTodoUnread가 먼저 막음 — 여기는 그 밖 길의 마지막 막이)
     var body = JSON.stringify({schema: 1, items: myTodos});
     var payload = {message: "mytasks", content: b64EncodeUnicode(body), branch: "main"};
     if (myTodoSha) payload.sha = myTodoSha;
     fetch(MYTASKS_API, {method: "PUT", headers: Object.assign({"Content-Type":"application/json"}, ghHeaders()), body: JSON.stringify(payload)}).then(function(resp){
       if (resp.status === 401) return;
+      if (!resp.ok){ saveFailToast("내 할 일", resp.status); return; }   // 판24h: 실패 알림(종전엔 삼킴)
       return resp.json().then(function(json){ myTodoSha = json.content && json.content.sha; });
-    }).catch(function(){});
+    }).catch(function(){ saveFailToast("내 할 일"); });
   }
   // 기한(due, 선택) — 지시와 같은 D-day 배지(경과 빨강·3일 내 주황). 미완료 행에는 인라인 날짜칸으로 기한을 바로 고친다(v309, PM 9/3).
   // 정렬 — 기한 있는 것부터 기한순, 없는 것은 생성순(내게 온 지시와 같은 규칙). 내 업무 탭·직원 홈 공용
@@ -27025,6 +27061,7 @@
   function addMyTodo(){
     var el = document.getElementById("myTodoInput"), dueEl = document.getElementById("myTodoDue");
     var title = el.value.trim(); if (!title) return;
+    if (myTodoUnread()) return;   // P1 판24h: 목록을 못 읽은 채 더하면 서버의 내 할 일이 새 1건으로 바뀜(입력 글은 칸에 남김)
     var due = (dueEl && isDate(dueEl.value)) ? dueEl.value : "";
     myTodos.push({ id: genId("td"), title: title, done: false, due: due, created: todayStr() });
     el.value = ""; if (dueEl) dueEl.value = "";
@@ -29992,6 +30029,7 @@ function dutyStage(nx){
         var b = res.body || {};
         abPresets.items = abNormPresets(Array.isArray(b.items) ? b.items : (Array.isArray(b.presets) ? b.presets : []));
         abPresets.error = "";
+        abPresets.ok = true; abPresets.ts = Number(b.ts) || 0;   // P1 판24h(C206): 읽었음 + 읽은 판 시각(저장 때 base_ts — 서버 경합 가드)
       } else if (res.status === 404){
         abPresets.items = [];
       } else {
@@ -30008,14 +30046,19 @@ function dutyStage(nx){
   }
   function abSavePresets(list, done){
     if (abPresets.saving){ alert("이전 노선 저장이 아직 끝나지 않았습니다. 잠시 뒤 다시 시도하세요."); return; }
+    // P1 판24h(C206): 단골 노선은 목록 통째 교체 — 노선을 못 읽은 화면(오류 줄이 뜬 빈 목록)에서 [＋ 노선 추가]를 저장하면 회사 공용 노선 전체가 새 1개로 바뀌었다(직전 1벌만 서버에 남음).
+    //   못 읽었으면 저장하지 않고 다시 읽음 · 읽은 판 시각(base_ts)을 보내 그사이 다른 기기가 바꿨으면 서버가 409(종전엔 base_ts를 안 보내 서버 경합 가드가 한 번도 안 걸림)
+    if (!abPresets.ok){ alert("단골 노선을 아직 읽지 못했습니다 — 다시 읽습니다. 노선이 보이면 다시 해 주세요. (읽기 전에 저장하면 회사 단골 노선 전체가 이 화면 목록으로 바뀔 수 있어 막습니다)"); abPresets.error = ""; abPresets.items = null; loadAbPresets(); renderAbManual(true); return; }
     abPresets.saving = true;
-    gwCall("gw-allbaro", { action: "ab_presets_put", items: list }).then(function(res){
+    gwCall("gw-allbaro", { action: "ab_presets_put", items: list, base_ts: abPresets.ts || 0 }).then(function(res){
       abPresets.saving = false;
       if (res.status === 401){ onSessionInvalid(); return; }
+      if (res.status === 409){ abPresets.ok = false; abPresets.items = null; loadAbPresets(); renderAbManual(true); alert("다른 기기에서 단골 노선이 먼저 바뀌어 이번 저장은 들어가지 않았습니다 — 노선을 다시 읽었습니다. 확인한 뒤 다시 해 주세요."); return; }
       if (res.status === 200 && res.body && res.body.ok !== false){
         var b = res.body || {};
         abPresets.items = abNormPresets(Array.isArray(b.items) ? b.items : list);   // 서버가 정리한 목록이 오면 그것을 따른다
         abPresets.error = "";
+        if (b.ts) abPresets.ts = Number(b.ts) || abPresets.ts;   // 판24h: 저장한 판 시각(다음 저장의 base_ts)
         if (done) done();
         renderAbManual(true);
         return;

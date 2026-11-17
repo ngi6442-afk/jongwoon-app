@@ -2605,13 +2605,14 @@ try {
   const dse30 = (status, code) => { const log = []; const api = new Function('__st', '__code', '__log', ['var edu = [], eduBase = 0, eduPending = true, eduLoaded = true;',   // v447 eduLoaded — 읽은 뒤 저장(읽기 전은 v447 검사)
     'function gwCall(fn, body){ __log.push(fn + ":" + body.action + ":" + body.collection); return { then: function(f){ f({ status: __st, body: __code ? { error_code: __code } : {} }); return { catch: function(){} }; } }; }',
     'function gwToast(m, w){ __log.push("toast:" + (w ? "warn:" : "") + m); } function mergeEdu(a){ return a; }',
+    'function saveFailToast(w, st){ __log.push("fail:" + w + ":" + st); }',   // P1 판24h(C206): 500 등은 실패 알림(대기 유지) — 알림 글은 'P1 판24h' 블록이 실제 함수로 봄
     fn30('doSaveEdu'), 'doSaveEdu(); return { pending: function(){ return eduPending; } };'].join('\n'))(status, code, log); return { log, pending: api.pending() }; };
   const ds403_30 = dse30(403, 'NO_WRITE'), ds403n_30 = dse30(403), ds403d_30 = dse30(403, 'DEVICE_NOT_APPROVED'), ds200_30 = dse30(200), ds500_30 = dse30(500);
   const noWr30 = (r) => r.log.length === 2 && r.log[0] === 'gw-data:save:edu' && r.log[1].indexOf('toast:warn:안전 › 체크 칸 기록 저장 권한이 없어 서버가 이 변경을 받지 않았습니다') === 0 && r.pending === false;
   T('v430 doSaveEdu: 서버 거절 403 NO_WRITE(안전 수행이 아님 — 이유 코드가 없는 403도)면 경고 토스트 "안전 › 체크 칸 기록 저장 권한이 없어 서버가 이 변경을 받지 않았습니다"(v447 칸 이름)·보류 해제(다음 읽기 때 서버 값) / 403 DEVICE_NOT_APPROVED(기기 승인 취소)면 "승인되지 않은 기기입니다" 안내·권한 문구 없음·보류 유지 / 200은 토스트 없음 / 그 밖의 오류는 종전대로(보류 유지)',
     noWr30(ds403_30) && noWr30(ds403n_30)
     && ds403d_30.log.length === 2 && ds403d_30.log[1].indexOf('toast:warn:승인되지 않은 기기입니다 — 관리자에게 기기 승인을 요청하세요.') === 0 && ds403d_30.log[1].indexOf('저장 권한이 없어') < 0 && ds403d_30.pending === true
-    && ds200_30.log.join(',') === 'gw-data:save:edu' && ds200_30.pending === false && ds500_30.log.join(',') === 'gw-data:save:edu' && ds500_30.pending === true,
+    && ds200_30.log.join(',') === 'gw-data:save:edu' && ds200_30.pending === false && ds500_30.log.join(',') === 'gw-data:save:edu,fail:안전 › 체크 칸 기록:500' && ds500_30.pending === true,   // 판24h: 500 = 보류 유지 + 실패 알림 1번(종전 알림 0)
     JSON.stringify({ a: ds403_30, n: ds403n_30, d: ds403d_30, b: ds200_30, c: ds500_30 }));
 
   // ⑧ 레지스트리 자리(정적) — 칩·칸 · 안전 탭 버튼은 MODULE_TAB 값에 없음 · view-safety도 MODULE_VIEW 값에 없음
@@ -3746,6 +3747,7 @@ try {
     'function gwCall(fn, body){ var k = body.action + (body.collection ? ":" + body.collection : ""); __log.push(k); var r = __resp[k]; if (typeof r === "function") r = r(); if (r instanceof Error) return Promise.reject(r); return (r && typeof r.then === "function") ? r : Promise.resolve(r || { status: 500, body: {} }); }',
     'function csSiteHooksRetry(){ __log.push("hooks"); } function renderSites(){ __log.push("renderSites"); } function renderCalendar(){} function renderWorkers(){}',
     'function asbNoSpecial(){ return ["(앱 판정)"]; }',
+    'function saveFailToast(w, st){ __log.push("fail:" + st); }',   // P1 판24h(C206): 대장 저장 실패 알림(이 검사는 site_edu_gap 부르는 횟수만 셈 — 알림 글은 'P1 판24h' 블록)
     fn33('asList'), fn33('memberName'), fn33('asbWorkerNames'), fn33('mergeAsb'), fn33('normAsbRow'), fn33('liveAsb'), fn33('liveSites'), fn33('esc'), fn33('sheetRow'),
     GAPDECL33, 'var siteEduGapSig = {}, siteEduGapSeq = 0;',
     fn33('siteGapSig'), fn33('siteGapSigs'), SK33, fn33('siteEduLine'), fn33('siteEduLines'), fn33('loadSiteEduGap'), fn33('loadAsb'), fn33('doSaveAsb'),
@@ -8951,7 +8953,8 @@ try {
   //   375 실행 = 옛 카드 6장·표 글 0·옛 칩 줄 보임(HTML 인라인 display 그대로)·머리 '총 9 · 표시 6/6'(옛 셈)·검색칸 안내 옛 글·자리 legacy → 1366(경계 넘김) = 표·옛 칩 줄 숨김·[더보기] 숨김·검색칸 안내 표 글·머리 '총 9 · 표시 6/6'(v444 검토 — 옛 본문과 같은 식, 그린 뒤 onPaint) →
   //   검색칸에 '포항'이 있는 채 다시 375 = 옛 검색어(obSearchTerm)를 칸 글로 맞춰 그 카드만(o1) · 옛 칩 줄 다시 flex
   const LEG_SHA44 = 'd45120dd7f6a70e20d795dc6f1c1b6beab7d5a83a13b0e24c10109156d47788a';
-  const KEEP44 = { setObStatus: '79168b6660b9598b', loadOnbid: '16871a60c10cbe26', scheduleOnbidSave: '66cca6b7fa0614de', doSaveOnbid: '167747227433dac3', obExpired: '5bebe392d73fa422', liveObs: '283968a60a2a2fdc', findOb: 'ba94045a8e6b99ef', setBidLayer: '2866e6652936072a', mergeBidsLocal: 'b381a770ab833b3e' };
+  const KEEP44 = { setObStatus: '79168b6660b9598b', loadOnbid: '16871a60c10cbe26', scheduleOnbidSave: '66cca6b7fa0614de', doSaveOnbid: 'fc8398008a04a5b2', obExpired: '5bebe392d73fa422', liveObs: '283968a60a2a2fdc', findOb: 'ba94045a8e6b99ef', setBidLayer: '2866e6652936072a', mergeBidsLocal: 'b381a770ab833b3e' };
+  //   P1 판24h(C206 D5): doSaveOnbid는 실패 응답·끊김·쓰기 거절을 성공으로 넘기지 않는 본문으로 다시 고정(16774722… → fc839800… — 고친 동작은 'P1 판24h'가 실행으로 지킴)
   const keepBad9 = Object.keys(KEEP44).filter((n) => sha44(body44(n)).slice(0, 16) !== KEEP44[n]);
   const X9 = mk44({ width: 375 }); X9.api.render(); const g9 = (id) => X9.env.host(id);
   const p9 = [(X9.host._h.match(/<div class="item"/g) || []).length, X9.host._h.indexOf('data-vs-row') < 0, g9('obFilterBar').style.display, /data-ob-st-f="all">전체 6<\/button>/.test(g9('obFilterBar').innerHTML), g9('obHead').textContent, g9('obSearch').placeholder, X9.host.getAttribute('data-vs-mode')];
@@ -9639,7 +9642,7 @@ try {
     asbWorkerNames: '1b19314636ac3e991335bc6a1449a643e71b3af4771e52201097e5dd20627c2f', siteYear: '1809126db67bd12286c9fb8b49fbcf0ff3fb0c2b84aa76c48e1e1df6320359a2', sheetRow: 'f77f0201e4dee7c2179eec69c9503a423dd46ce569d4b76061847b29d0b26fc8',
     bindFold: '2e17be3f057f6b655fa35148f5297d965924e9b512d7fb3eb04b85640cd1c2bc', renderSiteFilter: 'e97f8fe38b3fd5a03059965f57755e56759cc40c7045814b5f34718bef78dd7a', siteLabel: '049362d010ea05ceeffb8696f4991ef0217d477609575e6b06b2c7f2fd0a7f8e',
     siteKind: '64c88120acef6e84df6790fd6d823260eecfaf65797395716fc915db9c6c0c68', liveSites: 'e00f9252efe93c334c686519f1045752b921aa980071aa9cf0ad9c7bc1ceb206', asbNotifyDue: '69a4a67bc06987e081064888bb7a94bf1dd41cb8010f5aa75cde6ff4f409059f',
-    asbKeepUntil: '18324fa514e86abd8f436ca1cf791a49d6b6b4129862614277fcd475d50c3b55', loadAsb: '82117c350e5ed2fe6c06fe9d34f8c396d60fa8f7ab948964596ea971529f2692', doSaveAsb: 'c222ce0bd5f70b3534e319e55460b8b29c7c39ef05f25cf21359da6ad1960000',
+    asbKeepUntil: '18324fa514e86abd8f436ca1cf791a49d6b6b4129862614277fcd475d50c3b55', loadAsb: '82117c350e5ed2fe6c06fe9d34f8c396d60fa8f7ab948964596ea971529f2692', doSaveAsb: '95db3507549c408d0e9766262fe4e991df6a50fc16913e2b0de392d5c4367488',
     loadSiteEduGap: '206f6af42ee8808fafec26b2e8742dff16caf2dad025c86653e1de3b3b556591', openSiteWorkers: '87bac54bab4f204a3e6366c5bff4c8d881fba2a95a1c42d2b792843b6a68fba5', siteGapSig: '2fc2297595a63951b3285ed8b880a5374bd23826c649aa067ee1d02d9c1b8a0a',
     siteGapSigs: '57394ee9f4c0ce6313ce503e414ef906cbbc35594ff43f56bbf935bb35490724', renderSwList: '769c2fa77f6c4ba96c8697590a809712ef9a93d0599481d3a776a663ba40b635' };
   //   v445 검토: 현장 창 두 함수(openSiteWorkers·renderSwList)는 창 안 선택 swSel(검색으로 다시 그려도 체크 그대로·그려지지 않은 지정은 빠지지 않음 — 30년 보존 근로자 id)과
@@ -9648,6 +9651,7 @@ try {
   //   v456(원장 C079·C082 ②): doSaveAsb는 연속 409 멈춤(n·saveConflictStop)·다시 읽기 실패 뒤 다시 저장 안 함(saveConflictToast)·400 ORPHAN_WORKER 알림을 더한 본문으로 다시 고정(356cbdcb… → be7d2128… — 고친 동작은 v456 묶음 ①이 실행으로 지킴)
   //   v456 검토: 400 ORPHAN_WORKER 첫 번은 명부 저장을 끝낸 뒤 한 번만 다시 보냄(asbOrphTry)·알림 글에서 새로고침 안내 뺌 → 다시 고정(be7d2128… → 7495f882… — 고친 동작은 v456 묶음 ⑥이 실행으로 지킴)
   //   v456 2차 검토: 두 번째 400 ORPHAN_WORKER에서 서버가 돌려준 고아 id만 대장에서 빼고 한 번 더 저장(asbOrphDrop) → 다시 고정(7495f882… → 930e3cae… — 고친 동작은 v456 묶음 ⑧이 실행으로 지킴)
+  //   P1 판24h(C206): doSaveAsb는 500·끊김 실패 알림을 더한 본문으로 다시 고정(c222ce0b… → 95db3507… — 고친 동작은 'P1 판24h'가 실행으로 지킴)
   const hBad12 = Object.keys(HASH45).filter((n) => sha45(body45(n)) !== HASH45[n]);
   const m12 = miss45.length, X12 = mk45({ width: 375 }); X12.api.render();
   const l12a = [X12.host.getAttribute('data-vs-mode'), (X12.host._h.match(/class="item asb-item"/g) || []).length, X12.host._h.indexOf('data-vs-row') < 0, X12.env.host('siteFilterBar').style.display, X12.api.cur(), X12.env.host('siteHead').textContent].join('|');
@@ -11504,7 +11508,7 @@ try {
       'var workers=[], wkLoaded=true, wkDirty={}, wkBase=1, wkSaveTimer=null, wkPending=true; function mergeWorkers(a,b){ return b; } function renderWorkers(){} function renderXgWorkers(){} function loadWorkers(){}',
       'var asb=[], asbBase=1, asbPending=true; function canSee(){ return true; } function siteGapSigs(){ return null; } function mergeAsb(a,b){ return b; } function normAsbRow(){} function loadSiteEduGap(){}',
       'var edu=[], eduLoaded=true, eduBase=1, eduPending=true; function mergeEdu(a,b){ return b; } var fam=[], famBase=1, famPending=true; function mergeFam(a,b){ return b; }',
-      'function gwToast(m){ ENV.toasts.push(String(m)); }',
+      'function gwToast(m){ ENV.toasts.push(String(m)); } function saveFailToast(){}',   // 판24h: 저장 실패 알림은 'P1 판24h' 블록이 실제 함수로 봄(여기는 409 셈만)
       'function gwCall(fn, b){ if (b.action === "save"){ ENV.saves++; if (ENV.saves > 12) return Promise.resolve({ status: 599, body: {} }); return Promise.resolve(ENV.scen("save", ENV.saves)); } ENV.gets++; return Promise.resolve(ENV.scen("get", ENV.gets)); }',
       fn54(src, 'saveConflictToast'), fn54(src, 'saveConflictStop'), fn54(src, SAVE54[col]),
       'return ' + SAVE54[col] + ';'].join('\n');
@@ -11562,11 +11566,11 @@ try {
     return out;
   };
   const w54 = await runW54(html);
-  // 첫 PUT documents는 GET 전이라 0(T502) · 그 뒤 GET이 준 77 · 첫 tasks도 0(v421) · licenses는 GET 전 undefined(종전 — 409 처리가 컬렉션마다 달라 일괄 적용 안 함)
-  const wOk54 = w54.seq === '409,409,412:SAVE_CONFLICT_STOP,200,409' && w54.toasts === 1 && w54.bases === 'documents:0,documents:77,tasks:0,licenses:undefined' && w54.err === '400:CLI_BIZ13';
+  // 첫 PUT documents는 GET 전이라 0(T502) · 그 뒤 GET이 준 77 · 첫 tasks도 0(v421) · licenses도 GET 전 0(P1 판24h C206 — 자료 구분 없이 base 0 · 종전 undefined는 서버 낙관락을 건너뛰어 목록을 통째로 바꿨다)
+  const wOk54 = w54.seq === '409,409,412:SAVE_CONFLICT_STOP,200,409' && w54.toasts === 1 && w54.bases === 'documents:0,documents:77,tasks:0,licenses:0' && w54.err === '400:CLI_BIZ13';
   const wMutA = await runW54(once54(html, '    if (col === "documents" && _colBase[col] === undefined) saveBase = 0;\n', ''));
   const wMutB = await runW54(once54(html, '        if (saveConflictStop(n409)){ _col409[col] = 0; return _ghResp(412, { error_code: "SAVE_CONFLICT_STOP" }); }\n', ''));
-  T('v456 ② fetch 대역(실행 — 실제 window.fetch 덮어쓰기): 같은 컬렉션 저장 409 연달아 3번째 = 412 SAVE_CONFLICT_STOP·"저장 충돌 — 새로고침" 알림 1번 · 200이면 셈 0(다음 409는 다시 409) · documents는 GET 전 base 0(T502)·GET 뒤 77 · tasks GET 전 0(v421 그대로) · 그 밖 컬렉션 종전 · 거절 이유 코드 넘김(400 CLI_BIZ13) · 결함 사본(documents base 줄 걷음 = 비어 감 · 대역 멈춤 걷음 = 409 계속) ✗',
+  T('v456 ② fetch 대역(실행 — 실제 window.fetch 덮어쓰기): 같은 컬렉션 저장 409 연달아 3번째 = 412 SAVE_CONFLICT_STOP·"저장 충돌 — 새로고침" 알림 1번 · 200이면 셈 0(다음 409는 다시 409) · documents는 GET 전 base 0(T502)·GET 뒤 77 · tasks GET 전 0(v421 그대로) · 그 밖 컬렉션도 GET 전 0(판24h) · 거절 이유 코드 넘김(400 CLI_BIZ13) · 결함 사본(documents base 줄 걷음 = 비어 감 · 대역 멈춤 걷음 = 409 계속) ✗',
     wOk54 && wMutA.bases !== w54.bases && wMutB.seq !== w54.seq, JSON.stringify({ w54, mutA: wMutA.bases, mutB: wMutB.seq }));
 
   // ③ 거래처 13자리 두 벌(앱 cliBiz13 ↔ 서버 _lib/clibiz.js biz13) — 같은 표본 같은 결과 · saveClients 400 CLI_BIZ13 = 안내 토스트(CLI_BIZ13_MSG)
@@ -11621,7 +11625,7 @@ try {
       lost ? 'var workers=[{id:"w0"}], wkLoaded=true, wkDirty={}, wkBase=1, wkSaveTimer=null, wkPending=false; function renderWorkers(){} function renderXgWorkers(){} function loadWorkers(){}'
         : 'var workers=[{id:"w0"},{id:"wN"}], wkLoaded=true, wkDirty={wN:1}, wkBase=1, wkSaveTimer=null, wkPending=false; function renderWorkers(){} function renderXgWorkers(){} function loadWorkers(){}',
       'var asb=[{id:"a1",worker_ids:["w0","wN"]}' + (lost ? ',{id:"a2",worker_ids:["w0"],memo:"고침"}' : '') + '], asbBase=1, asbPending=false, asbSaveTimer=null; function canSee(){ return true; } function siteGapSigs(){ return null; } function mergeAsb(a,b){ return a; } function normAsbRow(){} function loadSiteEduGap(){}',
-      'function gwToast(m){ ENV.toasts.push(String(m)); }',
+      'function gwToast(m){ ENV.toasts.push(String(m)); } function saveFailToast(){}',   // 판24h: 저장 실패 알림은 'P1 판24h' 블록이 봄(여기는 고아 일용직 알림 셈)
       'function setTimeout(fn){ ENV.timers.push({ fn: fn, off: false }); return ENV.timers.length; } function clearTimeout(id){ if (id && ENV.timers[id - 1]) ENV.timers[id - 1].off = true; }',
       'function gwCall(fn, b){ return ENV.call(b); }',
       fn54(src, 'asList'), fn54(src, 'saveConflictToast'), fn54(src, 'saveConflictStop'), fn54(src, 'mergeWorkers'), fn54(src, 'doSaveWorkers'), fn54(src, 'scheduleWorkersSave'),
@@ -17587,6 +17591,258 @@ try {
   T('P1 판24g 계약 저장 덮임길 전수 수리(실행 — 실제 공통 길 window.fetch·낙관락 가짜 서버(base 409 → 이월 → 결재 대조)·실제 loadContracts·doSaveContracts·mergeContracts·csApprSync·csApprOnDecided·csSaveFields): J1 결재 동기화 읽기는 기준 시각 그대로 → 저장 409 → 병합 → 다른 계약 서류 체크 남음(D3) · J2 결재함 결정 직후 즉시 저장도 다른 계약 계약명·줄 남음 · J3 부팅 읽기 실패 뒤 새 계약 = 서버 3건(옛 2 + 새) · J4 409 다시 읽기 500·끊김 = 기준 사본 지키고 다시 저장 · J5 저장과 겹친 동기화 사본 버림 → 다른 기기의 되돌림 남음(C198 ②) · J6 늦은 200의 새 계약 기준 사본 · J7 기한 엔진 켬 단계 칸 저장 = 다른 기기 결재 승인·진행 남음·기한 표시 칸마다(C198 ⑤) · J8 서버 값이 남은 진행·단계 칸은 알림 없음·진짜 충돌은 그대로(D4) · 끊긴 저장 뒤 동기화 접목 · (독립 검토) N1 저장 200 뒤 접목 · X1 나가 있는 저장 중 다시 읽기가 먼저 온 순서 = 늦은 200의 더 새 판으로 기준(되돌림·다른 값 모두 남음) · L1 거꾸로 온 옛 200은 기준 안 되돌림 · X2 사본 버린 회차는 결재 반영 안 함(실제 진행 — 지시 겹침 0·기성 확인 0·결재자 기기 지시 그대로)·다음 그리기에서 다시 동기화 · X6 세션 비울 때 기준 시각·나가 있는 저장 수 · J5b 결재함 결정 직후 겹친 사본 · 이 화면 값이 이긴 진행·기한 칸 알림 그대로(줄 칸·단계 키·뺀 단계·계약 둘·칸 이름) · (재검토) X2r 사본 읽기 500·끊김 회차는 결재 반영 안 함·60초 뒤 접목(실제 진행) · 결정한 기기는 읽기 실패에도 반영·저장 · 같은 판 늦은 200은 앞당긴 기준 안 되돌림 · 세션 비울 때 기준 사본·세대 번호 · 결함 사본 ' + KG.length + '개 = 모두 ✗',
     RG.ok && KGr.every((x) => x), JSON.stringify({ RG, KGr }));
 } catch (e) { console.log('  (P1 판24g 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── P1 판24h(11/17 — 원장 C206): 읽기 실패 뒤 저장(서버 목록이 이 화면의 빈·한 줄 목록으로 통째로 바뀜)·저장 실패를 성공으로 — 대조 표 09_조사_문서\판24_재감사수리_자료_20261115\읽기실패뒤저장_수리표_1117.md
+//   (실행 — 실제 공통 길 window.fetch(기준 시각·base 0·409 셈·403 읽기 표시) + 낙관락 가짜 서버(gw-data handleSave 순서: base ≠ updated_at → 409 · 개인 컬렉션은 낙관락 없음 · 단골 노선 base_ts 대조)
+//    + 실제 읽기·저장·병합 함수(loadVehicles·doSaveVeh·resolveVehConflictAndRetry·doLoad·doSave·resolveConflictAndRetry·loadLeaves·doSaveLeaves·loadQuotes·doSaveQuotes·openQuoteEdit·loadPromo·doSavePromo·loadOnbid·doSaveOnbid·
+//      doSaveBids·saveClients·saveDocuments·loadMyTasks·addMyTodo·saveMyTasks·doSaveWorkers·doSaveFam·doSaveAsb·doSaveEdu·loadAbPresets·abSavePresets·clearSessionData와 그들이 부르는 함수 닫힘)
+//    · 대역은 그리기(render*)·캐시·타이머·화면 요소·알림 기록만 — 저장·병합·읽기 함수는 빈 함수로 두지 않음)
+try {
+  const fnH = (src, name) => { const i = src.search(new RegExp('\\n  function ' + name + '\\(')); if (i < 0) throw new Error('함수 없음 ' + name); let d = 0, st = false; for (let j = i + 1; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i + 1, j + 1); } } throw new Error('중괄호 ' + name); };
+  const varH = (src, name) => { const m = new RegExp('\\n  var ' + name + ' ?=[^\\n]*').exec(src); if (!m) throw new Error('변수 없음 ' + name); return m[0].slice(1); };
+  const wrapH = (src) => { const a = '  window.fetch = function(url, opts){'; const i = src.indexOf(a); if (i < 0) throw new Error('fetch 대역 없음'); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 2); } } throw new Error('대역 짝'); };
+  const tickH = () => new Promise((r) => setImmediate(r));
+  const cloneH = (x) => (x === undefined ? undefined : JSON.parse(JSON.stringify(x)));
+  // 닫힘: 뿌리 함수가 부르는 앱 함수를 끝까지 실제 본문으로 — 그리기·캐시·자동 생성·외부 전송·화면 알림만 대역(STUB_H — 이름 기록만)
+  const STUB_H = /^(render[A-Z]\w*|markLoadedForAutoGen|save\w*Cache|load\w*Cache|saveCache|loadCache|recOverdueGen|lmKeptNotice|paKick|maskKick|galleryRelaySend|mapRelaySend|apprFlushCreates|runBidQualGen|runAwardAutoCon|bidCorpGateRevert|loadSiteEduGap|loadDocSettings|bindTodoDueInputs|csAlignTasksAll|loadWorkers|abSetSaveState|abUpdateTotals|csSiteHooksRetry|stmtReset|bidSheetShowNew|vsSheetRender|switchTab|scheduleContractSave|conBaseSet|loadContracts|askClear)$/;
+  const OWN_H = { gwToast: 1, alert: 1, confirm: 1, setOffline: 1, getToken: 1, ghHeaders: 1, clearToken: 1, showTokenScreen: 1, onSessionInvalid: 1, isAdmin: 1, canSee: 1, canDo: 1, myId: 1, getMemberId: 1, myName: 1, todayStr: 1, genId: 1, gwCall: 1, setTimeout: 1, clearTimeout: 1, fetch: 1 };
+  const closeH = (H, roots) => { const all = new Set([...H.matchAll(/\n  function ([A-Za-z_$][\w$]*)\(/g)].map((m) => m[1])); const got = new Map(), stub = new Set(); const q = roots.slice(); while (q.length) { const n = q.shift(); if (got.has(n) || stub.has(n) || OWN_H[n] || !all.has(n)) continue; if (STUB_H.test(n) && roots.indexOf(n) < 0) { stub.add(n); continue; } const b = fnH(H, n); got.set(n, b); for (const m of b.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g)) q.push(m[1]); } return { real: [...got.keys()], stub: [...stub] }; };
+  const ROOTS_H = ['_ghResp', 'emptyDoc', '_urlCollection', 'b64EncodeUnicode', 'b64DecodeUnicode', 'saveConflictStop', 'saveConflictToast', 'saveFailToast', 'saveDeniedToast',
+    'loadVehicles', 'doSaveVeh', 'resolveVehConflictAndRetry', 'loadReceivables', 'doSaveRec', 'resolveRecConflictAndRetry', 'loadLicenses', 'doSaveLic', 'resolveLicConflictAndRetry',
+    'doLoad', 'doSave', 'resolveConflictAndRetry', 'loadLeaves', 'doSaveLeaves', 'loadQuotes', 'doSaveQuotes', 'openQuoteEdit', 'loadPromo', 'doSavePromo', 'loadOnbid', 'doSaveOnbid',
+    'loadBids', 'doSaveBids', 'loadClients', 'saveClients', 'loadDocuments', 'saveDocuments', 'loadMyTasks', 'addMyTodo', 'saveMyTasks', 'myTodoUnread',
+    'doSaveWorkers', 'doSaveFam', 'doSaveAsb', 'doSaveEdu', 'loadAbPresets', 'abSavePresets'];
+  const srcH = new Map();
+  const D0 = '2026-11-01', DN = '2026-11-17';
+  const items3 = () => [{ id: 's1', updated: D0, created: D0 }, { id: 's2', updated: D0, created: D0 }, { id: 's3', updated: D0, created: D0 }];
+  const mkH = (H) => {
+    const env = { clock: 1000, timers: [], toasts: [], alerts: [], calls: [], log: [], seq: [], offline: false, gen: 0, dom: {},
+      getFail: {}, getRej: {}, get403: {}, saveFail: {}, saveRej: {}, save403: {}, pgFail: 0,
+      S: { pre: { items: [{ id: 'p1', from: 'a', to: 'b', item: 'c', unit: '톤' }], ts: 500 } } };
+    ['vehicles', 'receivables', 'licenses', 'leaves', 'quotes', 'promo', 'onbid', 'bids', 'clients', 'documents', 'mytasks', 'workers', 'family', 'asbestos', 'edu'].forEach((c) => { env.S[c] = { schema: 1, items: items3(), updated_at: 1000 }; });
+    env.S.licenses.duties = [];
+    env.S.checklist = { records: { daily: { [DN]: { c1: DN + 'T01' } } }, custom: {}, updated_at: 1000 };
+    const R = (status, body) => Promise.resolve({ status, body });
+    const gwCallH = (fn, b) => {
+      const col = b.collection || '';
+      env.log.push(fn + ':' + b.action + (col ? ':' + col : ''));
+      if (fn === 'gw-allbaro') {
+        if (b.action === 'ab_presets_get') { if (env.pgFail > 0) { env.pgFail--; return R(500, { ok: false, code: 'X' }); } return R(200, { ok: true, items: cloneH(env.S.pre.items), ts: env.S.pre.ts }); }
+        if (b.action === 'ab_presets_put') { env.preBase = b.base_ts; if (b.base_ts !== undefined && b.base_ts !== null && Number(b.base_ts) !== env.S.pre.ts) return R(409, { ok: false, code: 'CONFLICT', ts: env.S.pre.ts }); env.S.pre = { items: cloneH(b.items), ts: ++env.clock }; return R(200, { ok: true, items: cloneH(b.items), ts: env.S.pre.ts }); }
+        return R(200, {});
+      }
+      if (b.action === 'get') {
+        if (env.get403[col]) return R(403, { error_code: 'NO_ACCESS' });
+        if (env.getRej[col] > 0) { env.getRej[col]--; return Promise.reject(new Error('net')); }
+        if (env.getFail[col] > 0) { env.getFail[col]--; return R(500, { error_code: 'X' }); }
+        return R(200, { doc: cloneH(env.S[col]) });
+      }
+      if (b.action === 'save') {
+        if (env.saveRej[col] > 0) { env.saveRej[col]--; env.seq.push(col + ':끊김'); return Promise.reject(new Error('net')); }
+        if (env.saveFail[col] > 0) { env.saveFail[col]--; env.seq.push(col + ':500'); return R(500, { error_code: 'X' }); }
+        if (env.save403[col]) { env.seq.push(col + ':403'); return R(403, { error_code: 'NO_WRITE' }); }
+        const prev = env.S[col];
+        if (col !== 'mytasks' && b.base !== undefined && prev && prev.updated_at && Number(b.base) !== Number(prev.updated_at)) { env.seq.push(col + ':409'); return R(409, { error_code: 'STALE_BASE' }); }
+        env.S[col] = Object.assign({}, cloneH(b.doc), { updated_at: ++env.clock }); env.seq.push(col + ':200'); return R(200, { updated_at: env.clock });
+      }
+      return R(200, {});
+    };
+    let src = srcH.get(H);
+    if (!src) {
+      const cl = closeH(H, ROOTS_H);
+      const apis = (H.match(/\n  var [A-Z_]+_(?:ROOT|PATH|API) = [^\n]*/g) || []).map((s) => s.slice(1)).join('\n');
+      src = ['var window = {}, DATA_OWNER = "o", DATA_REPO = "r", isOffline = false;',
+        'var _colBase = {}, _col409 = {}, _col409t = {}, _COL409_MS = 30000, _colRead403 = {};',
+        apis,
+        'var vehicles=[], vehSha=null, vehPending=false, receivables=[], recSha=null, recPending=false, licenses=[], duties=[], licSha=null, licPending=false, licRemoteOk=false;',
+        'var records={}, customItems={}, checkScopes={}, checkScopeTs={}, checkAssignee={}, checkAssigneeTs={}, checkReview={}, checkReviewTs={}, currentSha=null, pendingSave=false;',
+        'var leaves=[], leavesSha=null, leavesSaveTimer=null, leavesPending=false;',
+        'var quotes=[], quoteSha=null, quoteSaveTimer=null, quotePending=false, qtEditId=null, quoteLoaded=false;',
+        'var promoItems=[], promoSha=null, promoSaveTimer=null, promoPending=false, paAutoWait="", maskAutoWait="", galWait="", mapWait=false;',
+        'var onbids=[], onbidSha=null, onbidSaveTimer=null, onbidPending=false;',
+        'var bids=[], bidsSha=null, bidsSaveTimer=null, bidsPending=false, bidsLoaded=false, bidsSaveHeld=false, bidsLoading=0, bidsHealth=null, bidsAwards=null, bidsLoadErr=null, autoGenReady={};',
+        'var clients=[], cliSha=null, cliLoaded=false, cliDirty={}, cliLoading=0;',
+        'var documents=[], docSha=null, docSaveRetried=false, docSettingsTbl={}, docSettingsBase=0;',
+        'var myTodos=[], myTodoSha=null, myTodoLoaded=false, myTodoLoading=0;',
+        'var workers=[], wkLoaded=true, wkDirty={}, wkBase=1000, wkSaveTimer=null, wkPending=false, fam=[], famBase=1000, famPending=false, famSaveTimer=null;',
+        'var asb=[], asbBase=1000, asbPending=false, asbSaveTimer=null, asbOrphTry=0, edu=[], eduLoaded=true, eduBase=1000, eduPending=false, eduSaveTimer=null, abPresetFormOpen=false;',
+        ['MYTODO_UNREAD_MSG', 'QT_UNREAD_MSG', 'CLI_BIZ13_MSG', 'abPresets'].map((v) => varH(H, v)).join('\n'),
+        'function gwToast(m){ ENV.toasts.push(String(m)); } function alert(m){ ENV.alerts.push(String(m)); } function confirm(){ return true; } function setOffline(s){ ENV.offline = s; isOffline = s; }',
+        'function getToken(){ return "t"; } function ghHeaders(){ return {}; } function clearToken(){} function showTokenScreen(){} function onSessionInvalid(){ ENV.calls.push("onSessionInvalid"); }',
+        'function isAdmin(){ return true; } function canSee(){ return true; } function canDo(){ return true; } function myId(){ return "uA"; } function getMemberId(){ return "uA"; } function myName(){ return "시험A"; } function todayStr(){ return "' + DN + '"; } function genId(p){ return p + "N" + (++ENV.gen); }',
+        'var document = { getElementById: function(id){ if (!ENV.dom[id]) ENV.dom[id] = { id: id, value: "", textContent: "", innerHTML: "", style: {}, dataset: {}, classList: { add: function(c){ ENV.calls.push("show:" + id + ":" + c); }, remove: function(){}, contains: function(){ return false; } }, focus: function(){} }; return ENV.dom[id]; } };',
+        'var console = { warn: function(){}, log: function(){} };',
+        cl.stub.map((n) => 'function ' + n + '(){ ENV.calls.push("' + n + '"); }').join('\n'),
+        cl.real.map((n) => fnH(H, n)).join('\n'), wrapH(H), 'var fetch = window.fetch;',
+        'return { ex: function(s){ return eval(s); } };'].join('\n');
+      srcH.set(H, src);
+    }
+    env.api = new Function('ENV', 'gwCall', 'setTimeout', 'clearTimeout', 'btoa', 'atob', 'TextEncoder', 'TextDecoder', src)(env, gwCallH, (fn) => { env.timers.push(fn); return env.timers.length; }, (id) => { if (id) env.timers[id - 1] = null; },
+      (s) => Buffer.from(s, 'binary').toString('base64'), (s) => Buffer.from(s, 'base64').toString('binary'), TextEncoder, TextDecoder);
+    env.ex = (s) => env.api.ex(s);
+    env.flush = async () => { for (let k = 0; k < 40; k++) await tickH(); };
+    env.fire = async () => { for (let n = 0; n < 60; n++) { const i = env.timers.findIndex((x) => x); if (i < 0) break; const fn = env.timers[i]; env.timers[i] = null; fn(); await env.flush(); } };
+    env.ids = (c) => (env.S[c].items || []).map((x) => x.id).sort().join(',');
+    env.cs = (c) => env.seq.filter((s) => s.indexOf(c + ':') === 0).map((s) => s.slice(c.length + 1)).join(',');
+    env.gets = (c) => env.log.filter((s) => s === 'gw-data:get:' + c).length;
+    return env;
+  };
+  // 공통 길 8개 자료: 읽기 → 고침 → 저장(실제 함수) · fail = 저장 실패 알림 방식(offline = 오프라인 띠 · toast = 실패 토스트 — 판24h) · label = 알림 글의 자료 이름
+  const COLS_H = {
+    vehicles: { load: 'loadVehicles()', save: 'doSaveVeh()', add: 'vehicles.push({ id: "n1", no: "새", updated: "' + DN + '" }); vehPending = true;', pend: 'vehPending', fail: 'offline' },
+    receivables: { load: 'loadReceivables()', save: 'doSaveRec()', add: 'receivables.push({ id: "n1", updated: "' + DN + '", created: "' + DN + '" }); recPending = true;', pend: 'recPending', fail: 'offline' },
+    licenses: { load: 'loadLicenses()', save: 'doSaveLic()', add: 'licenses.push({ id: "n1", updated: "' + DN + '", created: "' + DN + '" }); licPending = true;', pend: 'licPending', fail: 'offline' },
+    checklist: { load: 'doLoad()', save: 'doSave()', add: 'records = { daily: {} }; records.daily["' + DN + '"] = { n1: "' + DN + 'T09" }; pendingSave = true;', pend: 'pendingSave', fail: 'offline' },
+    leaves: { load: 'loadLeaves()', save: 'doSaveLeaves()', add: 'leaves.push({ id: "n1", member_id: "uA", updated: "' + DN + '" }); leavesPending = true;', pend: 'leavesPending', fail: 'toast', label: '휴가' },
+    quotes: { load: 'loadQuotes()', save: 'doSaveQuotes()', add: 'quotes.push({ id: "n1", no: "202611-01", updated: "' + DN + '" }); quotePending = true;', pend: 'quotePending', fail: 'toast', label: '견적서' },
+    promo: { load: 'loadPromo()', save: 'doSavePromo()', add: 'promoItems.push({ id: "n1", updated: "' + DN + '", updated_ts: 5 }); promoPending = true; paAutoWait = "n1";', pend: 'promoPending', fail: 'toast', label: '홍보 기록' },
+    onbid: { load: 'loadOnbid()', save: 'doSaveOnbid()', add: 'onbids.push({ id: "n1", updated: "' + DN + '" }); onbidPending = true;', pend: 'onbidPending', fail: 'toast', label: '공매·부동산' },
+  };
+  const keysH = (E, c) => (c === 'checklist' ? Object.keys(E.S.checklist.records.daily[DN] || {}).sort().join(',') : E.ids(c));
+  const runH = async (H) => {
+    const R = {};
+    for (const c of Object.keys(COLS_H)) {
+      const C = COLS_H[c], want = c === 'checklist' ? 'c1,n1' : 'n1,s1,s2,s3';
+      // A: 앱을 켤 때 목록 읽기 500 → 고침 → 저장 = base 0 → 409 → 다시 읽기(이번엔 됨)·병합 → 200 · 서버 = 옛 3 + 새 1(종전: 새 1만 — 53→1 꼴)
+      { const E = mkH(H); E.getFail[c] = 1; E.ex(C.load); await E.flush(); E.ex(C.add); E.ex(C.save); await E.flush(); await E.fire();
+        R[c + 'A'] = keysH(E, c) + '|' + E.cs(c) + '|' + E.ex(C.pend); R[c + 'Aok'] = R[c + 'A'] === want + '|409,200|false'; }
+      // A2: 다시 읽기도 계속 실패 → 409 셋째에서 멈춤(412 — 충돌 알림) · 서버 그대로 · 대기 남음 · 요청 끝없이 되풀이 없음(저장 3·읽기 1+2)
+      { const E = mkH(H); E.getFail[c] = 99; E.ex(C.load); await E.flush(); E.ex(C.add); E.ex(C.save); await E.flush(); await E.fire();
+        R[c + 'A2'] = keysH(E, c) + '|' + E.cs(c) + '|' + E.ex(C.pend) + '|' + E.gets(c) + '|' + E.toasts.filter((t) => t.indexOf('저장 충돌') === 0).length + '|' + E.toasts.filter((t) => t.indexOf('저장에 실패했습니다') >= 0 && t.indexOf('주기업무') < 0).length;
+        R[c + 'A2ok'] = R[c + 'A2'] === (c === 'checklist' ? 'c1' : 's1,s2,s3') + '|409,409,409|true|3|1|0'; }
+      // B: 읽기 됨 → 저장 500 = 성공으로 넘기지 않음(대기 남음) + 알림(토스트 '… 저장에 실패했습니다(서버 응답 500)' 또는 오프라인 띠) · 서버 그대로
+      { const E = mkH(H); E.ex(C.load); await E.flush(); E.saveFail[c] = 1; E.ex(C.add); E.ex(C.save); await E.flush(); await E.fire();
+        const note = C.fail === 'toast' ? E.toasts.filter((t) => t.indexOf(C.label + ' 저장에 실패했습니다(서버 응답 500) — 방금 고친 내용은 이 화면에만') === 0).length : (E.offline ? 1 : 0);
+        R[c + 'B'] = keysH(E, c) + '|' + E.ex(C.pend) + '|' + note + '|' + E.calls.filter((x) => x === 'paKick').length + '|' + E.ex('paAutoWait');
+        R[c + 'Bok'] = R[c + 'B'] === (c === 'checklist' ? 'c1' : 's1,s2,s3') + '|true|1|0|' + (c === 'promo' ? 'n1' : ''); }
+      if (C.fail !== 'toast') continue;
+      // C: 저장 끊김 = 알림 '(연결 끊김)' · 대기 남음
+      { const E = mkH(H); E.ex(C.load); await E.flush(); E.saveRej[c] = 1; E.ex(C.add); E.ex(C.save); await E.flush();
+        R[c + 'C'] = E.ex(C.pend) + '|' + E.toasts.filter((t) => t.indexOf(C.label + ' 저장에 실패했습니다(연결 끊김)') === 0).length; R[c + 'Cok'] = R[c + 'C'] === 'true|1'; }
+      // D: 쓰기 거절(403 → 대역 write_denied 200) = 대기 내림 + 권한 알림(종전: 소리 없이 '저장됨')
+      { const E = mkH(H); E.ex(C.load); await E.flush(); E.save403[c] = 1; E.ex(C.add); E.ex(C.save); await E.flush();
+        R[c + 'D'] = E.ex(C.pend) + '|' + E.toasts.filter((t) => t.indexOf(C.label + ' 저장 권한이 없어 서버가 이 변경을 받지 않았습니다') === 0).length; R[c + 'Dok'] = R[c + 'D'] === 'false|1'; }
+    }
+    // 휴가 권한 숨김(읽기 403 — 빈 문서) 직원의 신청 = base 없음(종전대로 — 서버가 재구성) · 409 되풀이 없음(base 0이면 409 → 다시 읽기도 403 → 412로 영영 막힘)
+    { const E = mkH(H); E.get403.leaves = 1; E.ex('loadLeaves()'); await E.flush(); E.ex(COLS_H.leaves.add); E.ex('doSaveLeaves()'); await E.flush(); await E.fire();
+      R.l403 = E.cs('leaves') + '|' + E.ex('leavesPending'); R.l403ok = R.l403 === '200|false'; }
+    // 일감: 읽은 뒤 저장 500·끊김 = 대기 남음 + 알림(종전: 대기를 풀어 '저장됨')
+    { const E = mkH(H); E.ex('loadBids()'); await E.flush(); E.saveFail.bids = 1; E.ex('bids.push({ id: "n1", updated: "' + DN + '" }); bidsPending = true; doSaveBids();'); await E.flush();
+      E.saveRej.bids = 1; E.ex('doSaveBids()'); await E.flush();
+      R.bids = E.ex('bidsPending') + '|' + E.toasts.filter((t) => t.indexOf('입찰 공고 저장에 실패했습니다(서버 응답 500)') === 0).length + '|' + E.toasts.filter((t) => t.indexOf('입찰 공고 저장에 실패했습니다(연결 끊김)') === 0).length + '|' + E.ids('bids'); R.bidsok = R.bids === 'true|1|1|s1,s2,s3'; }
+    // 거래처: 저장 500·끊김 = 알림 · 고친 표시 남음
+    { const E = mkH(H); E.ex('loadClients()'); await E.flush(); E.saveFail.clients = 1; E.ex('clients.push({ id: "n1", name: "새" }); cliDirty.n1 = 1; saveClients();'); await E.flush();
+      E.saveRej.clients = 1; E.ex('saveClients()'); await E.flush();
+      R.cli = E.ex('cliDirty.n1') + '|' + E.toasts.filter((t) => t.indexOf('거래처 대장 저장에 실패했습니다(서버 응답 500)') === 0).length + '|' + E.toasts.filter((t) => t.indexOf('거래처 대장 저장에 실패했습니다(연결 끊김)') === 0).length; R.cliok = R.cli === '1|1|1'; }
+    // 문서함: 저장 500·끊김·409 두 번째(다시 읽기 실패) = 알림(종전 0 — 화면에만 있다가 새로고침 뒤 사라짐)
+    { const E = mkH(H); E.ex('loadDocuments()'); await E.flush(); E.saveFail.documents = 1; E.ex('documents.push({ id: "n1" }); saveDocuments();'); await E.flush();
+      E.saveRej.documents = 1; E.ex('saveDocuments()'); await E.flush();
+      E.S.documents.updated_at = 1500; E.getFail.documents = 1; E.ex('saveDocuments()'); await E.flush();
+      R.doc = [500, '연결 끊김', 409].map((k) => E.toasts.filter((t) => t.indexOf('문서함 저장에 실패했습니다(' + (typeof k === 'number' ? '서버 응답 ' + k : k) + ')') === 0).length).join(',') + '|' + E.cs('documents'); R.docok = R.doc === '1,1,1|500,끊김,409,409'; }
+    // 내 할 일: 읽기 실패 화면에서 더하기 = 막고 알림 + 다시 읽기 · 서버 3건 그대로 → 읽힌 뒤 더하기 = 서버 4건 · 못 읽은 채 저장 함수 = 보내지 않음 · 저장 500·끊김 = 알림
+    { const E = mkH(H); E.getFail.mytasks = 1; E.ex('loadMyTasks()'); await E.flush();
+      E.ex('document.getElementById("myTodoInput").value = "할 일 하나"; addMyTodo();');
+      const a0 = E.alerts.filter((t) => t.indexOf('내 할 일 목록을 아직 읽지 못했습니다') === 0).length + '|' + E.ex('myTodos.length'); await E.flush();
+      const a1 = a0 + '|' + E.ids('mytasks') + '|' + E.gets('mytasks') + '|' + E.ex('document.getElementById("myTodoInput").value');
+      E.ex('addMyTodo()'); await E.flush();
+      const a2 = E.S.mytasks.items.length + '|' + E.ex('myTodoLoaded');
+      E.ex('myTodoLoaded = false; saveMyTasks();'); await E.flush(); const a3 = E.cs('mytasks');
+      E.ex('myTodoLoaded = true;'); E.saveFail.mytasks = 1; E.ex('saveMyTasks()'); await E.flush(); E.saveRej.mytasks = 1; E.ex('saveMyTasks()'); await E.flush();
+      const a4 = E.toasts.filter((t) => t.indexOf('내 할 일 저장에 실패했습니다(') === 0).length + '|' + E.toasts.filter((t) => t.indexOf('내 할 일 목록을 아직 읽지 못했습니다') === 0).length;
+      R.my = [a1, a2, a3, a4].join(' / '); R.myok = R.my === '1|0|s1,s2,s3|2|할 일 하나 / 4|true / 200 / 2|1'; }
+    // 공통 길 밖 직접 저장 4: 500·끊김 = 알림(대기 남음 — 종전 알림 0)
+    for (const [fnN, col, lbl, pend] of [['doSaveWorkers', 'workers', '일용직 명부', 'wkPending'], ['doSaveFam', 'family', '가족친화 대장', 'famPending'], ['doSaveAsb', 'asbestos', '현장 대장', 'asbPending'], ['doSaveEdu', 'edu', '안전 › 체크 칸 기록', 'eduPending']]) {
+      const E = mkH(H); E.ex(pend + ' = true;'); E.saveFail[col] = 1; E.ex(fnN + '()'); await E.flush(); E.saveRej[col] = 1; E.ex(fnN + '()'); await E.flush();
+      R['d_' + col] = E.ex(pend) + '|' + E.toasts.filter((t) => t.indexOf(lbl + ' 저장에 실패했습니다(서버 응답 500)') === 0).length + '|' + E.toasts.filter((t) => t.indexOf(lbl + ' 저장에 실패했습니다(연결 끊김)') === 0).length;
+      R['d_' + col + 'ok'] = R['d_' + col] === 'true|1|1';
+    }
+    // 단골 노선: 읽기 실패 화면의 [＋ 노선 추가] = 보내지 않고 다시 읽음 · 읽힌 뒤 = 읽은 판 시각(base_ts)으로 저장 → 2개 · 그사이 다른 기기가 바꿈 = 409 → 다시 읽기·알림 · 서버 그대로
+    { const E = mkH(H); E.pgFail = 1; E.ex('loadAbPresets()'); await E.flush();
+      E.ex('abSavePresets((abPresets.items || []).concat([{ id: "pN", from: "x", to: "y", item: "z", unit: "톤" }]))'); await E.flush();
+      const p1 = E.alerts.filter((t) => t.indexOf('단골 노선을 아직 읽지 못했습니다') === 0).length + '|' + E.log.filter((s) => s === 'gw-allbaro:ab_presets_put').length + '|' + E.S.pre.items.length + '|' + E.log.filter((s) => s === 'gw-allbaro:ab_presets_get').length;
+      E.ex('abSavePresets(abPresets.items.concat([{ id: "pN", from: "x", to: "y", item: "z", unit: "톤" }]))'); await E.flush();
+      const p2 = E.preBase + '|' + E.S.pre.items.map((x) => x.id).join(',') + '|' + (E.ex('abPresets.ts') === E.S.pre.ts);
+      E.S.pre = { items: [{ id: 'p1' }, { id: 'pN' }, { id: 'pO' }], ts: 9999 };
+      E.ex('abSavePresets(abPresets.items.slice(0, 1))'); await E.flush();
+      const p3 = E.S.pre.items.length + '|' + E.alerts.filter((t) => t.indexOf('다른 기기에서 단골 노선이 먼저 바뀌어') === 0).length + '|' + E.ex('abPresets.items && abPresets.items.length') + '|' + E.ex('abPresets.ts');
+      R.pre = [p1, p2, p3].join(' / '); R.preok = R.pre === '1|0|1|2 / 500|p1,pN|true / 3|1|3|9999'; }
+    // 견적: 읽기 전 [+ 견적서 발행] = 창을 열지 않고 알림 + 다시 읽기 → 읽힌 뒤 = 창 열림·번호 = 다음 번호(빈 목록 기준 01이 아님)
+    { const E = mkH(H); E.S.quotes.items[0].no = DN.slice(0, 7).replace('-', '') + '-05'; E.getFail.quotes = 1; E.ex('loadQuotes()'); await E.flush();
+      E.ex('openQuoteEdit(null)'); await E.flush();
+      const q1 = E.alerts.filter((t) => t.indexOf('견적서 목록을 아직 읽지 못했습니다') === 0).length + '|' + E.calls.filter((x) => x === 'show:qtEditBackdrop:show').length + '|' + E.gets('quotes');
+      E.ex('openQuoteEdit(null)'); await E.flush();
+      const q2 = E.calls.filter((x) => x === 'show:qtEditBackdrop:show').length + '|' + E.ex('document.getElementById("qtNo").value');
+      R.qt = q1 + ' / ' + q2; R.qtok = R.qt === '1|0|2 / 1|202611-06'; }
+    // 세션 비우기(새로고침 없는 로그아웃): 다른 컬렉션 기준 시각·403 표시·내 할 일·견적 읽음 표시도 비움 → 다음 로그인 읽기 실패 화면의 저장 = base 0
+    { const E = mkH(H); E.ex('loadVehicles(); loadLeaves();'); await E.flush(); E.get403.leaves = 1; E.ex('loadLeaves()'); await E.flush(); E.get403.leaves = 0;
+      const H2 = fnH(H, 'clearSessionData').split('\n').map((l) => l.replace(/\/\/.*$/, '')).join('\n').trim(); const nm = new Set(); for (const m of H2.matchAll(/(?:^|[;{\s])([A-Za-z_$][\w$]*)\s*=(?!=)/g)) nm.add(m[1]);
+      ['_colBase', '_colRead403', 'myTodoLoaded', 'quoteLoaded', 'vehicles', 'leaves', 'quotes', 'myTodos', 'abPresets', 'records', 'documents', 'clients', 'bids', 'onbids', 'promoItems', 'licenses', 'duties', 'receivables', 'cliLoaded', 'cliDirty', 'wkLoaded', 'wkPending', 'wkDirty', 'eduLoaded', 'eduPending', 'bidsLoaded', 'bidsSaveHeld', 'edu', 'fam', 'workers'].forEach((n) => nm.delete(n));
+      E.ex('myTodoLoaded = true; quoteLoaded = true; _colBase.contracts = 7;');
+      E.ex('var ' + [...nm].join(', ') + '; (function(){ var stmtReset = function(){}; ' + H2.replace(/^function clearSessionData\(\)\{/, '').replace(/\}$/, '') + ' })();');
+      const k1 = Object.keys(E.ex('_colBase')).join(',') + '|' + Object.keys(E.ex('_colRead403')).join(',') + '|' + E.ex('myTodoLoaded') + '|' + E.ex('quoteLoaded');
+      E.getFail.vehicles = 1; E.ex('loadVehicles()'); await E.flush(); E.ex(COLS_H.vehicles.add + ' doSaveVeh();'); await E.flush(); await E.fire();
+      R.clr = k1 + '|' + E.ids('vehicles') + '|' + E.cs('vehicles'); R.clrok = R.clr === '||false|false|n1,s1,s2,s3|409,200'; }
+    // 정적: 직원 홈 할 일 더하기(dashAddTodo — 홈 그리기 안의 닫힌 함수)도 같은 막이
+    { const i = H.indexOf('function dashAddTodo(){'), seg = i < 0 ? '' : H.slice(i, i + 400); R.dash = seg.indexOf('if (myTodoUnread()) return;') > 0 && seg.indexOf('if (myTodoUnread()) return;') < seg.indexOf('myTodos.push('); }
+    R.ok = Object.keys(R).filter((k) => /ok$/.test(k)).every((k) => R[k] === true) && R.dash === true;
+    return R;
+  };
+  const RH = await runH(html);
+  const onceH = (src, a, b) => { if (src.split(a).length !== 2) throw new Error('결함 자리 아님: ' + a.slice(0, 70)); return src.replace(a, () => b); };
+  const KH = [
+    [' && col !== "tasks" && col !== "documents" && col !== "contracts" && !(typeof _colRead403 !== "undefined" && _colRead403[col])) saveBase = 0;', ' && false) saveBase = 0;'],   // 읽기 실패 화면의 base 없음 저장(8개 자료 — 53→1 꼴)
+    [' && !(typeof _colRead403 !== "undefined" && _colRead403[col])) saveBase = 0;', ') saveBase = 0;'],   // 403 읽기(휴가 숨김 직원)도 base 0 → 신청이 영영 막힘
+    ['if (typeof _colRead403 !== "undefined") _colRead403[col] = 1; ', ''],   // 403 읽기 표시 안 함
+    ['if(!resp.ok){ saveFailToast("휴가", resp.status); return; }', ''],   // D5
+    ['}).catch(function(){ saveFailToast("휴가"); });', '}).catch(function(){});'],
+    ['if(json&&json.write_denied){ leavesPending=false; saveDeniedToast("휴가"); return; } ', ''],
+    ['if(!resp.ok){ saveFailToast("견적서", resp.status); return; }', ''],
+    ['}).catch(function(){ saveFailToast("견적서"); });', '}).catch(function(){});'],
+    ['if(json&&json.write_denied){ quotePending=false; saveDeniedToast("견적서"); return; } ', ''],
+    ['if(!resp.ok){ saveFailToast("홍보 기록", resp.status); return; }', ''],
+    ['}).catch(function(){ saveFailToast("홍보 기록"); });', '}).catch(function(){});'],
+    ['if(json&&json.write_denied){ promoPending=false; saveDeniedToast("홍보 기록"); return; } ', ''],
+    ['if(!resp.ok){ saveFailToast("공매·부동산", resp.status); return; }', ''],
+    ['}).catch(function(){ saveFailToast("공매·부동산"); });', '}).catch(function(){});'],
+    ['if(json&&json.write_denied){ onbidPending=false; saveDeniedToast("공매·부동산"); return; } ', ''],
+    ['if(!resp.ok){ saveFailToast("입찰 공고", resp.status); return; } ', ''],
+    ['}).catch(function(){ saveFailToast("입찰 공고"); });', '}).catch(function(){});'],
+    ['      if (!resp.ok){ saveFailToast("거래처 대장", resp.status); return; }', ''],
+    ['}).catch(function(){ saveFailToast("거래처 대장"); });', '}).catch(function(){});'],
+    ['if (!resp.ok){ saveFailToast("문서함", resp.status); return; }', 'if (!resp.ok) throw new Error("HTTP " + resp.status);'],
+    ['docSaveRetried = false; saveFailToast("문서함"); });', 'docSaveRetried = false; });'],
+    ['    if (myTodoUnread()) return;   // P1 판24h: 목록을 못 읽은 채', '    // P1 판24h: 목록을 못 읽은 채'],   // 내 할 일 더하기 막이
+    ['      if (myTodoUnread()) return;   // P1 판24h: 위 addMyTodo와 같은 막이', '      // P1 판24h: 위 addMyTodo와 같은 막이'],   // 직원 홈 더하기 막이(정적)
+    ['myTodos = (p && p.items) || []; myTodoLoaded = true;', 'myTodos = (p && p.items) || [];'],   // 읽은 뒤에도 영영 막힘
+    ['    if (!myTodoLoaded){ gwToast(MYTODO_UNREAD_MSG, true); return; }', ''],   // 못 읽은 목록을 보냄
+    ['      if (!resp.ok){ saveFailToast("내 할 일", resp.status); return; }   // 판24h', '      // 판24h'],
+    ['}).catch(function(){ saveFailToast("내 할 일"); });', '}).catch(function(){});'],
+    ['if (!myTodoLoading) loadMyTasks(); return true; }', 'return true; }'],   // 막은 뒤 다시 읽지 않음
+    ['      if(res.status!==200&&res.status!==403) saveFailToast("일용직 명부", res.status);', ''],
+    ['}).catch(function(){ saveFailToast("일용직 명부"); });', '}).catch(function(){});'],
+    ['      else saveFailToast("가족친화 대장", res.status);', ''],
+    ['}).catch(function(){ saveFailToast("가족친화 대장"); });', '}).catch(function(){});'],
+    ['      else if(!(res.status===400&&res.body&&res.body.error_code==="ORPHAN_WORKER")) saveFailToast("현장 대장", res.status);', ''],
+    ['}).catch(function(){ saveFailToast("현장 대장"); });', '}).catch(function(){});'],
+    ['      if(res.status!==200&&res.status!==403) saveFailToast("안전 › 체크 칸 기록", res.status);', ''],
+    ['}).catch(function(){ saveFailToast("안전 › 체크 칸 기록"); });', '}).catch(function(){});'],
+    ['function saveFailToast(what, st){ if (st === 412) return; ', 'function saveFailToast(what, st){ '],   // 3번째 충돌 멈춤에 실패 알림이 겹침
+    ['abPresets.ok = true; abPresets.ts = Number(b.ts) || 0;', 'abPresets.ts = Number(b.ts) || 0;'],   // 단골 노선 읽은 뒤에도 막힘
+    ['    if (!abPresets.ok){', '    if (false){'],   // 단골 노선 읽기 실패 화면 저장이 통째 교체
+    ['items: list, base_ts: abPresets.ts || 0 }', 'items: list }'],   // base_ts 안 보냄 = 동시 저장 덮음
+    ['      if (res.status === 409){ abPresets.ok = false; abPresets.items = null; loadAbPresets(); renderAbManual(true); alert(', '      if (res.status === 409){ alert('],   // 409 뒤 다시 안 읽음
+    ['        if (b.ts) abPresets.ts = Number(b.ts) || abPresets.ts;', ''],   // 저장한 판 시각 안 담음 = 다음 저장이 409
+    ['    if(!id && !quoteLoaded){ alert(QT_UNREAD_MSG); loadQuotes(); return; }', ''],   // 견적 읽기 전 발행 창
+    ['        quoteLoaded=true;\n', ''],
+    ['    if (typeof _colBase !== "undefined") Object.keys(_colBase).forEach(function(k){ if (k !== "contracts") delete _colBase[k]; });\n', ''],   // 세션 비울 때 앞사람 기준 시각
+    ['_colRead403 = {}; myTodoLoaded = false; quoteLoaded = false;', 'myTodoLoaded = false; quoteLoaded = false;'],
+    ['_colRead403 = {}; myTodoLoaded = false; quoteLoaded = false;', '_colRead403 = {};'],
+  ];
+  const KHr = [];
+  for (const [a, b] of KH) { let r; try { r = await runH(onceH(html, a, b)); } catch (e) { r = { ok: false, threw: e.message }; } KHr.push(!r.ok); }
+  T('P1 판24h 읽기 실패 뒤 저장·저장 실패를 성공으로 전수 수리(실행 — 실제 공통 길 window.fetch·낙관락 가짜 서버·실제 읽기·저장·병합 함수): 차량·기성·인허가·체크리스트·휴가·견적·홍보·공매 = 읽기 500 뒤 저장 → 409 → 다시 읽어 병합 → 서버 옛 3 + 새 1(종전 새 1만) · 다시 읽기도 계속 실패 = 저장 3번(셋째 412 충돌 알림 1)·서버 그대로·대기 남음 · 저장 500 = 대기 남음 + 알림(휴가·견적·홍보·공매 토스트 "… 저장에 실패했습니다(서버 응답 500)" · 차량 등 오프라인 띠) · 홍보 실패 뒤 초안 생성 안 함 · 끊김 "(연결 끊김)" · 쓰기 거절 알림 · 휴가 권한 숨김(읽기 403) 신청 = 종전대로 1번에 200 · 일감·거래처·문서함(409 두 번째 포함)·직접 저장 4(명부·가족친화·현장 대장·교육) 실패 알림 · 내 할 일 읽기 전 더하기 막음·다시 읽기·읽힌 뒤 4건 · 단골 노선 읽기 전 저장 막음·base_ts·409 다시 읽기 · 견적 읽기 전 발행 창 막음·번호 이어짐 · 세션 비울 때 기준 시각·403 표시 비움 · 결함 사본 ' + KH.length + '개 = 모두 ✗',
+    RH.ok && KHr.every((x) => x), JSON.stringify({ RH, KHr }));
+} catch (e) { console.log('  (P1 판24h 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ── v489(판24f — 계약 저장 충돌 병합을 칸 단위로 · 원장 C196): 실행 검사는 위 'P1 판24f' 블록 · 여기는 문서·판 번호 정확 검사 + 칸 단위 병합을 부르는 줄·기준 사본을 세우는 줄 등 고정 글 12줄이 그대로 한 번씩 있는지 — 다음 판은 기준 줄·sw를 '489 이상'으로 풀 것
 try {
