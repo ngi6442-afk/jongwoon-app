@@ -18364,11 +18364,11 @@ try {
     const FT = ["`_colRead403`", "`saveFailToast`", "`saveDeniedToast`", "`myTodoLoaded`", "`quoteLoaded`", "원장 C206"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = "<p>(2026-11 v494) 저장이 서버에 들어가지 못하면(서버 오류·연결 끊김) 화면 아래에 \"○○ 저";
-    const ok = /기준: v494 \(2026-11-17\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 8 && gate.length === 3 && scr.length === 5 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 494 && ftv.length > 0 && mF.length === 0 && cb.length === 8 && gate.length === 3 && scr.length === 5 && !cb.some((l) => /\(PM/.test(l))
       && d.man.indexOf(MAN) > 0 && !/_colBase|_colRead403|saveFailToast|myTodoLoaded|quoteLoaded|abPresets|base_ts|gwCall/.test(cut(d.man, MAN, '\n'))
       && d.cl.indexOf('**P1 판24h(v494') > 0
       && FIX494.every((x) => d.ix.split(x).length === 2)
-      && /SHELL_CACHE = 'jw-shell-v494'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 494;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX494.map((x) => d.ix.split(x).length - 1) } };
   };
   const r494 = chk494(D494);
@@ -18381,6 +18381,36 @@ try {
   T('v494 문서·판 번호(정확 검사): FEATURES 기준 v494 (2026-11-17)·v494 절(판24h) · TESTLIST v494 칸 8(화면 확인 5 · 게이트 [x] 3) · MANUAL 저장 실패 알림 글(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 27줄 · sw jw-shell-v494 · 결함 사본 ' + M494.length + '개 = 모두 ✗',
     r494.ok && M494.every((v) => v === false), JSON.stringify({ r: r494.info, mut: M494 }));
 } catch (e) { console.log('  (v494 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v495(판24i — 계약 밖 병합 칸 단위 1판: 공용 병합 imMerge + 지시 · 원장 C209): 실행 검사는 위 'P1 판24i' 블록 · 여기는 문서·판 번호 정확 검사 + 고정 글 19줄(실행 검사가 못 지키는 고침 줄 — 빼면 ✗)
+try {
+  const rd495 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D495 = { ft: rd495('FEATURES.md'), tl: rd495('TESTLIST.md'), sw: rd495('sw.js'), man: rd495('MANUAL.html'), cl: rd495('CLAUDE.md'), ix: rd495('index.html') };
+  const FIX495 = ["    if (typeof imBaseDrop === \"function\") imBaseDrop(\"tasks\");", "        if (typeof imBaseSet === \"function\") imBaseSet(\"tasks\", []);   ", "          if (typeof imBaseSet === \"function\") imBaseSet(\"tasks\", remoteParsed.items || []);", "      if (typeof imOut === \"function\") imOut(\"tasks\", -1, imK);\n      return resp;", "    }, function(e){ if (typeof imOut === \"function\") imOut(\"tasks\", -1, imK); throw e; }).then(function(resp){", "if (!json.write_denied && typeof imBaseSet === \"function\"){", "    var cf = [], keep = JSON.stringify(l), skip = { id: 1, updated: 1, updated_ts: 1, del: 1 };", "      if (su > String(l.updated || \"\")) l.updated = s.updated;", "      var ts = Math.max(Number(l.updated_ts) || 0, Number(s.updated_ts) || 0); if (ts) l.updated_ts = ts;", "    if (cur.del === 1 || r.del === 1) m.del = mergeDel(cur, r);", "    if (opt.sort) out.sort(opt.sort);", "      if (opt.after) opt.after(m, r);", "      if (typeof imBaseAdvance === \"function\") imBaseAdvance(\"tasks\", t.id, { who_id: \"\", who: \"\", who_by: \"notmine\", notmine: t.notmine });", "  function imSt(col){ var S = imSt.s || (imSt.s = {}); return S[col] || (S[col] = { base: {}, at: 0, gen: 0, out: 0, has: false, sent: {}, sk: 0 }); }", "  function imBaseDrop(col){ var st = imSt(col); st.gen++; st.has = false; st.at = 0; st.base = {}; st.out = 0; st.sent = {}; }", "        if (imS && imS.has && imS.at && rAt && rAt < imS.at){ remoteParsed = null; _colBase.tasks = imS.at; }", "    if (x && st.sent[x]){ delete st.sent[x]; st.out = Math.max(0, st.out - 1); }", "\n        if (imS && !imS.has && imS.gen !== imG0){ if (typeof _colBase !== \"undefined\" && _colBase) delete _colBase.tasks; return; }", "\n      if (imS && !imS.has && imS.gen !== imG0){ if (typeof _colBase !== \"undefined\" && _colBase) delete _colBase.tasks; return; }"];
+  const chk495 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v495 (11/17)', '\n### '), tlv = cut(d.tl, '\n## v495 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`imMerge`", "`mergeDel`", "`opt.after`", "원장 C209"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = "<p>(2026-11 v495) 두 PC·폰에서 같은 지시를 거의 같은 때 고치면, 서로 다른 칸은 둘 다 ";
+    const ok = /기준: v495 \(2026-11-17\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 10 && gate.length === 3 && scr.length === 7 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf(MAN) > 0 && !/imMerge|imSt|imBase|imOut|mergeTasks|_colBase|conConflictToast|409|412|gwCall/.test(cut(d.man, MAN, '\n'))
+      && d.cl.indexOf('**P1 판24i(v495') > 0
+      && FIX495.every((x) => d.ix.split(x).length === 2)
+      && /SHELL_CACHE = 'jw-shell-v495'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX495.map((x) => d.ix.split(x).length - 1) } };
+  };
+  const r495 = chk495(D495);
+  const mu495 = (k, f) => chk495(Object.assign({}, D495, { [k]: f(D495[k]) })).ok;
+  const M495 = [mu495('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v494 (')), mu495('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v494'")),
+    mu495('ft', (s) => s.split('`imMerge`').join('imMerge')),
+    mu495('man', (s) => s.replace('<p>(2026-11 v495) ', '<p>')), mu495('cl', (s) => s.replace('**P1 판24i(v495', 'P1 판24i(')),
+    mu495('tl', (s) => s.replace('\n- [x] (AI) `uismoke` \'P1 판24i\'', '\n- (AI) `uismoke` \'P1 판24i\''))]
+    .concat(FIX495.map((x) => mu495('ix', (s) => s.replace(x, ''))));
+  T('v495 문서·판 번호(정확 검사): FEATURES 기준 v495 (2026-11-17)·v495 절(판24i) · TESTLIST v495 칸 10(화면 확인 7 · 게이트 [x] 3) · MANUAL 지시 저장 겹침 글(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 19줄 한 번씩 · sw jw-shell-v495 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
+    r495.ok && M495.every((v) => v === false), JSON.stringify({ r: r495.info, mut: M495 }));
+} catch (e) { console.log('  (v495 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
