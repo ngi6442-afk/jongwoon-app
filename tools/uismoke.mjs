@@ -18119,10 +18119,10 @@ try {
     const FT = ['`ALERT_WATCH_IDS`', '`gw-stmtmail-cron`', '`SECRETS_SCAN_OMIT_KEYS=STMT_MAIL_USER`', '원장 C203'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const ids = (d.ix.match(/var ALERT_WATCH_IDS = \[([^\]]*)\]/) || [0, ''])[1];
-    const ok = /기준: v493 \(2026-11-17\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 493 && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && !cb.some((l) => /\(PM/.test(l))
       && d.cl.indexOf('**v493**: 멈춤 감시 켬') > 0
       && ids.split('"gw-stmtmail-cron"').length === 2
-      && /SHELL_CACHE = 'jw-shell-v493'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 493;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, ids: ids.split(',').length } };
   };
   const r493 = chk493(D493);
@@ -18135,6 +18135,36 @@ try {
   T('v493 문서·판 번호(정확 검사): FEATURES 기준 v493 (2026-11-17)·v493 절 · TESTLIST v493 칸 3(운영 확인 1 · 게이트 [x] 2) · CLAUDE.md 한 줄 · 감시 목록 gw-stmtmail-cron 한 번 · sw jw-shell-v493 · 결함 사본 ' + M493.length + '개 = 모두 ✗',
     r493.ok && M493.every((v) => v === false), JSON.stringify({ r: r493.info, mut: M493 }));
 } catch (e) { console.log('  (v493 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v494(판24h — 계약 밖 자료의 읽기 실패 뒤 저장·저장 실패 처리 전수 수리 · 원장 C206): 실행 검사는 위 'P1 판24h' 블록 · 여기는 문서·판 번호 정확 검사 + 고정 글 27줄(공통 길의 '기준 없으면 base 0' 줄·403으로 읽은 자료 표시·저장 실패 알림 줄·읽기 전 막음 줄 등)이 그대로 한 번씩 있는지 — 다음 판은 기준 줄·sw를 '494 이상'으로 풀 것
+try {
+  const rd494 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D494 = { ft: rd494('FEATURES.md'), tl: rd494('TESTLIST.md'), sw: rd494('sw.js'), man: rd494('MANUAL.html'), cl: rd494('CLAUDE.md'), ix: rd494('index.html') };
+  const FIX494 = ["if (_colBase[col] === undefined && col !== \"tasks\" && col !== \"documents\" && col !== \"contracts\" && !(typeof _colRead403 !== \"undefined\" && _colRead403[col])) saveBase = 0;", "if (res.status === 403){ if (typeof _colRead403 !== \"undefined\") _colRead403[col] = 1; delete _colBase[col]; return _ghResp(200,", "    if (st === 412) return;\n    if (st === 401){ onSessionInvalid(); return; }", "    if (typeof sessReadReset === \"function\") sessReadReset();   /" + "/ 로그아웃 길", "    if (typeof sessReadReset === \"function\") sessReadReset();   /" + "/ P1 판24h 검토", "Object.keys(_colBase).forEach(function(k){ if (k !== \"contracts\") delete _colBase[k]; });", "_colRead403 = {}; myTodos = []; myTodoSha = null; myTodoLoaded = false; quoteLoaded = false; famBase = 0;", "if(!resp.ok){ saveFailToast(\"휴가\", resp.status); return; }", "if(!resp.ok){ saveFailToast(\"견적서\", resp.status); return; }", "if(!resp.ok){ saveFailToast(\"홍보 기록\", resp.status); return; }", "if(!resp.ok){ saveFailToast(\"공매·부동산\", resp.status); return; }", "if(!resp.ok){ saveFailToast(\"입찰 공고\", resp.status); return; }", "if (!resp.ok){ saveFailToast(\"거래처 대장\", resp.status); return; }", "if (!resp.ok){ saveFailToast(\"내 할 일\", resp.status); return; }", "if (!resp.ok){ saveFailToast(\"문서함\", resp.status, true); return; }", "    if (!myTodoLoaded){ gwToast(MYTODO_UNREAD_MSG, true); return; }", "if(!id && !quoteLoaded){ alert(QT_UNREAD_MSG); loadQuotes(); return; }", "items: list, base_ts: abPresets.ts || 0 }", "    if (!abPresets.ok){", "items: items, base_ts: (typeof abManual.ts === \"number\") ? abManual.ts : null }", "if (man) abSetManual(day, man, res.body.manual_ts);", "function abManWait(){ if (abManual.loaded) return false;", "      if (abManWait()) return;", "abManual.dirty = false; abManual.loaded = false; abManual.reread = true; abManual.err = AB_MAN_CONFLICT;", "if (abManual.reread){ abManual.reread = false; abManual.err = AB_MAN_CONFLICT; }", "abManual.err = abManual.reread ? AB_MAN_REREAD_FAIL : abErrText(res, \"직접 추가분을 불러오지 못했습니다\");", "abManual.err = abManual.reread ? AB_MAN_REREAD_FAIL : \"직접 추가분을 불러오지 못했습니다(네트워크).\";"];
+  const chk494 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v494 (11/17)', '\n### '), tlv = cut(d.tl, '\n## v494 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`_colRead403`", "`saveFailToast`", "`saveDeniedToast`", "`myTodoLoaded`", "`quoteLoaded`", "원장 C206"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = "<p>(2026-11 v494) 저장이 서버에 들어가지 못하면(서버 오류·연결 끊김) 화면 아래에 \"○○ 저";
+    const ok = /기준: v494 \(2026-11-17\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 8 && gate.length === 3 && scr.length === 5 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf(MAN) > 0 && !/_colBase|_colRead403|saveFailToast|myTodoLoaded|quoteLoaded|abPresets|base_ts|gwCall/.test(cut(d.man, MAN, '\n'))
+      && d.cl.indexOf('**P1 판24h(v494') > 0
+      && FIX494.every((x) => d.ix.split(x).length === 2)
+      && /SHELL_CACHE = 'jw-shell-v494'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX494.map((x) => d.ix.split(x).length - 1) } };
+  };
+  const r494 = chk494(D494);
+  const mu494 = (k, f) => chk494(Object.assign({}, D494, { [k]: f(D494[k]) })).ok;
+  const M494 = [mu494('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v493 (')), mu494('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v493'")),
+    mu494('ft', (s) => s.split('`saveFailToast`').join('saveFailToast')),
+    mu494('man', (s) => s.replace('<p>(2026-11 v494) ', '<p>')), mu494('cl', (s) => s.replace('**P1 판24h(v494', 'P1 판24h(')),
+    mu494('tl', (s) => s.replace('\n- [x] (AI) `uismoke` \'P1 판24h\'', '\n- (AI) `uismoke` \'P1 판24h\''))]
+    .concat(FIX494.map((x) => mu494('ix', (s) => s.replace(x, ''))));
+  T('v494 문서·판 번호(정확 검사): FEATURES 기준 v494 (2026-11-17)·v494 절(판24h) · TESTLIST v494 칸 8(화면 확인 5 · 게이트 [x] 3) · MANUAL 저장 실패 알림 글(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 27줄 · sw jw-shell-v494 · 결함 사본 ' + M494.length + '개 = 모두 ✗',
+    r494.ok && M494.every((v) => v === false), JSON.stringify({ r: r494.info, mut: M494 }));
+} catch (e) { console.log('  (v494 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
