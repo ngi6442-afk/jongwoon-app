@@ -14400,10 +14400,11 @@
     if (Array.isArray(tv)){ if (out.length !== tv.length || out.some(function(x, i){ return x !== tv[i]; })){ tv.length = 0; Array.prototype.push.apply(tv, out); } }
     else if (out.length) T[k] = out;
   }
-  // 계약 꼴(진행 줄 pipes·단계 stages)만 여기서: 단계 짝 = (이름·차수·같은 짝 몇 번째) · 진행 덩어리 = 줄의 cur 등 + 단계마다 vals·docs·appr 밖의 키 전부
-  var conBase = {};   // 기준 사본(id → 서버 사본 깊은 복사) — loadContracts 성공·409 다시 읽기·저장 200에서 세우고 결재 동기화 접목 뒤 칸마다 전진
-  var CON_W3_SKIP = { id: 1, updated: 1, del: 1, pipes: 1 }, CON_STG_OWN = { vals: 1, docs: 1, appr: 1 };
-  function conBaseSet(items){ conBase = {}; (items || []).forEach(function(x){ if (x && x.id) conBase[x.id] = JSON.parse(JSON.stringify(x)); }); }
+  // 계약 꼴(진행 줄 pipes·단계 stages)만 여기서: 단계 짝 = (이름·차수·같은 짝 몇 번째) · 진행 덩어리 = 줄의 cur 등 + 단계마다 vals·docs 밖의 키 전부(상태·완료일·지시·결재 기록 appr 포함)
+  //   검토 B1: 결재 기록을 진행과 따로 고르면 '열림 + 승인'처럼 갈라져 서버 결재 대조가 거절하거나 단계가 멈춤 — 진행·결재 기록은 한 덩어리, 계약 상태는 합친 뒤 진행에서 다시 셈(mergeContracts)
+  var conBase = {}, conBaseGen = 0;   // 기준 사본(id → 서버 사본 깊은 복사) — loadContracts 성공·409 다시 읽기·저장 200에서 세우고 결재 동기화 접목 뒤 칸마다 전진 · 세대 번호는 통째로 세울 때마다 하나씩
+  var CON_W3_SKIP = { id: 1, updated: 1, del: 1, pipes: 1 }, CON_STG_OWN = { vals: 1, docs: 1 };
+  function conBaseSet(items){ conBaseGen++; conBase = {}; (items || []).forEach(function(x){ if (x && x.id) conBase[x.id] = JSON.parse(JSON.stringify(x)); }); }
   function conStageIds(p){ var n = {}; return ((p && p.stages) || []).map(function(s){ var b = ((s && s.name) || "") + "\u0001" + ((s && s.round) || 0); n[b] = (n[b] || 0) + 1; return b + "\u0001" + n[b]; }); }
   function conProgOf(p){
     if (!p) return undefined; var o = {};
@@ -14411,7 +14412,7 @@
     o.stages = (Array.isArray(p.stages) ? p.stages : []).map(function(s){ var x = {}; Object.keys(s || {}).forEach(function(k){ if (!CON_STG_OWN[k]) x[k] = s[k]; }); return x; });
     return o;
   }
-  // 진행 덩어리를 줄에 씀 — 줄 객체·단계 배열·짝이 맞는 단계 객체는 제자리(넣기 박스가 잡아 둔 줄·단계에 응답 뒤 쓰는 값이 남게), 새 단계는 진행 키만(vals·docs·appr는 단계 걷기가 칸마다)
+  // 진행 덩어리를 줄에 씀 — 줄 객체·단계 배열·짝이 맞는 단계 객체는 제자리(넣기 박스가 잡아 둔 줄·단계에 응답 뒤 쓰는 값이 남게), 새 단계는 진행 키만(vals·docs는 단계 걷기가 칸마다)
   function conProgSet(tp, pr){
     Object.keys(tp).forEach(function(k){ if (k !== "key" && k !== "stages" && !Object.prototype.hasOwnProperty.call(pr, k)) delete tp[k]; });
     Object.keys(pr).forEach(function(k){ if (k !== "stages") tp[k] = mgCopy(pr[k]); });
@@ -14456,14 +14457,13 @@
         mgWalkKey(dv, "docs", pick, path.concat(["docs"]), 0);
         if (dv[0].docs === undefined){ if (s.docs !== undefined) delete s.docs; }
         else if (dv[0].docs !== s.docs && (conIsArr(s.docs) || mgKey(dv[0].docs) !== k0)) s.docs = dv[0].docs;
-        if (!opt.noAppr) mgWalkKey(ss, "appr", pick, path.concat(["appr"]), 0, "whole");
       });
     });
   }
   var CON_W3_LBL = { title: "계약명", client: "거래처", site: "현장", site_id: "현장", start: "시작일", who: "담당", who_id: "담당", label: "종류", type: "종류", docType: "문서 종류", contract_info: "계약 정보", work_log: "작업현황", attachments: "첨부", settle_amount: "정산액", amount_tbd: "계약금액", owner_info: "건축주 정보", asb_survey: "석면조사 정보", bldg_info: "건축물대장", pkst: "서류 체크", status: "진행 상태", review: "검토", lic_id: "인허가", bid_id: "입찰" };
   var CON_W3_CI = { title: "계약명", amount: "계약금액", d1: "계약일", d2: "착공일", d3: "준공일", client: "거래처", site: "현장", guarantee: "계약보증" };
   function conW3Label(path){
-    if (path[0] === "pipes"){ var u = path[2] === "#prog" ? "#prog" : path[3]; return ({ "#prog": "단계 진행", vals: "단계 칸", docs: "서류 체크", appr: "결재 기록" }[u] || "단계") + (u !== "#prog" && path[2] ? "(" + path[2] + ")" : ""); }
+    if (path[0] === "pipes"){ var u = path[2] === "#prog" ? "#prog" : path[3]; return ({ "#prog": "단계 진행", vals: "단계 칸", docs: "서류 체크" }[u] || "단계") + (u !== "#prog" && path[2] ? "(" + path[2] + ")" : ""); }
     if (path[0] === "contract_info" && CON_W3_CI[path[1]]) return CON_W3_CI[path[1]];
     return CON_W3_LBL[path[0]] || "그 밖의 칸";
   }
@@ -14504,10 +14504,10 @@
     if (!list.length || typeof apprToastShow !== "function") return;
     apprToastShow("다른 기기도 고친 칸을 이 화면 값으로 저장했습니다 — " + list[0].name + " · " + list[0].lbl + (list.length > 1 ? "(외 " + (list.length - 1) + ")" : ""));
   }
-  // 결재 동기화 접목 뒤(csSyncFromServer): ① 이 화면이 기준과 다르게 고쳐 둔 칸(진행·결재 기록·진행 상태 제외)은 접목 전 이 화면 값(pre)을 다시 얹음
+  // 결재 동기화 접목 뒤(csSyncFromServer): ① 이 화면이 기준과 다르게 고쳐 둔 칸(진행 덩어리 — 결재 기록 포함 — ·진행 상태 제외)은 접목 전 이 화면 값(pre)을 다시 얹음
   function conSyncKeep(b, c, pre){
     var ch = false;
-    conWalk3(c, b, pre, undefined, function(v){ var t = v[0], bb = v[1], p = v[2]; if (mgEq(p, bb) || mgEq(t, p)) return null; ch = true; return { v: p }; }, { noProg: true, noAppr: true, skip: { status: 1 }, docsView: conDocsView });
+    conWalk3(c, b, pre, undefined, function(v){ var t = v[0], bb = v[1], p = v[2]; if (mgEq(p, bb) || mgEq(t, p)) return null; ch = true; return { v: p }; }, { noProg: true, skip: { status: 1 }, docsView: conDocsView });
     return ch;
   }
   //   ② 기준 전진: 칸마다 접목 뒤 이 화면 값 == 서버 사본 값이면 기준 := 그 값(아니면 그대로) — 접목으로 들어온 서버 값을 '이 화면이 고친 칸'으로 잘못 세지 않게
@@ -14515,9 +14515,14 @@
     var b = c && conBase[c.id]; if (!b || !sc) return;
     conWalk3(b, b, c, sc, function(v){ var t = v[0], cc = v[2], x = v[3]; return (mgEq(cc, x) && !mgEq(t, cc)) ? { v: cc } : null; }, { docsView: conDocsView });
   }
+  // 칸 단위 병합 뒤 계약 상태(끝남·진행 중)를 진행에서 다시 셈 — csSyncFromServer 끝의 셈과 같은 식(진행 줄을 서버·이 화면에서 따로 받아 '상태 done·단계 열림'으로 어긋나지 않게)
+  function conStatusFix(c){
+    var lp = c && Array.isArray(c.pipes) ? c.pipes : []; if (!lp.length || (c.status !== "done" && c.status !== "active")) return;
+    c.status = lp.every(function(p){ return (p.cur || 0) >= ((p.stages || []).length); }) ? "done" : "active";
+  }
   function mergeContracts(local, remote){
     var byId={}, cfs=[]; (local||[]).forEach(function(c){ if(c&&c.id) byId[c.id]=c; });
-    (remote||[]).forEach(function(x){ if(!x||!x.id) return; var cur=byId[x.id]; if(!cur){ byId[x.id]=x; } else { var m=null, cb=(typeof conBase!=="undefined"&&conBase)?conBase[x.id]:null; if(cb&&typeof conMerge3==="function") m=conMerge3(cb, cur, x, cfs); if(!m){ var w=(x.updated||"")>(cur.updated||"")?x:cur; m=Object.assign({},(w===x?cur:x),w); if(cur.del===1||x.del===1) m.del=mergeDel(cur,x); } csKeepApproved(m, x); if (typeof csValMerge === "function") csValMerge(m, x); byId[x.id]=m; } });   // P1 판24 5차: 결재로 승인·반영된 변경계약 차수는 서버 쪽(같은 날이면 로컬이 통째로 이기던 것) · 판24f: 기준 사본이 있으면 칸 단위(conMerge3 — 이 계약 객체 제자리), 없으면(새 계약·기준 유실) 종전 통째 고르기
+    (remote||[]).forEach(function(x){ if(!x||!x.id) return; var cur=byId[x.id]; if(!cur){ byId[x.id]=x; } else { var m=null, cb=(typeof conBase!=="undefined"&&conBase)?conBase[x.id]:null; if(cb&&typeof conMerge3==="function") m=conMerge3(cb, cur, x, cfs); var m3=!!m; if(!m){ var w=(x.updated||"")>(cur.updated||"")?x:cur; m=Object.assign({},(w===x?cur:x),w); if(cur.del===1||x.del===1) m.del=mergeDel(cur,x); } csKeepApproved(m, x); if (typeof csValMerge === "function") csValMerge(m, x); if (m3 && typeof conStatusFix === "function") conStatusFix(m); byId[x.id]=m; } });   // P1 판24 5차: 결재로 승인·반영된 변경계약 차수는 서버 쪽(같은 날이면 로컬이 통째로 이기던 것) · 판24f: 기준 사본이 있으면 칸 단위(conMerge3 — 이 계약 객체 제자리), 없으면(새 계약·기준 유실) 종전 통째 고르기
     if (cfs.length && typeof conConflictToast === "function") conConflictToast(cfs);
     return Object.keys(byId).map(function(k){ return byId[k]; });
   }
@@ -14526,6 +14531,8 @@
     var body=JSON.stringify({schema:1, items:contracts});
     // 판24e: 이 저장에 실린 단계 칸 고침 번호 — 200이면 그 번호까지 고침 기록을 지움(그 뒤 고침은 남김)
     var sentSeq = (typeof csValEditSeq !== "undefined") ? csValEditSeq : 0;
+    // 판24f 검토(나): 보낼 때의 기준 세대 — 200이 왔을 때 그 사이 기준을 새로 세웠으면(다시 읽기·409·다른 저장 200) 이 body로 되돌리지 않음(거꾸로 도착한 200)
+    var sentGen = (typeof conBaseGen !== "undefined") ? conBaseGen : 0;
     var payload={message:"contracts: 업데이트", content:b64EncodeUnicode(body), branch:"main"};
     if(contractSha) payload.sha=contractSha;
     fetch(CONTRACT_API, {method:"PUT", headers:Object.assign({"Content-Type":"application/json"}, ghHeaders()), body:JSON.stringify(payload)}).then(function(resp){
@@ -14538,7 +14545,7 @@
       // 11/16(남은 것 2 — 재현됨): 이월 응답 뒤 다시 읽을 때, 이 저장을 보낸 뒤 고친 내용(디바운스로 아직 안 나간 것)이 있으면 대기 표시를 다시 세워
       //   다시 읽기가 통째로 덮지 않고 병합(mergeContracts — 로컬 고침은 남고 승인 차수만 서버 값 csKeepApproved)하게 한다. 그 고침은 걸려 있는 디바운스 저장이 보낸다
       //   11/16 검토 B2: 저장 함수 밖(결재 동기화 등)이 예약 없이 목록을 바꿨으면 저장도 예약(이미 예약돼 있으면 대기 표시만)
-      return resp.json().then(function(json){ if (typeof csValEditsDone === "function") csValEditsDone(sentSeq); if (resp.ok && typeof conBaseSet === "function") conBaseSet(JSON.parse(body).items); contractSha=json.content&&json.content.sha; contractsPending=false; if(json&&json.con_kept&&json.con_kept.length&&JSON.stringify({schema:1, items:contracts})!==body){ if(contractSaveTimer) contractsPending=true; else scheduleContractSave(); } if(json&&json.con_kept&&json.con_kept.length) loadContracts(); });   // 5차: 서버가 승인 차수를 지켰으면(낡은 사본) 화면을 서버 값으로
+      return resp.json().then(function(json){ if (typeof csValEditsDone === "function") csValEditsDone(sentSeq); if (resp.ok && typeof conBaseSet === "function" && conBaseGen === sentGen) conBaseSet(JSON.parse(body).items); contractSha=json.content&&json.content.sha; contractsPending=false; if(json&&json.con_kept&&json.con_kept.length&&JSON.stringify({schema:1, items:contracts})!==body){ if(contractSaveTimer) contractsPending=true; else scheduleContractSave(); } if(json&&json.con_kept&&json.con_kept.length) loadContracts(); });   // 5차: 서버가 승인 차수를 지켰으면(낡은 사본) 화면을 서버 값으로
     }).catch(function(){});
   }
   var WASTE_BACKBONE = [
@@ -16043,9 +16050,11 @@
   function csApprSync(c, force){
     if (!c || !c.scen || typeof gwCall !== "function" || !csApprPending(c)) return;
     var now = Date.now(); if (!force && csApprSyncAt[c.id] && now - csApprSyncAt[c.id] < 60000) return; csApprSyncAt[c.id] = now;
-    var id = c.id, seq0 = (typeof csSaveDoneSeq !== "undefined") ? csSaveDoneSeq : 0;
+    var id = c.id, seq0 = (typeof csSaveDoneSeq !== "undefined") ? csSaveDoneSeq : 0, gen0 = (typeof conBaseGen !== "undefined") ? conBaseGen : 0;
     csFetchServerContract(id).then(function(sc){
       c = findProc(id) || c;   // 응답 대기 중 409 병합이 객체를 바꿨을 수 있다(F6)
+      // 판24f 검토(가): 사본을 요청한 뒤 기준을 새로 세웠으면(409 다시 읽기·다시 읽기) 사본이 그보다 낡았을 수 있음 — 접목하지 않고 버림(저장 응답 전이라 위 저장 번호로는 못 거름)
+      if (sc && typeof conBaseGen !== "undefined" && conBaseGen !== gen0){ sc = null; csApprSyncAt[id] = 0; }
       // 판24e 검토 ①: 사본을 요청한 뒤 그 사이 저장이 끝났으면 사본이 낡음(방금 저장한 고침을 모름 — 고침 기록은 저장 응답 때 지워짐) → 접목하지 않고 버림 · 다음 그리기에서 다시 동기화(60초 제한 되돌림)
       //   결재함 목록 반영(아래)은 그대로 — 로컬 단계의 상신 번호로 결재 상태만 옮기므로 낡은 사본과 무관
       if (sc && typeof csSaveDoneSeq !== "undefined" && csSaveDoneSeq !== seq0){ sc = null; csApprSyncAt[id] = 0; }
@@ -16085,9 +16094,10 @@
   function csApprOnDecided(it){
     var cp = String(it && it.ref || "").slice(4).split("|"), id = cp[0], c0 = findProc(id);
     if (!c0){ if (typeof apprToastShow === "function") apprToastShow("계약을 이 기기에서 찾지 못했습니다 — 계약 탭에서 동기화됩니다"); return; }
-    var seq0 = (typeof csSaveDoneSeq !== "undefined") ? csSaveDoneSeq : 0;
+    var seq0 = (typeof csSaveDoneSeq !== "undefined") ? csSaveDoneSeq : 0, gen0 = (typeof conBaseGen !== "undefined") ? conBaseGen : 0;
     csFetchServerContract(id).then(function(sc){
       var c = findProc(id) || c0;
+      if (sc && typeof conBaseGen !== "undefined" && conBaseGen !== gen0) sc = null;   // 판24f 검토(가): 그 사이 기준을 새로 세웠으면 낡은 사본 — 접목하지 않음
       // 판24e 검토 ①: 사본을 요청한 뒤 저장이 끝났으면 낡은 사본 — 접목하지 않음(결재 반영은 로컬 단계에 그대로)
       if (sc && typeof csSaveDoneSeq !== "undefined" && csSaveDoneSeq !== seq0) sc = null;
       if (sc) csSyncFromServer(c, sc);
