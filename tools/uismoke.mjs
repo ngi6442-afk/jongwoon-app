@@ -17118,9 +17118,19 @@ try {
         const mid = fit(s) + ' ' + s.status;
         A.now += 120000; A.openId = 'kS'; A.api.render(); await A.flush(); await A.fire();
         R.realDone = bAfter + ' | A 저장 뒤 맞음=' + mid + ' | A 동기화 뒤 ' + srv.items[0].status + ' 맞음=' + fit(srv.items[0]) + ' | 거절 ' + (srv.rejects || 0); }
+      // ④ 원장 C199: 두 줄 중 하나만 끝(본 줄 진행 중 · 변경계약 줄 1차 끝·승인) · B는 계약명만 · A는 끝난 변경계약 줄의 진행 키 → 409 병합 뒤 상태 다시 셈 = 진행 중(conStatusFix — 모든 줄이 끝나야 끝남)
+      { const conN = { id: 'kN', scen: { type: 'dredge', pub: true, ver: 1 }, status: 'active', updated: Y, title: 'N', contract_info: { amount: 1000, d3: '2026-12-01' },
+          pipes: [{ key: 'main', cur: 1, stages: [{ name: '견적', status: 'done' }, { name: '공사 수행', status: 'open' }, { name: '준공', status: 'pending' }] },
+            { key: 'chg', cur: 1, stages: [{ name: '변경계약', aid: 'chgA', ak: '계약 단계', aw: 'amt', round: 1, status: 'done', done_at: Y, amt0: 1000, eff0: 1000, term0: '2026-12-01', vals: cloneF(SNAP), appr: { cid: 'c1', kind: '계약 단계', status: '승인', at: '2026-11-10T00:00:00Z', snap: cloneF(SNAP) } }] }] };
+        const { srv, A, B } = await two([conN], [{ id: 'a1', cid: 'c1', ref: 'con:kN|chg|0', kind: '계약 단계', status: '승인', snap: cloneF(SNAP), decided_at: '2026-11-11T01:00:00Z' }]);
+        const b = B.api.find('kN'); b.title = 'N-B'; b.updated = D; B.api.sched(); await B.fire();
+        const c = A.api.find('kN'); c.pipes[1].stages[0].due_src = '수동'; c.updated = D; A.api.sched(); await A.fire();
+        const s = srv.items[0];
+        R.realTwo = s.status + ' ' + A.api.find('kN').status + '|' + s.title + '|' + s.pipes.map((p) => p.key + p.cur + '/' + p.stages.length).join(',') + '|' + (s.pipes[1].stages[0].due_src || '-') + '|거절 ' + (srv.rejects || 0); }
       R.realok = R.realChg === '1:done/승인 → 1:done/승인,2:pending/- | 거절 0 알림 0'
         && R.realMain === 'done/승인 cur2 다음 open+지시 | A 저장 뒤 open/대기 cur1 | A 동기화 뒤 done/승인 cur2 다음 open | 거절 0'
-        && R.realDone === 'done done/승인 cur2 | A 저장 뒤 맞음=true active | A 동기화 뒤 done 맞음=true | 거절 0';
+        && R.realDone === 'done done/승인 cur2 | A 저장 뒤 맞음=true active | A 동기화 뒤 done 맞음=true | 거절 0'
+        && R.realTwo === 'active active|N-B|main1/3,chg1/1|수동|거절 0';
     }
     R.ok = R.r1ok && R.r2ok && R.r3ok && R.r4ok && R.r5ok && R.cfok && R.nocfok && R.rowsok && R.stok && R.nobok && R.excok && R.inplok && R.dkok && R.graftok && R.adv2ok && R.b1ok && R.b2ok && R.b3ok
       && R.gapok && R.gap2ok && R.genok && R.realok;
@@ -17139,6 +17149,7 @@ try {
     [[['CON_STG_OWN = { vals: 1, docs: 1 };', 'CON_STG_OWN = { vals: 1, docs: 1, appr: 1 };'], ['(conIsArr(s.docs) || mgKey(dv[0].docs) !== k0)) s.docs = dv[0].docs;\n', '(conIsArr(s.docs) || mgKey(dv[0].docs) !== k0)) s.docs = dv[0].docs;\n        mgWalkKey(ss, "appr", pick, path.concat(["appr"]), 0, "whole");\n']], null],   // B1 결재 기록을 진행과 따로 걷기(51deb37 꼴)
     ['CON_STG_OWN = { vals: 1, docs: 1 };', 'CON_STG_OWN = { vals: 1, docs: 1, appr: 1 };'],   // G12 결재 기록을 진행 덩어리에서 빼고 안 걷기(이 화면 값 그대로)
     [' if (m3 && typeof conStatusFix === "function") conStatusFix(m);', ''],   // 병합 뒤 계약 상태를 진행에서 다시 세지 않음
+    ['c.status = lp.every(function(p){ return (p.cur || 0) >= ((p.stages || []).length); }) ? "done" : "active";', 'c.status = lp.some(function(p){ return (p.cur || 0) >= ((p.stages || []).length); }) ? "done" : "active";'],   // C199 두 줄 중 하나만 끝나도 끝남으로(every → some)
     [' && conBaseGen === sentGen) conBaseSet(', ') conBaseSet('],   // (나) 거꾸로 온 200이 기준을 옛 body로
     ['      if (sc && typeof conBaseGen !== "undefined" && conBaseGen !== gen0){ sc = null; csApprSyncAt[id] = 0; }\n', ''],   // (가) 기준을 새로 세운 뒤 온 낡은 동기화 사본 접목
     ['conBaseSet(JSON.parse(body).items);', 'conBaseSet(JSON.parse(JSON.stringify(contracts)));'],   // G29 200 기준을 지금 목록으로
@@ -17172,7 +17183,7 @@ try {
     let k, rr = null; try { rr = await runF(mutF(from, to)); k = rr.ok; } catch (e) { k = 'err ' + e.message; } KF.push(k);
     if (process.env.P24F_DBG) console.log('   결함 사본', KF.length, k, rr ? Object.keys(rr).filter((x) => /ok$/.test(x) && x !== 'ok' && rr[x] === false).join(',') : '');   // 개발 확인용 — 사본마다 걸린 항목
   }
-  T('P1 판24f 계약 저장 충돌 칸 단위 병합(실행 — 실제 mergeContracts·conMerge3·loadContracts·doSaveContracts·csSyncFromServer·csApprSync · 가짜 fetch·시계): 재현 4꼴(서류 줄 대 서류 줄·작업현황 대 계약명·준공일·손대지 않은 계약·밤새 연 화면) 모두 남음 · 대조 단계 칸 그대로 · 같은 칸 충돌 = 이 화면 값 + 알림 한 줄(충돌 없으면 0) · 줄 지움·양쪽 추가 · 구조 서버만/이 화면만/양쪽(날짜) · 기준 없는 계약·예외 = 종전 규칙 · 제자리(계약·줄·단계 배열·단계 객체) · 배열 아닌 서류 체크 · 접목 뒤 안 나간 작업현황 줄·개요 고침 남음 · 기준 전진 뒤 다른 기기의 더 새 값 남음(칸마다 — 통째 아님) · 기준 세우는 자리 셋(읽기·409·200) · 결함 사본 ' + KF.length + '개 = 모두 ✗',
+  T('P1 판24f 계약 저장 충돌 칸 단위 병합(실행 — 실제 mergeContracts·conMerge3·loadContracts·doSaveContracts·csSyncFromServer·csApprSync · 가짜 fetch·시계): 재현 4꼴(서류 줄 대 서류 줄·작업현황 대 계약명·준공일·손대지 않은 계약·밤새 연 화면) 모두 남음 · 대조 단계 칸 그대로 · 같은 칸 충돌 = 이 화면 값 + 알림 한 줄(충돌 없으면 0) · 줄 지움·양쪽 추가 · 구조 서버만/이 화면만/양쪽(날짜) · 기준 없는 계약·예외 = 종전 규칙 · 제자리(계약·줄·단계 배열·단계 객체) · 배열 아닌 서류 체크 · 접목 뒤 안 나간 작업현황 줄·개요 고침 남음 · 기준 전진 뒤 다른 기기의 더 새 값 남음(칸마다 — 통째 아님) · 기준 세우는 자리 셋(읽기·409·200) · 두 줄 중 하나만 끝난 계약의 병합 뒤 상태 = 진행 중(C199) · 결함 사본 ' + KF.length + '개 = 모두 ✗',
     RF.ok && KF.every((v) => v === false), JSON.stringify({ r: RF, mut: KF }));
 } catch (e) { console.log('  (P1 판24f 검사 생략 — ' + e.message + ')'); fails++; }
 
