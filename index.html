@@ -14321,9 +14321,9 @@
   function loadContracts(){
     var token = getToken(); if(!token) return;
     fetch(CONTRACT_API, {headers: ghHeaders()}).then(function(resp){
-      if(resp.status===404){ contractSha=null; contracts=[]; autoGenReady.con=true; runAwardAutoCon(); return; }
+      if(resp.status===404){ contractSha=null; contracts=[]; if (typeof conBaseSet === "function") conBaseSet([]); autoGenReady.con=true; runAwardAutoCon(); return; }
       if(!resp.ok) throw new Error("HTTP "+resp.status);
-      return resp.json().then(function(json){ contractSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); var cr=(p&&p.items)||[]; contracts = contractsPending ? mergeContracts(contracts, cr) : cr; renderContracts(); renderTasks(); autoGenReady.con=true; runAwardAutoCon(); liveContracts().forEach(conBldgAutoTry); if (typeof asbLoaded !== "undefined" && asbLoaded && typeof csSiteHooksRetry === "function"){ try { csSiteHooksRetry(); } catch(e){} } });   // v384: 대장이 먼저 로드된 순서도 보류 훅 처리
+      return resp.json().then(function(json){ contractSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); var cr=(p&&p.items)||[]; contracts = contractsPending ? mergeContracts(contracts, cr) : cr; if (typeof conBaseSet === "function") conBaseSet(cr); renderContracts(); renderTasks(); autoGenReady.con=true; runAwardAutoCon(); liveContracts().forEach(conBldgAutoTry); if (typeof asbLoaded !== "undefined" && asbLoaded && typeof csSiteHooksRetry === "function"){ try { csSiteHooksRetry(); } catch(e){} } });   // v384: 대장이 먼저 로드된 순서도 보류 훅 처리
     }).catch(function(){});
   }
   var contractsPending=false;   // 저장 디바운스(1.4s) 사이 재로드가 편집을 덮지 않게 — bids/quotes와 동일 패턴
@@ -14358,9 +14358,167 @@
       });
     });
   }
+  // ── 판24f(원장 C196): 세 갈래 칸 단위 합치기 — 기준(이 기기가 서버에서 마지막으로 받은 사본)·이 화면·서버를 칸마다 견줌
+  //   걷기(mg*)는 자료 꼴에 매이지 않음: 객체는 한 단계 안쪽 키 하나씩 · 줄 배열(원소마다 겹치지 않는 id 또는 k)은 줄 하나씩(첨부처럼 한 단계 안쪽 배열도) · 그 밖은 통째 한 칸
+  //   칸마다 고르는 함수(pick)만 바꿔 병합·결재 동기화 뒤 다시 얹기·기준 전진에 같이 씀. pick(값[목표·기준·다른 쪽·덧], 자리, 덧정보) → null(목표 그대로) 또는 {v}(그 값으로 · v 없음 = 지움)
+  function mgPlain(v){ return !!v && typeof v === "object" && !Array.isArray(v); }
+  function mgKey(v){ if (v === undefined) return "u"; return JSON.stringify(v, function(k, x){ if (mgPlain(x)){ var o = {}; Object.keys(x).sort().forEach(function(kk){ o[kk] = x[kk]; }); return o; } return x; }); }   // 키 순서와 무관한 비교 글
+  function mgEq(a, b){ return mgKey(a) === mgKey(b); }
+  function mgCopy(v){ return v === undefined ? undefined : JSON.parse(JSON.stringify(v)); }
+  function mgKeysOf(cons){ var out = [], seen = {}; [0, 2, 1, 3].forEach(function(j){ var c = cons[j]; if (mgPlain(c)) Object.keys(c).forEach(function(k){ if (!seen[k]){ seen[k] = 1; out.push(k); } }); }); return out; }
+  function mgKind(vs, depth){
+    var pres = vs.filter(function(v){ return v !== undefined; }); if (!pres.length) return "whole";
+    if (depth < 1 && pres.every(mgPlain)) return "obj";
+    if (depth < 2 && pres.every(Array.isArray) && pres.some(function(a){ return a.length; })){
+      var rk = ["id", "k"].filter(function(key){ return pres.every(function(a){ var seen = {}; return a.every(function(r){ var id = mgPlain(r) ? r[key] : undefined; if ((typeof id !== "string" && typeof id !== "number") || id === "" || seen["_" + id]) return false; seen["_" + id] = 1; return true; }); }); })[0];
+      if (rk) return "rows:" + rk;
+    }
+    return "whole";
+  }
+  function mgWalkKey(cons, k, pick, path, depth, force){
+    var T = cons[0], vs = cons.map(function(c){ return mgPlain(c) ? c[k] : undefined; }), kind = force || mgKind(vs, depth);
+    if (kind === "obj"){
+      var tv = mgPlain(vs[0]) ? vs[0] : {}, sub = [tv].concat(vs.slice(1).map(function(v){ return mgPlain(v) ? v : undefined; }));
+      mgKeysOf(sub).forEach(function(sk){ mgWalkKey(sub, sk, pick, path.concat([sk]), depth + 1); });
+      if (tv !== vs[0] && Object.keys(tv).length) T[k] = tv;
+      return;
+    }
+    if (kind.slice(0, 5) === "rows:"){ mgWalkRows(cons, k, kind.slice(5), pick, path); return; }
+    var r = pick(vs, path);
+    if (r){ if (r.v === undefined) delete T[k]; else T[k] = mgCopy(r.v); }
+  }
+  // 줄 단위: 줄 하나 = 통째 한 칸 · 순서는 다른 쪽(병합이면 서버) 순서 뒤에 목표에만 있는 줄 · 목표 배열·남긴 줄 객체는 제자리
+  function mgWalkRows(cons, k, rk, pick, path){
+    var T = cons[0], A = cons.map(function(c){ var v = mgPlain(c) ? c[k] : undefined; return Array.isArray(v) ? v : []; }), ids = [], seen = {}, out = [];
+    [2, 0, 1, 3].forEach(function(j){ A[j].forEach(function(r){ var id = "_" + r[rk]; if (!seen[id]){ seen[id] = 1; ids.push(id); } }); });
+    ids.forEach(function(id){
+      var rv = A.map(function(a){ for (var i = 0; i < a.length; i++){ if ("_" + a[i][rk] === id) return a[i]; } return undefined; });
+      var r = pick(rv, path), v = r ? mgCopy(r.v) : rv[0];
+      if (v !== undefined) out.push(v);
+    });
+    var tv = T[k];
+    if (Array.isArray(tv)){ if (out.length !== tv.length || out.some(function(x, i){ return x !== tv[i]; })){ tv.length = 0; Array.prototype.push.apply(tv, out); } }
+    else if (out.length) T[k] = out;
+  }
+  // 계약 꼴(진행 줄 pipes·단계 stages)만 여기서: 단계 짝 = (이름·차수·같은 짝 몇 번째) · 진행 덩어리 = 줄의 cur 등 + 단계마다 vals·docs·appr 밖의 키 전부
+  var conBase = {};   // 기준 사본(id → 서버 사본 깊은 복사) — loadContracts 성공·409 다시 읽기·저장 200에서 세우고 결재 동기화 접목 뒤 칸마다 전진
+  var CON_W3_SKIP = { id: 1, updated: 1, del: 1, pipes: 1 }, CON_STG_OWN = { vals: 1, docs: 1, appr: 1 };
+  function conBaseSet(items){ conBase = {}; (items || []).forEach(function(x){ if (x && x.id) conBase[x.id] = JSON.parse(JSON.stringify(x)); }); }
+  function conStageIds(p){ var n = {}; return ((p && p.stages) || []).map(function(s){ var b = ((s && s.name) || "") + "\u0001" + ((s && s.round) || 0); n[b] = (n[b] || 0) + 1; return b + "\u0001" + n[b]; }); }
+  function conProgOf(p){
+    if (!p) return undefined; var o = {};
+    Object.keys(p).forEach(function(k){ if (k !== "key" && k !== "stages") o[k] = p[k]; });
+    o.stages = (Array.isArray(p.stages) ? p.stages : []).map(function(s){ var x = {}; Object.keys(s || {}).forEach(function(k){ if (!CON_STG_OWN[k]) x[k] = s[k]; }); return x; });
+    return o;
+  }
+  // 진행 덩어리를 줄에 씀 — 줄 객체·단계 배열·짝이 맞는 단계 객체는 제자리(넣기 박스가 잡아 둔 줄·단계에 응답 뒤 쓰는 값이 남게), 새 단계는 진행 키만(vals·docs·appr는 단계 걷기가 칸마다)
+  function conProgSet(tp, pr){
+    Object.keys(tp).forEach(function(k){ if (k !== "key" && k !== "stages" && !Object.prototype.hasOwnProperty.call(pr, k)) delete tp[k]; });
+    Object.keys(pr).forEach(function(k){ if (k !== "stages") tp[k] = mgCopy(pr[k]); });
+    var old = Array.isArray(tp.stages) ? tp.stages : [], oid = conStageIds({ stages: old }), nid = conStageIds(pr);
+    var out = (pr.stages || []).map(function(ps, i){
+      var at = oid.indexOf(nid[i]), st = at >= 0 && old[at] && typeof old[at] === "object" ? old[at] : {};
+      Object.keys(st).forEach(function(k){ if (!CON_STG_OWN[k] && !Object.prototype.hasOwnProperty.call(ps, k)) delete st[k]; });
+      Object.keys(ps).forEach(function(k){ st[k] = mgCopy(ps[k]); });
+      return st;
+    });
+    if (!Array.isArray(tp.stages)) tp.stages = out;
+    else if (out.length !== old.length || out.some(function(x, i){ return x !== old[i]; })){ old.length = 0; Array.prototype.push.apply(old, out); }
+  }
+  // 서류 체크가 아직 배열이 아닌 단계(dk·dtx 꼴)는 표준 항목 목록(모두 todo)으로 보고 견줌 — 한쪽만 체크해 배열이 된 경우도 줄 단위로
+  function conDocsView(s){
+    if (!s || conIsArr(s.docs) || s.docs !== undefined) return s ? s.docs : undefined;
+    if ((conIsArr(s.dk) || s.dtx) && typeof csDocsLost === "function" && !csDocsLost(s) && typeof csStageDocItems === "function"){ try { return csStageDocItems(s); } catch(e){} }
+    return undefined;
+  }
+  function conWalk3(T, B, O, X, pick, opt){
+    opt = opt || {}; var cons = [T, B, O, X];
+    mgKeysOf(cons).forEach(function(k){ if (!CON_W3_SKIP[k] && !(opt.skip && opt.skip[k])) mgWalkKey(cons, k, pick, [k], 0); });
+    var P = cons.map(function(c){ return c && Array.isArray(c.pipes) ? c.pipes : []; }), keys = [];
+    P.forEach(function(a){ a.forEach(function(p){ if (p && p.key != null && keys.indexOf(p.key) < 0) keys.push(p.key); }); });
+    keys.forEach(function(key){
+      var ps = P.map(function(a){ return a.filter(function(p){ return p && p.key === key; })[0]; }), tp = ps[0];
+      if (!opt.noProg){
+        var r = pick(ps.map(conProgOf), ["pipes", key, "#prog"], { seq: ps.map(function(p){ return p ? conStageIds(p).join("\u0002") : undefined; }) });
+        if (r){
+          if (r.v === undefined){ if (tp) T.pipes.splice(T.pipes.indexOf(tp), 1); return; }
+          if (!tp){ tp = { key: key }; if (!Array.isArray(T.pipes)) T.pipes = []; T.pipes.push(tp); }
+          conProgSet(tp, r.v);
+        }
+      }
+      if (!tp || !Array.isArray(tp.stages)) return;
+      var tid = conStageIds(tp), oid = ps.map(function(p){ return p ? conStageIds(p) : []; });
+      tp.stages.forEach(function(s, i){
+        if (!s || typeof s !== "object") return;
+        var ss = ps.map(function(p, j){ if (j === 0) return s; var at = oid[j].indexOf(tid[i]); return at < 0 ? undefined : p.stages[at]; }), path = ["pipes", key, s.name || ""];
+        mgWalkKey(ss, "vals", pick, path.concat(["vals"]), 0, "obj");
+        var dv = ss.map(function(x){ return x ? { docs: opt.docsView ? opt.docsView(x) : x.docs } : undefined; }), k0 = mgKey(dv[0].docs);
+        mgWalkKey(dv, "docs", pick, path.concat(["docs"]), 0);
+        if (dv[0].docs === undefined){ if (s.docs !== undefined) delete s.docs; }
+        else if (dv[0].docs !== s.docs && (conIsArr(s.docs) || mgKey(dv[0].docs) !== k0)) s.docs = dv[0].docs;
+        if (!opt.noAppr) mgWalkKey(ss, "appr", pick, path.concat(["appr"]), 0, "whole");
+      });
+    });
+  }
+  var CON_W3_LBL = { title: "계약명", client: "거래처", site: "현장", site_id: "현장", start: "시작일", who: "담당", who_id: "담당", label: "종류", type: "종류", docType: "문서 종류", contract_info: "계약 정보", work_log: "작업현황", attachments: "첨부", settle_amount: "정산액", amount_tbd: "계약금액", owner_info: "건축주 정보", asb_survey: "석면조사 정보", bldg_info: "건축물대장", pkst: "서류 체크", status: "진행 상태", review: "검토", lic_id: "인허가", bid_id: "입찰" };
+  var CON_W3_CI = { title: "계약명", amount: "계약금액", d1: "계약일", d2: "착공일", d3: "준공일", client: "거래처", site: "현장", guarantee: "계약보증" };
+  function conW3Label(path){
+    if (path[0] === "pipes"){ var u = path[2] === "#prog" ? "#prog" : path[3]; return ({ "#prog": "단계 진행", vals: "단계 칸", docs: "서류 체크", appr: "결재 기록" }[u] || "단계") + (u !== "#prog" && path[2] ? "(" + path[2] + ")" : ""); }
+    if (path[0] === "contract_info" && CON_W3_CI[path[1]]) return CON_W3_CI[path[1]];
+    return CON_W3_LBL[path[0]] || "그 밖의 칸";
+  }
+  // 병합(409·다시 읽기): 이 화면이 기준과 같으면(안 고침) 서버 값, 다르면 이 화면 값 · 양쪽이 같은 칸을 서로 다르게 고쳤으면 이 화면 값 + 충돌 기록(cfs)
+  //   진행 덩어리: 단계 짝 순서열이 다르면 구조를 바꾼 쪽 줄(양쪽 다 바꿨으면 날짜 늦은 쪽, 같으면 이 화면 + 충돌) · 예외면 이 계약을 되돌리고 null(종전 규칙으로)
+  function conMerge3(b, l, s, cfs){
+    var cf = [], keep = JSON.stringify(l);   // 예외 때 되돌릴 사본(이름 'snap'은 판24d 검사가 그리기 줄을 찾는 글이라 피함)
+    try {
+      var pick = function(v, path, meta){
+        var t = v[0], bb = v[1], o = v[2];
+        if (mgEq(t, o)) return null;
+        if (meta && meta.seq && meta.seq[0] !== meta.seq[2]){
+          var q = meta.seq;
+          if (q[2] === q[1]){ if (!mgEq(o, bb)) cf.push(path); return null; }
+          if (q[0] === q[1]){ if (!mgEq(t, bb)) cf.push(path); return { v: o }; }
+          cf.push(path); return String(s.updated || "") > String(l.updated || "") ? { v: o } : null;
+        }
+        if (mgEq(t, bb)) return { v: o };
+        if (!mgEq(o, bb)) cf.push(path);
+        return null;
+      };
+      var dl = (l.del === 1 || s.del === 1) ? mergeDel(l, s) : null;
+      conWalk3(l, b, s, undefined, pick, { docsView: conDocsView });
+      if (String(s.updated || "") > String(l.updated || "")) l.updated = s.updated;
+      if (dl !== null) l.del = dl;
+    } catch(e){
+      if (typeof console !== "undefined" && console.warn) console.warn("판24f 칸 단위 병합 실패 — 종전 규칙으로", l && l.id, e && e.message);
+      Object.keys(l).forEach(function(k){ delete l[k]; }); Object.assign(l, JSON.parse(keep));
+      return null;
+    }
+    var nm = (typeof csTitle === "function" ? csTitle(l) : l.title) || l.client || l.label || "계약";
+    cf.forEach(function(path){ cfs.push({ id: l.id, name: nm, lbl: conW3Label(path) }); });
+    return l;
+  }
+  function conConflictToast(cfs){
+    var seen = {}, list = [];
+    (cfs || []).forEach(function(e){ var key = e.id + "\u0001" + e.lbl; if (!seen[key]){ seen[key] = 1; list.push(e); } });
+    if (!list.length || typeof apprToastShow !== "function") return;
+    apprToastShow("다른 기기도 고친 칸을 이 화면 값으로 저장했습니다 — " + list[0].name + " · " + list[0].lbl + (list.length > 1 ? "(외 " + (list.length - 1) + ")" : ""));
+  }
+  // 결재 동기화 접목 뒤(csSyncFromServer): ① 이 화면이 기준과 다르게 고쳐 둔 칸(진행·결재 기록·진행 상태 제외)은 접목 전 이 화면 값(pre)을 다시 얹음
+  function conSyncKeep(b, c, pre){
+    var ch = false;
+    conWalk3(c, b, pre, undefined, function(v){ var t = v[0], bb = v[1], p = v[2]; if (mgEq(p, bb) || mgEq(t, p)) return null; ch = true; return { v: p }; }, { noProg: true, noAppr: true, skip: { status: 1 }, docsView: conDocsView });
+    return ch;
+  }
+  //   ② 기준 전진: 칸마다 접목 뒤 이 화면 값 == 서버 사본 값이면 기준 := 그 값(아니면 그대로) — 접목으로 들어온 서버 값을 '이 화면이 고친 칸'으로 잘못 세지 않게
+  function conBaseAdvance(c, sc){
+    var b = c && conBase[c.id]; if (!b || !sc) return;
+    conWalk3(b, b, c, sc, function(v){ var t = v[0], cc = v[2], x = v[3]; return (mgEq(cc, x) && !mgEq(t, cc)) ? { v: cc } : null; }, { docsView: conDocsView });
+  }
   function mergeContracts(local, remote){
-    var byId={}; (local||[]).forEach(function(c){ if(c&&c.id) byId[c.id]=c; });
-    (remote||[]).forEach(function(x){ if(!x||!x.id) return; var cur=byId[x.id]; if(!cur){ byId[x.id]=x; } else { var w=(x.updated||"")>(cur.updated||"")?x:cur; var m=Object.assign({},(w===x?cur:x),w); if(cur.del===1||x.del===1) m.del=mergeDel(cur,x); csKeepApproved(m, x); if (typeof csValMerge === "function") csValMerge(m, x); byId[x.id]=m; } });   // P1 판24 5차: 결재로 승인·반영된 변경계약 차수는 서버 쪽(같은 날이면 로컬이 통째로 이기던 것)
+    var byId={}, cfs=[]; (local||[]).forEach(function(c){ if(c&&c.id) byId[c.id]=c; });
+    (remote||[]).forEach(function(x){ if(!x||!x.id) return; var cur=byId[x.id]; if(!cur){ byId[x.id]=x; } else { var m=null, cb=(typeof conBase!=="undefined"&&conBase)?conBase[x.id]:null; if(cb&&typeof conMerge3==="function") m=conMerge3(cb, cur, x, cfs); if(!m){ var w=(x.updated||"")>(cur.updated||"")?x:cur; m=Object.assign({},(w===x?cur:x),w); if(cur.del===1||x.del===1) m.del=mergeDel(cur,x); } csKeepApproved(m, x); if (typeof csValMerge === "function") csValMerge(m, x); byId[x.id]=m; } });   // P1 판24 5차: 결재로 승인·반영된 변경계약 차수는 서버 쪽(같은 날이면 로컬이 통째로 이기던 것) · 판24f: 기준 사본이 있으면 칸 단위(conMerge3 — 이 계약 객체 제자리), 없으면(새 계약·기준 유실) 종전 통째 고르기
+    if (cfs.length && typeof conConflictToast === "function") conConflictToast(cfs);
     return Object.keys(byId).map(function(k){ return byId[k]; });
   }
   function doSaveContracts(){
@@ -14372,7 +14530,7 @@
     if(contractSha) payload.sha=contractSha;
     fetch(CONTRACT_API, {method:"PUT", headers:Object.assign({"Content-Type":"application/json"}, ghHeaders()), body:JSON.stringify(payload)}).then(function(resp){
       if(resp.status===401) return;
-      if(resp.status===409||resp.status===422){ return fetch(CONTRACT_API,{headers:ghHeaders()}).then(function(r){return r.status===404?null:r.json();}).then(function(j){ if(j){ var up={}; try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} contracts=mergeContracts(contracts, up.items||[]); contractSha=j.sha; if (typeof renderContracts === "function") renderContracts(); } return doSaveContracts(); }); }
+      if(resp.status===409||resp.status===422){ return fetch(CONTRACT_API,{headers:ghHeaders()}).then(function(r){return r.status===404?null:r.json();}).then(function(j){ if(j){ var up={}; try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} contracts=mergeContracts(contracts, up.items||[]); if (typeof conBaseSet === "function") conBaseSet(up.items||[]); contractSha=j.sha; if (typeof renderContracts === "function") renderContracts(); } return doSaveContracts(); }); }
       // P1 판24-③: 서버가 결재 없는 단계 완료·결재함에 없는 승인·상신 사본 바뀜을 거절(400 CON_APPR_REQUIRED) — 조용히 넘기지 않고 알린 뒤 서버 값으로 다시 읽는다(이 저장에 같이 들어간 다른 고침도 서버에 없음)
       if(resp.status===400){ return resp.json().then(function(json){ var ec=(json&&json.error_code)||""; contractSha=json&&json.content&&json.content.sha; contractsPending=false; if (typeof csValEditsDone === "function") csValEditsDone(sentSeq); if(ec==="CON_APPR_REQUIRED"){ alert(CON_APPR_REJECT_MSG); loadContracts(); } else if(ec==="CON_APPR_REVOKED"){ alert(CON_APPR_REVOKED_MSG); loadContracts(); } else if(ec==="CON_DUP_ID"){ alert(CON_DUP_ID_MSG); loadContracts(); } }); }   // 5차 B: 승인된 변경계약 되돌리기 거절은 그 까닭의 글
       // P1 판24-③ 검토(11/15 B9): 서버 오류(5xx — 결재함 못 읽음 APPROVALS_READ_FAILED 포함)도 조용히 넘기지 않는다(종전: 저장 대기 표시만 풀려 결재한 기기엔 '진행됨'으로 보이고 서버엔 없음)
@@ -14380,7 +14538,7 @@
       // 11/16(남은 것 2 — 재현됨): 이월 응답 뒤 다시 읽을 때, 이 저장을 보낸 뒤 고친 내용(디바운스로 아직 안 나간 것)이 있으면 대기 표시를 다시 세워
       //   다시 읽기가 통째로 덮지 않고 병합(mergeContracts — 로컬 고침은 남고 승인 차수만 서버 값 csKeepApproved)하게 한다. 그 고침은 걸려 있는 디바운스 저장이 보낸다
       //   11/16 검토 B2: 저장 함수 밖(결재 동기화 등)이 예약 없이 목록을 바꿨으면 저장도 예약(이미 예약돼 있으면 대기 표시만)
-      return resp.json().then(function(json){ if (typeof csValEditsDone === "function") csValEditsDone(sentSeq); contractSha=json.content&&json.content.sha; contractsPending=false; if(json&&json.con_kept&&json.con_kept.length&&JSON.stringify({schema:1, items:contracts})!==body){ if(contractSaveTimer) contractsPending=true; else scheduleContractSave(); } if(json&&json.con_kept&&json.con_kept.length) loadContracts(); });   // 5차: 서버가 승인 차수를 지켰으면(낡은 사본) 화면을 서버 값으로
+      return resp.json().then(function(json){ if (typeof csValEditsDone === "function") csValEditsDone(sentSeq); if (resp.ok && typeof conBaseSet === "function") conBaseSet(JSON.parse(body).items); contractSha=json.content&&json.content.sha; contractsPending=false; if(json&&json.con_kept&&json.con_kept.length&&JSON.stringify({schema:1, items:contracts})!==body){ if(contractSaveTimer) contractsPending=true; else scheduleContractSave(); } if(json&&json.con_kept&&json.con_kept.length) loadContracts(); });   // 5차: 서버가 승인 차수를 지켰으면(낡은 사본) 화면을 서버 값으로
     }).catch(function(){});
   }
   var WASTE_BACKBONE = [
@@ -15806,6 +15964,10 @@
   function csSyncFromServer(c, sc){
     if (!c || !sc || sc.id !== c.id) return false;
     var changed = false, chgPush = false;
+    // 판24f: 접목 전 이 화면 사본(기준 사본이 있을 때만) — 접목 뒤 이 화면이 기준과 다르게 고쳐 둔 칸(최상위 칸·줄·단계 칸·서류 줄)을 다시 얹는 데 씀
+    //   서버 사본도 떠 둠(아래 접목이 sc의 배열·객체를 그대로 이 화면에 붙이므로 다시 얹기가 sc까지 바꿈 — 기준 전진은 받은 그대로의 사본과 견줌)
+    var w3b = (typeof conBase !== "undefined" && conBase) ? conBase[c.id] : null, w3pre = null, w3sc = null;
+    if (w3b){ try { w3pre = JSON.parse(JSON.stringify(c)); w3sc = JSON.parse(JSON.stringify(sc)); } catch(e){ w3pre = null; } }
     Object.keys(sc).forEach(function(k){
       if (k === "pipes" || k === "status") return;
       if (sc[k] === undefined || sc[k] === null || sc[k] === "") return;
@@ -15833,8 +15995,12 @@
     c.pipes = lp;
     // 판24e(결함 2 원천): 서버 사본은 아직 안 나간(디바운스 중·요청 중) 이 기기의 단계 칸 고침을 모른다 — 그 칸만 로컬 값을 다시 얹음(결재·진행·다른 칸은 위 접목 그대로)
     if (typeof csValEditsApply === "function" && csValEditsApply(c)) changed = true;
+    // 판24f: 접목이 서버 값으로 덮은 칸 가운데 이 화면이 고쳐 둔 칸(아직 안 나간 작업현황 줄·개요 고침 등)은 이 화면 값으로 — 진행·결재 기록·진행 상태는 접목 그대로
+    if (w3pre && typeof conSyncKeep === "function"){ try { if (conSyncKeep(w3b, c, w3pre)) changed = true; } catch(e){ if (typeof console !== "undefined" && console.warn) console.warn("판24f 접목 뒤 다시 얹기 실패", e && e.message); } }
     if (c.status === "done" || c.status === "active"){ var st = lp.length && lp.every(function(p){ return p.cur >= p.stages.length; }) ? "done" : "active"; if (st !== c.status){ c.status = st; changed = true; } }
     if (chgPush){ c.updated = todayStr(); scheduleContractSave(); }   // v402 검토 5: 병합 결과(새 차수·지시)를 서버에 남김
+    // 판24f: 기준 전진 — 칸마다 접목 뒤 이 화면 값이 서버 사본과 같으면 기준도 그 값(다음 병합에서 접목된 서버 값을 '이 화면이 고친 칸'으로 세어 다른 기기의 더 새 값을 되돌리지 않게)
+    if (w3pre && typeof conBaseAdvance === "function"){ try { conBaseAdvance(c, w3sc); } catch(e){ if (typeof console !== "undefined" && console.warn) console.warn("판24f 기준 전진 실패", e && e.message); } }
     if (changed && typeof loadTasks === "function") loadTasks();
     return changed;
   }

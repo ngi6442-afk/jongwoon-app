@@ -16836,5 +16836,193 @@ try {
     r488.ok && M488.every((v) => v === false), JSON.stringify({ r: r488.info, mut: M488 }));
 } catch (e) { console.log('  (v488 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ── P1 판24f(11/17 — 원장 C196 ③): 계약 저장 충돌 병합을 칸 단위로 — 기준 사본(conBase)·세 갈래 병합(conMerge3 — mgWalkKey·mgWalkRows·conWalk3)·결재 동기화 접목 뒤 다시 얹기(conSyncKeep)·기준 전진(conBaseAdvance)·같은 칸 충돌 알림(conConflictToast)
+//   (실행 — 실제 mergeContracts·loadContracts·doSaveContracts·scheduleContractSave·csKeepApproved·csValMerge·csSyncFromServer·csApprSync … · 가짜 fetch·시계·타이머 · 서류 표준 항목 풀기(csStageDocItems·csDocsLost)만 대역)
+//   재현 4꼴(서류 줄 대 서류 줄 · 작업현황 대 계약명·준공일 · 손대지 않은 계약 · 밤새 연 화면)과 대조(단계 칸)는 브리핑 재현 t_wholemerge_1117.mjs와 같은 꼴 · 실제 화면은 판24f_화면재현_결과_1117.txt
+try {
+  const fnF = (src, name) => { const i = src.search(new RegExp('\\n  function ' + name + '\\(')); if (i < 0) throw new Error('함수 없음 ' + name); let d = 0, st = false; for (let j = i + 1; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i + 1, j + 1); } } throw new Error('중괄호 ' + name); };
+  const varF = (src, name) => { const m = new RegExp('\\n  var ' + name + ' ?=[^\\n]*').exec(src); if (!m) throw new Error('변수 없음 ' + name); return m[0].slice(1); };
+  const tickF = () => new Promise((r) => setTimeout(r, 0));
+  const cloneF = (x) => JSON.parse(JSON.stringify(x));
+  const FNF = ['mTime', 'mergeDel', 'csKeepApproved', 'mgPlain', 'mgKey', 'mgEq', 'mgCopy', 'mgKeysOf', 'mgKind', 'mgWalkKey', 'mgWalkRows', 'conBaseSet', 'conStageIds', 'conProgOf', 'conProgSet', 'conDocsView', 'conWalk3', 'conW3Label', 'conMerge3', 'conConflictToast', 'conSyncKeep', 'conBaseAdvance',
+    'mergeContracts', 'doSaveContracts', 'scheduleContractSave', 'loadContracts', 'liveContracts', 'csValEditNote', 'csValEditsApply', 'csValEditsDone', 'csValMerge', 'csSaveFields', 'conIsArr', 'csTitle',
+    'csFetchServerContract', 'csEmpty', 'csApprRank', 'csMergeDocs', 'csChgRank', 'csChgMerge', 'csSyncFromServer', 'csApprPending', 'csApprFind', 'csApprSync', 'csApprTake', 'csApprApply', 'csApprRef'];
+  const mkF = (H, srv) => {
+    const env = { puts: 0, gets: 0, timers: [], now: 1794900000000, alerts: 0, toasts: [], warns: 0, srv, onPut: null, renders: 0, tab: 'st', openId: null };
+    const fakeDate = { now: () => env.now, parse: (s) => Date.parse(s) };
+    const fetchF = (url, opts) => {
+      if (!opts || !opts.method || opts.method === 'GET') { env.gets++; const sha = env.srv.sha, content = JSON.stringify({ schema: 1, items: env.srv.items }); return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ sha, content }) }); }
+      if (env.onPut) { const f = env.onPut; env.onPut = null; f(); }   // 저장 요청 직전에 다른 기기가 저장(연속 409)
+      const pl = JSON.parse(opts.body), body = JSON.parse(pl.content); env.puts++;
+      if (pl.sha !== env.srv.sha) return Promise.resolve({ status: 409, ok: false, json: () => Promise.resolve({}) });
+      env.srv.items = cloneF(body.items); env.srv.sha = 'v' + (Number(env.srv.sha.slice(1)) + 1);
+      return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ content: { sha: env.srv.sha } }) });
+    };
+    const gwCallF = (fn, b) => Promise.resolve(b && b.action === 'approvals_list' ? { status: 200, body: { items: env.srv.approvals || [] } } : { status: 200, body: {} });
+    const src = [varF(H, 'CON_APPR_REJECT_MSG'), varF(H, 'CON_APPR_REVOKED_MSG'), varF(H, 'CON_SAVE_FAIL_MSG'), varF(H, 'CON_DUP_ID_MSG'), varF(H, 'CON_APPR_OLD_MSG'), varF(H, 'csApprSyncAt'), varF(H, 'csValEdits'), varF(H, 'csSaveDoneSeq'),
+      varF(H, 'conBase'), varF(H, 'CON_W3_SKIP'), varF(H, 'CON_W3_LBL'), varF(H, 'CON_W3_CI'),
+      'var contracts = [], contractSha = "v1", contractSaveTimer = null, contractsPending = false, CONTRACT_API = "x", autoGenReady = {}, apprPendingCreates = [];',
+      'function getToken(){ return "t"; } function ghHeaders(){ return {}; } function b64EncodeUnicode(s){ return s; } function b64DecodeUnicode(s){ return s; } function alert(){ ENV.alerts++; } function renderTasks(){} function renderSummary(){} function runAwardAutoCon(){} function conBldgAutoTry(){}',
+      'function todayStr(){ return "2026-11-17"; } function conDueOn(){ return false; } function findTask(){ return null; } function saveTasksCache(){} function scheduleTasksSave(){} function advanceProc(){} function materializeStage(){} function csOnDone(){} function conBillToRec(){} function loadTasks(){} function apprToastShow(m){ ENV.toasts.push(m); } function csChgOpenAt(){ return 0; }',
+      // 서류 표준 항목 풀기 대역(실제는 STAGE_DOCS 표에서 — 같은 꼴: k = 이름:순번, 모두 todo)
+      'function csDocsLost(){ return false; } function csStageDocItems(s){ if (conIsArr(s.docs)) return s.docs; return (s.dk || []).map(function(k, i){ return { k: k + ":" + i, t: k, n: "", st: "todo" }; }); }',
+      'function findProc(id){ return contracts.filter(function(c){ return c && c.id === id; })[0] || null; }',
+      'function renderContracts(){ ENV.renders++; var c = ENV.openId ? findProc(ENV.openId) : null; if (c && ENV.tab === "st") csApprSync(c); }',
+      'var console = { warn: function(){ ENV.warns++; }, log: function(){} };',
+      FNF.map((n) => fnF(H, n)).join('\n'),
+      'return { set: function(v){ contracts = v; }, get: function(){ return contracts; }, find: findProc, setSha: function(s){ contractSha = s; }, load: loadContracts, merge: mergeContracts, baseSet: conBaseSet, base: function(){ return conBase; }, setBaseRaw: function(id, o){ conBase[id] = o; }, sched: scheduleContractSave, render: renderContracts };'].join('\n');
+    const api = new Function('ENV', 'fetch', 'setTimeout', 'clearTimeout', 'Date', 'gwCall', src)(env, fetchF, (fn) => { env.timers.push(fn); return env.timers.length; }, (id) => { if (id) env.timers[id - 1] = null; }, fakeDate, gwCallF);
+    env.api = api;
+    env.flush = async () => { for (let k = 0; k < 30; k++) await tickF(); };
+    env.fire = async () => { for (;;) { const i = env.timers.findIndex((x) => x); if (i < 0) break; const fn = env.timers[i]; env.timers[i] = null; fn(); await env.flush(); } };
+    return env;
+  };
+  const D = '2026-11-17', Y = '2026-11-16';
+  const mkK = (o) => Object.assign({ id: 'k1', client: '가짜거래처', site: '가짜현장', title: '옛 계약명', updated: D,
+    contract_info: { amount: 1000, d3: '2026-12-01' },
+    pipes: [{ key: 'main', cur: 1, stages: [{ name: '계약', status: 'done' }, { name: '작업', status: 'pending', vals: { tax_no: 'A' }, docs: [{ k: 'd1', st: 'todo' }, { k: 'd2', st: 'todo' }] }] }],
+    work_log: [{ id: 'w1', date: Y, note: '첫 줄' }] }, o || {});
+  const runF = async (H) => {
+    const R = {};
+    // 함수 검사: 기준 사본 = 둘 다 연 때의 서버 사본(base) · a = 이 화면(옛 화면 A) · b = 서버(먼저 저장한 B)
+    const mergeF = (mutA, mutB, opt) => {
+      const E = mkF(H, { sha: 'v1', items: [] }); const base = mkK(); const a = cloneF(base), b = cloneF(base); mutA(a); mutB(b);
+      if (!(opt && opt.noBase)) E.api.baseSet([opt && opt.base ? opt.base(base) : base]);
+      if (opt && opt.raw) E.api.setBaseRaw('k1', opt.raw);
+      const held = { c: a, p: a.pipes[0], st: a.pipes[0].stages[1], stages: a.pipes[0].stages };
+      const m = E.api.merge([a], [b]).filter((c) => c.id === 'k1')[0];
+      return { m, E, held, a };
+    };
+    { const { m } = mergeF((a) => { a.pipes[0].stages[1].docs[0].st = 'done'; }, (b) => { b.pipes[0].stages[1].docs[1].st = 'done'; }); R.r1 = m.pipes[0].stages[1].docs.map((d) => d.st).join(','); R.r1ok = R.r1 === 'done,done'; }
+    { const { m } = mergeF((a) => { a.work_log.push({ id: 'w2', date: D, note: 'A 줄' }); }, (b) => { b.title = '새 계약명'; b.contract_info.d3 = '2026-12-20'; }); R.r2 = [m.work_log.length, m.title, m.contract_info.d3, m.contract_info.amount].join('|'); R.r2ok = R.r2 === '2|새 계약명|2026-12-20|1000'; }
+    { const { m } = mergeF(() => {}, (b) => { b.work_log.push({ id: 'w3', date: D, note: 'B 줄' }); }); R.r3 = m.work_log.map((w) => w.id).join(','); R.r3ok = R.r3 === 'w1,w3'; }
+    { const { m } = mergeF((a) => { a.pipes[0].stages[1].docs[0].st = 'done'; a.updated = D; }, (b) => { b.title = '새 계약명'; b.updated = Y; }, { base: (x) => Object.assign(x, { updated: '2026-11-15' }) }); R.r4 = m.title + '|' + m.pipes[0].stages[1].docs[0].st + '|' + m.updated; R.r4ok = R.r4 === '새 계약명|done|' + D; }
+    { const { m } = mergeF((a) => { a.pipes[0].stages[1].docs[0].st = 'done'; }, (b) => { b.pipes[0].stages[1].vals.tax_no = 'B'; }); R.r5 = m.pipes[0].stages[1].vals.tax_no + '|' + m.pipes[0].stages[1].docs[0].st; R.r5ok = R.r5 === 'B|done'; }
+    // 같은 칸 충돌 = 이 화면 값 + 알림 한 줄(계약 이름 · 칸 이름(외 n)) · 충돌 없으면 알림 없음
+    { const { m, E } = mergeF((a) => { a.title = 'A 계약명'; a.contract_info.d3 = '2026-12-31'; }, (b) => { b.title = 'B 계약명'; b.contract_info.d3 = '2027-01-31'; b.client = 'B 거래처'; });
+      R.cf = { title: m.title, d3: m.contract_info.d3, client: m.client, toasts: E.toasts };
+      R.cfok = m.title === 'A 계약명' && m.contract_info.d3 === '2026-12-31' && m.client === 'B 거래처' && E.toasts.length === 1 && E.toasts[0] === '다른 기기도 고친 칸을 이 화면 값으로 저장했습니다 — A 계약명 · 계약명(외 1)'; }
+    { const { m, E } = mergeF((a) => { a.title = 'A'; a.contract_info.amount = 2000; }, (b) => { b.client = 'B'; b.contract_info.d3 = '2027-02-28'; }); R.nocf = E.toasts.length + '|' + m.contract_info.amount + '|' + m.contract_info.d3; R.nocfok = R.nocf === '0|2000|2027-02-28'; }
+    // 줄 지움: 이 화면이 지운 줄(서버 안 고침)은 지운 채 · 서버가 지운 줄(이 화면 안 고침)도 지운 채 · 양쪽 추가 = 모두(서버 순서 뒤에 이 화면 새 줄)
+    { const { m } = mergeF((a) => { a.work_log = a.work_log.filter((w) => w.id !== 'w1'); }, (b) => { b.work_log.push({ id: 'w3', note: 'B' }); }); R.del1 = m.work_log.map((w) => w.id).join(','); }
+    { const { m } = mergeF((a) => { a.work_log.push({ id: 'w2', note: 'A' }); }, (b) => { b.work_log = []; }); R.del2 = m.work_log.map((w) => w.id).join(','); }
+    { const { m } = mergeF((a) => { a.work_log.push({ id: 'w2', note: 'A' }); }, (b) => { b.work_log.push({ id: 'w3', note: 'B' }); b.attachments = { 서류함: [{ id: 'f1', name: 'x' }] }; }); R.add2 = m.work_log.map((w) => w.id).join(',') + '|' + ((m.attachments || {}).서류함 || []).length; }
+    R.rowsok = R.del1 === 'w3' && R.del2 === 'w2' && R.add2 === 'w1,w3,w2|1';
+    // 구조: 서버만 단계를 붙임(변경 차수 등) → 서버 줄 + 짝 맞는 단계의 이 화면 서류 체크 · 이 화면만 붙임 → 이 화면 줄 + 서버 단계 칸 · 양쪽 다 → 날짜 늦은 쪽(같으면 이 화면) + 알림
+    { const { m, E } = mergeF((a) => { a.pipes[0].stages[1].docs[0].st = 'done'; }, (b) => { b.pipes[0].stages.push({ name: '준공', status: 'pending' }); b.pipes[0].stages[1].status = 'done'; b.pipes[0].cur = 2; });
+      R.st1 = m.pipes[0].stages.map((s) => s.name + ':' + s.status).join(',') + '|' + m.pipes[0].cur + '|' + ((m.pipes[0].stages[1].docs || [])[0] || {}).st + '|' + E.toasts.length; }
+    { const { m, E } = mergeF((a) => { a.pipes[0].stages.push({ name: '준공', status: 'pending' }); }, (b) => { b.pipes[0].stages[1].vals.tax_no = 'B'; });
+      R.st2 = m.pipes[0].stages.length + '|' + m.pipes[0].stages[1].vals.tax_no + '|' + E.toasts.length; }
+    { const { m, E } = mergeF((a) => { a.pipes[0].stages.push({ name: '준공A', status: 'pending' }); }, (b) => { b.pipes[0].stages.push({ name: '준공B', status: 'pending' }); });
+      R.st3 = m.pipes[0].stages.map((s) => s.name).join(',') + '|' + E.toasts.length + '|' + (E.toasts[0] || '').indexOf('단계 진행'); }
+    { const { m } = mergeF((a) => { a.pipes[0].stages.push({ name: '준공A', status: 'pending' }); a.updated = Y; }, (b) => { b.pipes[0].stages.push({ name: '준공B', status: 'pending' }); });
+      R.st4 = m.pipes[0].stages.map((s) => s.name).join(','); }
+    R.stok = R.st1 === '계약:done,작업:done,준공:pending|2|done|0' && R.st2 === '3|B|0' && /^계약,작업,준공A\|1\|\d+$/.test(R.st3) && R.st3.split('|')[2] !== '-1' && R.st4 === '계약,작업,준공B';
+    // 기준 없는 계약(새 계약·기준 유실) = 종전 규칙(같은 날 이 화면 통째) · 병합 중 예외 = 이 계약을 되돌려 종전 규칙 + console.warn 한 줄
+    { const { m, a } = mergeF((a) => { a.work_log.push({ id: 'w2' }); }, (b) => { b.title = '새 계약명'; }, { noBase: true }); R.nob = m.title + '|' + m.work_log.length + '|' + (m !== a); R.nobok = R.nob === '옛 계약명|2|true'; }
+    { const bad = mkK(); Object.defineProperty(bad, 'zz', { enumerable: true, get() { throw new Error('시험 예외'); } });
+      const { m, E, a } = mergeF((a) => { a.work_log.push({ id: 'w2' }); a.title = '쓰던 값'; }, (b) => { b.title = '새 계약명'; b.client = 'B'; }, { noBase: true, raw: bad });
+      R.exc = { title: m.title, client: m.client, wl: m.work_log.length, warns: E.warns, newObj: m !== a }; R.excok = m.title === '쓰던 값' && m.client === '가짜거래처' && m.work_log.length === 2 && E.warns === 1 && m !== a; }
+    // 제자리: 이 화면 계약·줄·단계 배열·단계 객체 그대로(서버 진행을 받아도) — 넣기 박스가 병합 전에 잡은 단계에 응답 뒤 쓴 값이 남음
+    { const { m, held } = mergeF((a) => { a.title = 'A'; }, (b) => { b.pipes[0].stages[1].status = 'open'; b.pipes[0].stages[1].done_at = D; });
+      held.st.docs[0].st = 'na';
+      R.inpl = { c: m === held.c, p: m.pipes[0] === held.p, arr: m.pipes[0].stages === held.stages, st: m.pipes[0].stages[1] === held.st, status: m.pipes[0].stages[1].status, na: ((m.pipes[0].stages[1].docs || [])[0] || {}).st };
+      R.inplok = R.inpl.c && R.inpl.p && R.inpl.arr && R.inpl.st && R.inpl.status === 'open' && R.inpl.na === 'na'; }
+    // 서류 체크가 아직 배열이 아닌 단계(dk 꼴): 이 화면 d 하나·서버 다른 d 하나 체크(양쪽이 각자 배열로 굳힘) → 둘 다 남음
+    { const dk = (x) => { x.pipes[0].stages[1].dk = ['계약서', '내역서']; delete x.pipes[0].stages[1].docs; };
+      const { m } = mergeF((a) => { dk(a); a.pipes[0].stages[1].docs = [{ k: '계약서:0', t: '계약서', n: '', st: 'done' }, { k: '내역서:1', t: '내역서', n: '', st: 'todo' }]; },
+        (b) => { dk(b); b.pipes[0].stages[1].docs = [{ k: '계약서:0', t: '계약서', n: '', st: 'todo' }, { k: '내역서:1', t: '내역서', n: '', st: 'done' }]; }, { base: (x) => { dk(x); return x; } });
+      R.dk = (m.pipes[0].stages[1].docs || []).map((d) => d.st).join(','); R.dkok = R.dk === 'done,done'; }
+    // 흐름 검사(가짜 서버) ─ 결재 대기 계약(단계 탭) · 결재 동기화 접목
+    const conF = () => ({ id: 'kF', scen: { type: 'dredge', pub: true, ver: 1 }, status: 'active', updated: Y, title: 'T0', client: 'C0', contract_info: { amount: 1000, d3: '2026-12-01' }, work_log: [{ id: 'w1', note: '첫 줄' }],
+      pipes: [{ key: 'main', cur: 1, stages: [{ name: '견적', due: 'manual', status: 'done', vals: { q_no: 'Q0' } }, { name: '청구', due: 'manual', status: 'open', appr: { cid: 'cF1', kind: '청구 검수', status: '대기', at: '2026-11-10T00:00:00Z' } }, { name: '수금확인', due: 'manual', status: 'pending' }] }] });
+    const apprF = () => [{ id: 'a1', cid: 'cF1', ref: 'con:kF|main|1', kind: '청구 검수', status: '대기', created: '2026-11-10T00:00:00Z' }];
+    const other = (E, f) => { f(E.srv.items[0]); E.srv.sha = 'v' + (Number(E.srv.sha.slice(1)) + 1); };
+    // 접목: 안 나간 작업현황 줄·개요 고침이 접목 뒤 남음 → 저장 · 기준 전진 뒤 다른 기기의 더 새 값(거래처)이 되돌아가지 않음
+    {
+      const E = mkF(H, { sha: 'v1', items: [conF()], approvals: apprF() });
+      E.api.load(); await E.flush(); E.openId = 'kF'; E.api.render(); await E.flush();
+      const c = E.api.find('kF'); c.work_log.push({ id: 'w2', note: '이 화면 줄' }); c.title = 'T-LOCAL'; c.updated = D; E.api.sched();
+      other(E, (s) => { s.client = 'C-OTHER'; s.pipes[0].stages[0].vals.q_no = 'Q-OTHER'; s.updated = D; });
+      E.now += 61000; E.api.render(); await E.flush();   // 결재 동기화 접목
+      const c2 = E.api.find('kF');
+      R.graft = { wl: c2.work_log.map((w) => w.id).join(','), title: c2.title, client: c2.client, q: c2.pipes[0].stages[0].vals.q_no };
+      other(E, (s) => { s.client = 'C-NEWER'; });
+      await E.fire();   // 디바운스 저장 → 409 → 병합 → 다시 저장
+      const s = E.srv.items[0];
+      R.graftSave = { wl: s.work_log.map((w) => w.id).join(','), title: s.title, client: s.client, q: s.pipes[0].stages[0].vals.q_no, toasts: E.toasts.length };
+      R.graftok = R.graft.wl === 'w1,w2' && R.graft.title === 'T-LOCAL' && R.graft.client === 'C-OTHER' && R.graft.q === 'Q-OTHER'
+        && R.graftSave.wl === 'w1,w2' && R.graftSave.title === 'T-LOCAL' && R.graftSave.client === 'C-NEWER' && R.graftSave.q === 'Q-OTHER' && R.graftSave.toasts === 0;
+    }
+    // 기준 전진은 칸마다(통째로 서버 사본을 기준으로 삼지 않음): 접목이 안 가져온 칸(서버가 비운 작업현황 — 접목은 이 화면 줄 유지)은 기준 그대로 → 뒤에 다른 기기가 새 줄만 남기면 그대로
+    {
+      const E = mkF(H, { sha: 'v1', items: [conF()], approvals: apprF() });
+      E.api.load(); await E.flush(); E.openId = 'kF'; E.api.render(); await E.flush();
+      other(E, (s) => { s.work_log = []; });
+      E.now += 61000; E.api.render(); await E.flush();
+      other(E, (s) => { s.work_log = [{ id: 'w5', note: '다른 기기' }]; });
+      const c = E.api.find('kF'); c.title = 'T-LOCAL'; c.updated = D; E.api.sched(); await E.fire();
+      R.adv2 = E.srv.items[0].work_log.map((w) => w.id).join(',') + '|' + E.srv.items[0].title; R.adv2ok = R.adv2 === 'w5|T-LOCAL';
+    }
+    // 기준 세우는 자리 셋 — ① 읽기(loadContracts): A가 손대지 않은 계약에 다른 기기가 넣은 줄이 A의 다른 계약 저장(409) 뒤에도 남음
+    {
+      const k2 = Object.assign(conF(), { id: 'kG', scen: null, title: 'G' });
+      const E = mkF(H, { sha: 'v1', items: [conF(), k2], approvals: [] });
+      E.api.load(); await E.flush();
+      other(E, (s) => { s.work_log.push({ id: 'w3', note: '다른 기기' }); });   // 날짜 같음(그날 이미 한 번 고쳐진 계약 — 종전 규칙은 이 화면 통째)
+      const g = E.api.find('kG'); g.title = 'G-A'; g.updated = D; E.api.sched(); await E.fire();
+      R.b1 = E.srv.items.filter((x) => x.id === 'kF')[0].work_log.map((w) => w.id).join(',') + '|' + E.srv.items.filter((x) => x.id === 'kG')[0].title; R.b1ok = R.b1 === 'w1,w3|G-A';
+    }
+    // ② 409 다시 읽기: 연속 409(다시 저장 직전 다른 기기가 계약명을 또 고침) → 두 번째 병합의 기준 = 첫 번째로 다시 읽은 서버 사본 → 더 새 계약명
+    {
+      const E = mkF(H, { sha: 'v1', items: [conF()], approvals: [] });
+      E.api.load(); await E.flush();
+      other(E, (s) => { s.title = 'T1'; s.updated = D; });
+      const c = E.api.find('kF'); c.client = 'C-A'; c.updated = D; E.api.sched();
+      let n = 0; const hook = () => { n++; if (n === 2) other(E, (s) => { s.title = 'T2'; }); if (n < 3) E.onPut = hook; }; E.onPut = hook;
+      await E.fire();
+      R.b2 = E.srv.items[0].title + '|' + E.srv.items[0].client + '|' + E.puts; R.b2ok = R.b2 === 'T2|C-A|3';
+    }
+    // ③ 저장 200: 이 화면이 계약명을 저장(200) → 다른 기기가 계약명을 고침 → 이 화면이 거래처 저장(409) → 다른 기기 계약명
+    {
+      const E = mkF(H, { sha: 'v1', items: [conF()], approvals: [] });
+      E.api.load(); await E.flush();
+      let c = E.api.find('kF'); c.title = 'T-A'; c.updated = D; E.api.sched(); await E.fire();
+      other(E, (s) => { s.title = 'T-B'; });
+      c = E.api.find('kF'); c.client = 'C-A'; E.api.sched(); await E.fire();
+      R.b3 = E.srv.items[0].title + '|' + E.srv.items[0].client; R.b3ok = R.b3 === 'T-B|C-A';
+    }
+    R.ok = R.r1ok && R.r2ok && R.r3ok && R.r4ok && R.r5ok && R.cfok && R.nocfok && R.rowsok && R.stok && R.nobok && R.excok && R.inplok && R.dkok && R.graftok && R.adv2ok && R.b1ok && R.b2ok && R.b3ok;
+    return R;
+  };
+  const RF = await runF(html);
+  const mutF = (from, to) => { if (html.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return html.replace(from, () => to); };
+  const KF = [];
+  for (const [from, to] of [
+    ['if(cb&&typeof conMerge3==="function") m=conMerge3(cb, cur, x, cfs);', ''],   // 칸 단위 병합 걷음(종전 통째)
+    ['contracts = contractsPending ? mergeContracts(contracts, cr) : cr; if (typeof conBaseSet === "function") conBaseSet(cr);', 'contracts = contractsPending ? mergeContracts(contracts, cr) : cr;'],   // 읽기 때 기준 안 세움
+    ['if (typeof conBaseSet === "function") conBaseSet(up.items||[]); ', ''],   // 409 다시 읽기 때 기준 안 세움
+    ['if (resp.ok && typeof conBaseSet === "function") conBaseSet(JSON.parse(body).items); ', ''],   // 저장 200 때 기준 안 세움
+    ['    if (w3pre && typeof conSyncKeep === "function"){', '    if (false){'],   // 접목 뒤 다시 얹기 걷음
+    ['    if (w3pre && typeof conBaseAdvance === "function"){', '    if (false){'],   // 기준 전진 걷음
+    ['w3sc = JSON.parse(JSON.stringify(sc));', 'w3sc = sc;'],   // 기준 전진이 접목·다시 얹기로 바뀐 서버 사본과 견줌(접목이 붙인 배열을 다시 얹기가 고침)
+    ['var b = c && conBase[c.id]; if (!b || !sc) return;', 'if (!c || !sc || !conBase[c.id]) return; conBase[c.id] = JSON.parse(JSON.stringify(sc)); return;'],   // 기준 전진을 통째(서버 사본)로
+    ['        if (mgEq(t, bb)) return { v: o };\n', ''],   // 이 화면이 안 고친 칸도 이 화면 값(서버 값 안 받음)
+    ['        if (!mgEq(o, bb)) cf.push(path);\n        return null;', '        return null;'],   // 같은 칸 충돌 기록 안 함
+    ['if (cfs.length && typeof conConflictToast === "function") conConflictToast(cfs);', ''],   // 충돌 알림 걷음
+    ['    if (depth < 2 && pres.every(Array.isArray) && pres.some(function(a){ return a.length; })){', '    if (false){'],   // 줄 단위 걷음(배열 통째)
+    ['    if (depth < 1 && pres.every(mgPlain)) return "obj";\n', ''],   // 객체 안쪽 키 단위 걷음(통째)
+    ['st = at >= 0 && old[at] && typeof old[at] === "object" ? old[at] : {};', 'st = {};'],   // 진행을 받을 때 단계 객체를 새로 만듦(제자리 아님)
+    ['    if ((conIsArr(s.dk) || s.dtx) && typeof csDocsLost === "function"', '    if (false && typeof csDocsLost === "function"'],   // 배열 아닌 서류 체크를 표준 항목으로 보지 않음
+    ['      Object.keys(l).forEach(function(k){ delete l[k]; }); Object.assign(l, JSON.parse(keep));\n', ''],   // 예외 때 이 계약 되돌리기 걷음
+    ['          if (q[0] === q[1]){ if (!mgEq(t, bb)) cf.push(path); return { v: o }; }\n', ''],   // 서버만 구조를 바꾼 줄을 서버 줄로 받지 않음
+    ['          if (q[2] === q[1]){ if (!mgEq(o, bb)) cf.push(path); return null; }\n', ''],   // 이 화면만 구조를 바꾼 줄을 이 화면 줄로 두지 않음
+    ['[2, 0, 1, 3].forEach(function(j){ A[j].forEach(', '[0, 2, 1, 3].forEach(function(j){ A[j].forEach(']]) {   // 줄 순서(서버 순서 뒤에 이 화면 새 줄)
+    let k; try { k = (await runF(mutF(from, to))).ok; } catch (e) { k = 'err ' + e.message; } KF.push(k);
+  }
+  T('P1 판24f 계약 저장 충돌 칸 단위 병합(실행 — 실제 mergeContracts·conMerge3·loadContracts·doSaveContracts·csSyncFromServer·csApprSync · 가짜 fetch·시계): 재현 4꼴(서류 줄 대 서류 줄·작업현황 대 계약명·준공일·손대지 않은 계약·밤새 연 화면) 모두 남음 · 대조 단계 칸 그대로 · 같은 칸 충돌 = 이 화면 값 + 알림 한 줄(충돌 없으면 0) · 줄 지움·양쪽 추가 · 구조 서버만/이 화면만/양쪽(날짜) · 기준 없는 계약·예외 = 종전 규칙 · 제자리(계약·줄·단계 배열·단계 객체) · 배열 아닌 서류 체크 · 접목 뒤 안 나간 작업현황 줄·개요 고침 남음 · 기준 전진 뒤 다른 기기의 더 새 값 남음(칸마다 — 통째 아님) · 기준 세우는 자리 셋(읽기·409·200) · 결함 사본 ' + KF.length + '개 = 모두 ✗',
+    RF.ok && KF.every((v) => v === false), JSON.stringify({ r: RF, mut: KF }));
+} catch (e) { console.log('  (P1 판24f 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
