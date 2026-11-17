@@ -16023,10 +16023,11 @@
   //   계약을 서버에서 읽는 길을 새로 만들면: 목록 전부를 들이면(통째·병합) 기준 시각 + conBaseSet · 일부만 들이면 gwPeek + 그 계약만 conBaseAdvance
   function csFetchServerContract(id){
     if (typeof CONTRACT_API === "undefined" || typeof getToken !== "function" || !getToken() || typeof fetch !== "function") return Promise.resolve(null);
+    //   판24g 검토 X2r: 읽기 실패(5xx·끊김·풀기 실패)는 '서버에 그 계약 없음'(null)과 나눠 { gwReadFail: 1 }로 돌려줌 — 받는 쪽이 사본으로 쓰지 않게 걸러야 함(csApprSync·csApprOnDecided)
     return fetch(CONTRACT_API, { headers: ghHeaders(), gwPeek: 1 }).then(function(resp){
-      if (!resp || !resp.ok) return null;
+      if (!resp || !resp.ok) return { gwReadFail: 1 };
       return resp.json().then(function(json){ var p = JSON.parse(b64DecodeUnicode(json.content)), items = (p && p.items) || []; for (var k = 0; k < items.length; k++){ if (items[k] && items[k].id === id) return items[k]; } return null; });
-    }).catch(function(){ return null; });
+    }).catch(function(){ return { gwReadFail: 1 }; });
   }
   // 서버 계약본을 로컬에 접목(2차 검토 F1) — '앞섬' 판정을 하지 않는다. 진행(pipes)은 cur가 앞선 쪽(동률이면 서버), 단계 입력값(vals)은 비어 있지 않은 쪽, 상신(appr)은 더 최근·결정이 난 쪽,
   // 최상위 키는 서버에 값이 있으면 서버(work_log·settle_amount·attachments는 서버가 비었으면 로컬 유지). 바뀐 게 있으면 true + loadTasks(다른 기기가 만든 지시)
@@ -16137,6 +16138,9 @@
     var id = c.id, seq0 = (typeof csSaveDoneSeq !== "undefined") ? csSaveDoneSeq : 0, gen0 = (typeof conBaseGen !== "undefined") ? conBaseGen : 0;
     csFetchServerContract(id).then(function(sc){
       c = findProc(id) || c;   // 응답 대기 중 409 병합이 객체를 바꿨을 수 있다(F6)
+      // 판24g 검토 X2r(원천): 사본 읽기 자체가 실패했으면 이 회차는 결재 반영 없이 끝냄 — 종전엔 실패를 '서버에 없음'으로 받아 결재함 목록으로 이 화면이 단계를 따로 진행(지시 겹침·결재자 기기 지시 바뀜)
+      //   60초 제한은 그대로(서버가 앓는 동안 그릴 때마다 다시 읽지 않게) — 60초 뒤 다음 그리기에서 다시
+      if (sc && sc.gwReadFail) return null;
       var scGot = !!sc;   // 판24g 검토 X2: 받은 사본을 아래에서 버렸는지
       // 판24g(C201 J5 — C198 ②): 사본이 오는 순간 계약 저장이 나가 있으면 버림 — 접목 뒤 기준 전진을 늦은 200의 기준 세우기가 되돌려
       //   접목한 칸을 '이 화면이 고친 칸'으로 세어 다른 기기 값을 덮던 길(다시 기준 값으로 되돌린 고침은 알림 없이). 다음 그리기에서 다시 동기화
@@ -16187,6 +16191,7 @@
     var seq0 = (typeof csSaveDoneSeq !== "undefined") ? csSaveDoneSeq : 0, gen0 = (typeof conBaseGen !== "undefined") ? conBaseGen : 0;
     csFetchServerContract(id).then(function(sc){
       var c = findProc(id) || c0;
+      if (sc && sc.gwReadFail) sc = null;   // 판24g 검토 X2r: 읽기 실패 표시는 사본이 아님 — 결정한 기기라 결재 반영·저장은 로컬 단계에 그대로
       if (sc && typeof conSaveOut !== "undefined" && conSaveOut > 0) sc = null;   // 판24g(C201 J5): 오는 순간 계약 저장이 나가 있는 사본 — 접목하지 않음(결정한 기기라 결재 반영은 로컬 단계에 그대로)
       if (sc && typeof conBaseGen !== "undefined" && conBaseGen !== gen0) sc = null;   // 판24f 검토(가): 그 사이 기준을 새로 세웠으면 낡은 사본 — 접목하지 않음
       // 판24e 검토 ①: 사본을 요청한 뒤 저장이 끝났으면 낡은 사본 — 접목하지 않음(결재 반영은 로컬 단계에 그대로)

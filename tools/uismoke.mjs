@@ -17295,7 +17295,7 @@ try {
         'function renderContracts(){ ENV.renders++; var c = ENV.openId ? findProc(ENV.openId) : null; if (c && ENV.tab === "st") csApprSync(c); }',
         'var console = { warn: function(){ ENV.warns++; }, log: function(){} };',
         FNG.map((n) => fnG(H, n)).join('\n'), wrapG(H), 'var fetch = window.fetch;', clearVarsG(H),
-        'return { set: function(v){ contracts = v; }, get: function(){ return contracts; }, find: findProc, load: loadContracts, merge: mergeContracts, baseSet: conBaseSet, base: function(){ return conBase; }, sched: scheduleContractSave, render: renderContracts, decided: csApprOnDecided, saveFields: csSaveFields, colBase: function(){ return _colBase.contracts; }, clear: clearSessionData, out: function(){ return conSaveOut; }, tasks: function(){ return typeof tasks !== "undefined" && Array.isArray(tasks) ? tasks : null; } };'].join('\n');
+        'return { set: function(v){ contracts = v; }, get: function(){ return contracts; }, find: findProc, load: loadContracts, merge: mergeContracts, baseSet: conBaseSet, base: function(){ return conBase; }, sched: scheduleContractSave, render: renderContracts, decided: csApprOnDecided, saveFields: csSaveFields, colBase: function(){ return _colBase.contracts; }, clear: clearSessionData, out: function(){ return conSaveOut; }, gen: function(){ return conBaseGen; }, tasks: function(){ return typeof tasks !== "undefined" && Array.isArray(tasks) ? tasks : null; } };'].join('\n');
       scm[skey] = src;
     }
     const fakeDate = { now: () => env.now, parse: (s) => Date.parse(s) };
@@ -17504,7 +17504,41 @@ try {
       const E4 = mkG(H, []); E4.api.baseSet([bP, bQ]); E4.api.merge([lP, lQ], [sP, sQ]);
       R.cfk = [r1.t, r2.t, r3.m.pipes[0].stages.map((x) => x.name).join(',') + ':' + r3.t, E4.toasts.join('/'), r5.t].map((x) => x.replace('다른 기기도 고친 칸을 이 화면 값으로 저장했습니다 — ', '')).join(' ; ');
       R.cfkok = R.cfk === 'O0 · 단계 진행 ; O0 · 단계 진행 ; 작업,검사,추가:O0 · 단계 진행 ; P0 · 단계 진행 ; O0 · 단계 기한(작업)'; }
-    R.ok = R.j1ok && R.j2ok && R.j3ok && R.j4ok && R.j5ok && R.j6ok && R.j7ok && R.j8ok && R.netok && R.n1ok && R.x1ok && R.l1ok && R.x2ok && R.x6ok && R.j5bok && R.cfkok;
+    // ── 독립 재검토(판24g 2차) 반영 ──
+    // X2r: 결재자 기기가 승인·진행·저장(지시 t-B) → 이 화면의 결재 동기화 사본 읽기 자체가 실패(500·끊김) → 이 회차는 결재 반영 안 함(이 화면 지시 0·기성 확인 0·알림 0) → 60초 뒤 다시 = 접목(실제 진행 모드)
+    for (const mode of ['500', 'net']) {
+      const kR2 = () => { const k = kRG(); delete k.pipes[0].stages[1].task_id; delete k.pipes[0].stages[1].due_badge; return k; };
+      const E = mkG(H, [kR2(), kOG()], { approvals: apprG('승인'), real: true }); E.api.load(); await E.flush();
+      E.other('kR', (s) => { const st = s.pipes[0].stages; st[1].status = 'done'; st[1].done_at = DG; st[1].appr = Object.assign({}, st[1].appr, { status: '승인', id: 'a1', decided_by: '결재자', decided_at: DG }); s.pipes[0].cur = 2; st[2].status = 'open'; st[2].task_id = 't-B'; });
+      if (mode === '500') E.getFail = 1; else E.getReject = 1;
+      E.openId = 'kR'; E.tab = 'st'; E.api.render(); await E.flush(); E.tab = 'x'; await E.fire();
+      const mid = (E.api.find('kR').pipes[0].stages[2].task_id || '-') + '/' + E.api.tasks().length + '/' + E.bills + '/' + E.toasts.length + '/' + (E.sv('kR').pipes[0].stages[2].task_id || '-');
+      E.tab = 'st'; E.now += 61000; E.api.render(); await E.flush(); await E.fire();
+      R['x2r' + mode] = mid + '|' + (E.api.find('kR').pipes[0].stages[2].task_id || '-') + '/' + E.api.tasks().length;
+    }
+    R.x2rok = R.x2r500 === '-/0/0/0/t-B|t-B/0' && R.x2rnet === '-/0/0/0/t-B|t-B/0';
+    // X2r-d: 결재함에서 결정한 기기는 사본 읽기가 실패해도 결재 반영·즉시 저장(로컬 단계) — 실패 표시를 사본으로 쓰지 않음
+    { const E = mkG(H, [kRG(), kOG()], { approvals: apprG() }); E.api.load(); await E.flush();
+      E.srv.approvals = apprG('승인'); E.getFail = 1;
+      E.api.decided({ ref: 'con:kR|main|1', id: 'a1', status: '승인', decided_at: '2026-11-17T00:00:00Z' }); await E.flush(); await E.fire();
+      R.x2rd = E.sv('kR').pipes[0].stages[1].status + '/' + E.sv('kR').pipes[0].stages[1].appr.status + '|' + E.sv('kR').title + '|' + E.toasts.length + '|' + E.warns;
+      R.x2rdok = R.x2rd === 'done/승인|R0|0|0'; }
+    // EQ: 같은 판(T)을 담은 기준 사본을 결재 동기화 접목이 칸마다 앞당긴 뒤 같은 판 T의 늦은 200이 오면 기준을 되돌리지 않음(등호) — 이 순서가 실제로 생기는 길: 앞 세션 저장이 나가 있는 채
+    //   세션을 비움(나가 있는 저장 수 0) → 다음 세션 읽기(T — 그 저장이 든 판) → 결재 동기화 접목 → 앞 세션 저장의 200(T) → 다른 기기가 거래처를 되돌림 → 이 화면 저장 = 되돌림 남음 · 알림 0
+    { const E = mkG(H, [kRG(), kOG()], { approvals: apprG() }); E.api.load(); await E.flush();
+      const c = E.api.find('kO'); c.title = 'O-A'; E.api.sched(); E.hold = (k, st) => k === 'PUT' && st === 200; await E.fire(); E.hold = null;
+      E.api.clear(); E.api.load(); await E.flush();
+      E.other('kR', (s) => { s.client = 'C1'; }); E.openId = 'kR'; E.now += 61000; E.api.render(); await E.flush(); E.openId = null;
+      const g = E.api.find('kR').client;
+      await E.release('PUT200');
+      E.other('kR', (s) => { s.client = 'C0'; });
+      E.api.find('kO').site = 'S-A'; E.api.sched(); await E.fire();
+      R.eq = g + '|' + E.sv('kR').client + '|' + E.sv('kO').site + '|' + E.toasts.length; R.eqok = R.eq === 'C1|C0|S-A|0'; }
+    // X6c: 세션을 비우면 기준 사본도 비고 세대 번호가 오름(앞 세션의 나가 있던 동기화 사본·늦은 200이 기준을 세우지 못하게)
+    { const E = mkG(H, [kRG(), kOG()]); E.api.load(); await E.flush();
+      const n0 = Object.keys(E.api.base()).length, g0 = E.api.gen(); E.api.clear();
+      R.x6c = n0 + '→' + Object.keys(E.api.base()).length + '|' + (E.api.gen() > g0); R.x6cok = R.x6c === '2→0|true'; }
+    R.ok = R.j1ok && R.j2ok && R.j3ok && R.j4ok && R.j5ok && R.j6ok && R.j7ok && R.j8ok && R.netok && R.n1ok && R.x1ok && R.l1ok && R.x2ok && R.x6ok && R.j5bok && R.cfkok && R.x2rok && R.x2rdok && R.eqok && R.x6cok;
     return R;
   };
   const RG = await runG(html);
@@ -17542,10 +17576,15 @@ try {
     ['      if (!path || path[0] !== "pipes") return false;', '      if (!path) return false; return true;'],   // 검토 G14
     ['var m=null, cf0=cfs.length, cb=', 'var m=null, cf0=0, cb='],   // 검토 G15: 앞 계약 알림을 뒤 계약 결과로 지움
     [', due_src: "단계 기한", due_badge: "단계 기한" }[u]', ' }[u]'],   // 검토 G24: 기한 표시 칸 이름
+    ['      if (sc && sc.gwReadFail) return null;\n', ''],   // 재검토 X2r: 읽기 실패 회차에 결재 반영
+    ['if (!resp || !resp.ok) return { gwReadFail: 1 };', 'if (!resp || !resp.ok) return null;'],   // 재검토 X2r: 읽기 실패(500)를 '서버에 없음'으로
+    ['}).catch(function(){ return { gwReadFail: 1 }; });', '}).catch(function(){ return null; });'],   // 재검토 X2r: 끊김을 '서버에 없음'으로
+    ['if (!at || at <= conBaseAt) return;', 'if (!at || at < conBaseAt) return;'],   // 재검토: 같은 판 늦은 200이 앞당긴 기준을 되돌림
+    ['    if (typeof conBaseSet === "function") conBaseSet([]);\n', ''],   // 재검토: 세션 비울 때 기준 사본·세대 번호
   ];
   const KGr = [];
   for (const [a, b] of KG) { let r; const h = onceG(html, a, b); try { r = await runG(h); } catch (e) { r = { ok: false, threw: e.message }; } KGr.push(!r.ok); }   // 결함 사본에서 기대한 응답(409 등)이 안 생겨 흐름이 끊기면 그것도 걸림
-  T('P1 판24g 계약 저장 덮임길 전수 수리(실행 — 실제 공통 길 window.fetch·낙관락 가짜 서버(base 409 → 이월 → 결재 대조)·실제 loadContracts·doSaveContracts·mergeContracts·csApprSync·csApprOnDecided·csSaveFields): J1 결재 동기화 읽기는 기준 시각 그대로 → 저장 409 → 병합 → 다른 계약 서류 체크 남음(D3) · J2 결재함 결정 직후 즉시 저장도 다른 계약 계약명·줄 남음 · J3 부팅 읽기 실패 뒤 새 계약 = 서버 3건(옛 2 + 새) · J4 409 다시 읽기 500·끊김 = 기준 사본 지키고 다시 저장 · J5 저장과 겹친 동기화 사본 버림 → 다른 기기의 되돌림 남음(C198 ②) · J6 늦은 200의 새 계약 기준 사본 · J7 기한 엔진 켬 단계 칸 저장 = 다른 기기 결재 승인·진행 남음·기한 표시 칸마다(C198 ⑤) · J8 서버 값이 남은 진행·단계 칸은 알림 없음·진짜 충돌은 그대로(D4) · 끊긴 저장 뒤 동기화 접목 · (독립 검토) N1 저장 200 뒤 접목 · X1 나가 있는 저장 중 다시 읽기가 먼저 온 순서 = 늦은 200의 더 새 판으로 기준(되돌림·다른 값 모두 남음) · L1 거꾸로 온 옛 200은 기준 안 되돌림 · X2 사본 버린 회차는 결재 반영 안 함(실제 진행 — 지시 겹침 0·기성 확인 0·결재자 기기 지시 그대로)·다음 그리기에서 다시 동기화 · X6 세션 비울 때 기준 시각·나가 있는 저장 수 · J5b 결재함 결정 직후 겹친 사본 · 이 화면 값이 이긴 진행·기한 칸 알림 그대로(줄 칸·단계 키·뺀 단계·계약 둘·칸 이름) · 결함 사본 ' + KG.length + '개 = 모두 ✗',
+  T('P1 판24g 계약 저장 덮임길 전수 수리(실행 — 실제 공통 길 window.fetch·낙관락 가짜 서버(base 409 → 이월 → 결재 대조)·실제 loadContracts·doSaveContracts·mergeContracts·csApprSync·csApprOnDecided·csSaveFields): J1 결재 동기화 읽기는 기준 시각 그대로 → 저장 409 → 병합 → 다른 계약 서류 체크 남음(D3) · J2 결재함 결정 직후 즉시 저장도 다른 계약 계약명·줄 남음 · J3 부팅 읽기 실패 뒤 새 계약 = 서버 3건(옛 2 + 새) · J4 409 다시 읽기 500·끊김 = 기준 사본 지키고 다시 저장 · J5 저장과 겹친 동기화 사본 버림 → 다른 기기의 되돌림 남음(C198 ②) · J6 늦은 200의 새 계약 기준 사본 · J7 기한 엔진 켬 단계 칸 저장 = 다른 기기 결재 승인·진행 남음·기한 표시 칸마다(C198 ⑤) · J8 서버 값이 남은 진행·단계 칸은 알림 없음·진짜 충돌은 그대로(D4) · 끊긴 저장 뒤 동기화 접목 · (독립 검토) N1 저장 200 뒤 접목 · X1 나가 있는 저장 중 다시 읽기가 먼저 온 순서 = 늦은 200의 더 새 판으로 기준(되돌림·다른 값 모두 남음) · L1 거꾸로 온 옛 200은 기준 안 되돌림 · X2 사본 버린 회차는 결재 반영 안 함(실제 진행 — 지시 겹침 0·기성 확인 0·결재자 기기 지시 그대로)·다음 그리기에서 다시 동기화 · X6 세션 비울 때 기준 시각·나가 있는 저장 수 · J5b 결재함 결정 직후 겹친 사본 · 이 화면 값이 이긴 진행·기한 칸 알림 그대로(줄 칸·단계 키·뺀 단계·계약 둘·칸 이름) · (재검토) X2r 사본 읽기 500·끊김 회차는 결재 반영 안 함·60초 뒤 접목(실제 진행) · 결정한 기기는 읽기 실패에도 반영·저장 · 같은 판 늦은 200은 앞당긴 기준 안 되돌림 · 세션 비울 때 기준 사본·세대 번호 · 결함 사본 ' + KG.length + '개 = 모두 ✗',
     RG.ok && KGr.every((x) => x), JSON.stringify({ RG, KGr }));
 } catch (e) { console.log('  (P1 판24g 검사 생략 — ' + e.message + ')'); fails++; }
 

@@ -55,7 +55,8 @@ const stubs = `
   var alerts = []; var CONTRACT_API = "contracts.json", serverItems = null, billN = 0;
   function getToken(){ return "t"; } function ghHeaders(){ return {}; } function loadTasks(){} function loadAsb(){} function conBillToRec(){ billN++; } function canSee(){ return true; } var contractSaveTimer = null, saveNowN = 0; function doSaveContracts(){ saveNowN++; } var toasts = []; function apprToastShow(m){ toasts.push(String(m)); }
   function b64DecodeUnicode(s){ return Buffer.from(s, "base64").toString("utf8"); }
-  var fetch = function(){ if (!serverItems) return Promise.resolve({ ok: false }); return Promise.resolve({ ok: true, json: function(){ return Promise.resolve({ sha: "s", content: Buffer.from(JSON.stringify({ schema: 1, items: serverItems }), "utf8").toString("base64") }); } }); };
+  // 판24g 재검토 X2r: '서버에 그 계약 없음'은 읽기 성공 + 빈 목록(종전 대역은 실패 응답 { ok: false }로 흉내 — 이제 앱은 읽기 실패 회차에 결재 반영을 하지 않으므로 뜻을 맞춤)
+  var fetch = function(){ if (!serverItems) return Promise.resolve({ ok: true, json: function(){ return Promise.resolve({ sha: "s", content: Buffer.from(JSON.stringify({ schema: 1, items: [] }), "utf8").toString("base64") }); } }); return Promise.resolve({ ok: true, json: function(){ return Promise.resolve({ sha: "s", content: Buffer.from(JSON.stringify({ schema: 1, items: serverItems }), "utf8").toString("base64") }); } }); };
   var confirms = [], confirmAns = true; var confirm = function(m){ confirms.push(String(m)); return confirmAns; }, alert = function(m){ alerts.push(String(m)); };
   var asb = [], asbLoaded = true, SITE_KIND = { asbestos:"석면", demolition:"철거", dredge:"준설" }, apprPendingCreates = [];
   function siteKind(r){ return (r && SITE_KIND[r.kind]) ? r.kind : "asbestos"; }
