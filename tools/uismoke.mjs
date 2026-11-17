@@ -16861,7 +16861,7 @@ try {
   const varF = (src, name) => { const m = new RegExp('\\n  var ' + name + ' ?=[^\\n]*').exec(src); if (!m) throw new Error('변수 없음 ' + name); return m[0].slice(1); };
   const tickF = () => new Promise((r) => setImmediate(r));   // 마이크로 작업을 다 비우는 한 박자(setTimeout 0은 Windows에서 느려 결함 사본 수십 개에 분 단위)
   const cloneF = (x) => JSON.parse(JSON.stringify(x));
-  const FNF = ['mTime', 'mergeDel', 'csKeepApproved', 'mgPlain', 'mgKey', 'mgEq', 'mgCopy', 'mgKeysOf', 'mgKind', 'mgWalkKey', 'mgWalkRows', 'conBaseSet', 'conStageIds', 'conProgOf', 'conProgSet', 'conDocsView', 'conWalk3', 'conW3Label', 'conMerge3', 'conConflictToast', 'conSyncKeep', 'conBaseAdvance',
+  const FNF = ['mTime', 'mergeDel', 'csKeepApproved', 'mgPlain', 'mgKey', 'mgEq', 'mgCopy', 'mgKeysOf', 'mgKind', 'mgWalkKey', 'mgWalkRows', 'conBaseSet', 'conBaseLate', 'conCfKept', 'conStageIds', 'conProgOf', 'conProgSet', 'conDocsView', 'conWalk3', 'conW3Label', 'conMerge3', 'conConflictToast', 'conSyncKeep', 'conBaseAdvance',
     'mergeContracts', 'doSaveContracts', 'scheduleContractSave', 'loadContracts', 'liveContracts', 'csValEditNote', 'csValEditsApply', 'csValEditsDone', 'csValMerge', 'csSaveFields', 'conIsArr', 'csTitle',
     'csFetchServerContract', 'csEmpty', 'csApprRank', 'csMergeDocs', 'csChgRank', 'csChgMerge', 'csSyncFromServer', 'csApprPending', 'csApprFind', 'csApprSync', 'csApprTake', 'csApprApply', 'csApprRef', 'csApprOnDecided', 'csSaveNow', 'conStatusFix'];
   // 검토 B1: 서버 결재 대조는 실제 _lib/conappr.js(scan·judge — gw-data 저장이 쓰는 그것) · 거절이면 400
@@ -16951,7 +16951,10 @@ try {
       R.st3 = m.pipes[0].stages.map((s) => s.name).join(',') + '|' + E.toasts.length + '|' + (E.toasts[0] || '').indexOf('단계 진행'); }
     { const { m } = mergeF((a) => { a.pipes[0].stages.push({ name: '준공A', status: 'pending' }); a.updated = Y; }, (b) => { b.pipes[0].stages.push({ name: '준공B', status: 'pending' }); });
       R.st4 = m.pipes[0].stages.map((s) => s.name).join(','); }
-    R.stok = R.st1 === '계약:done,작업:done,준공:pending|2|done|0' && R.st2 === '3|B|0' && /^계약,작업,준공A\|1\|\d+$/.test(R.st3) && R.st3.split('|')[2] !== '-1' && R.st4 === '계약,작업,준공B';
+    // (판24g 검토) 이 화면만 구조를 바꿈(단계 붙임) · 서버는 진행 내용만(단계 상태) · 서버 날짜가 늦음 → 구조는 이 화면 줄(날짜로 고르지 않음) + 알림 — conCfKept를 넣은 운영 구성에서 결함 사본 37의 몫
+    { const { m, E } = mergeF((a) => { a.pipes[0].stages.push({ name: '준공', status: 'pending' }); a.updated = Y; }, (b) => { b.pipes[0].stages[1].status = 'open'; b.updated = D; });
+      R.st5 = m.pipes[0].stages.map((s) => s.name).join(',') + '|' + E.toasts.length; }
+    R.stok = R.st5 === '계약,작업,준공|1' && R.st1 === '계약:done,작업:done,준공:pending|2|done|0' && R.st2 === '3|B|0' && /^계약,작업,준공A\|1\|\d+$/.test(R.st3) && R.st3.split('|')[2] !== '-1' && R.st4 === '계약,작업,준공B';
     // 기준 없는 계약(새 계약·기준 유실) = 종전 규칙(같은 날 이 화면 통째) · 병합 중 예외 = 이 계약을 되돌려 종전 규칙 + console.warn 한 줄
     { const { m, a } = mergeF((a) => { a.work_log.push({ id: 'w2' }); }, (b) => { b.title = '새 계약명'; }, { noBase: true }); R.nob = m.title + '|' + m.work_log.length + '|' + (m !== a); R.nobok = R.nob === '옛 계약명|2|true'; }
     { const bad = mkK(); Object.defineProperty(bad, 'zz', { enumerable: true, get() { throw new Error('시험 예외'); } });
@@ -17233,15 +17236,21 @@ try {
   const tickG = () => new Promise((r) => setImmediate(r));
   const cloneG = (x) => (x === undefined ? undefined : JSON.parse(JSON.stringify(x)));
   const CAG = createRequire(import.meta.url)(join(ROOT, 'netlify', 'functions', '_lib', 'conappr.js'));
-  const FNG = ['mTime', 'mergeDel', 'csKeepApproved', 'mgPlain', 'mgKey', 'mgEq', 'mgCopy', 'mgKeysOf', 'mgKind', 'mgWalkKey', 'mgWalkRows', 'conBaseSet', 'conBaseFill', 'conStageIds', 'conProgOf', 'conProgSet', 'conDocsView', 'conWalk3', 'conW3Label', 'conMerge3', 'conConflictToast', 'conSyncKeep', 'conBaseAdvance', 'conCfKept',
+  const FNG = ['mTime', 'mergeDel', 'csKeepApproved', 'mgPlain', 'mgKey', 'mgEq', 'mgCopy', 'mgKeysOf', 'mgKind', 'mgWalkKey', 'mgWalkRows', 'conBaseSet', 'conBaseLate', 'conStageIds', 'conProgOf', 'conProgSet', 'conDocsView', 'conWalk3', 'conW3Label', 'conMerge3', 'conConflictToast', 'conSyncKeep', 'conBaseAdvance', 'conCfKept',
     'mergeContracts', 'doSaveContracts', 'scheduleContractSave', 'loadContracts', 'liveContracts', 'csValEditNote', 'csValEditsApply', 'csValEditsDone', 'csValMerge', 'csSaveFields', 'conIsArr', 'csTitle',
     'csFetchServerContract', 'csEmpty', 'csApprRank', 'csMergeDocs', 'csChgRank', 'csChgMerge', 'csSyncFromServer', 'csApprPending', 'csApprFind', 'csApprSync', 'csApprTake', 'csApprApply', 'csApprRef', 'csApprOnDecided', 'csSaveNow', 'conStatusFix',
-    'b64EncodeUnicode', 'b64DecodeUnicode', '_ghResp', 'emptyDoc', '_urlCollection', 'saveConflictStop', 'saveConflictToast'];
+    'b64EncodeUnicode', 'b64DecodeUnicode', '_ghResp', 'emptyDoc', '_urlCollection', 'saveConflictStop', 'saveConflictToast', 'clearSessionData'];
+  // 검토 X2(실제 진행 모드 real): 결재 승인 → 단계 진행 → 다음 단계 지시 만들기를 실제 함수로(materializeStage·advanceProc·findTask·csApprApply·csChgOpenAt·conDueOn·csOnDone·csApprKindOf와 의존 함수 닫힘 — 판24f 'real'과 같은 조립)
+  const STUB_G = new Set(['genId', 'memberName', 'myName', 'myId', 'saveTasksCache', 'scheduleTasksSave', 'renderTasks', 'renderSummary', 'renderContracts', 'alert', 'conBillToRec', 'apprToastShow', 'loadTasks', 'fetch', 'gwCall', 'setTimeout', 'clearTimeout', 'confirm', 'esc', 'csSiteDone', 'conStageDue', 'canSee', 'canDo', 'todayStr', 'findProc', 'csDocsLost', 'csStageDocItems', 'getToken', 'ghHeaders', 'b64EncodeUnicode', 'b64DecodeUnicode', 'runAwardAutoCon', 'conBldgAutoTry', 'stmtReset']);
+  const closeG = (H, roots, have) => { const all = new Set([...H.matchAll(/\n  function ([A-Za-z_$][\w$]*)\(/g)].map((m) => m[1])); const got = new Map(); const q = roots.slice(); while (q.length) { const n = q.shift(); if (got.has(n) || STUB_G.has(n) || have.has(n) || !all.has(n)) continue; const b = fnG(H, n); got.set(n, b); for (const m of b.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g)) q.push(m[1]); } return [...got.keys()]; };
+  const varBlockG = (H, name) => { const i = H.search(new RegExp('\\n  var ' + name + ' = \\{')); if (i < 0) throw new Error('변수 없음 ' + name); let d = 0; for (let j = H.indexOf('{', i); j < H.length; j++) { if (H[j] === '{') d++; else if (H[j] === '}') { d--; if (d === 0) return H.slice(i + 1, j + 1) + ';'; } } throw new Error('중괄호 ' + name); };
+  // clearSessionData가 비우는 다른 자료 이름은 이 틀 안에 var로 둠(전역으로 새지 않게) — 계약 쪽(contracts·_colBase·conBase…)은 위에서 이미 있음
+  const clearVarsG = (H) => { const b = fnG(H, 'clearSessionData').split('\n').map((l) => l.replace(/\/\/.*$/, '')).join('\n'); const s = new Set(); for (const m of b.matchAll(/(?:^|[;{\s])([A-Za-z_$][\w$]*)\s*=(?!=)/g)) s.add(m[1]); return 'var ' + [...s].join(', ') + '; function stmtReset(){}'; };
   const srcG = new Map();
   // 가짜 서버(gw-data 꼴): 문서 { items, updated_at } · get = 그때 문서 사본(응답은 붙잡을 수 있음 — 읽은 시점과 도착 시점을 가름) · save = handleSave 순서
   const mkG = (H, items, opt) => {
     opt = opt || {};
-    const env = { now: 1794900000000, clock: 1000, timers: [], toasts: [], alerts: 0, warns: 0, renders: 0, tab: 'st', openId: null, hold: null, held: [], log: [], getFail: 0, getReject: 0, putReject: 0, dueOn: false, stageDue: null, tasks: {},
+    const env = { now: 1794900000000, clock: 1000, timers: [], toasts: [], alerts: 0, warns: 0, renders: 0, tab: 'st', openId: null, hold: null, held: [], log: [], getFail: 0, getReject: 0, putReject: 0, dueOn: false, stageDue: null, tasks: {}, bills: 0,
       srv: { doc: { schema: 1, items: cloneG(items), updated_at: 1000 }, approvals: opt.approvals || [] } };
     const gwCallG = (fn, b) => {
       if (b.action === 'approvals_list') return Promise.resolve({ status: 200, body: { items: cloneG(env.srv.approvals) } });
@@ -17268,22 +17277,26 @@ try {
       }
       return Promise.resolve({ status: 200, body: {} });
     };
-    let src = srcG.get(H);
+    const skey = opt.real ? 'R' : 'F', scm = srcG.get(H) || {}; srcG.set(H, scm);
+    let src = scm[skey];
     if (!src) {
       src = ['var window = {}; var _colBase = {}, _col409 = {}, _col409t = {}, _COL409_MS = 30000;',
         'function _rawFetch(){ throw new Error("raw"); } function onSessionInvalid(){} function gwToast(m){ ENV.toasts.push(String(m)); }',
         ['CON_APPR_REJECT_MSG', 'CON_APPR_REVOKED_MSG', 'CON_SAVE_FAIL_MSG', 'CON_DUP_ID_MSG', 'CON_APPR_OLD_MSG', 'csApprSyncAt', 'csValEdits', 'csSaveDoneSeq', 'conBase', 'CON_W3_SKIP', 'CON_W3_LBL', 'CON_W3_CI'].map((v) => varG(H, v)).join('\n'),
         'var contracts = [], contractSha = null, contractSaveTimer = null, contractsPending = false, CONTRACT_API = "https://api.github.com/repos/x/contents/data/contracts.json", autoGenReady = {}, apprPendingCreates = [];',
         'function getToken(){ return "t"; } function ghHeaders(){ return {}; } function alert(){ ENV.alerts++; } function renderTasks(){} function renderSummary(){} function runAwardAutoCon(){} function conBldgAutoTry(){}',
-        'function todayStr(){ return "2026-11-17"; } function saveTasksCache(){} function scheduleTasksSave(){} function conBillToRec(){} function loadTasks(){} function apprToastShow(m){ ENV.toasts.push(m); } function myName(){ return "시험A"; } function myId(){ return "uA"; }',
-        'function conDueOn(){ return ENV.dueOn; } function conStageDue(s){ return ENV.stageDue ? ENV.stageDue(s) : null; } function findTask(id){ return ENV.tasks[id] || null; } function advanceProc(){} function materializeStage(c, p){ var s = p.stages[p.cur]; if (s && s.status === "pending") s.status = "open"; } function csOnDone(){} function csChgOpenAt(){ return 0; }',
+        'function todayStr(){ return "2026-11-17"; } function saveTasksCache(){} function scheduleTasksSave(){} function conBillToRec(){ ENV.bills++; } function loadTasks(){} function apprToastShow(m){ ENV.toasts.push(m); } function myName(){ return "시험A"; } function myId(){ return "uA"; }',
+        opt.real ? ['var tasks = [], genN = 0;', 'function genId(p){ return p + "A" + (++genN); } function memberName(){ return ""; } function csSiteDone(){ return false; } function conStageDue(){ return null; } function canSee(){ return true; } function canDo(){ return true; } function confirm(){ return false; }',
+          ['CON_PROC_SRC', 'CON_MAP', 'CON_ADDED', 'SITE_KIND', 'CON_APPR_KINDS', 'STAGE_DOC_MAP'].map((v) => varG(H, v)).join('\n'), varBlockG(H, 'STAGE_DOCS'),
+          closeG(H, ['materializeStage', 'advanceProc', 'findTask', 'csApprApply', 'csChgOpenAt', 'conDueOn', 'csOnDone', 'csApprKindOf'], new Set(FNG)).map((n) => fnG(H, n)).join('\n')].join('\n')
+          : 'function conDueOn(){ return ENV.dueOn; } function conStageDue(s){ return ENV.stageDue ? ENV.stageDue(s) : null; } function findTask(id){ return ENV.tasks[id] || null; } function advanceProc(){} function materializeStage(c, p){ var s = p.stages[p.cur]; if (s && s.status === "pending") s.status = "open"; } function csOnDone(){} function csChgOpenAt(){ return 0; }',
         'function csDocsLost(){ return false; } function csStageDocItems(s){ if (conIsArr(s.docs)) return s.docs; return (s.dk || []).map(function(k, i){ return { k: k + ":" + i, t: k, n: "", st: "todo" }; }); }',
         'function findProc(id){ return contracts.filter(function(c){ return c && c.id === id; })[0] || null; }',
         'function renderContracts(){ ENV.renders++; var c = ENV.openId ? findProc(ENV.openId) : null; if (c && ENV.tab === "st") csApprSync(c); }',
         'var console = { warn: function(){ ENV.warns++; }, log: function(){} };',
-        FNG.map((n) => fnG(H, n)).join('\n'), wrapG(H), 'var fetch = window.fetch;',
-        'return { set: function(v){ contracts = v; }, get: function(){ return contracts; }, find: findProc, load: loadContracts, merge: mergeContracts, baseSet: conBaseSet, base: function(){ return conBase; }, sched: scheduleContractSave, render: renderContracts, decided: csApprOnDecided, saveFields: csSaveFields, colBase: function(){ return _colBase.contracts; } };'].join('\n');
-      srcG.set(H, src);
+        FNG.map((n) => fnG(H, n)).join('\n'), wrapG(H), 'var fetch = window.fetch;', clearVarsG(H),
+        'return { set: function(v){ contracts = v; }, get: function(){ return contracts; }, find: findProc, load: loadContracts, merge: mergeContracts, baseSet: conBaseSet, base: function(){ return conBase; }, sched: scheduleContractSave, render: renderContracts, decided: csApprOnDecided, saveFields: csSaveFields, colBase: function(){ return _colBase.contracts; }, clear: clearSessionData, out: function(){ return conSaveOut; }, tasks: function(){ return typeof tasks !== "undefined" && Array.isArray(tasks) ? tasks : null; } };'].join('\n');
+      scm[skey] = src;
     }
     const fakeDate = { now: () => env.now, parse: (s) => Date.parse(s) };
     env.api = new Function('ENV', 'gwCall', 'setTimeout', 'clearTimeout', 'Date', 'btoa', 'atob', 'TextEncoder', 'TextDecoder', src)(env, gwCallG, (fn) => { env.timers.push(fn); return env.timers.length; }, (id) => { if (id) env.timers[id - 1] = null; }, fakeDate,
@@ -17396,7 +17409,102 @@ try {
       E.other('kR', (s) => { s.client = 'C-다른'; });
       E.tab = 'st'; E.now += 61000; E.api.render(); await E.flush();
       R.net = E.api.find('kR').client; R.netok = R.net === 'C-다른'; }
-    R.ok = R.j1ok && R.j2ok && R.j3ok && R.j4ok && R.j5ok && R.j6ok && R.j7ok && R.j8ok && R.netok;
+    // ── 독립 검토(판24g) 반영 ──
+    // N1(검토 G1): 저장 200 뒤에도 결재 동기화 접목이 멈추지 않음(200 응답에서 나가 있는 저장 수를 줄임)
+    { const E = mkG(H, [kRG(), kOG()], { approvals: apprG() });
+      E.api.load(); await E.flush(); E.openId = 'kR'; E.tab = 'x';
+      const c = E.api.find('kO'); c.title = 'O-A'; E.api.sched(); await E.fire();
+      E.other('kR', (s) => { s.client = 'C-다른'; });
+      E.tab = 'st'; E.now += 61000; E.api.render(); await E.flush();
+      R.n1 = E.api.find('kR').client + '|' + E.api.out(); R.n1ok = R.n1 === 'C-다른|0'; }
+    // X1(검토 — 표 밖 길 · J12의 반대 순서): 저장 S가 나가 있는 동안 다시 읽기가 S 반영 전 판을 받아 S의 200보다 먼저 도착 → 늦은 200의 판이 더 새로우므로 기준 = S 본문
+    //   → 다른 기기가 계약명을 원래 값으로 되돌림(X1) · 다른 값으로 고침(X1b) → 이 화면 다른 칸 저장 = 다른 기기 값 남음 · 알림 0
+    for (const back of ['O0', 'O-B']) {
+      const E = mkG(H, [kRG(), kOG()]); E.api.load(); await E.flush();
+      const c = E.api.find('kO'); c.title = 'O-A'; c.updated = DG; E.api.sched();
+      E.hold = (k, st) => k === 'GET' || (k === 'PUT' && st === 200);
+      E.api.load(); await E.flush(); await E.fire();
+      E.hold = null; await E.release('GET'); await E.release('PUT200');
+      const bt = (E.api.base().kO || {}).title;
+      E.other('kO', (s) => { s.title = back; });
+      const c2 = E.api.find('kO'); c2.client = 'P-A'; E.api.sched(); await E.fire();
+      R['x1' + back] = bt + '|' + E.sv('kO').title + '|' + E.sv('kO').client + '|' + E.toasts.length;
+    }
+    R.x1ok = R.x1O0 === 'O-A|O0|P-A|0' && R['x1O-B'] === 'O-A|O-B|P-A|0';
+    // L1: 거꾸로 온 옛 200(그 판이 기준 사본의 판보다 낡음)은 기준을 되돌리지 않음 — 저장 1(거래처) 200 붙잡음 · 다른 기기 계약명 · 저장 2(현장) 409 → 병합 → 200 · 그 뒤 저장 1의 200
+    //   → 다른 기기가 계약명을 저장 1 때 값으로 되돌림 → 이 화면 다음 저장 = 되돌림 남음 · 알림 0
+    { const E = mkG(H, [kRG(), kOG()]); E.api.load(); await E.flush();
+      let n = 0; const c = E.api.find('kO'); c.client = 'P-1'; E.api.sched();
+      E.hold = (k, st) => k === 'PUT' && st === 200 && ++n === 1; await E.fire();
+      E.other('kO', (s) => { s.title = 'O-B'; });
+      c.site = 'S-2'; E.api.sched(); await E.fire(); E.hold = null;
+      await E.release('PUT200');
+      E.other('kO', (s) => { s.title = 'O0'; });
+      E.api.find('kO').work_log.push({ id: 'w7', note: 'L1' }); E.api.sched(); await E.fire();
+      R.l1 = E.sv('kO').title + '|' + E.sv('kO').client + '|' + E.sv('kO').site + '|' + E.sv('kO').work_log.length + '|' + E.toasts.length;
+      R.l1ok = R.l1 === 'O0|P-1|S-2|2|0'; }
+    // X2(검토 — 막는 것): 결재자 기기가 승인·진행·저장(다음 단계 지시 t-B) → 이 화면은 다른 계약 저장이 나가 있는 동안 결재 동기화 = 사본 버림 → 이 회차는 결재 반영도 안 함(지시 안 만듦 · 기성 확인 안 띄움)
+    //   → 저장 409 → 병합 → 다음 그리기(60초 제한 되돌림)에서 사본 접목 = 서버·이 화면 모두 결재자 기기 지시 t-B · 이 화면 지시 0 · 알림 0 (실제 진행 모드 — 지시 만들기·단계 진행 실제 함수)
+    { const approveB = (s) => { const st = s.pipes[0].stages; st[1].status = 'done'; st[1].done_at = DG; st[1].appr = Object.assign({}, st[1].appr, { status: '승인', id: 'a1', decided_by: '결재자', decided_at: DG }); s.pipes[0].cur = 2; st[2].status = 'open'; st[2].task_id = 't-B'; };
+      const kR2 = () => { const k = kRG(); delete k.pipes[0].stages[1].task_id; delete k.pipes[0].stages[1].due_badge; return k; };
+      const E = mkG(H, [kR2(), kOG()], { approvals: apprG('승인'), real: true }); E.api.load(); await E.flush();
+      E.other('kR', approveB);
+      const c = E.api.find('kO'); c.title = 'O-A'; c.updated = DG; E.api.sched();
+      E.hold = (k, st) => k === 'PUT' && st === 409; await E.fire(); E.hold = null;
+      E.openId = 'kR'; E.tab = 'st'; E.api.render(); await E.flush(); await E.fire();
+      const mid = (E.api.find('kR').pipes[0].stages[2].task_id || '-') + '/' + E.api.tasks().length;
+      E.tab = 'x'; await E.release('PUT409'); await E.fire();
+      E.tab = 'st'; E.api.render(); await E.flush(); await E.fire();
+      const s = E.sv('kR').pipes[0], l = E.api.find('kR').pipes[0];
+      R.x2 = [mid, s.stages[1].status + '/' + s.stages[1].appr.status, s.stages[2].task_id, l.stages[2].task_id, E.api.tasks().length, E.bills, E.toasts.length, E.sv('kO').title].join('|');
+      R.x2ok = R.x2 === '-/0|done/승인|t-B|t-B|0|0|0|O-A'; }
+    // X2b(검토 G6): 사본을 버린 회차 뒤 다음 그리기는 60초를 기다리지 않고 다시 동기화(결재 아직 대기) — 시간이 안 흘러도 다른 기기 거래처 접목
+    { const E = mkG(H, [kRG(), kOG()], { approvals: apprG() }); E.api.load(); await E.flush();
+      E.other('kO', (s) => { s.title = 'O-B'; });
+      const c = E.api.find('kO'); c.client = 'P-A'; E.api.sched();
+      E.hold = (k, st) => k === 'PUT' && st === 409; await E.fire(); E.hold = null;
+      E.openId = 'kR'; E.tab = 'st'; E.api.render(); await E.flush();
+      E.tab = 'x'; await E.release('PUT409'); await E.fire();
+      E.other('kR', (s) => { s.client = 'C-X'; });
+      E.tab = 'st'; E.api.render(); await E.flush();
+      R.x2b = E.api.find('kR').client; R.x2ok = R.x2ok && R.x2b === 'C-X'; }
+    // X6(검토): 새로 고침 없는 로그아웃(승인 대기 화면 [다른 계정으로 로그인]) → 다음 로그인에서 계약 읽기 실패 → 새 계약 = base 0 → 409 → 병합(서버 3건) · 앞 세션의 응답 없는 저장이 나가 있는 채 로그아웃해도 다음 세션의 동기화 접목은 됨
+    { const E = mkG(H, [kRG(), kOG()]); E.api.load(); await E.flush();
+      E.api.clear(); E.getFail = 1; E.api.load(); await E.flush();
+      E.api.get().push({ id: 'kN', status: 'active', updated: DG, title: '새 계약', pipes: [] }); E.api.sched(); await E.fire();
+      R.x6 = E.srv.doc.items.map((x) => x.id).sort().join(',') + '|' + E.puts(); }
+    { const E = mkG(H, [kRG(), kOG()], { approvals: apprG() }); E.api.load(); await E.flush();
+      const c = E.api.find('kO'); c.title = 'O-A'; E.api.sched(); E.hold = (k, st) => k === 'PUT'; await E.fire(); E.hold = null;   // 응답이 오지 않는 저장
+      E.api.clear(); E.api.load(); await E.flush(); E.openId = 'kR';
+      E.other('kR', (s) => { s.client = 'C-다른'; }); E.now += 61000; E.api.render(); await E.flush();
+      R.x6b = E.api.find('kR').client + '|' + E.api.out(); }
+    R.x6ok = R.x6 === 'kN,kO,kR|409,200' && R.x6b === 'C-다른|0';
+    // J5b(검토 G2): 결재함에서 결정한 직후(csApprOnDecided)도 저장이 나가 있는 동안 받은 사본은 접목 안 함 → 늦은 200 뒤 다른 기기가 거래처를 되돌림 → 즉시 저장의 409 병합 = 되돌림 남음 · 결재 반영(청구 끝남)
+    { const E = mkG(H, [kRG(), kOG()], { approvals: apprG() }); E.api.load(); await E.flush();
+      const c = E.api.find('kO'); c.title = 'O-A'; E.api.sched();
+      E.hold = (k, st) => k === 'PUT' && st === 200; await E.fire();
+      E.other('kR', (s) => { s.client = 'C1'; });
+      E.srv.approvals = apprG('승인'); E.hold = (k, st) => k === 'PUT' && (st === 200 || st === 409);
+      E.api.decided({ ref: 'con:kR|main|1', id: 'a1', status: '승인', decided_at: '2026-11-17T00:00:00Z' }); await E.flush();
+      const g = E.api.find('kR').client;
+      E.hold = null; await E.release('PUT200');
+      E.other('kR', (s) => { s.client = 'C0'; });
+      await E.release('PUT409'); await E.fire();
+      R.j5b = g + '|' + E.sv('kR').client + '|' + E.sv('kR').pipes[0].stages[1].status + '|' + E.toasts.length;
+      R.j5bok = R.j5b === 'C0|C0|done|0'; }
+    // 충돌 알림이 남는 꼴(검토 G10~G15·G24): 이 화면 값이 실제로 이긴 진행·단계 칸은 알림 그대로 — 줄 칸 · 단계 키 · 서버가 뺀 단계가 남음 · 계약 둘(앞 계약 알림을 뒤 계약이 지우지 않음) · 기한 표시 이름
+    { const mm = (mutL, mutS, extra) => { const b = kOG(); if (extra) extra(b); const l = cloneG(b), s = cloneG(b); mutL(l); mutS(s); return { b, l, s }; };
+      const one = (o) => { const E = mkG(H, []); E.api.baseSet([o.b]); const m = E.api.merge([o.l], [o.s])[0]; return { m, t: E.toasts.join('/') }; };
+      const r1 = one(mm((l) => { l.pipes[0].memo2 = 'L'; }, (s) => { s.pipes[0].memo2 = 'S'; }));
+      const r2 = one(mm((l) => { l.pipes[0].stages[0].memo = 'L'; }, (s) => { s.pipes[0].stages[0].memo = 'S'; }));
+      const r3 = one(mm((l) => { l.pipes[0].stages.push({ name: '추가', status: 'pending' }); }, (s) => { s.pipes[0].stages.pop(); }, (b) => { b.pipes[0].stages.push({ name: '검사', status: 'pending' }); }));
+      const r5 = one(mm((l) => { l.pipes[0].stages[0].due_src = 'L'; }, (s) => { s.pipes[0].stages[0].due_src = 'S'; }));
+      const bP = Object.assign(kOG(), { id: 'kP', title: 'P0' }), bQ = Object.assign(kOG(), { id: 'kQ', title: 'Q0' });
+      const lP = cloneG(bP), sP = cloneG(bP), lQ = cloneG(bQ), sQ = cloneG(bQ); lP.pipes[0].stages[0].memo = 'L'; sP.pipes[0].stages[0].memo = 'S'; sQ.title = 'Q-다른';
+      const E4 = mkG(H, []); E4.api.baseSet([bP, bQ]); E4.api.merge([lP, lQ], [sP, sQ]);
+      R.cfk = [r1.t, r2.t, r3.m.pipes[0].stages.map((x) => x.name).join(',') + ':' + r3.t, E4.toasts.join('/'), r5.t].map((x) => x.replace('다른 기기도 고친 칸을 이 화면 값으로 저장했습니다 — ', '')).join(' ; ');
+      R.cfkok = R.cfk === 'O0 · 단계 진행 ; O0 · 단계 진행 ; 작업,검사,추가:O0 · 단계 진행 ; P0 · 단계 진행 ; O0 · 단계 기한(작업)'; }
+    R.ok = R.j1ok && R.j2ok && R.j3ok && R.j4ok && R.j5ok && R.j6ok && R.j7ok && R.j8ok && R.netok && R.n1ok && R.x1ok && R.l1ok && R.x2ok && R.x6ok && R.j5bok && R.cfkok;
     return R;
   };
   const RG = await runG(html);
@@ -17409,20 +17517,35 @@ try {
     ['if(r.status!==404&&!r.ok) return { gwReadFail: 1 }; ', ''],   // 409 다시 읽기 500을 빈 목록으로
     ['return r.status===404?null:r.json();}, function(){ return { gwReadFail: 1 }; })', 'return r.status===404?null:r.json();})'],   // 409 다시 읽기 끊김 뒤 다시 저장 없음
     ['if(j&&j.gwReadFail){ scheduleContractSave(); return; }', ''],
-    ['      if (sc && typeof conSaveOut !== "undefined" && (out0 > 0 || conSaveOut > 0 || conSaveSent !== sent0)){ sc = null; csApprSyncAt[id] = 0; }', ''],   // 저장과 겹친 사본 접목(C198 ②)
-    ['if (typeof conSaveOut !== "undefined"){ conSaveOut++; conSaveSent++; }', ''],
+    ['      if (sc && typeof conSaveOut !== "undefined" && conSaveOut > 0){ sc = null; csApprSyncAt[id] = 0; }', ''],   // 저장과 겹친 사본 접목(C198 ②)
+    ['conSaveOut > 0){ sc = null; csApprSyncAt[id] = 0; }', 'conSaveOut > 0){ sc = null; }'],   // 검토 G6: 버린 뒤 60초 제한 안 되돌림(다음 그리기에서 다시 안 함)
+    ['      if (scGot && !sc) return null;\n', ''],   // 검토 X2: 사본 버린 회차에 결재 반영(이 화면이 단계 진행·지시 만듦)
+    ['      if (sc && typeof conSaveOut !== "undefined" && conSaveOut > 0) sc = null;', ''],   // 검토 G2: 결재함 결정 직후 겹친 사본 접목
+    ['if (typeof conSaveOut !== "undefined") conSaveOut++;', ''],
+    ['      if (typeof conSaveOut !== "undefined" && conSaveOut > 0) conSaveOut--;\n      if(resp.status===401) return;', '      if(resp.status===401) return;'],   // 검토 G1: 200 뒤 나가 있는 채로 남음
     ['}, function(){ if (typeof conSaveOut !== "undefined" && conSaveOut > 0) conSaveOut--; }).catch(function(){});', '}).catch(function(){});'],   // 끊긴 저장이 나가 있는 채로 남음
-    [' else if (resp.ok && typeof conBaseFill === "function") conBaseFill(JSON.parse(body).items);', ''],   // 늦은 200의 새 계약 기준 사본
+    [' else if (resp.ok && typeof conBaseLate === "function") conBaseLate(body);', ''],   // 검토 X1·J6: 늦은 200의 더 새 판으로 기준 안 세움
+    ['if (!at || at <= conBaseAt) return;', 'if (!at) return;'],   // 거꾸로 온 옛 200이 기준을 되돌림
+    ['conBaseAt = (typeof _colBase !== "undefined" && _colBase && Number(_colBase.contracts)) || 0; conBase = {};', 'conBase = {};'],   // 기준 사본의 판 시각을 안 담음
+    ['    if (typeof _colBase !== "undefined") delete _colBase.contracts;\n', ''],   // 검토 X6: 로그아웃 뒤 앞사람 기준 시각
+    ['    if (typeof conSaveOut !== "undefined") conSaveOut = 0;\n', ''],   // 검토 X6: 앞 세션의 응답 없는 저장이 다음 세션 접목을 막음
     ['if (!CON_STG_OWN[k] && !CON_STG_SIDE[k]) x[k] = s[k];', 'if (!CON_STG_OWN[k]) x[k] = s[k];'],   // 기한 표시를 진행 덩어리에(C198 ⑤)
     ['        Object.keys(CON_STG_SIDE).forEach(function(k){ mgWalkKey(ss, k, pick, path.concat([k]), 0, "whole"); });', ''],   // 기한 표시 칸 걷기 없음
     ['      Object.keys(side).forEach(function(k){ if (!Object.prototype.hasOwnProperty.call(ps, k)) st[k] = side[k]; });\n', ''],   // 진행을 서버 값으로 쓸 때 이 화면 기한 표시 지움
     ['if (m3 && typeof conCfKept === "function"){ try { conCfKept(cfs, cf0, m, x, cb); } catch(e){} }', ''],   // 알림 글 반대(D4)
     ['lbl: conW3Label(path), path: path }', 'lbl: conW3Label(path) }'],
     ['        return mgEq(f(mp), f(xp));', '        return false;'],   // 단계 칸 알림 글 반대
+    ['        for (k = 0; k < ks.length; k++){ if (ks[k] !== "stages" && !mgEq(X[ks[k]], B[ks[k]]) && !mgEq(M[ks[k]], X[ks[k]])) return false; }\n', ''],   // 검토 G10: 줄 칸이 이 화면 값으로 이겨도 알림 지움
+    ['if (mj < 0 || !mgEq(M.stages[mj], X.stages[k])) return false; }', '}'],   // 검토 G11
+    ['        for (k = 0; k < bi.length; k++){ if (xi.indexOf(bi[k]) < 0 && mi.indexOf(bi[k]) >= 0) return false; }', ''],   // 검토 G12
+    ['      if (path[2] === "#prog"){', '      if (path[2] === "#prog"){ return true;'],   // 검토 G13
+    ['      if (!path || path[0] !== "pipes") return false;', '      if (!path) return false; return true;'],   // 검토 G14
+    ['var m=null, cf0=cfs.length, cb=', 'var m=null, cf0=0, cb='],   // 검토 G15: 앞 계약 알림을 뒤 계약 결과로 지움
+    [', due_src: "단계 기한", due_badge: "단계 기한" }[u]', ' }[u]'],   // 검토 G24: 기한 표시 칸 이름
   ];
   const KGr = [];
-  for (const [a, b] of KG) { const r = await runG(onceG(html, a, b)); KGr.push(!r.ok); }
-  T('P1 판24g 계약 저장 덮임길 전수 수리(실행 — 실제 공통 길 window.fetch·낙관락 가짜 서버(base 409 → 이월 → 결재 대조)·실제 loadContracts·doSaveContracts·mergeContracts·csApprSync·csApprOnDecided·csSaveFields): J1 결재 동기화 읽기는 기준 시각 그대로 → 저장 409 → 병합 → 다른 계약 서류 체크 남음(D3) · J2 결재함 결정 직후 즉시 저장도 다른 계약 계약명·줄 남음 · J3 부팅 읽기 실패 뒤 새 계약 = 서버 3건(옛 2 + 새) · J4 409 다시 읽기 500·끊김 = 기준 사본 지키고 다시 저장 · J5 저장과 겹친 동기화 사본 버림 → 다른 기기의 되돌림 남음(C198 ②) · J6 늦은 200의 새 계약 기준 사본 · J7 기한 엔진 켬 단계 칸 저장 = 다른 기기 결재 승인·진행 남음·기한 표시 칸마다(C198 ⑤) · J8 서버 값이 남은 진행·단계 칸은 알림 없음·진짜 충돌은 그대로(D4) · 끊긴 저장 뒤 동기화 접목 · 결함 사본 ' + KG.length + '개 = 모두 ✗',
+  for (const [a, b] of KG) { let r; const h = onceG(html, a, b); try { r = await runG(h); } catch (e) { r = { ok: false, threw: e.message }; } KGr.push(!r.ok); }   // 결함 사본에서 기대한 응답(409 등)이 안 생겨 흐름이 끊기면 그것도 걸림
+  T('P1 판24g 계약 저장 덮임길 전수 수리(실행 — 실제 공통 길 window.fetch·낙관락 가짜 서버(base 409 → 이월 → 결재 대조)·실제 loadContracts·doSaveContracts·mergeContracts·csApprSync·csApprOnDecided·csSaveFields): J1 결재 동기화 읽기는 기준 시각 그대로 → 저장 409 → 병합 → 다른 계약 서류 체크 남음(D3) · J2 결재함 결정 직후 즉시 저장도 다른 계약 계약명·줄 남음 · J3 부팅 읽기 실패 뒤 새 계약 = 서버 3건(옛 2 + 새) · J4 409 다시 읽기 500·끊김 = 기준 사본 지키고 다시 저장 · J5 저장과 겹친 동기화 사본 버림 → 다른 기기의 되돌림 남음(C198 ②) · J6 늦은 200의 새 계약 기준 사본 · J7 기한 엔진 켬 단계 칸 저장 = 다른 기기 결재 승인·진행 남음·기한 표시 칸마다(C198 ⑤) · J8 서버 값이 남은 진행·단계 칸은 알림 없음·진짜 충돌은 그대로(D4) · 끊긴 저장 뒤 동기화 접목 · (독립 검토) N1 저장 200 뒤 접목 · X1 나가 있는 저장 중 다시 읽기가 먼저 온 순서 = 늦은 200의 더 새 판으로 기준(되돌림·다른 값 모두 남음) · L1 거꾸로 온 옛 200은 기준 안 되돌림 · X2 사본 버린 회차는 결재 반영 안 함(실제 진행 — 지시 겹침 0·기성 확인 0·결재자 기기 지시 그대로)·다음 그리기에서 다시 동기화 · X6 세션 비울 때 기준 시각·나가 있는 저장 수 · J5b 결재함 결정 직후 겹친 사본 · 이 화면 값이 이긴 진행·기한 칸 알림 그대로(줄 칸·단계 키·뺀 단계·계약 둘·칸 이름) · 결함 사본 ' + KG.length + '개 = 모두 ✗',
     RG.ok && KGr.every((x) => x), JSON.stringify({ RG, KGr }));
 } catch (e) { console.log('  (P1 판24g 검사 생략 — ' + e.message + ')'); fails++; }
 
