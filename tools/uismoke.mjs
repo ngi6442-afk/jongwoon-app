@@ -17613,13 +17613,13 @@ try {
     'doLoad', 'doSave', 'resolveConflictAndRetry', 'loadLeaves', 'doSaveLeaves', 'loadQuotes', 'doSaveQuotes', 'openQuoteEdit', 'loadPromo', 'doSavePromo', 'loadOnbid', 'doSaveOnbid',
     'loadBids', 'doSaveBids', 'loadClients', 'saveClients', 'loadDocuments', 'saveDocuments', 'loadMyTasks', 'addMyTodo', 'saveMyTasks', 'myTodoUnread',
     'doSaveWorkers', 'doSaveFam', 'doSaveAsb', 'doSaveEdu', 'loadAbPresets', 'abSavePresets',
-    'sessReadReset', 'sessViewerSwap', 'loadAbManual', 'abSetManual', 'abDoManualSave', 'abFlushManualSave', 'abScheduleManualSave', 'abManEnsure', 'abManPre', 'abWireManual', 'abPresetAdd'];   // 검토 반영(abPresetAdd는 abWireManual이 이름으로만 넘김)
+    'sessReadReset', 'sessViewerSwap', 'loadAbManual', 'abSetManual', 'abDoManualSave', 'abFlushManualSave', 'abScheduleManualSave', 'abManEnsure', 'abManWait', 'abOpenDay', 'abWireManual', 'abPresetAdd'];   // 검토 반영(abPresetAdd는 abWireManual이 이름으로만 넘김)
   const srcH = new Map();
   const D0 = '2026-11-01', DN = '2026-11-17';
   const items3 = () => [{ id: 's1', updated: D0, created: D0 }, { id: 's2', updated: D0, created: D0 }, { id: 's3', updated: D0, created: D0 }];
   const mkH = (H) => {
     const env = { clock: 1000, timers: [], toasts: [], alerts: [], calls: [], log: [], seq: [], offline: false, gen: 0, dom: {},
-      getFail: {}, getRej: {}, get403: {}, get404: {}, saveFail: {}, saveRej: {}, save403: {}, save401: {}, saveOrphan: {}, pgFail: 0, manPuts: [], manSeq: [], manConflict: 0, me: 'uA',
+      getFail: {}, getRej: {}, get403: {}, get404: {}, saveFail: {}, saveRej: {}, save403: {}, save401: {}, saveOrphan: {}, pgFail: 0, manPuts: [], manSeq: [], manFail: 0, manLose: 0, me: 'uA',
       S: { pre: { items: [{ id: 'p1', from: 'a', to: 'b', item: 'c', unit: '톤' }], ts: 500 }, man: { items: [{ route_id: 'p1', from: 'a', to: 'b', item: 'c', n: 3, qty_ton: 0, memo: '' }], ts: 700 } } };
     ['vehicles', 'receivables', 'licenses', 'leaves', 'quotes', 'promo', 'onbid', 'bids', 'clients', 'documents', 'mytasks', 'workers', 'family', 'asbestos', 'edu'].forEach((c) => { env.S[c] = { schema: 1, items: items3(), updated_at: 1000 }; });
     env.S.licenses.duties = [];
@@ -17633,7 +17633,9 @@ try {
         if (b.action === 'ab_presets_put') { env.preBase = b.base_ts; if (b.base_ts !== undefined && b.base_ts !== null && Number(b.base_ts) !== env.S.pre.ts) return R(409, { ok: false, code: 'CONFLICT', ts: env.S.pre.ts }); env.S.pre = { items: cloneH(b.items), ts: ++env.clock }; return R(200, { ok: true, items: cloneH(b.items), ts: env.S.pre.ts }); }
         // 그날 직접 추가(gw-allbaro handleManualGet·handleManualPut 꼴): base_ts가 오면 대조, 안 오면 통째 교체 · manConflict = 저장마다 다른 기기가 먼저 저장(409)
         if (b.action === 'ab_manual_get') return R(200, { ok: true, day: b.day, items: cloneH(env.S.man.items), ts: env.S.man.ts });
-        if (b.action === 'ab_manual_put') { env.manPuts.push(b.base_ts === undefined ? 'u' : b.base_ts); if (env.manConflict > 0) { env.manConflict--; env.S.man = { items: env.S.man.items, ts: env.S.man.ts + 1 }; } if (b.base_ts !== undefined && b.base_ts !== null && Number(b.base_ts) !== env.S.man.ts) { env.manSeq.push(409); return R(409, { ok: false, code: 'CONFLICT', ts: env.S.man.ts }); } env.S.man = { items: cloneH(b.items), ts: ++env.clock }; env.manSeq.push(200); return R(200, { ok: true, ts: env.S.man.ts }); }
+        if (b.action === 'ab_day') return R(200, { counts: [], manual: cloneH(env.S.man.items), manual_ts: env.S.man.ts });   // gw-allbaro handleDay 꼴(manual·manual_ts)
+        // manFail = 500(안 들어감) · manLose = 서버엔 들어가고 응답이 끊김(망·시간 초과)
+        if (b.action === 'ab_manual_put') { env.manPuts.push(b.base_ts === undefined ? 'u' : b.base_ts); if (env.manFail > 0) { env.manFail--; env.manSeq.push(500); return R(500, { ok: false, code: 'X' }); } if (b.base_ts !== undefined && b.base_ts !== null && Number(b.base_ts) !== env.S.man.ts) { env.manSeq.push(409); return R(409, { ok: false, code: 'CONFLICT', ts: env.S.man.ts }); } env.S.man = { items: cloneH(b.items), ts: ++env.clock }; if (env.manLose > 0) { env.manLose--; env.manSeq.push('200끊김'); return Promise.reject(new Error('net')); } env.manSeq.push(200); return R(200, { ok: true, ts: env.S.man.ts }); }
         return R(200, {});
       }
       if (b.action === 'get') {
@@ -17676,7 +17678,8 @@ try {
         'var asb=[], asbBase=1000, asbPending=false, asbSaveTimer=null, asbOrphTry=0, edu=[], eduLoaded=true, eduBase=1000, eduPending=false, eduSaveTimer=null, abPresetFormOpen=false;',
         'var conSaveOut = 0, sessViewerId = null, wkEduSt = "", eduSel = {}, abPresetEdit = false, abCardEls = {}, abManual = { day: "' + DN + '", items: [], loaded: false, timer: null, saving: false, dirty: false, savedTs: 0, bad: 0, err: "", errBad: false, pendingRender: false };',
         'function abDayOk(){ return true; }',
-        ['MYTODO_UNREAD_MSG', 'QT_UNREAD_MSG', 'CLI_BIZ13_MSG', 'abPresets', 'AB_MAN_UNREAD'].map((v) => varH(H, v)).join('\n'),
+        ['MYTODO_UNREAD_MSG', 'QT_UNREAD_MSG', 'CLI_BIZ13_MSG', 'abPresets', 'AB_MAN_WAIT', 'AB_MAN_CONFLICT'].map((v) => varH(H, v)).join('\n'),
+        'var abDay = { day: "", data: null, loading: false, error: "" }, abLearnOpen = "", abLearnNew = "", abStatus = null, AB_CODE_TEXT = {};',
         'function gwToast(m){ ENV.toasts.push(String(m)); } function alert(m){ ENV.alerts.push(String(m)); } function confirm(){ return true; } function setOffline(s){ ENV.offline = s; isOffline = s; }',
         'function getToken(){ return "t"; } function ghHeaders(){ return {}; } function clearToken(){} function showTokenScreen(){} function onSessionInvalid(){ ENV.calls.push("onSessionInvalid"); }',
         'function isAdmin(){ return true; } function canSee(){ return true; } function canDo(){ return true; } function myId(){ return ENV.me; } function getMemberId(){ return ENV.me; } function myName(){ return "시험A"; } function todayStr(){ return "' + DN + '"; } function genId(p){ return p + "N" + (++ENV.gen); }',
@@ -17824,38 +17827,70 @@ try {
       E.S.mytasks = { schema: 1, items: [{ id: 'b1' }, { id: 'b2' }], updated_at: 1000 };   // 이제부터 서버 개인 컬렉션 = 다음 사람 것
       E.me = 'uB'; const sw = E.ex('sessViewerSwap()');
       const k1 = sw + '|' + E.ex('myTodos.length') + '|' + E.ex('myTodoLoaded') + '|' + Object.keys(E.ex('_colBase')).join(',') + '|' + Object.keys(E.ex('_colRead403')).join(',');
-      R.swapCon = E.ex('conSaveOut') + '|' + (E.calls.filter((x) => x === 'conBaseSet').length - cb0); R.swapConok = R.swapCon === '0|1';   // 계약 기준 사본·나가 있는 저장 수도(clearSessionData의 계약 줄과 같은 것)
+      R.swapCon = E.ex('conSaveOut') + '|' + (E.calls.filter((x) => x === 'conBaseSet').length - cb0) + '|' + E.ex('_colBase.contracts'); R.swapConok = R.swapCon === '2|0|7';   // 2차 검토: 전환 길은 계약(기준 시각·기준 사본·나가 있는 저장 수)을 건드리지 않음 — 계약 배열과 짝(v493과 같음)
       E.getFail.mytasks = 1; E.ex('loadMyTasks()'); await E.flush();
       E.ex('document.getElementById("myTodoInput").value = "B 할 일"; addMyTodo();'); await E.flush(); E.ex('addMyTodo()'); await E.flush();
       E.getFail.leaves = 1; E.ex('loadLeaves()'); await E.flush(); E.ex('leaves.push({ id: "n1", member_id: "uB", updated: "' + DN + '" }); leavesPending = true; doSaveLeaves();'); await E.flush(); await E.fire();
-      R.swap = k1 + '|' + E.ids('mytasks') + '|' + E.ids('leaves') + '|' + E.cs('leaves'); R.swapok = R.swap.indexOf('true|0|false|||') === 0 && /\|b1,b2,tdN\d+\|n1,s1,s2,s3\|409,200$/.test(R.swap); }
+      R.swap = k1 + '|' + E.ids('mytasks') + '|' + E.ids('leaves') + '|' + E.cs('leaves'); R.swapok = R.swap.indexOf('true|0|false|contracts||') === 0 && /\|b1,b2,tdN\d+\|n1,s1,s2,s3\|409,200$/.test(R.swap); }
     // 새로고침 없는 로그아웃 뒤 가족친화: 대장만 비우고 기준(famBase)을 남기면 다음 로그인의 읽기 실패 화면 저장이 앞사람 기준으로 200 = 대장 통째(S16) → 기준도 0 → 409 → 다시 읽어 병합
     { const E = mkH(H); E.ex('fam = ' + JSON.stringify(E.S.family.items) + '; famBase = 1000;');
       E.ex('sessReadReset(false); fam = [];');   // clearSessionData가 부르는 것과 같은 묶음(세션 비우기 전체는 아래 clr 검사)
       E.ex('fam.push({ id: "n1", updated: "' + DN + '" }); famPending = true; doSaveFam();'); await E.flush(); await E.fire();
       R.fam = E.ids('family') + '|' + E.cs('family'); R.famok = R.fam === 'n1,s1,s2,s3|409,200'; }
-    // 그날 직접 추가(운반일지 — 그날 목록 통째 교체 · 실제 카드 단추 배선 abWireManual): 읽기 전 ＋ = 막고 남겨 둠 → 읽히면 서버 목록 위에 얹어 base_ts로 저장 · 다른 기기가 먼저 저장 = 409 → 다시 읽어 얹음 · 계속 409 = 3번에서 멈춤·알림
-    { const E = mkH(H);
-      E.ex('abPresets = { items: [{ id: "p1", from: "a", to: "b", item: "c" }, { id: "p2", from: "x", to: "y", item: "z" }], loading: false, saving: false, error: "", ok: true, ts: 500 };');
-      // 카드 자리(가짜 요소 — 단추에 붙은 실제 처리기를 누름)
+    // 그날 직접 추가(운반일지 — 그날 목록 통째 교체 · 실제 날짜 열기 abOpenDay(ab_day 응답의 manual·manual_ts) · 실제 카드 단추 배선 abWireManual):
+    //   값은 이 화면의 그날 목록 그대로 + 읽은 판 시각(base_ts) · 읽기 전 ＋·수량 = 받지 않고 안내 · 409 = 다시 저장하지 않고 다시 읽어 화면을 서버 값으로 + '방금 누른 것은 반영 안 됨' 안내
+    //   (2차 검토 D1·D2: 응답을 못 받은 저장이 이미 서버에 들어가 있어도 수가 부풀지 않음 — 종전 2차 수리의 '증감 다시 얹기'는 걷음)
+    const ABP = 'abPresets = { items: [{ id: "p1", from: "a", to: "b", item: "c" }, { id: "p2", from: "x", to: "y", item: "z" }], loading: false, saving: false, error: "", ok: true, ts: 500 };';
+    const mkMan = (E) => {   // 카드 자리(가짜 요소 — 단추·수량 칸에 붙은 실제 처리기를 부름)
+      E.ex(ABP);
       const els = [], mkEl = (attrs) => { const L = {}, cl = {}; const e = { attrs, value: '', textContent: '', className: '', L, getAttribute: (n) => (attrs[n] === undefined ? null : attrs[n]), addEventListener: (t, f) => { (L[t] = L[t] || []).push(f); }, classList: { contains: (c) => !!cl[c], add: (c) => { cl[c] = 1; }, remove: (c) => { delete cl[c]; } } }; els.push(e); return e; };
       ['p1', 'p2'].forEach((id) => ['data-ab-card', 'data-ab-n', 'data-ab-q', 'data-ab-plus', 'data-ab-minus'].forEach((k) => mkEl({ [k]: id })));
       E.host = { querySelectorAll: (sel) => { const m = /^\[(data-[\w-]+)\]$/.exec(sel); return els.filter((e) => m && e.attrs[m[1]] !== undefined); } };
       E.ex('abWireManual(ENV.host)');
-      E.ex('ENV.click = function(id){ ENV.host.querySelectorAll("[data-ab-plus]").filter(function(e){ return e.attrs["data-ab-plus"] === id; })[0].L.click[0](); }');
-      E.ex('ENV.click("p2")'); await E.fire();
-      const m1 = E.manPuts.length + '|' + E.ex('abManual.err.slice(0, 22)');
-      E.ex('loadAbManual("' + DN + '")'); await E.flush(); await E.fire();
-      const ser = () => E.S.man.items.map((x) => x.route_id + ':' + x.n).join(',');
-      const m2 = ser() + '|' + E.manPuts.join(',') + '|' + E.manSeq.join(',');
-      E.ex('ENV.click("p1")'); await E.fire();   // 다른 기기 없음 = 저장한 판 시각으로 한 번에 200
-      const m3 = ser() + '|' + E.manSeq.join(',');
-      E.manConflict = 1; E.ex('ENV.click("p2")'); await E.fire(); await E.flush(); await E.fire();   // 다른 기기가 먼저 저장 = 409 → 다시 읽어 얹음 → 200
-      const m4 = ser() + '|' + E.manSeq.join(',') + '|' + E.ex('abManual.err');
-      E.manConflict = 9; E.ex('ENV.click("p1")'); await E.fire(); await E.flush(); await E.fire(); await E.flush(); await E.fire();   // 계속 409 = 3번에서 멈춤
-      const m5 = E.manSeq.slice(-3).join(',') + '|' + E.ex('abManual.dirty') + '|' + E.ex('abManual.err.slice(0, 36)');
-      R.man = [m1, m2, m3, m4, m5].join(' / ');
-      R.manok = R.man === '0|그날 입력분을 불러오는 중이라 아직 저장 / p1:3,p2:1|700|200 / p1:4,p2:1|200,200 / p1:4,p2:2|200,200,409,200| / 409,409,409|true|다른 기기에서 그날 직접 추가분이 계속 바뀌어 저장하지 못했습니다'; }
+      E.press = (id) => { els.filter((e) => e.attrs['data-ab-plus'] === id)[0].L.click[0](); };
+      E.click = async (id) => { E.press(id); await E.fire(); await E.flush(); await E.fire(); };
+      E.qty = (id, v) => { const q = els.filter((e) => e.attrs['data-ab-q'] === id)[0]; q.value = v; q.L.input[0](); return q.value; };
+      E.ser = () => E.S.man.items.filter((x) => x.n > 0 || x.qty_ton > 0).map((x) => x.route_id + ':' + x.n + (x.qty_ton ? '/' + x.qty_ton : '')).sort().join(',');
+      E.view = () => E.ex('abManual.items.filter(function(x){ return x.n > 0 || x.qty_ton > 0; }).map(function(x){ return x.route_id + ":" + x.n + (x.qty_ton ? "/" + x.qty_ton : ""); }).sort().join(",")');
+      E.open = async () => { E.ex('abOpenDay("' + DN + '")'); await E.flush(); await E.fire(); };
+    };
+    { const E = mkH(H); mkMan(E);
+      await E.click('p2'); const qv = E.qty('p1', '1.5'); await E.fire();   // 그날 입력분을 읽기 전 ＋·수량
+      const m1 = E.manPuts.length + '|' + E.view() + '|' + JSON.stringify(qv) + '|' + E.ex('abManual.err === AB_MAN_WAIT');
+      await E.open(); const m2 = E.view() + '|' + E.manPuts.length + '|' + JSON.stringify(E.ex('abManual.err'));
+      await E.click('p2'); const m3 = E.ser() + '|' + E.manPuts.join(',') + '|' + E.manSeq.join(',');
+      await E.click('p1'); const m4 = E.ser() + '|' + E.manSeq.join(',');   // 저장한 판 시각으로 다음 저장 한 번에 200
+      E.S.man = { items: E.S.man.items.concat([{ route_id: 'p3', from: 'q', to: 'r', item: 's', n: 2, qty_ton: 0, memo: '' }]), ts: 4000 };   // 다른 기기가 그날 저장
+      await E.click('p2'); const m5 = E.ser() + '|' + E.manSeq.join(',') + '|' + E.view() + '|' + E.ex('abManual.err === AB_MAN_CONFLICT') + '|' + E.ex('abManual.dirty');
+      await E.click('p2'); const m6 = E.ser() + '|' + E.manSeq.slice(-1).join(',') + '|' + E.manPuts.slice(-1).join(',') + '|' + JSON.stringify(E.ex('abManual.err'));   // 다시 읽은 판 시각(4000)으로 나감 — loadAbManual이 ts를 넘김(2차 검토 N11)
+      R.man = [m1, m2, m3, m4, m5, m6].join(' / ');
+      R.manok = R.man === '0||""|true / p1:3|0|"" / p1:3,p2:1|700|200 / p1:4,p2:1|200,200 / p1:4,p2:1,p3:2|200,200,409|p1:4,p2:1,p3:2|true|false / p1:4,p2:2,p3:2|200|4000|""'; }
+    // D2(2차 검토): ＋ 한 번이 서버엔 들어갔는데 응답이 끊김 → 그날 다시 읽기 → 화면·서버 4(3 + 1 — 부풀지 않음) → 다음 ＋ = 409(자기 저장으로 판 시각이 바뀜) → 다시 읽어 안내 → 다시 ＋ = 200
+    { const E = mkH(H); mkMan(E); await E.open();
+      E.manLose = 1; await E.click('p1'); const d0 = E.ser() + '|' + E.ex('abManual.err.slice(0, 15)');
+      E.ex('abManual.loaded = false; loadAbManual("' + DN + '")'); await E.flush(); await E.fire(); const d1 = E.view() + '|' + E.ser();
+      await E.click('p2'); const d2 = E.view() + '|' + E.ser() + '|' + E.manSeq.join(',');
+      await E.click('p2'); R.d2 = [d0, d1, d2, E.ser()].join(' / '); R.d2ok = R.d2 === 'p1:4|저장 실패(네트워크) — 다 / p1:4|p1:4 / p1:4|p1:4|200끊김,409 / p1:4,p2:1'; }
+    // D1(2차 검토): ＋ 두 번이 들어갔는데 응답이 끊김 → 다른 카드 ＋ = 409 → 다시 읽어 화면 5(3 + 2)·그 ＋는 반영 안 됨·안내 → 다시 ＋ = 5·1(종전 2차 수리는 7)
+    { const E = mkH(H); mkMan(E); await E.open();
+      E.manLose = 1; E.ex('ENV.host.querySelectorAll("[data-ab-plus]").filter(function(e){ return e.attrs["data-ab-plus"] === "p1"; })[0].L.click[0]()'); await E.click('p1');
+      await E.click('p2'); const d1 = E.view() + '|' + E.ser() + '|' + E.manSeq.join(',') + '|' + E.ex('abManual.err === AB_MAN_CONFLICT');
+      await E.click('p2'); R.d1 = d1 + ' / ' + E.ser(); R.d1ok = R.d1 === 'p1:5|p1:5|200끊김,409|true / p1:5,p2:1'; }
+    // 5xx(서버에 안 들어감) → 화면 값 그대로 실패 표시 → 다음 ＋ = 같은 판 시각으로 200(화면 값 그대로 — 앞 고침 포함)
+    { const E = mkH(H); mkMan(E); await E.open();
+      E.manFail = 1; await E.click('p1'); const f0 = E.view() + '|' + E.ser() + '|' + E.ex('abManual.dirty');
+      await E.click('p2'); R.f5 = f0 + ' / ' + E.ser() + '|' + E.manSeq.join(','); R.f5ok = R.f5 === 'p1:4|p1:3|true / p1:4,p2:1|500,200'; }
+    // 저장이 나가 있는 동안 또 ＋(걸린 저장) → 그 저장이 409 = 걸린 저장도 내리고 다시 읽어 화면을 서버 값으로(옛 판 시각으로 또 보내지 않음) · 안내
+    { const E = mkH(H); mkMan(E); await E.open();
+      E.S.man = { items: E.S.man.items.concat([{ route_id: 'p9', from: 'q', to: 'r', item: 's', n: 1, qty_ton: 0, memo: '' }]), ts: 4000 };   // 다른 기기가 그날 저장
+      E.press('p2'); const i = E.timers.findIndex((x) => x); const fn = E.timers[i]; E.timers[i] = null; fn();   // 저장이 나감(응답 전)
+      E.press('p1'); await E.flush(); await E.fire();
+      R.infl = E.manSeq.join(',') + '|' + E.view() + '|' + E.ser() + '|' + E.ex('abManual.err === AB_MAN_CONFLICT') + '|' + E.ex('abManual.dirty');
+      R.inflok = R.infl === '409|p1:3,p9:1|p1:3,p9:1|true|false'; }
+    // 저장이 나가 있는 동안 읽기가 도착 = 화면·판 시각 그대로(보낸 값이 아직 서버 목록에 없을 수 있음)
+    { const E = mkH(H); mkMan(E); await E.open();
+      R.mid = E.ex('abManual.saving = true; var a = JSON.stringify(abManual.items), t = abManual.ts; abSetManual("' + DN + '", [], 9999); var r = (JSON.stringify(abManual.items) === a) + "|" + (abManual.ts === t) + "|" + abManual.loaded; abManual.saving = false; r');
+      R.midok = R.mid === 'true|true|true'; }
     // 정적: 직원 홈 할 일 더하기(dashAddTodo — 홈 그리기 안의 닫힌 함수)도 같은 막이
     { const i = H.indexOf('function dashAddTodo(){'), seg = i < 0 ? '' : H.slice(i, i + 400); R.dash = seg.indexOf('if (myTodoUnread()) return;') > 0 && seg.indexOf('if (myTodoUnread()) return;') < seg.indexOf('myTodos.push('); }
     R.ok = Object.keys(R).filter((k) => /ok$/.test(k)).every((k) => R[k] === true) && R.dash === true;
@@ -17910,8 +17945,9 @@ try {
     ['        if (b.ts) abPresets.ts = Number(b.ts) || abPresets.ts;', ''],   // 저장한 판 시각 안 담음 = 다음 저장이 409
     ['    if(!id && !quoteLoaded){ alert(QT_UNREAD_MSG); loadQuotes(); return; }', ''],   // 견적 읽기 전 발행 창
     ['        quoteLoaded=true;\n', ''],
-    ['    if (typeof sessReadReset === "function") sessReadReset(false);\n', ''],   // 세션 비울 때 앞사람 기준 시각·표시
-    ['if (withCon || k !== "contracts") delete _colBase[k];', 'if (withCon) delete _colBase[k];'],   // 로그아웃 길에서 계약 밖 기준 시각 남음
+    ['    if (typeof sessReadReset === "function") sessReadReset();   // 로그아웃 길', '    // 로그아웃 길'],   // 세션 비울 때 앞사람 기준 시각·표시
+    ['Object.keys(_colBase).forEach(function(k){ if (k !== "contracts") delete _colBase[k]; });\n    _colRead403', 'Object.keys(_colBase).forEach(function(k){ });\n    _colRead403'],   // 로그아웃·전환 길에서 계약 밖 기준 시각 남음
+    ['Object.keys(_colBase).forEach(function(k){ if (k !== "contracts") delete _colBase[k]; });\n    _colRead403', 'Object.keys(_colBase).forEach(function(k){ delete _colBase[k]; });\n    _colRead403'],   // 2차 검토: 전환 길에서 계약 기준 시각까지 지움(배열과 짝 깨짐)
     ['_colRead403 = {}; myTodos = []; myTodoSha = null; myTodoLoaded = false; quoteLoaded = false; famBase = 0;', 'myTodos = []; myTodoSha = null; myTodoLoaded = false; quoteLoaded = false; famBase = 0;'],
     ['myTodoLoaded = false; quoteLoaded = false; famBase = 0;', 'quoteLoaded = false; famBase = 0;'],
     ['quoteLoaded = false; famBase = 0;', 'famBase = 0;'],
@@ -17927,22 +17963,28 @@ try {
     ['if(res.status!==200&&res.status!==403) saveFailToast("안전 › 체크 칸 기록"', 'if(res.status!==200) saveFailToast("안전 › 체크 칸 기록"'],
     ['else if(!(res.status===400&&res.body&&res.body.error_code==="ORPHAN_WORKER")) saveFailToast("현장 대장"', 'else saveFailToast("현장 대장"'],   // M13
     ['_colRead403[col] = 1; delete _colBase[col]; return', '_colRead403[col] = 1; return'],   // S5 403 읽기 뒤 앞서 읽은 기준 시각으로 409 → 412
-    ['    if (typeof sessReadReset === "function") sessReadReset(true);   // P1 판24h 검토', '    // P1 판24h 검토'],   // S1·S4 로그인 창 전환
-    ['if (withCon || k !== "contracts")', 'if (k !== "contracts")'],   // 전환 길에서 계약 기준 시각 남음
-    ['    if (withCon && typeof conBaseSet === "function") conBaseSet([]);\n', ''],   // 전환 길에서 계약 기준 사본 남음
-    ['    if (withCon && typeof conSaveOut !== "undefined") conSaveOut = 0;', ''],   // 전환 길에서 나가 있는 저장 수 남음
-    ['abManPre(card).dn += (v - v0);', ''],   // S2 읽기 전 ＋를 서버 목록 위에 안 얹음
-    ['ids.forEach(function(id){ abManPreApply(items, id, pre[id]); });', ''],
+    ['    if (typeof sessReadReset === "function") sessReadReset();   // P1 판24h 검토', '    // P1 판24h 검토'],   // S1·S4 로그인 창 전환
+    ['    if (typeof sessReadReset === "function") sessReadReset();   // P1 판24h 검토', '    if (typeof sessReadReset === "function") sessReadReset(); if (typeof conBaseSet === "function") conBaseSet([]); conSaveOut = 0;   // P1 판24h 검토'],   // 2차 검토: 전환 길에서 계약 기준 사본·나가 있는 저장 수를 비움(v489·판24g 무력)
+    // ── 2차 검토(그날 직접 추가 — 값 그대로 + base_ts · 읽기 전 막음 · 409 = 다시 읽고 안내) ──
+    ['      if (abManWait()) return;   // P1 판24h', '      // P1 판24h'],   // 읽기 전 ＋를 받아 저장 대기(읽힌 뒤 화면 목록이 서버 값을 덮거나 버려짐)
+    ['        if (abManWait()){ var e0 = abManFind(id); inp.value = (e0 && abNum(e0.qty_ton) > 0) ? abTonTxt(e0.qty_ton) : ""; return; }', ''],   // 읽기 전 수량
+    ['inp.value = (e0 && abNum(e0.qty_ton) > 0) ? abTonTxt(e0.qty_ton) : ""; return; }', 'return; }'],   // 막은 수량 칸 글이 남음
+    ['function abManWait(){ if (abManual.loaded) return false;', 'function abManWait(){ return false;'],
     ['items: items, base_ts: (typeof abManual.ts === "number") ? abManual.ts : null }', 'items: items }'],   // S3 base_ts 안 보냄
-    ['        if (res.body.ts) abManual.ts = Number(res.body.ts) || abManual.ts;', ''],   // 저장한 판 시각 안 담음
-    ['abManPreBack(sent); abManual.c409 = (abManual.c409 || 0) + 1;', 'abManual.c409 = (abManual.c409 || 0) + 1;'],   // 409 뒤 이 기기 고침 잃음
-    ['        loadAbManual(day);\n      } else {', '      } else {'],   // 409 뒤 다시 안 읽음
-    ['} else if (res.status === 409 && (abManual.c409 || 0) < 2){', '} else if (res.status === 409){'],   // 계속 409면 끝없이
+    ['        if (res.body.ts) abManual.ts = Number(res.body.ts) || abManual.ts;   // 판24h', '        // 판24h'],   // 저장한 판 시각 안 담음 = 다음 저장이 409
     ['    abManual.ts = (ts === undefined || ts === null) ? null : (Number(ts) || 0);\n', ''],   // 읽은 판 시각 안 담음
+    ['if (man) abSetManual(day, man, res.body.manual_ts);', 'if (man) abSetManual(day, man);'],   // 2차 검토 N10: 날짜를 열 때 판 시각 안 넘김 = base_ts null(서버 가드 건너뜀)
+    [': []), b.ts);', ': []));'],   // 2차 검토 N11: 따로 읽기(409 뒤 다시 읽기)가 판 시각 안 넘김
+    ['        loadAbManual(day);\n      } else {', '      } else {'],   // 409 뒤 다시 안 읽음
+    ['abManual.dirty = false; abManual.loaded = false; abManual.reread = true; abManual.err = AB_MAN_CONFLICT;', 'abManual.dirty = true; abManual.loaded = false; abManual.reread = true; abManual.err = AB_MAN_CONFLICT;'],   // 409 뒤 다시 읽기가 화면을 못 맞춤
+    ['if (abManual.reread){ abManual.reread = false; abManual.err = AB_MAN_CONFLICT; }', 'if (abManual.reread){ abManual.reread = false; abManual.err = ""; }'],   // 409 뒤 '반영 안 됨' 안내가 사라짐
+    ['        if (abManual.timer){ clearTimeout(abManual.timer); abManual.timer = null; }\n        abManual.dirty = false;', '        abManual.dirty = false;'],   // 409 뒤 걸린 저장이 옛 판 시각으로 다시 나감
+    ['    if (abManual.dirty || abManual.saving || abManual.timer){ abManual.loaded = true; return; }\n    abManual.items = abNormManual(list);', '    abManual.items = abNormManual(list);'],   // 저장이 나가 있는 동안 온 읽기가 화면을 덮음
+    ['    else if (abManual.err === AB_MAN_WAIT) abManual.err = "";', ''],   // 읽힌 뒤에도 '불러오는 중' 글이 남음
   ];
   const KHr = [];
   for (const [a, b] of KH) { let r; try { r = await runH(onceH(html, a, b)); } catch (e) { r = { ok: false, threw: e.message }; } KHr.push(!r.ok); }
-  T('P1 판24h 읽기 실패 뒤 저장·저장 실패를 성공으로 전수 수리(실행 — 실제 공통 길 window.fetch·낙관락 가짜 서버·실제 읽기·저장·병합 함수): 차량·기성·인허가·체크리스트·휴가·견적·홍보·공매 = 읽기 500 뒤 저장 → 409 → 다시 읽어 병합 → 서버 옛 3 + 새 1(종전 새 1만) · 다시 읽기도 계속 실패 = 저장 3번(셋째 412 충돌 알림 1)·서버 그대로·대기 남음 · 저장 500 = 대기 남음 + 알림(휴가·견적·홍보·공매 토스트 "… 저장에 실패했습니다(서버 응답 500)" · 차량 등 오프라인 띠) · 홍보 실패 뒤 초안 생성 안 함 · 끊김 "(연결 끊김)" · 쓰기 거절 알림 · 휴가 권한 숨김(읽기 403) 신청 = 종전대로 1번에 200 · 일감·거래처·문서함(409 두 번째 포함)·직접 저장 4(명부·가족친화·현장 대장·교육) 실패 알림 · 내 할 일 읽기 전 더하기 막음·다시 읽기·읽힌 뒤 4건 · 단골 노선 읽기 전 저장 막음·base_ts·409 다시 읽기 · 견적 읽기 전 발행 창 막음·번호 이어짐 · 세션 비울 때 기준 시각·403 표시 비움 · 결함 사본 ' + KH.length + '개 = 모두 ✗',
+  T('P1 판24h 읽기 실패 뒤 저장·저장 실패를 성공으로 전수 수리(실행 — 실제 공통 길 window.fetch·낙관락 가짜 서버·실제 읽기·저장·병합 함수): 차량·기성·인허가·체크리스트·휴가·견적·홍보·공매 = 읽기 500 뒤 저장 → 409 → 다시 읽어 병합 → 서버 옛 3 + 새 1(종전 새 1만) · 다시 읽기도 계속 실패 = 저장 3번(셋째 412 충돌 알림 1)·서버 그대로·대기 남음 · 저장 500 = 대기 남음 + 알림(휴가·견적·홍보·공매 토스트 "… 저장에 실패했습니다(서버 응답 500)" · 차량 등 오프라인 띠) · 홍보 실패 뒤 초안 생성 안 함 · 끊김 "(연결 끊김)" · 쓰기 거절 알림 · 휴가 권한 숨김(읽기 403) 신청 = 종전대로 1번에 200 · 일감·거래처·문서함(409 두 번째 포함)·직접 저장 4(명부·가족친화·현장 대장·교육) 실패 알림 · 내 할 일 읽기 전 더하기 막음·다시 읽기·읽힌 뒤 4건 · 단골 노선 읽기 전 저장 막음·base_ts·409 다시 읽기 · 견적 읽기 전 발행 창 막음·번호 이어짐 · 세션 비울 때(로그아웃·로그인 창 전환 — 전환 길은 계약 그대로) 기준 시각·403 표시·읽음 표시·가족친화 기준 비움 · 그날 직접 추가(값 그대로 + base_ts · 읽기 전 ＋·수량 막음 · 409 = 다시 읽어 화면을 서버 값으로·안내·다시 저장 안 함 · 응답 못 받은 저장·5xx 뒤 수가 부풀지 않음) · 직접 저장 401 = 로그인 창 · 결함 사본 ' + KH.length + '개 = 모두 ✗',
     RH.ok && KHr.every((x) => x), JSON.stringify({ RH, KHr }));
 } catch (e) { console.log('  (P1 판24h 검사 생략 — ' + e.message + ')'); fails++; }
 
