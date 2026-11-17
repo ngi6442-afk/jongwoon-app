@@ -6536,7 +6536,8 @@
   function mergeTasks(local, remote){
     return imMerge("tasks", local, remote, {
       name: function(t){ return t.title || "지시"; },
-      lbl: { title: "제목", detail: "내용", who: "담당", who_id: "담당", who_by: "담당", scope: "공개 범위", due: "기한", status: "상태", done_at: "완료", done_by: "완료", done_src: "완료", approved_by: "승인", approved_at: "승인", recur: "반복" },
+      // 이름표 = 화면 글(수정 창 칸 글·줄 펼침 라벨): 제목 칸 '지시 내용' · 상세 칸 '상세' · 펼침 '담당 지정'·'완료 요청'·'승인'·'공개 범위'·'반복'
+      lbl: { title: "지시 내용", detail: "상세", who: "담당", who_id: "담당", who_by: "담당 지정", scope: "공개 범위", due: "기한", status: "상태", done_at: "완료 요청", done_by: "완료 요청", done_src: "완료 요청", approved_by: "승인", approved_at: "승인", recur: "반복" },
       sort: function(a, b){
         var ac = a.created || "", bc = b.created || "";
         if (ac !== bc) return ac < bc ? -1 : 1;
@@ -6548,6 +6549,7 @@
   function loadTasks(){
     var token = getToken();
     if (!token) return;
+    var imG0 = (typeof imSt === "function") ? imSt("tasks").gen : 0;   // 판24i 검토: 읽는 사이 로그아웃(기준 비움)이면 앞사람 목록을 들이지 않게
     fetch(TASKS_API, {headers: ghHeaders()}).then(function(resp){
       if (resp.status === 401){
         clearToken();
@@ -6575,7 +6577,9 @@
         // 판24i: 저장 200이 이미 더 새 판을 기준으로 세웠으면 이 읽기는 그보다 옛 판(저장보다 먼저 나간 읽기가 늦게 옴) — 화면·기준에 들이지 않고 버림
         //   (들이면 방금 저장해 서버에 든 고침이 화면에서 옛 값으로 돌아가고, 기준이 옛 판이라 다음 저장 병합이 그 옛 값을 '이 화면 고침'으로 서버에 다시 씀)
         var imS = (typeof imSt === "function") ? imSt("tasks") : null, rAt = (typeof _colBase !== "undefined" && _colBase && Number(_colBase.tasks)) || 0;
-        if (imS && imS.has && imS.at && rAt && rAt < imS.at) return;
+        if (imS && !imS.has && imS.gen !== imG0) return;   // 판24i 검토: 읽는 사이 로그아웃 — 버림
+        //   버릴 때 공통 길이 이미 기준 시각을 그 옛 판으로 되돌려 둠(검토 지적 · 실행 확인) → 기준 사본의 판 시각으로 다시(안 하면 다음 저장이 409 한 번 더)
+        if (imS && imS.has && imS.at && rAt && rAt < imS.at){ _colBase.tasks = imS.at; return; }
         tasksSha = json.sha;
         // 저장 대기 중이면 로컬 낙관적 변경을 보존하기 위해 머지(통째 덮어쓰기 금지) · 판24i: 저장이 나가 있는 동안(앞 저장 200이 대기 표시를 풀었어도 뒤 저장이 나가 있음)도 병합
         tasks = (tasksPending || pendingSave || (imS && imS.out > 0)) ? mergeTasks(tasks, remoteItems) : remoteItems;
@@ -6615,18 +6619,18 @@
       branch: "main"
     };
     if (tasksSha) payload.sha = tasksSha;
-    // 판24i: 보낼 때의 기준 세대 · 나가 있는 저장 수(응답·끊김에 뺌)
+    // 판24i: 보낼 때의 기준 세대 · 나가 있는 저장 수와 그 저장이 보낸 목록(응답·끊김에 뺌 — 보낸 목록은 '내 저장'이 서버에 든 칸을 충돌 알림에서 빼는 데 씀)
     var imG = (typeof imSt === "function") ? imSt("tasks").gen : 0;
-    if (typeof imOut === "function") imOut("tasks", 1);
+    var imK = (typeof imOut === "function") ? imOut("tasks", 1, tasks) : 0;
 
     fetch(TASKS_API, {
       method: "PUT",
       headers: Object.assign({"Content-Type":"application/json"}, ghHeaders()),
       body: JSON.stringify(payload)
     }).then(function(resp){
-      if (typeof imOut === "function") imOut("tasks", -1);
+      if (typeof imOut === "function") imOut("tasks", -1, imK);
       return resp;
-    }, function(e){ if (typeof imOut === "function") imOut("tasks", -1); throw e; }).then(function(resp){
+    }, function(e){ if (typeof imOut === "function") imOut("tasks", -1, imK); throw e; }).then(function(resp){
       if (resp.status === 401){
         clearToken();
         showTokenScreen(true);
@@ -6644,7 +6648,8 @@
         if (!json.write_denied && typeof imBaseSet === "function"){ var sent = JSON.parse(body).items; if (imSt("tasks").gen === imG) imBaseSet("tasks", sent); else imBaseLate("tasks", sent); }
         setOffline(false);
         saveTasksCache();
-        tasksPending = false;
+        // 판24i 검토: 이 저장이 나간 뒤 고쳐 저장 타이머가 걸려 있으면 대기 표시를 풀지 않음 — 풀면 그사이 온 읽기가 목록을 통째로 바꿔 타이머 저장이 그 고침 없이 나감(알림 0 · v494도 같음)
+        if (!tasksSaveTimer) tasksPending = false;
         apprFlushCreates();   // 대표 상신은 지시 저장이 실제로 성공한 뒤에만(결재함 C안)
       });
     }).catch(function(){
@@ -6653,14 +6658,20 @@
   }
 
   function resolveTasksConflictAndRetry(){
+    var imG0 = (typeof imSt === "function") ? imSt("tasks").gen : 0;
     return fetch(TASKS_API, {headers: ghHeaders()}).then(function(resp){
       if (resp.status === 404) return null;
       if (!resp.ok) return { gwReadFail: 1 };   // 판24i: 다시 읽기 실패(5xx)는 병합·기준 세우기 없이 다시 저장만(종전엔 빈 응답을 '읽음'으로 병합 — 기준을 빈 목록으로 세우면 다음 병합이 통째 고르기)
       return resp.json();
     }).then(function(json){
+      // 판24i 검토: 다시 읽는 사이 로그아웃(기준 비움 — 세대가 바뀌고 받은 사본 없음)이면 비운 목록에 앞사람 지시를 넣거나 기준을 세우지 않고 끝냄
+      var imS = (typeof imSt === "function") ? imSt("tasks") : null;
+      if (imS && !imS.has && imS.gen !== imG0) return;
+      var rAt = (typeof _colBase !== "undefined" && _colBase && Number(_colBase.tasks)) || 0;
       if (json && !json.gwReadFail){
         var remoteParsed = null;
         try{ remoteParsed = JSON.parse(b64DecodeUnicode(json.content)) || {}; }catch(e){}
+        if (imS && imS.has && imS.at && rAt && rAt < imS.at){ remoteParsed = null; _colBase.tasks = imS.at; }   // 판24i 검토: 그사이 더 새 판을 기준으로 세웠으면 옛 판 — 병합 없이 기준 시각을 기준 판으로 되돌려 다시 저장(409면 다시 읽음)
         if (remoteParsed){
           tasks = mergeTasks(tasks, remoteParsed.items || []);
           if (typeof imBaseSet === "function") imBaseSet("tasks", remoteParsed.items || []);   // 판24i: 옛 기준으로 병합한 뒤 새 기준
@@ -14610,13 +14621,19 @@
   //   상태는 함수 속성(imSt.s)에 둠 — 검사 틀이 함수만 떼어 돌려도 따로 둘 변수가 없게
   //   세대 번호(gen): 통째로 세울 때마다 +1 — 저장 200이 '보낼 때와 같은 기준'인지 가름(다르면 판 시각으로만 — imBaseLate) · 판 시각(at)은 공통 길 기준 시각(_colBase[col] — 읽기·저장 200과 같은 마이크로 작업 줄)
   //   나가 있는 저장 수(out): 저장이 둘 겹쳐 앞 것의 200이 대기 표시를 풀어도 뒤 것이 나가 있는 동안 온 읽기가 화면을 통째로 바꾸지 않게
-  function imSt(col){ var S = imSt.s || (imSt.s = {}); return S[col] || (S[col] = { base: {}, at: 0, gen: 0, out: 0, has: false }); }
+  function imSt(col){ var S = imSt.s || (imSt.s = {}); return S[col] || (S[col] = { base: {}, at: 0, gen: 0, out: 0, has: false, sent: {}, sk: 0 }); }
   function imBaseSet(col, items){ var st = imSt(col); st.gen++; st.has = true; st.at = (typeof _colBase !== "undefined" && _colBase && Number(_colBase[col])) || 0; st.base = {}; (items || []).forEach(function(x){ if (x && x.id) st.base[x.id] = mgCopy(x); }); }
   // 세대가 바뀐 저장 200: 그 판(공통 길이 막 세운 기준 시각)이 기준 판보다 새로우면 보낸 목록이 서버 사본 · 기준을 비운 뒤(로그아웃)는 세우지 않음
   function imBaseLate(col, items){ var st = imSt(col), at = (typeof _colBase !== "undefined" && _colBase && Number(_colBase[col])) || 0; if (!st.has || !at || at <= st.at) return; imBaseSet(col, items); }
-  function imBaseDrop(col){ var st = imSt(col); st.gen++; st.has = false; st.at = 0; st.base = {}; st.out = 0; }
+  function imBaseDrop(col){ var st = imSt(col); st.gen++; st.has = false; st.at = 0; st.base = {}; st.out = 0; st.sent = {}; }
   function imBaseKnown(col){ return imSt(col).has; }
-  function imOut(col, d){ var st = imSt(col); st.out = Math.max(0, st.out + d); }
+  // 나가 있는 저장: imOut(col, 1, 보내는 목록) → 번호 · imOut(col, -1, 번호) — 보낸 목록(id → 깊은 복사)은 응답 전까지 간직(서버 값이 내 저장이 보낸 값과 같은 칸은 '다른 기기 고침'이 아님 — 충돌 알림에서 뺌)
+  function imOut(col, d, x){
+    var st = imSt(col);
+    if (d > 0){ var k = ++st.sk, m = {}; (x || []).forEach(function(t){ if (t && t.id) m[t.id] = mgCopy(t); }); st.sent[k] = m; st.out++; return k; }
+    if (x && st.sent[x]){ delete st.sent[x]; st.out = Math.max(0, st.out - 1); }
+    return 0;
+  }
   // 서버 동작(저장 말고)이 그 항목의 칸을 바꿔 이 화면에도 같은 값을 쓴 뒤 — 기준 사본의 그 칸들도 그 값으로(서버가 한 일을 '이 화면이 고친 칸'으로 세지 않게)
   function imBaseAdvance(col, id, part){ var b = imSt(col).base[id]; if (!b || !part) return; Object.keys(part).forEach(function(k){ if (part[k] === undefined) delete b[k]; else b[k] = mgCopy(part[k]); }); }
   // 종전 규칙(항목 통째 — updated 날짜가 늦은 쪽, 같으면 이 화면 · 패자에만 있는 칸은 남김) — 이 화면 객체 제자리
@@ -14627,10 +14644,12 @@
     return cur;
   }
   // 한 항목 칸 단위(b 기준 · l 이 화면 — 제자리 · s 서버) · 예외면 이 항목을 되돌리고 null(종전 규칙으로)
-  function imMerge3(b, l, s, cfs, opt){
+  // mine = 나가 있는 내 저장들이 보낸 이 항목 사본 — 서버 값이 그중 하나와 같으면 그 칸은 내 저장이 넣은 것(충돌로 세지 않음 · 고르는 값은 그대로)
+  function imMerge3(b, l, s, cfs, opt, mine){
     var cf = [], keep = JSON.stringify(l), skip = { id: 1, updated: 1, updated_ts: 1, del: 1 };   // 칸으로 걷지 않는 것
     try {
-      var pick = function(v, path){ var t = v[0], bb = v[1], o = v[2]; if (mgEq(t, o)) return null; if (mgEq(t, bb)) return { v: o }; if (!mgEq(o, bb)) cf.push(path); return null; };
+      var own = function(o, path){ return (mine || []).some(function(a){ return mgEq(o, imAt(a, path)); }); };
+      var pick = function(v, path){ var t = v[0], bb = v[1], o = v[2]; if (mgEq(t, o)) return null; if (mgEq(t, bb)) return { v: o }; if (!mgEq(o, bb) && !own(o, path)) cf.push(path); return null; };
       var del2 = (l.del === 1 || s.del === 1) ? mergeDel(l, s) : null, cons = [l, b, s, undefined], su = String(s.updated || "");   // 지움은 고치기 전 두 쪽으로(mergeDel)
       mgKeysOf(cons).forEach(function(k){ if (!skip[k] && !(opt && opt.skip && opt.skip[k])) mgWalkKey(cons, k, pick, [k], 0); });
       if (su > String(l.updated || "")) l.updated = s.updated;
@@ -14654,7 +14673,8 @@
       if (!r || !r.id) return;
       var cur = byId[r.id];
       if (!cur){ byId[r.id] = r; return; }
-      var b = st.base[r.id], c0 = cfs.length, m = b ? imMerge3(b, cur, r, cfs, opt) : null;
+      var mine = Object.keys(st.sent).map(function(k){ return st.sent[k][r.id]; }).filter(Boolean);
+      var b = st.base[r.id], c0 = cfs.length, m = b ? imMerge3(b, cur, r, cfs, opt, mine) : null;
       if (!m) m = imWhole(cur, r);
       if (opt.after) opt.after(m, r);
       // 뒷손질 뒤 서버 값이 그대로 남은 칸은 '이 화면 값으로 저장' 알림에서 뺌

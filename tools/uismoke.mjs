@@ -18006,7 +18006,7 @@ try {
   const ROOTS_I = ['_ghResp', 'emptyDoc', '_urlCollection', 'b64EncodeUnicode', 'b64DecodeUnicode', 'saveConflictStop', 'saveConflictToast', 'mTime', 'mergeDel', 'findTask',
     'loadTasks', 'doSaveTasks', 'resolveTasksConflictAndRetry', 'scheduleTasksSave', 'mergeTasks', 'saveTasksCache', 'loadTasksCache', 'conConflictToast',
     'imSt', 'imBaseSet', 'imBaseLate', 'imBaseDrop', 'imBaseKnown', 'imOut', 'imBaseAdvance', 'imWhole', 'imMerge3', 'imAt', 'imMerge', 'mgWalkKey',
-    'addTask', 'openTaskModal', 'saveTaskModal', 'toggleTaskDone', 'approveTask', 'deleteTask', 'taskNotMine', 'csSaveFields'];
+    'addTask', 'openTaskModal', 'saveTaskModal', 'toggleTaskDone', 'approveTask', 'deleteTask', 'setTaskStatus', 'taskNotMine', 'csSaveFields'];
   const srcI = new Map();
   const D0 = '2026-11-10', DN = '2026-11-17';
   const tk = (id, x) => Object.assign({ id, title: id.slice(1), detail: '', who_id: 'u1', who: 'N:u1', scope: [], from: '관리', from_id: 'uB', by: '관리', due: '', status: 'open', done_at: null, done_by: null, created: D0, updated: D0 }, x || {});
@@ -18062,6 +18062,7 @@ try {
     if (opt.cache) env.ex('localStorage.setItem(TASKS_CACHE_KEY, ' + JSON.stringify(JSON.stringify({ sha: 'gw', items: seedI() })) + ')');
     env.flush = async () => { for (let k = 0; k < 40; k++) await tickI(); };
     env.fire = async () => { for (let n = 0; n < 60; n++) { const i = env.timers.findIndex((x) => x); if (i < 0) break; const fn = env.timers[i]; env.timers[i] = null; fn(); await env.flush(); } };
+    env.fireOne = async () => { const i = env.timers.findIndex((x) => x); if (i < 0) return false; const fn = env.timers[i]; env.timers[i] = null; fn(); await env.flush(); return true; };
     env.release = async (k) => { const i = env.held.findIndex((h) => h && h.k === k); if (i < 0) throw new Error('붙잡은 것 없음 ' + k); const h = env.held[i]; env.held[i] = null; h.go(); await env.flush(); };
     env.other = (id, fn) => { const t = env.S.items.find((x) => x.id === id); fn(t); t.updated = DN; env.S.updated_at = ++env.clock; };
     env.sv = (id) => env.S.items.find((x) => x.id === id) || {};
@@ -18084,6 +18085,9 @@ try {
     // ③ 같은 칸(기한)을 양쪽이 다르게 = 이 화면 값 + 알림 한 줄(계약과 같은 글) · 다른 기기만 고친 칸(제목) = 다른 기기 값
     { const E = mkI(H); await E.load(); E.other('tX', (t) => { t.due = '2026-12-01'; t.title = 'X2'; }); E.modal('tX', { teDue: '2026-12-05' }); await E.fire();
       I.r3 = [E.sv('tX').due, E.sv('tX').title, E.cft().length, E.cft()[0] || ''].join('|'); R.r3 = I.r3 === '2026-12-05|X2|1|다른 기기도 고친 칸을 이 화면 값으로 저장했습니다 — X2 · 기한'; }
+    // ③-나(검토 반영) 알림의 칸 이름 = 화면 글: 상세 칸 충돌 = '상세'(화면의 제목 칸 '지시 내용'과 헷갈리지 않게)
+    { const E = mkI(H); await E.load(); E.other('tX', (t) => { t.detail = 'B상세'; }); E.modal('tX', { teDetail: 'A상세' }); await E.fire();
+      I.r3b = [E.sv('tX').detail, E.cft()[0] || ''].join('|'); R.r3b = I.r3b === 'A상세|다른 기기도 고친 칸을 이 화면 값으로 저장했습니다 — X · 상세'; }
     // ④ 다른 기기 새 지시 Z·지움 V + 이 화면 새 지시 W·지움 Y → 넷 다 남음(지움은 지움)
     { const E = mkI(H); await E.load(); E.S.items.push(tk('tZ', { created: DN, updated: DN })); E.S.updated_at = ++E.clock; E.other('tV', (t) => { t.del = 1; t.updated_ts = 1794900000000; });
       E.el('taskTitle').value = 'W'; E.el('taskWho').value = 'u2'; E.el('taskDue').value = '2026-12-10'; E.ex('addTask()'); E.ex('deleteTask("tY")'); await E.fire();
@@ -18095,9 +18099,10 @@ try {
     { const E = mkI(H); await E.load(); E.ex('var __w = mgWalkKey, __n = 0; mgWalkKey = function(){ if (++__n === 12) throw new Error("시험"); return __w.apply(null, arguments); };');
       E.other('tX', closeT); E.modal('tX', { teDetail: '메모' }); await E.fire();
       I.r5b = [E.sv('tX').status, E.sv('tX').done_at, E.sv('tX').detail, E.sv('tX').approved_by, E.warns > 0, E.cft().length].join('|'); R.r5b = I.r5b === 'open||메모|B|true|0'; }
-    // ⑥-1 저장보다 먼저 나간 읽기가 저장 200 뒤에 옴(옛 판) → 버림(화면 메모 그대로)
+    // ⑥-1 저장보다 먼저 나간 읽기가 저장 200 뒤에 옴(옛 판) → 버림(화면 메모 그대로) · 검토 반영: 버릴 때 기준 시각을 기준 판으로 되돌림(다음 저장이 409 없이 200)
     { const E = mkI(H); await E.load(); E.modal('tX', { teDetail: 'M1' }); E.holdGet = 1; E.ex('loadTasks()'); await E.flush(); await E.fire(); await E.release('GET');
-      I.r61 = [E.loc('tX').detail, E.sv('tX').detail, E.seq.join(',')].join('|'); R.r61 = I.r61 === 'M1|M1|200'; }
+      const mid = E.loc('tX').detail; E.modal('tY', { teDetail: 'Y1' }); await E.fire();
+      I.r61 = [mid, E.sv('tX').detail, E.sv('tY').detail, E.seq.join(',')].join('|'); R.r61 = I.r61 === 'M1|M1|Y1|200,200'; }
     // ⑥-2 저장 둘이 겹침: 앞 저장 200이 대기 표시를 푼 뒤, 뒤 저장이 나가 있는 동안 온 읽기(뒤 저장 전 판) → 병합(통째 바꿈이면 뒤 저장의 고침이 화면·서버에서 사라짐)
     { const E = mkI(H); await E.load(); E.modal('tX', { teDetail: 'M1' }); E.holdPut.push('resp'); await E.fire(); E.modal('tY', { teDetail: 'Y1' }); E.holdPut.push('req'); await E.fire();
       await E.release('PUT응답'); await E.load(); const midY = E.loc('tY').detail; await E.release('PUT요청'); await E.fire();
@@ -18129,6 +18134,28 @@ try {
     // ⑨ 서버 동작 '내 것 아님'(담당 비움) 뒤 관리자가 다른 기기에서 다시 배정 → 옛 화면이 다른 지시 저장 → 새 배정 남음 · 알림 0
     { const E = mkI(H); await E.load(); E.ex('taskNotMine("tN")'); await E.flush(); E.other('tN', (t) => { t.who_id = 'u2'; t.who = 'N:u2'; t.who_by = 'edit'; }); E.modal('tY', { teDetail: 'Y1' }); await E.fire();
       I.r9 = [E.sv('tN').who_id, E.sv('tN').who_by, E.loc('tN').who_id, E.cft().length, E.seq.join(',')].join('|'); R.r9 = I.r9 === 'u2|edit|u2|0|409,200'; }
+    // ⑩(검토 반영) 저장 대기 중(타이머) 다른 기기가 X 끝남 → 읽기(대기 = 병합 — 옛 기준으로 병합한 뒤 새 기준) → 타이머 저장 → X 끝남 남음 · 알림 0
+    { const E = mkI(H); await E.load(); E.ex('setTaskStatus("tY", "hold")'); E.other('tX', closeT); await E.load(); await E.fire();
+      I.r10 = [E.sv('tX').status, E.sv('tY').status, E.seq.join(','), E.cft().length].join('|'); R.r10 = I.r10 === 'done|hold|200|0'; }
+    // ⑪(검토 반영) 늦게 온 옛 판 200: 앞 저장 응답 붙잡음 → 다른 기기 V 제목 V2 → 뒤 저장 409 → 다시 읽기(기준 = 새 판) → 200 → 앞 저장 200 늦게(판이 기준보다 옛것 — 기준 그대로) → 다른 기기 V3 → 다른 지시 저장 → V3 남음
+    { const E = mkI(H); await E.load(); E.modal('tX', { teDetail: 'M1' }); E.holdPut.push('resp'); await E.fireOne();
+      E.other('tV', (t) => { t.title = 'V2'; }); E.modal('tX', { teDetail: 'M2' }); await E.fire(); await E.release('PUT응답');
+      E.other('tV', (t) => { t.title = 'V3'; }); E.modal('tY', { teDetail: 'Y1' }); await E.fire();
+      I.r11 = [E.sv('tV').title, E.sv('tX').detail, E.seq.join(','), E.cft().length].join('|'); R.r11 = I.r11 === 'V3|M2|200,409,200,409,200|0'; }
+    // ⑫(검토 반영) 저장 타이머 창: X 저장 응답 붙잡음 → Y 고침(타이머 대기) → X 200(대기 표시는 타이머가 있어 남음) → 읽기 → 타이머 저장 → Y 남음(v494·1차 수리: 읽기가 목록을 통째로 바꿔 Y 소실)
+    { const E = mkI(H); await E.load(); E.modal('tX', { teDetail: 'M1' }); E.holdPut.push('resp'); await E.fireOne();
+      E.modal('tY', { teDetail: 'Y1' }); await E.release('PUT응답'); await E.load(); const mid = E.loc('tY').detail; await E.fire();
+      I.r12 = [mid, E.loc('tY').detail, E.sv('tY').detail, E.seq.join(',')].join('|'); R.r12 = I.r12 === 'Y1|Y1|Y1|200,200'; }
+    // ⑬(검토 반영) 로그아웃(배열 비움 + imBaseDrop — clearSessionData의 지시 두 줄) 동안 나가 있던 ㉮ 409 다시 읽기 ㉯ 목록 읽기가 뒤에 옴 → 비운 목록에 앞사람 지시를 넣지 않고 기준도 안 세움 · 다시 저장 없음
+    { const E = mkI(H); await E.load(); E.other('tX', closeT); E.modal('tY', { teDetail: 'Y1' }); E.holdGet = 1; await E.fire();
+      E.ex('tasks = []; imBaseDrop("tasks"); delete _colBase.tasks;'); await E.release('GET'); await E.fire();
+      const a = [E.ex('tasks.length'), E.ex('imBaseKnown("tasks")'), E.seq.join(',')].join('|');
+      const F = mkI(H); await F.load(); F.holdGet = 1; F.ex('loadTasks()'); await F.flush(); F.ex('tasks = []; imBaseDrop("tasks"); delete _colBase.tasks;'); await F.release('GET');
+      I.r13 = a + '/' + [F.ex('tasks.length'), F.ex('imBaseKnown("tasks")')].join('|'); R.r13 = I.r13 === '0|false|409/0|false'; }
+    // ⑭(검토 반영) 혼자 쓰는 화면: 같은 칸을 두 번 저장 · 앞 저장 200이 뒤 저장 409보다 늦게 옴 → 서버 값이 '나가 있는 내 저장'이 보낸 값이면 충돌 아님 — 알림 0(값은 뒤 저장)
+    { const E = mkI(H); await E.load(); E.modal('tX', { teDetail: 'M1' }); E.holdPut.push('resp'); await E.fireOne();
+      E.modal('tX', { teDetail: 'M2' }); await E.fire(); await E.release('PUT응답'); await E.fire();
+      I.r14 = [E.sv('tX').detail, E.seq.join(','), E.cft().length].join('|'); R.r14 = I.r14 === 'M2|200,409,200|0'; }
     return { R, I, ok: Object.keys(R).every((k) => R[k]) };
   };
   const onceI = (src, a, b) => { const n = src.split(a).length - 1; if (n !== 1) throw new Error('변이 자리 ' + n + '곳: ' + a.slice(0, 60)); return src.replace(a, () => b); };
@@ -18143,11 +18170,19 @@ try {
   // 결함 사본: [이름, 바꿀 글, 바꾼 글, 반드시 ✗가 될 검사]
   const KI = [
     ['종전 병합(수리 전)', null, null, ['r1', 'r2', 'r3', 'r7a']],
-    ['칸 고르기가 늘 이 화면', 'if (mgEq(t, o)) return null; if (mgEq(t, bb)) return { v: o }; if (!mgEq(o, bb)) cf.push(path); return null; };', 'if (mgEq(t, o)) return null; if (!mgEq(o, bb)) cf.push(path); return null; };', ['r1', 'r2']],
+    ['칸 고르기가 늘 이 화면', 'if (mgEq(t, o)) return null; if (mgEq(t, bb)) return { v: o }; if (!mgEq(o, bb) && !own(o, path)) cf.push(path); return null; };', 'if (mgEq(t, o)) return null; if (!mgEq(o, bb) && !own(o, path)) cf.push(path); return null; };', ['r1', 'r2']],
+    ['병합·기준 세우기 순서 뒤집음', '        tasks = (tasksPending || pendingSave || (imS && imS.out > 0)) ? mergeTasks(tasks, remoteItems) : remoteItems;\n        if (imS) imBaseSet("tasks", remoteItems);', '        if (imS) imBaseSet("tasks", remoteItems);\n        tasks = (tasksPending || pendingSave || (imS && imS.out > 0)) ? mergeTasks(tasks, remoteItems) : remoteItems;', ['r10']],
+    ['늦은 200 판 시각 비교 뺌', 'if (!st.has || !at || at <= st.at) return; imBaseSet(col, items); }', 'if (!st.has) return; imBaseSet(col, items); }', ['r11']],
+    ['타이머가 있어도 대기 표시 풂', '        if (!tasksSaveTimer) tasksPending = false;', '        tasksPending = false;', ['r12']],
+    ['409 다시 읽기의 로그아웃 거름 뺌', '      if (imS && !imS.has && imS.gen !== imG0) return;\n      var rAt', '      var rAt', ['r13']],
+    ['목록 읽기의 로그아웃 거름 뺌', '        if (imS && !imS.has && imS.gen !== imG0) return;   ', '        ', ['r13']],
+    ['옛 판 읽기 버릴 때 기준 시각 안 되돌림', '{ _colBase.tasks = imS.at; return; }', '{ return; }', ['r61']],
+    ['내 저장 값도 충돌로 셈', 'if (!mgEq(o, bb) && !own(o, path)) cf.push(path);', 'if (!mgEq(o, bb)) cf.push(path);', ['r14']],
+    ['알림 칸 이름 옛 글', 'lbl: { title: "지시 내용", detail: "상세",', 'lbl: { title: "제목", detail: "내용",', ['r3b']],
     ['읽기 200에서 기준 안 세움', '        if (imS) imBaseSet("tasks", remoteItems);', '', ['r1', 'r3']],
     ['저장 200에서 기준 안 세움', 'if (!json.write_denied && typeof imBaseSet === "function"){', 'if (false){', ['r63']],
     ['나가 있는 저장 수 안 봄', 'tasks = (tasksPending || pendingSave || (imS && imS.out > 0)) ?', 'tasks = (tasksPending || pendingSave) ?', ['r62']],
-    ['옛 판 읽기를 들임', '        if (imS && imS.has && imS.at && rAt && rAt < imS.at) return;', '', ['r61']],
+    ['옛 판 읽기를 들임', '        if (imS && imS.has && imS.at && rAt && rAt < imS.at){ _colBase.tasks = imS.at; return; }', '', ['r61']],
     ['늦게 온 200 기준 안 세움', 'if (imSt("tasks").gen === imG) imBaseSet("tasks", sent); else imBaseLate("tasks", sent);', 'if (imSt("tasks").gen === imG) imBaseSet("tasks", sent);', ['r63']],
     ['같은 칸 알림 없음', '    if (cfOut.length && typeof conConflictToast === "function") conConflictToast(cfOut);', '', ['r3']],
     ['기준 없음 = 이 화면 통째', '      if (!m) m = imWhole(cur, r);', '      if (!m) m = cur;', ['r5a']],
@@ -18165,7 +18200,7 @@ try {
     catch (e) { r = { R: {}, threw: e.message }; }
     KIr.push({ nm, ok: want.every((k) => r.R[k] === false), got: want.map((k) => k + ':' + r.R[k]).join(' '), threw: r.threw });
   }
-  T('P1 판24i 지시 병합 칸 단위(실행 — 실제 공통 길 window.fetch·낙관락 가짜 서버·실제 읽기·저장·병합·지시 처리·csSaveFields): ① 옛 화면 메모 저장 + 다른 기기 끝남 = 끝남·메모 둘 다 · ② 아침에 고친 X·다른 기기 X 끝남·오후 Y 저장 = X 끝남 · ③ 같은 칸 = 이 화면 값 + "다른 기기도 고친 칸을 이 화면 값으로 저장했습니다 — 이름 · 기한" 1 · 다른 기기만 고친 칸 = 다른 기기 · ④ 새 지시·지움 양쪽 남음 · ⑤ 캐시 부팅(받은 사본 없음)·병합 예외 = 종전 규칙(예외는 되돌린 뒤) · ⑥ 옛 판 읽기 버림·나가 있는 저장 중 읽기 = 병합·늦은 200 기준·다시 읽기 실패 = 기준 그대로·기준 비운 뒤 늦은 200 무시 · ⑦ csSaveFields 기한 = 닫힌 지시 끝남 남음 + 기한 · 캐시 부팅 화면은 자동 기한 건너뜀 → 받은 뒤 채움 · ⑧ 혼자 쓰는 화면 추가·수정·완료 요청·승인·되엶·지움 저장 6번 200·본문 = 종전 병합 사본과 같음 · ⑨ 내 것 아님 뒤 새 배정 남음 · 결함 사본 ' + KI.length + '개 = 각자 맡은 검사 ✗',
+  T('P1 판24i 지시 병합 칸 단위(실행 — 실제 공통 길 window.fetch·낙관락 가짜 서버·실제 읽기·저장·병합·지시 처리·csSaveFields): ① 옛 화면 메모 저장 + 다른 기기 끝남 = 끝남·메모 둘 다 · ② 아침에 고친 X·다른 기기 X 끝남·오후 Y 저장 = X 끝남 · ③ 같은 칸 = 이 화면 값 + "다른 기기도 고친 칸을 이 화면 값으로 저장했습니다 — 이름 · 기한" 1 · 다른 기기만 고친 칸 = 다른 기기 · ④ 새 지시·지움 양쪽 남음 · ⑤ 캐시 부팅(받은 사본 없음)·병합 예외 = 종전 규칙(예외는 되돌린 뒤) · ⑥ 옛 판 읽기 버림·나가 있는 저장 중 읽기 = 병합·늦은 200 기준·다시 읽기 실패 = 기준 그대로·기준 비운 뒤 늦은 200 무시 · ⑦ csSaveFields 기한 = 닫힌 지시 끝남 남음 + 기한 · 캐시 부팅 화면은 자동 기한 건너뜀 → 받은 뒤 채움 · ⑧ 혼자 쓰는 화면 추가·수정·완료 요청·승인·되엶·지움 저장 6번 200·본문 = 종전 병합 사본과 같음 · ⑨ 내 것 아님 뒤 새 배정 남음 · (독립 검토 반영) ③-나 알림 칸 이름 = 화면 글(상세) · ⑥-1 버릴 때 기준 시각 되돌림 · ⑩ 저장 대기 중 읽기 = 옛 기준 병합 뒤 새 기준 · ⑪ 늦게 온 옛 판 200은 기준 안 바꿈 · ⑫ 저장 타이머 창 고침 남음 · ⑬ 로그아웃 동안 나가 있던 읽기·다시 읽기 버림 · ⑭ 내 저장끼리 순서 바뀜 = 알림 0 · 결함 사본 ' + KI.length + '개 = 각자 맡은 검사 ✗',
     RI.ok && snapSame && KIr.every((x) => x.ok), JSON.stringify({ R: RI.R, I: Object.assign({}, RI.I, { snap8: undefined }), snapSame, bad: KIr.filter((x) => !x.ok) }));
 } catch (e) { console.log('  (P1 판24i 검사 생략 — ' + e.message + ')'); fails++; }
 
