@@ -8,6 +8,7 @@
     "@tensorflow-models/pose-detection": "^2.1.3",
     "@tensorflow/tfjs": "^4.22.0",
     "@tensorflow/tfjs-backend-wasm": "^4.22.0",
+    "imapflow": "2.10.0",
     "jimp": "^1.6.1",
     "pdfjs-dist": "4.7.76",
     "web-push": "^3.6.7"

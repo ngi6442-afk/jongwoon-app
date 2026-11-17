@@ -50,6 +50,15 @@
 [functions."gw-mchk-cron"]
   schedule = "0 22 * * *"
 
+# 29 판⑦ 메일 에이전트(PM 11/17 'A안 ㄱ') — UTC 22:00 = KST 07:00 매일. 예약은 기동만, 메일 읽기는 gw-stmtmail-run-background(15분).
+# 계정 = 환경변수 STMT_MAIL_USER·STMT_MAIL_PASS(PM이 직접 넣음) — 없으면 워커가 'MAIL_NOT_SET'만 남기고 끝남. 수동 = gw-cron-kick target 'stmtmail'.
+[functions."gw-stmtmail-cron"]
+  schedule = "0 22 * * *"
+
+# imapflow(2.10.0 고정 — 에스토니아 Postal Systems, 하위 의존성 원산지 11/17 확인)는 pino 작업 스레드 파일을 따로 들고 있어 묶지 않고 그대로 싣는다.
+[functions."gw-stmtmail-run-background"]
+  external_node_modules = ["imapflow"]
+
 # 예정(등재만 — appdata data/cron_map.json): gw-digest-0730(30 22 UTC = KST 07:30, 지시 요약 전용 — 지금은 gw-todo-cron 08:00에 통합 v396).
 
 # 정적 파일은 그대로 서빙, /.netlify/functions/* 는 서버리스 함수로.

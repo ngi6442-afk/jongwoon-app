@@ -12747,7 +12747,7 @@ try {
   K2.api.outVeh(); await fl29u(); const k2p = K2.env.pend.length; K2.env.pend.splice(0);   // 대기열이 다 보내진 뒤(결재 생성 끝 — 목록에는 아직 없음)를 흉내
   K2.api.STMT.appr = { ym: '2026-10', items: [] }; K2.api.STMT.month.vendors = vsO; const k2c = K2.api.vResend('2026-10', K2.api.group('veh')); K2.api.bar(); const barK = K2.env.el.innerHTML;
   T('29 판⑤ ② 차량 → 사장님 보고: 누르면 결재 목록·전월(9월) 읽고 확인 창(보고 글 그대로·"확정 1곳은 전달함") → stmt_sent(veh·appr·ref stmt:2026-10:veh·확정 곳만 base = 색인 at) → 결재 대기열 1건(kind 월말명세서·ref·내 id·cid·제목·본문)·영속·보냄·알림 → 달 다시 읽기 · 409 = 대기열 0·거래처 이름 붙은 까닭 · 같은 달 대기열 = 알림만(부르기 0) · 결재 대기 카드 = 확인 창에 "그 카드를 고칩니다" · 취소 = stmt_sent 0 · 기다리는 사이 사람 바뀜 = 아무것도 안 함 · 전달함인데 보고 없음 = 줄 붉은 안내·[보고 다시 올리기] → stmt_sent 없이 대기열 · 이미 확인된 보고가 있으면 다시 올리지 않음 · 결재 목록 못 읽음 = 안 올림 · 가장 늦은 보고가 반려 = [반려된 보고 다시 올리기]·안내 → 확인 창에 반려 까닭·새 카드(stmt_sent 없이) · 가장 늦은 카드가 대기면 다시 올리기 없음 · 이 세션에서 막 올린 달은 결재 생성 전 다시 읽어도 \'보고 없음\' 안 알림',
-    busy2 === true && J(acts2.filter((a) => !/^stmt_drop_list/.test(a))) === J(['approvals_list', 'stmt_month:2026-09', 'stmt_sent:2026-10', 'stmt_month:2026-10', 'approvals_list']) && A2.api.STMT.outBusy === false
+    busy2 === true && J(acts2.filter((a) => !/^stmt_(drop_list|mail_status)/.test(a))) === J(['approvals_list', 'stmt_month:2026-09', 'stmt_sent:2026-10', 'stmt_month:2026-10', 'approvals_list']) && A2.api.STMT.outBusy === false
     && J(sent2) === J({ action: 'stmt_sent', ym: '2026-10', group: 'veh', via: 'appr', ref: 'stmt:2026-10:veh', items: [{ vk: 'v05', base: 1001 }] })
     && A2.env.confirms.length === 1 && A2.env.confirms[0].indexOf(want1) > 0 && /확정 1곳은 '전달함'이 됩니다\. 올릴까요\?$/.test(A2.env.confirms[0])
     && J(pend2) === J([['월말명세서', 'stmt:2026-10:veh', 'u1', true, '월말명세서 2026-10 차량 거래처 2곳', true]]) && A2.env.saved === 1 && A2.env.flush === 1 && A2.env.toasts.indexOf('A:대표 결재로 상신 — 월말명세서 2026-10 차량 거래처 2곳') >= 0
@@ -12763,8 +12763,8 @@ try {
     && /data-st-out="veh" title="[^"]*">반려된 보고 다시 올리기<\/button><span class="st-no">보고가 반려됐습니다/.test(barJ) && /올린 보고: 반려 11\/13 — 포항모터스 빠짐/.test(barJ)
     && J2.env.pend.length === 1 && !J2.env.log.some((b) => b.action === 'stmt_sent') && /앞서 올린 보고가 반려됐습니다\(포항모터스 빠짐\) — 새로 올립니다/.test(J2.env.confirms[0] || '')
     && k2a === '' && k2b === 'none' && k2p === 1 && k2c === '' && barK.indexOf('전달함인데 올린 보고가 없습니다') < 0
-    && L2.env.pend.length === 0 && L2.env.toasts.some((s) => /^올리지 못했습니다 — 포항모터스|^올리지 못했습니다 — 일부 거래처만 전달함이 됐습니다/.test(s) || /일부 거래처만 전달함이 됐습니다/.test(s)) && J(L2.env.log.map((b) => b.action).filter((a) => a !== 'stmt_drop_list').slice(-3)) === J(['stmt_reindex', 'stmt_month', 'approvals_list'])
-    && M2.env.pend.length === 1 && J(M2.env.log.map((b) => b.action).filter((a) => a !== 'stmt_drop_list').slice(-3)) === J(['stmt_reindex', 'stmt_month', 'approvals_list'])
+    && L2.env.pend.length === 0 && L2.env.toasts.some((s) => /^올리지 못했습니다 — 포항모터스|^올리지 못했습니다 — 일부 거래처만 전달함이 됐습니다/.test(s) || /일부 거래처만 전달함이 됐습니다/.test(s)) && J(L2.env.log.map((b) => b.action).filter((a) => a !== 'stmt_drop_list' && a !== 'stmt_mail_status').slice(-3)) === J(['stmt_reindex', 'stmt_month', 'approvals_list'])
+    && M2.env.pend.length === 1 && J(M2.env.log.map((b) => b.action).filter((a) => a !== 'stmt_drop_list' && a !== 'stmt_mail_status').slice(-3)) === J(['stmt_reindex', 'stmt_month', 'approvals_list'])
     && N2.env.pend.length === 1 && N2.env.pend[0].mid === 'u1' && !N2.env.toasts.some((s) => /^A:/.test(s)) && !N2.api.STMT.rpt['2026-10'] && N2.api.STMT.outBusy === false && !N2.env.log.some((b) => b.action === 'stmt_month' && b.ym === '2026-10')
     && o2a === '' && o2b === 'none' && p2r === false && p2l === 'approvals_list' && p2n === 1 && !Q2.api.STMT.rpt['2026-10'],
     J({ acts2, sent2, pend2, toasts: A2.env.toasts, b2: B2.env.toasts, c2: [C2.env.log.length, C2.env.alerts], barO: barO.slice(0, 300), g2: [G2.env.log.map((b) => b.action), G2.env.pend.length], h2: H2.env.toasts, i2: I2.env.toasts,

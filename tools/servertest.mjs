@@ -9076,7 +9076,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     const loadAs90 = (p, src) => { const m = new Mod90(p, null); m.filename = p; m.paths = Mod90._nodeModulePaths(dirname(p)); m._compile(src, p); return m.exports; };
     const mut90 = [];
     {
-      const B = loadAs90(bp90, bsrc90.replace("if (src.data.bid !== m.id && !m.admin) return;", ''));
+      const B = loadAs90(bp90, bsrc90.replace("if (src.data.bid !== m.id && !m.admin && src.data.bid !== '__stmtmail__') return;", ''));
       const q = await cs90({ action: 'stmt_read', ym: '2026-10', vk: 'v07', name: 'g.jpg', b64: jpg90.toString('base64') }, tD90, 'dev1');
       const before = fakeC90.calls;
       await B.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tO90, 'x-device-id': 'dev1' }, body: JSON.stringify({ id: q.body.job }) });

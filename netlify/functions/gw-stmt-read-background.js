@@ -59,7 +59,7 @@ exports.handler = async function (event, context) {
     if (!RE_ID.test(id)) return;
     const src = await blobGet(store(FILES), 'stmtsrc:' + id);
     if (!src.ok || !src.data) return;
-    if (src.data.bid !== m.id && !m.admin) return;   // 맡긴 사람(또는 관리자)만
+    if (src.data.bid !== m.id && !m.admin && src.data.bid !== '__stmtmail__') return;   // 맡긴 사람(또는 관리자)만 · 29 판⑦ 메일 에이전트가 시간이 모자라 남긴 판독은 수행 권한이면 누구나
     const rec = { ts: Date.now(), bid: src.data.bid, ym: src.data.ym, vk: src.data.vk };
     let out;
     try {

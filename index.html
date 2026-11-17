@@ -9574,8 +9574,39 @@
     cfg.forEach(function(v){ if (v.active || v.vk === x.vk) h += '<option value="' + esc(v.vk) + '"' + (v.vk === x.vk ? " selected" : "") + '>' + esc(v.name) + '</option>'; });
     return h + '</select>';
   }
+  // ---- 29 판⑦ 메일 에이전트(PM 11/17 'A안 ㄱ') — 매일 07:00 서버가 회사 메일함(읽기 전용)에서 거래처 첨부를 이 목록으로 가져옴 · 여기는 상태 한 줄과 관리자 [지금 받기]뿐 ----
+  var STMT_MAIL_ERR = { MAIL_NOT_SET: "메일 계정이 아직 안 들어가 있습니다", MAIL_LOGIN_FAILED: "메일 로그인 거부 — 앱 비밀번호·IMAP 사용 설정을 확인해 주세요", MAIL_HOST_NOT_FOUND: "메일 서버 주소를 찾지 못했습니다", MAIL_TIMEOUT: "메일 서버 응답 없음(다음 실행에 다시)", MAIL_CONNECT_FAILED: "메일 서버에 붙지 못했습니다(다음 실행에 다시)", CFG_INVALID: "거래처 목록을 읽지 못했습니다", MAIL_RUN_FAILED: "메일 받기 중 오류" };
+  function stmtMailWhen(t){ var d = new Date(Number(t) || 0); return (d.getMonth() + 1) + "/" + d.getDate() + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); }
+  function stmtMailLine(){
+    var m = STMT.mail, l, h, run = isAdmin() && m && m.set ? ' <button type="button" class="mini-btn" data-st-drop="mailrun"' + (STMT.mailRun ? " disabled" : "") + '>' + (STMT.mailRun ? "받는 중…" : "지금 받기") + '</button>' : "";
+    if (!m) return "";
+    l = m.last;
+    if (!m.set) return '<div class="st-mute">📧 메일 자동 받기 — 아직 꺼짐(메일 계정을 넣으면 매일 07:00에 거래처가 보낸 첨부를 이 목록으로 가져옵니다)</div>';
+    if (!l) return '<div class="st-mute">📧 메일 자동 받기 — 켜짐, 아직 한 번도 안 돎(매일 07:00)' + run + '</div>';
+    if (!l.ok) return '<div class="st-no">📧 메일 받기 실패 ' + esc(stmtMailWhen(l.at)) + ' — ' + esc(STMT_MAIL_ERR[l.code] || ("오류 " + (l.code || ""))) + run + '</div>';
+    h = '📧 메일 자동 받기 — 마지막 ' + esc(stmtMailWhen(l.at)) + ' · 새 원본 ' + (Number(l.added) || 0) + '개' + (l.nov ? ' · <span class="st-no">거래처 고르기 ' + l.nov + '</span>' : '') + (l.fail ? ' · <span class="st-no">못 받음 ' + l.fail + '</span>' : '') + (l.left || l.full ? ' · <span class="st-mute">남은 첨부는 다음 실행에</span>' : '');
+    if (Date.now() - (Number(l.at) || 0) > 2 * 86400000) h += ' · <span class="st-no">2일 넘게 안 돎</span>';
+    return '<div>' + h + run + '</div>';
+  }
+  function stmtMailLoad(){
+    if (!canDo("stmt")) return;
+    gwCall("gw-stmt", { action: "stmt_mail_status" }).then(function(res){
+      var b = res.body || {};
+      if (res.status === 200 && b.status === "OK"){ STMT.mail = { set: !!b.set, last: b.last || null, senders: b.senders || 0 }; if (!STMT.ed && !STMT.cfg) stmtDropRender(); }
+    }).catch(function(){});
+  }
+  function stmtMailRun(){
+    if (!isAdmin() || STMT.mailRun) return;
+    STMT.mailRun = true; stmtDropRender();
+    gwCall("gw-stmt", { action: "stmt_mail_run" }).then(function(res){
+      var b = res.body || {};
+      if (res.status === 200 && b.status === "OK") gwToast("메일 받기를 시작했습니다 — 1~10분 뒤 목록에 들어옵니다");
+      else gwToast("메일 받기를 시작하지 못했습니다 — " + (STMT_MAIL_ERR[b.error_code] || b.error_code || res.status), true);
+      setTimeout(function(){ STMT.mailRun = false; stmtMailLoad(); if (STMT.ym) stmtDropLoad(STMT.ym); }, 90000);
+    }).catch(function(){ STMT.mailRun = false; stmtDropRender(); gwToast("메일 받기를 시작하지 못했습니다(네트워크)", true); });
+  }
   function stmtDropRowHtml(x, opt){
-    return '<div class="st-f"><span class="st-fn">' + esc(x.name) + ' <span class="st-mute">' + esc(STMT_DROP_KIND[x.kind] || "파일") + ' · ' + Math.max(1, Math.round((Number(x.size) || 0) / 1024)) + 'KB</span></span>'
+    return '<div class="st-f"><span class="st-fn">' + esc(x.name) + ' <span class="st-mute">' + esc(STMT_DROP_KIND[x.kind] || "파일") + ' · ' + Math.max(1, Math.round((Number(x.size) || 0) / 1024)) + 'KB' + (x.mail ? ' · 📧 메일 ' + esc(stmtMailWhen(x.mail.at)) + (x.mail.dom ? ' (' + esc(x.mail.dom) + ')' : '') : '') + '</span></span>'
       + stmtDropStText(x) + (opt.sel ? ' ' + stmtDropVendorSel(x) : '')
       + ' <button type="button" class="mini-btn" data-st-drop="open" data-id="' + esc(x.id) + '">열기</button>'
       + (opt.fill && x.state === "read" ? ' <button type="button" class="mini-btn" data-st-drop="fill" data-id="' + esc(x.id) + '">채우기</button>' : '')
@@ -9591,7 +9622,7 @@
       + '<span class="st-mute">(거래처는 파일 이름·내용으로 찾고, 원본은 그 거래처에 첨부로 남습니다 · 스캔·팩스는 AI가 1~3분 동안 읽습니다)</span>'
       + '<input type="file" id="stmtDropFile" multiple style="display:none" accept=".html,.htm,.xml,.pdf,.xls,.xlsx,.jpg,.jpeg,.png"></div>';
     todo = list.filter(function(x){ return x.state !== "read" && !stmtDropOnlyInv(x); });
-    h += '<div class="card st-files" id="stmtDropList">';
+    h += '<div class="card st-files" id="stmtDropList">' + stmtMailLine();
     if (q && q.busy) h += '<div class="st-mute">넣는 중 ' + Math.min(q.i + 1, q.files.length) + '/' + q.files.length + ' — ' + esc(String((q.files[q.i] || {}).name || "").slice(0, 40)) + '</div>';
     if (q && !q.busy && (q.done || q.errs.length)) h += '<div>' + '<span class="st-ok">' + q.done + '개 넣음</span>' + (q.dup ? ' <span class="st-mute">· 이미 넣은 파일 ' + q.dup + '개는 건너뜀</span>' : '') + '</div>';
     if (q && q.errs.length) h += q.errs.slice(0, 10).map(function(t){ return '<div class="st-no">⚠ ' + esc(t) + '</div>'; }).join("");
@@ -9614,6 +9645,7 @@
     var seq;
     if (!canDo("stmt") || !ym){ if (then) then(); return; }
     seq = STMT.dseq = (STMT.dseq || 0) + 1;
+    if (!STMT.mail || Date.now() - (STMT.mailAt || 0) > 60000){ STMT.mailAt = Date.now(); stmtMailLoad(); }   // 29 판⑦ 메일 상태 — 1분에 한 번까지
     gwCall("gw-stmt", { action: "stmt_drop_list", ym: ym }).then(function(res){
       var b = res.body || {}, sig = stmtDropSig();
       if (seq !== STMT.dseq || STMT.ym !== ym) return;
@@ -9756,6 +9788,7 @@
     if (act === "open") stmtDropOpen(id);
     else if (act === "del") stmtDropDel(id);
     else if (act === "fill" && STMT.ed) stmtDropFill(STMT.ed, id);
+    else if (act === "mailrun") stmtMailRun();
   }
   function stmtDropOnChange(e){
     var t = e && e.target;
@@ -32285,7 +32318,7 @@ function dutyStage(nx){
 
   // ---- 감시 경보 라벨(v399, 공통 기반 14 · 착수 브리핑 A7 2일차). 감시 항목(appdata cron_map watch=true id)별 완충(기본)/경보 승격/7일 무음.
   //      새로 편입된 감시는 1주간 경보가 안내로 낮춰지고, 승격을 누르면 즉시 경보. 라벨은 appdata watch.py가 판정 때 it:alerts로 읽는다. 관리자 전용·감사로그 ----
-  var ALERT_WATCH_IDS = ["gw-hwakwan-cron","gw-allbaro-cron","gw-todo-cron","gw-appr-cron","gw-mchk-cron","gw-promo-ai-cron","gw-doneif-cron","gw-brief-cron","bids.yml","bidsrefill.yml","autotask.yml","results.yml","backup.yml","weekly.yml","lawwatch.yml","JW 첨부백업"];   // cron_map watch=true와 동일(uismoke 대조) · v457 11/13 편입 아침 브리핑·앱 데이터 백업·주간 요약·법령 감시(Phase 1 판6) · v427 11/6 편입 첨부 증분 백업
+  var ALERT_WATCH_IDS = ["gw-hwakwan-cron","gw-allbaro-cron","gw-todo-cron","gw-appr-cron","gw-mchk-cron","gw-promo-ai-cron","gw-doneif-cron","gw-brief-cron","bids.yml","bidsrefill.yml","autotask.yml","results.yml","backup.yml","rnote","weekly.yml","lawwatch.yml","JW 첨부백업"];   // cron_map watch=true와 동일(uismoke 대조) · v457 11/13 편입 아침 브리핑·앱 데이터 백업·주간 요약·법령 감시(Phase 1 판6) · v427 11/6 편입 첨부 증분 백업
   var ALERT_WATCH_TXT = { "gw-hwakwan-cron":"화관법 자동 제출(07:30)", "gw-allbaro-cron":"운반일지 수집(08:00)", "gw-todo-cron":"할 일 기한·지시 요약(08:00)", "gw-appr-cron":"전결 총정리(매월 1일)", "gw-mchk-cron":"월 점검(매월 1일)","gw-promo-ai-cron":"사진AI 감독(10분)", "gw-doneif-cron":"완료 신호 워커(10분)", "bids.yml":"일감 수집(07:23)", "bidsrefill.yml":"공고문 판독(22:40)", "autotask.yml":"자동 지시 봇(08:10)", "results.yml":"개찰 대조(12·18시)", "gw-brief-cron":"아침 브리핑 생성(06:30)", "backup.yml":"앱 데이터 백업(매일 — 32시간 넘거나 부분 백업이면 경보)", "weekly.yml":"주간 요약", "lawwatch.yml":"법령 감시(주 1회 월요일)", "JW 첨부백업":"첨부 원본 증분 백업(PC 로컬미러백업, 평일 3시간)" };
   var ALERT_LEVEL_TXT = { warn:"완충(기본)", alert:"경보 승격", mute:"7일 무음" };
   var alertsSaving = false;

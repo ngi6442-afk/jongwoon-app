@@ -28,6 +28,7 @@ const DONEIF = require('./_lib/doneif');   // clogAppend(해시 체인) 재사�
 const S = require('./_lib/stmt');
 
 const RD = require('./_lib/stmtread');   // 29 판④ 원본 읽기
+const MAIL = require('./_lib/stmtmail');   // 29 판⑦ 메일 에이전트(보낸 사람 기억·상태) — imapflow는 워커에서만 불러옴(여기서는 안 씀)
 const DATA = 'gw_data';
 const USERS = 'gw_users';
 const FILES = 'gw_files';   // 29 판④ 판독 맡긴 원본(stmtsrc:<id> — 판독 뒤 지움)·결과(stmtread:<id>)
@@ -599,7 +600,8 @@ function fileKey(id) { return 'stmtfile:' + id; }
 function dropName(s) { return String(s == null ? '' : s).split(/[\\/]/).pop().replace(/\d[\d .\-·_]{7,}\d/g, function (m) { return m.replace(/\D/g, '').length >= 9 ? '…' : m; }).replace(/[\u0000-\u001f]/g, '').slice(0, 120); }   // 전화·주민·계좌 꼴(구분자 포함 9자리↑) — 검토 low5
 function dropMeta(e) {   // 목록에 내는 칸(결과 줄은 stmt_drop_get으로만)
   const st = (e.state === 'reading' && Date.now() - (Number(e.at_read || e.at) || 0) > STALE_READ) ? 'fail' : e.state;   // 맡긴 시각 기준(넣은 시각이 아니라 — 검토 med1)
-  return { id: e.id, name: e.name, size: e.size, kind: e.kind, vk: e.vk || '', how: e.how || '', state: st, code: st === 'fail' ? (e.code || 'READ_STALE') : (e.code || ''), job: e.job || '', n: e.n || 0, src: e.src || '', warn: (e.warn || 0), by: e.by, at: e.at, applied: e.applied || 0 };
+  return { id: e.id, name: e.name, size: e.size, kind: e.kind, vk: e.vk || '', how: e.how || '', state: st, code: st === 'fail' ? (e.code || 'READ_STALE') : (e.code || ''), job: e.job || '', n: e.n || 0, src: e.src || '', warn: (e.warn || 0), by: e.by, at: e.at, applied: e.applied || 0,
+    mail: e.mail ? { at: Number(e.mail.at) || 0, dom: String(e.mail.dom || '') } : null };   // 29 판⑦ 메일로 들어온 원본 — 받은 시각·보낸 쪽 도메인만(주소 해시는 내지 않음)
 }
 async function dropList(st, ym) {
   const l = await blobList(st, 'stmtdrop:' + ym + ':');
@@ -712,6 +714,9 @@ async function handleDropSet(st, c, d, R) {
     e.vk = v.vk; e.how = 'pick';
     e = await dropRead(e, Buffer.from(String(f.data.data), 'base64'), v, c);
     await audit(c, '명세서원본', d.ym + ':' + v.vk, '거래처 고름 · ' + e.state);
+    if (e.mail && /^[a-f0-9]{20}$/.test(String(e.mail.fh || ''))) {   // 29 판⑦ 메일로 온 원본 — 고른 거래처를 그 보낸 사람(해시)에 기억(다음 메일부터 자동). 실패해도 고르기는 됨
+      try { const sg = await getOpt(st, MAIL.SENDERS); if (sg.ok) await blobSet(st, MAIL.SENDERS, MAIL.learnSender(sg.data, e.mail.fh, v.vk)); } catch (x) {}
+    }
   }
   const w = await blobSet(st, dropKey(d.ym, d.id), e);
   if (!w.ok) return fail(w.code || 'STORAGE_WRITE_FAILED', R);
@@ -741,10 +746,29 @@ async function handleDropDel(st, c, d, R) {   // 잘못 넣은 파일 — 넣은
   return jr(200, { status: 'OK', request_id: R });
 }
 
-const READ = { stmt_cfg_get: handleCfgGet, stmt_month: handleMonth, stmt_get: handleGet, stmt_veh: handleVeh, stmt_alias_get: handleAliasGet, stmt_gap: handleGap, stmt_match: handleMatch, stmt_read_status: handleReadStatus };
+// ---- 29 판⑦ 메일 에이전트 상태·[지금 받기] ----
+// stmt_mail_status: 계정이 들어가 있는지(값은 내지 않음) · 마지막 실행 요약(숫자·코드) · 보낸 사람 기억 수
+async function handleMailStatus(st, c, d, R) {
+  const l = await getOpt(st, MAIL.LAST);
+  if (!l.ok) return fail(l.code, R);
+  const s = await getOpt(st, MAIL.SENDERS);
+  const n = (s.ok && s.data && s.data.map) ? Object.keys(s.data.map).filter(function (k) { return s.data.map[k] && s.data.map[k].vk; }).length : 0;
+  return jr(200, { status: 'OK', set: !!MAIL.mailEnv(), last: l.data || null, senders: n, start: MAIL.START_DAY, request_id: R });
+}
+// stmt_mail_run: 관리자만(메일함 접속 횟수·AI 판독 요금) — 워커를 바로 기동, 결과는 stmt_mail_status로
+async function handleMailRun(st, c, d, R) {
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  if (!MAIL.mailEnv()) return bad('MAIL_NOT_SET', R);
+  const r = await require('./gw-stmtmail-cron').kick('app:' + c.member.id);
+  if (!r.ok) return fail(r.code, R);
+  await audit(c, '명세서메일', 'run', '지금 받기');
+  return jr(200, { status: 'OK', started: true, request_id: R });
+}
+
+const READ = { stmt_mail_status: handleMailStatus, stmt_cfg_get: handleCfgGet, stmt_month: handleMonth, stmt_get: handleGet, stmt_veh: handleVeh, stmt_alias_get: handleAliasGet, stmt_gap: handleGap, stmt_match: handleMatch, stmt_read_status: handleReadStatus };
 // stmt_drop_list·stmt_drop_get·stmt_drop_file은 읽기지만 수행 권한만(파일 이름·원본·읽은 줄 원문 — 검토 low5) — WRITE 표에 둔다
 const WRITE = { stmt_cfg_set: handleCfgSet, stmt_save: handleSave, stmt_revert: handleRevert, stmt_reindex: handleReindex, stmt_alias_set: handleAliasSet, stmt_sent: handleSent, stmt_read: handleRead,
-  stmt_drop: handleDrop, stmt_drop_list: handleDropList, stmt_drop_get: handleDropGet, stmt_drop_set: handleDropSet, stmt_drop_file: handleDropFile, stmt_drop_del: handleDropDel };
+  stmt_drop: handleDrop, stmt_drop_list: handleDropList, stmt_drop_get: handleDropGet, stmt_drop_set: handleDropSet, stmt_drop_file: handleDropFile, stmt_drop_del: handleDropDel, stmt_mail_run: handleMailRun };
 async function handler(event) {
   const R = rid();
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
