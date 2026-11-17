@@ -6577,7 +6577,7 @@
         // 판24i: 저장 200이 이미 더 새 판을 기준으로 세웠으면 이 읽기는 그보다 옛 판(저장보다 먼저 나간 읽기가 늦게 옴) — 화면·기준에 들이지 않고 버림
         //   (들이면 방금 저장해 서버에 든 고침이 화면에서 옛 값으로 돌아가고, 기준이 옛 판이라 다음 저장 병합이 그 옛 값을 '이 화면 고침'으로 서버에 다시 씀)
         var imS = (typeof imSt === "function") ? imSt("tasks") : null, rAt = (typeof _colBase !== "undefined" && _colBase && Number(_colBase.tasks)) || 0;
-        if (imS && !imS.has && imS.gen !== imG0) return;   // 판24i 검토: 읽는 사이 로그아웃 — 버림
+        if (imS && !imS.has && imS.gen !== imG0){ if (typeof _colBase !== "undefined" && _colBase) delete _colBase.tasks; return; }   // 판24i 검토: 읽는 사이 로그아웃 — 버림 · 재검토: 공통 길이 막 세운 기준 시각도 지움(남으면 다음 사람의 읽기가 실패했을 때 저장이 앞사람 판 시각으로 나가 충돌 판정을 지나감 — 판24h와 같은 꼴)
         //   버릴 때 공통 길이 이미 기준 시각을 그 옛 판으로 되돌려 둠(검토 지적 · 실행 확인) → 기준 사본의 판 시각으로 다시(안 하면 다음 저장이 409 한 번 더)
         if (imS && imS.has && imS.at && rAt && rAt < imS.at){ _colBase.tasks = imS.at; return; }
         tasksSha = json.sha;
@@ -6666,7 +6666,7 @@
     }).then(function(json){
       // 판24i 검토: 다시 읽는 사이 로그아웃(기준 비움 — 세대가 바뀌고 받은 사본 없음)이면 비운 목록에 앞사람 지시를 넣거나 기준을 세우지 않고 끝냄
       var imS = (typeof imSt === "function") ? imSt("tasks") : null;
-      if (imS && !imS.has && imS.gen !== imG0) return;
+      if (imS && !imS.has && imS.gen !== imG0){ if (typeof _colBase !== "undefined" && _colBase) delete _colBase.tasks; return; }
       var rAt = (typeof _colBase !== "undefined" && _colBase && Number(_colBase.tasks)) || 0;
       if (json && !json.gwReadFail){
         var remoteParsed = null;
