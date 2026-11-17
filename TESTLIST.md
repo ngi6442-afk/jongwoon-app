@@ -1489,3 +1489,9 @@
 - [x] (AI) `stmtmail_check` 29(귀속 월·첨부 파트·한 번 돌기·멱등·지운 원본 안 돌아옴·시간 모자람·보낸 사람 기억·오류 이름·묶음·읽기 전용) · 실제 imapflow로 닫힌 포트·없는 주소 연결 → MAIL_CONNECT_FAILED·MAIL_HOST_NOT_FOUND — ✓ AI 11/17
 - [x] (AI) `servertest` 90 결함 사본 줄 맞춤 · `uismoke` 판⑤ 동작 순서에서 메일 상태 호출 걸러냄 · v399 감시 목록에 rnote · v489 문서 검사를 이 판 이상으로 풀고 v490 문서·판 번호 정확 검사 — ✓ AI 11/17
 - [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` 통과 — ✓ AI 11/17
+
+## v491 — 안전 › 체크: 자격·담당 교육 대상 표시에 유해화학물질관리자(2년 주기) · 범위 줄 글 고침
+- [ ] (PM) 인사·직원에서 유해화학물질관리자인 직원의 수정 창에 '유해화학물질관리자' 표시를 켜고, 안전 › 체크에서 그 사람 줄을 펼쳐 [+ 기록]으로 '유해화학물질관리자 안전교육' 수료일 넣기 → 기한이 수료일 2년 뒤로 나오는지
+- [x] (AI 시험 화면 대상) 시험 서버에서 표시 켜기 → 저장 → 다시 열어도 켜져 있음 · 체크 칸 그 사람 줄 펼침에 '유해화학물질관리자 안전교육 — 기록 없음'(노랑) · 기록 넣으면 ✓·기한 2년 뒤 · 범위 줄 글 '화관법 교육은 관리자만(대상 표시)' — ✓ AI 11/17(운영 백업 사본 시험 서버 · 관리자 계정: 켜기·저장·새로고침 뒤 유지 · 줄 '기록 없음' · 2025-03-10 넣자 다음 예정 2027-03-10 자동·✓ 2025-03)
+- [x] (AI) `uismoke` 'v460 ③'(표시만 켠 직원 기록 없음 · 기록 2025-01-10 → 기한 2027-01-10 · 근거 글 조문 · 다음 예정 24개월 · 결함 사본 3) · v460 ② 정적 7칸 · `servertest` 84 새 허용 키(저장·다른 칸 저장 뒤 그대로·비우면 지움) — ✓ AI 11/17
+- [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` 통과 · v490 문서 검사를 이 판 이상으로 풀고 v491 문서·판 번호 정확 검사 — ✓ AI 11/17

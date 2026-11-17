@@ -2061,7 +2061,7 @@
       <button type="button" class="sec-hd-add" id="eduAddWkBtn" style="display:none;">+ 일용직</button>
     </div>
     <div class="edu-lead" id="eduLead">회사가 사람마다 챙길 법정 교육·검진·위험성평가 공유·참여</div>
-    <div class="edu-scope-line" id="eduScopeLine">범위: 산안법 교육·검진·위험성평가 공유·참여 — 석면 작업 교육은 현장 칸 · 화관법 교육은 화관법 탭</div>
+    <div class="edu-scope-line" id="eduScopeLine">범위: 산안법 교육·검진·위험성평가 공유·참여 — 석면 작업 교육은 현장 칸 · 화관법 교육은 관리자만(대상 표시)</div>
     <div class="vs-tools" id="eduScopeBar">
       <button type="button" class="vs-chip on" data-edu-scope="member">직원</button>
       <button type="button" class="vs-chip" data-edu-scope="worker">일용직</button>
@@ -3470,6 +3470,7 @@
     <label class="dg-check"><input type="checkbox" id="meQ_env"> 환경기술인 (교육 3년)</label>
     <label class="dg-check"><input type="checkbox" id="meQ_tech"> 기술요원 (교육 3년)</label>
     <label class="dg-check"><input type="checkbox" id="meQ_elec"> 전기안전관리자 (법정교육 3년)</label>
+    <label class="dg-check"><input type="checkbox" id="meQ_chem"> 유해화학물질관리자 (안전교육 2년)</label>
     <span class="fld-label">소속 회사</span>
     <select id="meCorp"><option value="">(지정 안 함)</option><option value="env">종운환경</option><option value="con">종운건설</option><option value="both">종운환경·종운건설 (두 회사 중복 재적)</option></select>   <!-- v472(PM 11/14 18:48): 두 회사 중복 재적 = both(서버 MEMBER_CORP와 같은 값) -->
     <div style="font-size:12px;color:var(--sub);margin:-2px 2px 8px;">두 회사에 다 적을 둔 사람은 '두 회사 중복 재적'을 고릅니다 — 직원 목록에 '중복 재적' 표시가 붙습니다</div>
@@ -19946,6 +19947,7 @@
     { k:"env_edu",  n:"환경기술인 교육",             months:36,  hint:"신규 = 임명된 날부터 1년 이내 1회 · 보수 = 신규교육을 받은 날 기준 3년마다(의무 대장 70행)" },
     { k:"tech_edu", n:"기술요원 교육",               months:36,  hint:"유자격 기술요원 = 대상자가 된 날부터 1년 이내 최초, 이후 3년마다 · 소규모 특례 임명자는 6개월 이내 최초, 이후 1년마다(의무 대장 36행 — 표는 3년 기준, 특례면 다음 예정을 직접 고칩니다)" },
     { k:"elec_edu", n:"전기안전관리자 법정교육",     months:36,  hint:"전기안전관리기술교육 3년마다 1회 이상 · 최초 선임자는 선임된 날부터 6개월 이내(의무 대장 28행)" },
+    { k:"chem_edu", n:"유해화학물질관리자 안전교육", months:24,  hint:"선임된 날부터 2년 이내, 이후 2년마다 16시간(화학물질관리법 33조 · 시행규칙 37조·별표 6의3) — 운반 기사·그 밖 종사자 교육은 이 표에 없습니다" },   // v491
     { k:"special_demo", n:"특별교육(해체·밀폐 등)", months:0, hint:"석면 밖 특별교육 대상 작업(별표5 — 해체·밀폐공간 등). 철거 현장의 특별교육 줄(해체 특별교육)이 이 기록을 봅니다 — 석면 현장은 '석면 특별교육' 기록" }
   ];
   var EDU_RA_TYPE = { regular: "정기", adhoc: "수시", initial: "최초" };   // v447 위험성평가 회차 표식 구분(ra.type)
@@ -20321,7 +20323,8 @@
     { q: "wst", n: "폐기물 처리 담당자", items: [{ k: "wst_edu", months: 36, row: 35, b: "최초 허가받은 날부터 1년 이내, 이후 3년마다" }] },
     { q: "env", n: "환경기술인", items: [{ k: "env_edu", months: 36, row: 70, b: "신규 임명 1년 이내, 보수 3년마다" }] },
     { q: "tech", n: "기술요원", items: [{ k: "tech_edu", months: 36, row: 36, b: "3년마다(소규모 특례 임명자는 1년마다 — 표는 3년 기준)" }] },
-    { q: "elec", n: "전기안전관리자", items: [{ k: "elec_edu", months: 36, row: 28, b: "3년마다 1회 이상" }] }
+    { q: "elec", n: "전기안전관리자", items: [{ k: "elec_edu", months: 36, row: 28, b: "3년마다 1회 이상" }] },
+    { q: "chem", n: "유해화학물질관리자", items: [{ k: "chem_edu", months: 24, src: "화학물질관리법 33조 · 시행규칙 37조·별표 6의3", b: "선임된 날부터 2년 이내, 이후 2년마다 16시간" }] }   // v491 (PM 11/17 '추가') — 의무 대장에 행이 없어 row 대신 src(조문)를 근거 글에 적는다
   ];
   // 만 나이(기준일 t) — 생년월일이 날짜 꼴이 아니면 -1
   function eduAge(birth, t){ var a; if (!isDate(birth) || !isDate(t)) return -1; a = Number(t.slice(0, 4)) - Number(birth.slice(0, 4)); if (t.slice(5) < birth.slice(5)) a--; return a; }
@@ -20332,7 +20335,7 @@
     EDU_QUAL.forEach(function(q){
       if (qs.indexOf(q.q) < 0) return;
       q.items.forEach(function(x){
-        var rec = eduLastOf(recs, [x.k]), lab = eduKindLabel(x.k), basis = q.n + " 표시 — " + x.b + "(인허가 의무 대장 " + x.row + "행)", mon = x.months || 0, age, i, it;
+        var rec = eduLastOf(recs, [x.k]), lab = eduKindLabel(x.k), basis = q.n + " 표시 — " + x.b + (x.row ? "(인허가 의무 대장 " + x.row + "행)" : "(" + x.src + ")"), mon = x.months || 0, age, i, it;
         if (x.age){
           age = eduAge(m.birth, t);
           if (age < 0){ out.push({ k: x.k, lab: lab, it: eduGreyIt(x.k, EDU_CHK, EDU_CHK, basis + " · 생년월일이 없거나 볼 수 없어 주기를 정하지 못함(인사·직원에 생년월일 — 관리자만 봄)", rec) }); return; }

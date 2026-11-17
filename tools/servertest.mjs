@@ -5907,6 +5907,14 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     const q4_84 = r84.code === 200 && !('quals' in u84());
     T('84 v460 quals(자격·담당 교육 대상 표시): 허용 키만 정해진 순서로 저장(["elec","drv","hack","drv","__proto__"] → ["drv","elec"]) · 감사 1줄 f에 quals · 다른 칸만 보낸 저장 = 그대로 · 배열 아님·허용 키 0개 = 칸째 지움',
       q1_84 && q2_84 && q3_84 && q4_84 && evQ84.length === 1 && Array.isArray((evQ84[0].f || {}).quals), JSON.stringify({ q1_84, q2_84, q3_84, q4_84, ev: evQ84.length, m: u84() }));
+    // ①-2c (v491 — PM 11/17 '추가') 새 허용 키 chem(유해화학물질관리자) — 저장에서 살아남고 정해진 순서 맨 뒤 · 다른 칸만 보낸 저장 뒤에도 그대로 · 비우면 칸째 지움(뒤 검사 상태 그대로)
+    r84 = await callA84({ action: 'member_upsert', id: 'uw84', quals: ['chem', 'nope', 'tech'] }, tokAdm84);
+    const q5_84 = r84.code === 200 && JSON.stringify(u84().quals) === '["tech","chem"]';
+    r84 = await callA84({ action: 'member_upsert', id: 'uw84', rank: '주임' }, tokAdm84);
+    const q6_84 = r84.code === 200 && JSON.stringify(u84().quals) === '["tech","chem"]';
+    r84 = await callA84({ action: 'member_upsert', id: 'uw84', quals: [] }, tokAdm84);
+    const q7_84 = r84.code === 200 && !('quals' in u84());
+    T('84 v491 quals 새 허용 키 chem: ["chem","nope","tech"] → ["tech","chem"](허용 키만·정해진 순서) · 다른 칸만 보낸 저장 = 그대로 · 빈 배열 = 칸째 지움', q5_84 && q6_84 && q7_84, JSON.stringify({ q5_84, q6_84, q7_84, m: u84() }));
     // ①-3 소속 회사 값 검사 — 표 밖 값·객체 = 400 BAD_CORP · 같은 요청의 다른 칸(이름 바꾸기 아님 — 직급·사무직)도 안 바뀜 · 이름 색인 그대로
     const before84 = JSON.stringify(u84());
     const bc1 = await callA84({ action: 'member_upsert', id: 'uw84', corp: 'abc', office: true, rank: '대리' }, tokAdm84);

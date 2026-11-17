@@ -10038,7 +10038,7 @@ try {
     .filter((f) => nc47(readFileSync(join(ROOT, 'netlify', 'functions', f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')).indexOf('교육·검진') >= 0);
   const oldVis2 = []; { let i = -1; while ((i = v2.indexOf('교육·검진', i + 1)) >= 0) { if (v2.slice(i, i + '교육·검진·위험성평가'.length) !== '교육·검진·위험성평가') oldVis2.push(v2.slice(Math.max(0, i - 30), i + 20)); } }
   const SENT2 = ['<button class="lsub-btn" data-lsub="edu" id="sfChipEdu">체크</button>', '<span>체크</span> <span class="cnt" id="eduHead"></span>',
-    '<div class="edu-lead" id="eduLead">회사가 사람마다 챙길 법정 교육·검진·위험성평가 공유·참여</div>', '<div class="edu-scope-line" id="eduScopeLine">범위: 산안법 교육·검진·위험성평가 공유·참여 — 석면 작업 교육은 현장 칸 · 화관법 교육은 화관법 탭</div>',   // v450: 석면 작업 교육 구절
+    '<div class="edu-lead" id="eduLead">회사가 사람마다 챙길 법정 교육·검진·위험성평가 공유·참여</div>', '<div class="edu-scope-line" id="eduScopeLine">범위: 산안법 교육·검진·위험성평가 공유·참여 — 석면 작업 교육은 현장 칸 · 화관법 교육은 관리자만(대상 표시)</div>',   // v450: 석면 작업 교육 구절
     '교육·건강진단 이력은 <b>안전 › 체크</b> 칸으로 옮겼습니다', '일용직 교육·건강진단 이력은 <b>안전 › 체크</b> 칸(일용직)으로 옮겼습니다', '건강진단(배치전·특수) 날짜는 <b>안전 › 체크</b> 칸(일용직)에 적습니다',
     'var EDU_NO_WRITE = "안전 › 체크 칸 기록을 추가·수정·삭제할 권한이 없습니다', '<b>안전</b> = 현황 / 현장 / 체크(옛 현장 탭은', '"③ 건강진단 기록이 없는 사람 "+n+"명 — 빈칸(안전 › 체크에서 확인)"',
     'var EDU_HEAD_LINE = "회사가 사람마다 챙길 법정 교육·검진·위험성평가 공유·참여";'];
@@ -10911,10 +10911,10 @@ try {
   T('v450 ④ 폭(실행 — 실제 eduSheetDef·vsSheetMinW): 특별교육 89(≥ 89 — "근거 확인 중" 71.3 + 여백 17) · 다음 할 일 남는 폭 최소 121 · 단계별 열 합 742 / 956 / 1,180 ≤ 742 / 962 / 1,282 · 정의 검사 0 · 결함 사본(82 · 88 · 94 + 최소 그대로) = ✗',
     r4_50.ok && r4_50.sp === 89 && r4_50.nx === 121 && JSON.stringify(r4_50.sums) === '[742,956,1180]' && m4_50.every((v) => v === false), JSON.stringify({ r4_50, m4_50 }));
 
-  // ⑤ 범위 줄(#eduScopeLine) — 한 구절만 더함(새 줄·새 영역 0): '… — 석면 작업 교육은 현장 칸 · 화관법 교육은 화관법 탭' · 칸 머리 줄 두 개(#eduLead·#eduScopeLine) 그대로
+  // ⑤ 범위 줄(#eduScopeLine) — 한 구절만 더함(새 줄·새 영역 0): '… — 석면 작업 교육은 현장 칸 · 화관법 교육은 관리자만(대상 표시)' · 칸 머리 줄 두 개(#eduLead·#eduScopeLine) 그대로
   const pe5_50 = (() => { const i = html.indexOf('<div class="sf-pane" id="sfPaneEdu"'), j = html.indexOf('<div class="card" id="eduList">', i); return i > 0 && j > i ? html.slice(i, j) : ''; })();
-  T('v450 ⑤ 범위 줄 글: "범위: 산안법 교육·검진·위험성평가 공유·참여 — 석면 작업 교육은 현장 칸 · 화관법 교육은 화관법 탭" 1곳 · class edu-scope-line 1·edu-lead 1(새 줄 0) · 옛 글("공유·참여 — 화관법") 0',
-    V.cnt47(html, '<div class="edu-scope-line" id="eduScopeLine">범위: 산안법 교육·검진·위험성평가 공유·참여 — 석면 작업 교육은 현장 칸 · 화관법 교육은 화관법 탭</div>') === 1
+  T('v450 ⑤ 범위 줄 글: "범위: 산안법 교육·검진·위험성평가 공유·참여 — 석면 작업 교육은 현장 칸 · 화관법 교육은 관리자만(대상 표시)" 1곳 · class edu-scope-line 1·edu-lead 1(새 줄 0) · 옛 글("공유·참여 — 화관법") 0',
+    V.cnt47(html, '<div class="edu-scope-line" id="eduScopeLine">범위: 산안법 교육·검진·위험성평가 공유·참여 — 석면 작업 교육은 현장 칸 · 화관법 교육은 관리자만(대상 표시)</div>') === 1
     && V.cnt47(pe5_50, 'class="edu-scope-line"') === 1 && V.cnt47(pe5_50, 'class="edu-lead"') === 1 && V.cnt47(html, '공유·참여 — 화관법 교육은 화관법 탭') === 0, String(pe5_50.length));
 
   // ⑥ 운영 모양 흉내(숫자만 — 이름 없음): 일용직 155 = 석면 현장만 120(옛 석면 종결 — 그중 10명은 2026 기록 있음) · 석면+준설 2 · 준설만 9(2025 준설) · 현장 없음 24 + 직원 4 →
@@ -13251,14 +13251,31 @@ try {
     r1_60.ok && m1_60.every((v) => v === false), JSON.stringify({ r: r1_60.info, mut: m1_60 }));
 
   // ② 정적 — 인사·직원 수정 창 6칸(채움·저장) · EDU_KINDS 8종 · 서버 gw-auth(허용 키만·비면 칸째 지움·감사 칸·안전 권한자 투영) — 서버 실행은 servertest 84
-  const au60 = V.rd47('netlify/functions/gw-auth.js'), ids60 = ['drv', 'cm', 'wst', 'env', 'tech', 'elec'], kinds60 = ['drv_edu', 'drv_fit', 'cm_edu', 'cm_fit', 'wst_edu', 'env_edu', 'tech_edu', 'elec_edu'];
+  const au60 = V.rd47('netlify/functions/gw-auth.js'), ids60 = ['drv', 'cm', 'wst', 'env', 'tech', 'elec', 'chem'], kinds60 = ['drv_edu', 'drv_fit', 'cm_edu', 'cm_fit', 'wst_edu', 'env_edu', 'tech_edu', 'elec_edu', 'chem_edu'];   // v491 chem
   T('v460 ② 정적: 인사·직원 수정 창 대상 표시 6칸(id meQ_… 각 1번)·창 열 때 회원 quals로 채움·저장 때 켠 키만 quals로 · EDU_KINDS 8종(종류 고르기에 나옴) · EDU_QUAL 키 = 서버 QUAL_KEYS(같은 순서) · 서버 = 허용 키만 정해진 순서로·하나도 없으면 칸째 지움·AUD_FIELDS에 quals·회원 목록 투영은 안전 권한이 숨김이 아닐 때만 quals',
     ids60.every((k) => V.cnt47(html, 'id="meQ_' + k + '"') === 1) && /EDU_QUAL\.forEach\(function\(q\)\{ var el = document\.getElementById\("meQ_" \+ q\.q\); if \(el\) el\.checked = !!\(m && Array\.isArray\(m\.quals\) && m\.quals\.indexOf\(q\.q\) >= 0\); \}\);/.test(html)
     && /quals: EDU_QUAL\.filter\(function\(q\)\{ var el = document\.getElementById\("meQ_" \+ q\.q\); return !!\(el && el\.checked\); \}\)\.map\(function\(q\)\{ return q\.q; \}\),/.test(html)
     && kinds60.every((k) => V.cnt47(html, '{ k:"' + k + '",') === 1) && ids60.every((k, i) => html.indexOf('{ q: "' + k + '",') > (i ? html.indexOf('{ q: "' + ids60[i - 1] + '",') : 0))
-    && /const QUAL_KEYS = \['drv', 'cm', 'wst', 'env', 'tech', 'elec'\];/.test(au60)
+    && /const QUAL_KEYS = \['drv', 'cm', 'wst', 'env', 'tech', 'elec', 'chem'\];/.test(au60)
     && /if \(d\.quals !== undefined\) \{ const q = Array\.isArray\(d\.quals\) \? QUAL_KEYS\.filter\(function \(k\) \{ return d\.quals\.indexOf\(k\) >= 0; \}\) : \[\]; if \(q\.length\) m\.quals = q; else delete m\.quals; \}/.test(au60)
     && /const AUD_FIELDS = \[[^\]]*'test_acct','quals'\]/.test(au60) && /if \(seeSafety\) \{ o\.office = m\.office; o\.supervisor = m\.supervisor; o\.corp = m\.corp; o\.test_acct = m\.test_acct; o\.quals = m\.quals; \}/.test(au60), '');
+
+  // ③ v491(56 — PM 11/17 '추가'): 유해화학물질관리자 대상 표시(chem) — 2년 주기 · 인허가 의무 대장에 행이 없어 근거 글은 조문(src) · 행이 있는 표시는 종전 글 그대로
+  const chk3_60 = (src) => {
+    const X = V.mk47({ src, members: [{ id: 'm0', name: '관리자', admin: true }, { id: 'c1', name: '화관하나', dept: '관리부', quals: ['chem'] }, { id: 'c2', name: '화관둘', dept: '관리부', quals: ['tech', 'chem'] }], workers: [], asb: [], edu: [E60('k', 'c2', 'chem_edu', '2025-01-10')] }); X.api.render();
+    const q = (id) => X.api.find(id).st.x.q.map((e) => e.k + ':' + e.it.t + (e.it.cls ? '[' + e.it.cls + ']' : '') + (e.it.miss ? '!' : '') + (e.it.due ? '@' + e.it.due : ''));
+    const e1 = X.api.find('member:c1').st.x.q[0], e2 = X.api.find('member:c2').st.x.q[0];
+    const info = { c1: q('member:c1'), c2: q('member:c2'), b1: e1.it.basis, bT: e2.it.basis, lab: e1.lab, nf: X.api.nextFor('chem_edu', 'member:c1', '2026-01-10', 0, null) };
+    const ok = JSON.stringify(info.c1) === '["chem_edu:기록 없음[vs-warn]!"]' && JSON.stringify(info.c2) === JSON.stringify(['tech_edu:기록 없음[vs-warn]!', 'chem_edu:✓ 2025-01@2027-01-10'])
+      && info.b1 === '유해화학물질관리자 표시 — 선임된 날부터 2년 이내, 이후 2년마다 16시간(화학물질관리법 33조 · 시행규칙 37조·별표 6의3) — 기록 없음' && info.b1.indexOf('undefined') < 0
+      && info.bT.indexOf('(인허가 의무 대장 36행)') > 0 && info.lab === '유해화학물질관리자 안전교육' && info.nf === '2028-01-10';
+    return { ok, info };
+  };
+  const r3_60 = chk3_60(html);
+  const m3_60 = [mut60('{ k: "chem_edu", months: 24, src:', '{ k: "chem_edu", months: 36, src:'), mut60('(x.row ? "(인허가 의무 대장 " + x.row + "행)" : "(" + x.src + ")")', '"(인허가 의무 대장 " + x.row + "행)"'),
+    mut60('{ q: "chem", n: "유해화학물질관리자", items:', '{ q: "chemx", n: "유해화학물질관리자", items:')].map((s) => W.safe51(() => chk3_60(s)).ok);
+  T('v460 ③ v491 유해화학물질관리자 표시(실행 — 실제 eduQualItems·eduNextFor): 표시만 켠 직원 = 안전교육 기록 없음(노랑·빠짐) · 기록 2025-01-10 = ✓ 기한 2027-01-10(2년) · 근거 글 = 조문(의무 대장 행 글·undefined 없음) · 행 있는 표시(기술요원)는 "의무 대장 36행" 그대로 · 종류 이름 · 다음 예정 자동 24개월 · 결함 사본 3개(주기 36·근거 글 행만·키 다름) = 모두 ✗',
+    r3_60.ok && m3_60.every((v) => v === false), JSON.stringify({ r: r3_60.info, mut: m3_60 }));
 
   // ③ 문서
   const ft3 = V.rd47('FEATURES.md'), tl3 = V.rd47('TESTLIST.md'), cl3 = V.rd47('CLAUDE.md'), sw3 = V.rd47('sw.js'), man3 = V.rd47('MANUAL.html');
@@ -17229,12 +17246,12 @@ try {
     const FT = ['`gw-stmtmail-cron`', '`gw-stmtmail-run-background`', '`STMT_MAIL_USER`', '`ymOf`', '`senderHash`', '`looksStmt`', '`stmt_mail_status`', '`stmt_mail_run`', '`learnSender`', '`imapflow` 2.10.0', '`stmtmail_check`'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = '<li><b>메일로 원본 자동 받기</b> (2026-11 v490)';
-    const ok = /기준: v490 \(2026-11-17\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 3 && cb.filter((l) => /^- \[ \] \(PM\)/.test(l)).length === 1
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 490 /* v491: 기준 줄·sw = 이 판 이상 */ && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 3 && cb.filter((l) => /^- \[ \] \(PM\)/.test(l)).length === 1
       && /`stmtmail_check` 통과/.test(tlv)
       && d.man.indexOf(MAN) > 0 && !/stmt_|imap|STMT_|__stmtmail__/i.test(cut(d.man, MAN, '</li>'))
       && d.cl.indexOf('**월말명세서 메일 에이전트(v490') > 0
       && FIX490.every((x) => d.ix.split(x).length === 2)
-      && /SHELL_CACHE = 'jw-shell-v490'/.test(d.sw);
+      && Number((d.sw.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 490;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, fix: FIX490.map((x) => d.ix.split(x).length - 1) } };
   };
   const r490 = chk490(D490);
@@ -17247,6 +17264,37 @@ try {
   T('v490 문서·판 번호(정확 검사): FEATURES 기준 v490 (2026-11-17)·v490 절(메일 에이전트) · TESTLIST v490 칸 6(PM 1 · 게이트 [x] 3 · stmtmail_check) · MANUAL 메일 자동 받기(내부 이름 0) · CLAUDE.md 한 줄 · 앱 고정 글 5줄 · sw jw-shell-v490 · 결함 사본 ' + M490.length + '개 = 모두 ✗',
     r490.ok && M490.every((v) => v === false), JSON.stringify({ r: r490.info, mut: M490 }));
 } catch (e) { console.log('  (v490 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v491(56 — PM 11/17 15:31 '추가'): 안전 › 체크 대상 표시에 유해화학물질관리자. 실행 검사는 위 'v460 ③'·servertest 84 · 여기는 문서·판 번호 정확 검사 + 고정 글 3줄 — 다음 판은 기준 줄·sw를 '491 이상'으로 풀 것
+try {
+  const rd491 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D491 = { ft: rd491('FEATURES.md'), tl: rd491('TESTLIST.md'), sw: rd491('sw.js'), man: rd491('MANUAL.html'), cl: rd491('CLAUDE.md'), ix: rd491('index.html'), au: rd491('netlify/functions/gw-auth.js') };
+  const FIX491 = ['<label class="dg-check"><input type="checkbox" id="meQ_chem"> 유해화학물질관리자 (안전교육 2년)</label>', '{ q: "chem", n: "유해화학물질관리자", items: [{ k: "chem_edu", months: 24,', '석면 작업 교육은 현장 칸 · 화관법 교육은 관리자만(대상 표시)</div>'];
+  const chk491 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v491 (11/17)', '\n### '), tlv = cut(d.tl, '\n## v491 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
+    const FT = ['`chem`', '`chem_edu`', '`QUAL_KEYS`', '`src`', '`eduScopeLine`'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = '<p><b>유해화학물질관리자 교육</b> (2026-11 v491)';
+    const ok = /기준: v491 \(2026-11-17\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && cb.filter((l) => /^- \[ \] \(PM\)/.test(l)).length === 1
+      && d.man.indexOf(MAN) > 0 && !/chem|quals|QUAL_|meQ_/.test(cut(d.man, MAN, '</p>'))
+      && d.cl.indexOf('**유해화학물질관리자 대상 표시(v491') > 0
+      && FIX491.every((x) => d.ix.split(x).length === 2)
+      && /const QUAL_KEYS = \['drv', 'cm', 'wst', 'env', 'tech', 'elec', 'chem'\];/.test(d.au)
+      && /SHELL_CACHE = 'jw-shell-v491'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, fix: FIX491.map((x) => d.ix.split(x).length - 1) } };
+  };
+  const r491 = chk491(D491);
+  const mu491 = (k, f) => chk491(Object.assign({}, D491, { [k]: f(D491[k]) })).ok;
+  const M491 = [mu491('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v490 (')), mu491('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v490'")),
+    mu491('ft', (s) => s.split('`chem_edu`').join('chem_edu')), mu491('man', (s) => s.replace('(2026-11 v491)', '')),
+    mu491('cl', (s) => s.replace('**유해화학물질관리자 대상 표시(v491', '유해화학물질관리자 대상 표시(')),
+    mu491('au', (s) => s.replace("'elec', 'chem'];", "'elec'];"))]
+    .concat(FIX491.map((x) => mu491('ix', (s) => s.replace(x, ''))));
+  T('v491 문서·판 번호(정확 검사): FEATURES 기준 v491 (2026-11-17)·v491 절 · TESTLIST v491 칸 4(PM 1 · 게이트 [x] 2) · MANUAL 유해화학물질관리자 교육 글(내부 이름 0) · CLAUDE.md 한 줄 · 앱 고정 글 3줄 · 서버 허용 키 · sw jw-shell-v491 · 결함 사본 ' + M491.length + '개 = 모두 ✗',
+    r491.ok && M491.every((v) => v === false), JSON.stringify({ r: r491.info, mut: M491 }));
+} catch (e) { console.log('  (v491 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

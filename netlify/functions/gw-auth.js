@@ -103,7 +103,7 @@ function normUid(uid) { return cleanText(uid).toLowerCase(); }
 // 영문소문자·숫자·._- 만 4~20자. 한글 금지 — 이름 형태를 아이디로 못 잡게 해 이름 색인 가로채기를 원천 차단.
 function validUid(uid) { return /^[a-z0-9._-]{4,20}$/.test(normUid(uid)); }
 function genId() { return 'u' + crypto.randomBytes(5).toString('hex'); }
-const QUAL_KEYS = ['drv', 'cm', 'wst', 'env', 'tech', 'elec'];   // v460 자격·담당 교육 대상 표시(앱 EDU_QUAL과 같은 키·순서)
+const QUAL_KEYS = ['drv', 'cm', 'wst', 'env', 'tech', 'elec', 'chem'];   // v460 자격·담당 교육 대상 표시(앱 EDU_QUAL과 같은 키·순서)
 function safeMember(m) { if (!m) return null; const { pin_salt, pin_hash, ...s } = m; return s; }
 // 일반 직책(v328, PM 9/8 "대표/관리자/개발자 제외한 다른 직책 등록 가능하게") — 권한 상승이 없는 직책만.
 // 이 직책의 회원 등록·직책 변경은 관리자(비개발자)도 할 수 있다. 관리자·대표·개발자 지정은 종전대로 개발자만.
