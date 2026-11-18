@@ -33,7 +33,7 @@ const STATUSES = ['doing', 'done', 'sent'];   // 작성 중 · 확정(검산 통
 const FINAL = { done: 1, sent: 1 };
 // §8 칸 묶음 — 읽기(번호 판독 글 vraw 포함: 별칭으로 차량이 맞아도 번호 오독은 읽기 간극으로 드러나게)·차량·종류·용도 따로
 const GAP_CLASSES = { read: ['date', 'vraw', 'item', 'qty', 'unit', 'amt', 'vat'], veh: ['veh'], kind: ['kind'], use: ['use'] };
-const LIMIT = { rows: 400, item: 40, note: 60, vraw: 24, name: 30, hint: 20, hints: 6, vendors: 40, src: 10, srcName: 80, pages: 200, tirePos: 30, alias: 500, vsub: 200, money: 1e10, qty: 1e7 };
+const LIMIT = { rows: 400, item: 40, note: 60, vraw: 24, name: 30, hint: 20, hints: 6, vendors: 40, src: 10, srcName: 80, pages: 200, tirePos: 30, tirePosN: 12, tirePosAll: 400, alias: 500, vsub: 200, money: 1e10, qty: 1e7 };
 
 // 차량 목록 시드 거래처(v2 §1 — 권민지 브리핑 원문 P03·P13 그대로, R1 기본값: 권민지가 화면에서 고침).
 // kind = 그 거래처 줄의 기본 품목 종류('' = 줄마다), basis = 줄 금액 기준(판독요약 2-2 서식 실측, 모르면 supply — 틀리면 붉은 칸으로 드러나고 화면에서 바꿈),
@@ -168,6 +168,9 @@ function cleanRow(x, ym) {
   if (kind !== '' && KINDS.indexOf(kind) < 0) return { code: 'BAD_KIND' };
   const use = (x.use === undefined || x.use === null) ? '' : x.use;
   if (use !== '' && USES.indexOf(use) < 0) return { code: 'BAD_USE' };
+  // 29 판⑧(PM 11/18 '안전보건만 중복으로'): 안전보건은 다른 용도 하나와 겹쳐 고름 — use = 그 용도 · safe 1. 안전보건만이면 use 'safety'(safe 없음)
+  if (x.safe !== undefined && x.safe !== null && x.safe !== 0 && x.safe !== 1 && x.safe !== true && x.safe !== false) return { code: 'BAD_USE' };
+  const safe = (x.safe === 1 || x.safe === true) && use !== '' && use !== 'safety';
   const qty = decimal(x.qty, LIMIT.qty), unit = decimal(x.unit, LIMIT.money);
   if (qty === undefined || unit === undefined) return { code: 'BAD_NUMBER' };
   // 금액 빈칸(null)은 받는다(29 판② — 작성 중 저장은 언제든: 종이를 보며 넣다 멈춘 줄) — 검산이 'amt'로 붉게 해 확정(done·sent)을 막는다
@@ -178,12 +181,17 @@ function cleanRow(x, ym) {
   let tire = null;
   if (kind === 'tire' && x.tire !== undefined && x.tire !== null) {
     if (typeof x.tire !== 'object' || Array.isArray(x.tire)) return { code: 'BAD_TIRE' };
-    const pos = text(x.tire.pos, LIMIT.tirePos), act = (x.tire.act === undefined || x.tire.act === null) ? '' : x.tire.act;
+    // 29 판⑧(PM 11/18 '갯수만큼'): 위치 여러 개 = ', '로 이은 글(옛 글 한 개 그대로) — 한 자리 30자 · 12자리까지
+    const pos = text(x.tire.pos, LIMIT.tirePosAll), act = (x.tire.act === undefined || x.tire.act === null) ? '' : x.tire.act;
     if (pos === null || TIRE_ACTS.indexOf(act) < 0) return { code: 'BAD_TIRE' };
+    const ps = pos ? pos.split(',').map(function (t) { return t.trim(); }) : [];
+    if (ps.length > LIMIT.tirePosN || ps.some(function (t) { return !t || t.length > LIMIT.tirePos; })) return { code: 'BAD_TIRE' };
     tire = { pos: pos, act: act };
   }
-  return { row: { r: r, date: date, veh: veh, vraw: vraw, item: item, kind: kind, use: use,
-    qty: qty ? qty.n : null, qd: qty ? qty.d : 0, unit: unit ? unit.n : null, ud: unit ? unit.d : 0, amt: amt, vat: vat, tire: tire, how: how, note: note } };
+  const row = { r: r, date: date, veh: veh, vraw: vraw, item: item, kind: kind, use: use,
+    qty: qty ? qty.n : null, qd: qty ? qty.d : 0, unit: unit ? unit.n : null, ud: unit ? unit.d : 0, amt: amt, vat: vat, tire: tire, how: how, note: note };
+  if (safe) row.safe = 1;
+  return { row: row };
 }
 // 줄 목록 → { rows } | { code, at } — 줄 id 겹침 거절, 줄 글에 개인정보 꼴이 있으면 거절
 function cleanRows(list, ym, needRid) {
@@ -302,7 +310,8 @@ function checkDoc(doc, vendor) {
   const rows = Array.isArray(doc.rows) ? doc.rows : [];
   const mode = docMode(doc);
   const bad = [], ownByVeh = dict(), vehKinds = dict();
-  let sumAmt = 0, sumVat = 0, nVat = 0, sumOwn = 0, sumGross = 0, est = 0;
+  let sumAmt = 0, sumVat = 0, nVat = 0, sumOwn = 0, sumGross = 0, est = 0, nSafe = 0, sumSafe = 0;
+  const safeUse = dict();
   rows.forEach(function (x, i) {
     const is = rowIssues(x, group);
     if (is.length) bad.push({ i: i, r: x.r || '', why: is });
@@ -310,6 +319,7 @@ function checkDoc(doc, vendor) {
     if (x.vat !== null && x.vat !== undefined) { sumVat += x.vat; nVat++; }
     const o = rowOwn(x, mode), g = rowGross(x, doc, mode);
     sumOwn += o; sumGross += g.v; if (g.est) est++;
+    if (x.use === 'safety' || x.safe === 1) { nSafe++; sumSafe += g.v; const su = x.use === 'safety' ? 'none' : x.use; safeUse[su] = (safeUse[su] || 0) + g.v; }   // 29 판⑧ 안전보건 합(용도별 — 'none' = 안전보건만)
     if (x.veh) {
       ownByVeh[x.veh] = (ownByVeh[x.veh] || 0) + o;
       const vk = vehKinds[x.veh] = vehKinds[x.veh] || dict();
@@ -341,7 +351,8 @@ function checkDoc(doc, vendor) {
   }
   if (!rows.length) issues.push('no_rows');
   return { ok: !bad.length && !issues.length, mode: mode, bad: bad, issues: issues, sum_amt: sumAmt, sum_vat: sumVat, sum_own: sumOwn, sum_gross: sumGross, est: est,
-    inv_diff: invDiff, sup_diff: supDiff, vat_diff: vatDiff, stated_diff: statedDiff, vsub_bad: vsubBad, carry_ok: carryOk, month_diff: monthDiff, veh_kinds: vehKinds };
+    inv_diff: invDiff, sup_diff: supDiff, vat_diff: vatDiff, stated_diff: statedDiff, vsub_bad: vsubBad, carry_ok: carryOk, month_diff: monthDiff, veh_kinds: vehKinds,
+    n_safe: nSafe, sum_safe: sumSafe, safe_use: safeUse };
 }
 
 // ---- 간극(v2 §8 — 사람 승인 단계 없음, 값 없이 칸 변경 여부만) ----
@@ -376,10 +387,12 @@ function gapCount(draftRows, rows) {
 
 // ---- 월 색인 한 줄(월 보드·차량별 이력) — 거래처·월 문서에서 금액 요약만. total·차량 합 = 부가세 포함 한 기준(gross), est = 비율로 추정한 줄 수 ----
 function vendorSummary(doc, chk) {
-  return { group: doc.group, status: doc.status, rows: (doc.rows || []).length, bad: chk.bad.length, issues: chk.issues.slice(0, 8), ok: chk.ok,
+  const out = { group: doc.group, status: doc.status, rows: (doc.rows || []).length, bad: chk.bad.length, issues: chk.issues.slice(0, 8), ok: chk.ok,
     total: chk.sum_gross, est: chk.est, inv: doc.inv ? doc.inv.total : null, stated: (doc.stated === null || doc.stated === undefined) ? null : doc.stated,
     bal: doc.carry ? doc.carry.bal : null, draft: !!doc.draft, at: doc.updated_at, by: doc.updated_by, veh: chk.veh_kinds,
-    sent: (doc.status === 'sent' && doc.sent && typeof doc.sent === 'object') ? { at: Number(doc.sent.at) || 0, via: String(doc.sent.via || ''), by: String(doc.sent.by || '') } : null };   // 29 판⑤ 전달 기록(월 보드 상태 글 · 누가 전달 — 비관리자는 결재 목록에 자기 상신만 보여 '보고 없음' 판정을 자기가 전달한 곳으로 한정)
+    sent: (doc.status === 'sent' && doc.sent && typeof doc.sent === 'object') ? { at: Number(doc.sent.at) || 0, via: String(doc.sent.via || ''), by: String(doc.sent.by || '') } : null };
+  if (chk.n_safe) out.safe = { n: chk.n_safe, total: chk.sum_safe, use: chk.safe_use };   // 29 판⑧ 안전보건 합(월 보드 묶음 줄)
+  return out;   // 29 판⑤ 전달 기록(월 보드 상태 글 · 누가 전달 — 비관리자는 결재 목록에 자기 상신만 보여 '보고 없음' 판정을 자기가 전달한 곳으로 한정)
 }
 // 차량 하나의 달별 종류 합(색인 여러 달) → [{ ym, kinds:{kind:[n, gross]}, total, vendors:[vk], pending:[vk] }]
 // 합에는 확정(done·sent)이고 검산 통과인 거래처만 넣는다 — 작성 중·붉은 문서는 pending으로 이름만(11/10 검토 M5)

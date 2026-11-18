@@ -12186,7 +12186,7 @@ try {
     v10: sumOf('v10', { group: 'tool', basis: 'supply', status: 'doing', rows: [CR({ r: 'w1', veh: '', kind: 'tool', use: 'safety', amt: 3000 })], inv: null, stated: 3000, carry: { prev: 0, month: 3300, paid: 0, bal: 3300 } }),
     v14: sumOf('v14', { group: 'tool', basis: 'supply', status: 'doing', rows: [CR({ r: 'k1', veh: '', kind: 'tool', use: 'etc', amt: 10 })], inv: null, stated: 10 })
   } };
-  const X4 = mk29s(); X4.api.STMT.month = MON;
+  const X4 = mk29s(); X4.api.STMT.month = MON; X4.api.STMT.showAll = true;   // 29 판⑧: 이 검사는 [실적 없는 거래처 보기]를 켠 화면(전부) — 기본(숨김)은 아래 '29 판⑧ ③'
   const def4 = X4.api.def(), ck4 = X4.api.checkDef(def4), inst4 = X4.api.inst(def4), M4 = X4.api.model(def4, inst4, 3), H4 = X4.api.html(def4, inst4, M4), cn4 = X4.api.chipN(def4, inst4, M4);
   const flat4 = M4.flat.map((e) => e.r ? e.r.vk : '#' + e.g).join(',');
   const st4 = X4.api.rows().map((r) => r.vk + ':' + X4.api.rowSt(r)).filter((s) => !/:wait$/.test(s)).join(',');
@@ -12541,7 +12541,7 @@ try {
     && p3.errs.length === 2 && p3.errs.every((s) => /타이어 위치/.test(s))
     && p3b.errs.length === 0 && !!s3.rows && J(s3.rows[0].tire) === J({ pos: '운전석 2축 바깥', act: 'new' }) && J(s3.rows[1].tire) === J({ pos: '', act: 'puncture' }) && s3.rows[2].tire === null
     && J(em3) === J([false, true, true])
-    && /<tr class="st-sub" data-sub="0"><td class="c-n"><\/td><td colspan="10">/.test(rh3) && /data-t="pos" data-i="0" value="운전석  2축   바깥"[^>]*list="stmtTirePos"/.test(rh3) && /<option value="new" selected>신품 교체<\/option>/.test(rh3)
+    && /<tr class="st-sub" data-sub="0"><td class="c-n"><\/td><td colspan="10">/.test(rh3) && /data-t="pos" data-k="0" data-i="0" value="운전석  2축   바깥"[^>]*list="stmtTirePos"/.test(rh3) && /<option value="new" selected>신품 교체<\/option>/.test(rh3)
     && /<tr class="st-sub" data-sub="2" style="display:none;">/.test(rh3p)
     && /class="st-sub"><td class="c-n"><\/td><td colspan="9"><div class="st-tire"><span class="st-tl">타이어<\/span><span>위치 <b>운전석  2축   바깥<\/b><\/span><span>조치 <b>신품 교체<\/b><\/span>/.test(rh3r) && !/st-sub/.test(rh3rp) && !/<input|<select|<button/.test(rh3r)
     && J(T3.api.TIRE) === J(tireLbl) && T3.api.TIRE_POS.length === 18 && T3.api.TIRE_POS.indexOf('조수석 3축 안쪽') >= 0,
@@ -12682,6 +12682,7 @@ try {
       '  setTab: function(x){ currentTab = x; }, setVeh: function(id, tb){ vehOpenId = id; vehDetTab = tb; } };'].join('\n'))(env);
     api.STMT.ym = '2026-10'; api.STMT.month = { status: 'OK', ym: '2026-10', vendors: o.vendors || VS29u(), cfg: o.cfg || CF29u, idx_at: 5, cfg_at: 6 };
     if (o.who !== undefined) api.STMT.who = o.who;
+    api.STMT.drop = { ym: '2026-10', ok: true, list: o.noDrop ? [] : (o.cfg || CF29u).map((v) => ({ id: 'd' + v.vk, vk: v.vk, state: 'read' })) };   // 29 판⑧: 문서 없는 거래처도 이 달 첨부가 있으면 실적(보고의 '빠진 곳') — 첨부 없는 곳은 '29 판⑧ ③'
     return { env, api };
   };
   const fl29u = async () => { for (let k = 0; k < 10; k++) await new Promise((r) => setTimeout(r, 0)); };
@@ -13089,6 +13090,7 @@ try {
   const slow6 = (b) => { inflight6++; maxIn6 = Math.max(maxIn6, inflight6); return new Promise((r) => setTimeout(() => { inflight6--; r(dropResp6(b)); }, 2)); };
   const waitQ6 = async (api) => { for (let k = 0; k < 200 && !(api.STMT.dq && api.STMT.dq.busy === false); k++) await new Promise((r) => setTimeout(r, 5)); await fl6(); };
   const U1 = mk6({ resp: { stmt_drop: slow6, stmt_drop_list: (b) => ({ status: 200, body: { status: 'OK', list: U1.api.STMT.drop.list } }) } });
+  U1.api.STMT.month.vendors = { v08: { group: 'veh', status: 'doing', rows: 1, bad: 0, issues: [], ok: true, total: 1000 } };   // 29 판⑧: 포항은 이 달 문서가 있어 보이는 줄(원본 없음 칩) — 문서·첨부 없는 곳은 숨김
   U1.api.files([{ name: 'a.pdf', size: 10, b64: 'QQ==' }, { name: 'big.pdf', size: 4300001, b64: '' }, { name: 'b.jpg', size: 10, b64: 'Qg==' }, { name: 'c.pdf', size: 10, b64: 'Qw==' }, { name: 'd.pdf', size: 10, b64: 'QQ==' }, { name: 'x.txt', size: 10, b64: 'eA==' }]);
   await waitQ6(U1.api);
   const drops1 = U1.env.log.filter((x) => x.body.action === 'stmt_drop');
@@ -18234,6 +18236,118 @@ try {
     r489.ok && M489.every((v) => v === false), JSON.stringify({ r: r489.info, mut: M489 }));
 } catch (e) { console.log('  (v489 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ---- 29 판⑧(PM 11/18 세 가지): ① 타이어 위치 = 수량만큼 칸 ② 작업용구 용도 — 안전보건은 다른 용도와 겹쳐 고름(안전보건 예산 집계) ③ 월 목록 — 이 달 실적(문서·첨부) 없는 거래처 숨김
+//      index.html @stmt-sheet 구간을 그대로 돌리고 서버 _lib/stmt.js와 대조
+try {
+  const req8 = createRequire(import.meta.url);
+  const SV8 = req8(join(ROOT, 'netlify', 'functions', '_lib', 'stmt.js'));
+  const blk8 = (a, b) => { const i = html.indexOf(a), j = html.indexOf(b); if (i < 0 || j < i) throw new Error('구간 없음: ' + a); return html.slice(i, j); };
+  const fn8 = (name) => { const i = html.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < html.length; j++) { const ch = html[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  const mk8 = () => {
+    const env = { who: 'u1' };
+    const api = new Function('__env', [
+      'var window = {}, localStorage = { getItem: function(){ return null; }, setItem: function(){} }, ResizeObserver = undefined, currentTab = "stmt";',
+      'var document = { getElementById: function(){ return null; }, querySelector: function(){ return null; }, activeElement: null };',
+      'function confirm(){ return true; } function alert(){}',
+      fn8('esc'), fn8('pad'), fn8('isDate'),
+      'function myId(){ return "u1"; } function canDo(m){ return m === "stmt"; } function canSee(){ return true; }',
+      'function findVeh(){ return null; } function liveVehicles(){ return []; } function findMember(){ return null; } function dispName(n){ return n; } function gwToast(){} function onSessionInvalid(){}',
+      'function gwCall(){ return Promise.resolve({ status: 500, body: {} }); }',
+      'var apprPendingCreates = []; function apprSavePending(){} function apprFlushCreates(){} function apprToastShow(){} function activeMembers(){ return []; } function memberName(){ return ""; }',
+      'var tasks = [], autoGenReady = {}; function liveTasks(){ return []; } function genId(p){ return p + "1"; } function todayStr(){ return "2026-11-18"; } function getUser(){ return "권민지"; }',
+      'function saveTasksCache(){} function renderTasks(){} function renderSummary(){} function scheduleTasksSave(){} var vehOpenId = null, vehDetTab = "ov"; function renderVehicles(){} function isAdmin(){ return false; } function loadTasks(){}',
+      blk8('// @vs-sheet-start', '// @vs-sheet-end'), blk8('// @stmt-sheet-start', '// @stmt-sheet-end'),
+      'return { STMT: STMT, edLoad: stmtEdLoad, edRow: stmtEdRow, newRow: stmtNewRow, collect: stmtEdCollect, rowHtml: stmtEdRowHtml, onInput: stmtOnInput, check: stmtCheck,',
+      '  tireN: stmtTireN, tireJoin: stmtTirePosJoin, chipCls: stmtChipCls, useSet: stmtUseSet, useDefault: stmtUseDefault, useSug: stmtUseSug, useNote: stmtUseNoteHtml,',
+      '  rows: stmtBoardRows, all: stmtBoardAll, hid: stmtBoardHid, group: stmtOutGroup, grp: stmtGrpLabel };'].join('\n'))(env);
+    return { env, api };
+  };
+  const J8 = (x) => JSON.stringify(x);
+  const edOf = (X, vendor, rows) => { X.api.STMT.ym = '2026-10'; X.api.STMT.ed = { ym: '2026-10', vk: vendor.vk, loading: true, err: '', msg: '', vendor: vendor, rows: [] }; X.api.edLoad({ vendor: vendor, doc: null }); const ed = X.api.STMT.ed; ed.rows = rows.map((r) => Object.assign(X.api.newRow(ed), r)); return ed; };
+  const inp = (X, i, k, v) => X.api.onInput({ target: { getAttribute: (n) => (n === 'data-t' ? 'pos' : (n === 'data-i' ? String(i) : (n === 'data-k' ? String(k) : null))), value: v } });
+
+  // ① 타이어 위치 = 수량만큼
+  const VT = { vk: 'v01', name: '스피드타이어', group: 'veh', kind: 'tire', basis: 'supply', carry: true };
+  const X1 = mk8();
+  const e1 = edOf(X1, VT, [{ date: '1', veh: 'veh_a', vin: '0001', item: '펑크 수리', kind: 'tire', qty: '2', unit: '10,000', amt: '20,000', vat: '2,000' }]);
+  const n1 = [X1.api.tireN(e1.rows[0])];
+  const h1 = X1.api.rowHtml(e1, e1.rows[0], 0, true, false, true, 11);
+  inp(X1, 0, 0, '운전석 1축'); inp(X1, 0, 1, ' 조수석  1축 ');
+  const p1 = X1.api.collect(e1), s1 = SV8.cleanRows(p1.rows, '2026-10', false);
+  e1.rows[0].qty = '20'; n1.push(X1.api.tireN(e1.rows[0]));
+  e1.rows[0].qty = '1'; n1.push(X1.api.tireN(e1.rows[0]));   // 넣은 칸(2) 아래로 줄지 않음
+  e1.rows[0].qty = ''; e1.rows[0].tire = { pos: '', act: '', ps: [] }; n1.push(X1.api.tireN(e1.rows[0]));
+  const back1 = X1.api.edRow({ r: 'z', kind: 'tire', qty: 2, qd: 0, tire: { pos: '운전석 1축, 조수석 1축', act: 'puncture' } });
+  const j1 = [X1.api.tireJoin({ ps: ['ㄱ'.repeat(31)] }), X1.api.tireJoin({ ps: Array(13).fill('운전석') }), X1.api.tireJoin({ pos: '운전석 2축 바깥' }), X1.api.tireJoin({ ps: ['', '운전석', ''] })];
+  const sv1 = [SV8.cleanRow({ kind: 'tire', tire: { pos: Array(13).fill('운전석').join(', '), act: '' } }, '2026-10').code, SV8.cleanRow({ kind: 'tire', tire: { pos: 'ㄱ'.repeat(31), act: '' } }, '2026-10').code,
+    SV8.cleanRow({ kind: 'tire', tire: { pos: '운전석,,조수석', act: '' } }, '2026-10').code, J8(SV8.cleanRow({ kind: 'tire', tire: { pos: '운전석 2축 바깥', act: 'new' } }, '2026-10').row.tire)];
+  T('29 판⑧ ① 타이어 위치 = 수량만큼(실행): 수량 2 = 위치 칸 2개(data-k 0·1) · 두 칸 입력 → tire.pos "운전석 1축, 조수석 1축"(띄어쓰기 접음) → 서버 cleanRows 통과·같은 값 · 수량 20 = 12칸 · 수량 1이어도 넣은 2칸 유지 · 빈 수량 = 1칸 · 불러온 줄 = 칸마다 나눔 · 한 칸 31자·13자리 = 틀림(앱 null·서버 BAD_TIRE) · 빈 칸 사이 = 채운 칸만 · 옛 한 자리 글 그대로',
+    J8(n1) === '[2,12,2,1]' && (h1.match(/data-t="pos" data-k="\d" data-i="0"/g) || []).length === 2 && /data-tps="0"/.test(h1)
+    && p1.errs.length === 0 && p1.rows[0].tire.pos === '운전석 1축, 조수석 1축' && !!s1.rows && s1.rows[0].tire.pos === '운전석 1축, 조수석 1축'
+    && J8(back1.tire.ps) === '["운전석 1축","조수석 1축"]' && J8(j1) === J8([null, null, '운전석 2축 바깥', '운전석'])
+    && J8(sv1) === J8(['BAD_TIRE', 'BAD_TIRE', 'BAD_TIRE', J8({ pos: '운전석 2축 바깥', act: 'new' })]),
+    J8({ n1, k: (h1.match(/data-t="pos" data-k="\d"/g) || []).length, p1: p1.rows[0].tire, s1: s1.rows ? s1.rows[0].tire : s1, back1: back1.tire, j1, sv1 }));
+
+  // ② 안전보건 겹표시
+  const VK = { vk: 'v10', name: '철탑종합공구상사', group: 'tool', kind: 'tool', basis: 'supply', carry: false };
+  const X2 = mk8();
+  const e2 = edOf(X2, VK, [{ date: '3', item: '안전화', kind: 'tool', qty: '1', unit: '50,000', amt: '50,000', vat: '5,000' }, { date: '4', item: '장갑', kind: 'tool', qty: '1', unit: '10,000', amt: '10,000', vat: '1,000' }]);
+  const r2 = e2.rows[0], st2 = () => r2.use + '/' + (r2.safe ? 1 : 0), on2 = (k) => X2.api.chipCls(r2, k, '').on;
+  const seq2 = [];
+  X2.api.useSet(0, 'safety'); seq2.push(st2());
+  X2.api.useSet(0, 'dredge'); seq2.push(st2() + ':' + on2('safety') + on2('dredge'));
+  X2.api.useSet(0, 'posco_cip'); seq2.push(st2());
+  X2.api.useSet(0, 'safety'); seq2.push(st2());
+  X2.api.useSet(0, 'safety'); seq2.push(st2());
+  X2.api.useSet(0, 'posco_cip'); seq2.push(st2());
+  X2.api.useSet(0, 'safety'); seq2.push(st2());
+  X2.api.useSet(0, 'safety'); seq2.push(st2());
+  X2.api.useSet(0, 'dredge'); seq2.push(st2());   // 안전보건만 → 준설 = 준설 + 안전보건
+  e2.rows[1].use = 'safety';
+  const p2 = X2.api.collect(e2), s2 = SV8.cleanRows(p2.rows, '2026-10', false);
+  const d2 = { basis: 'supply', group: 'tool', rows: s2.rows || [], inv: null, stated: 66000 };
+  const c2s = SV8.checkDoc(d2, VK), c2a = X2.api.check(d2, VK), vs2 = SV8.vendorSummary(Object.assign({ status: 'doing', updated_at: 1 }, d2), c2s);
+  const vs2n = SV8.vendorSummary({ group: 'tool', status: 'doing', rows: [], updated_at: 1 }, SV8.checkDoc({ group: 'tool', rows: [] }, VK));
+  const sv2 = [J8(SV8.cleanRow({ use: 'safety', safe: 1 }, '2026-10').row.safe), SV8.cleanRow({ use: 'dredge', safe: 2 }, '2026-10').code, J8(SV8.cleanRow({ use: '', safe: 1 }, '2026-10').row.safe), SV8.cleanRow({ use: 'vehicle', safe: true }, '2026-10').row.safe];
+  const ld2 = [X2.api.edRow({ r: 'a', use: 'dredge', safe: 1 }).safe, X2.api.edRow({ r: 'b', use: 'safety', safe: 1 }).safe, X2.api.edRow({ r: 'c', use: 'dredge' }).safe];
+  // 지난달 값에도 겹표시: 장갑 = 준설 + 안전보건
+  const e2b = edOf(X2, VK, [{ date: '5', item: '장갑', kind: 'tool', amt: '1,000' }, { date: '6', item: '장갑', kind: 'tool', amt: '1,000' }]);
+  e2b.prevUse = { ym: '2026-09', map: { '장갑': 'dredge+s' }, st: 'ok' };
+  X2.api.useDefault(0);
+  const pv2 = [e2b.rows[0].use, e2b.rows[0].safe, e2b.rows[0].useHow, J8(X2.api.chipCls(e2b.rows[1], 'safety', X2.api.useSug(e2b, e2b.rows[1]))), J8(X2.api.chipCls(e2b.rows[1], 'dredge', X2.api.useSug(e2b, e2b.rows[1])))];
+  e2.last = X2.api.collect(e2); const note2 = X2.api.useNote(e2);
+  T('29 판⑧ ② 안전보건 겹표시(실행): 안전보건만 = use safety · 다른 용도를 누르면 그 용도 + safe 1(두 칩 켜짐) · 용도 바꿔도 안전보건 유지 · 안전보건 다시 = 끔·켬 · 용도 끄면 안전보건만 남음 · 안전보건만에서 끄면 빈칸 · 저장 몸체 safe 1 → 서버 cleanRow 통과·같음 · 서버 = safety + safe·빈 용도 + safe는 safe 없음·safe 2 거절 · 검산 n_safe·sum_safe·safe_use 앱 = 서버 · 색인 줄 safe(있을 때만) · 불러온 줄 safe · 지난달 값 "dredge+s" = 준설 + 안전보건(점선)·빈 줄 제안 테두리 둘 · 안내 줄 안전보건 합',
+    J8(seq2) === J8(['safety/0', 'dredge/1:truetrue', 'posco_cip/1', 'posco_cip/0', 'posco_cip/1', 'safety/0', '/0', 'safety/0', 'dredge/1'])
+    && p2.errs.length === 0 && p2.rows[0].safe === 1 && p2.rows[1].safe === undefined && !!s2.rows && s2.rows[0].safe === 1 && s2.rows[0].use === 'dredge' && !('safe' in s2.rows[1]) && s2.rows[1].use === 'safety'
+    && sv2[1] === 'BAD_USE' && sv2[3] === 1 && sv2[0] === undefined && sv2[2] === undefined
+    && c2s.n_safe === 2 && c2s.sum_safe === 66000 && J8(c2s.safe_use) === J8({ dredge: 55000, none: 11000 }) && J8(c2a) === J8(c2s)
+    && J8(vs2.safe) === J8({ n: 2, total: 66000, use: { dredge: 55000, none: 11000 } }) && !('safe' in vs2n)
+    && J8(ld2) === '[1,0,0]' && J8(pv2) === J8(['dredge', 1, 'prev', J8({ on: false, prev: false, sug: true }), J8({ on: false, prev: false, sug: true })])
+    && /안전보건 2줄 · 66,000원/.test(note2),
+    J8({ seq2, p2: p2.rows.map((x) => [x.use, x.safe]), s2: s2.rows ? s2.rows.map((x) => [x.use, x.safe]) : s2, sv2, c2: [c2s.n_safe, c2s.sum_safe, c2s.safe_use, J8(c2a) === J8(c2s)], vs2: vs2.safe, ld2, pv2, note2: /안전보건 \d+줄[^<]*/.exec(note2) }));
+
+  // ③ 월 목록 — 실적 없는 거래처 숨김
+  const X3 = mk8();
+  const cfg3 = SV8.seedVendors();
+  const sm3 = (vk, doc) => SV8.vendorSummary(Object.assign({ updated_at: 1, updated_by: 'u1' }, doc), SV8.checkDoc(doc, cfg3.find((v) => v.vk === vk)));
+  X3.api.STMT.ym = '2026-10';
+  X3.api.STMT.month = { status: 'OK', ym: '2026-10', cfg: cfg3, cfg_at: 0, idx_at: 1, vendors: {
+    v05: sm3('v05', { group: 'veh', basis: 'total', status: 'done', rows: [SV8.cleanRow({ r: 'x1', veh: 'veh_a', item: '경유', kind: 'fuel', amt: 1000 }, '2026-10').row], inv: { date: '', supply: 909, vat: 91, total: 1000 }, stated: null }),
+    v10: sm3('v10', { group: 'tool', basis: 'supply', status: 'doing', rows: [SV8.cleanRow({ r: 'w1', item: '안전화', kind: 'tool', use: 'dredge', safe: 1, amt: 3000, vat: 300 }, '2026-10').row, SV8.cleanRow({ r: 'w2', item: '날', kind: 'tool', use: 'dredge', amt: 1000, vat: 100 }, '2026-10').row], inv: null, stated: 4400 }) } };
+  X3.api.STMT.drop = { ym: '2026-10', ok: true, list: [{ id: 'd1', vk: 'v07', state: 'read' }, { id: 'd2', vk: '', state: 'novendor' }] };
+  const vis3 = X3.api.rows().map((r) => r.vk).join(), all3 = X3.api.all().length, hid3 = X3.api.hid();
+  const rest3 = X3.api.group('veh').rest.map((r) => r.vk).join();
+  X3.api.STMT.showAll = true; const visAll3 = X3.api.rows().length, restAll3 = X3.api.group('veh').rest.map((r) => r.vk).join(); X3.api.STMT.showAll = false;
+  const grp3 = X3.api.grp('tool');
+  const statsSrc = fn8('stmtRenderStats'), cardsSrc = fn8('stmtBoardCards'), openSrc = fn8('stmtOpen');
+  X3.api.STMT.drop = null; const visNoDrop = X3.api.rows().map((r) => r.vk).join();
+  T('29 판⑧ ③ 월 목록 실적 없는 거래처 숨김(실행): 보이는 줄 = 이 달 문서가 있는 곳(v05·v10) + 이 달 첨부가 그 거래처로 잡힌 곳(v07 — 메일·끌어 놓기) · 거래처 못 찾은 첨부는 아무 줄도 안 띄움 · 숨김 수 = 전부 − 보이는 곳 · [보기] 켜면 전부 · 보고 글의 나머지(빠진 곳)는 단추와 무관하게 실적 있는 곳만 · 첨부 목록을 못 읽었으면 문서 있는 곳만 · 용구 묶음 줄 안전보건 합(용도별 풀이 title) · 숨김 단추(data-st-hid)·폰 빈 글·상세 열기는 전부에서',
+    vis3 === 'v05,v07,v10' && all3 === cfg3.filter((v) => v.active !== false).length && hid3 === all3 - 3 && visAll3 === all3 && rest3 === 'v07' && restAll3 === 'v07' && visNoDrop === 'v05,v10'
+    && /안전보건 3,300원/.test(grp3) && /title="준설 3,300원"/.test(grp3)
+    && /data-st-hid="1"/.test(statsSrc) && /STMT\.showAll = !STMT\.showAll/.test(statsSrc) && /이 달 실적\(문서·첨부\)이 있는 거래처가 아직 없습니다/.test(cardsSrc) && /stmtBoardAll\(\)\.forEach/.test(openSrc),
+    J8({ vis3, all3, hid3, visAll3, rest3, restAll3, visNoDrop, grp3 }));
+} catch (e) { console.log('  (29 판⑧ 검사 생략 — ' + e.message + ')'); fails++; }
+
 // ── v490(29 판⑦ 메일 에이전트 — PM 11/17 'A안 ㄱ'): 실행 검사는 tools/stmtmail_check.mjs · 여기는 문서·판 번호 정확 검사 + 앱 상태 줄·[지금 받기] 고정 글 — 다음 판은 기준 줄·sw를 '490 이상'으로 풀 것
 try {
   const rd490 = (p) => readFileSync(join(ROOT, p), 'utf8');
@@ -18394,11 +18508,11 @@ try {
     const FT = ["`imMerge`", "`mergeDel`", "`opt.after`", "원장 C209"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = "<p>(2026-11 v495) 두 PC·폰에서 같은 지시를 거의 같은 때 고치면, 서로 다른 칸은 둘 다 ";
-    const ok = /기준: v495 \(2026-11-17\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 10 && gate.length === 3 && scr.length === 7 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 495 /* v496: 기준 줄·sw = 이 판 이상 */ && ftv.length > 0 && mF.length === 0 && cb.length === 10 && gate.length === 3 && scr.length === 7 && !cb.some((l) => /\(PM/.test(l))
       && d.man.indexOf(MAN) > 0 && !/imMerge|imSt|imBase|imOut|mergeTasks|_colBase|conConflictToast|409|412|gwCall/.test(cut(d.man, MAN, '\n'))
       && d.cl.indexOf('**P1 판24i(v495') > 0
       && FIX495.every((x) => d.ix.split(x).length === 2)
-      && /SHELL_CACHE = 'jw-shell-v495'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 495;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX495.map((x) => d.ix.split(x).length - 1) } };
   };
   const r495 = chk495(D495);
@@ -18411,6 +18525,37 @@ try {
   T('v495 문서·판 번호(정확 검사): FEATURES 기준 v495 (2026-11-17)·v495 절(판24i) · TESTLIST v495 칸 10(화면 확인 7 · 게이트 [x] 3) · MANUAL 지시 저장 겹침 글(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 19줄 한 번씩 · sw jw-shell-v495 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
     r495.ok && M495.every((v) => v === false), JSON.stringify({ r: r495.info, mut: M495 }));
 } catch (e) { console.log('  (v495 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v496(29 판⑧ — PM 11/18 세 가지): 실행 검사는 위 '29 판⑧ ①~③' · 여기는 문서·판 번호 정확 검사 + 고정 글 — 다음 판은 기준 줄·sw를 '496 이상'으로 풀 것
+try {
+  const rd496 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D496 = { ft: rd496('FEATURES.md'), tl: rd496('TESTLIST.md'), sw: rd496('sw.js'), man: rd496('MANUAL.html'), cl: rd496('CLAUDE.md'), ix: rd496('index.html'), lib: rd496('netlify/functions/_lib/stmt.js') };
+  const FIX496 = ['function stmtActed(r){ return !!r.s || stmtDropOf(r.vk).length > 0; }', 'function stmtBoardRows(){ return STMT.showAll ? stmtBoardAll() : stmtBoardActed(); }', 'if (e.safe && row.use && row.use !== "safety") row.safe = 1;', 'tp = stmtTirePosJoin(e.tire);'];
+  const chk496 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v496 (11/18)', '\n### '), tlv = cut(d.tl, '\n## v496 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ['`tirePosAll`', '`stmtTireN`', '`stmtUsePick`', '`safe_use`', '`stmtActed`', '`stmtBoardActed`', '`data-st-hid`'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = '<li><b>실적 없는 거래처 숨김</b> (2026-11 v496)';
+    const ok = /기준: v496 \(2026-11-18\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 2 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf(MAN) > 0 && !/stmt|showAll|safe_|data-/.test(cut(d.man, MAN, '</li>')) && d.man.indexOf('위치 칸이 수량만큼 생깁니다(2026-11 v496') > 0 && d.man.indexOf('<b>안전보건</b>은 다른 용도와 함께 고를 수 있습니다') > 0
+      && d.cl.indexOf('**월말명세서 판⑧(v496)**') > 0
+      && FIX496.every((x) => d.ix.split(x).length === 2)
+      && d.lib.indexOf("if (safe) row.safe = 1;") > 0 && d.lib.indexOf('tirePosN: 12, tirePosAll: 400') > 0
+      && /SHELL_CACHE = 'jw-shell-v496'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX496.map((x) => d.ix.split(x).length - 1) } };
+  };
+  const r496 = chk496(D496);
+  const mu496 = (k, f) => chk496(Object.assign({}, D496, { [k]: f(D496[k]) })).ok;
+  const M496 = [mu496('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v495 (')), mu496('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v495'")),
+    mu496('ft', (s) => s.split('`stmtActed`').join('stmtActed')), mu496('man', (s) => s.replace('(2026-11 v496) — 그 달', '— 그 달')),
+    mu496('cl', (s) => s.replace('**월말명세서 판⑧(v496)**', '월말명세서 판⑧')), mu496('lib', (s) => s.replace('if (safe) row.safe = 1;', '')),
+    mu496('tl', (s) => s.replace("\n- [x] (AI) `uismoke` '29 판⑧", "\n- (AI) `uismoke` '29 판⑧"))]
+    .concat(FIX496.map((x) => mu496('ix', (s) => s.replace(x, ''))));
+  T('v496 문서·판 번호(정확 검사): FEATURES 기준 v496 (2026-11-18)·v496 절(판⑧) · TESTLIST v496 칸 6(화면 확인 3 · 운영 확인 1 · 게이트 [x] 2) · MANUAL 숨김·타이어·안전보건 글(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 4줄 + 서버 2줄 · sw jw-shell-v496 · 결함 사본 ' + M496.length + '개 = 모두 ✗',
+    r496.ok && M496.every((v) => v === false), JSON.stringify({ r: r496.info, mut: M496 }));
+} catch (e) { console.log('  (v496 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
