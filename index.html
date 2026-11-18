@@ -3668,6 +3668,9 @@
   var checkAssigneeTs = {};
   var checkReview = {};    // {type: {periodKey: {itemId: {by,date}}}} 승인 대기(하드코딩 항목)
   var checkReviewTs = {};  // 완료요청 편집시각 사이드카(v332) — review와 같은 3층 {type:{periodKey:{itemId: ms}}}. 삭제(승인·반려·요청취소)도 스탬프를 남겨 낡은 사본이 되살리지 못하게 한다
+  // P1 판24j(C209 가-2): 체크(완료 기록) 편집시각 사이드카 — records와 같은 3층 {type:{periodKey:{itemId: ms}}}, 문서 칸 records_ts. 체크 해제(키 지움)도 스탬프를 남겨 다른 기기의 낡은 사본이 되살리지 못하게(지운 표시)
+  //   옛 판 기기는 이 칸을 모르고(저장에서 빠질 수 있음) 스탬프가 없는 키는 종전 규칙(값 큰 쪽·한쪽에만 있으면 있는 쪽)
+  var checkRecTs = {};
   var currentSha = null;
   var saveTimer = null;
   var isOffline = false;
@@ -3851,13 +3854,15 @@
     if (typeof conSaveOut !== "undefined") conSaveOut = 0;
     if (typeof imBaseDrop === "function") imBaseDrop("tasks");   // 판24i: 지시 배열을 비우므로 지시 기준 사본도(세대 +1 — 앞사람의 늦은 저장 200이 기준을 세우지 못하게 · 나가 있는 저장 수 0) · 로그인 창 '전환'은 배열을 안 비워 기준도 짝으로 남김
     bids = []; onbids = []; quotes = []; promoItems = []; clients = []; myTodos = []; members = []; apprItems = []; myApprItems = []; fam = []; edu = [];
+    // P1 판24j(C209): 위에서 비운 배열의 받은 사본도(세대 +1 — 앞사람의 늦은 읽기·저장 200이 기준을 세우지 못하게 · 나가 있는 저장 수 0) · 명부·현장 대장·체크 추가 항목은 여기서 배열을 안 비워 기준도 짝으로 남김
+    if (typeof imBaseDrop === "function") ["vehicles", "receivables", "licenses", "documents", "leaves", "bids", "onbid", "quotes", "promo", "clients", "family", "edu"].forEach(function(c){ imBaseDrop(c); });
     cliLoaded = false; cliDirty = {};   // v441 검토: 비운 거래처 대장은 '아직 못 읽음'(빈 목록을 저장하지 않게 — loadClients가 200에서 다시 켬)
     wkLoaded = false;   // v442: 일용직 명부도 '아직 못 읽음'으로(loadWorkers가 200에서 다시 켬 — 빈 명부 저장 막음)
     asbDocConSt = {}; asbDocConWho = null;   // v451: 계약 탭 노동부 신고 단계 줄이 건 읽기 상태(현장 대장·명부 — 다음 사람은 다시 한 번씩)
     wkPending = false; wkDirty = {}; wkEduSt = "";   // v442 검토: 저장 대기·이 기기에서 고친 줄 표시·③ 건강진단용 교육 기록 읽기 상태도 비움(다음 사람이 앞사람 표시로 합치거나 '읽음'으로 보지 않게)
     eduLoaded = false; eduPending = false; eduSel = {};   // v447: 비운 체크 칸 기록은 '아직 못 읽음'(loadEdu가 200에서 다시 켬 — 빈 기록 + 새 1건이 서버 col:edu를 덮지 않게) · 저장 대기·표 선택도 비움
     bidsLoaded = false; bidsSaveHeld = false;   // v443: 비운 공고 목록은 '아직 못 읽음'(loadBids가 200에서 다시 켬 — 빈 목록 + 수동 등록 1건 저장이 서버 일감 문서를 덮지 않게)
-    records = {};
+    records = {}; checkRecTs = {};   // P1 판24j: 체크 지운 표시도 체크와 짝으로
     abStatus = null; abDay = { day: "", data: null, loading: false, error: "" }; abPresets = { items: null, loading: false, saving: false, error: "" };
     abManual = { day: "", items: [], loaded: false, timer: null, saving: false, dirty: false, savedTs: 0, bad: 0, err: "", errBad: false, pendingRender: false };
     abLearnDone = {}; abLearnOpen = ""; abLearnNew = "";
@@ -3890,6 +3895,7 @@
     if (eduSaveTimer){ clearTimeout(eduSaveTimer); eduSaveTimer = null; }
     workers = []; wkLoaded = false; wkPending = false; wkDirty = {}; wkBase = 0;
     edu = []; eduLoaded = false; eduPending = false; eduBase = 0; eduSel = {}; wkEduSt = "";
+    if (typeof imBaseDrop === "function"){ imBaseDrop("workers"); imBaseDrop("edu"); }   // P1 판24j: 비운 두 원장의 받은 사본도(앞사람 늦은 읽기·저장 200 거름)
     renderXgWorkers();   // 생성 창 투입 인력 목록 자리에 남은 앞사람 명부 이름을 지움(창이 닫혀 있어도 자리에 글이 남음)
     if (canSee("wk")) loadWorkers();
     if (canSee("safety")) loadEdu();
@@ -3928,6 +3934,8 @@
         // P1 판24g(C201 — D3): 목록 일부만 화면에 들이는 읽기(opts.gwPeek — 계약 결재 동기화)는 기준 시각을 바꾸지 않는다. 바꾸면 화면이 흡수하지 않은 서버 판을 '본 것'으로 쳐서
         //   다음 저장이 409 없이 통과해 이 화면이 낡게 든 다른 계약·다른 칸이 서버를 덮었다(알림 0). 기준 시각은 목록 전부를 들인(통째·병합) 읽기와 저장 200에서만
         if (!opts.gwPeek) _colBase[col] = doc.updated_at || 0;   // 낙관적 락 base — 이 시각 이후 남이 저장했으면 내 저장은 409로 튕겨 병합 경로를 탄다
+        // P1 판24j(C209): 받은 사본 맡김 — 이 doc은 아래 글로 굳힌 뒤 아무도 안 쓰므로 받은 사본(imRead)이 깊은 복사 없이 씀(일감 수백~천 건)
+        if (!opts.gwPeek && typeof imItemsOf === "function" && imColOn(col)) imSt(col).rd = { at: Number(doc.updated_at) || 0, items: imItemsOf(col, doc) };
         return _ghResp(200, { sha: "gw", content: b64EncodeUnicode(JSON.stringify(doc)) });
       });
     }
@@ -3945,7 +3953,10 @@
     //   종전엔 차량·기성·인허가·체크리스트·휴가·견적·홍보·공매가 base 없이 나가 서버 낙관락을 건너뛰고 목록을 이 화면 목록(빈 목록 또는 옛 캐시 + 새 1건)으로 통째로 바꿨다(시험 서버 재현 53→1 등 · 알림 0).
     //   지시·문서함·계약은 위 제 줄이 맡는다 · 읽기가 403(권한 숨김)이었던 컬렉션은 종전대로 base 없음(쓰기도 서버가 403 — 휴가만 숨김 직원 신청을 서버가 재구성하므로 base 0이면 409가 끝나지 않음)
     if (_colBase[col] === undefined && col !== "tasks" && col !== "documents" && col !== "contracts" && !(typeof _colRead403 !== "undefined" && _colRead403[col])) saveBase = 0;
+    // P1 판24j(C209): 판24i 저장 쪽 세 줄(나가 있는 저장·보낼 때 세대·200이면 기준 — 쓰기 거절이면 안 세움)을 자료마다 베끼지 않고 여기서 — doc은 이 저장만 쓰는 풀어 쓴 사본이라 깊은 복사 없이
+    var imV = (typeof imItemsOf === "function" && imColOn(col)) ? imSvGo(col, imItemsOf(col, doc), true) : null;
     return gwCall("gw-data", { action: "save", collection: col, doc: doc, base: saveBase }).then(function(res){
+      if (imV) imSvEnd(imV);
       if (res.status === 401){ onSessionInvalid(); return _ghResp(401, {}); }
       // 쓰기권한 없음: 서버가 이미 막았고 재시도해도 결과가 같아 200으로 흘린다(무한 재시도 방지). 단 v331부터 조용히 넘기지 않고 표시한다 —
       // 종전에는 화면상 저장된 것처럼 보여, 권한 없는 사람이 만진 값이 사라진 것을 아무도 몰랐다.
@@ -3963,9 +3974,10 @@
       if (res.status === 400 && res.body && res.body.error_code === "GATE_CORP_REG") return _ghResp(400, res.body);   // P1 판1 투찰 잠금 — 막힌 줄(blocked)을 doSaveBids가 되돌림
       if (res.status !== 200) return _ghResp(res.status, { error_code: (res.body && res.body.error_code) || "" });   // 저장 실패를 성공으로 위조하면 pending이 풀려 편집이 유실된다 · v456 거절 이유 코드는 넘김(거래처 CLI_BIZ13 안내)
       _colBase[col] = (res.body && res.body.updated_at) || Date.now();
+      if (imV) imSvOk(imV, _colBase[col]);   // P1 판24j: 저장 200 = 보낸 목록이 서버 사본(세대가 같거나 이 판이 기준 판보다 새로울 때만)
       // register_warn(문서함 v314): 저장은 됐는데 등재 결재 카드 자동 상신이 실패한 건수 — saveDocuments가 직원에게 알린다(관리자 결재함 폴이 자동 복구)
       return _ghResp(200, { content: { sha: "gw" }, register_warn: (res.body && res.body.register_warn) || 0, lic_kept: (res.body && Array.isArray(res.body.lic_kept)) ? res.body.lic_kept : null, con_kept: (res.body && Array.isArray(res.body.con_kept)) ? res.body.con_kept : null });   // P1 판24 5차 con_kept: 계약 저장에서 서버가 승인 차수를 지킨 단계   // P1 판28 검토 2: 인허가 저장에서 서버가 담당 단추 기준일을 지킨 행
-    });
+    }, function(e){ if (imV) imSvEnd(imV); throw e; });
   };
 
   function getToken(){ return gwToken(); }
@@ -4000,7 +4012,7 @@
 
   function saveCache(){
     try{
-      localStorage.setItem(CACHE_KEY, JSON.stringify({sha: currentSha, records: records, custom: customItems, scopes: checkScopes, assignee: checkAssignee, review: checkReview, scope_ts: checkScopeTs, assignee_ts: checkAssigneeTs, review_ts: checkReviewTs}));
+      localStorage.setItem(CACHE_KEY, JSON.stringify({sha: currentSha, records: records, records_ts: checkRecTs, custom: customItems, scopes: checkScopes, assignee: checkAssignee, review: checkReview, scope_ts: checkScopeTs, assignee_ts: checkAssigneeTs, review_ts: checkReviewTs}));   // P1 판24j: 체크 지운 표시(records_ts)도
     }catch(e){}
   }
 
@@ -4286,6 +4298,7 @@
     if(!ids.length) return;
     if(!confirm("선택한 "+ids.length+"건을 영구 삭제합니다.\n복구 불가! 계속할까요?")) return;
     var arr=moduleArr(mod), idset={}; ids.forEach(function(id){ idset[id]=1; });
+    if(typeof imCut==="function") imCut(mod==="tasks"?"tasks":(mod==="veh"?"vehicles":"receivables"), ids);   // P1 판24j(C209): 이 화면이 영구 삭제한 줄 — 병합에서 서버의 그대로인 사본이 되살리지 않게
     var kept=arr.filter(function(x){ return !(x && idset[x.id]); });
     arr.length=0; Array.prototype.push.apply(arr, kept);
     delSelSets[mod]={};
@@ -6205,6 +6218,8 @@
     if (checkReview[type] && checkReview[type][key]) delete checkReview[type][key][id];
     if (had) reviewStamp(type, key, id);   // 실제로 지운 것만 툼스톤 — 방어적 clear까지 스탬프하면 지도가 토글 수만큼 불어난다
   }
+  // P1 판24j(C209 가-2): 체크를 넣거나 지울 때마다 그 키의 시각(checkRecTs) — 지운 것도 남겨 다른 기기의 낡은 사본이 병합에서 되살리지 못하게(공개범위 reviewStamp와 같은 꼴)
+  function recStamp(type, key, id){ if (typeof checkRecTs === "undefined") return; if (!checkRecTs[type]) checkRecTs[type] = {}; if (!checkRecTs[type][key]) checkRecTs[type][key] = {}; checkRecTs[type][key][id] = Date.now(); }
   function toggleItem(type, itemId){
     var isAssignee = checkAssignee[itemId] && checkAssignee[itemId] === getMemberId();
     if (!canDo("check") && !isAssignee) return;
@@ -6216,10 +6231,11 @@
       // 직접 추가 항목 or 관리자 → 즉시 완료/해제 (승인 불필요)
       if (records[type][key][itemId]) delete records[type][key][itemId];
       else records[type][key][itemId] = todayStr();
+      recStamp(type, key, itemId);
       clearReview(type, key, itemId);
     } else {
       // 하드코딩 항목 + 비관리자 → 승인 대기 흐름
-      if (records[type][key][itemId]) delete records[type][key][itemId];   // 완료 되돌리기
+      if (records[type][key][itemId]){ delete records[type][key][itemId]; recStamp(type, key, itemId); }   // 완료 되돌리기(판24j: 지운 표시)
       else if (getReview(type, key, itemId)) clearReview(type, key, itemId); // 완료 요청 취소
       else setReview(type, key, itemId);                                    // 완료 요청 → 승인 대기
     }
@@ -6231,6 +6247,7 @@
     if (!records[type]) records[type] = {};
     if (!records[type][key]) records[type][key] = {};
     records[type][key][id] = todayStr();
+    recStamp(type, key, id);   // P1 판24j
     clearReview(type, key, id);
     saveCache(); renderList(); renderSummary(); scheduleSave();
   }
@@ -6258,7 +6275,15 @@
     }, 1500);
   }
 
-  function mergeRecords(local, remote){
+  // P1 판24j(C209 가-2): lts·rts = 두 쪽 체크 시각(records_ts — 지운 키도 남음). 시각이 다른 키는 늦게 누른 쪽 그대로(그쪽에 없으면 지움 = 해제가 이김) · 시각이 같거나 둘 다 없으면(옛 판 기기 문서) 종전 규칙
+  function recTsAt(m, t, k, id){ var v = m && m[t] && m[t][k] && m[t][k][id]; return Number(v) || 0; }
+  function mergeRecords(local, remote, lts, rts){
+    if (lts || rts){
+      var ov = mergeRecords(local, remote), ks = function(o, f){ Object.keys(o || {}).forEach(function(t){ Object.keys(o[t] || {}).forEach(function(k){ Object.keys(o[t][k] || {}).forEach(function(id){ f(t, k, id); }); }); }); };
+      var fix = function(t, k, id){ var lt = recTsAt(lts, t, k, id), rt = recTsAt(rts, t, k, id); if (lt === rt) return; var src = lt > rt ? local : remote, v = src && src[t] && src[t][k] ? src[t][k][id] : undefined; if (!ov[t]) ov[t] = {}; if (!ov[t][k]) ov[t][k] = {}; if (v) ov[t][k][id] = v; else delete ov[t][k][id]; };
+      ks(lts, fix); ks(rts, fix);
+      return ov;
+    }
     var merged = {};
     var types = {};
     Object.keys(local || {}).forEach(function(t){ types[t]=1; });
@@ -6318,7 +6343,26 @@
     return merged;
   }
 
+  // P1 판24j(C209): 체크 시각 두 쪽 합치기(키마다 큰 값 — 서버 scope_ts·review_ts 최댓값 병합과 같은 꼴)
+  function recTsMax(a, b){
+    var out = JSON.parse(JSON.stringify(a || {}));
+    Object.keys(b || {}).forEach(function(t){ Object.keys(b[t] || {}).forEach(function(k){ Object.keys(b[t][k] || {}).forEach(function(id){ var v = Number(b[t][k][id]) || 0; if (!out[t]) out[t] = {}; if (!out[t][k]) out[t][k] = {}; if (!(Number(out[t][k][id]) >= v)) out[t][k][id] = v; }); }); });
+    return out;
+  }
+  // 체크 추가 항목(custom {유형: {id: 항목}})을 항목 배열 꼴로(id = 유형 + \u0001 + 항목 id) — 공용 imMerge·받은 사본에 씀
+  function ckFlat(m){ var out = []; Object.keys(m || {}).forEach(function(type){ var mm = m[type] || {}; Object.keys(mm).forEach(function(id){ var o = mm[id]; if (o && typeof o === "object") out.push(Object.assign({}, o, { id: type + "\u0001" + id })); }); }); return out; }
   function mergeCustom(local, remote){
+    // P1 판24j(C209): 체크 추가 항목 칸 단위(공용 imMerge — 받은 사본과 견줌) · 받은 사본 없는 항목 = 종전(mergeKV — 늦게 고친 쪽, 같으면 이 화면) · 이름표 = 항목 이름
+    if (typeof imMerge === "function" && typeof ckFlat === "function"){
+      var out = {};
+      Object.keys(local || {}).concat(Object.keys(remote || {})).forEach(function(t){ out[t] = {}; });
+      imMerge("checklist", ckFlat(local), ckFlat(remote), {
+        name: function(x){ return x.t || "추가 항목"; },
+        lbl: { t: "항목 이름" },
+        whole: function(cur, r){ var p = String(cur.id), q = {}, w = {}; q[p] = cur; w[p] = r; return mergeKV(q, w)[p]; }
+      }).forEach(function(x){ var i = String(x.id).indexOf("\u0001"), t = String(x.id).slice(0, i), id = String(x.id).slice(i + 1), o = {}; Object.keys(x).forEach(function(k){ if (k !== "id") o[k] = x[k]; }); if (!out[t]) out[t] = {}; out[t][id] = o; });
+      return out;
+    }
     var merged = {};
     var types = {};
     Object.keys(local || {}).forEach(function(t){ types[t]=1; });
@@ -6406,6 +6450,7 @@
       showTokenScreen(false);
       return;
     }
+    var imG0 = (typeof imSt === "function") ? imSt("checklist").gen : 0;   // P1 판24j
     fetchRemote().then(function(resp){
       if (resp.status === 401){
         clearToken();
@@ -6416,16 +6461,21 @@
         throw new Error("HTTP " + resp.status);
       }
       return resp.json().then(function(json){
-        currentSha = json.sha;
         var decoded = b64DecodeUnicode(json.content);
         var parsed = JSON.parse(decoded);
-        if (pendingSave){
+        // P1 판24j(C209): 체크 추가 항목은 받은 사본과 함께(imRead — 병합은 옛 기준 → 기준 = 받은 항목) · 저장이 나가 있어도 병합 · 로그아웃 사이(0)·옛 판(1)이면 이 읽기 전부 버림
+        var ckPend = pendingSave || (typeof imSt === "function" && imSt("checklist").out > 0), ckc = null;
+        if (typeof imRead === "function"){ ckc = imRead("checklist", imG0, customItems, parsed.custom || {}, ckPend, mergeCustom, undefined, ckFlat(parsed.custom || {})); if (ckc === 0 || ckc === 1) return; }
+        currentSha = json.sha;
+        if (ckPend){
           // 미저장 편집(오프라인 체크 등) 보존 — 통째 교체하면 online 복귀 재로드가 체크를 덮어 증발시켰다(충돌 병합과 동일 규칙)
-          records = mergeRecords(records, parsed.records || {});
-          customItems = mergeCustom(customItems, parsed.custom || {});
+          records = mergeRecords(records, parsed.records || {}, (typeof checkRecTs !== "undefined") ? checkRecTs : null, parsed.records_ts || {});
+          if (typeof checkRecTs !== "undefined") checkRecTs = recTsMax(checkRecTs, parsed.records_ts);   // P1 판24j 지운 표시
+          customItems = ckc || mergeCustom(customItems, parsed.custom || {});
           applyScopeMerge(parsed);   // v331 공개범위·담당 + v332 완료요청 — 키 삭제를 표현하는 스탬프 병합(구 Object.assign은 로컬 무조건 승 + 삭제 전파 불가)
         } else {
           records = parsed.records || {};
+          if (typeof checkRecTs !== "undefined") checkRecTs = parsed.records_ts || {};
           customItems = parsed.custom || {};
           checkScopes = parsed.scopes || {};
           checkScopeTs = parsed.scope_ts || {};
@@ -6444,6 +6494,7 @@
       if (cache){
         currentSha = cache.sha;
         records = cache.records || {};
+        if (typeof checkRecTs !== "undefined") checkRecTs = cache.records_ts || {};   // P1 판24j
         customItems = cache.custom || {};
         checkScopes = cache.scopes || {};
         checkScopeTs = cache.scope_ts || {};
@@ -6466,6 +6517,7 @@
     var token = getToken();
     if (!token) return;
     var body = JSON.stringify({records: records, custom: customItems, scopes: checkScopes, assignee: checkAssignee, review: checkReview, scope_ts: checkScopeTs, assignee_ts: checkAssigneeTs, review_ts: checkReviewTs});
+    if (typeof checkRecTs !== "undefined") body = JSON.stringify(Object.assign(JSON.parse(body), { records_ts: checkRecTs }));   // P1 판24j(C209 가-2): 체크 지운 표시(records_ts — 옛 판 기기는 모르는 칸) · 위 본문 줄은 v331 검사가 글자째 봄
     var payload = {
       message: "check: 업데이트",
       content: b64EncodeUnicode(body),
@@ -6504,15 +6556,20 @@
   }
 
   function resolveConflictAndRetry(){
+    var imG0 = (typeof imSt === "function") ? imSt("checklist").gen : 0;   // P1 판24j
     return fetchRemote().then(function(resp){
       return resp.json();
     }).then(function(json){
-      var remoteParsed = {};
+      var remoteParsed = {}, rpOk = false;
       try{
-        remoteParsed = JSON.parse(b64DecodeUnicode(json.content)) || {};
+        remoteParsed = JSON.parse(b64DecodeUnicode(json.content)) || {}; rpOk = true;
       }catch(e){}
-      records = mergeRecords(records, remoteParsed.records || {});
-      customItems = mergeCustom(customItems, remoteParsed.custom || {});
+      // P1 판24j(C209): 체크는 지운 표시(records_ts)로 · 추가 항목은 받은 사본과 칸 단위(다시 읽기 실패면 병합·기준 없이) · 읽는 사이 로그아웃이면 끝
+      var ckc = null;
+      if (typeof imRead === "function"){ ckc = imRead("checklist", imG0, customItems, rpOk ? (remoteParsed.custom || {}) : null, true, mergeCustom, undefined, rpOk ? ckFlat(remoteParsed.custom || {}) : null); if (ckc === 0) return; if (ckc === 1) ckc = customItems; }
+      records = mergeRecords(records, remoteParsed.records || {}, (typeof checkRecTs !== "undefined") ? checkRecTs : null, remoteParsed.records_ts || {});
+      if (typeof checkRecTs !== "undefined") checkRecTs = recTsMax(checkRecTs, remoteParsed.records_ts);
+      customItems = ckc || mergeCustom(customItems, remoteParsed.custom || {});
       applyScopeMerge(remoteParsed);   // v331: 여기가 9/8 롤백의 발화점이었다 — 낡은 로컬 지도가 서버 최신값을 덮고 그대로 재저장됐다(v332부터 완료요청도 같은 병합)
       currentSha = json.sha;
       saveCache();
@@ -6539,6 +6596,9 @@
       name: function(t){ return t.title || "지시"; },
       // 이름표 = 화면 글(수정 창 칸 글·줄 펼침 라벨): 제목 칸 '지시 내용' · 상세 칸 '상세' · 펼침 '담당 지정'·'완료 요청'·'승인'·'공개 범위'·'반복'
       lbl: { title: "지시 내용", detail: "상세", who: "담당", who_id: "담당", who_by: "담당 지정", scope: "공개 범위", due: "기한", status: "상태", done_at: "완료 요청", done_by: "완료 요청", done_src: "완료 요청", approved_by: "승인", approved_at: "승인", recur: "반복" },
+      // 판24j(C209 2판): 상태·완료 요청·승인 기록은 한 덩어리(1판 남긴 것 — 반려와 승인이 겹치면 '열림 + 승인 기록'으로 갈라지던 것) · 서버에서 빠진 지시(영구 삭제)는 이 화면이 안 고쳤으면 되살리지 않음
+      grp: [["status", "done_at", "done_by", "done_src", "approved_by", "approved_at"]],
+      gone: 1,
       sort: function(a, b){
         var ac = a.created || "", bc = b.created || "";
         if (ac !== bc) return ac < bc ? -1 : 1;
@@ -7609,7 +7669,7 @@
       r.onload = function(){
         gwCall("gw-data", { action: "doc_att_put", id: docId, name: f.name, mime: f.type || "", data: String(r.result).split(",")[1] || "" }).then(function(res){
           if (res.status === 200 && res.body && Array.isArray(res.body.files)){
-            var d = findDoc(docId); if (d){ d.files = res.body.files; d.updated_ts = Date.now(); d.updated = todayStr(); }
+            var d = findDoc(docId); if (d){ d.files = res.body.files; d.updated_ts = Date.now(); d.updated = todayStr(); if (typeof imBaseAdvance === "function") imBaseAdvance("documents", d.id, { files: res.body.files }); }   // P1 판24j: 서버가 바꾼 첨부 목록 — 받은 사본도
             if (res.body.updated_at) _colBase["documents"] = res.body.updated_at;   // 서버가 문서 블롭을 바꿨다 — 다음 저장의 낙관락 base 갱신(불필요한 409 방지)
             apprToastShow("첨부됨 — " + f.name);
           } else alert('"' + f.name + '" 첨부 실패 (' + ((res.body && res.body.error_code) || res.status) + ')');
@@ -7651,7 +7711,7 @@
     gwCall("gw-data", { action: "doc_att_del", id: docId, n: n }).then(function(res){
       docAttBusy = false;
       if (res.status !== 200){ alert("첨부 삭제 실패 (" + ((res.body && res.body.error_code) || res.status) + ")"); return; }
-      if (d){ if (res.body && Array.isArray(res.body.files) && res.body.files.length) d.files = res.body.files; else delete d.files; d.updated_ts = Date.now(); d.updated = todayStr(); }
+      if (d){ if (res.body && Array.isArray(res.body.files) && res.body.files.length) d.files = res.body.files; else delete d.files; d.updated_ts = Date.now(); d.updated = todayStr(); if (typeof imBaseAdvance === "function") imBaseAdvance("documents", d.id, { files: d.files }); }   // P1 판24j: 받은 사본도
       if (res.body && res.body.updated_at) _colBase["documents"] = res.body.updated_at;
       docAttRenderModal(); renderDocuments();
       apprToastShow("첨부 삭제됨");
@@ -7770,17 +7830,19 @@
   function loadVehicles(){
     var token = getToken();
     if (!token) return;
+    var imG0 = (typeof imSt === "function") ? imSt("vehicles").gen : 0;   // P1 판24j: 읽는 사이 로그아웃이면 들이지 않게(imRead)
     fetch(VEH_API, {headers: ghHeaders()}).then(function(resp){
       if (resp.status === 401){ clearToken(); showTokenScreen(true); return; }
       if (resp.status === 404){
-        vehSha = null; vehicles = []; saveVehiclesCache(); renderVehicles(); renderDashboard(); markLoadedForAutoGen("veh"); return;
+        vehSha = null; vehicles = []; if (typeof imBaseSetAt === "function") imBaseSetAt("vehicles", [], 0); saveVehiclesCache(); renderVehicles(); renderDashboard(); markLoadedForAutoGen("veh"); return;
       }
       if (!resp.ok) throw new Error("HTTP " + resp.status);
       return resp.json().then(function(json){
-        vehSha = json.sha;
         var parsed = JSON.parse(b64DecodeUnicode(json.content));
         var ri = (parsed && parsed.items) || [];
-        vehicles = (vehPending ? mergeVeh(vehicles, ri) : ri);
+        // P1 판24j(C209): 받은 사본과 함께 — 저장 대기·나가 있는 저장 중이면 병합(옛 기준) 뒤 기준을 받은 목록으로 · 읽는 사이 로그아웃(0)·옛 판(1)이면 버림
+        if (typeof imRead === "function"){ var nx = imRead("vehicles", imG0, vehicles, ri, vehPending, mergeVeh); if (nx === 0 || nx === 1) return; vehSha = json.sha; vehicles = nx; }
+        else { vehSha = json.sha; vehicles = (vehPending ? mergeVeh(vehicles, ri) : ri); }
         setOffline(false); saveVehiclesCache(); renderVehicles(); renderDashboard(); markLoadedForAutoGen("veh");
       });
     }).catch(function(){
@@ -11008,6 +11070,15 @@
     return out.slice(-12);
   }
   function mergeVeh(local, remote){
+    // P1 판24j(C209): 칸 단위(공용 imMerge — 받은 사본과 견줘 이 화면이 고친 칸만 이 화면 값) · 만기 표식(vehDueMergeKeep)·검사 기록 합집합은 그 뒤에 그대로(고치기 전 이 화면 줄과 견줌)
+    //   이름표 = 차량 수정 창 칸 글 · 공용 부품이 없는 곳(옛 검사 틀)은 아래 종전 규칙
+    if (typeof imMerge === "function") return imMerge("vehicles", local, remote, {
+      name: function(v){ return v.no || "차량"; },
+      lbl: { no: "차량번호", kind: "상세", type: "차종", own: "소유", permit: "허가 종류", driver: "운전자", co: "시행 회사", biz: "사업용 여부", size: "규모", reg_date: "최초등록일", ceq_kind: "기종 · 연식", ceq_year: "기종 · 연식", insp_due: "검사 만기", ins_due: "보험 만기", state: "상태", insurer: "보험사", note: "메모", acq_price: "취득가액", nodoc_amt: "무자료금액", history: "점검·수리 이력" },
+      skip: { insp_log: 1 },
+      gone: 1,   // 다른 기기가 영구 삭제한 차량을 이 화면이 안 고쳤으면 되살리지 않음
+      fix: function(m, x, pre){ vehDueMergeKeep(m, pre, x); if (Array.isArray(pre.insp_log) || Array.isArray(x.insp_log)) m.insp_log = vehLogUnion(x.insp_log, pre.insp_log); }
+    });
     var byId = {};
     (local || []).forEach(function(v){ if (v && v.id) byId[v.id] = v; });
     (remote || []).forEach(function(x){
@@ -11039,8 +11110,11 @@
     }).catch(function(){ setOffline(true); });
   }
   function resolveVehConflictAndRetry(){
+    var imG0 = (typeof imSt === "function") ? imSt("vehicles").gen : 0;
     return fetch(VEH_API, {headers: ghHeaders()}).then(function(resp){ if (resp.status === 404) return null; return resp.json(); }).then(function(json){
-      if (json){ var vp = {}; try{ vp = JSON.parse(b64DecodeUnicode(json.content)) || {}; }catch(e){} vehicles = mergeVeh(vehicles, vp.items || []); vehSha = json.sha; }
+      // P1 판24j(C209): 다시 읽기 실패(빈 응답)는 병합·기준 없이 다시 저장 · 읽는 사이 로그아웃이면 끝
+      if (json && typeof imRead === "function"){ var vq = null; try{ vq = JSON.parse(b64DecodeUnicode(json.content)) || {}; }catch(e){} var nx = imRead("vehicles", imG0, vehicles, vq ? (vq.items || []) : null, true, mergeVeh); if (nx === 0) return; if (nx !== 1) vehicles = nx; vehSha = json.sha; }
+      else if (json){ var vp = {}; try{ vp = JSON.parse(b64DecodeUnicode(json.content)) || {}; }catch(e){} vehicles = mergeVeh(vehicles, vp.items || []); vehSha = json.sha; }
       saveVehiclesCache(); renderVehicles(); renderDashboard(); return doSaveVeh();
     });
   }
@@ -11504,17 +11578,34 @@
   }
   function loadDocuments(){
     var token = getToken(); if (!token) return;
+    var imG0 = (typeof imSt === "function") ? imSt("documents").gen : 0;   // P1 판24j
     fetch(DOC_API, {headers: ghHeaders()}).then(function(resp){
-      if (resp.status === 404){ docSha = null; documents = []; renderDocuments(); return; }
+      if (resp.status === 404){ docSha = null; documents = []; if (typeof imBaseSetAt === "function") imBaseSetAt("documents", [], 0); renderDocuments(); return; }
       if (!resp.ok) throw new Error("HTTP " + resp.status);
-      return resp.json().then(function(json){ docSha = json.sha; var p = JSON.parse(b64DecodeUnicode(json.content)); documents = (p && p.items) || []; renderDocuments(); });
+      return resp.json().then(function(json){ var p = JSON.parse(b64DecodeUnicode(json.content));
+        // P1 판24j(C209): 받은 사본과 함께 — 문서함은 저장 대기 표시가 없어 '나가 있는 저장'일 때만 병합 · 로그아웃 사이(0)·옛 판(1) 버림
+        if (typeof imRead === "function"){ var nx = imRead("documents", imG0, documents, (p && p.items) || [], false, mergeDocs); if (nx === 0 || nx === 1) return; docSha = json.sha; documents = nx; }
+        else { docSha = json.sha; documents = (p && p.items) || []; }
+        renderDocuments(); });
     }).catch(function(){ renderDocuments(); });
     if (isAdmin() && !docSettingsTbl) loadDocSettings(renderDocuments);
   }
   // 409 충돌 병합(v314): id 기준, 더 최근 수정(updated_ts ms, 없으면 updated 일자)이 이기고 del은 mergeDel(인허가 mergeLic와 같은 규칙).
   // 서버가 결재 경로(등재 승인·반려)로 문서 블롭을 스스로 바꾸게 되면서 낡은 사본 저장이 409로 서는 일이 생겼다 — 종전엔 조용히 유실
   function mergeDocs(local, remote){
+    // P1 판24j(C209): 칸 단위(공용 imMerge) — 지움(del)은 mergeDel 그대로 · 지운 시각·지운 사람·임시 숨김은 지움을 고른 쪽 값(delWith) · 등재 상태·등재자·반려는 한 덩어리
+    //   받은 사본 없는 문서 = 종전 시각 비교 통째(whole) · 서버에서 빠진(영구 삭제) 문서는 이 화면이 받은 뒤 안 고쳤으면 빼고(gone) · 아래 부활 차단도 그대로
     var byId = {};
+    if (typeof imMerge === "function"){
+      imMerge("documents", local, remote, {
+        name: function(d){ return d.title || "문서"; },
+        lbl: { title: "제목", no: "문서번호", cat: "카테고리", category: "카테고리", version: "버전", revised: "개정일", url: "링크 URL", note: "메모", scope: "공개범위", orig_dl: "원본 파일 내려받기", files: "첨부 파일", status: "등재 상태" },
+        delWith: ["deleted_at", "deleted_by", "hidden_tmp"],
+        grp: [["status", "registered_by", "registered_at", "reject_reason", "rejected_at", "reg_n"]],
+        whole: function(cur, x){ var w = mTime(x) > mTime(cur) ? x : cur, m = Object.assign({}, (w === x ? cur : x), w); if (cur.del === 1 || x.del === 1) m.del = mergeDel(cur, x); return Object.assign(cur, m); },
+        gone: 1
+      }).forEach(function(d){ byId[d.id] = d; });
+    } else {
     (local || []).forEach(function(l){ if (l && l.id) byId[l.id] = l; });
     (remote || []).forEach(function(x){
       if (!x || !x.id) return;
@@ -11525,6 +11616,7 @@
       if (cur.del === 1 || x.del === 1) m.del = mergeDel(cur, x);
       byId[x.id] = m;
     });
+    }
     // 부활 차단(9/6 검증 R1): remote에 없는데 del:1인 local-only 항목 = 영구 삭제된 문서의 사본 — 병합 결과에서 제거(서버 save도 같은 규칙으로 폐기한다)
     var remoteIds = {}; (remote || []).forEach(function(x){ if (x && x.id) remoteIds[x.id] = 1; });
     var out = []; Object.keys(byId).forEach(function(id){ var it = byId[id]; if (it && it.del === 1 && !remoteIds[id]) return; out.push(it); });
@@ -11540,8 +11632,11 @@
       if (resp.status === 401) return;
       if ((resp.status === 409 || resp.status === 422) && !docSaveRetried){
         docSaveRetried = true;   // 재조회·병합 후 1회 재시도(무한 루프 방지)
+        var imG0 = (typeof imSt === "function") ? imSt("documents").gen : 0;   // P1 판24j
         return fetch(DOC_API, {headers: ghHeaders()}).then(function(r2){ return r2.status === 404 ? null : r2.json(); }).then(function(json){
-          if (json){ var p = {}; try{ p = JSON.parse(b64DecodeUnicode(json.content)) || {}; }catch(e){} documents = mergeDocs(documents, p.items || []); }
+          // P1 판24j(C209): 받은 사본과 칸 단위 · 다시 읽기 실패면 병합·기준 없이 다시 저장 · 읽는 사이 로그아웃이면 끝
+          if (json && typeof imRead === "function"){ var q = null; try{ q = JSON.parse(b64DecodeUnicode(json.content)) || {}; }catch(e){} var nx = imRead("documents", imG0, documents, q ? (q.items || []) : null, true, mergeDocs); if (nx === 0){ docSaveRetried = false; return; } if (nx !== 1) documents = nx; }
+          else if (json){ var p = {}; try{ p = JSON.parse(b64DecodeUnicode(json.content)) || {}; }catch(e){} documents = mergeDocs(documents, p.items || []); }
           renderDocuments(); return saveDocuments();
         });
       }
@@ -11773,6 +11868,7 @@
       docTrashBusy = false;
       if (res.status !== 200){ docTrashFail(res, "복구"); return; }
       delete d.del; delete d.hidden_tmp; delete d.deleted_at; delete d.deleted_by; d.updated_ts = Date.now(); d.updated = todayStr();
+      if (typeof imBaseAdvance === "function") imBaseAdvance("documents", d.id, { del: undefined, hidden_tmp: undefined, deleted_at: undefined, deleted_by: undefined });   // P1 판24j: 서버가 한 되살림 — 받은 사본도(다음 병합에서 '이 화면 고침'으로 세지 않게)
       if (res.body && res.body.updated_at) _colBase["documents"] = res.body.updated_at;
       renderDocuments(); apprToastShow("복구됨 — " + (d.title || "").slice(0, 20));
       loadDocuments();   // 서버 스탬프(restored_by 등) 반영
@@ -12784,6 +12880,12 @@
   //   고치지 않은 줄은 서버 것 — 종전(v417) '늦은 쪽·같으면 로컬'은 updated가 날짜 단위라 같은 날 다른 기기가 고치거나 지운 줄을 이 기기 묵은 사본이 되돌렸다(다음 저장이 base를 새로 받아 409도 안 남)
   function mergeWorkers(local, server){
     var by={}, seen={}, out=[];
+    // P1 판24j(C209): 고친 줄(wkDirty)이 서버에도 있으면 받은 사본과 칸 단위(공용 imMerge — 이 화면 줄 제자리 · 서버만 고친 칸은 서버 값) · 받은 사본이 없는 줄은 종전대로 이 화면 줄 통째 · 알림 이름 = '일용직 명부'(이름은 안 씀)
+    if (typeof imMerge === "function") imMerge("workers", (local||[]).filter(function(r){ return r&&r.id&&wkDirty[r.id]; }), (server||[]).filter(function(r){ return r&&r.id&&wkDirty[r.id]; }), {
+      name: function(){ return "일용직 명부"; },
+      lbl: { name: "이름", birth: "생년월일", role: "직책", phone: "연락처", note: "비고" },
+      whole: function(cur){ return cur; }
+    });
     (server||[]).forEach(function(r){ if(r&&r.id) by[r.id]=r; });
     (local||[]).forEach(function(r){ if(r&&r.id&&wkDirty[r.id]) by[r.id]=r; });
     (server||[]).forEach(function(r){ if(r&&r.id&&!seen[r.id]){ seen[r.id]=1; out.push(by[r.id]); } });
@@ -12793,15 +12895,19 @@
   function doSaveWorkers(n){
     if(!wkLoaded) return Promise.resolve();   // v442: 못 읽은 명부는 보내지 않는다(위 wkLoaded — 고치는 길이 먼저 막고 알린다)
     var sent={}; Object.keys(wkDirty).forEach(function(id){ sent[id]=wkDirty[id]; });   // v442 검토: 이번에 보내는 고친 횟수 — 보내는 사이 또 고친 줄은 성공해도 표시를 남긴다(다음 저장이 보냄)
+    var imV=(typeof imSvGo==="function")?imSvGo("workers", workers):null;   // P1 판24j(C209): 나가 있는 저장·보낼 때 세대(공통 길 밖)
     return gwCall("gw-data",{action:"save",collection:"workers",doc:{schema:1,items:workers},base:wkBase}).then(function(res){
+      if(imV) imSvEnd(imV);
       if(res.status===409){
         if(saveConflictStop(n)) return;   // v456(C079): 연달아 3번째 409면 멈춤·알림(대기·고친 줄 표시는 남김 — 다음에 고치면 다시 보냄)
+        var imG0=(typeof imSt==="function")?imSt("workers").gen:0;
         return gwCall("gw-data",{action:"get",collection:"workers"}).then(function(r2){
-          if(r2.status===200){ var doc=(r2.body&&r2.body.doc)||{}; workers=mergeWorkers(workers, Array.isArray(doc.items)?doc.items:[]); wkBase=doc.updated_at||0; wkLoaded=true; renderWorkers(); renderXgWorkers(); return doSaveWorkers((n||0)+1); }
+          var nq=-1; if(r2.status===200&&typeof imRead==="function"){ var dq=(r2.body&&r2.body.doc)||{}; nq=imRead("workers", imG0, workers, Array.isArray(dq.items)?dq.items:[], true, mergeWorkers, dq.updated_at||0); if(nq===0) return; if(nq===1) return saveConflictToast(); }   // P1 판24j: 칸 단위(병합은 옛 기준 → 기준 = 받은 명부) · 로그아웃 사이면 끝 · 옛 판이면 다시 읽기 실패와 같이
+          if(r2.status===200){ var doc=(r2.body&&r2.body.doc)||{}; workers=(nq!==-1)?nq:mergeWorkers(workers, Array.isArray(doc.items)?doc.items:[]); wkBase=doc.updated_at||0; wkLoaded=true; renderWorkers(); renderXgWorkers(); return doSaveWorkers((n||0)+1); }
           saveConflictToast();   // v456(C079): 다시 읽기 실패면 곧바로 다시 저장하지 않는다(종전엔 낡은 base로 바로 다시 보내 409 → 다시 읽기 실패를 끝없이 되풀이할 수 있었다)
         });
       }
-      if(res.status===200){ wkBase=(res.body&&res.body.updated_at)||Date.now(); Object.keys(sent).forEach(function(id){ if(wkDirty[id]===sent[id]) delete wkDirty[id]; }); if(!wkSaveTimer) wkPending=false; }   // v442: 보내는 사이 또 고쳐 저장이 다시 잡혔으면(wkSaveTimer) 대기 표시를 남긴다
+      if(res.status===200){ wkBase=(res.body&&res.body.updated_at)||Date.now(); if(imV) imSvOk(imV, wkBase); Object.keys(sent).forEach(function(id){ if(wkDirty[id]===sent[id]) delete wkDirty[id]; }); if(!wkSaveTimer) wkPending=false; }   // v442: 보내는 사이 또 고쳐 저장이 다시 잡혔으면(wkSaveTimer) 대기 표시를 남긴다
       // v442 검토: 서버 거절(403) — doSaveEdu(v430)와 같은 갈래. 기기 승인 취소(DEVICE_NOT_APPROVED — 서버가 권한보다 먼저 봄)는 권한 문제가 아니라 대기·고친 줄 표시를 남기고 기기 안내만.
       //   권한(NO_WRITE — 일용직 수행이 아님 · 권한이 바뀐 직후 등)이면 서버가 이 변경을 받을 일이 없으므로 대기·표시·잡힌 저장을 내리고 서버 명부를 다시 읽는다
       //   (종전엔 403을 삼켜 대기 표시가 켜진 채 남아, 그 뒤 읽기마다 이 기기에만 있는 줄이 병합으로 살아남았다 — 표·현장 창·서류 명단 후보에 서버에 없는 사람)
@@ -12814,13 +12920,16 @@
         }
       }
       if(res.status!==200&&res.status!==403) saveFailToast("일용직 명부", res.status);   // P1 판24h(C206): 500 등도 알림(대기·고친 줄 표시는 남김 — 종전엔 알림 0)
-    }).catch(function(){ saveFailToast("일용직 명부"); });
+    }).catch(function(){ if(imV) imSvEnd(imV); saveFailToast("일용직 명부"); });
   }
   function liveWorkers(){ return workers.filter(function(w){ return w && w.del!==1; }); }
   function sortedWorkers(){ return liveWorkers().sort(function(a,b){ return ((a.role==="반장"?0:1)-(b.role==="반장"?0:1)) || (a.name||"").localeCompare(b.name||""); }); }
   function loadWorkers(){
+    var imG0=(typeof imSt==="function")?imSt("workers").gen:0;   // P1 판24j
     return gwCall("gw-data",{action:"get",collection:"workers"}).then(function(res){
-      if(res.status===200){ var wdoc=(res.body&&res.body.doc)||{}, wi=Array.isArray(wdoc.items)?wdoc.items:[]; if(wkPending) workers=mergeWorkers(workers, wi); else { workers=wi; wkDirty={}; } wkBase=wdoc.updated_at||0; wkLoaded=true; renderWorkers(); renderXgWorkers(); }   // v417 base 보관 · v442 읽음 표시 · 저장 대기 중이면 행 단위 병합(로드 덮어쓰기 금지 — 검토: 이 기기에서 고친 줄만 이 기기 것) · 대기가 없으면 서버 명부 그대로(고친 줄 표시도 비움)
+      // P1 판24j(C209): 받은 사본과 함께(판 시각 = doc.updated_at) — 대기·나가 있는 저장이면 고친 줄만 칸 단위 · 아니면 서버 명부 그대로 + 고친 표시 비움 · 로그아웃·전환 사이(0)·옛 판(1) 버림
+      var nq=-1; if(res.status===200&&typeof imRead==="function"){ var qdoc=(res.body&&res.body.doc)||{}; nq=imRead("workers", imG0, workers, Array.isArray(qdoc.items)?qdoc.items:[], wkPending, mergeWorkers, qdoc.updated_at||0); if(nq===0||nq===1) return; }
+      if(res.status===200){ var wdoc=(res.body&&res.body.doc)||{}, wi=Array.isArray(wdoc.items)?wdoc.items:[]; if(nq!==-1){ workers=nq; if(nq===wi||(!nq.length&&!wi.length)) wkDirty={}; } else if(wkPending) workers=mergeWorkers(workers, wi); else { workers=wi; wkDirty={}; } wkBase=wdoc.updated_at||0; wkLoaded=true; renderWorkers(); renderXgWorkers(); }   // v417 base 보관 · v442 읽음 표시 · 저장 대기 중이면 행 단위 병합(로드 덮어쓰기 금지 — 검토: 이 기기에서 고친 줄만 이 기기 것) · 대기가 없으면 서버 명부 그대로(고친 줄 표시도 비움)
       else if(res.status===403){ var h=document.getElementById("wkList"); if(h) h.innerHTML='<div class="empty-line">권한이 없습니다 — 권한관리에서 [일용직]을 열어주세요.</div>'; }
     }).catch(function(){});
   }
@@ -14718,11 +14827,20 @@
     try {
       var own = function(o, path){ return (mine || []).some(function(a){ return mgEq(o, imAt(a, path)); }); };
       var pick = function(v, path){ var t = v[0], bb = v[1], o = v[2]; if (mgEq(t, o)) return null; if (mgEq(t, bb)) return { v: o }; if (!mgEq(o, bb) && !own(o, path)) cf.push(path); return null; };
-      var del2 = (l.del === 1 || s.del === 1) ? mergeDel(l, s) : null, cons = [l, b, s, undefined], su = String(s.updated || "");   // 지움은 고치기 전 두 쪽으로(mergeDel)
-      mgKeysOf(cons).forEach(function(k){ if (!skip[k] && !(opt && opt.skip && opt.skip[k])) mgWalkKey(cons, k, pick, [k], 0); });
+      // 판24j: 지움과 짝인 칸(opt.delWith — 문서함 지운 시각·지운 사람)은 지움을 고른 쪽 값으로(칸 걷기에서 뺌) · 상태 묶음(opt.grp)은 한 덩어리로 먼저 정하고(imGrp) 그 칸들은 걷기에서 그 결정대로
+      // 판24j: 지움도 받은 사본과 견줌 — 이 화면이 지움 표시를 안 바꿨으면 서버 쪽, 서버가 안 바꿨으면 이 화면 쪽, 둘 다 바꿨으면 종전 mergeDel(나중에 고친 쪽 · 같으면 지움)
+      //   (종전엔 늘 mergeDel이라 다른 기기가 지운 문서를 옛 화면이 다른 칸만 고쳐 저장해도 되살아남)
+      var dl0 = l.del === 1 ? 1 : 0, db0 = b && b.del === 1 ? 1 : 0, ds0 = s.del === 1 ? 1 : 0, dsrc = dl0 === db0 ? s : (ds0 === db0 ? l : null);
+      var dw = (opt && opt.delWith) || [], dside = (l.del === 1 || s.del === 1) ? (dsrc || imDelSide(l, s)) : null, gd = {};
+      dw.forEach(function(k){ skip[k] = 1; });
+      ((opt && opt.grp) || []).forEach(function(g, gi){ var d = imGrp(l, b, s, g, gi, cf, mine, pick); g.forEach(function(k){ gd[k] = d; }); });
+      var gpick = function(v, path){ return gd[path[0]] === "o" ? { v: v[2] } : null; };
+      var del2 = (l.del === 1 || s.del === 1) ? (dsrc ? (dsrc === s ? ds0 : dl0) : mergeDel(l, s)) : null, cons = [l, b, s, undefined], su = String(s.updated || "");   // 지움은 고치기 전 두 쪽으로(받은 사본 · 둘 다 바꿨으면 mergeDel)
+      mgKeysOf(cons).forEach(function(k){ if (!skip[k] && !(opt && opt.skip && opt.skip[k])) mgWalkKey(cons, k, gd[k] ? gpick : pick, [k], 0, gd[k] ? "whole" : undefined); });
       if (su > String(l.updated || "")) l.updated = s.updated;
       var ts = Math.max(Number(l.updated_ts) || 0, Number(s.updated_ts) || 0); if (ts) l.updated_ts = ts;
       if (del2 !== null) l.del = del2;
+      if (dside === s) dw.forEach(function(k){ if (s[k] === undefined) delete l[k]; else l[k] = mgCopy(s[k]); });
     } catch(e){
       if (typeof console !== "undefined" && console.warn) console.warn("판24i 칸 단위 병합 실패 — 종전 규칙으로", l && l.id, e && e.message);
       for (var k0 in l){ if (Object.prototype.hasOwnProperty.call(l, k0)) delete l[k0]; } Object.assign(l, JSON.parse(keep));   // 고친 칸을 되돌림(제자리)
@@ -14740,20 +14858,84 @@
     (remote || []).forEach(function(r){
       if (!r || !r.id) return;
       var cur = byId[r.id];
+      if (!cur && st.cut && st.cut[r.id] && st.base[r.id] && mgEq(st.base[r.id], r)) return;   // 판24j: 이 화면이 영구 삭제한 줄(imCut)을 서버가 받은 그대로 갖고 있음 — 되살리지 않음(그 뒤 다른 기기가 고쳤으면 남김)
       if (!cur){ byId[r.id] = r; return; }
       var mine = Object.keys(st.sent).map(function(k){ return st.sent[k][r.id]; }).filter(Boolean);
-      var b = st.base[r.id], c0 = cfs.length, m = b ? imMerge3(b, cur, r, cfs, opt, mine) : null;
+      var pre = opt.fix ? mgCopy(cur) : null;   // 판24j: 고치기 전 이 화면 줄(차량 만기 표식·검사 기록처럼 종전 보호가 '고치기 전 이 화면 값'을 봄)
+      var b = st.base[r.id], c0 = cfs.length, m = b && opt.fast ? imFast(b, cur, r) : null;
+      if (!m) m = b ? imMerge3(b, cur, r, cfs, opt, mine) : null;
+      if (!m && opt.whole) m = opt.whole(cur, r);   // 판24j: 자료별 종전 통째 규칙(홍보·문서함 = 시각 비교 · 체크 추가 항목 = 같으면 이 화면)
       if (!m) m = imWhole(cur, r);
+      if (opt.fix) opt.fix(m, r, pre);
       if (opt.after) opt.after(m, r);
       // 뒷손질 뒤 서버 값이 그대로 남은 칸은 '이 화면 값으로 저장' 알림에서 뺌
       cfs.slice(c0).forEach(function(e){ if (!mgEq(imAt(m, e.path), imAt(r, e.path))) cfOut.push({ id: m.id, name: (opt.name ? opt.name(m) : m.title) || "항목", lbl: (opt.lbl && opt.lbl[e.path[0]]) || "그 밖의 칸", path: e.path }); });
       byId[r.id] = m;
     });
+    if (opt.gone) imGone(st, byId, remote);
     if (cfOut.length && typeof conConflictToast === "function") conConflictToast(cfOut);
     var out = Object.keys(byId).map(function(id){ return byId[id]; });
     if (opt.sort) out.sort(opt.sort);
     return out;
   }
+  // ── 판24j(원장 C209 2판): 나머지 자료에 붙이는 공용 부품 — 판24i '세 자리'를 자료마다 손으로 베끼지 않게
+  //   지움 짝 칸(opt.delWith)이 따를 쪽: mergeDel과 같은 축(나중에 고친 쪽 · 같으면 지운 쪽)
+  function imDelSide(l, s){ var a = mTime(l), c = mTime(s); if (a === c) return s.del === 1 && l.del !== 1 ? s : l; return a > c ? l : s; }
+  // 상태 묶음(opt.grp = [[칸, 칸…], …]): '상태 + 그 상태의 처리자·시각'을 한 값으로 견줌 — 한쪽만 바꿨으면 그쪽 덩어리 통째 · 양쪽이 다르게 바꿨으면 이 화면 덩어리 + 알림(자리 = 묶음 첫 칸)
+  //   (칸마다 따로 고르면 '반려(이 화면) + 승인 기록(다른 기기)'처럼 갈라짐 — 계약 진행 덩어리와 같은 생각)
+  //   묶음 값 하나(칸 → 값)를 칸 고르기(pick — 칸과 같은 규칙·같은 충돌 기록)에 한 번 넘겨 정함: 내 저장이 보낸 사본(mine)에도 묶음 값을 잠깐 얹어 '내 저장 값' 거름이 같이 돌게
+  //   돌려줌 "o" = 묶음 칸 모두 서버 값 · "l" = 모두 이 화면 값(칸 걷기가 이 결정대로 씀 — imMerge3 gpick) · 충돌 자리는 묶음 첫 칸 이름으로
+  function imGrp(l, b, s, g, gi, cf, mine, pick){
+    var pk = function(o){ var x = {}; g.forEach(function(k){ if (o && o[k] !== undefined) x[k] = o[k]; }); return x; }, gk = "\u0001grp" + gi, n0 = cf.length, r0;
+    (mine || []).forEach(function(a){ a[gk] = pk(a); });
+    try { r0 = pick([pk(l), pk(b), pk(s)], [gk]); } finally { (mine || []).forEach(function(a){ delete a[gk]; }); }
+    for (var i = n0; i < cf.length; i++){ if (cf[i] && cf[i][0] === gk) cf[i] = [g[0]]; }
+    return r0 ? "o" : "l";
+  }
+  // opt.gone(문서함·지시): 서버 목록에서 빠진 항목(영구 삭제 등) 중 이 화면이 받은 뒤 손대지 않은 것(받은 사본과 같음)은 이 화면에서도 뺌 — 낡은 화면의 저장이 되살리지 않게
+  //   이 화면이 고친 것·받은 사본이 없는 것은 종전대로 남김(사람이 고친 것을 소리 없이 버리지 않음) · 이 화면에서 뺀 항목을 서버에서 지우는 쪽(반대 방향)은 하지 않음(캐시 부팅 화면이 남의 새 항목을 지울 수 있음)
+  function imGone(st, byId, remote){
+    var rid = {}; (remote || []).forEach(function(r){ if (r && r.id) rid[r.id] = 1; });
+    Object.keys(byId).forEach(function(id){ var b = st.base[id]; if (!rid[id] && b && mgEq(b, byId[id])) delete byId[id]; });
+  }
+  // opt.fast(일감·부동산 — 수천 건): 한쪽이 받은 사본 그대로인 항목은 칸 걷기 없이 — 이 화면이 안 고쳤으면 서버 줄 통째, 서버가 안 바꿨으면 이 화면 줄 그대로(둘 다 칸 단위 결과와 같음 · updated·updated_ts는 늦은 쪽)
+  //   걷기를 줄이려는 것(판24j 실측: 일감 2,512건 저장 대기 중 읽기 병합 99ms → 아래 숫자는 결과 파일) · 둘 다 바꾼 항목만 imMerge3 · 글자째 비교라 키 순서가 다르면 그냥 걷기로
+  function imFast(b, l, s){
+    var kb = JSON.stringify(b), up = function(){ if (String(s.updated || "") > String(l.updated || "")) l.updated = s.updated; var ts = Math.max(Number(l.updated_ts) || 0, Number(s.updated_ts) || 0); if (ts) l.updated_ts = ts; };
+    if (JSON.stringify(s) === kb){ up(); return l; }
+    if (JSON.stringify(l) !== kb) return null;
+    var u = l.updated, uts = l.updated_ts;
+    for (var k in l){ if (Object.prototype.hasOwnProperty.call(l, k)) delete l[k]; }
+    Object.assign(l, s); if (String(u || "") > String(l.updated || "")) l.updated = u; if ((Number(uts) || 0) > (Number(l.updated_ts) || 0)) l.updated_ts = uts;
+    return l;
+  }
+  // 이 화면의 영구 삭제(hardDelete — 지시·차량·기성): 그 id를 적어 둠 — 병합이 '이 화면이 뺀 줄'과 '이 화면이 모르는 새 줄'을 가름(캐시로 부팅해 빠진 줄은 적히지 않아 지우지 않음)
+  function imCut(col, ids){ var st = imSt(col); if (!st.cut) st.cut = {}; (ids || []).forEach(function(id){ st.cut[id] = 1; }); }
+  // 공통 길(window.fetch 대역)을 지나는 자료 — 대역이 저장 쪽(나가 있는 저장·보낼 때 세대·200이면 기준·쓰기 거절이면 안 세움)과 읽기 사본 맡김(imSt(col).rd)을 맡음. 지시(tasks)는 판24i 제 줄 그대로라 넣지 않음
+  //   자료 이름은 공통 길 컬렉션 이름과 글자까지 같아야 함(기준 판 시각을 _colBase[col]에서 받음)
+  function imColOn(col){ return { vehicles: 1, receivables: 1, licenses: 1, documents: 1, clients: 1, leaves: 1, bids: 1, onbid: 1, quotes: 1, promo: 1, checklist: 1 }[col] === 1; }
+  function imItemsOf(col, doc){ if (!doc || typeof doc !== "object") return []; if (col === "checklist") return ckFlat(doc.custom); return Array.isArray(doc.items) ? doc.items : []; }
+  function imAtOf(col, at){ return at !== undefined ? (Number(at) || 0) : ((typeof _colBase !== "undefined" && _colBase && Number(_colBase[col])) || 0); }
+  // 기준을 판 시각과 함께 통째로(own = 이 목록을 아무도 안 고침 — 깊은 복사 생략: 공통 길이 막 풀어 쓰지 않는 사본)
+  function imBaseSetAt(col, items, at, own){ var st = imSt(col); st.gen++; st.has = true; st.at = Number(at) || 0; st.base = {}; (items || []).forEach(function(x){ if (x && x.id) st.base[x.id] = own ? x : mgCopy(x); }); }
+  // 읽기 도착(목록 전부를 화면에 들이는 읽기·409 다시 읽기): g0 = 요청 때 imSt(col).gen · ri = 받은 목록(읽기 실패면 null) · pend = 저장 대기 · merge(이 화면, 받은 목록) · at = 판 시각(공통 길 자료는 생략) · bi = 기준으로 둘 줄(체크 추가 항목처럼 꼴이 다르면)
+  //   돌려줌 0 = 버림(읽는 사이 로그아웃 — 기준을 비움) · 1 = 이 화면 그대로(읽기 실패·옛 판 — 병합·기준 없음, 공통 길 기준 시각은 기준 판으로) · 그 밖 = 새 목록(병합은 옛 기준으로 한 뒤 기준을 받은 것으로)
+  function imRead(col, g0, cur, ri, pend, merge, at, bi){
+    var st = imSt(col), cb = imColOn(col) && typeof _colBase !== "undefined" && _colBase, rAt = imAtOf(col, at);
+    if (!st.has && st.gen !== g0){ if (cb) delete _colBase[col]; st.rd = null; return 0; }
+    if (ri == null) return 1;
+    if (st.has && st.at && rAt && rAt < st.at){ if (cb) _colBase[col] = st.at; st.rd = null; return 1; }
+    var items = bi || ri, rd = st.rd, own = rd && rd.at === rAt && rd.items && rd.items.length === items.length ? rd.items : null;
+    var out = (pend || st.out > 0) ? merge(cur, ri) : ri;
+    st.rd = null;
+    imBaseSetAt(col, own || items, rAt, !!own);
+    return out;
+  }
+  // 저장(공통 길 밖 자료 — 명부·현장 대장·교육·가족친화 — 와 공통 길 대역이 부름): 보내기 직전 v = imSvGo(col, 보내는 목록) · 응답(어떤 것이든)·끊김 imSvEnd(v) · 200(쓰기 거절 아님) imSvOk(v, 판 시각)
+  function imSvGo(col, items, own){ var st = imSt(col), k = ++st.sk, m = {}, it = []; (items || []).forEach(function(t){ if (t && t.id){ var c = own ? t : mgCopy(t); m[t.id] = c; it.push(c); } }); st.sent[k] = m; st.out++; return { c: col, g: st.gen, k: k, it: it }; }
+  function imSvEnd(v){ if (v && v.k){ imOut(v.c, -1, v.k); v.k = 0; } }
+  //   세대가 같으면 보낸 목록이 서버 사본 · 그사이 기준을 새로 세웠으면 이 200의 판이 더 새로울 때만 · 기준을 비운 뒤(로그아웃)는 세우지 않음
+  function imSvOk(v, at){ var st = imSt(v.c), a = Number(at) || 0; if (st.gen === v.g || (st.has && a && a > st.at)) imBaseSetAt(v.c, v.it, a, true); }
   // 결재 동기화 접목 뒤(csSyncFromServer): ① 이 화면이 기준과 다르게 고쳐 둔 칸(진행 덩어리 — 결재 기록 포함 — ·진행 상태 제외)은 접목 전 이 화면 값(pre)을 다시 얹음
   function conSyncKeep(b, c, pre){
     var ch = false;
@@ -17982,15 +18164,26 @@
   function liveLeaves(){ return leaves.filter(function(l){ return l && l.del!==1; }); }
   function loadLeaves(){
     var token=getToken(); if(!token) return;
+    var imG0 = (typeof imSt === "function") ? imSt("leaves").gen : 0;   // P1 판24j
     fetch(LEAVES_API, {headers:ghHeaders()}).then(function(resp){
-      if(resp.status===404){ leavesSha=null; leaves=[]; renderLeaves(); return; }
+      if(resp.status===404){ leavesSha=null; leaves=[]; if (typeof imBaseSetAt === "function") imBaseSetAt("leaves", [], 0); renderLeaves(); return; }
       if(!resp.ok) throw new Error("HTTP "+resp.status);
-      return resp.json().then(function(json){ leavesSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); var ri=(p&&p.items)||[]; leaves = leavesPending ? mergeLeaves(leaves, ri) : ri; renderLeaves(); renderDashboard(); });
+      return resp.json().then(function(json){ var p=JSON.parse(b64DecodeUnicode(json.content)); var ri=(p&&p.items)||[];
+        // P1 판24j(C209): 받은 사본과 함께 · 로그아웃 사이(0)·옛 판(1) 버림
+        if (typeof imRead === "function"){ var nx = imRead("leaves", imG0, leaves, ri, leavesPending, mergeLeaves); if (nx === 0 || nx === 1) return; leavesSha=json.sha; leaves = nx; }
+        else { leavesSha=json.sha; leaves = leavesPending ? mergeLeaves(leaves, ri) : ri; }
+        renderLeaves(); renderDashboard(); });
     }).catch(function(){});
   }
   var leavesPending = false;
   function scheduleLeavesSave(){ leavesPending=true; if(leavesSaveTimer) clearTimeout(leavesSaveTimer); leavesSaveTimer=setTimeout(doSaveLeaves,1200); }
-  function mergeLeaves(local,remote){ var byId={}; (local||[]).forEach(function(l){if(l&&l.id)byId[l.id]=l;}); (remote||[]).forEach(function(x){if(!x||!x.id)return;var c=byId[x.id];if(!c){byId[x.id]=x;}else{var w=(x.updated||"")>(c.updated||"")?x:c;var m=Object.assign({},(w===x?c:x),w);if(c.del===1||x.del===1)m.del=mergeDel(c,x);byId[x.id]=m;}}); return Object.keys(byId).map(function(k){return byId[k];}); }
+  // P1 판24j(C209): 칸 단위(공용 imMerge) — 승인(상태·승인자·승인일)·취소 요청·면담 단계는 각각 한 덩어리 · 이름표 = 휴가 신청 창·목록 글 · 알림 이름 = 유형·시작일(직원 이름은 안 씀)
+  function mergeLeaves(local,remote){ if (typeof imMerge === "function") return imMerge("leaves", local, remote, {
+      name: function(l){ return (leaveTypeLabel(l.type) + " " + (l.start || "")).trim() || "휴가"; },
+      lbl: { type: "유형", start: "기간", end: "기간", reason: "사유", days: "기간", status: "승인", cancel_req: "휴가 취소", stage: "면담", member_id: "신청자" },
+      grp: [["status", "approver", "approved_at"], ["cancel_req", "cancel_req_at", "cancel_approver"], ["stage", "interview_at", "interviewer", "applied_at"]]
+    });
+    var byId={}; (local||[]).forEach(function(l){if(l&&l.id)byId[l.id]=l;}); (remote||[]).forEach(function(x){if(!x||!x.id)return;var c=byId[x.id];if(!c){byId[x.id]=x;}else{var w=(x.updated||"")>(c.updated||"")?x:c;var m=Object.assign({},(w===x?c:x),w);if(c.del===1||x.del===1)m.del=mergeDel(c,x);byId[x.id]=m;}}); return Object.keys(byId).map(function(k){return byId[k];}); }
   function doSaveLeaves(){
     var token=getToken(); if(!token) return;
     var body=JSON.stringify({schema:1,items:leaves});
@@ -17998,7 +18191,10 @@
     if(leavesSha) payload.sha=leavesSha;
     fetch(LEAVES_API,{method:"PUT",headers:Object.assign({"Content-Type":"application/json"},ghHeaders()),body:JSON.stringify(payload)}).then(function(resp){
       if(resp.status===401) return;
-      if(resp.status===409||resp.status===422){ return fetch(LEAVES_API,{headers:ghHeaders()}).then(function(r){return r.status===404?null:r.json();}).then(function(j){ if(j){var up={};try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} leaves=mergeLeaves(leaves,up.items||[]); leavesSha=j.sha;} return doSaveLeaves(); }); }
+      if(resp.status===409||resp.status===422){ var imG0=(typeof imSt==="function")?imSt("leaves").gen:0;   // P1 판24j: 받은 사본과 칸 단위 · 다시 읽기 실패면 병합·기준 없이 다시 저장 · 읽는 사이 로그아웃이면 끝
+        return fetch(LEAVES_API,{headers:ghHeaders()}).then(function(r){return r.status===404?null:r.json();}).then(function(j){
+          if(j&&typeof imRead==="function"){ var uq=null; try{uq=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} var nx=imRead("leaves", imG0, leaves, uq?(uq.items||[]):null, true, mergeLeaves); if(nx===0) return; if(nx!==1) leaves=nx; leavesSha=j.sha; j=null; }   // j=null: 아래 종전 병합 건너뜀(다시 저장은 한 곳)
+          if(j){var up={};try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} leaves=mergeLeaves(leaves,up.items||[]); leavesSha=j.sha;} return doSaveLeaves(); }); }
       if(!resp.ok){ saveFailToast("휴가", resp.status); return; }   // P1 판24h(C206 D5): 500·412 등을 성공으로 넘기지 않음(대기 남김 — 종전엔 대기를 풀어 새로고침 뒤 사라짐)
       return resp.json().then(function(json){ if(json&&json.write_denied){ leavesPending=false; saveDeniedToast("휴가"); return; } leavesSha=json.content&&json.content.sha; leavesPending=false; });
     }).catch(function(){ saveFailToast("휴가"); });
@@ -18380,31 +18576,43 @@
   function liveFam(){ return fam.filter(function(r){ return r && r.del!==1; }); }
   function findFam(id){ for(var i=0;i<fam.length;i++){ if(fam[i].id===id) return fam[i]; } return null; }
   function famName(x){ return dispName(memberName(x.member_id))||x.member_name||"-"; }
-  function mergeFam(local,remote){ var byId={}; (local||[]).forEach(function(r){if(r&&r.id)byId[r.id]=r;}); (remote||[]).forEach(function(x){if(!x||!x.id)return;var c=byId[x.id];if(!c){byId[x.id]=x;}else{var w=(x.updated||"")>(c.updated||"")?x:c;var m=Object.assign({},(w===x?c:x),w);if(c.del===1||x.del===1)m.del=mergeDel(c,x);byId[x.id]=m;}}); return Object.keys(byId).map(function(k){return byId[k];}); }
+  // P1 판24j(C209): 칸 단위(공용 imMerge) · 이름표 = 가족친화 대장 입력 칸 글 · 알림 이름 = 유형·날짜(직원 이름은 안 씀)
+  function mergeFam(local,remote){ if (typeof imMerge === "function") return imMerge("family", local, remote, {
+      name: function(x){ return (famTypeLabel(x.type) + " " + (x.date || "")).trim() || "실적"; },
+      lbl: { type: "유형", date: "날짜", member_id: "대상 직원", member_name: "대상 직원", note: "메모" }
+    });
+    var byId={}; (local||[]).forEach(function(r){if(r&&r.id)byId[r.id]=r;}); (remote||[]).forEach(function(x){if(!x||!x.id)return;var c=byId[x.id];if(!c){byId[x.id]=x;}else{var w=(x.updated||"")>(c.updated||"")?x:c;var m=Object.assign({},(w===x?c:x),w);if(c.del===1||x.del===1)m.del=mergeDel(c,x);byId[x.id]=m;}}); return Object.keys(byId).map(function(k){return byId[k];}); }
   function loadFam(){
     if(!isAdmin()) return;
+    var imG0 = (typeof imSt === "function") ? imSt("family").gen : 0;   // P1 판24j
     gwCall("gw-data",{action:"get",collection:"family"}).then(function(res){
       if(res.status!==200) return;
       var doc=(res.body&&res.body.doc)||{};
       var ri=Array.isArray(doc.items)?doc.items:[];
-      fam = famPending ? mergeFam(fam, ri) : ri;   // 저장 대기 중 로드 덮어쓰기 금지 — 로컬 우선 병합
+      // P1 판24j(C209): 받은 사본과 함께(판 시각 = doc.updated_at) · 로그아웃 사이(0)·옛 판(1) 버림(기준 famBase도 그대로)
+      if (typeof imRead === "function"){ var nx = imRead("family", imG0, fam, ri, famPending, mergeFam, doc.updated_at||0); if (nx === 0 || nx === 1) return; fam = nx; }
+      else fam = famPending ? mergeFam(fam, ri) : ri;   // 저장 대기 중 로드 덮어쓰기 금지 — 로컬 우선 병합
       famBase = doc.updated_at||0;
       renderFam();
     }).catch(function(){});
   }
   function scheduleFamSave(){ famPending=true; if(famSaveTimer) clearTimeout(famSaveTimer); famSaveTimer=setTimeout(doSaveFam,1200); }
   function doSaveFam(n){
+    var imV = (typeof imSvGo === "function") ? imSvGo("family", fam) : null;   // P1 판24j(C209): 나가 있는 저장·보낼 때 세대(공통 길 밖 — 대역 대신 여기서)
     gwCall("gw-data",{action:"save",collection:"family",doc:{schema:1,items:fam},base:famBase}).then(function(res){
+      if (imV) imSvEnd(imV);
       if(res.status===409){   // 동시 저장 충돌 — 재조회·병합·재시도(휴가와 같은 규칙)
         if(saveConflictStop(n)) return;   // v456(C079): 연달아 3번째 409면 멈춤·알림
+        var imG0 = (typeof imSt === "function") ? imSt("family").gen : 0;
         return gwCall("gw-data",{action:"get",collection:"family"}).then(function(r2){
-          if(r2.status===200){ var doc=(r2.body&&r2.body.doc)||{}; fam=mergeFam(fam,Array.isArray(doc.items)?doc.items:[]); famBase=doc.updated_at||0; return doSaveFam((n||0)+1); }
+          var nq=-1; if(r2.status===200 && typeof imRead === "function"){ var dq=(r2.body&&r2.body.doc)||{}; nq=imRead("family", imG0, fam, Array.isArray(dq.items)?dq.items:[], true, mergeFam, dq.updated_at||0); if(nq===0) return; if(nq===1) return saveConflictToast(); }   // P1 판24j: 칸 단위(병합은 옛 기준 → 기준 = 받은 대장) · 로그아웃 사이면 끝 · 옛 판이면 다시 읽기 실패와 같이
+          if(r2.status===200){ var doc=(r2.body&&r2.body.doc)||{}; fam=(nq!==-1)?nq:mergeFam(fam,Array.isArray(doc.items)?doc.items:[]); famBase=doc.updated_at||0; return doSaveFam((n||0)+1); }
           saveConflictToast();   // v456(C079): 다시 읽기 실패면 곧바로 다시 저장하지 않음
         });
       }
-      if(res.status===200){ famBase=(res.body&&res.body.updated_at)||Date.now(); famPending=false; }
+      if(res.status===200){ famBase=(res.body&&res.body.updated_at)||Date.now(); famPending=false; if (imV) imSvOk(imV, famBase); }
       else saveFailToast("가족친화 대장", res.status);   // P1 판24h(C206): 실패 알림(대기는 남김 — 종전엔 알림 0)
-    }).catch(function(){ saveFailToast("가족친화 대장"); });
+    }).catch(function(){ if (imV) imSvEnd(imV); saveFailToast("가족친화 대장"); });
   }
   // 분기 선택 상태 + 기간 계산
   var famQ = null;   // {y,q}
@@ -18427,6 +18635,11 @@
   function asbNotifyDue(r){ return isDate(r.start) ? addDays(r.start, -7) : ""; }      // 작업신고: 착수 7일 전(법 제122조③)
   function asbKeepUntil(r){ if(!isDate(r.end)) return ""; var d=new Date(r.end+"T00:00:00"); d.setFullYear(d.getFullYear()+30); return fmtDate(d); }
   function mergeAsb(local, remote){
+    // P1 판24j(C209): 칸 단위(공용 imMerge) · 이름표 = 현장 기록 창 칸 글 · 알림 이름 = 공사명
+    if (typeof imMerge === "function") return imMerge("asbestos", local, remote, {
+      name: function(r){ return r.title || "현장"; },
+      lbl: { kind: "종류", title: "공사명", client: "발주처", site: "작업장 소재지", start: "작업 시작일", end: "작업 종료일", material: "자재 종류", area: "면적", status: "진행 상태", conc: "공기 중 석면농도", waste_no: "폐기물 인계번호", member_ids: "투입 근로자 — 직원", worker_ids: "투입 근로자 — 일용직", note: "메모" }
+    });
     var byId = {}; (local||[]).forEach(function(r){ if(r&&r.id) byId[r.id]=r; });
     (remote||[]).forEach(function(x){
       if(!x||!x.id) return; var c=byId[x.id];
@@ -18442,11 +18655,14 @@
   //   opt.noHooks = 현황·체크 칸(v447 검토)이 부를 때 — 보류된 계약 연결·종결(csSiteHooksRetry → csSiteDone, 대장·계약 저장이 날 수 있음)을 돌리지 않는다(현황은 읽기만). 현장 칸·계약 쪽 읽기는 종전대로 돌린다
   function loadAsb(opt){
     if(!canSee("site")) return;   // v429: 현장 대장 = 현장 권한(서버 col:asbestos도 site — 인허가 lic만 있으면 403). 종전 lic 판정이라 현장 권한만 있는 사람은 목록이 비었다
+    var imG0 = (typeof imSt === "function") ? imSt("asbestos").gen : 0;   // P1 판24j
     return gwCall("gw-data",{action:"get",collection:"asbestos"}).then(function(res){
       if(res.status!==200) return false;
       var doc=(res.body&&res.body.doc)||{};
       var ri=Array.isArray(doc.items)?doc.items:[];
-      asb = asbPending ? mergeAsb(asb, ri) : ri;   // 저장 대기 중이면 로컬 우선(로드 덮어쓰기 금지)
+      // P1 판24j(C209): 받은 사본과 함께(모양 교정한 뒤 — 교정을 '이 화면 고침'으로 세지 않게) · 로그아웃 사이(0)·옛 판(1) 버림
+      if (typeof imRead === "function"){ ri.forEach(normAsbRow); var nx = imRead("asbestos", imG0, asb, ri, asbPending, mergeAsb, doc.updated_at||0); if (nx === 0) return false; if (nx === 1) return true; asb = nx; }
+      else asb = asbPending ? mergeAsb(asb, ri) : ri;   // 저장 대기 중이면 로컬 우선(로드 덮어쓰기 금지)
       asb.forEach(normAsbRow);                     // v336: 모양 교정은 입구에서 1회 — 다음 저장 때 서버 기록도 배열로 정리된다
       asbBase = doc.updated_at||0; asbLoaded = true;
       if (!(opt && opt.noHooks) && typeof csSiteHooksRetry === "function"){ try { csSiteHooksRetry(); } catch(e){} }   // v384: 보류된 계약 연결·종결 · v432 현황 읽기는 건너뜀
@@ -18474,12 +18690,15 @@
   // v335의 safeRender(개별 try/catch + 닫기 보장 + 실패 토스트)는 v336에서 걷어냈다 —
   // 덮는 층이 아니라 던지는 원인(asList)과 순서(afterSave)를 고쳤기 때문. 위 gwToast 아래 주석 참조.
   function doSaveAsb(n){
-    var sent = canSee("safety") ? null : siteGapSigs(asb);   // v433: 지금 보내는 대장의 줄별 투입 인원 서명(gwCall이 이 자리에서 글로 굳힌다) — 200이면 서버가 판정할 대장이 바로 이것
+    var sent = canSee("safety") ? null : siteGapSigs(asb); var imV = (typeof imSvGo === "function") ? imSvGo("asbestos", asb) : null;   // v433: 지금 보내는 대장의 줄별 투입 인원 서명(gwCall이 이 자리에서 글로 굳힌다) — 200이면 서버가 판정할 대장이 바로 이것 · P1 판24j(C209): imV = 나가 있는 저장·보낼 때 세대(공통 길 밖)
     return gwCall("gw-data",{action:"save",collection:"asbestos",doc:{schema:1,items:asb},base:asbBase}).then(function(res){
+      if (imV) imSvEnd(imV);
       if(res.status===409){
         if(saveConflictStop(n)) return;   // v456(C079): 연달아 3번째 409면 멈춤·알림
+        var imG0 = (typeof imSt === "function") ? imSt("asbestos").gen : 0;
         return gwCall("gw-data",{action:"get",collection:"asbestos"}).then(function(r2){
-          if(r2.status===200){ var doc=(r2.body&&r2.body.doc)||{}; asb=mergeAsb(asb,Array.isArray(doc.items)?doc.items:[]); asb.forEach(normAsbRow); asbBase=doc.updated_at||0; return doSaveAsb((n||0)+1); }   // v336 적대검증: 409 병합도 입구다 — 여기서 안 고치면 문자열 "[]"가 서버로 되돌아간다
+          var nq=-1; if(r2.status===200 && typeof imRead === "function"){ var dq=(r2.body&&r2.body.doc)||{}, rq=Array.isArray(dq.items)?dq.items:[]; rq.forEach(normAsbRow); nq=imRead("asbestos", imG0, asb, rq, true, mergeAsb, dq.updated_at||0); if(nq===0) return; if(nq===1) return saveConflictToast(); }   // P1 판24j: 칸 단위(모양 교정한 받은 대장과 — 병합은 옛 기준 → 기준 = 받은 대장) · 로그아웃 사이면 끝 · 옛 판이면 다시 읽기 실패와 같이
+          if(r2.status===200){ var doc=(r2.body&&r2.body.doc)||{}; asb=(nq!==-1)?nq:mergeAsb(asb,Array.isArray(doc.items)?doc.items:[]); asb.forEach(normAsbRow); asbBase=doc.updated_at||0; return doSaveAsb((n||0)+1); }   // v336 적대검증: 409 병합도 입구다 — 여기서 안 고치면 문자열 "[]"가 서버로 되돌아간다
           saveConflictToast();   // v456(C079): 다시 읽기 실패면 곧바로 다시 저장하지 않음
         });
       }
@@ -18492,9 +18711,10 @@
         if(asbOrphTry===1){ var gone=asbOrphDrop(res.body.ids); if(gone){ asbOrphTry=2; gwToast(gone+"명은 일용직 명부에 없어 현장 대장에서 뺐습니다 — 필요하면 일용직 명부에 다시 등록한 뒤 그 현장 [근로자 추가]에서 넣어 주세요.", true); if(typeof renderSites==="function") renderSites(); return doSaveAsb(n); } }
         gwToast("현장 대장을 저장하지 못했습니다 — 넣은 일용직이 아직 서버 명부에 없습니다(일용직 명부 저장이 끝나지 않음).\n일용직 명부가 저장된 뒤 그 현장 [근로자 추가]에서 [이 현장에 넣기]를 다시 눌러 주세요.", true);
       }
+      if(res.status===200&&imV) imSvOk(imV, (res.body&&res.body.updated_at)||0);   // P1 판24j: 저장 200 = 보낸 대장이 서버 사본(세대가 같거나 이 판이 기준 판보다 새로울 때만)
       if(res.status===200){ asbBase=(res.body&&res.body.updated_at)||Date.now(); asbPending=false; if(!canSee("safety")) loadSiteEduGap(sent); }   // v433: 저장한 대장(보낸 서명)으로 특별교육 줄 다시 확인 — 응답 전에 또 고친 줄은 다음 저장 뒤까지 '확인 못 함'(화면 대장으로 서명하면 옛 이름이 확인된 것처럼 그려짐 — v433 검토)
       else if(!(res.status===400&&res.body&&res.body.error_code==="ORPHAN_WORKER")) saveFailToast("현장 대장", res.status);   // P1 판24h(C206): 500 등도 알림(대기는 남김 — 종전엔 알림 0 · 명부 밖 일용직 거절은 위 제 알림)
-    }).catch(function(){ saveFailToast("현장 대장"); });
+    }).catch(function(){ if (imV) imSvEnd(imV); saveFailToast("현장 대장"); });
   }
   function asbWorkerNames(r){
     var out=[];
@@ -20228,6 +20448,12 @@
   function liveEdu(){ return edu.filter(function(r){ return r && r.del!==1; }); }
   function findEdu(id){ for(var i=0;i<edu.length;i++){ if(edu[i].id===id) return edu[i]; } return null; }
   function mergeEdu(local, remote){
+    // P1 판24j(C209): 칸 단위(공용 imMerge) · 평가 회차 표식(ra)·검진 명의는 칸 그대로 · 이름표 = 교육·건강진단 이력 창 칸 글 · 알림 이름 = 종류·날짜(직원·일용직 이름은 안 씀)
+    if (typeof imMerge === "function") return imMerge("edu", local, remote, {
+      name: function(r){ return (eduKindLabel(r.kind) + " " + (r.date || "")).trim() || "기록"; },
+      lbl: { ptype: "대상", pid: "대상", kind: "종류", date: "이수·실시일", hours: "시간", next: "다음 예정일", note: "기관·비고", ra: "평가 회차", org: "검진 받은 회사 명의" },
+      grp: [["ptype", "pid"], ["ra"]]
+    });
     var byId={}; (local||[]).forEach(function(r){ if(r&&r.id) byId[r.id]=r; });
     (remote||[]).forEach(function(x){
       if(!x||!x.id) return; var c=byId[x.id];
@@ -20241,11 +20467,14 @@
   }
   function loadEdu(){
     if(!canSee("safety")) return;   // v430 교육·건강진단 기록 = 안전 권한(서버 COL edu:'safety' — 종전 hr 관리자 전용)
+    var imG0 = (typeof imSt === "function") ? imSt("edu").gen : 0;   // P1 판24j
     return gwCall("gw-data",{action:"get",collection:"edu"}).then(function(res){   // v432: 읽기 결과를 돌려준다(성공 true · 실패 false — 안전 › 현황 '불러오지 못함')
       if(res.status!==200) return false;
       var doc=(res.body&&res.body.doc)||{};
       var ri=Array.isArray(doc.items)?doc.items:[];
-      edu = eduPending ? mergeEdu(edu, ri) : ri;
+      // P1 판24j(C209): 받은 사본과 함께 · 로그아웃·전환 사이(0)·옛 판(1) 버림
+      if (typeof imRead === "function"){ var nx = imRead("edu", imG0, edu, ri, eduPending, mergeEdu, doc.updated_at||0); if (nx === 0) return false; if (nx === 1) return true; edu = nx; }
+      else edu = eduPending ? mergeEdu(edu, ri) : ri;
       eduBase = doc.updated_at||0; eduLoaded = true;   // v447 읽기 전 저장 막기 해제(위 eduLoaded)
       renderEdu(); renderCalendar(); renderSites();
       if (isAdmin() && currentTab === "dash") renderDashboard();   // v432 관리자 홈 만기 목록의 교육·검진 다음 예정 줄 — 홈이 보일 때만(다른 화면이면 홈으로 돌아올 때 switchTab이 다시 그린다)
@@ -20255,15 +20484,19 @@
   function scheduleEduSave(){ eduPending=true; if(eduSaveTimer) clearTimeout(eduSaveTimer); eduSaveTimer=setTimeout(doSaveEdu,1200); }
   function doSaveEdu(n){
     if(!eduLoaded) return Promise.resolve();   // v447: 못 읽은 기록은 보내지 않는다(위 eduLoaded — 고치는 길이 먼저 막고 알린다)
+    var imV = (typeof imSvGo === "function") ? imSvGo("edu", edu) : null;   // P1 판24j(C209): 나가 있는 저장·보낼 때 세대(공통 길 밖)
     return gwCall("gw-data",{action:"save",collection:"edu",doc:{schema:1,items:edu},base:eduBase}).then(function(res){
+      if (imV) imSvEnd(imV);
       if(res.status===409){
         if(saveConflictStop(n)) return;   // v456(C079): 연달아 3번째 409면 멈춤·알림
+        var imG0 = (typeof imSt === "function") ? imSt("edu").gen : 0;
         return gwCall("gw-data",{action:"get",collection:"edu"}).then(function(r2){
-          if(r2.status===200){ var doc=(r2.body&&r2.body.doc)||{}; edu=mergeEdu(edu,Array.isArray(doc.items)?doc.items:[]); eduBase=doc.updated_at||0; return doSaveEdu((n||0)+1); }
+          var nq=-1; if(r2.status===200 && typeof imRead === "function"){ var dq=(r2.body&&r2.body.doc)||{}; nq=imRead("edu", imG0, edu, Array.isArray(dq.items)?dq.items:[], true, mergeEdu, dq.updated_at||0); if(nq===0) return; if(nq===1) return saveConflictToast(); }   // P1 판24j: 칸 단위(병합은 옛 기준 → 기준 = 받은 기록) · 로그아웃 사이면 끝 · 옛 판이면 다시 읽기 실패와 같이
+          if(r2.status===200){ var doc=(r2.body&&r2.body.doc)||{}; edu=(nq!==-1)?nq:mergeEdu(edu,Array.isArray(doc.items)?doc.items:[]); eduBase=doc.updated_at||0; return doSaveEdu((n||0)+1); }
           saveConflictToast();   // v456(C079): 다시 읽기 실패면 곧바로 다시 저장하지 않음
         });
       }
-      if(res.status===200){ eduBase=(res.body&&res.body.updated_at)||Date.now(); eduPending=false; }
+      if(res.status===200){ eduBase=(res.body&&res.body.updated_at)||Date.now(); eduPending=false; if (imV) imSvOk(imV, eduBase); }
       // v430: 서버 거절(403 NO_WRITE — 안전 '수행'이 아님)을 알린다. 종전엔 조용히 삼켜 '저장했습니다'만 남았다(권한이 바뀐 직후 5분 캐시 등).
       //   보류 표시를 내려 다음 읽기 때 서버 값으로 돌아가게 한다(남은 로컬 변경을 다시 올리지 않음)
       //   v430(검토): 기기 승인 취소(403 DEVICE_NOT_APPROVED — 서버 handleSave가 권한보다 먼저 본다)는 권한 문제가 아니다 — 기기 안내를 띄우고
@@ -20273,7 +20506,7 @@
         else { eduPending=false; gwToast("안전 › 체크 칸 기록 저장 권한이 없어 서버가 이 변경을 받지 않았습니다.\n화면 값은 새로고침하면 서버 값으로 돌아갑니다.", true); }
       }
       if(res.status!==200&&res.status!==403) saveFailToast("안전 › 체크 칸 기록", res.status);   // P1 판24h(C206): 500 등도 알림(대기는 남김 — 종전엔 알림 0)
-    }).catch(function(){ saveFailToast("안전 › 체크 칸 기록"); });
+    }).catch(function(){ if (imV) imSvEnd(imV); saveFailToast("안전 › 체크 칸 기록"); });
   }
   // v430 교육·검진 쓰기 가드(openEdu·saveEdu·deleteEdu 첫 줄) — 안전 '수행'만. 보기 권한 칸은 [+ 이력 추가]·[수정]이 숨지만(.sf-pane.readonly) 창이 열린 사이 권한이 바뀌어도 알린다
   var EDU_NO_WRITE = "안전 › 체크 칸 기록을 추가·수정·삭제할 권한이 없습니다 — 권한관리 [안전] 열이 '수행'이어야 합니다.";
@@ -21355,15 +21588,25 @@
   function loadBids(){
     var token=getToken(); if(!token) return;
     bidsLoading++;
+    var imG0 = (typeof imSt === "function") ? imSt("bids").gen : 0;   // P1 판24j
     var lp=fetch(BIDS_API, {headers:ghHeaders()}).then(function(resp){
-      if(resp.status===404){ bidsSha=null; bids=[]; bidsLoaded=false; bidsLoadErr=null; renderBids(); return; }   // v443: gw 대역에서 빈 문서는 200으로 온다 — 404는 못 읽음(빈 목록을 저장하지 않게)
+      if(resp.status===404){ bidsSha=null; bids=[]; if (typeof imBaseSetAt === "function") imBaseSetAt("bids", [], 0); bidsLoaded=false; bidsLoadErr=null; renderBids(); return; }   // v443: gw 대역에서 빈 문서는 200으로 온다 — 404는 못 읽음(빈 목록을 저장하지 않게)
       if(!resp.ok) throw new Error("HTTP "+resp.status);
-      return resp.json().then(function(json){ bidsSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); var ri=(p&&p.items)||[]; bidsHealth=(p&&p.health)||null; bidsAwards=(p&&p.awards)||null; bids = bidsPending ? mergeBidsLocal(bids, ri) : ri; bidsLoaded=true; bidsLoadErr=null; renderBids(); renderDashboard(); runBidQualGen(); autoGenReady.bids=true; runAwardAutoCon(); if(bidsSaveHeld){ bidsSaveHeld=false; scheduleBidsSave(); } });   // v443 읽음 표시 · 못 읽어 미뤄 둔 저장은 병합한 뒤 다시 잡음
+      return resp.json().then(function(json){ var p=JSON.parse(b64DecodeUnicode(json.content)); var ri=(p&&p.items)||[];
+        // P1 판24j(C209): 받은 사본과 함께(공통 길이 맡긴 사본을 깊은 복사 없이) · 로그아웃 사이(0)·옛 판(1) 버림
+        if (typeof imRead === "function"){ var nx = imRead("bids", imG0, bids, ri, bidsPending, mergeBidsLocal); if (nx === 0 || nx === 1) return; bids = nx; } else bids = bidsPending ? mergeBidsLocal(bids, ri) : ri;
+        bidsSha=json.sha; bidsHealth=(p&&p.health)||null; bidsAwards=(p&&p.awards)||null; bidsLoaded=true; bidsLoadErr=null; renderBids(); renderDashboard(); runBidQualGen(); autoGenReady.bids=true; runAwardAutoCon(); if(bidsSaveHeld){ bidsSaveHeld=false; scheduleBidsSave(); } });   // v443 읽음 표시 · 못 읽어 미뤄 둔 저장은 병합한 뒤 다시 잡음
     }).catch(function(e){ bidsLoadErr={ msg:String((e&&e.message)||e||"오류"), ts:Date.now() }; renderBids(); });
     lp.then(function(){ bidsLoading--; }, function(){ bidsLoading--; });   // v443 검토: 읽기가 끝나면(200·404·실패 모두) 읽는 중 수를 내림
   }
   function scheduleBidsSave(){ bidsPending=true; if(bidsSaveTimer) clearTimeout(bidsSaveTimer); bidsSaveTimer=setTimeout(doSaveBids,1200); }
-  function mergeBidsLocal(local,remote){ var byId={}; (local||[]).forEach(function(b){if(b&&b.id)byId[b.id]=b;}); (remote||[]).forEach(function(x){if(!x||!x.id)return;var c=byId[x.id];if(!c){byId[x.id]=x;}else{var w=(x.updated||"")>(c.updated||"")?x:c;var m=Object.assign({},(w===x?c:x),w);if(c.del===1||x.del===1)m.del=mergeDel(c,x);byId[x.id]=m;}}); return Object.keys(byId).map(function(k){return byId[k];}); }
+  // P1 판24j(C209): 일감·부동산 한 함수 — 자료 이름(col: "bids" 기본 · 부동산 "onbid")을 갈라 받아 각자 받은 사본과 칸 단위(공용 imMerge) · 이름표 = 표 머리 글
+  function mergeBidsLocal(local,remote,col){ if (typeof imMerge === "function") return imMerge(col === "onbid" ? "onbid" : "bids", local, remote, {
+      name: function(b){ return b.title || (col === "onbid" ? "물건" : "공고"); },
+      lbl: col === "onbid" ? { title: "물건(소재지)", due: "마감", status: "상태", kind: "종류", note: "메모" } : { title: "공고명", org: "발주기관", due: "마감", status: "상태", note: "메모", result: "결과", layer: "구분" },
+      fast: 1   // 수천 건 — 한쪽이 받은 그대로인 줄은 칸 걷기 없이(imFast)
+    });
+    var byId={}; (local||[]).forEach(function(b){if(b&&b.id)byId[b.id]=b;}); (remote||[]).forEach(function(x){if(!x||!x.id)return;var c=byId[x.id];if(!c){byId[x.id]=x;}else{var w=(x.updated||"")>(c.updated||"")?x:c;var m=Object.assign({},(w===x?c:x),w);if(c.del===1||x.del===1)m.del=mergeDel(c,x);byId[x.id]=m;}}); return Object.keys(byId).map(function(k){return byId[k];}); }
   function doSaveBids(){
     var token=getToken(); if(!token) return;
     if(!bidsLoaded){ bidsSaveHeld=true; return; }   // v443: 못 읽은 공고 문서는 보내지 않는다(위 bidsLoaded — 수동 등록 [저장]이 먼저 막고 알림 · 읽기 200 뒤 병합해 다시 잡음)
@@ -21376,7 +21619,10 @@
     if(bidsSha) payload.sha=bidsSha;
     fetch(BIDS_API,{method:"PUT",headers:Object.assign({"Content-Type":"application/json"},ghHeaders()),body:JSON.stringify(payload)}).then(function(resp){
       if(resp.status===401) return;
-      if(resp.status===409||resp.status===422){ return fetch(BIDS_API,{headers:ghHeaders()}).then(function(r){return r.status===404?null:r.json();}).then(function(j){ if(j){var up={};try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} bids=mergeBidsLocal(bids,up.items||[]); if(up.health) bidsHealth=up.health; if(up.awards) bidsAwards=up.awards; bidsSha=j.sha;} return doSaveBids(); }); }
+      if(resp.status===409||resp.status===422){ var imG0=(typeof imSt==="function")?imSt("bids").gen:0;   // P1 판24j: 받은 사본과 칸 단위 · 다시 읽기 실패면 병합·기준 없이 다시 저장 · 읽는 사이 로그아웃이면 끝
+        return fetch(BIDS_API,{headers:ghHeaders()}).then(function(r){return r.status===404?null:r.json();}).then(function(j){
+          if(j&&typeof imRead==="function"){ var uq=null; try{uq=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} var nx=imRead("bids", imG0, bids, uq?(uq.items||[]):null, true, mergeBidsLocal); if(nx===0) return; if(nx!==1){ bids=nx; if(uq.health) bidsHealth=uq.health; if(uq.awards) bidsAwards=uq.awards; } bidsSha=j.sha; j=null; }   // j=null: 아래 종전 병합 건너뜀(다시 저장은 한 곳)
+          if(j){var up={};try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} bids=mergeBidsLocal(bids,up.items||[]); if(up.health) bidsHealth=up.health; if(up.awards) bidsAwards=up.awards; bidsSha=j.sha;} return doSaveBids(); }); }
       return resp.json().then(function(json){ if(resp.status===400&&json&&json.error_code==="GATE_CORP_REG"){ bidCorpGateRevert(json); return; } if(!resp.ok){ saveFailToast("입찰 공고", resp.status); return; } if(json&&json.write_denied){ bidsPending=false; saveDeniedToast("입찰 공고"); return; } bidsSha=json.content&&json.content.sha; bidsPending=false; });   // P1 판1: 투찰 잠금 거절은 그 줄만 되돌려 다시 저장(@corp-reg) · P1 판24h(C206): 그 밖 실패(500·412 등)는 성공으로 넘기지 않음(대기 남김 · 종전엔 대기를 풀었다)
     }).catch(function(){ saveFailToast("입찰 공고"); });
   }
@@ -21391,19 +21637,27 @@
   function liveQuotes(){ return quotes.filter(function(q){ return q && q.del!==1; }); }
   function loadQuotes(){
     var token=getToken(); if(!token) return;
+    var imG0 = (typeof imSt === "function") ? imSt("quotes").gen : 0;   // P1 판24j
     fetch(QUOTE_API,{headers:ghHeaders()}).then(function(resp){
-      if(resp.status===404){ quoteSha=null; quotes=[]; quoteLoaded=false; renderQuotes(); return; }
+      if(resp.status===404){ quoteSha=null; quotes=[]; if (typeof imBaseSetAt === "function") imBaseSetAt("quotes", [], 0); quoteLoaded=false; renderQuotes(); return; }
       if(!resp.ok) throw new Error("HTTP "+resp.status);
       return resp.json().then(function(json){
-        quoteSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content));
+        var p=JSON.parse(b64DecodeUnicode(json.content));
         var ri=(p&&p.items)||[];
-        quotes = quotePending ? mergeQuotes(quotes, ri) : ri;
+        // P1 판24j(C209): 받은 사본과 함께 · 로그아웃 사이(0)·옛 판(1) 버림
+        if (typeof imRead === "function"){ var nx = imRead("quotes", imG0, quotes, ri, quotePending, mergeQuotes); if (nx === 0 || nx === 1) return; quotes = nx; } else quotes = quotePending ? mergeQuotes(quotes, ri) : ri;
+        quoteSha=json.sha;
         quoteLoaded=true;
         renderQuotes();
       });
     }).catch(function(){});
   }
   function mergeQuotes(local,remote){
+    // P1 판24j(C209): 칸 단위(공용 imMerge) · 이름표 = 견적서 발행 창 칸 글 · 알림 이름 = 견적번호(금액은 안 씀)
+    if (typeof imMerge === "function") return imMerge("quotes", local, remote, {
+      name: function(q){ return q.no || q.title || "견적서"; },
+      lbl: { no: "견적번호", date: "견적일자", co: "회사", recv: "수신처", title: "용역명 / 공사명", item: "품명", sang: "성상", gubun: "구분", unit: "단위", qty: "수량", price: "단가", vat: "부가세", note: "내부 메모", con_id: "계약" }
+    });
     var byId={}; (local||[]).forEach(function(q){ if(q&&q.id) byId[q.id]=q; });
     (remote||[]).forEach(function(x){ if(!x||!x.id) return; var c=byId[x.id];
       if(!c){ byId[x.id]=x; } else { var w=(x.updated||"")>(c.updated||"")?x:c; var m=Object.assign({},(w===x?c:x),w); if(c.del===1||x.del===1) m.del=mergeDel(c,x); byId[x.id]=m; } });
@@ -21416,7 +21670,10 @@
     if(quoteSha) payload.sha=quoteSha;
     fetch(QUOTE_API,{method:"PUT",headers:Object.assign({"Content-Type":"application/json"},ghHeaders()),body:JSON.stringify(payload)}).then(function(resp){
       if(resp.status===401) return;
-      if(resp.status===409||resp.status===422){ return fetch(QUOTE_API,{headers:ghHeaders()}).then(function(r){ return r.status===404?null:r.json(); }).then(function(j){ if(j){ var up={}; try{ up=JSON.parse(b64DecodeUnicode(j.content))||{}; }catch(e){} quotes=mergeQuotes(quotes,up.items||[]); quoteSha=j.sha; } return doSaveQuotes(); }); }
+      if(resp.status===409||resp.status===422){ var imG0=(typeof imSt==="function")?imSt("quotes").gen:0;   // P1 판24j: 받은 사본과 칸 단위 · 다시 읽기 실패면 병합·기준 없이 다시 저장 · 읽는 사이 로그아웃이면 끝
+        return fetch(QUOTE_API,{headers:ghHeaders()}).then(function(r){ return r.status===404?null:r.json(); }).then(function(j){
+          if(j&&typeof imRead==="function"){ var uq=null; try{ uq=JSON.parse(b64DecodeUnicode(j.content))||{}; }catch(e){} var nx=imRead("quotes", imG0, quotes, uq?(uq.items||[]):null, true, mergeQuotes); if(nx===0) return; if(nx!==1) quotes=nx; quoteSha=j.sha; j=null; }   // j=null: 아래 종전 병합 건너뜀(다시 저장은 한 곳)
+          if(j){ var up={}; try{ up=JSON.parse(b64DecodeUnicode(j.content))||{}; }catch(e){} quotes=mergeQuotes(quotes,up.items||[]); quoteSha=j.sha; } return doSaveQuotes(); }); }
       if(!resp.ok){ saveFailToast("견적서", resp.status); return; }   // P1 판24h(C206 D5): 실패는 실패로(대기 남김)
       return resp.json().then(function(json){ if(json&&json.write_denied){ quotePending=false; saveDeniedToast("견적서"); return; } quoteSha=json.content&&json.content.sha; quotePending=false; renderQuotes(); });
     }).catch(function(){ saveFailToast("견적서"); });
@@ -23613,18 +23870,28 @@
 
   function loadPromo(){
     var token=getToken(); if(!token) return;
+    var imG0 = (typeof imSt === "function") ? imSt("promo").gen : 0;   // P1 판24j
     fetch(PROMO_API,{headers:ghHeaders()}).then(function(resp){
-      if(resp.status===404){ promoSha=null; promoItems=[]; renderPromo(); return; }
+      if(resp.status===404){ promoSha=null; promoItems=[]; if (typeof imBaseSetAt === "function") imBaseSetAt("promo", [], 0); renderPromo(); return; }
       if(!resp.ok) throw new Error("HTTP "+resp.status);
       return resp.json().then(function(json){
-        promoSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content));
+        var p=JSON.parse(b64DecodeUnicode(json.content));
         var ri=(p&&p.items)||[];
-        promoItems = promoPending ? mergePromo(promoItems, ri) : ri;
+        // P1 판24j(C209): 받은 사본과 함께 · 로그아웃 사이(0)·옛 판(1) 버림
+        if (typeof imRead === "function"){ var nx = imRead("promo", imG0, promoItems, ri, promoPending, mergePromo); if (nx === 0 || nx === 1) return; promoItems = nx; } else promoItems = promoPending ? mergePromo(promoItems, ri) : ri;
+        promoSha=json.sha;
         renderPromo();
       });
     }).catch(function(){});
   }
   function mergePromo(local,remote){
+    // P1 판24j(C209): 칸 단위(공용 imMerge) — 검수 상태와 반려 사유(note)는 한 덩어리 · 받은 사본 없는 기록 = 종전 시각(promoStamp) 비교 통째 · 이름표 = 현장 기록·기록 상세 창 글
+    if (typeof imMerge === "function") return imMerge("promo", local, remote, {
+      name: function(p){ return p.title || p.region || "홍보 기록"; },
+      lbl: { title: "블로그 제목", body: "블로그 본문 초안", status: "검수", region: "지역", facility: "시설·대상", problem: "문제·상황", metric: "수치", contract_id: "관련 계약", photos: "사진" },
+      grp: [["status", "note"]],
+      whole: function(cur, x){ var w = mTime(x) > mTime(cur) ? x : cur, m = Object.assign({}, (w === x ? cur : x), w); if (cur.del === 1 || x.del === 1) m.del = mergeDel(cur, x); return Object.assign(cur, m); }
+    });
     var byId={}; (local||[]).forEach(function(q){ if(q&&q.id) byId[q.id]=q; });
     (remote||[]).forEach(function(x){ if(!x||!x.id) return; var c=byId[x.id];
       if(!c){ byId[x.id]=x; } else { var w=mTime(x)>mTime(c)?x:c; var m=Object.assign({},(w===x?c:x),w); if(c.del===1||x.del===1) m.del=mergeDel(c,x); byId[x.id]=m; } });
@@ -23637,7 +23904,10 @@
     if(promoSha) payload.sha=promoSha;
     fetch(PROMO_API,{method:"PUT",headers:Object.assign({"Content-Type":"application/json"},ghHeaders()),body:JSON.stringify(payload)}).then(function(resp){
       if(resp.status===401) return;
-      if(resp.status===409||resp.status===422){ return fetch(PROMO_API,{headers:ghHeaders()}).then(function(r){ return r.status===404?null:r.json(); }).then(function(j){ if(j){ var up={}; try{ up=JSON.parse(b64DecodeUnicode(j.content))||{}; }catch(e){} promoItems=mergePromo(promoItems,up.items||[]); promoSha=j.sha; } return doSavePromo(); }); }
+      if(resp.status===409||resp.status===422){ var imG0=(typeof imSt==="function")?imSt("promo").gen:0;   // P1 판24j: 받은 사본과 칸 단위 · 다시 읽기 실패면 병합·기준 없이 다시 저장 · 읽는 사이 로그아웃이면 끝
+        return fetch(PROMO_API,{headers:ghHeaders()}).then(function(r){ return r.status===404?null:r.json(); }).then(function(j){
+          if(j&&typeof imRead==="function"){ var uq=null; try{ uq=JSON.parse(b64DecodeUnicode(j.content))||{}; }catch(e){} var nx=imRead("promo", imG0, promoItems, uq?(uq.items||[]):null, true, mergePromo); if(nx===0) return; if(nx!==1) promoItems=nx; promoSha=j.sha; j=null; }   // j=null: 아래 종전 병합 건너뜀(다시 저장은 한 곳)
+          if(j){ var up={}; try{ up=JSON.parse(b64DecodeUnicode(j.content))||{}; }catch(e){} promoItems=mergePromo(promoItems,up.items||[]); promoSha=j.sha; } return doSavePromo(); }); }
       if(!resp.ok){ saveFailToast("홍보 기록", resp.status); return; }   // P1 판24h(C206 D5): 실패는 실패로 — 대기 남김 · 서버에 없는 기록으로 초안 생성·사진 가리기·갤러리 전송을 이어 가지 않음(기다리는 일은 다음 저장 200 뒤)
       return resp.json().then(function(json){ if(json&&json.write_denied){ promoPending=false; saveDeniedToast("홍보 기록"); return; } promoSha=json.content&&json.content.sha; promoPending=false; renderPromo();
         if(paAutoWait){ var w=paAutoWait; paAutoWait=""; paKick(w, true); }   // 새 기록이 서버에 실린 뒤에만 자동 생성
@@ -26189,10 +26459,14 @@
   function obExpired(b){ return !!(b.due && b.due<todayStr() && (b.status==="new"||b.status==="검토")); }
   function loadOnbid(){
     var token=getToken(); if(!token) return;
+    var imG0 = (typeof imSt === "function") ? imSt("onbid").gen : 0;   // P1 판24j
     fetch(ONBID_API, {headers:ghHeaders()}).then(function(resp){
-      if(resp.status===404){ onbidSha=null; onbids=[]; renderOnbid(); return; }
+      if(resp.status===404){ onbidSha=null; onbids=[]; if (typeof imBaseSetAt === "function") imBaseSetAt("onbid", [], 0); renderOnbid(); return; }
       if(!resp.ok) throw new Error("HTTP "+resp.status);
-      return resp.json().then(function(json){ onbidSha=json.sha; var p=JSON.parse(b64DecodeUnicode(json.content)); var ri=(p&&p.items)||[]; onbids = onbidPending ? mergeBidsLocal(onbids, ri) : ri; renderOnbid(); });
+      return resp.json().then(function(json){ var p=JSON.parse(b64DecodeUnicode(json.content)); var ri=(p&&p.items)||[];
+        // P1 판24j(C209): 받은 사본과 함께(자료 이름 onbid) · 로그아웃 사이(0)·옛 판(1) 버림
+        if (typeof imRead === "function"){ var nx = imRead("onbid", imG0, onbids, ri, onbidPending, function(a, b){ return mergeBidsLocal(a, b, "onbid"); }); if (nx === 0 || nx === 1) return; onbids = nx; } else onbids = onbidPending ? mergeBidsLocal(onbids, ri) : ri;
+        onbidSha=json.sha; renderOnbid(); });
     }).catch(function(){});
   }
   function scheduleOnbidSave(){ onbidPending=true; if(onbidSaveTimer) clearTimeout(onbidSaveTimer); onbidSaveTimer=setTimeout(doSaveOnbid,1200); }
@@ -26203,7 +26477,10 @@
     if(onbidSha) payload.sha=onbidSha;
     fetch(ONBID_API,{method:"PUT",headers:Object.assign({"Content-Type":"application/json"},ghHeaders()),body:JSON.stringify(payload)}).then(function(resp){
       if(resp.status===401) return;
-      if(resp.status===409||resp.status===422){ return fetch(ONBID_API,{headers:ghHeaders()}).then(function(r){return r.status===404?null:r.json();}).then(function(j){ if(j){var up={};try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} onbids=mergeBidsLocal(onbids,up.items||[]); onbidSha=j.sha;} return doSaveOnbid(); }); }
+      if(resp.status===409||resp.status===422){ var imG0=(typeof imSt==="function")?imSt("onbid").gen:0;   // P1 판24j: 받은 사본과 칸 단위 · 다시 읽기 실패면 병합·기준 없이 다시 저장 · 읽는 사이 로그아웃이면 끝
+        return fetch(ONBID_API,{headers:ghHeaders()}).then(function(r){return r.status===404?null:r.json();}).then(function(j){
+          if(j&&typeof imRead==="function"){ var uq=null; try{uq=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} var nx=imRead("onbid", imG0, onbids, uq?(uq.items||[]):null, true, function(a, b){ return mergeBidsLocal(a, b, "onbid"); }); if(nx===0) return; if(nx!==1) onbids=nx; onbidSha=j.sha; j=null; }   // j=null: 아래 종전 병합 건너뜀(다시 저장은 한 곳)
+          if(j){var up={};try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} onbids=mergeBidsLocal(onbids,up.items||[]); onbidSha=j.sha;} return doSaveOnbid(); }); }
       if(!resp.ok){ saveFailToast("공매·부동산", resp.status); return; }   // P1 판24h(C206 D5): 실패는 실패로(대기 남김)
       return resp.json().then(function(json){ if(json&&json.write_denied){ onbidPending=false; saveDeniedToast("공매·부동산"); return; } onbidSha=json.content&&json.content.sha; onbidPending=false; });
     }).catch(function(){ saveFailToast("공매·부동산"); });
@@ -26545,10 +26822,17 @@
   function loadClients(){
     var token = getToken(); if (!token) return;
     cliLoading++;
+    var imG0 = (typeof imSt === "function") ? imSt("clients").gen : 0;   // P1 판24j
     fetch(CLIENT_API, {headers: ghHeaders()}).then(function(resp){
       if (resp.status === 404){ cliSha = null; clients = []; cliLoaded = false; renderClients(); return; }   // v441 검토: gw 대역에서 빈 대장은 200(빈 문서)으로 온다 — 404는 읽기 실패로(빈 목록을 저장하지 않게)
       if (!resp.ok) throw new Error("HTTP " + resp.status);
-      return resp.json().then(function(json){ cliSha = json.sha; var p = JSON.parse(b64DecodeUnicode(json.content)); clients = (p && p.items) || []; cliLoaded = true; cliDirty = {}; renderClients(); });
+      return resp.json().then(function(json){ var p = JSON.parse(b64DecodeUnicode(json.content));
+        // P1 판24j(C209): 받은 사본과 함께 — 저장이 나가 있으면 고친 줄만 칸 단위로 합침(고친 표시 남김) · 아니면 종전대로 서버 대장 그대로 + 고친 표시 비움 · 로그아웃 사이(0)·옛 판(1) 버림
+        var ri = (p && p.items) || [], nx = (typeof imRead === "function") ? imRead("clients", imG0, clients, ri, false, function(a, b){ return cliMergeRemote(b).items; }) : ri;
+        if (nx === 0 || nx === 1) return;
+        var keep = nx !== ri ? cliDirty : null; if (keep && p) p.items = nx;   // 병합했으면 아래 줄이 병합 목록을 들이고 고친 표시를 되살림
+        cliSha = json.sha; clients = (p && p.items) || []; cliLoaded = true; cliDirty = {}; renderClients();
+        if (keep) cliDirty = keep; });
     }).catch(function(){ renderClients(); }).then(function(){ cliLoading--; }, function(){ cliLoading--; });
   }
   function cliReloadIfUnread(){ if (!cliLoaded && !cliLoading) loadClients(); }
@@ -26573,10 +26857,14 @@
   //   그사이 다른 기기가 같은 거래처(상호 열쇠·사업자번호 — cliTwinOf)를 먼저 넣었으면 둘 다 남기고 알림(중복·삭제는 사람 확인 — 자동으로 빼거나 합치지 않음)
   function cliSaveConflict(retried){
     if (retried){ alert("거래처 대장이 다른 기기에서 계속 바뀌어 저장하지 못했습니다 — 새로고침한 뒤 다시 해 주세요."); return; }
+    var imG0 = (typeof imSt === "function") ? imSt("clients").gen : 0;   // P1 판24j
     return fetch(CLIENT_API, {headers: ghHeaders()}).then(function(r){
       if (!r.ok) throw new Error("HTTP " + r.status);
       return r.json().then(function(j){
-        var p = JSON.parse(b64DecodeUnicode(j.content)), m = cliMergeRemote((p && p.items) || []);
+        var p = JSON.parse(b64DecodeUnicode(j.content)), pi = (p && p.items) || [];
+        // P1 판24j(C209): 읽는 사이 로그아웃이면 끝 · 옛 판이면 다시 읽기 실패와 같이(알림) · 병합(cliMergeRemote — 옛 기준) 뒤 기준 = 받은 대장
+        if (typeof imRead === "function"){ var mq = null, nx = imRead("clients", imG0, clients, pi, true, function(a, b){ mq = cliMergeRemote(b); return mq.items; }); if (nx === 0) return; if (nx === 1) throw new Error("옛 판"); }
+        var m = mq || cliMergeRemote(pi);
         clients = m.items; cliSha = j.sha; renderClients(); saveClients(true);
         if (m.twins.length) alert("다른 기기에서 같은 거래처가 먼저 대장에 들어왔습니다 — 대장에 같은 거래처가 둘 있습니다: " + m.twins.join(", ") + "\n하나를 [삭제]해 주세요(지운 표시만 남습니다).");
       });
@@ -26585,6 +26873,12 @@
   // 409 병합 — 서버 대장 순서·내용을 바탕으로, 이 기기에서 고친 거래처만 이 기기 것으로 바꾸거나(같은 id) 끝에 더함(새 거래처). 고치지 않은 거래처는 서버 것(다른 기기 수정이 이 기기 묵은 사본에 덮이지 않게)
   function cliMergeRemote(remote){
     var byId = {}, seen = {}, items = [], twins = [], rl = [];
+    // P1 판24j(C209): 고친 줄(cliDirty)이 서버에도 있으면 받은 사본과 칸 단위(공용 imMerge — 이 화면 줄 제자리 · 서버만 고친 칸은 서버 값) · 받은 사본이 없는 줄은 종전대로 이 화면 줄 통째
+    if (typeof imMerge === "function") imMerge("clients", clients.filter(function(c){ return c && c.id && cliDirty[c.id]; }), remote.filter(function(c){ return c && c.id && cliDirty[c.id]; }), {
+      name: function(c){ return c.name || "거래처"; },
+      lbl: { name: "상호", biz_no: "사업자번호", indiv: "개인 거래처", contact: "담당자", phone: "연락처", email: "이메일", address: "주소", note: "메모", waste_proc: "폐기물 처리업소" },
+      whole: function(cur){ return cur; }
+    });
     remote.forEach(function(c){ if (c && c.id){ byId[c.id] = c; if (c.del !== 1) rl.push(c); } });
     clients.forEach(function(c){ if (c && c.id && cliDirty[c.id]) byId[c.id] = c; });
     remote.forEach(function(c){ if (c && c.id && !seen[c.id]){ seen[c.id] = 1; items.push(byId[c.id]); } });
@@ -27576,15 +27870,17 @@
   function loadReceivables(){
     var token = getToken();
     if (!token) return;
+    var imG0 = (typeof imSt === "function") ? imSt("receivables").gen : 0;   // P1 판24j
     fetch(REC_API, {headers: ghHeaders()}).then(function(resp){
       if (resp.status === 401){ clearToken(); showTokenScreen(true); return; }
-      if (resp.status === 404){ recSha = null; receivables = []; saveRecCache(); renderReceivables(); renderDashboard(); return; }
+      if (resp.status === 404){ recSha = null; receivables = []; if (typeof imBaseSetAt === "function") imBaseSetAt("receivables", [], 0); saveRecCache(); renderReceivables(); renderDashboard(); return; }
       if (!resp.ok) throw new Error("HTTP " + resp.status);
       return resp.json().then(function(json){
-        recSha = json.sha;
         var parsed = JSON.parse(b64DecodeUnicode(json.content));
         var recRemote = (parsed && parsed.items) || [];
-        receivables = recPending ? mergeRec(receivables, recRemote) : recRemote;   // 오프라인 편집(pending) 병합 — tasks/veh/lic와 동일(없으면 online 복귀 때 입금 처리분 증발)
+        // P1 판24j(C209): 받은 사본과 함께(병합은 옛 기준 → 기준 = 받은 목록) · 로그아웃 사이(0)·옛 판(1) 버림
+        if (typeof imRead === "function"){ var nx = imRead("receivables", imG0, receivables, recRemote, recPending, mergeRec); if (nx === 0 || nx === 1) return; recSha = json.sha; receivables = nx; }
+        else { recSha = json.sha; receivables = recPending ? mergeRec(receivables, recRemote) : recRemote; }   // 오프라인 편집(pending) 병합 — tasks/veh/lic와 동일(없으면 online 복귀 때 입금 처리분 증발)
         setOffline(false); saveRecCache(); renderReceivables(); renderDashboard();
         recOverdueGen();   // 미수 장기화 자동 지시(만기 자동생성이 먼저 돈 경우 보충)
       });
@@ -27601,6 +27897,14 @@
   }
 
   function mergeRec(local, remote){
+    // P1 판24j(C209): 칸 단위(공용 imMerge) · 검수({by, date})는 한 덩어리(처리자·날짜가 갈라지지 않게) · 이름표 = 기성 수정 창·표 머리 글(금액은 알림에 안 씀 — 칸 이름만)
+    if (typeof imMerge === "function") return imMerge("receivables", local, remote, {
+      name: function(r){ return [r.client, r.desc].filter(Boolean).join(" ") || "기성"; },
+      lbl: { co: "회사", client: "거래처", desc: "내역", amount: "금액", billed: "청구일", assignee: "담당", scope: "공개 대상", paid: "입금 완료", invoice: "발행", reviewed: "검수", mismatch: "불일치", recheck: "금액 바뀜", note: "메모" },
+      grp: [["reviewed"]],
+      gone: 1,   // 다른 기기가 영구 삭제한 기성을 이 화면이 안 고쳤으면 되살리지 않음
+      sort: function(a, b){ var ac = a.created || "", bc = b.created || ""; if (ac !== bc) return ac < bc ? -1 : 1; return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0); }
+    });
     var byId = {};
     (local || []).forEach(function(r){ if (r && r.id) byId[r.id] = r; });
     (remote || []).forEach(function(x){
@@ -27634,8 +27938,11 @@
   }
 
   function resolveRecConflictAndRetry(){
+    var imG0 = (typeof imSt === "function") ? imSt("receivables").gen : 0;
     return fetch(REC_API, {headers: ghHeaders()}).then(function(resp){ if (resp.status === 404) return null; return resp.json(); }).then(function(json){
-      if (json){ var rp = {}; try{ rp = JSON.parse(b64DecodeUnicode(json.content)) || {}; }catch(e){} receivables = mergeRec(receivables, rp.items || []); recSha = json.sha; }
+      // P1 판24j(C209): 다시 읽기 실패는 병합·기준 없이 다시 저장 · 읽는 사이 로그아웃이면 끝
+      if (json && typeof imRead === "function"){ var rq = null; try{ rq = JSON.parse(b64DecodeUnicode(json.content)) || {}; }catch(e){} var nx = imRead("receivables", imG0, receivables, rq ? (rq.items || []) : null, true, mergeRec); if (nx === 0) return; if (nx !== 1) receivables = nx; recSha = json.sha; }
+      else if (json){ var rp = {}; try{ rp = JSON.parse(b64DecodeUnicode(json.content)) || {}; }catch(e){} receivables = mergeRec(receivables, rp.items || []); recSha = json.sha; }
       saveRecCache(); renderReceivables(); renderDashboard(); return doSaveRec();
     });
   }
@@ -28456,15 +28763,17 @@
 
   function loadLicenses(){
     var token = getToken(); if (!token) return;
+    var imG0 = (typeof imSt === "function") ? imSt("licenses").gen : 0;   // P1 판24j
     fetch(LIC_API, {headers: ghHeaders()}).then(function(resp){
       if (resp.status === 401){ clearToken(); showTokenScreen(true); return; }
-      if (resp.status === 404){ licSha = null; licenses = []; duties = []; licRemoteOk = true; saveLicCache(); renderLicenses(); renderDashboard(); markLoadedForAutoGen("lic"); return; }
+      if (resp.status === 404){ licSha = null; licenses = []; duties = []; if (typeof imBaseSetAt === "function") imBaseSetAt("licenses", [], 0); licRemoteOk = true; saveLicCache(); renderLicenses(); renderDashboard(); markLoadedForAutoGen("lic"); return; }
       if (!resp.ok) throw new Error("HTTP " + resp.status);
       return resp.json().then(function(json){
-        licSha = json.sha;
         var parsed = JSON.parse(b64DecodeUnicode(json.content));
         var ri = (parsed && parsed.items) || [];
-        licenses = (licPending ? mergeLic(licenses, ri) : ri);
+        // P1 판24j(C209): 받은 사본과 함께 · 로그아웃 사이(0)·옛 판(1)이면 면허·의무 대장 둘 다 들이지 않음(같은 문서)
+        if (typeof imRead === "function"){ var nx = imRead("licenses", imG0, licenses, ri, licPending, mergeLic); if (nx === 0 || nx === 1) return; licSha = json.sha; licenses = nx; }
+        else { licSha = json.sha; licenses = (licPending ? mergeLic(licenses, ri) : ri); }
         var rd = (parsed && parsed.duties) || [];   // duties도 같은 문서에서 — 로드가 편집을 덮지 않게 pending이면 병합
         duties = (licPending ? mergeDuties(duties, rd) : rd);
         licRemoteOk = true;   // 시드 허용 조건 — 캐시 폴백이 아닌 진짜 원격 상태를 봤을 때만(리뷰 high: 폴백 시드가 남의 편집을 덮음)
@@ -28482,6 +28791,12 @@
     licSaveTimer = setTimeout(function(){ licSaveTimer = null; doSaveLic(); }, 1500);
   }
   function mergeLic(local, remote){
+    // P1 판24j(C209): 면허 줄 칸 단위(공용 imMerge) — 의무 대장(duties)은 대상 아님(mergeDuties 그대로) · 이름표 = 인허가 수정 창 칸 글
+    if (typeof imMerge === "function") return imMerge("licenses", local, remote, {
+      name: function(l){ return l.name || "인허가"; },
+      lbl: { name: "인허가명", org: "법인", license_no: "허가번호", expiry: "만료일", edu_due: "보수교육·점검 다음 예정일", edu_cycle: "주기 메모", note: "메모", scope: "공개 대상 직원", issued: "발급일" },
+      sort: function(a, b){ var ac = a.created || "", bc = b.created || ""; if (ac !== bc) return ac < bc ? -1 : 1; return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0); }
+    });
     var byId = {};
     (local || []).forEach(function(l){ if (l && l.id) byId[l.id] = l; });
     (remote || []).forEach(function(x){
@@ -28513,8 +28828,11 @@
     }).catch(function(){ setOffline(true); });
   }
   function resolveLicConflictAndRetry(){
+    var imG0 = (typeof imSt === "function") ? imSt("licenses").gen : 0;
     return fetch(LIC_API, {headers: ghHeaders()}).then(function(resp){ if (resp.status === 404) return null; return resp.json(); }).then(function(json){
-      if (json){ var lp = {}; try{ lp = JSON.parse(b64DecodeUnicode(json.content)) || {}; }catch(e){} licenses = mergeLic(licenses, lp.items || []); duties = mergeDuties(duties, lp.duties || []); licSha = json.sha; }
+      // P1 판24j(C209): 면허는 받은 사본과 칸 단위(다시 읽기 실패면 병합·기준 없이) · 읽는 사이 로그아웃이면 끝 · 의무 대장은 종전 mergeDuties
+      if (json && typeof imRead === "function"){ var lq = null; try{ lq = JSON.parse(b64DecodeUnicode(json.content)) || {}; }catch(e){} var nx = imRead("licenses", imG0, licenses, lq ? (lq.items || []) : null, true, mergeLic); if (nx === 0) return; if (nx !== 1) licenses = nx; if (lq) duties = mergeDuties(duties, lq.duties || []); licSha = json.sha; }
+      else if (json){ var lp = {}; try{ lp = JSON.parse(b64DecodeUnicode(json.content)) || {}; }catch(e){} licenses = mergeLic(licenses, lp.items || []); duties = mergeDuties(duties, lp.duties || []); licSha = json.sha; }
       saveLicCache(); renderLicenses(); renderDashboard(); return doSaveLic();
     });
   }
@@ -29096,6 +29414,7 @@ function dutyStage(nx){
       if (duties.length){ renderDuties(); return; }   // confirm 대기 중 로드·다른 탭이 채웠으면 중단(재검사)
       // 세션 간 재시드 차단(리뷰 med) — 다른 관리자가 그사이 등재·확정했으면 낡은 세션의 시드가 ts 승자가 되어
       // 확정 이력을 통째로 되돌린다. 쓰기 직전 원격을 다시 읽어 duties를 재검사(내부 catch 별도 — 시드파일 오류와 구분)
+      var imG0 = (typeof imSt === "function") ? imSt("licenses").gen : 0;   // P1 판24j
       fetch(LIC_API, {headers: ghHeaders()}).then(function(resp){
         if (resp.status === 404) return null;
         if (!resp.ok) throw new Error("HTTP " + resp.status);
@@ -29105,7 +29424,9 @@ function dutyStage(nx){
         if (json){
           licSha = json.sha;
           var parsed = JSON.parse(b64DecodeUnicode(json.content));
-          licenses = (licPending ? mergeLic(licenses, (parsed && parsed.items) || []) : ((parsed && parsed.items) || []));
+          // P1 판24j(C209): 목록 전부를 들이는 읽기 — 받은 사본과 함께(로그아웃 사이면 등재 중단 · 옛 판이면 면허는 이 화면 그대로)
+          if (typeof imRead === "function"){ var nx = imRead("licenses", imG0, licenses, (parsed && parsed.items) || [], licPending, mergeLic); if (nx === 0) return; if (nx !== 1) licenses = nx; }
+          else licenses = (licPending ? mergeLic(licenses, (parsed && parsed.items) || []) : ((parsed && parsed.items) || []));
           rd = (parsed && parsed.duties) || [];
         }
         if (rd.length){

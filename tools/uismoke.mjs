@@ -8954,7 +8954,8 @@ try {
   //   375 실행 = 옛 카드 6장·표 글 0·옛 칩 줄 보임(HTML 인라인 display 그대로)·머리 '총 9 · 표시 6/6'(옛 셈)·검색칸 안내 옛 글·자리 legacy → 1366(경계 넘김) = 표·옛 칩 줄 숨김·[더보기] 숨김·검색칸 안내 표 글·머리 '총 9 · 표시 6/6'(v444 검토 — 옛 본문과 같은 식, 그린 뒤 onPaint) →
   //   검색칸에 '포항'이 있는 채 다시 375 = 옛 검색어(obSearchTerm)를 칸 글로 맞춰 그 카드만(o1) · 옛 칩 줄 다시 flex
   const LEG_SHA44 = 'd45120dd7f6a70e20d795dc6f1c1b6beab7d5a83a13b0e24c10109156d47788a';
-  const KEEP44 = { setObStatus: '79168b6660b9598b', loadOnbid: '16871a60c10cbe26', scheduleOnbidSave: '66cca6b7fa0614de', doSaveOnbid: 'fc8398008a04a5b2', obExpired: '5bebe392d73fa422', liveObs: '283968a60a2a2fdc', findOb: 'ba94045a8e6b99ef', setBidLayer: '2866e6652936072a', mergeBidsLocal: 'b381a770ab833b3e' };
+  const KEEP44 = { setObStatus: '79168b6660b9598b', loadOnbid: 'ab54149e7fd441a1', scheduleOnbidSave: '66cca6b7fa0614de', doSaveOnbid: '992ffe79b30e7c5b', obExpired: '5bebe392d73fa422', liveObs: '283968a60a2a2fdc', findOb: 'ba94045a8e6b99ef', setBidLayer: '2866e6652936072a', mergeBidsLocal: '6c4ffc2bc88d71db' };
+  //   P1 판24j(C209 2판): 읽기·409 다시 읽기·병합은 받은 사본과 칸 단위로 고친 본문으로 다시 고정(loadOnbid 16871a60… → ab54149e… · doSaveOnbid fc839800… → 992ffe79… · mergeBidsLocal b381a770… → 6c4ffc2b… — 고친 동작은 'P1 판24j'가 실행으로 지킴, 폰 옛 본문은 그대로)
   //   P1 판24h(C206 D5): doSaveOnbid는 실패 응답·끊김·쓰기 거절을 성공으로 넘기지 않는 본문으로 다시 고정(16774722… → fc839800… — 고친 동작은 'P1 판24h'가 실행으로 지킴)
   const keepBad9 = Object.keys(KEEP44).filter((n) => sha44(body44(n)).slice(0, 16) !== KEEP44[n]);
   const X9 = mk44({ width: 375 }); X9.api.render(); const g9 = (id) => X9.env.host(id);
@@ -9643,7 +9644,7 @@ try {
     asbWorkerNames: '1b19314636ac3e991335bc6a1449a643e71b3af4771e52201097e5dd20627c2f', siteYear: '1809126db67bd12286c9fb8b49fbcf0ff3fb0c2b84aa76c48e1e1df6320359a2', sheetRow: 'f77f0201e4dee7c2179eec69c9503a423dd46ce569d4b76061847b29d0b26fc8',
     bindFold: '2e17be3f057f6b655fa35148f5297d965924e9b512d7fb3eb04b85640cd1c2bc', renderSiteFilter: 'e97f8fe38b3fd5a03059965f57755e56759cc40c7045814b5f34718bef78dd7a', siteLabel: '049362d010ea05ceeffb8696f4991ef0217d477609575e6b06b2c7f2fd0a7f8e',
     siteKind: '64c88120acef6e84df6790fd6d823260eecfaf65797395716fc915db9c6c0c68', liveSites: 'e00f9252efe93c334c686519f1045752b921aa980071aa9cf0ad9c7bc1ceb206', asbNotifyDue: '69a4a67bc06987e081064888bb7a94bf1dd41cb8010f5aa75cde6ff4f409059f',
-    asbKeepUntil: '18324fa514e86abd8f436ca1cf791a49d6b6b4129862614277fcd475d50c3b55', loadAsb: '82117c350e5ed2fe6c06fe9d34f8c396d60fa8f7ab948964596ea971529f2692', doSaveAsb: '95db3507549c408d0e9766262fe4e991df6a50fc16913e2b0de392d5c4367488',
+    asbKeepUntil: '18324fa514e86abd8f436ca1cf791a49d6b6b4129862614277fcd475d50c3b55', loadAsb: 'b6701fc2a31d8d63b85c6e07e1c4fc91eea2f96c93fd26492dd62cd0404468e9', doSaveAsb: 'a8a49dc763fbf1e6e8dc20d0f928b15d2326c8d9c3f536511c6f5a466574e846',
     loadSiteEduGap: '206f6af42ee8808fafec26b2e8742dff16caf2dad025c86653e1de3b3b556591', openSiteWorkers: '87bac54bab4f204a3e6366c5bff4c8d881fba2a95a1c42d2b792843b6a68fba5', siteGapSig: '2fc2297595a63951b3285ed8b880a5374bd23826c649aa067ee1d02d9c1b8a0a',
     siteGapSigs: '57394ee9f4c0ce6313ce503e414ef906cbbc35594ff43f56bbf935bb35490724', renderSwList: '769c2fa77f6c4ba96c8697590a809712ef9a93d0599481d3a776a663ba40b635' };
   //   v445 검토: 현장 창 두 함수(openSiteWorkers·renderSwList)는 창 안 선택 swSel(검색으로 다시 그려도 체크 그대로·그려지지 않은 지정은 빠지지 않음 — 30년 보존 근로자 id)과
@@ -9653,6 +9654,7 @@ try {
   //   v456 검토: 400 ORPHAN_WORKER 첫 번은 명부 저장을 끝낸 뒤 한 번만 다시 보냄(asbOrphTry)·알림 글에서 새로고침 안내 뺌 → 다시 고정(be7d2128… → 7495f882… — 고친 동작은 v456 묶음 ⑥이 실행으로 지킴)
   //   v456 2차 검토: 두 번째 400 ORPHAN_WORKER에서 서버가 돌려준 고아 id만 대장에서 빼고 한 번 더 저장(asbOrphDrop) → 다시 고정(7495f882… → 930e3cae… — 고친 동작은 v456 묶음 ⑧이 실행으로 지킴)
   //   P1 판24h(C206): doSaveAsb는 500·끊김 실패 알림을 더한 본문으로 다시 고정(c222ce0b… → 95db3507… — 고친 동작은 'P1 판24h'가 실행으로 지킴)
+  //   P1 판24j(C209 2판): loadAsb·doSaveAsb는 받은 사본(읽기·409 다시 읽기·저장 200)을 더한 본문으로 다시 고정(82117c35… → b6701fc2… · 95db3507… → a8a49dc7… — 고친 동작은 'P1 판24j'가 실행으로 지킴, v433·v337 글 검사는 그대로 통과)
   const hBad12 = Object.keys(HASH45).filter((n) => sha45(body45(n)) !== HASH45[n]);
   const m12 = miss45.length, X12 = mk45({ width: 375 }); X12.api.render();
   const l12a = [X12.host.getAttribute('data-vs-mode'), (X12.host._h.match(/class="item asb-item"/g) || []).length, X12.host._h.indexOf('data-vs-row') < 0, X12.env.host('siteFilterBar').style.display, X12.api.cur(), X12.env.host('siteHead').textContent].join('|');
@@ -18205,6 +18207,232 @@ try {
   T('P1 판24i 지시 병합 칸 단위(실행 — 실제 공통 길 window.fetch·낙관락 가짜 서버·실제 읽기·저장·병합·지시 처리·csSaveFields): ① 옛 화면 메모 저장 + 다른 기기 끝남 = 끝남·메모 둘 다 · ② 아침에 고친 X·다른 기기 X 끝남·오후 Y 저장 = X 끝남 · ③ 같은 칸 = 이 화면 값 + "다른 기기도 고친 칸을 이 화면 값으로 저장했습니다 — 이름 · 기한" 1 · 다른 기기만 고친 칸 = 다른 기기 · ④ 새 지시·지움 양쪽 남음 · ⑤ 캐시 부팅(받은 사본 없음)·병합 예외 = 종전 규칙(예외는 되돌린 뒤) · ⑥ 옛 판 읽기 버림·나가 있는 저장 중 읽기 = 병합·늦은 200 기준·다시 읽기 실패 = 기준 그대로·기준 비운 뒤 늦은 200 무시 · ⑦ csSaveFields 기한 = 닫힌 지시 끝남 남음 + 기한 · 캐시 부팅 화면은 자동 기한 건너뜀 → 받은 뒤 채움 · ⑧ 혼자 쓰는 화면 추가·수정·완료 요청·승인·되엶·지움 저장 6번 200·본문 = 종전 병합 사본과 같음 · ⑨ 내 것 아님 뒤 새 배정 남음 · (독립 검토 반영) ③-나 알림 칸 이름 = 화면 글(상세) · ⑥-1 버릴 때 기준 시각 되돌림 · ⑩ 저장 대기 중 읽기 = 옛 기준 병합 뒤 새 기준 · ⑪ 늦게 온 옛 판 200은 기준 안 바꿈 · ⑫ 저장 타이머 창 고침 남음 · ⑬ 로그아웃 동안 나가 있던 읽기·다시 읽기 버림 · ⑭ 내 저장끼리 순서 바뀜 = 알림 0 · 결함 사본 ' + KI.length + '개 = 각자 맡은 검사 ✗',
     RI.ok && snapSame && KIr.every((x) => x.ok), JSON.stringify({ R: RI.R, I: Object.assign({}, RI.I, { snap8: undefined }), snapSame, bad: KIr.filter((x) => !x.ok) }));
 } catch (e) { console.log('  (P1 판24i 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── P1 판24j(11/18 — 원장 C209 2판): 계약 밖 나머지 14곳 + 체크 해제 — 공용 imMerge(상태 묶음 grp·지움 짝 delWith·종전 통째 whole·뒷손질 fix·서버에서 빠진 항목 gone)·읽기 부품 imRead·공통 길 저장 부품(imSvGo·imSvEnd·imSvOk) · 전수 표 09_조사_문서\판24_재감사수리_자료_20261115\계약밖14곳_병합_전수표_1118.md
+//   (실행 — 실제 공통 길 window.fetch + 낙관락 가짜 서버(자료 14 + 체크리스트) + 실제 읽기·저장·409 다시 읽기·병합 함수·doLoad·doSave·toggleItem·mergeTasks — 대역은 그리기·캐시·자동 생성·화면 요소·이름표·시계만)
+//   ① 자료마다: 다른 기기가 상태 칸(조사 표 ⑤의 칸)을 바꿈 + 이 화면이 같은 항목의 다른 칸 저장 → 둘 다 남음·알림 0 ② 이 화면이 저장(200)한 칸을 다른 기기가 다시 고침 → 다른 항목 저장 뒤 다른 기기 값 ③ 같은 칸 = 이 화면 값 + 알림 1(칸 이름 = 화면 글)
+//   ④ 혼자 쓰는 화면 저장 본문 = 종전 병합 사본과 같음(자료마다) ⑤ 기존 보호(차량 만기 표식·검사 기록 합집합·문서함 지움 사본·서버에서 빠진 문서·이 화면이 영구 삭제한 차량) ⑥ 받은 사본 없음·병합 예외 = 종전
+//   ⑦ 체크 해제 지운 표시(새 판 다른 기기의 해제가 남음 · 옛 판 기기 문서(지운 표시 없음)와 섞여도 이 화면 해제가 남고 남의 새 체크도 남음) ⑧ 상태 묶음(지시 반려 vs 승인 = 반려 덩어리 통째 + 알림) ⑨ 옛 판 읽기 버림·로그아웃 사이 읽기 버림·나가 있는 저장 중 읽기 = 병합
+try {
+  const fnJ = (src, name) => { const i = src.search(new RegExp('\\n  function ' + name + '\\(')); if (i < 0) throw new Error('함수 없음 ' + name); let d = 0, st = false; for (let j = i + 1; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i + 1, j + 1); } } throw new Error('중괄호 ' + name); };
+  const wrapJ = (src) => { const a = '  window.fetch = function(url, opts){'; const i = src.indexOf(a); if (i < 0) throw new Error('fetch 대역 없음'); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 2); } } throw new Error('대역 짝'); };
+  const tickJ = () => new Promise((r) => setImmediate(r));
+  const cloneJ = (x) => (x === undefined ? undefined : JSON.parse(JSON.stringify(x)));
+  const STUB_J = /^(render[A-Z]\w*|markLoadedForAutoGen|save\w*Cache|load\w*Cache|saveCache|loadCache|recOverdueGen|lmKeptNotice|paKick|maskKick|galleryRelaySend|mapRelaySend|apprFlushCreates|runBidQualGen|runAwardAutoCon|bidCorpGateRevert|loadSiteEduGap|loadDocSettings|csAlignTasksAll|csSiteHooksRetry|stmtReset|bidSheetShowNew|vsSheetRender|switchTab|scheduleContractSave|askClear|siteGapSigs|advanceProc|vehDueAsk|pushNotify|resetTaskScope|runAutoTaskGen|populateMemberNames|apprSavePending|csValEditNote)$/;
+  const OWN_J = { gwToast: 1, apprToastShow: 1, alert: 1, confirm: 1, setOffline: 1, getToken: 1, ghHeaders: 1, clearToken: 1, showTokenScreen: 1, onSessionInvalid: 1, isAdmin: 1, canSee: 1, canDo: 1, myId: 1, getMemberId: 1, myName: 1, getUser: 1, todayStr: 1, genId: 1, gwCall: 1, setTimeout: 1, clearTimeout: 1, fetch: 1, _rawFetch: 1, leaveTypeLabel: 1, famTypeLabel: 1, eduKindLabel: 1, memberName: 1 };
+  const closeJ = (H, roots) => { const all = new Set([...H.matchAll(/\n  function ([A-Za-z_$][\w$]*)\(/g)].map((m) => m[1])); const got = new Map(), stub = new Set(); const q = roots.slice(); while (q.length) { const n = q.shift(); if (got.has(n) || stub.has(n) || OWN_J[n] || !all.has(n)) continue; if (STUB_J.test(n) && roots.indexOf(n) < 0) { stub.add(n); continue; } const b = fnJ(H, n); got.set(n, b); for (const m of b.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g)) q.push(m[1]); } return { real: [...got.keys()], stub: [...stub] }; };
+  const ROOTS_J = ['_ghResp', 'emptyDoc', '_urlCollection', 'b64EncodeUnicode', 'b64DecodeUnicode', 'saveConflictStop', 'saveConflictToast', 'saveFailToast', 'saveDeniedToast', 'mTime', 'mergeDel', 'conConflictToast',
+    'imSt', 'imBaseSet', 'imBaseDrop', 'imBaseKnown', 'imOut', 'imBaseAdvance', 'imWhole', 'imMerge3', 'imMerge', 'imAt', 'imDelSide', 'imGrp', 'imGone', 'imCut', 'imColOn', 'imItemsOf', 'imAtOf', 'imBaseSetAt', 'imRead', 'imSvGo', 'imSvEnd', 'imSvOk', 'ckFlat', 'recTsMax', 'recTsAt',
+    'loadVehicles', 'scheduleVehSave', 'doSaveVeh', 'resolveVehConflictAndRetry', 'mergeVeh', 'vehDueMergeKeep', 'vehLogUnion', 'loadReceivables', 'scheduleRecSave', 'doSaveRec', 'resolveRecConflictAndRetry', 'mergeRec',
+    'loadLicenses', 'scheduleLicSave', 'doSaveLic', 'resolveLicConflictAndRetry', 'mergeLic', 'loadDocuments', 'saveDocuments', 'mergeDocs', 'loadLeaves', 'scheduleLeavesSave', 'doSaveLeaves', 'mergeLeaves',
+    'loadFam', 'scheduleFamSave', 'doSaveFam', 'mergeFam', 'loadAsb', 'scheduleAsbSave', 'asbSaveFire', 'doSaveAsb', 'mergeAsb', 'normAsbRow', 'loadEdu', 'scheduleEduSave', 'doSaveEdu', 'mergeEdu',
+    'loadBids', 'scheduleBidsSave', 'doSaveBids', 'mergeBidsLocal', 'loadOnbid', 'scheduleOnbidSave', 'doSaveOnbid', 'loadQuotes', 'scheduleQuoteSave', 'doSaveQuotes', 'mergeQuotes', 'loadPromo', 'schedulePromoSave', 'doSavePromo', 'mergePromo',
+    'loadClients', 'saveClients', 'cliSaveConflict', 'cliMergeRemote', 'cliMarkDirty', 'loadWorkers', 'scheduleWorkersSave', 'doSaveWorkers', 'mergeWorkers', 'wkMarkDirty',
+    'doLoad', 'doSave', 'resolveConflictAndRetry', 'scheduleSave', 'mergeRecords', 'mergeCustom', 'mergeKV', 'toggleItem', 'recStamp', 'fetchRemote', 'applyScopeMerge', 'mergeTasks'];
+  const D0 = '2026-11-10', DN = '2026-11-18';
+  const seedJ = () => ['s1', 's2', 's3'].map((id, i) => ({ id, created: D0, updated: D0, title: 'T' + (i + 1), no: 'N' + (i + 1), name: 'N' + (i + 1), note: '', status: 'new', state: '운행', type: 'annual', start: D0, kind: 'k', date: D0, client: 'C' + (i + 1), desc: 'D' + (i + 1), phone: '', reason: '', facility: '', next: '', expiry: '2026-12-31', paid: null, ptype: 'member', pid: 'm' + (i + 1) }));
+  // 자료마다: c 컬렉션 · arr 화면 배열 · load 읽기 · save 저장 예약(실제) · A 다른 기기가 바꾸는 상태 칸 [칸, 값, 같이 바꾸는 칸] · B 이 화면이 고치는 칸 · lbl 그 칸의 화면 글 · ts 고침마다 updated_ts(문서함·홍보) · dirty 고친 줄 표시(거래처·명부)
+  const CJ = [
+    { c: 'vehicles', arr: 'vehicles', load: 'loadVehicles()', save: 'scheduleVehSave()', A: ['state', '정비'], B: 'note', lbl: '메모' },
+    { c: 'receivables', arr: 'receivables', load: 'loadReceivables()', save: 'scheduleRecSave()', A: ['paid', DN], B: 'note', lbl: '메모' },
+    { c: 'licenses', arr: 'licenses', load: 'loadLicenses()', save: 'scheduleLicSave()', A: ['expiry', '2027-06-30'], B: 'note', lbl: '메모' },
+    { c: 'documents', arr: 'documents', load: 'loadDocuments()', save: 'saveDocuments()', A: ['del', 1, { deleted_at: DN, deleted_by: 'B' }], B: 'note', lbl: '메모', ts: 1 },
+    { c: 'leaves', arr: 'leaves', load: 'loadLeaves()', save: 'scheduleLeavesSave()', A: ['status', 'approved', { approver: 'B', approved_at: DN }], B: 'reason', lbl: '사유' },
+    { c: 'family', arr: 'fam', load: 'loadFam()', save: 'scheduleFamSave()', A: ['date', '2026-11-12'], B: 'note', lbl: '메모' },
+    { c: 'asbestos', arr: 'asb', load: 'loadAsb()', save: 'scheduleAsbSave()', A: ['status', 'done'], B: 'note', lbl: '메모' },
+    { c: 'edu', arr: 'edu', load: 'loadEdu()', save: 'scheduleEduSave()', A: ['next', '2027-05-01'], B: 'note', lbl: '기관·비고' },
+    { c: 'bids', arr: 'bids', load: 'loadBids()', save: 'scheduleBidsSave()', A: ['status', '패스'], B: 'note', lbl: '메모' },
+    { c: 'onbid', arr: 'onbids', load: 'loadOnbid()', save: 'scheduleOnbidSave()', A: ['status', '입찰'], B: 'note', lbl: '메모' },
+    { c: 'quotes', arr: 'quotes', load: 'loadQuotes()', save: 'scheduleQuoteSave()', A: ['title', 'T1x'], B: 'note', lbl: '내부 메모' },
+    { c: 'promo', arr: 'promoItems', load: 'loadPromo()', save: 'schedulePromoSave()', A: ['status', 'approved', { note: '' }], B: 'facility', lbl: '시설·대상', ts: 1 },
+    { c: 'clients', arr: 'clients', load: 'loadClients()', save: 'saveClients()', A: ['phone', '010'], B: 'note', lbl: '메모', dirty: 'cliMarkDirty' },
+    { c: 'workers', arr: 'workers', load: 'loadWorkers()', save: 'scheduleWorkersSave()', A: ['phone', '010'], B: 'note', lbl: '비고', dirty: 'wkMarkDirty' },
+    { c: 'checklist', arr: null, load: 'doLoad()', save: 'scheduleSave()', A: ['who', 'B'], B: 't', lbl: '항목 이름' }];
+  const CJm = {}; CJ.forEach((C) => { CJm[C.c] = C; });
+  const srcJ = new Map();
+  const mkJ = (H) => {
+    const env = { clock: 1000, ms: 1794000000000, timers: [], toasts: [], log: [], seq: [], gen: 0, warns: 0, holdGet: 0, holdPut: [], held: [], S: {} };
+    CJ.forEach((C) => { if (C.c !== 'checklist') env.S[C.c] = { schema: 1, items: seedJ(), updated_at: 1000 }; });
+    env.S.licenses.duties = [];
+    env.S.checklist = { records: { daily: { [DN]: { c1: DN, c2: DN } } }, custom: { daily: { s1: { t: 'T1', who: 'w', created: 1, updated: 1 }, s2: { t: 'T2', who: 'w', created: 1, updated: 1 }, s3: { t: 'T3', who: 'w', created: 1, updated: 1 } } }, updated_at: 1000 };
+    const procSave = (col, b) => { const prev = env.S[col]; if (b.base !== undefined && prev && Number(b.base) !== Number(prev.updated_at)) { env.seq.push(col + ':409'); return { status: 409, body: { error_code: 'STALE_BASE' } }; } env.S[col] = Object.assign({}, cloneJ(b.doc), { updated_at: ++env.clock }); env.seq.push(col + ':200'); return { status: 200, body: { updated_at: env.clock } }; };
+    const gwCallJ = (fn, b) => {
+      const col = b.collection || '';
+      if (b.action === 'get') {
+        const ans = { status: 200, body: { doc: cloneJ(env.S[col] || { schema: 1, items: [] }) } };
+        if (env.holdGet > 0) { env.holdGet--; return new Promise((res) => env.held.push({ k: 'GET', go: () => res(ans) })); }
+        return Promise.resolve(ans);
+      }
+      if (b.action === 'save') {
+        const mode = env.holdPut.shift();
+        if (mode === 'req') return new Promise((res) => env.held.push({ k: 'PUT요청', go: () => res(procSave(col, b)) }));
+        return Promise.resolve(procSave(col, b));
+      }
+      return Promise.resolve({ status: 200, body: {} });
+    };
+    let src = srcJ.get(H);
+    if (!src) {
+      const cl = closeJ(H, ROOTS_J);
+      const apis = (H.match(/\n  var [A-Z_]+_(?:ROOT|PATH|API) = [^\n]*/g) || []).map((s) => s.slice(1)).join('\n');
+      src = ['var window = {}, DATA_OWNER = "o", DATA_REPO = "r", isOffline = false;',
+        'var _colBase = {}, _col409 = {}, _col409t = {}, _COL409_MS = 30000, _colRead403 = {};', apis,
+        'var vehicles=[], vehSha=null, vehPending=false, vehSaveTimer=null, receivables=[], recSha=null, recPending=false, recSaveTimer=null, licenses=[], duties=[], licSha=null, licPending=false, licSaveTimer=null, licRemoteOk=false;',
+        'var records={}, customItems={}, checkScopes={}, checkScopeTs={}, checkAssignee={}, checkAssigneeTs={}, checkReview={}, checkReviewTs={}, checkRecTs={}, currentSha=null, pendingSave=false, saveTimer=null, CURRENT_KEYS={ daily: "' + DN + '" };',
+        'var leaves=[], leavesSha=null, leavesSaveTimer=null, leavesPending=false;',
+        'var quotes=[], quoteSha=null, quoteSaveTimer=null, quotePending=false, qtEditId=null, quoteLoaded=false;',
+        'var promoItems=[], promoSha=null, promoSaveTimer=null, promoPending=false, paAutoWait="", maskAutoWait="", galWait="", mapWait=false;',
+        'var onbids=[], onbidSha=null, onbidSaveTimer=null, onbidPending=false;',
+        'var bids=[], bidsSha=null, bidsSaveTimer=null, bidsPending=false, bidsLoaded=false, bidsSaveHeld=false, bidsLoading=0, bidsHealth=null, bidsAwards=null, bidsLoadErr=null, autoGenReady={};',
+        'var clients=[], cliSha=null, cliLoaded=false, cliDirty={}, cliLoading=0;',
+        'var documents=[], docSha=null, docSaveRetried=false, docSettingsTbl={}, docSettingsBase=0;',
+        'var workers=[], wkLoaded=false, wkDirty={}, wkBase=0, wkSaveTimer=null, wkPending=false, fam=[], famBase=0, famPending=false, famSaveTimer=null;',
+        'var asb=[], asbBase=0, asbPending=false, asbSaveTimer=null, asbOrphTry=0, asbLoaded=false, edu=[], eduLoaded=false, eduBase=0, eduPending=false, eduSaveTimer=null, currentTab="", tasks=[];',
+        'var LS = {}; var localStorage = { getItem: function(k){ return Object.prototype.hasOwnProperty.call(LS, k) ? LS[k] : null; }, setItem: function(k, v){ LS[k] = String(v); }, removeItem: function(k){ delete LS[k]; } };',
+        'function gwToast(m){ ENV.toasts.push("toast:" + m); } function apprToastShow(m){ ENV.toasts.push(String(m)); } function alert(m){ ENV.toasts.push("alert:" + m); } function confirm(){ return true; } function setOffline(s){ isOffline = s; }',
+        'function getToken(){ return "t"; } function ghHeaders(){ return {}; } function clearToken(){} function showTokenScreen(){} function onSessionInvalid(){} function _rawFetch(){ throw new Error("raw"); }',
+        'function isAdmin(){ return true; } function canSee(){ return true; } function canDo(){ return true; } function myId(){ return "uA"; } function getMemberId(){ return "uA"; } function myName(){ return "시험A"; } function getUser(){ return "시험A"; } function todayStr(){ return "' + DN + '"; } function genId(p){ return p + "N" + (++ENV.gen); }',
+        'function leaveTypeLabel(t){ return "L:" + t; } function famTypeLabel(t){ return "F:" + t; } function eduKindLabel(k){ return "E:" + k; } function memberName(id){ return id ? "N:" + id : ""; }',
+        'var document = { getElementById: function(){ return null; } };',
+        'var console = { warn: function(){ ENV.warns++; }, log: function(){} };',
+        cl.stub.map((n) => 'function ' + n + '(){}').join('\n'),
+        cl.real.map((n) => fnJ(H, n)).join('\n'), wrapJ(H), 'var fetch = window.fetch;',
+        'return { ex: function(s){ return eval(s); } };'].join('\n');
+      srcJ.set(H, src);
+    }
+    env.api = new Function('ENV', 'gwCall', 'setTimeout', 'clearTimeout', 'btoa', 'atob', 'TextEncoder', 'TextDecoder', src)(env, gwCallJ, (fn) => { env.timers.push(fn); return env.timers.length; }, (id) => { if (id) env.timers[id - 1] = null; },
+      (s) => Buffer.from(s, 'binary').toString('base64'), (s) => Buffer.from(s, 'base64').toString('binary'), TextEncoder, TextDecoder);
+    env.ex = (s) => env.api.ex(s);
+    env.flush = async () => { for (let k = 0; k < 40; k++) await tickJ(); };
+    env.fire = async () => { for (let n = 0; n < 60; n++) { const i = env.timers.findIndex((x) => x); if (i < 0) break; const fn = env.timers[i]; env.timers[i] = null; fn(); await env.flush(); } };
+    env.release = async (k) => { const i = env.held.findIndex((h) => h && h.k === k); if (i < 0) throw new Error('붙잡은 것 없음 ' + k); const h = env.held[i]; env.held[i] = null; h.go(); await env.flush(); };
+    env.load = async (C) => { env.ex(C.load); await env.flush(); };
+    env.sv = (C, id) => (C.c === 'checklist' ? env.S.checklist.custom.daily[id] : env.S[C.c].items.find((x) => x.id === id)) || {};
+    env.loc = (C, id) => JSON.parse(env.ex('JSON.stringify(' + (C.c === 'checklist' ? 'customItems.daily.' + id : C.arr + '.filter(function(x){ return x && x.id === "' + id + '"; })[0]') + ' || {})'));
+    env.other = (C, id, f) => { const t = env.sv(C, id); f(t); if (C.c === 'checklist') t.updated = ++env.ms; else { t.updated = DN; if (C.ts) t.updated_ts = ++env.ms; } env.S[C.c].updated_at = ++env.clock; };
+    env.setA = (C) => (t) => { t[C.A[0]] = C.A[1]; Object.assign(t, C.A[2] || {}); };
+    env.edit = (C, id, val, more) => {
+      if (C.c === 'checklist') env.ex('customItems.daily.' + id + '.' + C.B + ' = ' + JSON.stringify(val) + '; customItems.daily.' + id + '.updated = ' + (++env.ms) + '; ' + C.save);
+      else env.ex('(function(){ var a = ' + C.arr + '; for (var i = 0; i < a.length; i++){ if (a[i].id === "' + id + '"){ a[i].' + C.B + ' = ' + JSON.stringify(val) + '; a[i].updated = "' + DN + '"; ' + (C.ts ? 'a[i].updated_ts = ' + (++env.ms) + '; ' : '') + (more || '') + ' } } })(); ' + (C.dirty ? C.dirty + '("' + id + '"); ' : '') + C.save);
+    };
+    env.cs = (C) => env.seq.filter((s) => s.indexOf(C.c + ':') === 0).map((s) => s.slice(C.c.length + 1)).join(',');
+    env.cft = () => env.toasts.filter((s) => s.indexOf('다른 기기도 고친 칸') === 0);
+    return env;
+  };
+  const runJ = async (H, only) => {
+    const R = {}, I = {}, want = (k) => !only || only.indexOf(k) >= 0;
+    for (const C of CJ) {
+      // ① 다른 기기 상태 칸 + 이 화면 다른 칸 → 둘 다 · 알림 0
+      if (want('r1_' + C.c)) { const E = mkJ(H); await E.load(C); E.other(C, 's1', E.setA(C)); E.edit(C, 's1', 'L'); await E.flush(); await E.fire();
+        const s = E.sv(C, 's1'), l = E.loc(C, 's1'), extra = Object.keys(C.A[2] || {}).every((k) => JSON.stringify(s[k]) === JSON.stringify(C.A[2][k]));
+        I['r1_' + C.c] = [s[C.A[0]], s[C.B], l[C.A[0]], extra, E.cs(C), E.cft().length].join('|'); R['r1_' + C.c] = I['r1_' + C.c] === [C.A[1], 'L', C.A[1], true, '409,200', 0].join('|'); }
+      // ③ 같은 칸 = 이 화면 값 + 알림 1(칸 이름 = 화면 글)
+      if (want('r3_' + C.c)) { const E = mkJ(H); await E.load(C); E.other(C, 's1', (t) => { t[C.B] = 'O'; }); E.edit(C, 's1', 'L'); await E.flush(); await E.fire();
+        I['r3_' + C.c] = [E.sv(C, 's1')[C.B], E.cft().length, E.cft()[0] || ''].join('|'); R['r3_' + C.c] = E.sv(C, 's1')[C.B] === 'L' && E.cft().length === 1 && (E.cft()[0] || '').slice(-(' · ' + C.lbl).length) === ' · ' + C.lbl; }
+      // ④ 혼자 쓰는 화면: 두 항목 차례로 저장 — 저장 본문(서버 사본)·응답 순서를 종전 병합 사본과 견주려고 남김
+      if (want('r4_' + C.c)) { const E = mkJ(H); await E.load(C); E.edit(C, 's1', 'M1'); await E.flush(); await E.fire(); E.edit(C, 's2', 'M2'); await E.flush(); await E.fire();
+        const doc = cloneJ(E.S[C.c]); delete doc.updated_at; I['r4_' + C.c] = JSON.stringify(doc).replace(/"updated_ts":\d+/g, '"updated_ts":0').replace(/"updated":\d{10,}/g, '"updated":0') + '|' + E.cs(C) + '|' + E.cft().length; }
+    }
+    // ② 이 화면이 저장(200)한 칸을 다른 기기가 다시 고침 → 다른 항목 저장 뒤 다른 기기 값(저장 200에서 받은 사본을 세움 — 공통 길·공통 길 밖)
+    for (const c of ['vehicles', 'leaves', 'family', 'asbestos', 'promo']) {
+      if (!want('r2_' + c)) continue; const C = CJm[c], E = mkJ(H); await E.load(C); E.edit(C, 's1', 'M'); await E.flush(); await E.fire(); E.other(C, 's1', (t) => { t[C.B] = 'N'; }); E.edit(C, 's2', 'Y'); await E.flush(); await E.fire();
+      I['r2_' + c] = [E.sv(C, 's1')[C.B], E.loc(C, 's1')[C.B], E.sv(C, 's2')[C.B], E.cs(C), E.cft().length].join('|'); R['r2_' + c] = I['r2_' + c] === 'N|N|Y|200,409,200|0';
+    }
+    const V = CJm.vehicles, Dc = CJm.documents;
+    // ⑤-가 차량 만기 표식: 다른 기기 검사 만기 → 서버 완료 창(표식 prev) → 이 화면이 같은 날짜로 고친 뒤 메모 저장 = 새 만기·알림 0(충돌을 뒷손질이 서버 값으로 돌려 알림에서 뺌)
+    if (want('r5v')) { const E = mkJ(H); await E.load(V); E.other(V, 's1', (t) => { t.insp_due = '2026-12-20'; }); E.other(V, 's1', (t) => { t.insp_due = '2027-12-20'; t.due_set = { insp_due: { prev: '2026-12-20', at: 5 } }; });
+      E.edit(V, 's1', 'L', 'a[i].insp_due = "2026-12-20";'); await E.flush(); await E.fire();
+      I.r5v = [E.sv(V, 's1').insp_due, E.sv(V, 's1').note, E.cft().length, E.cs(V)].join('|'); R.r5v = I.r5v === '2027-12-20|L|0|409,200'; }
+    // ⑤-나 검사 기록(insp_log) 합집합: 두 쪽이 다른 줄을 더함 = 둘 다(at 순)·알림 0
+    if (want('r5l')) { const E = mkJ(H); await E.load(V); E.other(V, 's1', (t) => { t.insp_log = [{ at: '2026-11-02', confirmed: 'x', src: 'b' }]; });
+      E.edit(V, 's1', 'L', 'a[i].insp_log = [{ at: "2026-11-01", confirmed: "y", src: "a" }];'); await E.flush(); await E.fire();
+      I.r5l = [(E.sv(V, 's1').insp_log || []).map((x) => x.at).join(','), E.cft().length].join('|'); R.r5l = I.r5l === '2026-11-01,2026-11-02|0'; }
+    // ⑤-다 문서함: 이 화면에만 있는 지운 사본(dx) 버림 + 서버에서 영구 삭제된 s3(이 화면이 안 고침) 되살리지 않음
+    if (want('r5d')) { const E = mkJ(H); await E.load(Dc); E.ex('documents.push({ id: "dx", del: 1, updated: "' + DN + '" })'); E.S.documents.items = E.S.documents.items.filter((x) => x.id !== 's3'); E.other(Dc, 's2', (t) => { t.title = 'T2x'; });
+      E.edit(Dc, 's1', 'L'); await E.flush(); await E.fire();
+      I.r5d = [E.S.documents.items.map((x) => x.id).sort().join(','), E.ex('documents.map(function(x){ return x.id; }).sort().join(",")'), E.sv(Dc, 's2').title].join('|'); R.r5d = I.r5d === 's1,s2|s1,s2|T2x'; }
+    // ⑤-라 이 화면이 영구 삭제한 차량(imCut — hardDelete 자리) + 다른 기기 저장(409) = 되살리지 않음
+    if (want('r5c')) { const E = mkJ(H); await E.load(V); E.other(V, 's2', (t) => { t.note = 'B'; });
+      E.ex('imCut("vehicles", ["s3"]); vehicles = vehicles.filter(function(x){ return x.id !== "s3"; }); scheduleVehSave();'); await E.flush(); await E.fire();
+      I.r5c = [E.S.vehicles.items.map((x) => x.id).sort().join(','), E.sv(V, 's2').note, E.cs(V)].join('|'); R.r5c = I.r5c === 's1,s2|B|409,200'; }
+    // ⑥ 받은 사본 없음(기준 비움) · 병합 예외(칸 걷기 던짐) = 종전 결과(같은 날 이 화면 통째) — 종전 병합 사본의 결과와 같음은 아래에서 견줌
+    if (want('r6')) {
+      { const E = mkJ(H); await E.load(V); E.ex('imSt("vehicles").base = {}'); E.other(V, 's1', E.setA(V)); E.edit(V, 's1', 'L'); await E.flush(); await E.fire(); I.r6a = [E.sv(V, 's1').state, E.sv(V, 's1').note, E.cft().length].join('|'); }
+      { const E = mkJ(H); await E.load(V); E.ex('mgWalkKey = function(){ throw new Error("시험"); };'); E.other(V, 's1', E.setA(V)); E.edit(V, 's1', 'L'); await E.flush(); await E.fire(); I.r6b = [E.sv(V, 's1').state, E.sv(V, 's1').note, E.cft().length, E.warns > 0].join('|'); }
+    }
+    // ⑦-가 새 판 다른 기기가 c1 체크 해제(지운 표시 records_ts) → 이 화면이 c3 체크 → 저장(409 → 병합) = c1 없음·c2·c3 남음
+    const K = CJm.checklist, recs = (E) => Object.keys(((E.S.checklist.records || {}).daily || {})[DN] || {}).sort().join(','), lrec = (E) => E.ex('Object.keys((records.daily || {})["' + DN + '"] || {}).sort().join(",")');
+    if (want('r7a')) { const E = mkJ(H); await E.load(K); delete E.S.checklist.records.daily[DN].c1; E.S.checklist.records_ts = { daily: { [DN]: { c1: ++E.ms } } }; E.S.checklist.updated_at = ++E.clock;
+      E.ex('toggleItem("daily", "c3")'); await E.flush(); await E.fire();
+      I.r7a = [recs(E), lrec(E), E.cs(K)].join('|'); R.r7a = I.r7a === 'c2,c3|c2,c3|409,200'; }
+    // ⑦-나 이 화면이 c1 해제 · 옛 판 기기(지운 표시 칸을 모름 — 문서에 records_ts 없음)가 c4 체크해 먼저 저장 = c1 해제 남음·c4 남음·서버에 c1 지운 표시
+    if (want('r7b')) { const E = mkJ(H); await E.load(K); E.ex('toggleItem("daily", "c1")'); E.S.checklist.records.daily[DN].c4 = DN; delete E.S.checklist.records_ts; E.S.checklist.updated_at = ++E.clock; await E.flush(); await E.fire();
+      const ts = (((E.S.checklist.records_ts || {}).daily || {})[DN] || {}).c1;
+      I.r7b = [recs(E), lrec(E), Number(ts) > 0, E.cs(K)].join('|'); R.r7b = I.r7b === 'c2,c4|c2,c4|true|409,200'; }
+    // ⑧ 상태 묶음(지시): 받은 사본 = 완료 요청(review) · 다른 기기 = 승인(done·승인자) · 이 화면 = 반려(open·완료 요청 지움) → 반려 덩어리 통째(승인 기록 안 남음) + 알림 1('상태')
+    if (want('r8t')) { const E = mkJ(H);
+      const out = E.ex('imBaseSetAt("tasks", [{ id: "t1", title: "X", status: "review", done_at: "' + D0 + '", done_by: "A", approved_by: null, approved_at: null, updated: "' + D0 + '" }], 1); JSON.stringify(mergeTasks([{ id: "t1", title: "X", status: "open", done_at: null, done_by: null, approved_by: null, approved_at: null, updated: "' + DN + '" }], [{ id: "t1", title: "X", status: "done", done_at: "' + D0 + '", done_by: "A", approved_by: "B", approved_at: "' + DN + '", updated: "' + DN + '" }])[0])');
+      const t = JSON.parse(out); I.r8t = [t.status, t.done_at, t.approved_by, E.cft().length, E.cft()[0] || ''].join('|'); R.r8t = I.r8t === 'open|||1|다른 기기도 고친 칸을 이 화면 값으로 저장했습니다 — X · 상태'; }
+    // ⑨-가 저장보다 먼저 나간 읽기가 저장 200 뒤에 옴(옛 판) → 버림(화면 메모 그대로) · 기준 시각 되돌림(다음 저장 409 없음)
+    if (want('r9a')) { const E = mkJ(H); await E.load(V); E.edit(V, 's1', 'M1'); E.holdGet = 1; E.ex('loadVehicles()'); await E.flush(); await E.fire(); await E.release('GET');
+      const mid = E.loc(V, 's1').note; E.edit(V, 's2', 'Y1'); await E.flush(); await E.fire();
+      I.r9a = [mid, E.sv(V, 's1').note, E.sv(V, 's2').note, E.cs(V)].join('|'); R.r9a = I.r9a === 'M1|M1|Y1|200,200'; }
+    // ⑨-나 읽는 사이 로그아웃(배열 비움 + imBaseDrop — clearSessionData 줄) → 비운 목록에 앞사람 줄을 넣지 않고 기준도 안 세움
+    if (want('r9b')) { const E = mkJ(H); E.holdGet = 1; E.ex('loadVehicles()'); await E.flush(); E.ex('vehicles = []; imBaseDrop("vehicles");'); await E.release('GET');
+      I.r9b = [E.ex('vehicles.length'), E.ex('imBaseKnown("vehicles")')].join('|'); R.r9b = I.r9b === '0|false'; }
+    // ⑨-다 저장이 나가 있는 동안(요청 붙잡음) 온 읽기(저장 전 판) = 병합(이 화면 고침 남음 — 문서함은 저장 대기 표시가 없어 '나가 있는 저장'으로만 가름)
+    if (want('r9c')) { const E = mkJ(H); await E.load(Dc); E.holdPut.push('req'); E.edit(Dc, 's1', 'L'); await E.flush(); E.ex('loadDocuments()'); await E.flush();
+      const mid = E.loc(Dc, 's1').note; await E.release('PUT요청'); await E.fire();
+      I.r9c = [mid, E.sv(Dc, 's1').note, E.loc(Dc, 's1').note].join('|'); R.r9c = I.r9c === 'L|L|L'; }
+    return { R, I };
+  };
+  // 수리 전 꼴(결함 사본 0): 14곳 병합을 종전 통째 규칙으로 · 체크 지운 표시 무시
+  const OLDJ = (H) => H.split('typeof imMerge === "function"').join('false').split('    if (lts || rts){').join('    if (false){');
+  const RJ = await runJ(html);
+  const RJ0 = await runJ(OLDJ(html), CJ.map((C) => 'r4_' + C.c).concat(['r6']));
+  // ④ 혼자 쓰는 화면 = 종전 병합 사본과 저장 본문·응답 같음 · 응답은 200,200 · 알림 0
+  CJ.forEach((C) => { const k = 'r4_' + C.c; RJ.R[k] = RJ.I[k] === RJ0.I[k] && /\|200,200\|0$/.test(RJ.I[k]); });
+  // ⑥ 받은 사본 없음·예외 = 종전 결과(같은 날 이 화면 통째 — 상태 '운행')와 같음 · 예외는 경고 남김
+  RJ.R.r6 = RJ.I.r6a === RJ0.I.r6a && RJ.I.r6a === '운행|L|0' && RJ.I.r6b.split('|').slice(0, 3).join('|') === RJ0.I.r6b.split('|').slice(0, 3).join('|') && /\|true$/.test(RJ.I.r6b);
+  const onceJ = (src, a, b) => { const n = src.split(a).length - 1; if (n !== 1) throw new Error('변이 자리 ' + n + '곳: ' + a.slice(0, 60)); return src.replace(a, () => b); };
+  // 결함 사본: [이름, 바꿀 글(null = 수리 전 꼴 전부), 바꾼 글, 반드시 ✗가 될 검사]
+  const KJ = [
+    ['수리 전 꼴(14곳 종전 병합 · 체크 지운 표시 무시)', null, null, CJ.map((C) => 'r1_' + C.c).concat(CJ.map((C) => 'r3_' + C.c), ['r7a', 'r7b'])],
+    ['칸 고르기가 늘 이 화면', 'if (mgEq(t, o)) return null; if (mgEq(t, bb)) return { v: o }; if (!mgEq(o, bb) && !own(o, path)) cf.push(path); return null; };', 'if (mgEq(t, o)) return null; if (!mgEq(o, bb) && !own(o, path)) cf.push(path); return null; };', ['r1_vehicles', 'r1_leaves', 'r1_asbestos']],
+    ['읽기에서 받은 사본 안 세움', '    imBaseSetAt(col, own || items, rAt, !!own);\n', '\n', ['r1_vehicles', 'r1_bids', 'r1_checklist']],
+    ['공통 길 저장 200에서 받은 사본 안 세움', '      if (imV) imSvOk(imV, _colBase[col]);', '', ['r2_vehicles', 'r2_leaves']],
+    ['가족친화 저장 200에서 받은 사본 안 세움', 'famPending=false; if (imV) imSvOk(imV, famBase); }', 'famPending=false; }', ['r2_family']],
+    ['현장 대장 저장 200에서 받은 사본 안 세움', '      if(res.status===200&&imV) imSvOk(imV, (res.body&&res.body.updated_at)||0);', '', ['r2_asbestos']],
+    ['나가 있는 저장 수 안 봄', 'var out = (pend || st.out > 0) ? merge(cur, ri) : ri;', 'var out = pend ? merge(cur, ri) : ri;', ['r9c']],
+    ['옛 판 읽기를 들임', 'if (st.has && st.at && rAt && rAt < st.at){ if (cb) _colBase[col] = st.at; st.rd = null; return 1; }', '', ['r9a']],
+    ['로그아웃 사이 읽기를 들임', 'if (!st.has && st.gen !== g0){ if (cb) delete _colBase[col]; st.rd = null; return 0; }', '', ['r9b']],
+    ['체크 지운 표시 무시', '    if (lts || rts){', '    if (false){', ['r7a', 'r7b']],
+    ['체크 해제에 지운 표시 안 남김', '      recStamp(type, key, itemId);\n      clearReview(type, key, itemId);', '      clearReview(type, key, itemId);', ['r7b']],
+    ['체크 지운 표시 저장 안 함', 'if (typeof checkRecTs !== "undefined") body = JSON.stringify(', 'if (false) body = JSON.stringify(', ['r7b']],
+    ['차량 만기 뒷손질 뺌', '      if (opt.fix) opt.fix(m, r, pre);', '', ['r5v']],
+    ['검사 기록을 칸으로 걸음', '      skip: { insp_log: 1 },', '      skip: {},', ['r5l']],
+    ['서버에서 빠진 항목 되살림', '    if (opt.gone) imGone(st, byId, remote);', '', ['r5d']],
+    ['이 화면이 영구 삭제한 줄 되살림', '      if (!cur && st.cut && st.cut[r.id] && st.base[r.id] && mgEq(st.base[r.id], r)) return;', '', ['r5c']],
+    ['지움을 받은 사본과 안 견줌', 'dsrc = dl0 === db0 ? s : (ds0 === db0 ? l : null);', 'dsrc = null;', ['r1_documents']],
+    ['지움 짝 칸 안 따름', '      if (dside === s) dw.forEach(', '      if (false) dw.forEach(', ['r1_documents']],
+    ['상태 묶음 없음(지시)', '      grp: [["status", "done_at", "done_by", "done_src", "approved_by", "approved_at"]],\n', '', ['r8t']],
+    ['상태 묶음을 칸마다 고름', 'var gpick = function(v, path){ return gd[path[0]] === "o" ? { v: v[2] } : null; };', 'var gpick = pick;', ['r8t']],
+    ['알림 칸 이름 옛 글(차량 메모)', 'insurer: "보험사", note: "메모", acq_price', 'insurer: "보험사", note: "비고", acq_price', ['r3_vehicles']],
+    ['체크 추가 항목 종전 병합', 'if (typeof imMerge === "function" && typeof ckFlat === "function"){', 'if (false){', ['r1_checklist']],
+    ['거래처 고친 줄 칸 단위 없음', 'if (typeof imMerge === "function") imMerge("clients",', 'if (false) imMerge("clients",', ['r1_clients']],
+    ['명부 고친 줄 칸 단위 없음', 'if (typeof imMerge === "function") imMerge("workers",', 'if (false) imMerge("workers",', ['r1_workers']],
+    ['큰 목록 지름길이 이 화면이 고친 줄도 서버 통째', '    if (JSON.stringify(l) !== kb) return null;\n', '\n', ['r1_bids', 'r3_bids']],
+    ['부동산이 일감 받은 사본을 씀','imMerge(col === "onbid" ? "onbid" : "bids",', 'imMerge("bids",', ['r1_onbid']]];
+  const KJr = [];
+  for (const [nm, a, b, want] of KJ) {
+    let r;
+    try { const H = a === null ? OLDJ(html) : onceJ(html, a, b); r = await runJ(H, want); }
+    catch (e) { r = { R: {}, threw: e.message }; }
+    KJr.push({ nm, ok: want.every((k) => r.R[k] === false), got: want.map((k) => k + ':' + r.R[k]).join(' '), threw: r.threw });
+  }
+  const badJ = Object.keys(RJ.R).filter((k) => !RJ.R[k]);
+  T('P1 판24j 계약 밖 14곳 + 체크 해제 칸 단위(실행 — 실제 공통 길·낙관락 가짜 서버·실제 읽기·저장·409 다시 읽기·병합·doLoad·doSave·toggleItem): ① 자료 15벌(14곳 + 체크 추가 항목) 다른 기기 상태 칸 + 이 화면 다른 칸 = 둘 다·알림 0 · ② 저장 200 뒤 다른 기기가 다시 고친 칸 = 다른 기기 값(차량·휴가·가족친화·현장 대장·홍보) · ③ 같은 칸 = 이 화면 값 + 알림 1(칸 이름 = 화면 글) · ④ 혼자 쓰는 화면 저장 본문 = 종전 병합 사본과 같음(15벌) · ⑤ 차량 만기 표식(알림에서 뺌)·검사 기록 합집합·문서함 지운 사본·서버에서 빠진 문서·영구 삭제한 차량 · ⑥ 받은 사본 없음·예외 = 종전 · ⑦ 체크 해제 지운 표시·옛 판 문서 섞임 · ⑧ 지시 반려 vs 승인 = 반려 덩어리 · ⑨ 옛 판 읽기·로그아웃 사이 읽기 버림·나가 있는 저장 중 읽기 병합 · 결함 사본 ' + KJ.length + '개 = 각자 맡은 검사 ✗',
+    badJ.length === 0 && KJr.every((x) => x.ok), JSON.stringify({ bad: badJ.map((k) => k + '=' + (RJ.I[k] || '')), mut: KJr.filter((x) => !x.ok) }));
+} catch (e) { console.log('  (P1 판24j 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ── v489(판24f — 계약 저장 충돌 병합을 칸 단위로 · 원장 C196): 실행 검사는 위 'P1 판24f' 블록 · 여기는 문서·판 번호 정확 검사 + 칸 단위 병합을 부르는 줄·기준 사본을 세우는 줄 등 고정 글 12줄이 그대로 한 번씩 있는지 — 다음 판은 기준 줄·sw를 '489 이상'으로 풀 것
 try {
