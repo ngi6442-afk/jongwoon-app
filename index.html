@@ -5211,7 +5211,7 @@
   //   누르면 taskSheetAct가 지금 규칙(canActTask·canApproveTask·canDo("tasks")·canDo("con"))을 다시 보고 기존 함수(toggleTaskDone·approveTask·rejectTask·setTaskStatus·openTaskModal·openStageDoc·taskNotMine)를 부른다.
   //   배선은 위임 하나 — 처리 열은 bindRows(root = 그릴 때마다 새로 생기는 표 칸), 펼침은 bind(root = 펼침 칸). 자리 host(#taskList)에는 걸지 않는다(v438 규칙 — 그릴 때마다 리스너가 쌓임).
   // 바꾸는 버튼은 모두 .mini-btn(보기 권한 .view.readonly CSS가 숨김) — 읽기 토글(칩·필터 초기화·[닫기 ▲])만 .vs-chip. 선택 칸은 sel.can = canDo("tasks")일 때만(보기 권한은 선택 칸 없음).
-  var TASK_AUTO_SHORT = { "veh:":"차량 만기", "lic:":"인허가", "cert:":"증명서", "rec:":"미수 45일", "bid:":"적격심사", "site:":"현장 대장", "wk:":"일용직" };   // 구분 칸 짧은 이름 — 배정표 긴 이름(ASSIGN_PREFIX_TXT)은 title
+  var TASK_AUTO_SHORT = { "veh:":"차량 만기", "lic:":"인허가", "cert:":"증명서", "rec:":"미수 45일", "bid:":"적격심사", "site:":"현장 대장", "wk:":"일용직", "hr:":"입·퇴사", "acct:":"계정", "ks:":"실적 신고" };   // 구분 칸 짧은 이름(C185 판1 +3) — 배정표 긴 이름(ASSIGN_PREFIX_TXT)은 title
   var TASK_ST_ORDER = { "진행": 0, "승인 대기": 1, "보류": 2, "완료": 3 };   // 상태 열 정렬 순서
   var TASK_DASH = '<span style="color:#9AA09C;">-</span>';
   var TASK_SHEET_DEF = null;
@@ -32977,8 +32977,8 @@ function dutyStage(nx){
 
   // ---- 자동 지시 배정표(v395, 공통 기반 1 첫 시범 — 업무별 최적화 설계 3-14 A1 · 착수 브리핑 A2). 접두어 → 담당. 공란 = '담당 없음' 배지(관리자 폴백 금지).
   //      변경 전 표 1판 보존 → [되돌리기] 1클릭(R1). 관리자만(서버 강제)·감사로그·낙관락 base·토스트 — 등급표 카드와 같은 결. 승인권자 1인은 저장만(라우팅 연결은 A5). ----
-  var ASSIGN_PREFIX_ORDER = ["veh:","lic:","cert:","rec:","bid:","site:","wk:"];   // 서버 ASSIGN_PREFIXES 키와 동일(uismoke 대조) · v417 site:·wk:(카드 10)
-  var ASSIGN_PREFIX_TXT = { "veh:":"차량 만기(정기검사·보험)", "lic:":"인허가 만기·보수교육", "cert:":"증명서 갱신(20일 주기)", "rec:":"미수 장기화(45일)", "bid:":"적격심사 검토", "site:":"현장 대장 미입력(월 1회)", "wk:":"일용직 인적사항 미입력(월 1회)" };
+  var ASSIGN_PREFIX_ORDER = ["veh:","lic:","cert:","rec:","bid:","site:","wk:","hr:","acct:","ks:"];   // 서버 ASSIGN_PREFIXES 키와 동일(uismoke 대조) · v417 site:·wk:(카드 10) · C185 판1 hr:·acct:·ks:
+  var ASSIGN_PREFIX_TXT = { "veh:":"차량 만기(정기검사·보험)", "lic:":"인허가 만기·보수교육", "cert:":"증명서 갱신(20일 주기)", "rec:":"미수 장기화(45일)", "bid:":"적격심사 검토", "site:":"현장 대장 미입력(월 1회)", "wk:":"일용직 인적사항 미입력(월 1회)", "hr:":"입사·퇴사 체크리스트(인사)", "acct:":"입사·퇴사 계정(부여·회수 확인·대장)", "ks:":"현장 실적 신고(연 1회)" };
   var assignTbl = null, assignBase = 0, assignSaving = false;
   function assignMemberOpts(cur){
     var h = '<option value=""' + (cur ? '' : ' selected') + '>(없음 — 담당 없음 배지)</option>';
@@ -33334,6 +33334,9 @@ function dutyStage(nx){
       why: "연습 모드는 매일 평일 08:10에 '켰으면 생겼을 지시'만 세고 지시·알림을 만들지 않습니다.", setBase: b.updated_at || 0 });
     else if (lm && lc === "dry") out.push({ id: "autotask:lic_duty:live", q: "인허가 기한 지시를 켤까요?", recTxt: "켬(실제 발행)", curTxt: "연습(발행 0)", args: { rule: "lic_duty", mode: "live" }, def: "keep",
       why: pmconLicWhy(b), setBase: b.updated_at || 0 });
+    // C185 판1 범위 밖 규칙(meta_srv의 인허가 기한 밖 줄) — 줄은 evrRows 한 곳 · 점검 카드가 같은 응답을 씀(evrSeen). 표본에 그 줄이 없으면 부르지 않음
+    if (typeof evrSeen === "function") evrSeen(b);
+    if (b.meta_srv && Object.keys(b.meta_srv).some(function(k){ return k !== "lic_duty"; })) evrRows(b).forEach(function(r){ out.push(r); });
     return out;
   }
   // P1 판20 — 연습 요약(it:autotask:dry의 인허가 칸, 서버 _lib/licduty drySummary)을 업무 말로: 무엇이 누구에게 몇 건 · 앞으로 60일 · 지시 안 가는 행 · 되돌리기
@@ -33861,6 +33864,77 @@ function dutyStage(nx){
     }).catch(function(){ vehBgCardBusy = false; alert("승격 해제 실패(네트워크)"); });
   }
   PMCON_CHECKS.push({ id: "vehbg", title: "차량 법령 근거", render: vehBgCardRender });
+  // ---- C185 판1 범위 밖 자동 지시 규칙(서버가 세는 5줄 — 착수계획 09_조사_문서/45_Phase1_자료_20261113/C185_자료_1119/C185_착수계획_1119.md ⓑ P3·점검 카드) ----
+  //   콘솔 줄 = evrRows(꺼짐 → 연습으로 · 연습 ∧ 준비됨 ∧ 연습 요약 있음 → 켤까요?(무응답 = 그대로) · 켜짐 ∧ 멈춤 까닭 → 연습으로 내릴까요?(무응답 = 그대로 멈춤)) — pmconRowsAutotask가 인허가 기한 줄 뒤에 붙인다.
+  //   점검 카드 = 규칙마다 상태(준비 중·연습·켜짐·꺼짐)·연습 결과 한 줄 · 켜진 규칙만 켠 날과 [연습으로]·[끄기](PM만 — pmcon_decide → 기존 스위치 길 handleAutotaskSet · 서버 새 액션 없음).
+  //   자료 = 콘솔 줄 함수가 받은 autotask_get 응답을 이 그리기 회차(pmconSeq)로 남긴 것(차량 근거 카드와 같은 방식 — 따로 부르지 않음). 화면 글에 규칙 id·키 꼴을 싣지 않는다(이름은 서버 meta_srv 라벨).
+  var evrLast = null, evrCardBusy = false;
+  var EVR_STOP = { TOO_MANY: "한 번에 생길 사건이 10건을 넘어 멈춰 있습니다", PII: "지시 글에 직원 이름이 섞여 멈춰 있습니다", NO_SINCE: "켠 시각 기록이 없어 멈춰 있습니다" };
+  var EVR_SKIP = { ERROR: "계산하다 오류가 났습니다", MEMBERS_UNAVAILABLE: "직원 명부를 읽지 못했습니다", ASSIGN_UNAVAILABLE: "배정표를 읽지 못했습니다", READ_FAILED: "자료를 읽지 못했습니다", TASKS_READ_FAILED: "지시를 읽지 못했습니다" };
+  function evrSeen(b){ evrLast = { seq: pmconSeq, b: b }; }
+  function evrIds(b){ return Object.keys((b && b.meta_srv) || {}).filter(function(k){ return k !== "lic_duty"; }); }
+  function evrMd(ms){ var n = Number(ms) || 0, t = new Date(n); return (!n || isNaN(t.getTime())) ? "" : (t.getMonth() + 1) + "/" + t.getDate(); }
+  function evrSumTxt(s){
+    if (!s) return "아직 연습 집계가 없습니다(다음 평일 08:10 정기업무 봇 뒤에 채워짐).";
+    if (s.ready === false) return "준비 중 — 계산이 아직 들어오지 않아 켤 수 없습니다.";
+    if (s.skip) return (EVR_STOP[s.skip] || EVR_SKIP[s.skip] || "이번에는 세지 못했습니다") + ".";
+    var p = [(s.win ? "최근 " + s.win + "일에 생긴 일을 켰다면 " : "오늘 실행에 ") + "지시 " + (Number(s.tasks) || 0) + "건(사건 " + (Number(s.events) || 0) + ")"];
+    (s.who || []).forEach(function(w){ p.push((memberName(w.id) || "배정표 담당") + " " + (Number(w.n) || 0) + "건"); });
+    if (s.no_who) p.push("담당이 없어 만들지 않을 " + s.no_who + "건");
+    if (s.no_due) p.push("기한 없이 " + s.no_due + "건");
+    if (s.old) p.push("켠 날보다 앞선 일이라 뺀 " + s.old + "건");
+    if (s.gone) p.push("지워진 지시와 같아 다시 만들지 않는 " + s.gone + "건");
+    if (s.marked) p.push("날짜·상태가 바뀌어 확인 표시가 붙은 옛 지시 " + s.marked + "건");
+    if ((s.no_row || []).length) p.push("근거 표에 없어 기한을 세지 못한 항목 " + s.no_row.length + "개");
+    return p.join(" · ") + ".";
+  }
+  function evrRows(b){
+    var out = [], rules = b.rules || {}, ms = b.meta_srv || {}, dr = (b.dry && b.dry.rules) || {};
+    evrIds(b).forEach(function(k){
+      var m = ms[k] || {}, cur = rules[k], s = dr[k] || null, nm = m.label || "자동 지시 규칙";
+      if (cur === "off") out.push({ id: "autotask:" + k + ":dry", q: nm + " — 꺼진 규칙을 연습 모드(발행 0)로 되돌릴까요?", recTxt: "연습(발행 0)", curTxt: "꺼짐", args: { rule: k, mode: "dry" }, def: "rec",
+        why: "연습 모드는 매일 평일 08:10에 '켰으면 생겼을 지시'만 세고 지시·알림을 만들지 않습니다.", setBase: b.updated_at || 0 });
+      else if (cur === "dry" && m.ready === true && s && s.ready !== false) out.push({ id: "autotask:" + k + ":live", q: nm + " — 켤까요?", recTxt: "켬(실제 발행)", curTxt: "연습(발행 0)", args: { rule: k, mode: "live" }, def: "keep",
+        why: evrSumTxt(s) + " 켜면 켠 뒤에 생긴 일만 지시합니다(지난 일 소급 없음). 직원에게 새로 가는 알림이라 사흘 전 예고 뒤에 켭니다. 되돌리기: 이 화면 '범위 밖 자동 지시 규칙' 카드 [연습으로]·[끄기](이미 생긴 지시는 남음).", setBase: b.updated_at || 0 });
+      else if (cur === "live" && s && EVR_STOP[s.skip]) out.push({ id: "autotask:" + k + ":dry", q: nm + " — 멈춰 있습니다. 연습으로 내릴까요?", recTxt: "연습(발행 0)", curTxt: "켜짐(멈춤)", args: { rule: k, mode: "dry" }, def: "keep",
+        why: EVR_STOP[s.skip] + ". 맞는 일이면 막는 기준을 고쳐야 하고(개발), 아니면 연습으로 내립니다. 무응답이면 그대로 멈춰 있습니다(지시 0).", setBase: b.updated_at || 0 });
+    });
+    return out;
+  }
+  function evrCardRender(el){
+    if (!el) return;
+    var head = '<div style="font-weight:600;font-size:13.5px;">범위 밖 자동 지시 규칙</div>';
+    var b = evrLast && evrLast.seq === pmconSeq ? evrLast.b : null;   // 이번 그리기에서 콘솔 줄이 받은 응답(따로 부르지 않음)
+    if (!(b && b.rules)){ el.innerHTML = head + '<div class="pc-none" style="color:#B00020;">불러오지 못했습니다 — 새로고침 후 다시 보세요</div>'; return; }
+    var ids = evrIds(b), ms = b.meta_srv || {}, dr = (b.dry && b.dry.rules) || {}, since = b.since || {}, cw = !!(pmconState && pmconState.canWrite && pmconState.base !== null);
+    if (!ids.length){ el.innerHTML = head + '<div class="pc-none">등록된 규칙이 없습니다.</div>'; return; }
+    var li = ids.map(function(k){
+      var m = ms[k] || {}, cur = b.rules[k], s = dr[k] || null, st, act = "", line = "";
+      if (m.ready !== true) st = "준비 중" + (cur === "off" ? "(꺼짐)" : "");
+      else st = cur === "live" ? "켜짐" + (evrMd(since[k]) ? " · 켠 날 " + evrMd(since[k]) : "") : (cur === "off" ? "꺼짐" : "연습");
+      if (m.ready === true && cur !== "off") line = '<br><span style="color:var(--sub);">' + esc(evrSumTxt(s)) + '</span>';
+      if (cur === "live") act = cw ? '<br><button type="button" class="mini-btn" data-evr-set="' + esc(k) + ':dry">연습으로</button> <button type="button" class="mini-btn" data-evr-set="' + esc(k) + ':off">끄기</button>' : ' <span class="pc-who">바꾸실 분: PM</span>';
+      return '<li><b>' + esc(m.label || "자동 지시 규칙") + '</b> — ' + esc(st) + line + act + '</li>';
+    });
+    el.innerHTML = head + '<ul style="margin:6px 0 4px;padding-left:18px;font-size:12.5px;line-height:1.6;">' + li.join("") + '</ul>'
+      + '<div class="pc-none">켜기는 연습 결과가 쌓인 뒤 위 \'정할 것\' 줄로 합니다. 켠 뒤에 생긴 일만 지시합니다.</div>';
+    Array.prototype.forEach.call(el.querySelectorAll ? el.querySelectorAll("[data-evr-set]") : [], function(btn){ btn.addEventListener("click", function(){ var p = btn.getAttribute("data-evr-set").split(":"); evrCardSet(b, p[0], p[1]); }); });
+  }
+  function evrCardSet(b, k, mode){
+    if (evrCardBusy || !pmconState || !pmconState.canWrite || pmconState.base === null) return;
+    var m = (b.meta_srv || {})[k] || {}, nm = m.label || "자동 지시 규칙", txt = mode === "off" ? "끄기" : "연습으로";
+    if (!confirm(nm + " — [" + txt + "]\n" + (mode === "off" ? "끄면 지시도 연습 집계도 멈춥니다." : "연습으로 내리면 지시·알림을 더 만들지 않고 수만 셉니다.") + " 이미 생긴 지시는 남습니다.")) return;
+    evrCardBusy = true;
+    gwCall("gw-data", { action: "pmcon_decide", kind: "autotask", row: "autotask:" + k + ":" + mode, grade: "R1", due: "", q: nm + " — " + txt, rec: txt, choice: "ok", args: { rule: k, mode: mode }, set_base: Number(b.updated_at) || 0, val: txt, base: pmconState.base }).then(function(res){
+      evrCardBusy = false;
+      if (res.status === 409){ apprToastShow("다른 곳에서 방금 바뀌었습니다 — 다시 불러왔습니다"); renderPmcon(); return; }
+      if (res.status !== 200){ alert("저장 실패 (" + ((res.body && res.body.error_code) || res.status) + ")"); renderPmcon(); return; }
+      apprToastShow(txt + " — 적용했습니다(누른 기록에 남음)");
+      renderPmcon();
+    }).catch(function(){ evrCardBusy = false; alert("저장 실패(네트워크) — 다시 시도해주세요."); });
+  }
+  PMCON_CHECKS.push({ id: "evrules", title: "범위 밖 자동 지시 규칙", render: evrCardRender });
+
   (function(){
     var rb = document.getElementById("pmconReloadBtn"); if (rb) rb.addEventListener("click", function(){ renderPmcon(); });
     var pb = document.getElementById("pmconPermBtn"); if (pb) pb.addEventListener("click", function(){ switchTab("perm"); });

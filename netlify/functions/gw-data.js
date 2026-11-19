@@ -18,6 +18,7 @@ const AR = require('./_lib/autorules');  // v417 자동 지시 서버 규칙 3�
 const CLIBIZ = require('./_lib/clibiz');   // v456 거래처 사업자번호 칸 13자리 판정(앱 cliBiz13과 같은 규칙 — uismoke v456 대조)
 const CONAPPR = require('./_lib/conappr');   // P1 판24-③ 계약 단계 결재 서버 강제(앱 csApprKindOf와 같은 판정 — uismoke P1 판24 대조)
 const DUTY = require('./_lib/duty');   // P1 판28 인허가 '이번 달' 회차 계산(앱 DUTY_SHARED 구간과 같은 본문 — uismoke P1 판28이 글자째 대조)
+const EV = require('./_lib/evrules');   // C185 판1 범위 밖 자동 지시 규칙 5줄(서버가 셈) 공통 틀 — 새 키 꼴·실행(사건 막이·이름 대조·옛 지시 표시)·계획 함수 자리(판2~6)
 const LD = require('./_lib/licduty');   // P1 판20 인허가 기한 → 담당 자동 지시(판정 = 이번 달 탭과 같은 dutyCur·dutyStage · 스위치 settings:autotask lic_duty, 기본 dry)
 const SITEEDU = require('./_lib/siteedu');   // v433 현장 대장 '특별교육 미이수' 판정(앱 asbNoSpecial·eduHasValidSpecial과 같은 규칙 — uismoke v433 대조)
 
@@ -480,6 +481,15 @@ async function handleSave(event, d, R) {
       if (!t || typeof t !== 'object') return;
       const o = oldByA[t.id];
       if (o && LD.isDutyKey(o.auto_key) && o.lic_reopen !== undefined) t.lic_reopen = o.lic_reopen; else delete t.lic_reopen;
+    });
+    // C185 판1: 범위 밖 규칙 실행기만 만드는 새 키 꼴(hr:·acct:·ks:·veh:<id>:ev: — EV.isEvLike, 접두어가 같으면 꼴이 조금 달라도)도 서버만 쓴다.
+    //   서버 문서에 이 꼴로 있던 지시 = 키 서버 값(빼거나 바꿔 보내도 되돌림) · 서버에 없던 줄·다른 키였던 줄이 이 꼴을 달고 오면 종전 키로(없었으면 뗌) · 직전 문서를 못 읽은 저장에 이 꼴 = 500(인허가 기한 키와 같은 규칙)
+    if (prevReadFailed && doc.items.some(function (t) { return !!t && typeof t === 'object' && EV.isEvLike(t.auto_key); })) return jr(500, { status: 'ERROR', error_code: 'PREV_READ_FAILED', request_id: R });
+    doc.items.forEach(function (t) {
+      if (!t || typeof t !== 'object') return;
+      const o = oldByA[t.id];
+      if (o && EV.isEvLike(o.auto_key)) { t.auto_key = o.auto_key; return; }
+      if (EV.isEvLike(t.auto_key)) { if (o && o.auto_key !== undefined) t.auto_key = o.auto_key; else delete t.auto_key; }
     });
     doc.items.forEach(function (t) { if (!t || !t.auto_key || t.who_id) return; const o = oldByA[t.id]; if (o && o.who_id && o.who_by === 'assign') { t.who_id = o.who_id; t.who = o.who || ''; t.who_by = 'assign'; } });
     // v397 앱 기준 review 보호: 서버가 올린 review('앱 기준')를 클라 사본이 open으로 보내면 반려(doneif_off=1)가 아닌 한 서버 값을 이월(낡은 사본·로컬 우선 병합 방지). 승인(done)은 통과
@@ -994,17 +1004,21 @@ function autotaskRuleOf(autoKey, today) {
 }
 async function handleAutotaskIngest(event, d, R) {
   if (!botKeyOk(d.key)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });   // v453 상수시간
-  const items = (d.only !== 'lic_duty' && Array.isArray(d.items)) ? d.items : [];
+  const items = (d.only !== 'lic_duty' && d.only !== 'srv' && Array.isArray(d.items)) ? d.items : [];
   // P1 판20 검토 B1: only 'lic_duty' = 봇이 보낼 항목 없이 인허가 기한 지시만 돌리려고 부른 호출 — 받은 항목·숨길 키·차량 다시 지시·배정 채움·일반 자동 지시 알림을 돌지 않는다
   //   (종전 봇이면 ingest를 안 부르던 날에 다른 규칙·관리자 '정기업무 n건'이 새로 생기지 않게 — 인허가 스위치를 켜도 기존 자동 지시는 종전과 같음).
   const only = d.only === 'lic_duty';
-  const hideKeys = (!only && Array.isArray(d.hide_keys)) ? d.hide_keys.map(String) : [];
+  const quiet = only || d.only === 'srv';   // C185 판1: 'srv' = 봇이 서버 규칙(인허가 기한 + 범위 밖 5규칙) 때문에만 부른 호출 — 'lic_duty'와 같은 뜻(받은 항목·숨길 키·차량 다시 지시·배정 채움·일반 알림 안 돎)
+  const hideKeys = (!quiet && Array.isArray(d.hide_keys)) ? d.hide_keys.map(String) : [];
   const st = store(DATA);
+  const sw = await autotaskRead(st);   // v453 규칙 스위치 — 키 없음·읽기 실패면 기본 dry(막음) · C185 판1: 서버 규칙 입력을 지시 문서보다 먼저 읽으려고 지시 읽기 앞으로 옮김(값·판정 그대로)
+  const srvIds = EV.RULE_IDS.filter(function (k) { return sw.rules[k] === 'live' && autotaskReady(k); });   // C185 판1 — live이고 준비된(계획 함수가 있는) 규칙만. 지금은 0개
+  let srvIn = null;
+  if (srvIds.length) { try { srvIn = await evInput(st, srvIds); } catch (e) { srvIn = {}; } }   // 입력(명부·배정표·차량·대장·계약·근거 승격)을 지시 문서보다 먼저 한 번 — 지시 읽기~쓰기 사이를 늘리지 않게
   const r = await blobGet(st, colKey('tasks'));
   const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
   await verSnapshot('tasks', doc, '정기봇', true);
   const today = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
-  const sw = await autotaskRead(st);   // v453 규칙 스위치 — 키 없음·읽기 실패면 기본 dry(막음)
   const have = {}, have0 = {};
   doc.items.forEach(function (t) { if (t && t.auto_key) { have[t.auto_key] = t; have0[t.auto_key] = 1; } });
   let made = 0, fixed = 0, blocked = 0;
@@ -1026,7 +1040,7 @@ async function handleAutotaskIngest(event, d, R) {
   //   검토 P1-4: 이 갈래는 봇이 ingest를 부를 때만 돈다 — 지금 봇(appdata collectors/autotask.py)은 새 항목도 숨길 키도 없으면 ingest를 부르지 않으므로 매일 돈다는 보장이 없다.
   //     주 경로는 관리자 앱 접속(runAutoTaskGen — 세션 1회), 이 갈래는 보조. 봇이 매일 부르게 하는 것은 appdata 쪽 일(이 판 밖).
   let redo = 0;
-  if (!only) try {
+  if (!quiet) try {
     const rvh = await blobGet(st, colKey('vehicles'));
     if (rvh.ok && rvh.data && Array.isArray(rvh.data.items)) {
       AR.vehRedo(rvh.data.items, doc.items, today).forEach(function (n) {
@@ -1053,6 +1067,14 @@ async function handleAutotaskIngest(event, d, R) {
       }
     } catch (e) { lic = { mode: 'live', skip: 'ERROR' }; }
   }
+  // C185 판1 서버 규칙 실행기 — live이고 준비된 범위 밖 규칙만(위 srvIds · 지금은 0개 = 아래 줄들이 아무것도 바꾸지 않음). 만든 지시는 made에 넣지 않는다(관리자 '정기업무 n건'에 안 섞임 — 판20과 같음).
+  //   담당 알림은 아래 notifyAutoCreated 한 호출에 합친다(표식 호출이면 실행기가 만든 것만). 응답·감사에는 규칙별 수만(srv).
+  let srv = null, srvTouched = 0, srvTxt = '';
+  const srvNew = [];
+  if (srvIds.length) {
+    try { const er = evExec(srvIn || {}, srvIds, sw.rules, sw.since || {}, doc.items, today, true); srv = er.res; srvTouched = er.changed; srvTxt = er.txt; er.made.forEach(function (t) { srvNew.push(t); }); }
+    catch (e) { srv = {}; srvIds.forEach(function (k) { srv[k] = EV.skipSum('live', 'ERROR'); }); srvTxt = ' · 서버 규칙 건너뜀(ERROR)'; }
+  }
   hideKeys.slice(0, 200).forEach(function (k) {
     const t = have[k];
     if (t && t.del !== 1) { t.del = 1; t.updated = today; fixed++; }
@@ -1061,25 +1083,26 @@ async function handleAutotaskIngest(event, d, R) {
   let assigned = 0;
   const notLd = function (t) { return !(t && LD.isDutyKey(t.auto_key)); };   // P1 판20: 인허가 기한 지시의 담당·알림은 licduty 한 길(재직 확인·옮기기) — 일반 배정 채움·알림에서 뺀다
   const blankBefore = {}; doc.items.forEach(function (t) { if (t && t.auto_key && !t.who_id) blankBefore[t.id] = 1; });
-  if (!only) try { const at = await assignRead(st); if (Object.keys(at.rules || {}).length) { const ms = await assignMembers(); if (ms) assigned = assignFill(doc.items.filter(notLd), at.rules, assignNames(ms)); } } catch (e) {}
+  if (!quiet) try { const at = await assignRead(st); if (Object.keys(at.rules || {}).length) { const ms = await assignMembers(); if (ms) assigned = assignFill(doc.items.filter(notLd), at.rules, assignNames(ms)); } } catch (e) {}
   // v396 알림: 이번에 생긴 항목 + 이번에 담당이 채워진 항목 → 담당자 본인 1발(설정 assignee일 때만)
-  const notifyItems = only ? [] : doc.items.filter(function (t) { return t && t.auto_key && t.who_id && notLd(t) && !licNew[t.id] && (t.created === today && !have0[t.auto_key] || blankBefore[t.id]); });   // P1 판20 인허가 기한 지시는 아래 licDutyNotify 한 길
+  const notifyItems = quiet ? [] : doc.items.filter(function (t) { return t && t.auto_key && t.who_id && notLd(t) && !licNew[t.id] && (t.created === today && !have0[t.auto_key] || blankBefore[t.id]); });   // P1 판20 인허가 기한 지시는 아래 licDutyNotify 한 길
+  if (srvNew.length) srvNew.forEach(function (t) { if (notifyItems.indexOf(t) < 0) notifyItems.push(t); });   // C185 판1: 실행기가 만든 지시도 같은 한 호출로(표식 없는 호출이면 위 거름에 이미 들어 있어 겹치지 않음)
   let notified = 0;
   if (notifyItems.length) notified = await notifyAutoCreated(st, notifyItems, '정기봇');
   const blockTxt = blocked ? ' · 스위치 막음 ' + blocked + '(' + Object.keys(blockedBy).map(function (k) { return k + ' ' + blockedBy[k] + ' — ' + (k === 'unknown' ? '허용 꼴 밖' : sw.rules[k]); }).join(', ') + ')' : '';   // v453 규칙 이름·건수·스위치 값만(키·본문 없음)
   const licTxt = !lic ? '' : (lic.skip ? ' · 인허가 기한 건너뜀(' + lic.skip + ')' : ((lic.bundled || lic.made || lic.bumped || lic.moved || lic.next || lic.no_who || lic.reopened) ? ' · 인허가 기한 ' + (lic.bundled ? '묶음 ' + lic.bundled + ' · ' : '') + '새 ' + lic.made + ' · 단계 올림 ' + lic.bumped + (lic.moved ? ' · 담당 옮김 ' + lic.moved : '') + (lic.next ? ' · 다음 회차 ' + lic.next : '') + (lic.reopened ? ' · 다시 엶 ' + lic.reopened : '') + (lic.no_who ? ' · 담당 없음 ' + lic.no_who + '행' : '') : ''));   // P1 판20 수·행 수만
-  if (made || fixed || assigned || (lic && lic.touched)) {
+  if (made || fixed || assigned || (lic && lic.touched) || srvTouched) {
     doc.updated_by = '정기봇'; doc.updated_at = Date.now();
     const w = await blobSet(st, colKey('tasks'), doc);
     if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
-    try { await appendAudit({ ts: Date.now(), by: '정기봇', bid: 'bot', col: 'tasks', ev: [{ op: '정기업무', id: '', t: '신규 ' + made + (redo ? '(차량 다시 지시 ' + redo + ')' : '') + ' · 정정 ' + fixed + (assigned ? ' · 배정 ' + assigned : '') + blockTxt + licTxt }] }); } catch (e) {}
-  } else if (blocked || licTxt) {
-    try { await appendAudit({ ts: Date.now(), by: '정기봇', bid: 'bot', col: 'tasks', ev: [{ op: '정기업무', id: '', t: '신규 0' + blockTxt + licTxt }] }); } catch (e) {}   // v453 쓴 것은 없어도 막힌 것은 남김
+    try { await appendAudit({ ts: Date.now(), by: '정기봇', bid: 'bot', col: 'tasks', ev: [{ op: '정기업무', id: '', t: '신규 ' + made + (redo ? '(차량 다시 지시 ' + redo + ')' : '') + ' · 정정 ' + fixed + (assigned ? ' · 배정 ' + assigned : '') + blockTxt + licTxt + srvTxt }] }); } catch (e) {}
+  } else if (blocked || licTxt || srvTxt) {
+    try { await appendAudit({ ts: Date.now(), by: '정기봇', bid: 'bot', col: 'tasks', ev: [{ op: '정기업무', id: '', t: '신규 0' + blockTxt + licTxt + srvTxt }] }); } catch (e) {}   // v453 쓴 것은 없어도 막힌 것은 남김
   }
   let licSent = 0;
   if (lic && lic.notify) { licSent = await licDutyNotify(lic.notify, today); delete lic.notify; }   // 저장된 뒤에만(저장 실패면 위에서 500으로 끝남)
   if (lic) lic.notified = licSent;
-  return jr(200, Object.assign({ status: 'OK', made: made, redo: redo, fixed: fixed, assigned: assigned, notified: notified, blocked: blocked, blocked_rules: blockedBy, request_id: R }, lic ? { lic: lic } : {}, only ? { only: 'lic_duty' } : {}));
+  return jr(200, Object.assign({ status: 'OK', made: made, redo: redo, fixed: fixed, assigned: assigned, notified: notified, blocked: blocked, blocked_rules: blockedBy, request_id: R }, lic ? { lic: lic } : {}, srv ? { srv: srv } : {}, quiet ? { only: only ? 'lic_duty' : 'srv' } : {}));   // C185 판1: srv = 범위 밖 규칙별 수(live 규칙이 있을 때만)
 }
 
 // P1 판20 인허가 기한 지시 — 입력 모으기(한 곳). 탭(lic_month_get)과 같은 원천: 근거 승격본 자동 회차 행(licBgRead → licBgOut 칸) · col:licenses duties·items · 배정표(엄격 — 못 읽으면 건너뜀, 빈 표로 보지 않음).
@@ -1113,6 +1136,63 @@ async function licDutyNotify(byWho, today) {
     try { const rs = await push.sendTo([who], { title: '인허가 기한 지시 ' + list.length + '건', body: body.slice(0, 200), url: './', tag: 'lic-duty-' + who + '-' + today }, { ctx: tc, primaryOnly: true, by: '정기봇' }); if (rs && Number(rs.sent) > 0) n++; } catch (e) {}   // 판20 검토 B2: 실제 보낸 사람만 셈(구독 없음·실패 = 0)
   }
   return n;
+}
+// C185 판1 서버 규칙 실행기 — ① 입력 한 번 모으기(evInput: 규칙들이 읽는 것의 합집합만 — 명부 push.loadMembers 한 번 · 배정표 엄격 · 차량·대장·계약 · 인사·차량 근거 승격)
+//   ② 규칙별 계획 함수(_lib/evrules RULES[id].plan — 판2~6) ③ 적용(evExec → EV.run: 사건 10건 막이 · 끼워 넣은 값만 명부 이름 대조 · 담당 = 배정표 재직자 · 옛 지시 표시 붙이기·떼기).
+//   ingest(write 참 — live 규칙)와 dry_put(write 거짓 — 요약)이 같은 길. 입력 하나를 못 읽으면 그 입력을 쓰는 규칙만 건너뜀(skip) — 다른 규칙은 진행.
+async function evInput(st, ids) {
+  const need = {}; ids.forEach(function (k) { EV.needsOf(k).forEach(function (n) { need[n] = 1; }); });
+  const inp = {};
+  const col = async function (name) { const r = await blobGet(st, colKey(name)); if (!r.ok && r.code !== 'NOT_FOUND') return { ok: false, why: 'READ_FAILED' }; return { ok: true, data: (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : [] }; };
+  for (const n of Object.keys(need)) {
+    try {
+      if (n === 'members') { const ms = await push.loadMembers(); inp.members = (!Array.isArray(ms) || ms.unavailable) ? { ok: false, why: 'MEMBERS_UNAVAILABLE' } : { ok: true, data: ms }; }
+      else if (n === 'assign') { const as = await licAssignStrict(st); inp.assign = as.ok ? { ok: true, data: as.rules || {} } : { ok: false, why: 'ASSIGN_UNAVAILABLE' }; }
+      else if (n === 'vehicles') inp.vehicles = await col('vehicles');
+      else if (n === 'sites') inp.sites = await col('asbestos');
+      else if (n === 'contracts') inp.contracts = await col('contracts');
+      else if (n === 'hrbg') inp.hrbg = { ok: true, data: await hrBgState(st) };
+      else if (n === 'vehbg') inp.vehbg = { ok: true, data: await vehBgState(st) };
+      else inp[n] = { ok: false, why: 'READ_FAILED' };
+    } catch (e) { inp[n] = { ok: false, why: 'READ_FAILED' }; }
+  }
+  return inp;
+}
+// 반환 { res: {규칙: 요약}, made: [새 지시], changed: 바뀐 지시 수, txt: 감사 조각(수만) }
+function evExec(inp, ids, modes, since, tasks, today, write) {
+  const res = {}, made = [], txts = []; let changed = 0;
+  const now = Date.now();
+  let active = null, names = null;
+  ids.forEach(function (k) {
+    const mode = modes[k] === 'live' ? 'live' : 'dry';
+    const miss = EV.needsOf(k).filter(function (n) { return !(inp && inp[n] && inp[n].ok); });
+    if (miss.length) { const why = (inp && inp[miss[0]] && inp[miss[0]].why) || 'READ_FAILED'; res[k] = EV.skipSum(mode, why); txts.push(k + ' 건너뜀(' + why + ')'); return; }
+    if (!Array.isArray(tasks)) { res[k] = EV.skipSum(mode, 'TASKS_READ_FAILED'); txts.push(k + ' 건너뜀(TASKS_READ_FAILED)'); return; }
+    const cx = EV.ctxFor(k, mode, since && since[k], now, today);
+    if (cx.skip) { res[k] = EV.skipSum(mode, cx.skip); txts.push(k + ' 멈춤(' + cx.skip + ')'); return; }
+    if (!active) {   // 재직자(담당이 될 수 있는 사람) = tier.ctxOf와 같은 판정 · 이름 대조 = 명부 전부(퇴사·삭제 포함)
+      const ms = inp.members.data; active = {}; names = [];
+      (tier.ctxOf(ms).members || []).forEach(function (m) { if (m && m.id) active[m.id] = m.name || ''; });
+      ms.forEach(function (m) { if (m && typeof m.name === 'string') names.push(m.name); });
+    }
+    const data = { tasks: tasks };
+    Object.keys(inp).forEach(function (n) { if (inp[n] && inp[n].ok) data[n] = inp[n].data; });
+    const o = EV.run(k, data, cx.ctx, tasks, { rules: inp.assign.data, active: active, names: names, mkId: function () { return 't' + crypto.randomBytes(6).toString('hex'); } }, write);
+    res[k] = o.sum; o.made.forEach(function (t) { made.push(t); }); changed += o.changed;
+    if (o.txt) txts.push(o.txt);
+  });
+  return { res: res, made: made, changed: changed, txt: txts.length ? ' · 서버 규칙 ' + txts.join(', ') : '' };
+}
+// 연습 요약(dry_put) — 꺼진 규칙 = 없음 · 준비 안 된 규칙 = {mode, ready false} · 준비된 규칙 = 연습이면 최근 30일 기준, 켜져 있으면 오늘 실행 미리 보기(쓰지 않음)
+async function evDrySummaries(st, rules, since, today) {
+  const out = {}, run = [];
+  EV.RULE_IDS.forEach(function (k) { const m = rules[k]; if (!m || m === 'off') return; if (!autotaskReady(k)) { out[k] = EV.notReadySum(m); return; } run.push(k); });
+  if (!run.length) return out;
+  let inp = {}, tasks = null;
+  try { inp = await evInput(st, run); } catch (e) { inp = {}; }
+  try { const rt = await blobGet(st, colKey('tasks')); if (rt.ok || rt.code === 'NOT_FOUND') tasks = (rt.ok && rt.data && Array.isArray(rt.data.items)) ? rt.data.items : []; } catch (e) { tasks = null; }
+  try { Object.assign(out, evExec(inp, run, rules, since, tasks, today, false).res); } catch (e) { run.forEach(function (k) { out[k] = EV.skipSum(rules[k], 'ERROR'); }); }
+  return out;
 }
 
 // 지금 수집(관리자 버튼) — 서버가 나라장터 API를 직접 조회해 병합. G2B_API_KEY(Netlify env) 필요. 10분 쿨다운.
@@ -2476,7 +2556,8 @@ async function handleLicAttPut(event, d, R, c) {
 // 변경 전 표는 prev에 1판 보존(R1 되돌리기 1클릭). 변경은 관리자만·감사로그·낙관락(등급표 패턴). 승인권자 1인(approver_id)은 저장만(승인 라우팅 연결은 A5 done_if 때).
 const ASSIGN_KEY = 'settings:assign';
 const ASSIGN_PREFIXES = { 'veh:': '차량 만기(정기검사·보험)', 'lic:': '인허가 만기·보수교육', 'cert:': '증명서 갱신(20일 주기)', 'rec:': '미수 장기화(45일)', 'bid:': '적격심사 검토',
-  'site:': '현장 대장 미입력(월 1회)', 'wk:': '일용직 인적사항 미입력(월 1회)' };   // v417 카드 10 공통 바탕 ④ — site:·wk: 행 추가(담당은 결정 2, R1 D-3 뒤)
+  'site:': '현장 대장 미입력(월 1회)', 'wk:': '일용직 인적사항 미입력(월 1회)',
+  'hr:': '입사·퇴사 체크리스트(인사)', 'acct:': '입사·퇴사 계정(부여·회수 확인·대장)', 'ks:': '현장 실적 신고(연 1회)' };   // C185 판1 +3(범위 밖 규칙 — 담당은 배정표 카드에서) · v417 카드 10 공통 바탕 ④ — site:·wk: 행 추가(담당은 결정 2, R1 D-3 뒤)
 function assignEmpty() { return { schema: 1, rules: {}, approver_id: '', prev: null, updated_at: 0, updated_by: '' }; }
 async function assignRead(st) {
   try { const r = await blobGet(st, ASSIGN_KEY); if (r.ok && r.data && r.data.rules && typeof r.data.rules === 'object') return Object.assign(assignEmpty(), r.data); } catch (e) {}
@@ -2907,6 +2988,21 @@ const AUTOTASK_RULES = {
 // P1 판20: 서버가 직접 세는 규칙(봇이 항목을 보내지 않음 — autotask_ingest가 근거 승격본·의무 대장·배정표로 만든다) — 스위치는 같은 settings:autotask rules 칸(기본 dry)·
 //   같은 되돌리기·같은 감사·같은 PM 콘솔 줄 꼴('autotask:<규칙>:<값>'). 관리자 카드 줄(앱 AUTO_RULE_ORDER — 카드 그리기 함수는 판29 해시로 고정)과 meta(3건)에는 넣지 않고 meta_srv로 내린다.
 const AUTOTASK_SRV_RULES = { lic_duty: { label: '인허가 의무 기한 지시(30일·7일 전·지남 → 인허가 담당)', key: 'lic:<허가증>:duty:<번호>:<회차 기한>', prefix: 'lic:' } };
+// C185 판1 범위 밖 규칙 5줄(서버가 셈 · 같은 스위치 문서 · 기본 dry) — ready = 계획 함수가 들어왔는지(_lib/evrules · 판2~6이 채움). 준비 안 된 규칙을 live로 바꾸는 저장 = 400 RULE_NOT_READY.
+//   라벨은 PM 콘솔·카드·감사에 보이는 글 — 규칙 id·키 꼴을 넣지 않는다(키 꼴은 key 칸 — 화면이 쓰지 않음).
+Object.assign(AUTOTASK_SRV_RULES, {
+  hr_join: { label: '입사 체크리스트 지시(입사일 기준 · 인사·계정 담당)', key: 'hr:<회원>:join:<입사일>:<번호> · acct:<회원>:join:<입사일>', prefix: 'hr:', ready: EV.ready('hr_join') },
+  hr_leave: { label: '퇴사 체크리스트 지시(퇴사일 기준 · 인사·계정 담당)', key: 'hr:<회원>:leave:<퇴사일>:<번호> · acct:<회원>:leave:<퇴사일>', prefix: 'hr:', ready: EV.ready('hr_leave') },
+  veh_ceq31: { label: '건설기계 정기검사 지시 31일 전(차량 담당)', key: 'veh:<id>:insp:<만료일>', prefix: 'veh:', ready: EV.ready('veh_ceq31') },
+  ks_report: { label: '현장 실적 신고 지시(매년 1/15~2/15 · 실적 신고 담당)', key: 'ks:<신고 연도>', prefix: 'ks:', ready: EV.ready('ks_report') },
+  veh_event: { label: '차량 매각·말소 지시(사건일 기준 · 차량 담당)', key: 'veh:<id>:ev:<sold|dereg>:<사건일>:<main|waste>', prefix: 'veh:', ready: EV.ready('veh_event') },
+});
+function autotaskReady(k) { return hasOwn(AUTOTASK_SRV_RULES, k) ? AUTOTASK_SRV_RULES[k].ready !== false : hasOwn(AUTOTASK_RULES, k); }
+function autotaskSince(o) {   // 켠 시각 칸 거르기 — 아는 규칙 · 양수 ms만
+  const out = {}; if (!o || typeof o !== 'object' || Array.isArray(o)) return out;
+  Object.keys(o).forEach(function (k) { const v = Number(o[k]); if (autotaskRuleTbl(k) && isFinite(v) && v > 0) out[k] = v; });
+  return out;
+}
 const AUTOTASK_MODES = ['dry', 'live', 'off'];
 function autotaskRuleTbl(k) { return hasOwn(AUTOTASK_RULES, k) ? AUTOTASK_RULES[k] : (hasOwn(AUTOTASK_SRV_RULES, k) ? AUTOTASK_SRV_RULES[k] : null); }
 function autotaskDefaults() { const o = {}; Object.keys(AUTOTASK_RULES).concat(Object.keys(AUTOTASK_SRV_RULES)).forEach(function (k) { o[k] = 'dry'; }); return o; }
@@ -2917,14 +3013,14 @@ async function autotaskRead(st) {
     if (r.ok && r.data && r.data.rules && typeof r.data.rules === 'object') {
       const rules = autotaskDefaults();
       Object.keys(r.data.rules).forEach(function (k) { if (autotaskValid(k, r.data.rules[k])) rules[k] = r.data.rules[k]; });
-      return { rules: rules, prev: r.data.prev || null, updated_at: r.data.updated_at || 0, updated_by: r.data.updated_by || '' };
+      return { rules: rules, since: autotaskSince(r.data.since), prev: r.data.prev || null, updated_at: r.data.updated_at || 0, updated_by: r.data.updated_by || '' };   // C185 판1 since = 규칙별 켠 시각(ms)
     }
   } catch (e) {}
-  return { rules: autotaskDefaults(), prev: null, updated_at: 0, updated_by: '' };
+  return { rules: autotaskDefaults(), since: {}, prev: null, updated_at: 0, updated_by: '' };
 }
 function autotaskPublic(a) {
   const meta = {}; Object.keys(AUTOTASK_RULES).forEach(function (k) { meta[k] = AUTOTASK_RULES[k]; });
-  return { rules: a.rules, meta: meta, meta_srv: AUTOTASK_SRV_RULES, modes: AUTOTASK_MODES, prev: a.prev ? { updated_at: a.prev.updated_at || 0, updated_by: a.prev.updated_by || '' } : null, updated_at: a.updated_at || 0, updated_by: a.updated_by || '' };
+  return { rules: a.rules, since: a.since || {}, meta: meta, meta_srv: AUTOTASK_SRV_RULES, modes: AUTOTASK_MODES, prev: a.prev ? { updated_at: a.prev.updated_at || 0, updated_by: a.prev.updated_by || '' } : null, updated_at: a.updated_at || 0, updated_by: a.updated_by || '' };
 }
 function prevMonthOf(today) { const t = String(today).split('-'); const d = new Date(Date.UTC(+t[0], +t[1] - 1, 1) - 86400000); return d.toISOString().slice(0, 7); }
 async function autotaskFacts(st) {
@@ -2965,6 +3061,11 @@ async function handleAutotaskDryPut(event, d, R) {
     try { const li = await licDutyInput(st, null, licKstToday()); ls = li.ok ? Object.assign({ mode: a.rules.lic_duty, ver: li.ver }, LD.drySummary(li.input, 60)) : { mode: a.rules.lic_duty, skip: li.why }; } catch (e) { ls = { mode: a.rules.lic_duty, skip: 'ERROR' }; }
     if (ls && !AR.piiScan(ls)) doc.rules = Object.assign({}, doc.rules, { lic_duty: ls });
   }
+  // C185 판1: 범위 밖 규칙 5줄 요약도 서버가 센다 — 봇이 보낸 같은 이름 칸은 버리고, 끔이 아닌 규칙마다 서버 요약(준비 안 됨 = {mode, ready false}) · AR.piiScan 통과분만
+  EV.RULE_IDS.forEach(function (k) { if (hasOwn(doc.rules, k)) { doc.rules = Object.assign({}, doc.rules); delete doc.rules[k]; } });
+  let es = {};
+  try { es = await evDrySummaries(st, a.rules, a.since || {}, licKstToday()); } catch (e) { es = {}; }
+  Object.keys(es).forEach(function (k) { if (es[k] && !AR.piiScan(es[k])) { const add = {}; add[k] = es[k]; doc.rules = Object.assign({}, doc.rules, add); } });
   const w = await blobSet(st, 'it:autotask:dry', doc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   return jr(200, { status: 'OK', request_id: R, ts: doc.ts });
@@ -2991,16 +3092,23 @@ async function handleAutotaskSet(event, d, R) {
   if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   const rule = String(d.rule || ''), mode = String(d.mode || '');
   if (!autotaskValid(rule, mode)) return jr(400, { status: 'REJECTED', error_code: 'BAD_RULE', request_id: R });
+  if (mode === 'live' && !autotaskReady(rule)) return jr(400, { status: 'REJECTED', error_code: 'RULE_NOT_READY', request_id: R });   // C185 판1 — 계획 함수가 없는 규칙('준비 중')은 켤 수 없다(관리자 카드·PM 콘솔 길 모두 여기)
   const st = store(DATA);
   const a = await autotaskRead(st);
   if (d.base !== undefined && Number(d.base) !== Number(a.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'AUTOTASK_STALE', request_id: R });
   if (a.rules[rule] === mode) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
   const next = Object.assign({}, a.rules); next[rule] = mode;
-  const doc = { schema: 1, rules: next, prev: { rules: a.rules, updated_at: a.updated_at || 0, updated_by: a.updated_by || '' }, updated_by: c.member.id, updated_at: Date.now() };
+  // C185 판1 켠 시각: live가 아닌 데서 live로 바뀌는 저장에서 그 규칙만 지금 시각 · live에서 내리면 지움(다시 켜면 새로 찍혀 그 사이 사건은 세지 않음) · 직전 판에도 같이 · 값이 있을 때만 칸
+  const since = Object.assign({}, a.since || {});
+  if (mode === 'live') since[rule] = Date.now(); else delete since[rule];
+  const prev = { rules: a.rules, updated_at: a.updated_at || 0, updated_by: a.updated_by || '' };
+  if (Object.keys(a.since || {}).length) prev.since = a.since;
+  const doc = { schema: 1, rules: next, prev: prev, updated_by: c.member.id, updated_at: Date.now() };
+  if (Object.keys(since).length) doc.since = since;
   const w = await blobSet(st, AUTOTASK_KEY, doc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'tasks', ev: [{ op: '자동지시규칙', id: rule, t: autotaskRuleTbl(rule).label + ' ' + a.rules[rule] + '→' + mode }] }); } catch (e) {}
-  return jr(200, Object.assign({ status: 'OK', request_id: R }, autotaskPublic({ rules: next, prev: doc.prev, updated_at: doc.updated_at, updated_by: doc.updated_by })));
+  return jr(200, Object.assign({ status: 'OK', request_id: R }, autotaskPublic({ rules: next, since: since, prev: doc.prev, updated_at: doc.updated_at, updated_by: doc.updated_by })));
 }
 async function handleAutotaskRevert(event, d, R) {
   const c = await currentMember(event);
@@ -3011,11 +3119,18 @@ async function handleAutotaskRevert(event, d, R) {
   if (!a.prev || !a.prev.rules) return jr(400, { status: 'REJECTED', error_code: 'NO_PREV', request_id: R });
   if (d.base !== undefined && Number(d.base) !== Number(a.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'AUTOTASK_STALE', request_id: R });
   const rules = autotaskDefaults(); Object.keys(a.prev.rules).forEach(function (k) { if (autotaskValid(k, a.prev.rules[k])) rules[k] = a.prev.rules[k]; });
-  const doc = { schema: 1, rules: rules, prev: { rules: a.rules, updated_at: a.updated_at || 0, updated_by: a.updated_by || '' }, updated_by: c.member.id, updated_at: Date.now() };
+  if (Object.keys(rules).some(function (k) { return rules[k] === 'live' && !autotaskReady(k); })) return jr(400, { status: 'REJECTED', error_code: 'RULE_NOT_READY', request_id: R });   // C185 판1 — 준비 안 된 규칙을 되돌림으로 켜지 않음
+  // C185 판1 켠 시각: 되돌린 결과 새로 live가 된 규칙 = 지금 시각 · 그대로 live인 규칙 = 지금 값 · 나머지 = 없음
+  const now0 = Date.now(), since = {};
+  Object.keys(rules).forEach(function (k) { if (rules[k] !== 'live') return; if (a.rules[k] !== 'live') since[k] = now0; else if (a.since && a.since[k]) since[k] = a.since[k]; });
+  const prev = { rules: a.rules, updated_at: a.updated_at || 0, updated_by: a.updated_by || '' };
+  if (Object.keys(a.since || {}).length) prev.since = a.since;
+  const doc = { schema: 1, rules: rules, prev: prev, updated_by: c.member.id, updated_at: now0 };
+  if (Object.keys(since).length) doc.since = since;
   const w = await blobSet(st, AUTOTASK_KEY, doc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'tasks', ev: [{ op: '자동지시규칙되돌림', id: '', t: '규칙 스위치 직전 판으로' }] }); } catch (e) {}
-  return jr(200, Object.assign({ status: 'OK', request_id: R }, autotaskPublic({ rules: rules, prev: doc.prev, updated_at: doc.updated_at, updated_by: doc.updated_by })));
+  return jr(200, Object.assign({ status: 'OK', request_id: R }, autotaskPublic({ rules: rules, since: since, prev: doc.prev, updated_at: doc.updated_at, updated_by: doc.updated_by })));
 }
 // ---- 감시 경보 라벨 it:alerts (v399 — 공통 기반 14 · 착수 브리핑 A7 2일차). 감시 항목(크론 지도 id)별 라벨 {level, until, by, ts}.
 // level: 'warn'(기본 — 편입 뒤 1주는 경보를 안내로 낮춤) · 'alert'(승격 1클릭 — 즉시 경보) · 'mute'(7일 무음, until). IT 운영 책임자(관리자) 전용·감사로그.
@@ -5135,7 +5250,12 @@ function backupAutotaskClamp(curData, payload) {
   if (isObj(curData) && isObj(curData.rules)) Object.keys(curData.rules).forEach(function (k) { if (autotaskValid(k, curData.rules[k])) now[k] = curData.rules[k]; });
   const rules = Object.assign({}, payload.rules), lowered = [];
   Object.keys(rules).forEach(function (k) { if (rules[k] === 'live' && now[k] !== 'live') { rules[k] = 'dry'; lowered.push(k); } });
-  return { payload: Object.assign({}, payload, { rules: rules }), lowered: lowered };
+  // C185 판1 켠 시각(since): 복원 뒤에도 live인 규칙(= 지금도 live)만 지금 값을 지키고, 낮춘 규칙·백업에만 있던 값은 버림 · 값이 있을 때만 칸(복원 문서 통째 비교 servertest 85 ④⑤)
+  const sinceNow = (isObj(curData) && isObj(curData.since)) ? curData.since : {}, since = {};
+  Object.keys(rules).forEach(function (k) { if (rules[k] === 'live' && typeof sinceNow[k] === 'number' && sinceNow[k] > 0) since[k] = sinceNow[k]; });
+  const out = Object.assign({}, payload, { rules: rules });
+  if (Object.keys(since).length) out.since = since; else delete out.since;
+  return { payload: out, lowered: lowered };
 }
 // 재해 복원 모드 쓰기 계획 — {payload, note} 또는 {status, body}(거절). dry와 쓰기가 같은 것을 쓴다. preview에 merge·member를 얹는다(값 없음).
 async function backupRestorePlan(sn, key, cls, cur, data, preview) {
