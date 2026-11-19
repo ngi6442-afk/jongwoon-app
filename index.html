@@ -18395,17 +18395,20 @@
   function scheduleLeavesSave(){ leavesPending=true; if(leavesSaveTimer) clearTimeout(leavesSaveTimer); leavesSaveTimer=setTimeout(function(){ leavesSaveTimer=null; doSaveLeaves(); },1200); }   // P1 판24j 검토: 돈 타이머는 표시를 지움(저장 200이 '타이머 남음'을 보고 대기를 남기게)
   // P1 판24j(C209): 칸 단위(공용 imMerge) — 승인(상태·승인자·승인일)·취소 요청·면담 단계는 각각 한 덩어리 · 이름표 = 휴가 신청 창·목록 글 · 알림 이름 = 유형·시작일(직원 이름은 안 씀)
   // P1 판39 검토 반영(C182): 휴직 종류 병합 뒷손질 — 승인·반려 때 그 화면의 종류가 인사기록에 들어가므로 종류는 '결정한 쪽' 값을 따름
-  //   ① 이 화면은 승인 대기(종류만 고침)인데 서버는 이미 승인·반려 = 서버 결정(상태 묶음은 imMerge가 서버 쪽 통째)과 그때의 종류 · 이 화면 종류 고침은 버리고 알림
-  //   ② 이 화면이 승인·반려(그때 종류를 인사기록에 보냄)했는데 서버는 승인 대기인 채 종류만 바뀜 = 이 화면 종류 · 알림(이 화면 값으로 저장)
+  //   합친 줄이 승인 대기가 아니면 그 줄의 승인 묶음(상태·승인자·승인일 — imMerge가 한쪽 통째로 고름)을 낸 쪽의 종류를 씀(재검토: 두 관리자가 서로 다른 종류로 동시에 승인한 경우 포함)
+  //   ① 서버 묶음이 남음 = 서버 종류 · 이 화면이 받은 사본(imSt base)보다 종류를 실제로 고쳤을 때만 알림(낡은 대기 줄만 들고 있었으면 알림 0 — 재검토 거짓 알림)
+  //   ② 이 화면 묶음이 남음 = 이 화면 종류 · 서버가 승인 대기인 채 종류만 바꾼 경우 알림(이 화면 값으로 저장) — 묶음끼리 겹친 경우는 imMerge의 겹침 알림('승인')이 이미 남
   function loaKindMergeFix(m, r, pre){
     if (!m || !r || !pre || m.type !== "loa" || pre.loa_kind === r.loa_kind) return;
-    var nm = "휴직 " + (m.start || "");
-    if (pre.status === "pending" && r.status !== "pending" && m.status === r.status){
+    if (m.status === "pending") return;
+    var nm = "휴직 " + (m.start || ""), b = (typeof imSt === "function" && imSt("leaves").base[m.id]) || null;
+    var srv = m.status === r.status && m.approver === r.approver && m.approved_at === r.approved_at, loc = m.status === pre.status && m.approver === pre.approver && m.approved_at === pre.approved_at;
+    if (srv){
       if (r.loa_kind === undefined) delete m.loa_kind; else m.loa_kind = r.loa_kind;
-      if (typeof apprToastShow === "function") apprToastShow("다른 기기가 먼저 승인·반려해 이 화면의 고침은 저장하지 않았습니다 — " + nm + " · 휴직 종류");
-    } else if (pre.status !== "pending" && r.status === "pending" && m.status === pre.status){
+      if (b && b.loa_kind !== pre.loa_kind && typeof apprToastShow === "function") apprToastShow("다른 기기가 먼저 승인·반려해 이 화면의 고침은 저장하지 않았습니다 — " + nm + " · 휴직 종류");
+    } else if (loc){
       if (pre.loa_kind === undefined) delete m.loa_kind; else m.loa_kind = pre.loa_kind;
-      if (typeof apprToastShow === "function") apprToastShow("다른 기기도 고친 칸을 이 화면 값으로 저장했습니다 — " + nm + " · 휴직 종류");
+      if (r.status === "pending" && typeof apprToastShow === "function") apprToastShow("다른 기기도 고친 칸을 이 화면 값으로 저장했습니다 — " + nm + " · 휴직 종류");
     }
   }
   function mergeLeaves(local,remote){ if (typeof imMerge === "function") return imMerge("leaves", local, remote, {
@@ -18668,6 +18671,8 @@
   //   업무상 부상·질병 휴업 = 근속에서 빼지 않음(근로기준법 제60조⑥은 출근율에서 '출근으로 봄'까지 — 근속 가산은 조문이 직접 말하지 않음, 노무사 확인 거리) · 그 밖의 휴직 = 근속에서 뺌(지금과 같음 — 취업규칙 제17조①과 다를 수 있어 노무사 확인 전, AI가 정하지 않음)
   //   표는 프로토타입 없는 객체 — 'toString' 같은 상속 이름이 종류로 통과하지 않게(검토 반영)
   var LOA_KIND = Object.assign(Object.create(null), { child:"육아휴직", injury:"업무상 부상·질병 휴업", other:"그 밖의 휴직" });
+  // 재검토: 육아휴직은 종료 예정일 필수(신청 창·관리자 종류 고침·승인) — 종료일 없는 옛 기록은 계산이 지금처럼(오늘까지) 돎
+  var LOA_CHILD_END_MSG = "육아휴직은 종료 예정일을 넣어 주세요. (종료 예정일이 빈 신청은 반려한 뒤 종료 예정일을 넣어 다시 신청하면 됩니다.)";
   function loaKindNote(k){
     if(k==="child") return "근속에 포함 · 계약직이면 2년 날짜를 휴직 일수만큼 늦춤";
     if(k==="injury") return "근속에서 빼지 않음";
@@ -18720,7 +18725,7 @@
     // 사직·휴직 단계 전환(공통)
     wire("data-rs-interview", function(id){ if(!isAdmin()) return; var l=findLeave(id); if(!l) return; var cfg=REQ_LINE[l.type]||REQ_LINE.resign; if(!confirm(cfg.interviewConfirm)) return; if(l.stage==="interview_req"){ l.stage="interview_done"; l.interview_at=todayStr(); l.interviewer=myName()||""; l.updated=todayStr(); scheduleLeavesSave(); renderLeaves(); renderDashboard(); } });
     wire("data-rs-apply", function(id){ var l=findLeave(id); if(!l||l.member_id!==getMemberId()||l.stage!=="interview_done") return; var cfg=REQ_LINE[l.type]||REQ_LINE.resign; if(!confirm(cfg.applyConfirm)) return; l.stage="resign_req"; l.applied_at=todayStr(); l.updated=todayStr(); scheduleLeavesSave(); renderLeaves(); renderDashboard(); });
-    wire("data-rs-approve", function(id){ if(!isAdmin()) return; var l=findLeave(id); if(!l||(l.stage||"resign_req")!=="resign_req") return; var cfg=REQ_LINE[l.type]||REQ_LINE.resign; if(!confirm((l.type==="loa" ? "휴직 종류: "+(LOA_KIND[l.loa_kind]||"(종류 없음 — 지금처럼 근속에서 뺌)")+"\n" : "")+cfg.approveConfirm)) return; setLeaveStatus(id,"approved"); });
+    wire("data-rs-approve", function(id){ if(!isAdmin()) return; var l=findLeave(id); if(!l||(l.stage||"resign_req")!=="resign_req") return; var cfg=REQ_LINE[l.type]||REQ_LINE.resign; if(l.type==="loa" && l.loa_kind==="child" && !isDate(l.end)){ alert(LOA_CHILD_END_MSG); return; } if(!confirm((l.type==="loa" ? "휴직 종류: "+(LOA_KIND[l.loa_kind]||"(종류 없음 — 지금처럼 근속에서 뺌)")+"\n" : "")+cfg.approveConfirm)) return; setLeaveStatus(id,"approved"); });
     wire("data-rs-reject", function(id){ if(!isAdmin()) return; var l=findLeave(id); if(!l) return; var cfg=REQ_LINE[l.type]||REQ_LINE.resign; if(confirm(cfg.rejectConfirm)) setLeaveStatus(id,"rejected"); });
     // P1 판39(C182): 관리자가 승인 전에 휴직 종류를 고침(승인 줄 고르기) — 승인하면 이 종류가 인사기록에 들어감
     Array.prototype.forEach.call(host.querySelectorAll("[data-rs-kind]"),function(el){ el.addEventListener("change",function(){ loaKindSet(el.getAttribute("data-rs-kind"), el.value); }); });
@@ -18728,6 +18733,7 @@
   function loaKindSet(id, k){
     if(!isAdmin() || !LOA_KIND[k]) return false;
     var l=findLeave(id); if(!l || l.type!=="loa" || l.status!=="pending") return false;
+    if(k==="child" && !isDate(l.end)){ alert(LOA_CHILD_END_MSG); renderLeaves(); return false; }
     l.loa_kind=k; l.updated=todayStr();
     scheduleLeavesSave(); renderLeaves(); renderDashboard();
     return true;
@@ -18735,6 +18741,7 @@
   function setLeaveStatus(id,status){
     if(!isAdmin()) return;
     var l=findLeave(id); if(!l || l.status!=="pending") return;
+    if(status==="approved" && l.type==="loa" && l.loa_kind==="child" && !isDate(l.end)){ alert(LOA_CHILD_END_MSG); return; }
     l.status=status; l.approver=myName()||"관리자"; l.approved_at=todayStr(); l.updated=todayStr();
     if(l.type==="resign" || l.type==="loa") l.stage = (status==="approved" ? (l.type==="resign"?"resigned":"onloa") : "rejected");
     // 휴직 승인 → 휴직 상태 인사기록 반영
@@ -18796,6 +18803,8 @@
     var start=document.getElementById("loaStart").value;
     var end=document.getElementById("loaEnd").value;
     if(!LOA_KIND[kind]){ alert("휴직 종류를 고르세요."); return; }
+    // P1 판39 재검토: 육아휴직은 종료 예정일 필수 — 계약직 2년 날짜가 예정 종료일에서 멈춤(비우면 복직 처리 전까지 끝없이 늦어짐)
+    if(kind==="child" && !isDate(end)){ alert(LOA_CHILD_END_MSG); return; }
     if(!isDate(start)){ alert("휴직 시작 예정일을 선택하세요."); return; }
     if(end && isDate(end) && end<start){ alert("종료 예정일이 시작일보다 빠릅니다."); return; }
     if(!confirm("휴직 면담을 신청할까요? 관리자 면담완료 후 휴직 본신청이 가능합니다.")) return;
