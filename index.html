@@ -5879,7 +5879,8 @@
     return true;
   }
   // P1 판38(C166): 검사 지시 + 차량 법령 근거 승격일 때만 검사 기록 칸(수검일·연장 만료일 · 건설기계는 신청일) — 아니면 숨김(종전 창 그대로)
-  function vehDueRecOn(L){ return !!(L && L.f === "insp_due" && typeof vehLawOn === "function" && vehLawOn()); }
+  //   8차 지시: 판38 켜짐(vehLaw38On — 기간 칸 있는 근거 행)일 때만 · 차량 상태가 검사보류·매각·말소예정이면 숨김(수정 창과 같게)
+  function vehDueRecOn(L){ return !!(L && L.f === "insp_due" && typeof vehLaw38On === "function" && vehLaw38On() && !(L.v && typeof isGreyState === "function" && isGreyState(L.v))); }
   function vehDueRecFill(L){
     var on = vehDueRecOn(L), ceq = !!(on && L.v && L.v.size === "건설기계"), set = function(id, val){ var el = document.getElementById(id); if (el) el.value = val; };
     var box = document.getElementById("vehDueRec"), aw = document.getElementById("vehDueApplyW");
@@ -5908,7 +5909,9 @@
     t = findTask(q.id);
     if (!t || t.del === 1 || t.status === "done" || t.status === "review"){ vehDueClose(); return; }
     //   6차 검토(권고): 새 만기 없이 수검일·신청일·연장 만료일만 넣으면 조용히 버려지지 않게 막음
-    if ((!s || s === q.cur) && q.rec){ var r0 = vehDueRecVal(q); if (r0 && (r0.insp_done || r0.insp_apply || r0.insp_ext !== r0.ext_was)){ vehDueErr("수검일·검사 신청일·연장(유예) 만료일은 새 검사 만기를 넣을 때만 기록됩니다 — 새 만기를 넣거나 그 칸을 비워 주세요."); return; } }
+    //   8차 지시: 연장 칸만 바꾸거나 지운 경우는 그 말로(이 창은 새 만기 없이 차량 줄 연장 칸을 바꾸지 않음)
+    if ((!s || s === q.cur) && q.rec){ var r0 = vehDueRecVal(q); if (r0 && (r0.insp_done || r0.insp_apply)){ vehDueErr("수검일·검사 신청일은 새 검사 만기를 넣을 때만 기록됩니다 — 새 만기를 넣거나 그 칸을 비워 주세요."); return; }
+      if (r0 && r0.insp_ext !== r0.ext_was){ vehDueErr("이 창은 새 검사 만기 없이 연장(유예) 만료일을 " + (r0.insp_ext ? "바꾸지" : "지우지") + " 않습니다 — 연장 칸을 처음 값(" + (r0.ext_was || "빈 칸") + ")으로 두거나, 연장만 고치려면 차량 수정 창에서 고쳐 주세요."); return; } }
     if (!s || s === q.cur){ vehDueClose(); vehDueFinish(q.id); return; }   // 비움·같은 날 = 날짜 그대로 완료(서버 쓰기 없음)
     why = vehDueWhy(s);
     if (why){ vehDueErr(why); return; }
@@ -10861,7 +10864,9 @@
   // 근거 표 attr.size가 있으면 그것(승격 뒤). P1 판13: 별표 15의2·종합검사 별표 1은 차종(승용·승합·화물·특수)마다 주기가 달라 규모 칸에 차종을 함께 고른다(등록증 '차종' 칸) — 피견인은 비고 2(비사업용 승용 기간)
   var VEH_SIZE_DEF = ["경형 승용", "소형 승용", "중형 승용", "대형 승용", "경형 승합", "소형 승합", "중형 승합", "대형 승합", "경형 화물", "소형 화물", "중형 화물", "대형 화물", "경형 특수", "소형 특수", "중형 특수", "대형 특수", "피견인", "건설기계"];
   function vehInsShow(s){ var t = String(s == null ? "" : s).trim(); return Object.prototype.hasOwnProperty.call(VEH_INS_SHOW, t) ? VEH_INS_SHOW[t] : t; }
-  function vehLawOn(){ return !!(VEH_LAW.on && VEH_LAW.rows && VEH_LAW.rows.length); }   // rows = 쓸 수 있는 행(vehLawRowOk)만 — 하나도 없으면 꺼짐(검토 반영)
+  function vehLawOn(){ return !!(VEH_LAW.on && VEH_LAW.rows && VEH_LAW.rows.length); }
+  // P1 판38 8차 지시: 판38 켜짐 = 승격 ∧ 승격본에 기간 칸 셋이 있는 행이 하나라도 있음 — 꺼짐이면 새 칸 표시·새 열쇠 쓰기·새 칸 검사·이어 세기 모두 운영 그대로(옛 판이 승격된 채 앱만 배포해도 같음 · 서버 vehBg38S 같은 규칙)
+  function vehLaw38On(){ return vehLawOn() && VEH_LAW.rows.some(vehLawWinHas); }   // rows = 쓸 수 있는 행(vehLawRowOk)만 — 하나도 없으면 꺼짐(검토 반영)
   function vehColsNow(){
     if (!vehLawOn()) return VEH_COLS;
     var out = [];
@@ -11008,6 +11013,7 @@
   // 갱신 줄 하나로 회차 시작일(이어 세기 기산) — vehLawChain·vehLawFirstOk 같이 씀
   function vehLawStart(e, ok, v, cls){
     var E, r0, s, ap, inWin, S0, dn = vehDayNum;
+    if (!e || !vehRealDate(e.prev)) return null;   // 8차 지시(7차 ③): 종전 만기가 달력 날짜가 아닌 줄(만기 빈 차의 첫 줄 등)은 어디서도 E를 세지 않음
     E = (vehRealDate(e.insp_ext) && e.insp_ext > e.prev) ? e.insp_ext : e.prev;
     r0 = vehLawPick(ok, v, cls, E);
     if (!r0 || !vehLawWinHas(r0)) return null;
@@ -11029,42 +11035,39 @@
     return { E: vehLawEnd(st.S0, r.every_m), r: r, E2: (rS && vehLawWinHas(rS) && rS.every_m !== r.every_m) ? vehLawEnd(st.S0, rS.every_m) : "", r2: rS, st: st };
   }
   //   d가 E(La)의 검사 기간 폭 안(차령 경계 회차면 어느 행 주기의 E에 맞아도 — 계산은 r 행 · 칩 '확인 필요' age)
-  //   tight = 세 칸 빈 갱신 줄 — 기간 안에 받은 것으로 보는 줄이라 새 만기가 E 앞뒤 기간 끝 일수(win_after) 안일 때만(검사증 차이는 값 있는 줄만 기간 폭까지)
-  function vehLawFeIn(d, fe, tight){ var dn = vehDayNum, w = function(E, r){ return !!(E && r && dn(d) >= dn(E) - (tight ? r.win_after : r.win_before) && dn(d) <= dn(E) + r.win_after); }; return vehRealDate(d) && (w(fe.E, fe.r) || w(fe.E2, fe.r2)); }
-  // 6차 검토(11/19 — 오케스트레이터 결정): 깨끗 조건(화이트리스트) — 이것을 채울 때만 '확인 필요' 없이 조용히 이어 셈. 기록에서 직접 셈(따라가기 상태에 기대지 않음)
-  //   D = 지금 만기 · 뒤에서부터 출발 줄 후보 La를 찾아 처음 맞는 것:
-  //   ① 판38 줄(insp_done 열쇠)·그 회차 근거 행 기간 칸 ② 이어짐(La.prev = 앞 줄 확정 · 뒤 줄들도 · 마지막 확정 = D)
-  //   ③ 뒤 줄은 모두 세 칸 빈 줄이고 확정이 E(La) 기간 폭 안 ④ D가 E(La) 기간 폭 안 ⑤ La.prev에서 떠난 다른 줄 없음(되돌림·다시 갱신·두 화면)
-  //   ⑥ La에 수검일·신청일이 있으면 앞 줄들의 수검일·신청일과 같은 값이 아니고, 종전 만기(연장이 더 뒤면 그 날)보다 주기의 절반 넘게 앞서지 않음
-  //   돌려줌: null = 판38 줄 없음(운영 그대로) · { clean: false } · { clean: true, a, fe }
+  function vehLawFeIn(d, fe){ var dn = vehDayNum, w = function(E, r){ return !!(E && r && dn(d) >= dn(E) - r.win_before && dn(d) <= dn(E) + r.win_after); }; return vehRealDate(d) && (w(fe.E, fe.r) || w(fe.E2, fe.r2)); }
+  // 8차 지시(11/19 — 오케스트레이터 결정 · 착수 브리핑 "비워 두면 지금 계산과 같은 결과"): 값 줄 = 판38 기록 줄 가운데 수검일이나 신청일이 빈 글자가 아닌 줄 · 빈 줄(판38 전 줄 · 세 칸 빈 판38 줄)은 정보로 쓰지 않음
+  function vehLawValLine(x){ return !!(x && typeof x === "object" && ((typeof x.insp_done === "string" && x.insp_done !== "") || (typeof x.insp_apply === "string" && x.insp_apply !== ""))); }
+  //   값 줄이 갱신 꼴인가(ⓐⓑ) → 그 줄로 센 E(La)(vehLawFirstEnd) 또는 null — ⓐ 근거 행 기간 칸 · 종전·새 만기 달력 날짜 · 새 만기 > 종전 만기 · 수검일·신청일 달력 날짜이고 새 만기 이하 ⓑ 새 만기가 E(La)의 검사 기간 폭 안
+  //   깨끗 조건(vehLawClean)·연장 옮김(vehLawRenewOk)·서버 vehLawRenewS 같은 규칙
+  function vehLawRenewFe(e, ok, v, cls){
+    var vals, fe;
+    if (!vehLawValLine(e) || !vehRealDate(e.prev) || !vehRealDate(e.confirmed) || !(e.confirmed > e.prev)) return null;
+    vals = [e.insp_done, e.insp_apply].filter(function(s){ return typeof s === "string" && s !== ""; });
+    if (vals.some(function(s){ return !vehRealDate(s) || s > e.confirmed; })) return null;
+    fe = vehLawFirstEnd(e, ok, v, cls);
+    return fe && vehLawFeIn(e.confirmed, fe) ? fe : null;
+  }
+  // 깨끗 조건 — 세 등급: null = ㉮ 운영 그대로(값 줄 없음 · 차량 줄 연장 칸이 이 회차에 걸리지 않음) · { clean: false } = ㉰ 참고 + 확인 필요 · { clean: true, a, fe } = ㉯ 조용히 이어 셈
+  //   La = 마지막 값 줄(뒤로 더 찾지 않음) · D = 지금 만기:
+  //   ⓐⓑ La가 갱신 꼴(vehLawRenewFe) ⓒ La 뒤 줄이 이어지고(prev = 앞 줄 확정 · 마지막 확정 = D) 확정이 E(La) 폭 안 ⓓ D가 E(La) 폭 안
+  //   ⓔ La.prev에서 떠난 다른 값 줄 없음(두 화면) ⓕ La 수검일·신청일이 앞 값 줄의 것과 같지 않고 종전 만기(연장이 더 뒤면 그 날)보다 주기 절반 넘게 앞서지 않음
+  //   ⓖ 차량 줄 연장 칸이 La.prev 뒤 ~ D 이하이고 La의 연장과 다르면 아님(이 회차 몫인데 기록 줄에 못 붙은 연장) · La 앞의 빈 줄은 보지 않음
   function vehLawClean(v, ok, cls){
-    var log = Array.isArray(v.insp_log) ? v.insp_log : [], n = log.length, D = v.insp_due, a, j, La, fe, bad, vals, lo, B, tA;
-    if (!log.some(function(x){ return x && typeof x === "object" && typeof x.insp_done === "string"; })) return null;
-    if (!vehRealDate(D) || !log[n - 1] || log[n - 1].confirmed !== D) return { clean: false };
-    for (a = n - 1; a >= 0; a--){
-      La = log[a];
-      if (!La || typeof La !== "object" || typeof La.insp_done !== "string" || !vehRealDate(La.prev) || !vehRealDate(La.confirmed)) continue;
-      fe = vehLawFirstEnd(La, ok, v, cls);
-      if (!fe) continue;
-      for (bad = false, j = Math.max(a, 1); j < n; j++){ if (!log[j] || !log[j - 1] || log[j].prev !== log[j - 1].confirmed){ bad = true; break; } }
-      if (bad) return { clean: false };
-      tA = !vehLawLogVal(La);
-      for (j = a + 1; j < n; j++){ if (vehLawLogVal(log[j]) || !vehLawFeIn(log[j].confirmed, fe, tA)){ bad = true; break; } }
-      if (bad || !vehLawFeIn(D, fe, tA)) continue;
-      //   ③-2 La 자신도 갱신 꼴(La의 새 만기가 E(La) 기간 폭 안) · ⑦ La의 종전 만기는 앞 줄이 갱신 꼴로 세운 만기(앞 줄이 같은 회차 정정·오타·되돌림이면 아님 — 첫 줄은 차량 만기)
-      //      갱신 꼴 = 새 만기가 종전 만기보다 뒤이고 E 기간 폭 안(앞 줄이 판38 전 줄이면 그 확정 만기를 그대로 씀)
-      if (!(La.confirmed > La.prev) || !vehLawFeIn(La.confirmed, fe, tA)) continue;
-      if (a > 0 && log[a - 1] && typeof log[a - 1].insp_done === "string"){ var fp = vehLawFirstEnd(log[a - 1], ok, v, cls); if (!fp || !(log[a - 1].confirmed > log[a - 1].prev) || !vehLawFeIn(log[a - 1].confirmed, fp, !vehLawLogVal(log[a - 1]))) continue; }
-      if (log.some(function(x, k){ return k !== a && x && typeof x === "object" && x.prev === La.prev; })) continue;
-      vals = [La.insp_done, La.insp_apply].filter(vehRealDate);
-      if (vals.length){
-        if (log.slice(0, a).some(function(x){ return x && typeof x === "object" && vals.some(function(s){ return x.insp_done === s || x.insp_apply === s; }); })) continue;
-        B = (vehRealDate(La.insp_ext) && La.insp_ext > La.prev) ? La.insp_ext : La.prev; lo = vehAddMonths(B, -Math.floor(fe.st.r0.every_m / 2));
-        if (vals.some(function(s){ return s < lo; })) continue;
-      }
-      return { clean: true, a: a, fe: fe };
-    }
-    return { clean: false };
+    var log = Array.isArray(v.insp_log) ? v.insp_log : [], n = log.length, D = v.insp_due, X = v.insp_ext, a, j, La, fe, vals, lo, B, last = log[n - 1];
+    for (a = n - 1; a >= 0 && !vehLawValLine(log[a]); a--);
+    if (a < 0) return (last && typeof last === "object" && vehRealDate(last.prev) && vehRealDate(X) && vehRealDate(D) && last.prev < X && X <= D) ? { clean: false } : null;
+    La = log[a]; fe = vehLawRenewFe(La, ok, v, cls);
+    if (!fe || !vehRealDate(D)) return { clean: false };
+    for (j = a + 1; j < n; j++){ if (!log[j] || typeof log[j] !== "object" || log[j].prev !== log[j - 1].confirmed || !vehLawFeIn(log[j].confirmed, fe)) return { clean: false }; }
+    if (last.confirmed !== D || !vehLawFeIn(D, fe)) return { clean: false };
+    if (log.some(function(x, k){ return k !== a && vehLawValLine(x) && x.prev === La.prev; })) return { clean: false };
+    vals = [La.insp_done, La.insp_apply].filter(vehRealDate);
+    if (log.slice(0, a).some(function(x){ return vehLawValLine(x) && vals.some(function(s){ return x.insp_done === s || x.insp_apply === s; }); })) return { clean: false };
+    B = (vehRealDate(La.insp_ext) && La.insp_ext > La.prev) ? La.insp_ext : La.prev; lo = vehAddMonths(B, -Math.floor(fe.st.r0.every_m / 2));
+    if (vals.some(function(s){ return s < lo; })) return { clean: false };
+    if (vehRealDate(X) && La.prev < X && X <= D && X !== La.insp_ext) return { clean: false };
+    return { clean: true, a: a, fe: fe };
   }
   function vehLawComp(r){ return (r && Array.isArray(r.cites) ? r.cites : []).some(function(c){ return c && typeof c.law === "string" && c.law.indexOf("종합검사") >= 0; }); }
   function vehLawEnd(s, m){ var t = vehAddMonths(s, m); return +t.slice(8, 10) < +s.slice(8, 10) ? t : vehAddDays(t, -1); }
@@ -11074,7 +11077,7 @@
   function vehLawChain(v, ok, cls, today){
     var log = Array.isArray(v.insp_log) ? v.insp_log : [], e = null, i, r0, E, s, ap, inWin, S, S0, end, r, d, n, anchor, best = null, bestN = Infinity, bestR = null, cItp = false, hitItp = false, g, dn = vehDayNum;
     var bnd = false, hitBnd = false, rS, sv, cl = vehLawClean(v, ok, cls), pk;
-    //   6차 검토: 판38 줄이 없으면 null(누적식 — 운영 그대로) · 깨끗하면 La에서 E(La) 그대로(조용히) · 깨끗하지 않으면 따라가기 출발점에서 세되 늘 '확인 필요' rec
+    //   8차 지시: ㉮(값 줄 없음)면 null(누적식 — 운영 그대로) · ㉯ 깨끗하면 La에서 E(La) 그대로(조용히) · ㉰ 깨끗하지 않으면 따라가기 출발점에서 세되 늘 '확인 필요' rec
     //   (따라가기도 출발점을 못 정하면 { rec } — vehLawCalc가 누적식에 '확인 필요'를 붙임)
     if (!cl) return null;
     if (cl.clean) e = log[cl.a];
@@ -11136,7 +11139,7 @@
     ceq: "만료 뒤 소유권을 넘겨받은 회차는 이전등록일부터 신청 기간을 세고, 이른 신청도 종전 만기 다음날부터일 수 있음(건설기계관리법 시행규칙 23조①⑤)",
     comp: "종합검사 대상 차는 기간 안에 신청해 적합 판정을 받았는지로 셈(종합검사 규칙 9조①) — 신청이 기간 안이었으면 종전 만기 다음날부터일 수 있음",
     ceqlate: "신청일을 몰라 신청 기간 안으로 봤으나 수검일이 신청 기간 뒤 — 신청이 기간 안이었는지",
-    rec: "검사 만기를 고친 기록이 섞였거나 기록과 지금 만기가 이어지지 않아 이 제안은 참고만 — 검사증 날짜를 따르세요"
+    rec: "넣은 기록만으로는 이 회차의 법정 만기를 단정할 수 없어 이 제안은 참고만 — 검사증 날짜를 따르세요"
   };
   // 3차 검토: 차령 경계 회차 = "age:<종전 만기 날 행 주기>:<시작일 행 주기>" — 어느 날 차령으로 보는지 단정하지 않음
   function vehLawChkTxt(a){ var t = (Array.isArray(a) ? a : []).map(function(k){ var p = String(k).split(":"); return p[0] === "age" ? "차령이 바뀌는 회차 — 차령을 어느 날로 보느냐에 따라 주기가 " + p[1] + "개월 또는 " + p[2] + "개월일 수 있음" : VEH_LAW_CHK[k]; }).filter(Boolean); return t.length ? " · 확인 필요: " + t.join(" / ") : ""; }
@@ -11156,7 +11159,10 @@
     ok = (rows || []).filter(function(x){ return vehLawRowOk(x) && x.cls === cls; });
     // P1 판38(C166): 판38 갱신 기록(수검일 칸이 있는 줄)이 있고 근거 행에 기간 칸이 있으면 그 회차에서 이어 셈 — 아니면(기록 없는 차·근거 표 옛 판) 아래 누적식 그대로
     //   6차 검토: 판38 줄이 있는데 깨끗하지 않고 이어 셀 출발점도 없으면 누적식으로 내되 '확인 필요'(rec)
-    var chained = vehLawChain(v, ok, cls, today), recC = !!(chained && chained.rec);
+    //   8차 지시: 근거 표에 기간 칸 셋이 있는 행이 없으면(옛 판) 이어 세기 꺼짐 · 차 한 대의 기록 계산 예외는 그 차만 제안 없음(표 그리기·저장 예약이 깨지지 않게)
+    var chained = null, recC;
+    if ((rows || []).some(function(x){ return vehLawRowOk(x) && vehLawWinHas(x); })){ try { chained = vehLawChain(v, ok, cls, today); } catch (err) { return null; } }
+    recC = !!(chained && chained.rec);
     if (chained && chained.st) return chained;
     anchor = v.insp_due ? v.insp_due : today;
     prev = v.reg_date;
@@ -11217,41 +11223,38 @@
     return out.join(" · ");
   }
   // 갱신 기록 1줄 — 승격일 때만(아니면 null = 기록 안 함). 제안은 새 날짜를 기준일로 계산(그 회차의 법정 만료일)
-  //   P1 판38: 다섯째 값(있으면) = 이번 수검일·검사 신청일·연장(유예) 만료일 {insp_done, insp_apply, insp_ext} — 기록 줄에 같이 남기고(insp_done은 "" 포함 = 판38 줄 표시),
-  //   제안은 그 줄을 더한 기록으로 셈(이어 세기). 없으면(옛 부르기) 종전 줄 그대로
-  //   5차 검토(11/19): 같은 회차 정정(새 만기가 종전 만기의 검사 기간 폭 안 — 제안 근거 행 기준)이면 수검일·신청일은 기록하지 않음(오타 만기가 출발점이 되지 않게 · 서버 vehLawSameS 같은 규칙)
+  //   P1 판38: 다섯째 값(있으면 · 8차 지시: 판38 켜짐일 때만) = 이번 수검일·검사 신청일·연장(유예) 만료일 {insp_done, insp_apply, insp_ext} — 기록 줄에 같이 남기고(insp_done은 "" 포함 = 판38 줄 표시),
+  //   제안은 그 줄을 더한 기록으로 셈(이어 세기). 없으면(옛 부르기·판38 꺼짐) 종전 줄 그대로
+  //   5차 검토(11/19): 같은 회차 정정(새 만기가 종전 만기의 검사 기간 폭 안)이면 수검일·신청일은 기록하지 않음(오타 만기가 출발점이 되지 않게 · 서버 vehLawSameS 같은 규칙)
   //   돌려준 줄의 dropped = 참이면 넣은 수검일·신청일을 뺀 것(창이 안내 한 줄 — 저장되는 줄에는 안 남음)
+  //   8차 지시: 연장(유예) 만료일은 이 저장이 값 줄이고 갱신 꼴(vehLawRenewOk — ⓐⓑ)일 때만 기록 줄에 실음(extMove — 창이 차량 줄 연장 칸을 비움) · 그 밖(빈 줄·같은 회차 정정·갱신 꼴 아닌 값 줄)은 싣지 않고 차량 줄 그대로
+  //   종전 만기 이하의 낡은 값은 싣지도 지우지도 않음
   function vehLawLogEntry(v, prev, confirmed, src){
-    var r, ex = arguments.length > 4 && arguments[4] ? vehLawExOf(arguments[4]) : null, dropped = false, move = false;
+    var r, ex = arguments.length > 4 && arguments[4] && vehLaw38On() ? vehLawExOf(arguments[4]) : null, dropped = false, move = false;
     if (!vehLawOn() || !v || !vehRealDate(confirmed) || prev === confirmed) return null;
     r = vehLawLogCalc(v, prev, confirmed, ex);
     if (!r || r.st === "na") return null;
-    //   6차 검토: 같은 회차 판정은 수검일·신청일 유무와 관계없이(연장만 넣은 정정에도) · 연장 만료일은 '갱신 꼴 저장'(vehLawRenewOk)일 때만 기록 줄로 옮김(move — 차량 줄 연장 칸 비움) · 아니면 차량 줄에 그대로
-    if (ex && r.st === "ok"){
+    if (ex){
       if (ex.insp_ext && !(ex.insp_ext > prev)) delete ex.insp_ext;
-      if (vehLawSame(r.rule, prev, confirmed)){ dropped = !!(ex.insp_done || ex.insp_apply); ex.insp_done = ""; delete ex.insp_apply; delete ex.insp_ext; }
-      else if (vehLawRenewOk(r.rule, prev, confirmed, ex)) move = true;
+      if (vehLawSame(v, prev, confirmed)){ dropped = !!(ex.insp_done || ex.insp_apply); ex.insp_done = ""; delete ex.insp_apply; delete ex.insp_ext; }
+      else if (vehLawRenewOk(v, prev, confirmed, ex)) move = !!ex.insp_ext;
       else delete ex.insp_ext;
       r = vehLawLogCalc(v, prev, confirmed, ex); if (!r || r.st === "na") return null;
     }
     return Object.assign({ at: todayStr(), prev: prev || "", confirmed: confirmed, proposed: r.st === "ok" ? r.date : "", rule: r.st === "ok" ? r.rule : "", diff: r.st === "ok" ? r.diff : null, by: String((typeof myId === "function" && myId()) || "").slice(0, 40), src: src }, ex || {}, dropped ? { dropped: true } : {}, move ? { extMove: true } : {});
   }
   function vehLawLogCalc(v, prev, confirmed, ex){ return vehLawCalc(Object.assign({}, v, { insp_due: confirmed }, ex ? { insp_log: (Array.isArray(v.insp_log) ? v.insp_log : []).concat([Object.assign({ prev: prev || "", confirmed: confirmed }, ex)]) } : {}), VEH_LAW.rows, todayStr()); }
-  function vehLawSame(rule, prev, conf){
-    var r = (VEH_LAW.rows || []).filter(function(x){ return x && x.id === rule && vehLawRowOk(x); })[0], dn = vehDayNum;
-    return !!(r && vehLawWinHas(r) && vehRealDate(prev) && vehRealDate(conf) && dn(conf) >= dn(prev) - r.win_before && dn(conf) <= dn(prev) + r.win_after);
+  //   8차 지시: 근거 행 = 그 차 속성·날짜로 고른 행(서버 vehLawSameS·vehLawRenewS가 차량 줄로 같은 행을 고름 — 기록 줄 rule에 기대지 않음)
+  function vehLawOkOf(v){ var cls = v && v.size === "건설기계" ? "ceq" : "car"; return { cls: cls, ok: (v && vehRealDate(v.reg_date)) ? (VEH_LAW.rows || []).filter(function(x){ return vehLawRowOk(x) && x.cls === cls; }) : [] }; }   // 최초등록일이 없거나 틀리면 행 없음(차령을 못 셈)
+  //   같은 회차 정정 = 새 만기가 종전 만기 날 근거 행의 검사 기간 폭 안
+  function vehLawSame(v, prev, conf){
+    var k = vehLawOkOf(v), r, dn = vehDayNum;
+    if (!v || !vehRealDate(prev) || !vehRealDate(conf)) return false;
+    r = vehLawPick(k.ok, v, k.cls, prev);
+    return !!(r && vehLawWinHas(r) && dn(conf) >= dn(prev) - r.win_before && dn(conf) <= dn(prev) + r.win_after);
   }
-  //   6차 검토: '갱신 꼴 저장' — 새 만기가 E(종전 만기·연장·넣은 수검일/신청일로 센 그 회차 만료일)의 검사 기간 폭 안(제안 근거 행 기준 · 서버 vehLawRenewS 같은 규칙)
-  function vehLawRenewOk(rule, prev, conf, ex){
-    var r = (VEH_LAW.rows || []).filter(function(x){ return x && x.id === rule && vehLawRowOk(x); })[0], dn = vehDayNum, E, s, ap, early, at, inWin, S0, end;
-    if (!r || !vehLawWinHas(r) || !vehRealDate(prev) || !vehRealDate(conf)) return false;
-    E = (ex && vehRealDate(ex.insp_ext) && ex.insp_ext > prev) ? ex.insp_ext : prev;
-    s = ex && vehRealDate(ex.insp_done) ? ex.insp_done : ""; ap = (r.win_basis === "apply" && ex && vehRealDate(ex.insp_apply)) ? ex.insp_apply : "";
-    early = !!(r.win_basis === "apply" && !ap && s && dn(s) < dn(E) - r.win_before); at = r.win_basis === "apply" ? (ap || (early ? s : "")) : s;
-    inWin = !at || (dn(at) >= dn(E) - r.win_before && dn(at) <= dn(E) + r.win_after);
-    S0 = (inWin || !s) ? vehAddDays(E, 1) : vehAddDays(s, 1); end = vehLawEnd(S0, r.every_m);
-    return dn(conf) >= dn(end) - r.win_before && dn(conf) <= dn(end) + r.win_after;
-  }
+  //   '갱신 꼴 값 저장' = 이번 줄(종전 만기·새 만기·넣은 칸)이 값 줄이고 ⓐⓑ(vehLawRenewFe — 깨끗 조건과 같은 판정)
+  function vehLawRenewOk(v, prev, conf, ex){ var k = vehLawOkOf(v); return !!(v && vehLawRenewFe(Object.assign({}, ex || {}, { prev: prev, confirmed: conf }), k.ok, v, k.cls)); }
   var VEH_LAW_SAME_MSG = "만기 날짜만 바로잡는 저장이라 수검일·검사 신청일은 기록하지 않았습니다.";
   // P1 판38: 새 칸 값 고르기 — 수검일은 늘 글자("" = 비움), 신청일·연장 만료일은 넣었을 때만
   function vehLawExOf(x){
@@ -11269,6 +11272,8 @@
     if (x.insp_done && x.insp_done > today) return "수검일이 오늘 뒤입니다 — 검사를 받은 날을 넣어 주세요.";
     if (x.insp_apply && x.insp_apply > today) return "검사 신청일이 오늘 뒤입니다.";
     if (x.insp_apply && x.insp_done && x.insp_apply > x.insp_done) return "검사 신청일이 수검일보다 뒤입니다.";
+    //   8차 지시(7차 ⓪): 수검일·신청일이 새 만기보다 뒤면 받지 않음(서버 vehLawEx INSP_AFTER_DUE 같은 규칙)
+    if (vehRealDate(conf) && ((x.insp_done && x.insp_done > conf) || (x.insp_apply && x.insp_apply > conf))) return (x.insp_done && x.insp_done > conf ? "수검일" : "검사 신청일") + "이 새 검사 만기(" + conf + ")보다 뒤입니다 — 날짜를 확인해 주세요.";
     if (x.insp_ext && vehRealDate(prev) && !(x.insp_ext > prev)) return "연장(유예) 만료일은 종전 검사 만기(" + prev + ")보다 뒤여야 합니다.";
     // 독립 검토 5: 말이 안 되는 날짜(오기) — 넉넉한 범위만(VEH_INSP_SPAN_M·VEH_EXT_SPAN_M — 서버 vehLawEx 같은 값)
     var base = vehRealDate(prev) ? prev : today, near = function(s){ return [base].concat(vehRealDate(conf) ? [conf] : []).some(function(b){ return s >= vehAddMonths(b, -VEH_INSP_SPAN_M) && s <= vehAddMonths(b, VEH_INSP_SPAN_M); }); };
@@ -11283,7 +11288,7 @@
   function vehLawLogPush(v, e){ if (!v || !e) return; v.insp_log = (Array.isArray(v.insp_log) ? v.insp_log : []).concat([e]).slice(-VEH_LOG_MAX); }
   //   P1 판38: 셋째 값(있으면) = 완료 창의 새 칸 — 보낼 law에 insp_done(""도)·넣은 신청일·연장 만료일을 더함(서버 vehLawEx가 검사 · 판38 줄 표시)
   function vehLawArg(vid, date){   // 지시 완료 창(veh_due_set)이 함께 보낼 제안 — 승격 아니면 null(요청 글 그대로)
-    var x3 = arguments.length > 2 && arguments[2] ? arguments[2] : null, v = findVeh(vid), e = v ? (x3 ? vehLawLogEntry(v, v.insp_due || "", date, "task", x3) : vehLawLogEntry(v, v.insp_due || "", date, "task")) : null;
+    var x3 = arguments.length > 2 && arguments[2] && vehLaw38On() ? arguments[2] : null, v = findVeh(vid), e = v ? (x3 ? vehLawLogEntry(v, v.insp_due || "", date, "task", x3) : vehLawLogEntry(v, v.insp_due || "", date, "task")) : null;
     //   재검토(11/19): 완료 창은 연장 칸을 비워 보낼 때 insp_ext ""와 창이 보여 준 값 ext_was를 함께 — 서버가 '일부러 지움'과 '낡은 창'을 가름
     //   5차 검토: 같은 회차 정정이면 수검일·신청일은 보내지 않음(e.dropped — 서버도 같은 규칙으로 뺌)
     return e ? Object.assign({ proposed: e.proposed, rule: e.rule }, x3 ? vehLawExOf(e.dropped ? { insp_ext: x3.insp_ext } : x3) : {}, (x3 && typeof x3.insp_ext === "string" && !vehRealDate(x3.insp_ext)) ? { insp_ext: "" } : {}, (x3 && typeof x3.ext_was === "string") ? { ext_was: x3.ext_was } : {}, e.dropped ? { dropped: true } : {}) : null;
@@ -11338,32 +11343,30 @@
     var g = function(id){ var el = document.getElementById(id); return el ? String(el.value || "").trim() : ""; }, base = editingVehId ? findVeh(editingVehId) : null;
     var f = Object.assign({}, base || {}, { state: g("vehState"), insp_due: g("vehInsp") || null, insurer: g("vehInsurer"), biz: g("vehBiz"), size: g("vehSize"), reg_date: g("vehRegDate"), ceq_kind: g("vehCeqKind"), ceq_year: g("vehCeqYear") });
     // P1 판38: 만기를 바꾸는 중이면 저장 때 남을 기록 줄을 임시로 더해 제안을 셈(창 안 칩이 '이번 수검일' 기준으로 보이게)
-    //   5차 검토: 같은 회차 정정이면 저장 때처럼 수검일·신청일을 뺀 줄로(vehLawLogEntry와 같은 결과)
-    if (base && f.insp_due && f.insp_due !== (base.insp_due || "") && vehRealDate(f.insp_due)){
-      var fx = vehLawExOf(vehModalEx(f.size === "건설기계")), fr = (fx.insp_done || fx.insp_apply) && vehLawOn() ? vehLawLogCalc(f, base.insp_due || "", f.insp_due, fx) : null;
-      if (fr && fr.st === "ok" && vehLawSame(fr.rule, base.insp_due || "", f.insp_due)){ fx.insp_done = ""; delete fx.insp_apply; }
-      f.insp_log = (Array.isArray(base.insp_log) ? base.insp_log : []).concat([Object.assign({ prev: base.insp_due || "", confirmed: f.insp_due }, fx)]);
+    //   8차 지시: 저장과 같은 길(vehLawLogEntry — 같은 회차 정정·연장 옮김 그대로 · 차량 줄 연장 칸도 vehModalInspSave처럼)
+    if (base && f.insp_due && f.insp_due !== (base.insp_due || "") && vehRealDate(f.insp_due) && vehLaw38On()){
+      var ln = vehLawLogEntry(f, base.insp_due || "", f.insp_due, "edit", vehModalEx(f.size === "건설기계"));
+      if (ln){ f.insp_log = (Array.isArray(base.insp_log) ? base.insp_log : []).concat([ln]); vehModalInspSave(f, vehModalChanged(false), (ln.extMove && ln.insp_ext) || ""); delete ln.extMove; delete ln.dropped; }
     }
     return f;
   }
   // P1 판38: 창의 검사 기록 칸 값(신청일은 건설기계만)
-  function vehModalEx(ceq){ var x = { insp_done: vehModalVal("vehInspDone").trim(), insp_ext: vehModalStaleExt() ? "" : vehModalVal("vehInspExt").trim() }; if (ceq) x.insp_apply = vehModalVal("vehInspApply").trim(); return x; }
-  //   6차 검토(M1): 손대지 않은 연장 칸에 종전 만기 이하의 낡은 값이 남아 있으면 없는 것으로 봄(검사·기록하지 않음 — 서버 veh_due_set 규칙과 같음) · 사람이 바꾼 칸만 검사
-  function vehModalStaleExt(){ var s = vehModalVal("vehInspExt").trim(), d0 = vehModalSnap && typeof vehModalSnap.vehInsp === "string" ? vehModalSnap.vehInsp.trim() : ""; return !!(editingVehId && s && isDate(d0) && !(s > d0) && s === vehModalSnap.vehInspExt); }
-  // P1 판38: 저장 전 검사 기록 칸 확인 → "" 또는 안내(저장 안 함) · 승격 전(칸 숨김)은 보지 않음
+  function vehModalEx(ceq){ var x = { insp_done: vehModalVal("vehInspDone").trim(), insp_ext: vehModalVal("vehInspExt").trim() }; if (ceq) x.insp_apply = vehModalVal("vehInspApply").trim(); return x; }
+  // P1 판38: 저장 전 검사 기록 칸 확인 → "" 또는 안내(저장 안 함) · 판38 꺼짐(칸 숨김)은 보지 않음
   function vehModalInspWhy(ch, prev){
     var x;
-    if (!vehLawOn()) return "";
+    if (!vehLaw38On()) return "";
     x = vehModalEx(vehModalVal("vehSize").trim() === "건설기계");
     if ((x.insp_done || x.insp_apply) && !ch("vehInsp")) return "수검일·검사 신청일은 검사 만기를 새 날짜로 바꿀 때 같이 넣습니다.";
     //   6차 검토(M1): 손대지 않은 연장 칸은 검사하지 않음(창이 열린 사이 다른 기기가 만기를 바꿔 낡은 값이 된 경우 포함)
     if (!ch("vehInspExt")) x.insp_ext = "";
     return vehLawExWhy(x, prev, todayStr(), vehModalVal("vehInsp").trim());
   }
-  // P1 판38: 저장 — 갱신 꼴 저장으로 연장 만료일이 기록 줄로 옮겨졌으면(셋째 값 — 6차 검토: extMove) 차량 줄에서 비움 · 아니면 바꾼 연장 만료일만 차량 줄에(빈 칸은 키째)
+  // P1 판38: 저장 — 셋째 값 = 이번 기록 줄에 실린 연장 만료일(8차 지시: 값 줄 갱신 꼴일 때만 — vehLawLogEntry extMove)
+  //   실렸으면 차량 줄 연장 칸은 그 값과 같을 때나 사람이 칸을 바꿨을 때만 비움(다른 값 — 낡은 값·다른 기기 값 — 은 그대로) · 안 실렸으면 바꾼 연장 만료일만 차량 줄에(빈 칸은 키째)
   function vehModalInspSave(v, ch, logged){
-    if (!vehLawOn()) return;
-    if (logged){ vehSetOpt(v, "insp_ext", ""); return; }
+    if (!vehLaw38On()) return;
+    if (logged){ if (v.insp_ext === logged || ch("vehInspExt")) vehSetOpt(v, "insp_ext", ""); return; }
     if (ch("vehInspExt")) vehSetOpt(v, "insp_ext", vehRealDate(vehModalVal("vehInspExt").trim()) ? vehModalVal("vehInspExt").trim() : "");
   }
   function vehModalLawRefresh(){
@@ -11371,7 +11374,7 @@
     ["vehCeqKind", "vehCeqYear"].forEach(function(id){ el = document.getElementById(id); if (el){ el.disabled = !ceq; el.placeholder = ceq ? (id === "vehCeqYear" ? "연식(예: 2015)" : "기종(예: " + vehCeqKindEg() + ")") : "건설기계만"; } });
     el = document.getElementById("vehLawHint"); if (el){ el.innerHTML = vehLawOn() ? vehLawBadge(vehLawCalc(f, VEH_LAW.rows, todayStr()), "modal") : ""; el.style.display = vehLawOn() ? "" : "none"; }
     // P1 판38: 검사 기록 칸·건설기계 안내는 승격됐을 때만(판27 원칙 — 승격 전 화면 그대로) · 신청일은 건설기계만
-    ["vehInspRec", "vehCeqHint"].forEach(function(id){ el = document.getElementById(id); if (el) el.style.display = vehLawOn() ? "" : "none"; });
+    ["vehInspRec", "vehCeqHint"].forEach(function(id){ el = document.getElementById(id); if (el) el.style.display = vehLaw38On() ? "" : "none"; });   // 8차 지시: 판38 켜짐(기간 칸 있는 근거 행)일 때만
     //   6차 검토(권고): 상태가 제안 대상이 아니면(검사보류·매각·말소예정) 검사 기록 칸 숨김(넣은 값이 기록 없이 사라지지 않게)
     el = document.getElementById("vehInspRec"); if (el && isGreyState(f)) el.style.display = "none";
     // 독립 검토 6: 새 차 만들기는 만기 갱신이 아니라 기록 줄이 안 남음 — 검사 기록 칸을 감춤(넣은 값이 소리 없이 버려지지 않게)
@@ -11478,7 +11481,7 @@
   function vehLogUnion(a, b){
     var seen = {}, out = [];
     [].concat(Array.isArray(a) ? a : [], Array.isArray(b) ? b : []).forEach(function(e){ var k; if (!e || typeof e !== "object") return; k = [e.at, e.confirmed, e.src].join("|"); if (seen[k]) return; seen[k] = 1; out.push(e); });
-    // 6차 검토(M2): 열쇠가 같아도 새 칸 값이 양쪽 다 있고 서로 다르면(같은 날 같은 새 만기로 두 화면이 갱신) 두 줄 다 남김 — 깨끗 조건 ⑤로 '확인 필요' · 서버 vehLogUnion 같은 규칙
+    // 6차 검토(M2): 열쇠가 같아도 새 칸 값이 양쪽 다 있고 서로 다르면(같은 날 같은 새 만기로 두 화면이 갱신) 두 줄 다 남김 — 깨끗 조건 ⓔ(8차)로 '확인 필요' · 서버 vehLogUnion 같은 규칙
     var keyL = function(e){ return [e.at, e.confirmed, e.src].join("|"); };
     [].concat(Array.isArray(a) ? a : [], Array.isArray(b) ? b : []).forEach(function(e){ var k, same; if (!e || typeof e !== "object" || out.indexOf(e) >= 0) return; k = keyL(e); same = out.filter(function(o){ return keyL(o) === k; }); if (same.length && same.every(function(o){ return vehLogClash(o, e); })) out.push(e); });
     out.sort(function(p, q){ var x = String(p.at || ""), y = String(q.at || ""); return x < y ? -1 : (x > y ? 1 : 0); });
@@ -11596,11 +11599,11 @@
     // P1 판27 검사 만기를 바꾸면 제안·확정 날짜 기록(승격일 때만 · 상태 저장 뒤 — 검토 반영) · P1 판38: 이번 수검일·신청일·연장 만료일을 같은 줄에, 줄이 남으면 차량 줄의 연장 만료일은 비움
     var inspLog = (!isNew && ch("vehInsp")) ? vehLawLogEntry(v, inspPrev, v.insp_due, "edit", typeof vehModalEx === "function" ? vehModalEx(v.size === "건설기계") : null) : null;
     // P1 판38 5차 검토: 같은 회차 정정이라 넣은 수검일·신청일을 뺐으면 저장 뒤 안내 한 줄(기록 줄에는 표시를 남기지 않음)
-    var inspDrop = !!(inspLog && inspLog.dropped), extMove = !!(inspLog && inspLog.extMove);
+    var inspDrop = !!(inspLog && inspLog.dropped), extMove = (inspLog && inspLog.extMove && inspLog.insp_ext) || "";
     if (inspDrop) delete inspLog.dropped;
     if (inspLog) delete inspLog.extMove;
     vehLawLogPush(v, inspLog);
-    //   6차 검토: 연장 칸을 비우는 것은 갱신 꼴 저장으로 연장이 기록 줄에 옮겨졌을 때만(extMove)
+    //   8차 지시: 연장 칸을 비우는 것은 이번 기록 줄에 실린 값(extMove)과 같거나 사람이 칸을 바꿨을 때만
     if (typeof vehModalInspSave === "function") vehModalInspSave(v, ch, extMove);
     v.updated = todayStr();
     closeVehModal();
