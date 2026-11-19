@@ -2082,7 +2082,8 @@ async function handleVehDueSet(event, d, R) {
   wv.due_set = Object.assign({}, (wv.due_set && typeof wv.due_set === 'object') ? wv.due_set : {}); wv.due_set[field] = { prev: cur, at: now };   // 검토 S1: 낡은 사본 되돌림 보호 표식(vehDueGuard·앱 vehDueMergeKeep)
   const lawLog = (field === 'insp_due' && d.law && (await vehBgState(st)).on) ? vehLawLog(d.law, cur, date, today, c.member.id, 'task') : null;   // P1 판27: 법정 검사 제안이 켜진 앱이 보낸 제안 날짜와 확정 날짜(검사 칸만 · 승격일 때만 — 검토 반영, 못 읽으면 기록 안 함 · 표시 기록, 값 판정 없음)
   // P1 판38: 판38 앱이 보낸 줄(insp_done 칸 있음)이면 새 칸을 기록 줄에 더하고, 차량 줄의 연장 만료일(그 회차 몫)은 기록으로 옮겨졌으니 비움 — 옛 앱 요청은 종전 그대로
-  const extWas = (lawLog && lx.ex && Object.prototype.hasOwnProperty.call(wv, 'insp_ext')) ? String(wv.insp_ext == null ? '' : wv.insp_ext) : null;
+  //   8차-c: 저장 전 차량 줄 연장 값은 판38 길인지와 상관없이 잡음(보험 지시·옛 앱·옛 판 저장에서 감사 f에 거짓 '연장 바뀜'이 찍히지 않게)
+  const extWas = Object.prototype.hasOwnProperty.call(wv, 'insp_ext') ? String(wv.insp_ext == null ? '' : wv.insp_ext) : null;
   //   6차 검토(11/19): 연장 만료일의 한살이(앱 vehLawLogEntry 같은 규칙) — 같은 회차 정정(vehLawSameS — 수검일·신청일 유무와 관계없이)이면 수검일·신청일 뺌 · 연장은 기록에 안 실음
   //   기록 줄로 옮기고 차량 줄을 비우는 것은 '갱신 꼴 저장'(vehLawRenewS — 새 만기가 E(종전 만기·연장·수검일/신청일)의 기간 폭 안)일 때만 · 그 밖은 차량 줄 연장 칸 그대로(요청에 새 연장 값이 있으면 그 값 · 일부러 지움이면 지움)
   let inspDropped = false;
@@ -2191,7 +2192,7 @@ function vehLawSameS(bg, v, prev, conf) {
 //   ⓐ 종전·새 만기 날짜 · 새 만기 > 종전 만기 · 수검일·신청일 ≤ 새 만기 · 근거 행 기간 칸 ⓑ 새 만기가 E(종전 만기·연장·수검일/신청일로 센 그 회차 만료일 — 민법 160조②③)의 검사 기간 폭 안
 function vehLawRenewS(bg, v, prev, conf, ex) {
   const k = vehLawOkOfS(bg, v), dn = vehDayNumS, x = ex || {};
-  const vals = [x.insp_done, x.insp_apply].filter(function (s) { return typeof s === 'string' && s !== ''; });
+  const vals = [x.insp_done, k.cls === 'ceq' ? x.insp_apply : ''].filter(function (s) { return typeof s === 'string' && s !== ''; });   // 8차-c: 자동차는 신청일만 있는 줄을 값 줄로 보지 않음(앱 vehLawValLine 같은 규칙)
   if (!v || !vals.length || !vehRealDateS(prev) || !vehRealDateS(conf) || !(conf > prev) || vals.some(function (s) { return !vehRealDateS(s) || s > conf; })) return false;
   const E = (vehRealDateS(x.insp_ext) && x.insp_ext > prev) ? x.insp_ext : prev, r0 = vehLawPickS(k.ok, v, k.cls, E);
   if (!r0 || !vehLawWinHasS(r0)) return false;

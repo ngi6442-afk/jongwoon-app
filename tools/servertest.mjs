@@ -12382,7 +12382,14 @@ function J91a(x) { return JSON.stringify(x); }
     //   8차 지시: 옛 판(기간 칸 0행)이 승격된 채 = 판27 줄만(새 열쇠 없음) · 연장 칸 그대로 · ext_now 없음 · 새 칸 검사 안 함(미래 수검일도 200)
     seed38({ oldBg: true }); const r7 = await set38(c, tokW, 'k1', '2027-11-15', L38({ insp_done: TMR38, insp_ext: '2026-11-20' })); const l7 = (W38().insp_log || [])[0] || {};
     out.oldBg = r7.code === 200 && l7.confirmed === '2027-11-15' && !('insp_done' in l7) && !('insp_ext' in l7) && W38().insp_ext === '2026-11-15' && !('ext_now' in r7.body);
-    return { ok: Object.keys(out).every((k) => k === 'extLifeInfo' || k === 'carryInfo' || out[k] === true), info: out };
+    //   8차-c(검토 full:0): 판38 길이 아닌 저장(보험 지시 · 옛 앱 검사 지시 · 옛 판 승격 검사 지시)은 차량 줄 연장 값이 있어도 감사 f에 insp_ext 없음(운영 판과 같음)
+    const auF = async (opt, task, date, law) => { seed38(opt); const a0 = auditMock.logs.length; const r = await set38(c, tokW, task, date, law); const f = (auditMock.logs.slice(a0)[0] || { ev: [{}] }).ev[0].f || {}; return r.code + ':' + Object.keys(f).sort().join(','); };
+    out.auditInfo = [await auF({}, 'k2', '2027-12-20'), await auF({}, 'k1', '2027-11-15', { proposed: '2027-11-15', rule: 't.car.38' }), await auF({ oldBg: true }, 'k1', '2027-11-15', L38({ insp_done: '2026-11-10' })), await auF({ off: true }, 'k1', '2027-11-15')].join(' # ');
+    //   8차-c: 자동차는 신청일만 넣은 줄을 값 줄로 보지 않음 — 갱신 꼴이라도 연장을 기록 줄에 안 실음(차량 줄 그대로)
+    seed38(); const r8 = await set38(c, tokW, 'k1', '2027-11-15', L38({ insp_done: '', insp_apply: '2026-11-01', insp_ext: '2026-11-20' })); const l8 = (W38().insp_log || [])[0] || {};
+    out.carApply = r8.code === 200 && !('insp_ext' in l8) && W38().insp_ext === '2026-11-20';
+    out.audit = out.auditInfo === '200:ins_due # 200:insp_due # 200:insp_due # 200:insp_due';
+    return { ok: Object.keys(out).every((k) => k === 'extLifeInfo' || k === 'carryInfo' || k === 'auditInfo' || out[k] === true), info: out };
   };
   const chkB38 = async (c) => {   // 거절 — 꼴·미래·순서·종전 만기 앞 연장 · 쓰기 전(차량·버전 링·감사 그대로) · 권한 순서
     const got = [];
@@ -12477,6 +12484,9 @@ function J91a(x) { return JSON.stringify(x); }
       ["typeof q[n] === 'string' && p[n] !== '' && q[n] !== '' && p[n] !== q[n]", "typeof q[n] === 'string' && p[n] !== q[n]"],
       ["  const base = vehDueDate(cur) || today, near =", "  const base = today, near ="],
       ["const VEH_INSP_SPAN_M = 36, VEH_EXT_SPAN_M = 120;", "const VEH_INSP_SPAN_M = 36, VEH_EXT_SPAN_M = 24;"],
+      // 8차-c: 감사 거짓 '연장 바뀜'(extWas를 판38 길에서만 잡던 꼴)
+      ["  const extWas = Object.prototype.hasOwnProperty.call(wv, 'insp_ext') ?", "  const extWas = (lawLog && lx.ex && Object.prototype.hasOwnProperty.call(wv, 'insp_ext')) ?"],
+      ["const vals = [x.insp_done, k.cls === 'ceq' ? x.insp_apply : '']", "const vals = [x.insp_done, x.insp_apply]"],
     ];
     const kill = [];
     for (const [from, to] of MUT38) {
