@@ -19333,11 +19333,11 @@ try {
     const FT = ["`imMerge`", "`imRead`", "`records_ts`", "원장 C209"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = "<p>(2026-11 v497) 차량·기성·인허가·문서함·휴가·가족친화·현장·교육·입찰·부동산·견적서·홍보·";
-    const ok = /기준: v497 \(2026-11-18\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 11 && gate.length === 3 && scr.length === 8 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 497 && ftv.length > 0 && mF.length === 0 && cb.length === 11 && gate.length === 3 && scr.length === 8 && !cb.some((l) => /\(PM/.test(l))
       && d.man.indexOf(MAN) > 0 && !/imMerge|imSt|imBase|imOut|imRead|imSv|records_ts|mergeTasks|_colBase|conConflictToast|409|412|gwCall/.test(cut(d.man, MAN, '\n'))
       && d.cl.indexOf('**P1 판24j(v497') > 0
       && FIX497.every((x) => d.ix.split(x).length === 2)
-      && /SHELL_CACHE = 'jw-shell-v497'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 497;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX497.map((x) => d.ix.split(x).length - 1) } };
   };
   const r497 = chk497(D497);
@@ -19350,6 +19350,36 @@ try {
   T('v497 문서·판 번호(정확 검사): FEATURES 기준 v497 (2026-11-18)·v497 절(판24j) · TESTLIST v497 칸 11(화면 확인 8 · 게이트 [x] 3) · MANUAL 지시 저장 겹침 글(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 67줄 한 번씩 · sw jw-shell-v497 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
     r497.ok && M497.every((v) => v === false), JSON.stringify({ r: r497.info, mut: M497 }));
 } catch (e) { console.log('  (v497 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v498(판40 — 결재함 승인 뒤 계약 단계 반영 · 11/19 운영 장애 · 원장 C221): 실행 검사는 위 'P1 판40' 블록 · 여기는 문서·판 번호 정확 검사 + 고정 글 21줄(실행 검사가 못 지키는 고침 줄 — 빼면 ✗)
+try {
+  const rd498 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D498 = { ft: rd498('FEATURES.md'), tl: rd498('TESTLIST.md'), sw: rd498('sw.js'), man: rd498('MANUAL.html'), cl: rd498('CLAUDE.md'), ix: rd498('index.html') };
+  const FIX498 = ["  var CS_APPR_RETRY_MS = 4000, CS_APPR_RETRY_MAX = 5;", "tn = Number(tryN) || 0;\n    if (!id) return;", "    if (who === undefined){ who = me; if (it && !it.decided_by) it = Object.assign({}, it, { decided_by: { name: myName() } }); }", "      if (who !== ((typeof myId === \"function\") ? (myId() || \"\") : \"\")) return;", "        c = JSON.parse(JSON.stringify(sc)); contracts.push(c);", "        if (typeof apprToastShow === \"function\") apprToastShow(\"결재 결과를 계약 단계에 아직 옮기지 못했습니다 — 앱을 새로 고치면 자동으로 반영됩니다(또는 계약 탭에서 그 계약의 단계·서류 탭)\");", "    return !!a.by && typeof myName === \"function\" && a.by === myName();", "  var CS_APPR_HEAL_MAX = 6, csApprHealN = {}, csApprHealBusy = false, csApprHealAt = 0, csApprHealSt = {}, csApprHealHold = false, csApprHealStop = false, csApprHealOutAt = 0;", "        else if (++n > 100) res(false);", "    items.forEach(function(x){ if (x && x.cid && String(x.ref || \"\").indexOf(\"con:\") === 0 && (x.status === \"승인\" || x.status === \"반려\")) by[x.cid] = x; });", "    if (who === undefined) who = csApprWho(); else if (who !== csApprWho()) return 0;", "    csApprHealBusy = true; csApprHealAt = Date.now(); if (!pn) csApprHealStop = false;", "    hits.forEach(function(h){ csApprHealN[h.cid] = (csApprHealN[h.cid] || 0) + 1; if (ids.indexOf(h.id) < 0){ ids.push(h.id); cids[h.id] = []; } cids[h.id].push(h.cid); });", "        if (!c || who !== csApprWho()) return false;", "    if (!h || h.bill !== \"due\" || !ok || who !== csApprWho()) return null;", "      if (!c || who !== csApprWho() || (sc && !sc.gwReadFail && sc.rec_id)) return;", "      if (!h || h.bill === \"skip\") return;", "  var CS_APPR_GUARD_MS = 5000;", "      if (done) return; done = true; if (timer) clearTimeout(timer);\n      if (who !== csApprWho()) return;", "res.body.items.forEach(function(x){ if (x && x.cid && x.cid === cid && x.ref === ref) it = x; });", "      if(resp.status>=500 && typeof csApprHealFail === \"function\" && csApprHealFail(resp.status)){ contractsPending=false; if (typeof csValEditsDone === \"function\") csValEditsDone(sentSeq); loadContracts(); return; }"];
+  const chk498 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v498 (11/19)', '\n### '), tlv = cut(d.tl, '\n## v498 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`advanceProc`", "`csApprMine(s)`", "`csApprHealLoaded`", "원장 C221"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = "<p>(2026-11 v498) (계약 › 단계) 결재함에서 계약 단계·청구 검수를 승인하면 그 계약의 단계";
+    const ok = /기준: v498 \(2026-11-19\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 8 && gate.length === 3 && scr.length === 5 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf(MAN) > 0 && !/csAppr|advanceProc|conSaveOut|apprRefresh|loadContracts|conBase|CS_APPR|scheduleContractSave|409|412|gwCall/.test(cut(d.man, MAN, '\n'))
+      && d.cl.indexOf('**P1 판40(v498') > 0
+      && FIX498.every((x) => d.ix.split(x).length === 2)
+      && /SHELL_CACHE = 'jw-shell-v498'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX498.map((x) => d.ix.split(x).length - 1) } };
+  };
+  const r498 = chk498(D498);
+  const mu498 = (k, f) => chk498(Object.assign({}, D498, { [k]: f(D498[k]) })).ok;
+  const M498 = [mu498('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v497 (')), mu498('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v497'")),
+    mu498('ft', (s) => s.split('`advanceProc`').join('advanceProc')),
+    mu498('man', (s) => s.replace('<p>(2026-11 v498) ', '<p>')), mu498('cl', (s) => s.replace('**P1 판40(v498', 'P1 판40(')),
+    mu498('tl', (s) => s.replace('\n- [x] (AI) `uismoke` \'P1 판40\'', '\n- (AI) `uismoke` \'P1 판40\''))]
+    .concat(FIX498.map((x) => mu498('ix', (s) => s.replace(x, ''))));
+  T('v498 문서·판 번호(정확 검사): FEATURES 기준 v498 (2026-11-19)·v498 절(판40) · TESTLIST v498 칸 8(화면 확인 5 · 게이트 [x] 3) · MANUAL 결재 승인 뒤 단계 반영 글(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 21줄 한 번씩 · sw jw-shell-v498 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
+    r498.ok && M498.every((v) => v === false), JSON.stringify({ r: r498.info, mut: M498 }));
+} catch (e) { console.log('  (v498 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
