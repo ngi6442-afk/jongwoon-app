@@ -2085,7 +2085,8 @@ async function handleVehDueSet(event, d, R) {
   //   재검토(11/19): 단, 창이 보여 준 값(ext_was)이 지금 차량 줄 값과 같고 사람이 칸을 비워 보냈으면(clr) 일부러 지운 것 — 옮기지 않고 지움(수정 창 길과 같은 결과)
   if (lawLog && lx.ex && !lx.ex.insp_ext && extWas && vehDueDate(extWas) && vehDueDate(cur) && extWas > cur && !(lx.clr && lx.was === extWas)) lx.ex.insp_ext = extWas;
   //   재검토: ts = 고친 시각(합치기에서 같은 줄이면 큰 쪽이 남음 — vehLogUnion)
-  if (lawLog && lx.ex) { Object.assign(lawLog, lx.ex, { ts: now }); delete wv.insp_ext; }
+  //   3차 검토: ts = max(지금, 같은 줄(at·확정·src)에 이미 있는 ts + 1) — 앱 vehLawTs와 같은 규칙
+  if (lawLog && lx.ex) { Object.assign(lawLog, lx.ex, { ts: vehLawTsS(wv.insp_log, lawLog, now) }); delete wv.insp_ext; }
   if (lawLog) wv.insp_log = (Array.isArray(wv.insp_log) ? wv.insp_log : []).concat([lawLog]).slice(-VEH_LOG_MAX);
   wdoc.updated_by = c.member.id; wdoc.updated_at = now;
   const w = await blobSet(st, colKey('vehicles'), wdoc);
@@ -2120,8 +2121,9 @@ function vehLawLog(law, prev, confirmed, today, by, src) {
 function vehLawEx(law, cur, today, date) {
   if (!law || typeof law !== 'object' || Array.isArray(law) || !Object.prototype.hasOwnProperty.call(law, 'insp_done')) return { ok: true, ex: null };
   const ex = {}, own = function (k) { return Object.prototype.hasOwnProperty.call(law, k); };
-  if (own('ext_was') && !(law.ext_was === '' || vehDueDate(law.ext_was))) return { ok: false, code: 'BAD_INSP_DATE', f: 'ext_was' };
-  const clr = own('insp_ext') && law.insp_ext === '' && own('ext_was'), was = clr ? law.ext_was : null;
+  //   3차 검토(11/19): ext_was 꼴이 틀리면(글자 아님·너무 긺) 거절하지 않고 '모름'으로 받음(차량 줄 연장일이 1900년대 같은 값이어도 지시 완료가 막히지 않게 — 비교는 글자째)
+  const wasOk = typeof law.ext_was === 'string' && law.ext_was.length <= 10;
+  const clr = own('insp_ext') && law.insp_ext === '' && wasOk, was = clr ? law.ext_was : null;
   for (const k of ['insp_done', 'insp_apply', 'insp_ext']) {
     const s = law[k];
     if (s == null || s === '') { if (k === 'insp_done') ex[k] = ''; continue; }
@@ -2139,6 +2141,12 @@ function vehLawEx(law, cur, today, date) {
 }
 // 조문에 상한이 없어 오기만 거르는 넉넉한 값(개월) — 정기검사는 만기 근처에 받음(기간 밖 이른·늦은 수검도 들어감) · 연장·유예는 사유 종료까지(시행규칙 75조 — 상한 없음). 정상 입력이 막히면 늘림(앱과 같이)
 const VEH_INSP_SPAN_M = 36, VEH_EXT_SPAN_M = 24;
+function vehLawTsS(log, e, now) {   // 3차 검토(11/19): 같은 줄(at·확정·src)의 ts보다 1 크게 — 시계가 늦은 쪽이 써도 새 기록이 앞 기록에 지지 않게(앱 vehLawTs)
+  const k = [e.at, e.confirmed, e.src].join('|');
+  let m = 0;
+  (Array.isArray(log) ? log : []).forEach(function (x) { if (x && [x.at, x.confirmed, x.src].join('|') === k) m = Math.max(m, Number(x.ts) || 0); });
+  return Math.max(now, m + 1);
+}
 function vehAddMonthsS(s, n) {   // 앱 vehAddMonths와 같은 말일 맞춤
   const y = +s.slice(0, 4), m = +s.slice(5, 7) - 1 + n, d = +s.slice(8, 10), yy = y + Math.floor(m / 12), mm = ((m % 12) + 12) % 12, last = new Date(Date.UTC(yy, mm + 1, 0)).getUTCDate();
   return new Date(Date.UTC(yy, mm, Math.min(d, last))).toISOString().slice(0, 10);

@@ -18955,7 +18955,7 @@ try {
       'function syncP(v){ return { then: function(f){ return syncP(f ? f(v) : v); }, catch: function(){ return syncP(v); } }; }',
       'function gwCall(fn, body){ E.sent.push(JSON.parse(JSON.stringify(body))); return syncP(typeof E.gw === "function" ? E.gw(body) : { status: 500, body: {} }); }'].join('\n');
     const api = new Function('E', 'document', pre + '\n' + b38(src, '// @veh-law-start', '// @veh-law-end') + '\n' + b38(src, '// @veh-due-start', '// @veh-due-end')
-      + '\nreturn { VEH_LAW: VEH_LAW, calc: vehLawCalc, end: vehLawEnd, badge: vehLawBadge, rowOk: vehLawRowOk, logE: vehLawLogEntry, arg: vehLawArg, open: openVehModal, save: saveVehFromModal, veh: findVeh, refresh: vehModalLawRefresh, toggle: toggleTaskDone, dueOk: vehDueOk, imSt: imSt, imBaseSet: imBaseSet };')(E, { getElementById: el });
+      + '\nreturn { VEH_LAW: VEH_LAW, calc: vehLawCalc, end: vehLawEnd, badge: vehLawBadge, rowOk: vehLawRowOk, logE: vehLawLogEntry, arg: vehLawArg, open: openVehModal, save: saveVehFromModal, veh: findVeh, refresh: vehModalLawRefresh, toggle: toggleTaskDone, dueOk: vehDueOk, imSt: imSt, imBaseSet: imBaseSet, logFix: vehLawLogFix, fixable: vehLawLogFixable };')(E, { getElementById: el });
     const V = (o) => Object.assign({ state: '운행', biz: '사업용' }, o);
     const L = (o) => Object.assign({ at: '2026-01-01', confirmed: '', proposed: '', rule: '', diff: null, by: 'u1', src: 'edit' }, o);
     const C = (v, rows) => sh38(api.calc(v, rows || RW38, T38));
@@ -19035,8 +19035,28 @@ try {
     const reOut = C(ro2) + '|' + api.badge(api.calc(ro2, RW38, T38), 'cell').replace(/<[^>]+>/g, '');
     //   '정정'·'애매'는 건너뜀 — 지난 검토 세 정정 그대로 · 한 주기 절반쯤 어긋난 비운 갱신 = 앞 줄에서 셈 + '확인 필요'
     const ra = V({ size: '대형 화물', reg_date: '2018-03-10', insp_due: '2025-09-09' }); stp(ra, '2026-03-09', { insp_done: '2025-09-01' }); stp(ra, '2026-06-10', { insp_done: '' });
-    const reAmb = C(ra) + '|' + /그 뒤 수검일 없이 바꾼 만기가 한 주기 뒤 날짜와 맞지 않아 정정으로 보고 셈에서 뺌/.test(api.badge(api.calc(ra, RW38, T38), 'det'));
+    const reAmb = C(ra) + '|' + /그 뒤 수검일 없이 바꾼 만기가 한 주기 뒤 날짜와 맞지 않아 셈에서 뺌/.test(api.badge(api.calc(ra, RW38, T38), 'det'));
+    // ⑯ 3차 검토(11/19 — 검토자 재현 rev_p38 t11): 수검일 정정 길은 그 회차 갱신 줄(값·비운) 또는 애매 줄에만 — 정정 줄에 쓰지 않음
+    //   (가) 오타 비운 갱신 → 비운 정정 → 정정 길로 수검일 = 오타 갱신 줄에 들어가 2026-09-09 차이 0 · (나) 값 갱신 만기 오타 → 크게 고친 정정(앞 갱신 줄 한 주기 뒤 날짜 = 정정) → 확인 필요 없음 · 정정 길 = 앞 값 줄
+    //   (다) 애매 안내대로(실제 늦은 갱신) 수검일을 넣으면 그 애매 줄이 값 갱신이 되어 풀림 · (라) 지금 만기가 마지막 기록과 다르면 정정 길 없음 · (마) ts = 앞 ts + 1(시계가 늦어도) · (바) 차령 경계 회차 = 갱신 + '확인 필요'(애매 안내 없음)
+    const ga = V({ size: '대형 화물', reg_date: '2018-03-10', insp_due: '2026-03-09' }); stp(ga, '2026-09-19', { insp_done: '' }); stp(ga, '2026-09-09', { insp_done: '' });
+    api.logFix(ga, { insp_done: '2026-03-01' });
+    const fA = C(ga) + '|' + ga.insp_log.map((x) => x.insp_done).join(',');
+    const gb = V({ size: '대형 화물', reg_date: '2018-03-10', insp_due: '2025-09-09' }); stp(gb, '2027-03-09', { insp_done: '2025-09-01' }); stp(gb, '2026-03-09', { insp_done: '' });
+    const fB0 = C(gb) + '|' + /확인 필요/.test(api.badge(api.calc(gb, RW38, T38), 'det'));
+    api.logFix(gb, { insp_done: '2025-08-20' }); const fB = fB0 + '|' + C(gb) + '|' + gb.insp_log.map((x) => x.insp_done).join(',');
+    const gc = V({ size: '대형 화물', reg_date: '2018-03-10', insp_due: '2025-09-09' }); stp(gc, '2026-03-09', { insp_done: '2025-09-01' }); stp(gc, '2026-11-20', { insp_done: '' });
+    const fC0 = C(gc) + '|' + /실제로 검사를 받은 갱신이었으면 만기는 그대로 두고 수정 창에서 그 수검일을 넣어 주세요/.test(api.badge(api.calc(gc, RW38, T38), 'det'));
+    api.logFix(gc, { insp_done: '2026-05-20' }); const fC = fC0 + '|' + C(gc) + '|' + /확인 필요/.test(api.badge(api.calc(gc, RW38, T38), 'det')) + '|' + gc.insp_log.map((x) => x.insp_done).join(',');
+    const gd = JSON.parse(JSON.stringify(gc)); gd.insp_due = '2026-12-01'; const fD = String(api.fixable(gd)) + '|' + String(api.logFix(gd, { insp_done: '2026-05-21' }));
+    const gt = V({ size: '대형 화물', reg_date: '2018-03-10', insp_due: '2026-09-09', insp_log: [L({ prev: '2026-03-09', confirmed: '2026-09-09', insp_done: '', ts: Date.now() + 1e9 })] }); const t0 = gt.insp_log[0].ts; api.logFix(gt, { insp_done: '2026-03-01' });
+    const gn = V({ size: '대형 화물', reg_date: '2018-03-10', insp_due: '2026-03-09', insp_log: [L({ at: T38, prev: '2026-03-09', confirmed: '2026-09-09', insp_done: '', ts: t0 + 5 })] }); stp(gn, '2026-09-09', { insp_done: '2026-03-01' });
+    const fT = gt.insp_log[0].ts === t0 + 1 && gn.insp_log[1].ts === t0 + 6;
+    const ge = V({ size: '대형 화물', reg_date: '2021-06-01', insp_due: '2025-05-31' }); stp(ge, '2026-05-31', { insp_done: '2025-05-20' }); stp(ge, '2026-11-30', { insp_done: '' });
+    const geT = api.badge(api.calc(ge, RW38, T38), 'det');
+    const fE = C(ge) + '|' + /차령이 바뀌는 회차 — 차령을 어느 날로 보느냐에 따라 주기가 12개월 또는 6개월일 수 있음/.test(geT) + '|' + /한 주기 뒤 날짜와 맞지 않아/.test(geT);
     Object.assign(api.VEH_LAW, { on: false, ver: '', rows: [], attr: null, at: Date.now(), busy: false });
+    R.re3 = [fA, fB, fC, fD, fT, fE].join(' # ');
     R.re = [re0, re1, re1cell, re12, reOut, reAmb].join(' # ');
     // ⑨ 근거 표 옛 판(기간 칸 없음) = 판38 기록이 있어도 누적식 그대로 · 기간 칸 꼴 틀린 행 = 쓰지 않음
     const vo = V(Object.assign({ insp_due: '2026-01-05', insp_log: [L({ prev: '2024-05-09', confirmed: '2026-01-05', insp_done: '2024-01-05' })] }, v1));
@@ -19179,6 +19199,7 @@ try {
       "<span class=\"vl-b am\" title=\"근거 시험법 별표 · 표시만 — 검사 만기는 넣은 날짜 그대로 · 직전 수검일 기준 — 종전 만기 2025-03-09, 수검일 2025-03-01(검사 기간 안) → 2025-03-10부터 셈 · 제작연도에 등록하지 않은 차(차령 기산일 = 제작연도 말일)는 차령 경계 근처 회차가 다를 수 있음\">법정 검사 제안 <b>2026-09-09</b> · 차이 +11일</span><span class=\"vl-n\" style=\"display:block;font-size:11.5px;color:#1F6B3A;margin-top:2px;\">직전 수검일 기준 — 종전 만기 2025-03-09, 수검일 2025-03-01(검사 기간 안) → 2025-03-10부터 셈 · 제작연도에 등록하지 않은 차(차령 기산일 = 제작연도 말일)는 차령 경계 근처 회차가 다를 수 있음</span>"].join('\n'),
     oldBg: 'ok/2026-05-09/-124/t38.m24|false|true,true,false,false,false,false',
     why: 'alert:수검일이 오늘 뒤입니다 — 검사를 받은 날을 넣어 주세요.|alert:수검일·검사 신청일은 검사 만기를 새 날짜로 바꿀 때 같이 넣습니다(지금 만기를 넣은 갱신 기록이 있으면 그 수검일을 고칠 수 있습니다).|alert:연장(유예) 만료일은 종전 검사 만기(2026-04-23)보다 뒤여야 합니다.|alert:달력에 없는 날짜입니다: 수검일|alert:검사 신청일이 수검일보다 뒤입니다.|alert:수검일이 종전 검사 만기(2026-04-23)와 새 만기 어느 쪽과도 너무 멀리 떨어져 있습니다 — 날짜를 확인해 주세요(오기가 아니면 이 칸을 비우고 저장한 뒤, 창을 다시 열어 이 칸만 넣어 저장하면 마지막 기록에 들어갑니다).|alert:연장(유예) 만료일이 종전 검사 만기(2026-04-23)보다 너무 뒤입니다 — 날짜를 확인해 주세요.| [저장됨]',
+    re3: 'ok/2026-09-09/0/t38.m12b|2026-03-01, # ok/2026-03-09/0/t38.m12b|false|ok/2026-03-09/0/t38.m12b|2025-08-20, # ok/2026-09-09/72/t38.m12b|true|ok/2026-11-20/0/t38.m12b|false|2025-09-01,2026-05-20 # null|null # true # ok/2027-05-31/-182/t38.m12|true|false',
     re: 'ok/2026-03-09/11/t38.m12b # ok/2026-09-20/0/t38.m12b # 제안 2026-09-20 · 차이 0일 · 직전 갱신 기준 # ok/2032-09-20/0/t38.m12b/2032-09-20 # ok/2026-07-20/0/t38.m12b|제안 2026-07-20 · 차이 0일 · 직전 갱신 기준 # ok/2026-09-09/-91/t38.m12b|true', fixDone: '2026-04-10,1,2026-03-20,2026-11-01,true,2026-03-20,,2026-03-20,"",2016-01-01,0',
     fix: "ok/2027-03-09/0/t38.m12b,3,ok/2026-06-30/61/t38.c12,ok/2027-03-09/0/t38.m12b,ok/2027-03-09/0/t38.m12b",
     more: "ok/2028-03-01/-29/t38.m24,ok/2026-03-09/0/t38.m12,none///rule,ok/2027-01-01/0/t38.bus,ok/2026-11-19/null/t38.y1,ok/2026-09-01/-92/t38.m6,ok/2027-03-01/0/w.b",
@@ -19214,8 +19235,17 @@ try {
     ['    if (r0.win_basis === "apply" && !ap && s && dn(s) > dn(E) + r0.win_after) chk.push("ceqlate");\n', ''],
     [' + "부터 셈" + vehLawChkTxt(c.chk);', ' + "부터 셈";'],
     ['    if (vehRealDate(x.insp_done) || vehRealDate(x.insp_apply) || vehRealDate(x.insp_ext)) return "val";\n', ''],
-    ['    for (i = log.length - 1; i >= 0; i--){ kd = vehLawLogKind(log[i], ok, v, cls);', '    for (i = 0; i < log.length; i++){ kd = vehLawLogKind(log[i], ok, v, cls);'],
-    ['    if (dn(x.confirmed) >= dn(ex) - r.win_before && dn(x.confirmed) <= dn(ex) + r.win_after) return "renew";\n', ''],
+    ['    for (i = log.length - 1; i >= 0; i--){ kd = kinds[i];', '    for (i = 0; i < log.length; i++){ kd = kinds[i];'],
+    ['    if (vehLawExpOk(x.prev, x.confirmed, ok, v, cls)) return "renew";\n', ''],
+    // 3차 검토(11/19): 고칠 줄 고르기·정정 판정·ts·차령 경계
+    ['    for (i = log.length - 1; i >= 0; i--){ if (k[i] === "val" || k[i] === "renew" || k[i] === "amb") return log[i]; }', '    return log[log.length - 1];'],
+    ['    for (i = log.length - 1; i >= 0; i--){ if (k[i] === "val" || k[i] === "renew" || k[i] === "amb") return log[i]; }', '    for (i = log.length - 1; i >= 0; i--){ if (k[i] === "val" || k[i] === "renew") return log[i]; }'],
+    ['      if (R && vehLawExpOk((vehRealDate(R.insp_ext) && R.insp_ext > R.prev) ? R.insp_ext : R.prev, log[i].confirmed, ok, v, cls)) k[i] = "fix";\n', ''],
+    ['    if (!last || !v.insp_due || last.confirmed !== v.insp_due || !vehLawOn()) return null;', '    if (!last || !vehLawOn()) return null;'],
+    ['    return [vehLawPick(ok, v, cls, prev), vehLawPick(ok, v, cls, s)].some(', '    return [vehLawPick(ok, v, cls, prev)].some('],
+    ['    if (hitBnd) chk.push("age:" + hitBnd);\n', ''],
+    ['ts: Math.max(Date.now(), (Number(L.ts) || 0) + 1), by:', 'ts: Date.now(), by:'],
+    ['return Math.max(Date.now(), m + 1); }', 'return Date.now(); }'],
     ['if (kd === "val" || kd === "renew"){ e = log[i]; break; }', 'if (kd){ e = log[i]; break; }'],
     [' if (kd === "amb") amb = true; }', ' }'],
     ['    return (dn(x.confirmed) >= dn(x.prev) - r.win_before && dn(x.confirmed) <= dn(x.prev) + r.win_after) ? "fix" : "amb";', '    return "fix";'],
@@ -19225,14 +19255,14 @@ try {
     ['    if (chg && !p.auto && d.value === p.done && a.value === p.apply){ d.value = ""; a.value = ""; p.auto = true; }', '    if (false){ }'],
     ['    else if (!chg && p.auto && d.value === "" && a.value === ""){ d.value = p.done; a.value = p.apply; p.auto = false; }', ''],
     ['pre = { done: fx && vehRealDate(fx.insp_done) ? fx.insp_done : "",', 'pre = { done: "",'],
-    ['src: src }, ex || {}, ex ? { ts: Date.now() } : {});', 'src: src }, ex || {});'],
-    ['    n = Object.assign({}, L, { insp_done: vehRealDate(x.insp_done) ? x.insp_done : "", ts: Date.now(),', '    n = Object.assign({}, L, { insp_done: vehRealDate(x.insp_done) ? x.insp_done : "", ts: 0,'],
+    ['src: src }, ex || {}, ex ? { ts: vehLawTs(v.insp_log, { at: todayStr(), confirmed: confirmed, src: src }) } : {});', 'src: src }, ex || {});'],
+    ['    n = Object.assign({}, L, { insp_done: vehRealDate(x.insp_done) ? x.insp_done : "", ts: Math.max(', '    n = Object.assign({}, L, { insp_done: vehRealDate(x.insp_done) ? x.insp_done : "", ts: 0 || Math.min('],
     [', (x3 && typeof x3.ext_was === "string") ? { ext_was: x3.ext_was } : {}) : null;', ') : null;'],
     ['return [base].concat(vehRealDate(conf) ? [conf] : []).some(', 'return [base].some('],
     ['    if (arguments[4] === true) return "";\n', ''],
     [' && (x.reg_min == null || !(v.reg_date < x.reg_min)); })[0] || null;', '; })[0] || null;'],
     ['      if (!v.insp_due && d < anchor) continue;', '      if (!v.insp_due && d <= anchor) continue;'],
-    ['      if (!(n > bestN)){ best = d; bestN = n; bestR = r; hitItp = cItp; }', '      if (n < bestN){ best = d; bestN = n; bestR = r; hitItp = cItp; }'],
+    ['      if (!(n > bestN)){ best = d; bestN = n; bestR = r; hitItp = cItp;', '      if (n < bestN){ best = d; bestN = n; bestR = r; hitItp = cItp;'],
     ['    r0 = vehLawPick(ok, v, cls, E);', '    r0 = ok[0] || null;'],
     ['      r = vehLawPick(ok, v, cls, end);', '      r = vehLawPick(ok, v, cls, S);'],
     ['var extGone = !!(v && res.body.law_log && typeof res.body.law_log.insp_done === "string");', 'var extGone = !!(v && res.body.law_log);'],
@@ -19245,7 +19275,7 @@ try {
     ['return +t.slice(8, 10) < +s.slice(8, 10) ? t : vehAddDays(t, -1); }', 'return vehAddDays(t, -1); }'],
     ['  function vehLawWinOk(r){ return (r.win_before == null && r.win_after == null && r.win_basis == null) || vehLawWinHas(r); }', '  function vehLawWinOk(r){ return true; }'],
     ['    if (!r0 || !vehLawWinHas(r0)) return null;', '    if (!r0) return null;'],
-    ['src: src }, ex || {}, ex ? { ts: Date.now() } : {});', 'src: src }, {}, ex ? { ts: Date.now() } : {});'],
+    ['src: src }, ex || {}, ex ? { ts: vehLawTs(', 'src: src }, {}, ex ? { ts: vehLawTs('],
     ['    if (logged){ vehSetOpt(v, "insp_ext", ""); return; }', '    if (logged) return;'],
     ['if (el) el.style.display = vehLawOn() ? "" : "none"; });', 'if (el) el.style.display = ""; });'],
     ['    if (x.insp_done && x.insp_done > today) return "수검일이 오늘 뒤입니다 — 검사를 받은 날을 넣어 주세요.";\n', ''],
@@ -19266,7 +19296,7 @@ try {
   ];
   const kill38 = [];
   for (const [from, to] of MUT38) { let r; try { r = all38(sm38(from, to)); } catch (e) { r = { ok: false, x: e.message }; } if (r.ok || (r.x && /한 곳이 아님/.test(r.x))) kill38.push(from.trim().slice(0, 60) + (r.x ? ' (' + r.x + ')' : '')); }
-  T('P1 판38 차량 법정 검사 만기 제안의 기산(실행 — 실제 @veh-law·@veh-due·수정 창·완료 창·mergeVeh): ① 자동차 기간 전 수검(사례 1 · 74조② 후단·77조② 전 90일 경계 2024-02-09 안·02-08 밖) ② 기간 뒤 수검(사례 2 · 후 31일 경계 04-01 안·04-02 밖) ③ 연장·유예(사례 3 · 77조② 괄호·75조③ — 연장 만료일로 기간 · 종전 만기 앞 연장 날짜는 안 씀) ④ 건설기계 신청 시점(사례 4 · 23조①⑤ 전후 31일 경계 · 신청 비움 = 기간 안 · 신청 밖 + 수검 비움 = 종전 만기 다음날 · 같은 날짜 자동차는 받은 날로) ⑤ 월말 등록(사례 5 · 민법 160조②③ — 누적식 기준 없음 → 이어 세기 제안 · 해당일 없음 = 말일) · 차령 경계 넘는 회차 = 그때 행 ⑥ 수검일 기록 없는 차(운영 52대 꼴 포함) = 운영 v497 결과와 글·칩 HTML까지 같음(옛 판 근거 표도) ⑦ 검사 만기 빈 차 = 오늘 이후 첫 만료일(한계 ①) · 건설기계 사업용 여부·연식 없이 제안(한계 ②) ⑧ 칩: 이어 센 제안 = 칸 끝 "수검일 기준"·초록 한 줄 · 누적식 = 지금 안내 그대로 ⑨ 근거 표 옛 판(기간 칸 없음) = 누적식 · 기간 칸 꼴 틀린 행 = 안 씀 ⑩ 승격 전 = 새 칸·안내 숨김·기록·연장 칸 안 씀·완료 창 law 없음 ⑪ 수정 창: 시안 ① 예 그대로(2027-04-23 차이 0 · "직전 수검일 기준 — 종전 만기 2026-04-23, 수검일 2026-04-10(검사 기간 안) → 2026-04-24부터 셈") · 기록 줄 새 칸 · 연장 만료일 옮김·비움·연장만 저장·지움 · 건설기계 신청일 · 안내 5가지(오늘 뒤·만기 안 바꿈·종전 만기 앞 연장·달력·신청일 > 수검일 — 저장 안 함) ⑫ 완료 창: 칸·law 새 칸·응답 기록·연장 칸 비움·받은 사본 전진 · 보험 지시 = 칸 없음 ⑬ 병합: 다른 기기 수검일·만기 뒤 옛 화면 저장 = 새 칸·기록 남음 · 받은 사본 전진 뒤 다른 기기 새 연장 만료일 남음 · 기록 합집합이 빈 칸을 채움 · 새 칸 id 한 번씩·창 글 내부 이름 없음·구간 코드에 기간 일수 숫자 없음 ⑭ 독립 검토 반영: 만기 오타 정정 저장(세 칸 빈 줄)은 이어 세기 출발점이 아님(사업용 대형 화물 정정·건설기계 첫 정정·연도 오타 정정 = 누적식·앞 줄과 같은 날) · 마지막 값 있는 줄 · 차령 경계 회차 행 · 2001년 전 승합 · 만기 빈 차 오늘 당일 · 같은 거리면 뒤 날 · 기간 판정 행 = 그 회차 행 · 건설기계 신청일 비움 + 이른 수검 = 신청도 기간 전 · 확인 필요(기간 끝 + 휴일 여유 · 건설기계 신청 기간 밖 · 종합검사 근거 행 기간 밖 · 신청일 모르고 늦은 수검) · 오기 범위 안내 · 새 차 만들기 = 검사 기록 칸 숨김 · 판38 전 서버 응답 = 연장 칸 그대로 · 병합 알림 이름 ⑮ 재검토: 세 칸 빈 줄 = 갱신(한 주기 뒤 날짜 근처 — 출발점)/정정(건너뜀) — 비운 갱신 1회·12회 연속·기간 밖 수검 줄 뒤 = 차이 0·"직전 갱신 기준" · 한 주기와 어긋난 비운 갱신 = 앞 줄에서 셈 + 확인 필요 · 같은 줄은 ts 큰 쪽·비운 수검일 안 되살림 · 수검일 정정 길(창에 마지막 수검일 · 만기 그대로 고쳐 저장 = 같은 줄 고침 · 만기 바꾸면 비움·되돌리면 다시 · 비워 저장 · 범위 밖도 받음) · 묵은 만기 차 첫 수검일 받음 · 완료 창 ext_was · 결함 사본 ' + MUT38.length + '개 = 모두 ✗',
+  T('P1 판38 차량 법정 검사 만기 제안의 기산(실행 — 실제 @veh-law·@veh-due·수정 창·완료 창·mergeVeh): ① 자동차 기간 전 수검(사례 1 · 74조② 후단·77조② 전 90일 경계 2024-02-09 안·02-08 밖) ② 기간 뒤 수검(사례 2 · 후 31일 경계 04-01 안·04-02 밖) ③ 연장·유예(사례 3 · 77조② 괄호·75조③ — 연장 만료일로 기간 · 종전 만기 앞 연장 날짜는 안 씀) ④ 건설기계 신청 시점(사례 4 · 23조①⑤ 전후 31일 경계 · 신청 비움 = 기간 안 · 신청 밖 + 수검 비움 = 종전 만기 다음날 · 같은 날짜 자동차는 받은 날로) ⑤ 월말 등록(사례 5 · 민법 160조②③ — 누적식 기준 없음 → 이어 세기 제안 · 해당일 없음 = 말일) · 차령 경계 넘는 회차 = 그때 행 ⑥ 수검일 기록 없는 차(운영 52대 꼴 포함) = 운영 v497 결과와 글·칩 HTML까지 같음(옛 판 근거 표도) ⑦ 검사 만기 빈 차 = 오늘 이후 첫 만료일(한계 ①) · 건설기계 사업용 여부·연식 없이 제안(한계 ②) ⑧ 칩: 이어 센 제안 = 칸 끝 "수검일 기준"·초록 한 줄 · 누적식 = 지금 안내 그대로 ⑨ 근거 표 옛 판(기간 칸 없음) = 누적식 · 기간 칸 꼴 틀린 행 = 안 씀 ⑩ 승격 전 = 새 칸·안내 숨김·기록·연장 칸 안 씀·완료 창 law 없음 ⑪ 수정 창: 시안 ① 예 그대로(2027-04-23 차이 0 · "직전 수검일 기준 — 종전 만기 2026-04-23, 수검일 2026-04-10(검사 기간 안) → 2026-04-24부터 셈") · 기록 줄 새 칸 · 연장 만료일 옮김·비움·연장만 저장·지움 · 건설기계 신청일 · 안내 5가지(오늘 뒤·만기 안 바꿈·종전 만기 앞 연장·달력·신청일 > 수검일 — 저장 안 함) ⑫ 완료 창: 칸·law 새 칸·응답 기록·연장 칸 비움·받은 사본 전진 · 보험 지시 = 칸 없음 ⑬ 병합: 다른 기기 수검일·만기 뒤 옛 화면 저장 = 새 칸·기록 남음 · 받은 사본 전진 뒤 다른 기기 새 연장 만료일 남음 · 기록 합집합이 빈 칸을 채움 · 새 칸 id 한 번씩·창 글 내부 이름 없음·구간 코드에 기간 일수 숫자 없음 ⑭ 독립 검토 반영: 만기 오타 정정 저장(세 칸 빈 줄)은 이어 세기 출발점이 아님(사업용 대형 화물 정정·건설기계 첫 정정·연도 오타 정정 = 누적식·앞 줄과 같은 날) · 마지막 값 있는 줄 · 차령 경계 회차 행 · 2001년 전 승합 · 만기 빈 차 오늘 당일 · 같은 거리면 뒤 날 · 기간 판정 행 = 그 회차 행 · 건설기계 신청일 비움 + 이른 수검 = 신청도 기간 전 · 확인 필요(기간 끝 + 휴일 여유 · 건설기계 신청 기간 밖 · 종합검사 근거 행 기간 밖 · 신청일 모르고 늦은 수검) · 오기 범위 안내 · 새 차 만들기 = 검사 기록 칸 숨김 · 판38 전 서버 응답 = 연장 칸 그대로 · 병합 알림 이름 ⑮ 재검토: 세 칸 빈 줄 = 갱신(한 주기 뒤 날짜 근처 — 출발점)/정정(건너뜀) — 비운 갱신 1회·12회 연속·기간 밖 수검 줄 뒤 = 차이 0·"직전 갱신 기준" · 한 주기와 어긋난 비운 갱신 = 앞 줄에서 셈 + 확인 필요 · 같은 줄은 ts 큰 쪽·비운 수검일 안 되살림 · 수검일 정정 길(창에 마지막 수검일 · 만기 그대로 고쳐 저장 = 같은 줄 고침 · 만기 바꾸면 비움·되돌리면 다시 · 비워 저장 · 범위 밖도 받음) · 묵은 만기 차 첫 수검일 받음 · 완료 창 ext_was ⑯ 3차 검토: 정정 길 = 그 회차 갱신 줄·애매 줄에만(오타 비운 갱신 뒤 정정 → 갱신 줄 · 값 갱신 만기 크게 고친 정정 = 정정으로 봄·확인 필요 없음 · 애매 안내대로 늦은 수검일 = 풀림 · 지금 만기 ≠ 마지막 기록 = 정정 길 없음) · ts = 같은 줄 ts + 1(시계 늦어도 · 새 줄·정정 둘 다) · 차령 경계 회차 = 갱신 + 확인 필요(애매 안내 없음) · 결함 사본 ' + MUT38.length + '개 = 모두 ✗',
     st38 && real38.ok && kill38.length === 0, JSON.stringify({ st38, a: real38.a, b: real38.b, 안깨짐: kill38 }).slice(0, 6000));
 } catch (e) { console.log('  (P1 판38 검사 생략 — ' + e.message + ')'); fails++; }
 
