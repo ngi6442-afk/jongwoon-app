@@ -17,7 +17,7 @@ const ID = '[^:\\s\\x00-\\x1f\\x7f]{1,80}';   // gw-data AUTOTASK_ID와 같은 �
 const DATE = '\\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\\d|3[01])';
 // 새 키 꼴 — 만드는 곳은 서버 실행기 하나(앱·봇은 만들지 않음). 봇이 보내면 gw-data AUTOTASK_KEY_RE 밖이라 unknown으로 막힌다.
 const KEY_RE = {
-  hr: new RegExp('^hr:(' + ID + '):(join|leave):(' + DATE + '):([1-8])$'),        // 입사·퇴사 체크(인사) — 판2·3
+  hr: new RegExp('^hr:(' + ID + '):(join|leave):(' + DATE + '):([1-9]\\d?)$'),        // 입사·퇴사 체크(인사) — 판2·3 · 항목 번호 1~99(판2 검토 7 — 항목 표 한 줄을 더해도 꼴 안)
   acct: new RegExp('^acct:(' + ID + '):(join|leave):(' + DATE + ')$'),             // 입사·퇴사 계정 — 판2·3
   ks: /^ks:(\d{4})$/,                                                              // 현장 실적 신고(연 1회) — 판5
   vehEv: new RegExp('^veh:(' + ID + '):ev:(sold|dereg):(' + DATE + '):(main|waste)$'),   // 차량 매각·말소 — 판6
@@ -55,7 +55,7 @@ const DAY = 86400000;
 const TITLE_MAX = 120;   // 지시 제목 상한(ingest·실행기가 만들 때와 같음)
 const PLAN_TITLE_MAX = 100, PLAN_DETAIL_MAX = 430;   // C185 판2(ⓙ 3): 계획 함수가 내는 글 상한 — 표시 머리(20자 안팎)·까닭 줄(60자 안팎)을 붙여도 120·500 안
 // 검토 E: 봇에 돌려주는 규칙별 칸은 수와 건너뜀 까닭만(담당 id 목록·근거 행 id 없음)
-const BOT_KEYS = ['mode', 'events', 'tasks', 'no_who', 'no_due', 'marked', 'unmarked', 'gone', 'old', 'skip'];
+const BOT_KEYS = ['mode', 'events', 'tasks', 'no_who', 'no_due', 'marked', 'unmarked', 'gone', 'old', 'skip', 'found', 'filled'];
 function botSum(res) { const o = {}; Object.keys(res || {}).forEach(function (k) { const s = res[k] || {}, b = {}; BOT_KEYS.forEach(function (f) { if (s[f] !== undefined) b[f] = s[f]; }); o[k] = b; }); return o; }
 function hasOwn(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
 function ready(id) { return hasOwn(RULES, id) && typeof RULES[id].plan === 'function'; }
@@ -73,7 +73,7 @@ function ctxFor(id, mode, sinceMs, nowMs, today) {
   return { ctx: { mode: 'dry', today: today, since: s0, since_day: kstDay(s0), win: DRY_WIN } };
 }
 // 연습 요약 꼴(it:autotask:dry.rules.<규칙>) — 사람 이름·회원 id 없음(담당 id만 — 화면이 이름으로 바꿈) · ms 시각 같은 긴 숫자 없음(AR.piiScan 전화 꼴에 우연히 걸리지 않게)
-function emptySum(mode) { return { mode: mode, ready: true, win: mode === 'dry' ? DRY_WIN : 0, events: 0, tasks: 0, who: [], no_who: 0, no_due: 0, marked: 0, unmarked: 0, gone: 0, old: 0, no_row: [], skip: '', ref: {} }; }
+function emptySum(mode) { return { mode: mode, ready: true, win: mode === 'dry' ? DRY_WIN : 0, events: 0, found: 0, filled: 0, tasks: 0, who: [], no_who: 0, no_due: 0, marked: 0, unmarked: 0, gone: 0, old: 0, no_row: [], skip: '', ref: {} }; }
 function skipSum(mode, why) { const s = emptySum(mode); s.skip = String(why || 'ERROR').slice(0, 40); return s; }
 function notReadySum(mode) { return { mode: mode, ready: false }; }
 function cnt(v) { const n = Number(v); return isFinite(n) && n > 0 ? Math.floor(n) : 0; }
@@ -121,7 +121,8 @@ function run(id, input, ctx, tasks, opt, write) {
   const have = {};
   tasks.forEach(function (t) { if (t && t.auto_key) (have[t.auto_key] || (have[t.auto_key] = [])).push(t); });
   const alive = function (k) { return (have[k] || []).some(function (t) { return t.del !== 1; }); };
-  const active = opt.active || {}, plans = [];
+  const active = opt.active || {}, plans = [], fills = [];   // fills = 빈 기한을 채울 열린 지시(판2 검토 2)
+  sum.found = Array.isArray(p.events) ? p.events.length : 0;   // 계획 함수가 낸 사건 수(담당 없음 등으로 만들 지시가 없어도 — 화면 '사건 n' · 판2 검토 6)
   (Array.isArray(p.events) ? p.events : []).forEach(function (ev) {
     const mk = [], seen = {};
     ((ev && Array.isArray(ev.tasks)) ? ev.tasks : []).forEach(function (x) {
@@ -162,6 +163,10 @@ function run(id, input, ctx, tasks, opt, write) {
   });
   sum.who = Object.keys(by).sort().map(function (w) { return { id: w, n: by[w] }; });
   let changed = out.made.length;
+  // 판2 검토 2: 같은 키의 열린 지시(안 지움·안 끝남)가 기한 빈칸이고 이번 계획의 기한이 날짜면 그 기한만 채움(이미 있는 기한은 안 바꿈 · 알림·사건 수·막이에 안 셈) — 근거가 나중에 승격·다시 읽힌 날
+  (Array.isArray(p.events) ? p.events : []).forEach(function (ev) { ((ev && Array.isArray(ev.tasks)) ? ev.tasks : []).forEach(function (x) { const k = String((x && x.key) || ''); if (!k || !have[k] || !isDate(x.due) || out.made.some(function (m) { return m.auto_key === k; })) return; have[k].forEach(function (t) { if (t.del !== 1 && t.status !== 'done' && !t.due && !fills.some(function (f) { return f[0] === t; })) fills.push([t, x.due]); }); }); });
+  sum.filled = fills.length;
+  fills.forEach(function (f) { if (write) { f[0].due = f[1]; f[0].updated = ctx.today; changed++; } });
   if (R.mark && p.subjects && typeof p.subjects === 'object') {
     tasks.forEach(function (t) {
       if (!t || t.del === 1 || t.status === 'done' || ruleOfKey(t.auto_key) !== id) return;
@@ -173,7 +178,7 @@ function run(id, input, ctx, tasks, opt, write) {
     });
   }
   out.changed = write ? changed : 0;
-  if (sum.tasks || sum.unmarked || (write && changed)) out.txt = id + ' 새 ' + sum.tasks + (sum.marked ? ' · 표시 ' + sum.marked : '') + (sum.unmarked ? ' · 표시 뗌 ' + sum.unmarked : '') + (sum.no_who ? ' · 담당 없음 ' + sum.no_who : '');
+  if (sum.tasks || sum.unmarked || (write && changed)) out.txt = id + ' 새 ' + sum.tasks + (sum.filled ? ' · 기한 채움 ' + sum.filled : '') + (sum.marked ? ' · 표시 ' + sum.marked : '') + (sum.unmarked ? ' · 표시 뗌 ' + sum.unmarked : '') + (sum.no_who ? ' · 담당 없음 ' + sum.no_who : '');
   else if (sum.no_who) out.txt = id + ' 담당 없음 ' + sum.no_who;
   return out;
 }
@@ -194,7 +199,7 @@ const HR_JOIN_ITEMS = [   // no(키 번호 — 바꾸지 말 것) · pre(키 접
   { no: 7, pre: 'acct:', t: '계정 부여·관리대장 등재', due: 'day0', row: '', d: '그룹웨어 계정을 만들고 계정 관리대장에 적습니다. 그 직원의 기기가 승인되면 승인 대기로 올라갑니다(기기를 쓰지 않는 직원은 [완료]).' },
   { no: 8, pre: 'hr:', t: '비상연락처 확보', due: 'day0', row: '', d: '비상연락처를 받아 인사 카드에 적습니다.' },
 ];
-const HR_JOIN_TAIL = ' 대상 직원은 지시 펼침의 [인사 카드]에서 확인합니다.';
+const HR_JOIN_TAIL = ' 대상 직원은 관리자 화면의 [인사 카드](지시 펼침·지시 카드)에서 확인합니다.';   // 판2 검토 4: 단추는 관리자에게만 — 담당이 관리자가 아니면 관리자에게 물어 확인
 function hrJoinKey(mid, hire, it) { return it.pre === 'acct:' ? 'acct:' + mid + ':join:' + hire : 'hr:' + mid + ':join:' + hire + ':' + it.no; }
 function realDate(s) { if (!isDate(s)) return false; const t = new Date(s + 'T00:00:00Z'); return !isNaN(t.getTime()) && t.toISOString().slice(0, 10) === s; }
 function addDaysK(s, n) { return new Date(Date.parse(s + 'T00:00:00Z') + n * DAY).toISOString().slice(0, 10); }

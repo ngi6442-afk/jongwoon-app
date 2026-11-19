@@ -17,7 +17,7 @@ function parseKey(k) {   // 'veh:<id>:insp:<due>' · 'veh:<id>:ins:<due>' · 'li
   const ld = LD.parse(k);   // P1 판20 인허가 기한 지시 'lic:<허가증>:duty:<번호>:<회차 기한>' · 첫 회차 묶음 'lic:-:duty:over:<날>:<n>' — 아래 lic 갈래보다 먼저
   if (ld) return ld.bundle ? { dom: 'licduty', col: 'licenses', id: '', kind: 'bundle', bundle: true } : { dom: 'licduty', col: 'licenses', id: ld.lic, kind: 'duty', no: ld.no, due: ld.due };
   // C185 판2 입·퇴사 지시(서버 규칙 실행기 — _lib/evrules 키 꼴과 같음): hr:<회원>:join|leave:<날짜>:<번호> = 사람 [완료]만 · acct:<회원>:join|leave:<날짜> = 계정(입사 = 승인 기기 신호 · 퇴사 = 판3)
-  const hrm = /^(hr|acct):([^:\s\x00-\x1f\x7f]{1,80}):(join|leave):(\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01]))(?::([1-8]))?$/.exec(String(k || ''));
+  const hrm = /^(hr|acct):([^:\s\x00-\x1f\x7f]{1,80}):(join|leave):(\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01]))(?::([1-9]\d?))?$/.exec(String(k || ''));   // 판2 검토 7: 항목 번호 1~99(evrules KEY_RE.hr와 같음)
   if (hrm && (hrm[1] === 'hr') === !!hrm[5]) return { dom: hrm[1], col: hrm[1] === 'acct' ? 'devices' : '__none', id: hrm[2], kind: hrm[3], due: hrm[4], no: hrm[5] ? Number(hrm[5]) : 0 };
   const p = String(k || '').split(':');
   if (p[0] === 'veh' && p.length >= 4) return { dom: 'veh', col: 'vehicles', id: p[1], kind: p[2], due: p[3] };
@@ -136,9 +136,9 @@ function signalFor(task, recs) {
     return n2 === 0 ? { ok: true, why: 'wk.birth_blank 0' } : { ok: false, why: 'wk.birth_blank ' + n2 };
   }
   if (k.dom === 'cert') return certSignal(task, k, recs);   // P1 판19 — recs.__rows.proof(증빙 보관함 색인, 읽기 실패 = null) · recs.__certOpen(plan이 싣는다)
-  if (k.dom === 'licduty') return licDutySignal(task, k, recs);
+  if (k.dom === 'licduty') return licDutySignal(task, k, recs);   // P1 판20 — recs.__rows.lic_duties(의무 대장 행, 크론이 싣는다 · 못 읽음 = 신호 없음)
   if (k.dom === 'hr') return { ok: false, why: 'manual' };   // C185 판2: 입·퇴사 체크 항목은 사람이 [완료]
-  if (k.dom === 'acct') return acctSignal(k, recs);   // C185 판2: 입사 계정 = 그 직원의 승인 기기 1대 이상(크론이 기기 레코드를 싣는다 · 못 읽음·이번 회차 안 읽음 = 신호 없음)   // P1 판20 — recs.__rows.lic_duties(의무 대장 행, 크론이 싣는다 · 못 읽음 = 신호 없음)
+  if (k.dom === 'acct') return acctSignal(k, recs);   // C185 판2: 입사 계정 = 그 직원의 승인 기기 1대 이상(크론이 기기 레코드를 싣는다 · 못 읽음·이번 회차 안 읽음 = 신호 없음)
   const rec = ((recs || {})[k.col] || {})[k.id];
   if (!rec) return { ok: false, why: 'no_record' };
   if (k.dom === 'veh' || k.dom === 'lic') {

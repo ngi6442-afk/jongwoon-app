@@ -541,6 +541,8 @@
     .item-title{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
     .item-meta{white-space:normal;}
   }
+  /* C185 판2 검토 4(11/19): 아랫줄로 내려간 버튼 줄이 카드보다 넓으면(폰 지시 카드 — 기한·완료·서류·보류·수정·내 것 아님·인사 카드 = 351px > 카드 346px) 줄 안에서 접힘. 카드 폭 안에 드는 줄은 그대로 */
+  @media (max-width:640px){ .task-ctrl{max-width:100%;} }
   .mini-btn{
     border:1px solid var(--line);
     background:#fff;
@@ -5116,7 +5118,8 @@
       var editBtn = canDo("tasks") ? '<button class="mini-btn" data-task-edit="' + t.id + '">수정</button>' : '';
       var docBtn = (t.proc_id && canDo("con") && t.pipe !== "chg" && !csTaskChg(t)) ? '<button class="mini-btn" data-task-doc="' + t.proc_id + '" data-task-doc-stage="' + esc(t.stage_name||"") + '">📄 서류</button>' : '';
       var notMineBtn = taskNotMineBtn(t);   // v413
-      ctrl = '<div class="task-ctrl">' + ddayBadge + doneBtn + docBtn + holdBtn + editBtn + notMineBtn + '</div>';
+      var hrCardBtn = (/^(?:hr|acct):[^:]+:/.test(String(t.auto_key || "")) && isAdmin()) ? '<button class="mini-btn" data-task-hrcard="' + esc(t.id) + '">인사 카드</button>' : "";   // C185 판2 검토 4: 폰 지시 카드에도(관리자 — 인사 탭과 같은 판정)
+      ctrl = '<div class="task-ctrl">' + ddayBadge + doneBtn + docBtn + holdBtn + editBtn + notMineBtn + hrCardBtn + '</div>';
     }
 
     var cls = "item task-item" + (isDone ? " checked" : "") + (t.status === "hold" ? " hold" : "") + (t.status === "review" ? " review" : "");
@@ -5600,6 +5603,9 @@
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-task-done]"), function(el){
       el.addEventListener("click", function(e){ e.stopPropagation(); toggleTaskDone(el.getAttribute("data-task-done")); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-task-hrcard]"), function(el){   // C185 판2 검토 4: 폰 지시 카드 [인사 카드]
+      el.addEventListener("click", function(e){ e.stopPropagation(); var t = findTask(el.getAttribute("data-task-hrcard")), hm = t && /^(?:hr|acct):([^:]+):/.exec(String(t.auto_key || "")); if (hm && isAdmin()) taskHrCardOpen(hm[1]); });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-task-notmine]"), function(el){   // v413
       el.addEventListener("click", function(e){ e.stopPropagation(); taskNotMine(el.getAttribute("data-task-notmine")); });
@@ -33890,7 +33896,7 @@ function dutyStage(nx){
     if (!s) return "아직 연습 집계가 없습니다(다음 평일 08:10 정기업무 봇 뒤에 채워짐).";
     if (s.ready === false) return "준비 중 — 계산이 아직 들어오지 않아 켤 수 없습니다.";
     if (s.skip) return (EVR_STOP[s.skip] || EVR_SKIP[s.skip] || "이번에는 세지 못했습니다") + ".";
-    var p = [(s.win ? "최근 " + s.win + "일에 생긴 일을 켰다면 " : "오늘 실행에 ") + "지시 " + (Number(s.tasks) || 0) + "건(사건 " + (Number(s.events) || 0) + ")"];
+    var p = [(s.win ? "최근 " + s.win + "일 기준으로 켰다면 " : "오늘 실행에 ") + "지시 " + (Number(s.tasks) || 0) + "건(사건 " + (Number(s.found !== undefined ? s.found : s.events) || 0) + ")"];   // 판2 검토 6: 사건 = 계획 함수가 낸 사건 수(담당이 없어 만들 지시가 0이어도)
     (s.who || []).forEach(function(w){ p.push((memberName(w.id) || "배정표 담당") + " " + (Number(w.n) || 0) + "건"); });
     if (s.no_who) p.push("담당이 없어 만들지 않을 " + s.no_who + "건");
     if (s.no_due) p.push("기한 없이 " + s.no_due + "건");
@@ -33906,11 +33912,19 @@ function dutyStage(nx){
   }
   // '켤까요?' 줄 — 검토 G: [ㄱ]은 누르는 즉시 켬(예고는 사람이 먼저) · 만들 지시 0건인데 담당이 없어 못 만드는 것만 있으면 [ㄱ]을 닫고 배정표 담당부터
   function evrLiveRow(b, k, nm, s){
+    // C185 판2 검토 3: 막힘 = 그 규칙이 쓰는 배정표 줄(서버 meta_srv.uses · autotask_get assign_state)의 담당이 비었거나 재직자 아님·못 읽음 — 연습 요약 수와 상관없이 · 연습 집계를 못 했으면(skip) 켬을 추천하지 않음
+    //   셈: 빈 배정표 줄('담당이 비어 있습니다')이 이미 '정할 것'에 있으면 이 줄은 세지 않음 · 담당이 퇴사자 등이라 배정표 줄이 안 뜨면 이 줄을 셈
+    var uses = ((b.meta_srv || {})[k] || {}).uses || [], ast = b.assign_state || {};
+    var miss = uses.filter(function(p){ return ast[p] !== "ok"; });
     var noWhoOnly = !(Number(s.tasks) > 0) && Number(s.no_who) > 0 && !s.skip;
-    return { id: "autotask:" + k + ":live", q: nm + " — 켤까요?", recTxt: noWhoOnly ? "그대로(담당 먼저)" : "켬(실제 발행)", curTxt: "연습(발행 0)", args: { rule: k, mode: "live" }, def: "keep",
+    var needWho = miss.length > 0 || noWhoOnly, skipped = !!s.skip, blocked = needWho || skipped;
+    var row = { id: "autotask:" + k + ":live", q: nm + " — 켤까요?", recTxt: needWho ? "그대로(담당 먼저)" : (skipped ? "그대로(다음 집계 뒤)" : "켬(실제 발행)"), curTxt: "연습(발행 0)", args: { rule: k, mode: "live" }, def: "keep",
       block: noWhoOnly ? "배정표 담당을 먼저 정해 주세요" : "",
-      card: noWhoOnly ? "assignCard" : "", nocount: noWhoOnly,   // C185 판2(ⓙ 5): 막힌 줄 = [카드 열기]가 배정표 카드로 · 같은 빈 담당(배정표 줄)과 두 번 세지 않음
-      why: noWhoOnly ? evrSumTxt(s) + " 담당이 없어 켜도 지시가 생기지 않습니다 — 배정표 카드에서 담당을 먼저 정해 주세요." : evrSumTxt(s) + " [ㄱ]을 누르면 바로 켜지고 다음 평일 08:10 실행부터 지시가 생깁니다(켠 뒤에 생긴 일만 — 지난 일 소급 없음). 직원에게 새로 가는 알림이라 누르기 사흘 전에 예고해 주세요. 되돌리기: 이 화면 '범위 밖 자동 지시 규칙' 카드 [연습으로]·[끄기](이미 생긴 지시는 남음).", setBase: b.updated_at || 0 };
+      card: needWho ? "assignCard" : "pmconChk-evrules", nocount: needWho && miss.length > 0 && miss.every(function(p){ return ast[p] === "empty"; }),   // 검토 5: 막히지 않은 줄의 [카드 열기] = 이 화면 점검 카드
+      why: blocked ? evrSumTxt(s) : evrSumTxt(s) + " [ㄱ]을 누르면 바로 켜지고 다음 평일 08:10 실행부터 지시가 생깁니다(켠 뒤에 생긴 일만 — 지난 일 소급 없음). 직원에게 새로 가는 알림이라 누르기 사흘 전에 예고해 주세요. 되돌리기: 이 화면 '범위 밖 자동 지시 규칙' 카드 [연습으로]·[끄기](이미 생긴 지시는 남음).", setBase: b.updated_at || 0 };
+    if (!row.block && needWho) row.block = "배정표 담당을 먼저 정해 주세요";   // 판2 검토 3: 배정표 줄 빈칸·퇴사자·못 읽음(위 block 줄 = 요약이 담당 없음뿐 — 판1 그대로)
+    else if (!row.block && skipped) row.block = "이번 연습 집계를 하지 못했습니다 — 다음 집계 뒤에 정해 주세요";
+    return row;
   }
   function evrRows(b){
     var out = [], rules = b.rules || {}, ms = b.meta_srv || {}, dr = (b.dry && b.dry.rules) || {};

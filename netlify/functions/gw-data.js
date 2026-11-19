@@ -85,6 +85,16 @@ function taskHrHiddenFor(member, t) {
   return true;
 }
 // 비관리자에게 숨는 지시 = 기성 연동 지시(v464 — 기성 숨김 직원) ∨ 입·퇴사 지시(C185 판2). 읽기 거름·저장 이월이 이 한 함수를 부른다
+// C185 판2 검토 8: 입·퇴사 지시의 공개 범위는 서버가 늘 [지금 담당] 하나(담당이 비면 [] — taskHrHiddenFor·화면 taskVisible이 관리자만 보게 함)
+function hrScopeFix(items) {
+  let n = 0;
+  (items || []).forEach(function (t) {
+    if (!t || typeof t !== 'object' || !/^(?:hr|acct):/.test(String(t.auto_key || ''))) return;
+    const want = (t.who_id && t.who_id !== '__all__') ? [String(t.who_id)] : [];
+    if (JSON.stringify(t.scope || []) !== JSON.stringify(want)) { t.scope = want; n++; }
+  });
+  return n;
+}
 function taskHiddenFor(member, t) { return taskRecHiddenFor(member, t) || taskHrHiddenFor(member, t); }
 // 인가된 기기만 데이터 접근. 관리자는 항상 허용.
 async function deviceApproved(event, member) {
@@ -469,8 +479,8 @@ async function handleSave(event, d, R) {
     if (prevReadFailed) return jr(500, { status: 'ERROR', error_code: 'PREV_READ_FAILED', request_id: R });
     const hidOld = {}; oldItems.forEach(function (o) { if (o && o.id && taskHiddenFor(c.member, o)) hidOld[o.id] = o; });
     const seenT = {};
-    doc.items = doc.items.map(function (t) { if (t && t.id && hidOld[t.id]) { seenT[t.id] = 1; return hidOld[t.id]; } return t; })
-      .filter(function (t) { return !(t && taskHiddenFor(c.member, t) && !(t.id && hidOld[t.id])); });   // 서버에 없던 기성 연동 지시를 이 직원이 새로 만들 길은 없음(입금확인·미수 45일은 관리자·기성 화면에서) — 버림
+    doc.items = doc.items.map(function (t) { if (t && t.id && hidOld[t.id]) { if (seenT[t.id]) return null; seenT[t.id] = 1; return hidOld[t.id]; } return t; })   // 판2 검토 10: 같은 숨은 id 두 번 = 한 벌
+      .filter(function (t) { return t !== null && !(t && taskHiddenFor(c.member, t) && !(t.id && hidOld[t.id])); });   // 서버에 없던 기성 연동 지시를 이 직원이 새로 만들 길은 없음(입금확인·미수 45일은 관리자·기성 화면에서) — 버림
     Object.keys(hidOld).forEach(function (id) { if (!seenT[id]) doc.items.push(hidOld[id]); });
   }
   if (col === 'tasks' && Array.isArray(doc.items)) {
@@ -526,6 +536,7 @@ async function handleSave(event, d, R) {
     const blankBeforeS = {}; doc.items.forEach(function (t) { if (t && t.auto_key && !t.who_id) blankBeforeS[t.id] = 1; });
     const notLdS = function (t) { return !(t && LD.isDutyKey(t.auto_key)); };   // P1 판20 검토 B2: 인허가 기한 지시의 담당은 정기 실행(licduty — 재직 확인·옮기기)만 채운다
     try { const at = await assignRead(store(DATA)); if (Object.keys(at.rules || {}).length) { const ms = await assignMembers(); if (ms) assignFill(doc.items.filter(notLdS), at.rules, assignNames(ms)); } } catch (e) {}
+    hrScopeFix(doc.items);   // C185 판2 검토 8: 입·퇴사 지시(hr:·acct:) 공개 범위 = 서버가 지금 담당 하나로(담당이 넓혀 보내도·담당이 바뀌어도 · 비면 관리자만)
     // v396 알림: 클라 생성기(runAutoTaskGen·recOverdueGen·runBidQualGen)가 만든 새 자동 지시 + 이번에 채워진 공란 → 담당자 본인 1발(설정 assignee일 때만)
     const newAutoS = doc.items.filter(function (t) { return t && t.auto_key && t.who_id && notLdS(t) && (!oldByA[t.id] || blankBeforeS[t.id]); });
     if (newAutoS.length) await notifyAutoCreated(store(DATA), newAutoS, c.member.name);
@@ -1099,6 +1110,7 @@ async function handleAutotaskIngest(event, d, R) {
   const notLd = function (t) { return !(t && LD.isDutyKey(t.auto_key)); };   // P1 판20: 인허가 기한 지시의 담당·알림은 licduty 한 길(재직 확인·옮기기) — 일반 배정 채움·알림에서 뺀다
   const blankBefore = {}; doc.items.forEach(function (t) { if (t && t.auto_key && !t.who_id) blankBefore[t.id] = 1; });
   if (!quiet) try { const at = await assignRead(st); if (Object.keys(at.rules || {}).length) { const ms = await assignMembers(); if (ms) assigned = assignFill(doc.items.filter(notLd), at.rules, assignNames(ms)); } } catch (e) {}
+  hrScopeFix(doc.items);   // C185 판2 검토 8: 배정 채움으로 담당이 바뀐 입·퇴사 지시의 공개 범위도 지금 담당으로(공개 범위만 바뀌면 쓰지 않음 — 담당이 바뀐 날은 assigned로 씀)
   // v396 알림: 이번에 생긴 항목 + 이번에 담당이 채워진 항목 → 담당자 본인 1발(설정 assignee일 때만)
   const notifyItems = quiet ? [] : doc.items.filter(function (t) { return t && t.auto_key && t.who_id && notLd(t) && !licNew[t.id] && (t.created === today && !have0[t.auto_key] || blankBefore[t.id]); });   // P1 판20 인허가 기한 지시는 아래 licDutyNotify 한 길
   for (let i = notifyItems.length - 1; i >= 0; i--) if (srvNew.indexOf(notifyItems[i]) >= 0) notifyItems.splice(i, 1);   // C185 판1 검토 A: 실행기가 만든 지시는 저장 뒤 알림(아래) — 일반 알림 길(저장 앞 · 종전 그대로)에서 뺌
@@ -1159,6 +1171,10 @@ async function licDutyNotify(byWho, today) {
 // C185 판1 서버 규칙 실행기 — ① 입력 한 번 모으기(evInput: 규칙들이 읽는 것의 합집합만 — 명부 push.loadMembers 한 번 · 배정표 엄격 · 차량·대장·계약 · 인사·차량 근거 승격)
 //   ② 규칙별 계획 함수(_lib/evrules RULES[id].plan — 판2~6) ③ 적용(evExec → EV.run: 사건 10건 막이 · 끼워 넣은 값만 명부 이름 대조 · 담당 = 배정표 재직자 · 옛 지시 표시 붙이기·떼기).
 //   ingest(write 참 — live 규칙)와 dry_put(write 거짓 — 요약)이 같은 길. 입력 하나를 못 읽으면 그 입력을 쓰는 규칙만 건너뜀(skip) — 다른 규칙은 진행.
+async function bgReadBad(st, keys) {   // 근거 승격 표시·근거 문서 — 없음(ok·null · 시험 가짜 저장소 NOT_FOUND)은 실패가 아님 · 그 밖의 못 읽음만 참
+  for (const k of [keys.flag, keys.bg]) { const r = await blobGet(st, k); if (!r.ok && r.code !== 'NOT_FOUND') return true; }
+  return false;
+}
 async function evInput(st, ids) {
   const need = {}; ids.forEach(function (k) { EV.needsOf(k).forEach(function (n) { need[n] = 1; }); });
   const inp = {};
@@ -1170,8 +1186,8 @@ async function evInput(st, ids) {
       else if (n === 'vehicles') inp.vehicles = await col('vehicles');
       else if (n === 'sites') inp.sites = await col('asbestos');
       else if (n === 'contracts') inp.contracts = await col('contracts');
-      else if (n === 'hrbg') inp.hrbg = { ok: true, data: await hrBgState(st) };
-      else if (n === 'vehbg') inp.vehbg = { ok: true, data: await vehBgState(st) };
+      else if (n === 'hrbg') inp.hrbg = (await bgReadBad(st, HR_BG_KEYS)) ? { ok: false, why: 'HRBG_READ_FAILED' } : { ok: true, data: await hrBgState(st) };   // 판2 검토 2: 못 읽음 = 건너뜀(미승격으로 보지 않음)
+      else if (n === 'vehbg') inp.vehbg = (await bgReadBad(st, VEH_BG_KEYS)) ? { ok: false, why: 'VEHBG_READ_FAILED' } : { ok: true, data: await vehBgState(st) };
       else inp[n] = { ok: false, why: 'READ_FAILED' };
     } catch (e) { inp[n] = { ok: false, why: 'READ_FAILED' }; }
   }
@@ -1197,12 +1213,13 @@ function evExec(inp, ids, modes, since, tasks, today, write) {
     const data = { tasks: tasks };
     Object.keys(inp).forEach(function (n) { if (inp[n] && inp[n].ok) data[n] = inp[n].data; });
     // 검토 D: 규칙마다 따로 — 이 규칙이 쓰다 예외가 나면 이번에 넣은 지시(뒤에 붙인 줄)와 붙이고 뗀 표시(그 규칙 키 꼴 지시의 제목·본문·updated)만 되돌리고 그 규칙만 ERROR
-    const n0 = tasks.length, back = [];
+    const n0 = tasks.length, back = [], dueBack = write ? tasks.map(function (t) { return [t, t && t.due, t && t.updated]; }) : [];   // 판2 검토 2: 빈 기한 채움(다른 키 꼴 지시도 — 판4·6)도 되돌림에 포함
     if (write) tasks.forEach(function (t) { if (t && EV.ruleOfKey(t.auto_key) === k) back.push([t, t.title, t.detail, t.updated]); });
     let o;
     try { o = EV.run(k, data, cx.ctx, tasks, { rules: inp.assign.data, active: active, names: names, mkId: function () { return 't' + crypto.randomBytes(6).toString('hex'); } }, write); }
     catch (e) {
       if (write) { tasks.length = n0; back.forEach(function (b) { b[0].title = b[1]; b[0].detail = b[2]; b[0].updated = b[3]; }); }
+      if (write) dueBack.forEach(function (b) { if (b[0] && (b[0].due !== b[1] || b[0].updated !== b[2])) { if (b[1] === undefined) delete b[0].due; else b[0].due = b[1]; b[0].updated = b[2]; } });
       res[k] = EV.skipSum(mode, 'ERROR'); txts.push(k + ' 건너뜀(ERROR)'); return;
     }
     res[k] = o.sum; o.made.forEach(function (t) { made.push(t); }); changed += o.changed;
@@ -2081,6 +2098,7 @@ async function handleTaskNotmine(event, d, R) {
   if (!t.who_id || t.who_id !== c.member.id) return jr(403, { status: 'FORBIDDEN', error_code: 'NOT_ASSIGNEE', request_id: R });
   const now = Date.now(); const today = new Date(now + 9 * 3600000).toISOString().slice(0, 10); const prev = t.who_id;
   t.who_id = ''; t.who = ''; t.who_by = 'notmine'; t.notmine = { by: c.member.id, ts: now, prev: prev }; t.updated = today;
+  hrScopeFix([t]);   // C185 판2 검토 8: 입·퇴사 지시면 공개 범위도 비움(옛 담당이 계속 보지 않게 — 관리자만)
   doc.updated_by = c.member.id; doc.updated_at = now;
   const w = await blobSet(st, colKey('tasks'), doc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
@@ -3023,8 +3041,8 @@ const AUTOTASK_SRV_RULES = { lic_duty: { label: '인허가 의무 기한 지시(
 // C185 판1 범위 밖 규칙 5줄(서버가 셈 · 같은 스위치 문서 · 기본 dry) — ready = 계획 함수가 들어왔는지(_lib/evrules · 판2~6이 채움). 준비 안 된 규칙을 live로 바꾸는 저장 = 400 RULE_NOT_READY.
 //   라벨은 PM 콘솔·카드·감사에 보이는 글 — 규칙 id·키 꼴을 넣지 않는다(키 꼴은 key 칸 — 화면이 쓰지 않음).
 Object.assign(AUTOTASK_SRV_RULES, {
-  hr_join: { label: '입사 체크리스트 지시(입사일 기준 · 인사·계정 담당)', key: 'hr:<회원>:join:<입사일>:<번호> · acct:<회원>:join:<입사일>', prefix: 'hr:', ready: EV.ready('hr_join') },
-  hr_leave: { label: '퇴사 체크리스트 지시(퇴사일 기준 · 인사·계정 담당)', key: 'hr:<회원>:leave:<퇴사일>:<번호> · acct:<회원>:leave:<퇴사일>', prefix: 'hr:', ready: EV.ready('hr_leave') },
+  hr_join: { uses: ['hr:', 'acct:'], label: '입사 체크리스트 지시(입사일 기준 · 인사·계정 담당)', key: 'hr:<회원>:join:<입사일>:<번호> · acct:<회원>:join:<입사일>', prefix: 'hr:', ready: EV.ready('hr_join') },
+  hr_leave: { uses: ['hr:', 'acct:'], label: '퇴사 체크리스트 지시(퇴사일 기준 · 인사·계정 담당)', key: 'hr:<회원>:leave:<퇴사일>:<번호> · acct:<회원>:leave:<퇴사일>', prefix: 'hr:', ready: EV.ready('hr_leave') },
   veh_ceq31: { label: '건설기계 정기검사 지시 31일 전(차량 담당)', key: 'veh:<id>:insp:<만료일>', prefix: 'veh:', ready: EV.ready('veh_ceq31') },
   ks_report: { label: '현장 실적 신고 지시(매년 1/15~2/15 · 실적 신고 담당)', key: 'ks:<신고 연도>', prefix: 'ks:', ready: EV.ready('ks_report') },
   veh_event: { label: '차량 매각·말소 지시(사건일 기준 · 차량 담당)', key: 'veh:<id>:ev:<sold|dereg>:<사건일>:<main|waste>', prefix: 'veh:', ready: EV.ready('veh_event') },
@@ -3118,7 +3136,17 @@ async function handleAutotaskGet(event, d, R) {
     if (items.length) { const r = await blobGet(st, colKey('vehicles')); const by = {}; ((r.ok && r.data && r.data.items) || []).forEach(function (v) { if (v && v.id) by[v.id] = v; });
       veh_items = items.slice(0, 60).map(function (it) { const v = by[it.id] || {}; return { id: it.id, no: String(v.no || ''), due: it.due, days: it.days, state: String(v.state || ''), kind: String(v.kind || '').slice(0, 20) }; }); }
   } catch (e) {}
-  return jr(200, Object.assign({ status: 'OK', request_id: R, dry: dry, veh_items: veh_items }, autotaskPublic(a)));
+  // C185 판2 검토 3: 범위 밖 규칙이 쓰는 배정표 줄의 지금 상태(ok = 재직 담당 · empty = 빈칸 · gone = 담당이 재직자 아님 · unknown = 못 읽음) — 콘솔 '켤까요?' 줄이 이것으로 막힘을 정함(이름 없음)
+  const assign_state = {};
+  try {
+    const as = await licAssignStrict(st), ms = as.ok ? await assignMembers() : null;
+    Object.keys(AUTOTASK_SRV_RULES).forEach(function (k) { (AUTOTASK_SRV_RULES[k].uses || []).forEach(function (pfx) {
+      if (!as.ok || !ms) { assign_state[pfx] = 'unknown'; return; }
+      const w = as.rules && as.rules[pfx] && as.rules[pfx].who_id ? String(as.rules[pfx].who_id) : '';
+      assign_state[pfx] = !w ? 'empty' : (hasOwn(ms, w) ? 'ok' : 'gone');
+    }); });
+  } catch (e) {}
+  return jr(200, Object.assign({ status: 'OK', request_id: R, dry: dry, veh_items: veh_items, assign_state: assign_state }, autotaskPublic(a)));
 }
 async function handleAutotaskSet(event, d, R) {
   const c = await currentMember(event);

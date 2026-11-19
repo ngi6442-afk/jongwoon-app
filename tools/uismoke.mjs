@@ -5772,7 +5772,8 @@ try {
     JSON.stringify({ cg9, a: ca9.slice(1, 3), ft9, pc9, dc9, st9c, ta9c }));
 
   // ⑩ 홈·내 업무 행 함수 무변 — taskRowHtml·myTaskRowHtml·bindTaskHandlers·renderMyTasks·myOpenTasks = v438(43e61b0) 원문 글자째(해시) · 표 구간이 이 함수들을 다시 정의하지 않음
-  const ROWSHA39 = { taskRowHtml: '7551762e4f45f494ca6c5b613d7298e0c7a80e4e8b2521d919e7e90dc870f068', myTaskRowHtml: '6ca787b55b82ea05024badf543c00e1ab70bbf8e08a13ffe5fbe6df22f90347f', bindTaskHandlers: '0b30c25b5b80cb79b12adafdd60d85c24574d1f5088e95ce366d70f9cfca531e',
+  //   C185 판2 검토 4: taskRowHtml·bindTaskHandlers 해시 갱신 — 폰 지시 카드 [인사 카드](hr:·acct: 지시·관리자) 단추 한 줄·누름 길 한 묶음만 더함(그 둘을 걷으면 옛 해시와 같음)
+  const ROWSHA39 = { taskRowHtml: 'c602321b189d1d602e12674363af3ff665079d49e0a3d832de8ead79f3ef5158', myTaskRowHtml: '6ca787b55b82ea05024badf543c00e1ab70bbf8e08a13ffe5fbe6df22f90347f', bindTaskHandlers: '7ff15af70145c0b2db93fcf83ad0c11ea10a05901aac653ac89009ff5d7f9b88',
     renderMyTasks: 'e97e59dd3ce324be31863f0f572f3b5e1912e8eafabd3e038c3a996f9d61c88f', myOpenTasks: 'fb2988cb6985492ae6103c7c5a7da5e7b739d3224ff0ad19596fac7d786ed8dc' };
   const rowBad39 = Object.keys(ROWSHA39).filter((n) => sha39(body39(n)) !== ROWSHA39[n] || (html.match(new RegExp('function ' + n + '\\(', 'g')) || []).length !== 1);
   T('v439 ⑩ 홈·내 업무 행 함수 무변: taskRowHtml·myTaskRowHtml·bindTaskHandlers·renderMyTasks·myOpenTasks = v438(43e61b0) 원문 글자째(sha256) · 파일에 한 번씩만 정의(표 구간은 칸·펼침 함수를 새로 씀)',
@@ -19723,7 +19724,7 @@ try {
     const b1 = mk({}).rows(BC({ ready: { hr_join: true }, dry: { hr_join: SUMC() } }));
     const L = b1.find((r) => r.id === 'autotask:hr_join:live');
     o.live = b1.length === 1 && !!L && L.def === 'keep' && JSON.stringify(L.args) === '{"rule":"hr_join","mode":"live"}' && L.setBase === 44 && L.q === LBL.hr_join + ' — 켤까요?'
-      && /최근 30일에 생긴 일을 켰다면 지시 8건\(사건 1\)/.test(L.why) && /담당가 7건/.test(L.why) && /배정표 담당 1건/.test(L.why) && /켠 날보다 앞선 일이라 뺀 1건/.test(L.why) && /사흘 전에 예고/.test(L.why) && /\[ㄱ\]을 누르면 바로 켜지고 다음 평일 08:10 실행부터/.test(L.why) && /\[연습으로\]·\[끄기\]/.test(L.why) && !IDRE.test(L.why + L.q) && !L.block && L.recTxt === '켬(실제 발행)';
+      && /최근 30일 기준으로 켰다면 지시 8건\(사건 1\)/.test(L.why) && /담당가 7건/.test(L.why) && /배정표 담당 1건/.test(L.why) && /켠 날보다 앞선 일이라 뺀 1건/.test(L.why) && /사흘 전에 예고/.test(L.why) && /\[ㄱ\]을 누르면 바로 켜지고 다음 평일 08:10 실행부터/.test(L.why) && /\[연습으로\]·\[끄기\]/.test(L.why) && !IDRE.test(L.why + L.q) && !L.block && L.recTxt === '켬(실제 발행)';
     const b2 = mk({}).rows(BC({ rules: { ks_report: 'off' } }));
     o.off = b2.length === 1 && b2[0].id === 'autotask:ks_report:dry' && b2[0].def === 'rec' && JSON.stringify(b2[0].args) === '{"rule":"ks_report","mode":"dry"}';
     const b3 = mk({}).rows(BC({ ready: { veh_event: true }, rules: { veh_event: 'live' }, dry: { veh_event: SUMC({ mode: 'live', win: 0, skip: 'TOO_MANY', tasks: 0 }) } }));
@@ -19878,18 +19879,27 @@ try {
     [/var EVR_STOP = \{[^}]+\};/, /EVR_STOP\.TEXT_LONG = "[^"]+";/, /var EVR_SKIP = \{[^}]+\};/, /var evrLast = null, evrCardBusy = false;/, /var AUTO_RULE_ORDER = \[[^\]]+\];/, /var PMCON_PLAN = \{[^\n]+\};/].map((re) => stP2(re, src)).join('\n'),
     FN3.map((n) => fnP2(n, src)).join('\n'),
     'return { rows: pmconRowsAutotask, card: evrCardRender, setSeq: function(n){ pmconSeq = n; } };'].join('\n'));
-  const BJ = (o) => { o = o || {}; const ms = { lic_duty: { label: '인허가' }, hr_join: { label: '입사 체크리스트 지시', ready: true }, hr_leave: { label: '퇴사 체크리스트 지시', ready: false } };
-    return { rules: Object.assign({ lic_duty: 'live', hr_join: 'dry', hr_leave: 'dry' }, o.rules || {}), since: o.since || {}, meta: {}, meta_srv: ms, updated_at: 44, dry: o.dry === null ? null : { rules: Object.assign({}, o.dry || {}) } }; };
+  const BJ = (o) => { o = o || {}; const ms = { lic_duty: { label: '인허가' }, hr_join: { label: '입사 체크리스트 지시', ready: true, uses: ['hr:', 'acct:'] }, hr_leave: { label: '퇴사 체크리스트 지시', ready: false, uses: ['hr:', 'acct:'] } };
+    return { rules: Object.assign({ lic_duty: 'live', hr_join: 'dry', hr_leave: 'dry' }, o.rules || {}), since: o.since || {}, meta: {}, meta_srv: ms, updated_at: 44, assign_state: o.ast || { 'hr:': 'ok', 'acct:': 'ok' }, dry: o.dry === null ? null : { rules: Object.assign({}, o.dry || {}) } }; };
   const SJ = (x) => Object.assign({ mode: 'dry', ready: true, win: 30, events: 1, tasks: 8, who: [{ id: 'u1', n: 8 }], no_who: 0, no_due: 0, marked: 0, unmarked: 0, gone: 0, old: 0, no_row: [], skip: '', ref: {} }, x || {});
   const chk3 = (src) => {
     const o = {}, mk = (x) => box3(src)(x || {});
     const r1 = mk().rows(BJ({ dry: { hr_join: SJ({ tasks: 0, events: 0, who: [], no_who: 8 }) } })).find((r) => r.id === 'autotask:hr_join:live');
-    o.blocked = !!r1 && r1.block === '배정표 담당을 먼저 정해 주세요' && r1.card === 'assignCard' && r1.nocount === true && r1.why.indexOf('[ㄱ]을 누르면') < 0 && /배정표 카드에서 담당을 먼저/.test(r1.why);
+    o.blocked = !!r1 && r1.block === '배정표 담당을 먼저 정해 주세요' && r1.card === 'assignCard' && r1.nocount === false && r1.why.indexOf('[ㄱ]을 누르면') < 0 && r1.why.indexOf('담당을 먼저') < 0;   // 배정표는 재직 담당인데 요약에 담당 없음뿐 = 막힘·셈(배정표 줄이 안 뜸)
+    // 판2 검토 3: 운영 꼴 — 배정표 인사·계정 빈칸 + 최근 30일 대상 0명 = 막힘·셈에서 빠짐(빈 배정표 줄이 셈) · 담당이 퇴사자(gone)·못 읽음(unknown) = 막힘·셈 · 글은 요약 한 번(막힘 글은 화면이 덧붙임)
+    const z1 = mk().rows(BJ({ ast: { 'hr:': 'empty', 'acct:': 'empty' }, dry: { hr_join: SJ({ tasks: 0, events: 0, who: [], found: 0 }) } })).find((r) => r.id === 'autotask:hr_join:live');
+    const z2 = mk().rows(BJ({ ast: { 'hr:': 'ok', 'acct:': 'gone' }, dry: { hr_join: SJ() } })).find((r) => r.id === 'autotask:hr_join:live');
+    const z3 = mk().rows(BJ({ ast: { 'hr:': 'unknown', 'acct:': 'ok' }, dry: { hr_join: SJ() } })).find((r) => r.id === 'autotask:hr_join:live');
+    const z4 = mk().rows(BJ({ ast: { 'hr:': 'empty', 'acct:': 'gone' }, dry: { hr_join: SJ() } })).find((r) => r.id === 'autotask:hr_join:live');
+    o.assign = !!z1 && z1.block === '배정표 담당을 먼저 정해 주세요' && z1.recTxt === '그대로(담당 먼저)' && z1.nocount === true && z1.card === 'assignCard' && z1.why.indexOf('[ㄱ]을 누르면') < 0
+      && !!z2 && !!z2.block && z2.nocount === false && !!z3 && !!z3.block && z3.nocount === false && !!z4 && !!z4.block && z4.nocount === false;
+    const z5 = mk().rows(BJ({ dry: { hr_join: SJ({ tasks: 0, events: 0, who: [], no_who: 8, found: 1 }) } })).find((r) => r.id === 'autotask:hr_join:live');
+    o.found = !!z5 && /지시 0건\(사건 1\)/.test(z5.why);   // 판2 검토 6: 사건 = 계획 함수가 낸 수
     const r2 = mk().rows(BJ({ dry: { hr_join: SJ() } })).find((r) => r.id === 'autotask:hr_join:live');
-    o.open = !!r2 && !r2.block && !r2.nocount && !r2.card && r2.why.indexOf('[ㄱ]을 누르면 바로 켜지고') >= 0;
+    o.open = !!r2 && !r2.block && !r2.nocount && r2.card === 'pmconChk-evrules' && r2.recTxt === '켬(실제 발행)' && r2.why.indexOf('[ㄱ]을 누르면 바로 켜지고') >= 0;   // 판2 검토 5: [카드 열기] = 이 화면 점검 카드
     const r3 = mk().rows(BJ({ dry: { hr_join: SJ({ tasks: 0, events: 0, who: [], no_who: 2, skip: 'MEMBERS_UNAVAILABLE' }) } })).find((r) => r.id === 'autotask:hr_join:live');
     const r4 = mk().rows(BJ({ dry: { hr_join: SJ({ tasks: 0, events: 0, who: [], no_who: 0 }) } })).find((r) => r.id === 'autotask:hr_join:live');
-    o.edges = !!r3 && !r3.block && !!r4 && !r4.block;   // 판1 재확인 N27·N28: 건너뜀(skip) 있음·담당 없음 0 = 막지 않음
+    o.edges = !!r3 && r3.block === '이번 연습 집계를 하지 못했습니다 — 다음 집계 뒤에 정해 주세요' && r3.recTxt === '그대로(다음 집계 뒤)' && r3.nocount === false && !!r4 && !r4.block;   // 판2 검토 3: 건너뜀(skip) = 켬 추천 안 함 · 담당 없음 0·배정표 재직 = 막지 않음(N28)
     const r5 = mk().rows(BJ({ rules: { hr_join: 'live' }, dry: { hr_join: SJ({ mode: 'live', win: 0, skip: 'TEXT_LONG', tasks: 0 }) } })).find((r) => r.id === 'autotask:hr_join:dry');
     o.textLong = !!r5 && /길이 상한을 넘어 멈춰 있습니다/.test(r5.why);
     const c1 = mk({ seq: 3 }); c1.rows(BJ({ rules: { hr_join: 'live' }, dry: null })); const e1 = { innerHTML: '', querySelectorAll: () => [] }; c1.card(e1);
@@ -19901,22 +19911,47 @@ try {
   const R3 = chk3();
   const rp = fnP2('renderPmcon');
   const static3 = /var pn = pend\.filter\(function\(r\)\{ return !r\.nocount; \}\)\.length;/.test(rp) && rp.indexOf('hd.textContent = "정할 것 " + pn') > 0 && rp.indexOf('bd.textContent = String(pn)') > 0 && rp.indexOf('r.k = r.card ? Object.assign({}, k, { card: r.card }) : k;') > 0;
-  T('C185 판2 ③ 콘솔·카드(실행): 담당 없음뿐 켜기 줄 = [ㄱ] 닫힘·막힘 글(\'[ㄱ]을 누르면…\' 없음)·[카드 열기] = 배정표 카드·셈에서 빠짐(ⓙ 5 — renderPmcon 머리·배지 = 셈 빠진 수) · 만들 지시 있음 = 종전 · 건너뜀 있음·담당 없음 0 = 막지 않음(ⓙ 9) · 글 길이 멈춤 줄(ⓙ 3) · 켜졌는데 요약 없음 = "켠 뒤 첫 집계 전"(ⓙ 6) · 입사 참고 수 글(입사일 빈칸·승격 전·지난 12개월 — 내부 칸 이름 0)',
+  T('C185 판2 ③ 콘솔·카드(실행): 켜기 줄 막힘 = 배정표 상태 직접(검토 3 — 쓰는 줄 인사·계정 중 빈칸·퇴사자·못 읽음 하나라도 = [ㄱ] 닫힘·[카드 열기] 배정표 · 빈칸뿐 = 셈에서 빠짐(빈 배정표 줄이 셈) · 퇴사자·못 읽음 섞임 = 셈) · 배정표 재직이어도 요약이 담당 없음뿐 = 막힘·셈 · 건너뜀(skip) = 켬 추천 안 함 · 막힌 줄 글 = 요약 한 번(막힘 글 겹침 0) · 막히지 않은 줄 [카드 열기] = 점검 카드(검토 5) · 사건 = found(검토 6) · 글 길이 멈춤 줄 · 켜졌는데 요약 없음 = "켠 뒤 첫 집계 전" · 입사 참고 수 글(내부 칸 이름 0) · renderPmcon 셈·카드 자리',
     R3.ok && static3, JSON.stringify(Object.assign({ static3 }, R3)));
   const mutH2 = (from, to) => { if (html.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); return html.replace(from, () => to); };
   const MV = [['if (t && /^(?:hr|acct):/.test(String(t.auto_key || ""))) return !!(t.scope && t.scope.length && scopeIncludes(t.scope, curMember()));', ''],
     ['return !!(t.scope && t.scope.length && scopeIncludes(t.scope, curMember()));', 'return scopeIncludes(t.scope, curMember());']];
   const MB = [['if (/^(?:hr|acct):[^:]+:/.test(String(t.auto_key || "")) && isAdmin()) b.push(', 'if (/^(?:hr|acct):[^:]+:/.test(String(t.auto_key || ""))) b.push('],
     ['var hm = /^(?:hr|acct):([^:]+):/.exec(String(t.auto_key || "")); if (hm && isAdmin()) taskHrCardOpen(hm[1]);', 'taskHrCardOpen(String(t.auto_key || "").split(":")[1]);']];
-  const M3 = [['card: noWhoOnly ? "assignCard" : "", nocount: noWhoOnly,', 'card: "", nocount: false,'],
-    ['why: noWhoOnly ? evrSumTxt(s) + " 담당이 없어 켜도 지시가 생기지 않습니다', 'why: false ? evrSumTxt(s) + " 담당이 없어 켜도 지시가 생기지 않습니다'],
+  const M3 = [['var miss = uses.filter(function(p){ return ast[p] !== "ok"; });', 'var miss = [];'], ['nocount: needWho && miss.length > 0 && miss.every(function(p){ return ast[p] === "empty"; }),', 'nocount: needWho,'],
+    ['card: needWho ? "assignCard" : "pmconChk-evrules",', 'card: needWho ? "assignCard" : "",'], ['why: blocked ? evrSumTxt(s) : evrSumTxt(s) + " [ㄱ]', 'why: evrSumTxt(s) + " [ㄱ]'],
+    ['needWho = miss.length > 0 || noWhoOnly, skipped = !!s.skip,', 'needWho = miss.length > 0 || noWhoOnly, skipped = false,'], ['if (!row.block && needWho) row.block = ', 'if (false) row.block = '], ['else if (!row.block && skipped) row.block = ', 'else if (false) row.block = '], ['(Number(s.found !== undefined ? s.found : s.events) || 0)', '(Number(s.events) || 0)'],
     ['var noWhoOnly = !(Number(s.tasks) > 0) && Number(s.no_who) > 0 && !s.skip;', 'var noWhoOnly = !(Number(s.tasks) > 0) && Number(s.no_who) >= 0;'],
     ['if (m.ready === true && cur === "live" && !s) line =', 'if (false) line ='], ['EVR_STOP.TEXT_LONG = "지시 글이 길이 상한을 넘어 멈춰 있습니다";', 'EVR_STOP.TEXT_LONG = "x";'],
     ['if (Number(rf.no_hire)) p.push(', 'if (false) p.push(']];
+  // ④ 폰 지시 카드 [인사 카드](검토 4) — taskRowHtml의 단추 문장·bindTaskHandlers의 누름 묶음을 그대로 꺼내 실행 · ctrl 줄에 단추가 붙는지
+  const box4 = (src) => new Function('U', 'LOG', [
+    'function esc(s){ return String(s); } function isAdmin(){ return !!(U && U.admin); } function findTask(id){ return LOG.tasks[id]; } function taskHrCardOpen(mid){ LOG.open.push(mid); }',
+    'function btn(t){ ' + stP2(/var hrCardBtn = [^\n]+/, fnP2('taskRowHtml', src)) + '\n return hrCardBtn; }',   // 꺼낸 줄 끝 주석이 뒤를 삼키지 않게 줄바꿈
+    'function bind(host){\n' + stP2(/Array\.prototype\.forEach\.call\(host\.querySelectorAll\("\[data-task-hrcard\]"\)[\s\S]*?\n\s*\}\);/, fnP2('bindTaskHandlers', src)) + '\n }',
+    'return { btn: btn, bind: bind };'].join('\n'));
+  const chk4 = (src) => {
+    const LOG = { open: [], tasks: { h1: { id: 'h1', auto_key: 'hr:uN7:join:2026-12-01:1' }, a1: { id: 'a1', auto_key: 'acct:uN8:join:2026-12-01' }, c1: { id: 'c1', auto_key: 'cert:c1' }, p1: { id: 'p1' } } };
+    const ad = box4(src)({ admin: true }, LOG), wk = box4(src)({ admin: false }, LOG);
+    const has = (h) => /^<button class="mini-btn" data-task-hrcard="[^"]+">인사 카드<\/button>$/.test(h);
+    const ok1 = has(ad.btn(LOG.tasks.h1)) && has(ad.btn(LOG.tasks.a1)) && ad.btn(LOG.tasks.c1) === '' && ad.btn(LOG.tasks.p1) === '' && wk.btn(LOG.tasks.h1) === '';
+    const el = (id) => { const e = { attr: id, h: null, getAttribute: () => id, addEventListener: (ev, f) => { if (ev === 'click') e.h = f; } }; return e; };
+    const run = (who, id) => { const e = el(id), stop = { n: 0 }; who.bind({ querySelectorAll: (q) => (q === '[data-task-hrcard]' ? [e] : []) }); if (e.h) e.h({ stopPropagation: () => { stop.n++; } }); return stop.n; };
+    const s1 = run(ad, 'a1'); run(wk, 'h1'); run(ad, 'c1'); run(ad, 'zz');
+    const ctrl = /ctrl = '<div class="task-ctrl">' \+ ddayBadge \+ doneBtn \+ docBtn \+ holdBtn \+ editBtn \+ notMineBtn \+ hrCardBtn \+ '<\/div>';/.test(fnP2('taskRowHtml', src));
+    const css = /@media \(max-width:640px\)\{ \.task-ctrl\{max-width:100%;\} \}/.test(src || html);   // 380px 실측: 단추 6개 줄 351px > 카드 346px → 줄 안에서 접힘(시험 서버 화면 확인)
+    return ok1 && s1 === 1 && JSON.stringify(LOG.open) === '["uN8"]' && ctrl && css;
+  };
+  T('C185 판2 ④ 폰 지시 카드 [인사 카드](실행 — taskRowHtml 단추 문장·bindTaskHandlers 누름 묶음 그대로): 입·퇴사 지시(hr·acct)·관리자만 단추 · 다른 자동 지시·보통 지시·비관리자 = 없음 · 누름 = 키의 회원 id로 카드 열기(카드 펼침으로 번지지 않음) · 비관리자·다른 지시·없는 id = 안 엶 · 단추가 카드 버튼 줄에 붙음 · 640px 밑 버튼 줄이 카드보다 넓으면 줄 안에서 접힘(max-width 100%)', chk4());
+  const M4 = [['var hrCardBtn = (/^(?:hr|acct):[^:]+:/.test(String(t.auto_key || "")) && isAdmin())', 'var hrCardBtn = (/^(?:hr|acct):[^:]+:/.test(String(t.auto_key || "")))'],
+    ['if (hm && isAdmin()) taskHrCardOpen(hm[1]); });', 'if (hm) taskHrCardOpen(hm[1]); });'], ['el.addEventListener("click", function(e){ e.stopPropagation(); var t = findTask(el.getAttribute("data-task-hrcard"))', 'el.addEventListener("click", function(e){ var t = findTask(el.getAttribute("data-task-hrcard"))'],
+    ['editBtn + notMineBtn + hrCardBtn + \'</div>\';', 'editBtn + notMineBtn + \'</div>\';'], ['@media (max-width:640px){ .task-ctrl{max-width:100%;} }', '']];
+  const k4 = M4.map(([a, b]) => { try { return chk4(mutH2(a, b)); } catch (e) { return 'err ' + e.message; } });
+  T('C185 판2 ④ 결함 사본 ' + M4.length + '개(단추 관리자 판정 걷음 · 누름 관리자 판정 걷음 · 펼침 번짐 · 버튼 줄에서 뺌 · 폰 줄 접힘 걷음) = 모두 ✗', k4.every((v) => v === false), JSON.stringify(k4));
   const kV = MV.map(([a, b]) => { try { return chkVis(mutH2(a, b)); } catch (e) { return 'err ' + e.message; } });
   const kB = MB.map(([a, b]) => { try { return chkBtn(mutH2(a, b)); } catch (e) { return 'err ' + e.message; } });
   const k3 = M3.map(([a, b]) => { try { return chk3(mutH2(a, b)).ok; } catch (e) { return 'err ' + e.message; } });
-  T('C185 판2 ①②③ 결함 사본 ' + (MV.length + MB.length + M3.length) + '개(입·퇴사 거름 걷음 · 빈 공개 범위를 전체 공개로 · 인사 권한 없이 단추 · 누름 권한 걷음 · 막힌 줄 카드·셈 걷음 · 막힌 줄 글 · 판정 경계 느슨 · 요약 없음 글 걷음 · 글 길이 멈춤 글 걷음 · 참고 수 글 걷음) = 모두 ✗',
+  T('C185 판2 ①②③ 결함 사본 ' + (MV.length + MB.length + M3.length) + '개(입·퇴사 거름 걷음 · 빈 공개 범위를 전체 공개로 · 인사 권한 없이 단추 · 누름 권한 걷음 · 배정표 상태 안 봄 · 빈칸뿐 셈 판정 · 막히지 않은 줄 카드 · 막힌 줄 글 겹침 · 건너뜀 안 막음 · 사건 수 · 판정 경계 느슨 · 요약 없음 글 걷음 · 글 길이 멈춤 글 걷음 · 참고 수 글 걷음) = 모두 ✗',
     kV.concat(kB, k3).every((v) => v === false), JSON.stringify({ kV, kB, k3 }));
 } catch (e) { console.log('  (C185 판2 검사 생략 — ' + e.message + ')'); fails++; }
 

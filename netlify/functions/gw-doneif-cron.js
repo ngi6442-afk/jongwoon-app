@@ -32,7 +32,7 @@ async function run(st, nowMs) {
       if (new Date(nowMs).getUTCMinutes() < 10) {
         try {
           const us = store(USERS), l = await blobList(us, 'device:');
-          if (l && l.ok) { devs = []; for (const k of l.keys) { if (String(k).indexOf('device:') !== 0) continue; const r = await blobGet(us, k); if (r.ok && r.data && typeof r.data === 'object') devs.push({ member_id: r.data.member_id, status: r.data.status }); else { devs = null; break; } } }
+          if (l && l.ok) { devs = []; for (const k of l.keys) { if (String(k).indexOf('device:') !== 0) continue; const r = await blobGet(us, k); if (!r.ok) { devs = null; break; } if (r.data && typeof r.data === 'object') devs.push({ member_id: r.data.member_id, status: r.data.status }); } }   // 판2 검토 1: 못 읽음만 신호 끔 · 지운 기기(ok·null)·객체 아닌 값은 건너뜀
         } catch (e) { devs = null; }
       }
       recs.__rows.devices = devs;
@@ -75,9 +75,12 @@ async function run(st, nowMs) {
       const apv = (ar.ok && ar.data && ar.data.approver_id) ? String(ar.data.approver_id) : '';
       const tc = await push.tierCtx();
       const to = apv ? [apv] : ((tc && tc.adminIds) || []);
-      if (to.length) {
-        const body = p.candidates.slice(0, 3).map(function (c) { return c.title.slice(0, 28); }).join(' · ') + (p.candidates.length > 3 ? ' 외 ' + (p.candidates.length - 3) + '건' : '') + ' — 지시함 [오늘 승인 일괄]';
-        await push.sendTo(to, { title: '승인 대기 ' + last.moved + '건(앱 기준)', body: body.slice(0, 200), url: './', tag: 'task-appbase-' + today }, { ctx: tc, primaryOnly: true, by: '앱 기준' });
+      // C185 판2 검토 9: 승인권자가 관리자가 아니면 입·퇴사 지시(hr:·acct: — 담당·관리자만 보는 지시)는 그 사람 알림에서 뺌(입사 날짜가 든 제목이 지시를 볼 수 없는 사람에게 가지 않게)
+      const hrId = {}; tdoc.items.forEach(function (t) { if (t && /^(?:hr|acct):/.test(String(t.auto_key || ''))) hrId[t.id] = 1; });
+      const cands = (apv && (((tc && tc.adminIds) || []).indexOf(apv) < 0)) ? p.candidates.filter(function (x) { return !hrId[x.id]; }) : p.candidates;
+      if (to.length && cands.length) {
+        const body = cands.slice(0, 3).map(function (c) { return c.title.slice(0, 28); }).join(' · ') + (cands.length > 3 ? ' 외 ' + (cands.length - 3) + '건' : '') + ' — 지시함 [오늘 승인 일괄]';
+        await push.sendTo(to, { title: '승인 대기 ' + (cands === p.candidates ? last.moved : cands.length) + '건(앱 기준)', body: body.slice(0, 200), url: './', tag: 'task-appbase-' + today }, { ctx: tc, primaryOnly: true, by: '앱 기준' });
         last.notified = to.length;
       }
     } catch (e) {}
