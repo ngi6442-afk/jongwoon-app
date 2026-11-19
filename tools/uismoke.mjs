@@ -19657,11 +19657,11 @@ try {
     const FT = ["`loa_kind`", "`loa_days_child`", "`loaKindMergeFix`", "원장 C182"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = "<p>(2026-11 v499) (휴가 › 휴직) 휴직 면담을 신청할 때 <b>휴직 종류</b>(육아휴직 ·";
-    const ok = /기준: v499 \(2026-11-19\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 8 && gate.length === 3 && scr.length === 5 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 499 && ftv.length > 0 && mF.length === 0 && cb.length === 8 && gate.length === 3 && scr.length === 5 && !cb.some((l) => /\(PM/.test(l))
       && d.man.indexOf(MAN) > 0 && !/loa_kind|loa_days|loaKind|serviceInfo|ctChildDays|contractPlan|mergeLeaves|LOA_|member_upsert|imSt|gwCall/.test(cut(d.man, MAN, '\n'))
       && d.cl.indexOf('**P1 판39(v499') > 0
       && FIX499.every((x) => d.ix.split(x).length === 2)
-      && /SHELL_CACHE = 'jw-shell-v499'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 499;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX499.map((x) => d.ix.split(x).length - 1) } };
   };
   const r499 = chk499(D499);
@@ -19802,6 +19802,37 @@ try {
   T('C185 판1 ②③ 결함 사본 ' + MC.length + '개(준비 안 된 규칙도 켜기 줄 · 멈춤 줄 걷음 · 켜기 무응답을 켬으로 · PM 아니어도 단추 · 옛 그리기 회차 응답 씀 · set_base 0 · 준비 중 표시 걷음) = 모두 ✗', kC.every((v) => v === false), JSON.stringify(kC));
 } catch (e) { console.log('  (C185 판1 검사 생략 — ' + e.message + ')'); fails++; }
 
+
+// ── v500(C185 판1 — 범위 밖 자동 지시 규칙 공통 틀 · 원장 C185): 실행 검사는 위 'C185 판1' 블록 · 여기는 문서·판 번호 정확 검사 + 고정 글 17줄(실행 검사가 못 지키는 고침 줄 — 빼면 ✗)
+try {
+  const rd500 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D500 = { ft: rd500('FEATURES.md'), tl: rd500('TESTLIST.md'), sw: rd500('sw.js'), man: rd500('MANUAL.html'), cl: rd500('CLAUDE.md'), ix: rd500('index.html') };
+  const FIX500 = ["PMCON_CHECKS.push({ id: \"evrules\", title: \"범위 밖 자동 지시 규칙\", render: evrCardRender });", "\"hr:\":\"입사·퇴사 체크리스트(인사)\", \"acct:\":\"입사·퇴사 계정(부여·회수 확인·대장)\", \"ks:\":\"현장 실적 신고(연 1회)\" };", "var ASSIGN_PREFIX_ORDER = [\"veh:\",\"lic:\",\"cert:\",\"rec:\",\"bid:\",\"site:\",\"wk:\",\"hr:\",\"acct:\",\"ks:\"];", "\"hr:\":\"입·퇴사\", \"acct:\":\"계정\", \"ks:\":\"실적 신고\" };", "if (typeof evrSeen === \"function\") evrSeen(b);", "var b = evrLast && evrLast.seq === pmconSeq ? evrLast.b : null;", "if (m.ready !== true) st = \"준비 중\" + (cur === \"off\" ? \"(꺼짐)\" : \"\");", "else if (cur === \"dry\" && m.ready === true && s && s.ready !== false && s.mode === \"dry\") out.push(evrLiveRow(b, k, nm, s));", "else if (cur === \"live\" && s && s.mode === \"live\" && EVR_STOP[s.skip]) out.push({ id: \"autotask:\" + k + \":dry\", q: nm + \" — 멈춰 있습니다. 연습으로 내릴까요?\"", "var EVR_STOP = { TOO_MANY: \"한 번에 생길 사건이 10건을 넘어 멈춰 있습니다\", PII: \"지시 글에 직원 이름이 섞여 멈춰 있습니다\", NO_SINCE: \"켠 시각 기록이 없어 멈춰 있습니다\" };", "var noWhoOnly = !(Number(s.tasks) > 0) && Number(s.no_who) > 0 && !s.skip;", "block: noWhoOnly ? \"배정표 담당을 먼저 정해 주세요\" : \"\",", "[ㄱ]을 누르면 바로 켜지고 다음 평일 08:10 실행부터 지시가 생깁니다(켠 뒤에 생긴 일만 — 지난 일 소급 없음). 직원에게 새로 가는 알림이라 누르기 사흘 전에 예고해 주세요.", "\"켠 뒤 첫 집계 전(다음 평일 08:10 정기업무 봇 뒤에 채워짐).\"", "\"준비 중인 규칙은 계산이 들어온 뒤 켤 수 있습니다.\"", "else if (res.body && res.body.error_code === \"RULE_NOT_READY\") alert(\"아직 준비 중인 규칙이라 켤 수 없습니다.\");", "gwCall(\"gw-data\", { action: \"pmcon_decide\", kind: \"autotask\", row: \"autotask:\" + k + \":\" + mode, grade: \"R1\", due: \"\", q: nm + \" — \" + txt, rec: txt, choice: \"ok\", args: { rule: k, mode: mode }, set_base: Number(b.updated_at) || 0, val: txt, base: pmconState.base })"];
+  const MANA500 = "(2026-11 v500) '입사·퇴사 체크리스트(인사)'·'입사·퇴사 ";
+  const chk500 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v500 (11/19)', '\n### '), tlv = cut(d.tl, '\n## v500 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`hr_join`", "`settings:autotask.since`", "`RULE_NOT_READY`", "원장 C185"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = "<li><b>범위 밖 자동 지시 규칙</b> (2026-11 v500) — 입사·퇴사 체크리스트, 건설기계 ", MAN2 = "(2026-11 v500) '입사·퇴사 체크리스트(인사)'·'입사·퇴사 ";
+    const ok = /기준: v500 \(2026-11-19\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 14 && gate.length === 3 && scr.length === 11 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf(MAN) > 0 && !/hr_join|hr_leave|veh_ceq31|ks_report|veh_event|evrules|AUTOTASK|RULE_NOT_READY|pmcon_|handleAutotask|gwCall/.test(cut(d.man, MAN, '\n')) && d.man.indexOf(MAN2) > 0
+      && d.cl.indexOf('**C185 판1(v500') > 0
+      && FIX500.every((x) => d.ix.split(x).length === 2)
+      && /SHELL_CACHE = 'jw-shell-v500'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX500.map((x) => d.ix.split(x).length - 1) } };
+  };
+  const r500 = chk500(D500);
+  const mu500 = (k, f) => chk500(Object.assign({}, D500, { [k]: f(D500[k]) })).ok;
+  const M500 = [mu500('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v499 (')), mu500('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v499'")),
+    mu500('ft', (s) => s.split('`hr_join`').join('hr_join')),
+    mu500('man', (s) => s.replace('규칙</b> (2026-11 v500) ', '규칙</b> ')), mu500('man', (s) => s.replace(MANA500, '')), mu500('cl', (s) => s.replace('**C185 판1(v500', 'C185 판1(')),
+    mu500('tl', (s) => s.replace('\n- [x] (AI) `uismoke` \'C185 판1\'', '\n- (AI) `uismoke` \'C185 판1\''))]
+    .concat(FIX500.map((x) => mu500('ix', (s) => s.replace(x, ''))));
+  T('v500 문서·판 번호(정확 검사): FEATURES 기준 v500 (2026-11-19)·v500 절(C185 판1) · TESTLIST v500 칸 14(화면·운영 확인 11 · 게이트 [x] 3) · MANUAL 점검 카드 줄·배정표 문장(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 17줄 한 번씩 · sw jw-shell-v500 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL 둘·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
+    r500.ok && M500.every((v) => v === false), JSON.stringify({ r: r500.info, mut: M500 }));
+} catch (e) { console.log('  (v500 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
