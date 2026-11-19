@@ -19817,11 +19817,11 @@ try {
     const FT = ["`hr_join`", "`settings:autotask.since`", "`RULE_NOT_READY`", "원장 C185"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = "<li><b>범위 밖 자동 지시 규칙</b> (2026-11 v500) — 입사·퇴사 체크리스트, 건설기계 ", MAN2 = "(2026-11 v500) '입사·퇴사 체크리스트(인사)'·'입사·퇴사 ";
-    const ok = /기준: v500 \(2026-11-19\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 14 && gate.length === 3 && scr.length === 11 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 500 && ftv.length > 0 && mF.length === 0 && cb.length === 14 && gate.length === 3 && scr.length === 11 && !cb.some((l) => /\(PM/.test(l))
       && d.man.indexOf(MAN) > 0 && !/hr_join|hr_leave|veh_ceq31|ks_report|veh_event|evrules|AUTOTASK|RULE_NOT_READY|pmcon_|handleAutotask|gwCall/.test(cut(d.man, MAN, '\n')) && d.man.indexOf(MAN2) > 0
       && d.cl.indexOf('**C185 판1(v500') > 0
       && FIX500.every((x) => d.ix.split(x).length === 2)
-      && /SHELL_CACHE = 'jw-shell-v500'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 500;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX500.map((x) => d.ix.split(x).length - 1) } };
   };
   const r500 = chk500(D500);
@@ -19955,6 +19955,37 @@ try {
     kV.concat(kB, k3).every((v) => v === false), JSON.stringify({ kV, kB, k3 }));
 } catch (e) { console.log('  (C185 판2 검사 생략 — ' + e.message + ')'); fails++; }
 
+
+// ── v501(C185 판2 — 입사 자동 지시 · 원장 C185): 실행 검사는 위 'C185 판2' 블록 · 여기는 문서·판 번호 정확 검사 + 고정 글 25줄(실행 검사가 못 지키는 고침 줄 — 빼면 ✗)
+try {
+  const rd501 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D501 = { ft: rd501('FEATURES.md'), tl: rd501('TESTLIST.md'), sw: rd501('sw.js'), man: rd501('MANUAL.html'), cl: rd501('CLAUDE.md'), ix: rd501('index.html') };
+  const FIX501 = ["if (t && /^(?:hr|acct):/.test(String(t.auto_key || \"\"))) return !!(t.scope && t.scope.length && scopeIncludes(t.scope, curMember()));", "if (/^(?:hr|acct):[^:]+:/.test(String(t.auto_key || \"\")) && isAdmin()) b.push(taskSheetBtn(\"hrcard\", id, \"인사 카드\", \"\", \"이 지시의 대상 직원 인사 카드를 엽니다\"));", "var hm = /^(?:hr|acct):([^:]+):/.exec(String(t.auto_key || \"\")); if (hm && isAdmin()) taskHrCardOpen(hm[1]);", "function taskHrCardOpen(mid){", "var uses = ((b.meta_srv || {})[k] || {}).uses || [], ast = b.assign_state || {};", "var miss = uses.filter(function(p){ return ast[p] !== \"ok\"; });", "var needWho = miss.length > 0 || noWhoOnly, skipped = !!s.skip, blocked = needWho || skipped;", "if (!row.block && needWho) row.block = \"배정표 담당을 먼저 정해 주세요\";", "else if (!row.block && skipped) row.block = \"이번 연습 집계를 하지 못했습니다 — 다음 집계 뒤에 정해 주세요\";", "card: needWho ? \"assignCard\" : \"pmconChk-evrules\", nocount: needWho && miss.length > 0 && miss.every(function(p){ return ast[p] === \"empty\"; }),", "why: blocked ? evrSumTxt(s) : evrSumTxt(s) + \" [ㄱ]을 누르면 바로 켜지고", "(s.win ? \"최근 \" + s.win + \"일 기준으로 켰다면 \" : \"오늘 실행에 \") + \"지시 \" + (Number(s.tasks) || 0) + \"건(사건 \" + (Number(s.found !== undefined ? s.found : s.events) || 0) + \")\"", "var pn = pend.filter(function(r){ return !r.nocount; }).length;", "r.k = r.card ? Object.assign({}, k, { card: r.card }) : k;", "EVR_STOP.TEXT_LONG = \"지시 글이 길이 상한을 넘어 멈춰 있습니다\";", "if (m.ready === true && cur === \"live\" && !s) line = '<br><span style=\"color:var(--sub);\">켠 뒤 첫 집계 전(다음 평일 08:10 정기업무 봇 뒤에 채워짐).</span>';", "if (Number(rf.no_hire)) p.push(\"입사일이 비어 아직 세지 않은 \" + Number(rf.no_hire) + \"명\");", "if (Number(rf.bg_off)) p.push(\"인사 근거 승격 전이라 기한 없이\");", "if (rf.past12 !== undefined) p.push(\"참고: 지난 12개월 입사 \" + (Number(rf.past12) || 0) + \"명(켠 뒤 일만 — 소급 없음)\");", "var hrCardBtn = (/^(?:hr|acct):[^:]+:/.test(String(t.auto_key || \"\")) && isAdmin()) ? '<button class=\"mini-btn\" data-task-hrcard=\"' + esc(t.id) + '\">인사 카드</button>' : \"\";", "ctrl = '<div class=\"task-ctrl\">' + ddayBadge + doneBtn + docBtn + holdBtn + editBtn + notMineBtn + hrCardBtn + '</div>';", "var t = findTask(el.getAttribute(\"data-task-hrcard\")), hm = t && /^(?:hr|acct):([^:]+):/.exec(String(t.auto_key || \"\")); if (hm && isAdmin()) taskHrCardOpen(hm[1]);", "@media (max-width:640px){ .task-ctrl{max-width:100%;} }", "else if (res.body && res.body.error_code === \"ASSIGN_NEEDED\") alert(\"배정표 담당을 먼저 정해 주세요 — 이 규칙이 쓰는 배정표 줄의 담당이 비었거나 재직자가 아닙니다.\");", "if (res.status !== 200 && res.body && res.body.error_code === \"ASSIGN_NEEDED\"){ alert(\"배정표 담당을 먼저 정해 주세요 — 이 규칙이 쓰는 배정표 줄의 담당이 비었거나 재직자가 아닙니다.\"); renderPmcon(); return; }"];
+  const MANA501 = "(2026-11 v501) '입사·퇴사 체크리스트(인사)'·'입사·퇴사 ";
+  const chk501 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v501 (11/20)', '\n### '), tlv = cut(d.tl, '\n## v501 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`hr_join`", "`ASSIGN_NEEDED`", "`HRBG_READ_FAILED`", "원장 C185"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = "<li><b>범위 밖 자동 지시 — 입사 체크리스트</b> (2026-11 v501) — 입사 체크리스트 지", MAN2 = "(2026-11 v501) '입사·퇴사 체크리스트(인사)'·'입사·퇴사 ";
+    const ok = /기준: v501 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 12 && gate.length === 3 && scr.length === 9 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf(MAN) > 0 && !/hr_join|hr_leave|veh_ceq31|ks_report|veh_event|evrules|AUTOTASK|RULE_NOT_READY|pmcon_|handleAutotask|gwCall|ASSIGN_NEEDED|HRBG_READ|planHr|HR_JOIN|taskHr|hrScope|assign_state|meta_srv/.test(cut(d.man, MAN, '\n')) && d.man.indexOf(MAN2) > 0
+      && d.cl.indexOf('**C185 판2(v501') > 0
+      && FIX501.every((x) => d.ix.split(x).length === 2)
+      && /SHELL_CACHE = 'jw-shell-v501'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX501.map((x) => d.ix.split(x).length - 1) } };
+  };
+  const r501 = chk501(D501);
+  const mu501 = (k, f) => chk501(Object.assign({}, D501, { [k]: f(D501[k]) })).ok;
+  const M501 = [mu501('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v500 (')), mu501('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v500'")),
+    mu501('ft', (s) => s.split('`hr_join`').join('hr_join')),
+    mu501('man', (s) => s.replace('체크리스트</b> (2026-11 v501) ', '체크리스트</b> ')), mu501('man', (s) => s.replace(MANA501, '')), mu501('cl', (s) => s.replace('**C185 판2(v501', 'C185 판2(')),
+    mu501('tl', (s) => s.replace('\n- [x] (AI) `uismoke` \'C185 판2\'', '\n- (AI) `uismoke` \'C185 판2\''))]
+    .concat(FIX501.map((x) => mu501('ix', (s) => s.replace(x, ''))));
+  T('v501 문서·판 번호(정확 검사): FEATURES 기준 v501 (2026-11-20)·v501 절(C185 판2) · TESTLIST v501 칸 12(화면·운영 확인 9 · 게이트 [x] 3) · MANUAL 점검 카드 줄·배정표 문장(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 25줄 한 번씩 · sw jw-shell-v501 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL 둘·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
+    r501.ok && M501.every((v) => v === false), JSON.stringify({ r: r501.info, mut: M501 }));
+} catch (e) { console.log('  (v501 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
