@@ -2081,6 +2081,8 @@ async function handleVehDueSet(event, d, R) {
   const lawLog = (field === 'insp_due' && d.law && (await vehBgState(st)).on) ? vehLawLog(d.law, cur, date, today, c.member.id, 'task') : null;   // P1 판27: 법정 검사 제안이 켜진 앱이 보낸 제안 날짜와 확정 날짜(검사 칸만 · 승격일 때만 — 검토 반영, 못 읽으면 기록 안 함 · 표시 기록, 값 판정 없음)
   // P1 판38: 판38 앱이 보낸 줄(insp_done 칸 있음)이면 새 칸을 기록 줄에 더하고, 차량 줄의 연장 만료일(그 회차 몫)은 기록으로 옮겨졌으니 비움 — 옛 앱 요청은 종전 그대로
   const extWas = (lawLog && lx.ex && Object.prototype.hasOwnProperty.call(wv, 'insp_ext')) ? String(wv.insp_ext == null ? '' : wv.insp_ext) : null;
+  // 독립 검토 4: 요청에 연장 만료일이 없어도(낡은 완료 창 · 다른 기기가 그 사이 넣음) 그때 차량 줄에 있는 연장 만료일(종전 만기 뒤 날짜)을 기록 줄로 옮긴 뒤 비움 — 지우기만 하지 않게
+  if (lawLog && lx.ex && !lx.ex.insp_ext && extWas && vehDueDate(extWas) && vehDueDate(cur) && extWas > cur) lx.ex.insp_ext = extWas;
   if (lawLog && lx.ex) { Object.assign(lawLog, lx.ex); delete wv.insp_ext; }
   if (lawLog) wv.insp_log = (Array.isArray(wv.insp_log) ? wv.insp_log : []).concat([lawLog]).slice(-VEH_LOG_MAX);
   wdoc.updated_by = c.member.id; wdoc.updated_at = now;
@@ -2123,7 +2125,17 @@ function vehLawEx(law, cur, today) {
   }
   if (ex.insp_apply && ex.insp_done && ex.insp_apply > ex.insp_done) return { ok: false, code: 'INSP_ORDER', f: 'insp_apply' };
   if (ex.insp_ext && vehDueDate(cur) && !(ex.insp_ext > cur)) return { ok: false, code: 'INSP_EXT_EARLY', f: 'insp_ext' };
+  // 독립 검토 5: 오기 거름(넉넉한 범위 — 앱 VEH_INSP_SPAN_M·VEH_EXT_SPAN_M 같은 값): 수검일·신청일 = 종전 만기(없으면 오늘) 앞뒤 VEH_INSP_SPAN_M개월 · 연장 만료일 = 그 뒤 VEH_EXT_SPAN_M개월까지
+  const base = vehDueDate(cur) || today, lo = vehAddMonthsS(base, -VEH_INSP_SPAN_M), hi = vehAddMonthsS(base, VEH_INSP_SPAN_M);
+  for (const k of ['insp_done', 'insp_apply']) if (ex[k] && (ex[k] < lo || ex[k] > hi)) return { ok: false, code: 'INSP_RANGE', f: k };
+  if (ex.insp_ext && ex.insp_ext > vehAddMonthsS(base, VEH_EXT_SPAN_M)) return { ok: false, code: 'INSP_RANGE', f: 'insp_ext' };
   return { ok: true, ex: ex };
+}
+// 조문에 상한이 없어 오기만 거르는 넉넉한 값(개월) — 정기검사는 만기 근처에 받음(기간 밖 이른·늦은 수검도 들어감) · 연장·유예는 사유 종료까지(시행규칙 75조 — 상한 없음). 정상 입력이 막히면 늘림(앱과 같이)
+const VEH_INSP_SPAN_M = 36, VEH_EXT_SPAN_M = 24;
+function vehAddMonthsS(s, n) {   // 앱 vehAddMonths와 같은 말일 맞춤
+  const y = +s.slice(0, 4), m = +s.slice(5, 7) - 1 + n, d = +s.slice(8, 10), yy = y + Math.floor(m / 12), mm = ((m % 12) + 12) % 12, last = new Date(Date.UTC(yy, mm + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(yy, mm, Math.min(d, last))).toISOString().slice(0, 10);
 }
 // 승격 판정 한 곳(읽기·기록 같이 씀): 근거 표 꼴 맞음 ∧ settings:veh.bg_ver = 그 판 ver. 어느 쪽이든 못 읽으면 on false(기록 안 함 — fail-closed)
 async function vehBgState(st) {

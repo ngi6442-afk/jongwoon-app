@@ -12312,7 +12312,11 @@ function J91a(x) { return JSON.stringify(x); }
     out.oldApp = r2.code === 200 && !('insp_done' in l2) && !('insp_ext' in l2) && W38().insp_ext === '2026-11-15';
     seed38(); const r3 = await set38(c, tokW, 'k1', '2027-11-15', L38({ insp_done: '', insp_apply: '', insp_ext: '' }));
     const l3 = (W38().insp_log || [])[0] || {};
-    out.blank = r3.code === 200 && l3.insp_done === '' && !('insp_apply' in l3) && !('insp_ext' in l3) && !('insp_ext' in W38());
+    // 독립 검토 4(11/19): 요청에 연장 만료일이 없어도(낡은 완료 창) 차량 줄에 있던 연장 만료일(종전 만기 뒤)은 기록 줄로 옮긴 뒤 비움 — 종전 기대값(기록 줄에 없음 = 지우기만)을 이 동작으로 바꿈
+    out.blank = r3.code === 200 && l3.insp_done === '' && !('insp_apply' in l3) && l3.insp_ext === '2026-11-15' && !('insp_ext' in W38());
+    seed38(); W38().insp_ext = '2026-10-01'; const r3b = await set38(c, tokW, 'k1', '2027-11-15', L38({ insp_done: '' }));
+    const l3b = (W38().insp_log || [])[0] || {};
+    out.staleExt = r3b.code === 200 && !('insp_ext' in l3b) && !('insp_ext' in W38());
     seed38(); const r4 = await set38(c, tokW, 'k1', '2027-11-15', L38({ insp_done: KST38, insp_apply: KST38 }));
     const l4 = (W38().insp_log || [])[0] || {};
     out.today = r4.code === 200 && l4.insp_done === KST38 && l4.insp_apply === KST38;
@@ -12327,7 +12331,8 @@ function J91a(x) { return JSON.stringify(x); }
     seed38(); const v0 = JSON.stringify(mem.gw_data['col:vehicles']), a0 = auditMock.logs.length;
     const exp = [[L38({ insp_done: '2026-02-30' }), 'BAD_INSP_DATE:insp_done'], [L38({ insp_done: 20261110 }), 'BAD_INSP_DATE:insp_done'], [L38({ insp_done: '1999-12-31' }), 'BAD_INSP_DATE:insp_done'],
       [L38({ insp_done: TMR38 }), 'INSP_FUTURE:insp_done'], [L38({ insp_done: '2026-11-10', insp_apply: TMR38 }), 'INSP_FUTURE:insp_apply'], [L38({ insp_done: '2026-11-10', insp_apply: '2026-11-11' }), 'INSP_ORDER:insp_apply'],
-      [L38({ insp_done: '', insp_ext: '2026-10-31' }), 'INSP_EXT_EARLY:insp_ext'], [L38({ insp_done: '', insp_ext: '2026-10-30' }), 'INSP_EXT_EARLY:insp_ext'], [L38({ insp_done: '', insp_ext: '2026/12/01' }), 'BAD_INSP_DATE:insp_ext']];
+      [L38({ insp_done: '', insp_ext: '2026-10-31' }), 'INSP_EXT_EARLY:insp_ext'], [L38({ insp_done: '', insp_ext: '2026-10-30' }), 'INSP_EXT_EARLY:insp_ext'], [L38({ insp_done: '', insp_ext: '2026/12/01' }), 'BAD_INSP_DATE:insp_ext'],
+      [L38({ insp_done: '2023-10-30' }), 'INSP_RANGE:insp_done'], [L38({ insp_done: '', insp_apply: '2016-01-01' }), 'INSP_RANGE:insp_apply'], [L38({ insp_done: '', insp_ext: '2028-11-01' }), 'INSP_RANGE:insp_ext']];
     for (const [law, ec] of exp) { const r = await set38(c, tokW, 'k1', '2027-11-15', law); const e = (r.body.error_code || '') + ':' + (r.body.field || ''); if (r.code !== 400 || e !== ec) got.push(ec + ' → ' + r.code + '/' + e); }
     const same = JSON.stringify(mem.gw_data['col:vehicles']) === v0 && !Object.keys(mem.gw_data).some((k) => k.indexOf('ver:vehicles:') === 0) && auditMock.logs.length === a0;
     // 권한: 배정표 차량 담당 = 그 지시의 그 차 검사 칸 + 새 칸 · 다른 차(배정표 밖 담당) = 403(새 칸이 틀려도 권한이 먼저) · 날짜가 이미 바뀐 칸 = 403
@@ -12354,8 +12359,8 @@ function J91a(x) { return JSON.stringify(x); }
   };
   try {
     const c0 = caller38(load38(SRC38)), RA = await chkA38(c0), RB = await chkB38(c0), RC = await chkC38(c0);
-    T('P1 판38 ① veh_due_set 새 칸 기록: 수검일·연장 만료일 → 기록 줄(응답 law_log 같은 값)·차량 줄 연장 만료일 비움·감사 f {insp_due, insp_ext[이전, ""]} · 옛 앱(insp_done 키 없음) = 종전 줄·연장 칸 그대로 · 비움 = insp_done ""만 · 오늘(KST) = 받음 · 보험 지시 = 새 칸 안 봄(미래 날짜여도 200·연장 칸 그대로) · 승격 아님 = 기록·law_log 없음·연장 칸 그대로', RA.ok, JSON.stringify(RA.info));
-    T('P1 판38 ② veh_due_set 새 칸 검사: 달력에 없는 날·숫자·1999년·빗금 꼴 = 400 BAD_INSP_DATE · 수검일·신청일 내일 = 400 INSP_FUTURE · 신청일 > 수검일 = 400 INSP_ORDER · 연장 만료일 ≤ 종전 만기 = 400 INSP_EXT_EARLY(어긋난 칸 field) · 거절은 쓰기 전(차량·버전 링·감사 그대로) · 배정표 차량 담당 = 그 지시 그 차만(다른 차 그대로) · 배정표 밖 담당·다른 차 지시 = 403 NO_WRITE(새 칸이 틀려도 권한이 먼저)', RB.ok, JSON.stringify(RB.info));
+    T('P1 판38 ① veh_due_set 새 칸 기록: 수검일·연장 만료일 → 기록 줄(응답 law_log 같은 값)·차량 줄 연장 만료일 비움·감사 f {insp_due, insp_ext[이전, ""]} · 옛 앱(insp_done 키 없음) = 종전 줄·연장 칸 그대로 · 비움 = insp_done "" + 차량 줄에 있던 연장 만료일을 기록 줄로 옮긴 뒤 비움(독립 검토 4 — 종전 만기 이하 연장 날짜는 옮기지 않고 비움) · 오늘(KST) = 받음 · 보험 지시 = 새 칸 안 봄(미래 날짜여도 200·연장 칸 그대로) · 승격 아님 = 기록·law_log 없음·연장 칸 그대로', RA.ok, JSON.stringify(RA.info));
+    T('P1 판38 ② veh_due_set 새 칸 검사: 달력에 없는 날·숫자·1999년·빗금 꼴 = 400 BAD_INSP_DATE · 수검일·신청일 내일 = 400 INSP_FUTURE · 신청일 > 수검일 = 400 INSP_ORDER · 연장 만료일 ≤ 종전 만기 = 400 INSP_EXT_EARLY(어긋난 칸 field) · 오기 범위(수검일·신청일 = 종전 만기 앞뒤 36개월 밖 · 연장 = 종전 만기 + 24개월 뒤) = 400 INSP_RANGE(독립 검토 5) · 거절은 쓰기 전(차량·버전 링·감사 그대로) · 배정표 차량 담당 = 그 지시 그 차만(다른 차 그대로) · 배정표 밖 담당·다른 차 지시 = 403 NO_WRITE(새 칸이 틀려도 권한이 먼저)', RB.ok, JSON.stringify(RB.info));
     T('P1 판38 ③ 차량 저장 기록 합치기(vehLogKeep·vehLogUnion): 새 칸을 모르는 사본이 같은 기록 줄을 보내도 서버 줄의 수검일·연장 만료일 남음(메모는 들어감) · 서버 줄에 없던 새 칸은 들어온 사본 값으로 채움 · 다른 줄은 더함(at 순)', RC.ok, JSON.stringify(RC.info));
     const MUT38 = [
       ["  if (lawLog && lx.ex) { Object.assign(lawLog, lx.ex); delete wv.insp_ext; }", "  if (lawLog && lx.ex) { delete wv.insp_ext; }"],
@@ -12370,13 +12375,17 @@ function J91a(x) { return JSON.stringify(x); }
       ["  if (extWas !== null) f.insp_ext = [extWas, ''];\n", ''],
       ["!Object.prototype.hasOwnProperty.call(law, 'insp_done')) return { ok: true, ex: null };", "false) return { ok: true, ex: null };"],
       ["    if (!vehDueDate(s)) return { ok: false, code: 'BAD_INSP_DATE', f: k };\n", ''],
+      ["  if (lawLog && lx.ex && !lx.ex.insp_ext && extWas && vehDueDate(extWas) && vehDueDate(cur) && extWas > cur) lx.ex.insp_ext = extWas;\n", ''],
+      ["  if (lawLog && lx.ex && !lx.ex.insp_ext && extWas && vehDueDate(extWas) && vehDueDate(cur) && extWas > cur) lx.ex.insp_ext = extWas;\n", "  if (lawLog && lx.ex && !lx.ex.insp_ext && extWas) lx.ex.insp_ext = extWas;\n"],
+      ["  for (const k of ['insp_done', 'insp_apply']) if (ex[k] && (ex[k] < lo || ex[k] > hi)) return { ok: false, code: 'INSP_RANGE', f: k };\n", ''],
+      ["  if (ex.insp_ext && ex.insp_ext > vehAddMonthsS(base, VEH_EXT_SPAN_M)) return { ok: false, code: 'INSP_RANGE', f: 'insp_ext' };\n", ''],
     ];
     const kill = [];
     for (const [from, to] of MUT38) {
       let k; try { const cm = caller38(load38(mut38(from, to))); k = !((await chkA38(cm)).ok && (await chkB38(cm)).ok && (await chkC38(cm)).ok); } catch (e) { k = 'err ' + e.message; }
       if (k !== true) kill.push(from.trim().slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k));
     }
-    T('P1 판38 ④ 결함 사본 ' + MUT38.length + '개(새 칸 안 남김·연장 칸 안 비움·거절 걷음·미래·순서·종전 만기 앞 연장 검사 걷음·보험 지시도 검사·비운 수검일 안 남김·합집합 채움 걷음·감사 연장 칸 걷음·옛 앱 요청도 새 줄·날짜 꼴 걷음) = 모두 ✗', kill.length === 0, kill.join(' | '));
+    T('P1 판38 ④ 결함 사본 ' + MUT38.length + '개(새 칸 안 남김·연장 칸 안 비움·거절 걷음·미래·순서·종전 만기 앞 연장 검사 걷음·보험 지시도 검사·비운 수검일 안 남김·합집합 채움 걷음·감사 연장 칸 걷음·옛 앱 요청도 새 줄·날짜 꼴 걷음 · 독립 검토: 연장 만료일 옮김 걷음·종전 만기 이하도 옮김·범위 검사 걷음 2) = 모두 ✗', kill.length === 0, kill.join(' | '));
   } catch (e) { T('P1 판38 검사 실행', false, String(e && e.stack || e).slice(0, 500)); }
   finally { reset38(); }
 }

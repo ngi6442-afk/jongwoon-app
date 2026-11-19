@@ -10916,23 +10916,36 @@
   //     건설기계 = 기간 안에 신청했으면 종전 만기 다음날부터, 아니면 받은 날 다음날부터(건설기계관리법 시행규칙 23조①⑤) · 연장·유예 만료일이 있으면 그 날로 기간을 봄(77조② 괄호·75조③)
   //     비운 칸: 수검일 = 기간 안 · 신청일 = 신청 기간 안 · 연장 = 없음(지금 계산과 같은 결과 — 브리핑 확인 문항 1)
   //   만료일(민법 160조②③ — 원문 차량근거_자료_20261115/원문): 기산일에서 n개월 뒤 해당일의 전날, 그 달에 해당일이 없으면 그 달 말일 · 회차마다 기산일에서 바로 셈(월말 등록도 제안 — day_max·first_adj_days는 누적식에서만)
-  //   기산 원천 = 차량 줄 insp_log 의 마지막 판38 줄(insp_done 칸이 글자 — "" 포함 · prev = 종전 만기). 그 줄이 없거나 그 회차 근거 행에 기간 칸이 없으면 null(누적식 그대로)
+  //   기산 원천 = 차량 줄 insp_log 에서 값(수검일·신청일·연장 만료일 중 하나라도 날짜)이 있는 마지막 판38 줄(prev = 종전 만기). 그 줄이 없거나 그 회차 근거 행에 기간 칸이 없으면 null(누적식 그대로)
+  //   독립 검토 1(11/19): 세 칸 모두 빈 줄(만기 오타 정정·수검일을 모르는 갱신)은 출발점으로 쓰지 않음 — 정정 저장이 '갱신'으로 세어져 제안이 −194일·−547일 어긋나던 것(비운 칸 = 기간 안 = 누적식·앞 줄 이어 세기와 같은 결과라 버려도 잃는 것 없음)
+  //   확인 필요(원문만으로 정할 수 없는 자리 — 칩 글에만 붙이고 계산은 그대로 · 독립 검토 3): ⓐ 판정일이 기간 끝 바로 뒤 VEH_LAW_HOLI일 안(민법 161조·155조 — 끝날이 토요일·공휴일이면 다음날까지 · 공휴일 달력 없음)
+  //     ⓑ 건설기계 신청 기간 밖(23조① 괄호 — 만료 뒤 소유권 이전 회차는 이전등록일부터 · ⑤ '신청기간까지'는 끝만 정함 — 이른 신청) ⓒ 종합검사 근거 행(별표 1 인용) 차의 기간 밖(종합검사 규칙 9조① '신청하여 적합 판정' — 앱은 받은 날로 봄)
+  var VEH_LAW_HOLI = 3;   // 연휴로 끝날이 밀릴 수 있는 날 수(토·일·공휴일 겹침 — 판정을 바꾸지 않고 '확인 필요' 글만)
+  function vehLawLogVal(x){ return !!(x && typeof x === "object" && typeof x.insp_done === "string" && vehRealDate(x.prev) && (vehRealDate(x.insp_done) || vehRealDate(x.insp_apply) || vehRealDate(x.insp_ext))); }
+  function vehLawComp(r){ return (r && Array.isArray(r.cites) ? r.cites : []).some(function(c){ return c && typeof c.law === "string" && c.law.indexOf("종합검사") >= 0; }); }
   function vehLawEnd(s, m){ var t = vehAddMonths(s, m); return +t.slice(8, 10) < +s.slice(8, 10) ? t : vehAddDays(t, -1); }
   function vehLawPick(ok, v, cls, at){   // 그 날 차령에 맞는 행(vehLawCalc 행 고르기와 같은 규칙 — 그쪽을 고치면 여기도)
     return ok.filter(function(x){ var age = vehLawAge(x, v, at); return vehLawHas(x.biz, v.biz) && vehLawHas(x.size, v.size) && (cls !== "ceq" || vehLawHas(x.ceq_kind, v.ceq_kind)) && (x.age_min == null || !(age < x.age_min)) && (x.age_max == null || !(age >= x.age_max)) && (x.reg_min == null || !(v.reg_date < x.reg_min)); })[0] || null;
   }
   function vehLawChain(v, ok, cls, today){
     var log = Array.isArray(v.insp_log) ? v.insp_log : [], e = null, i, r0, E, s, ap, inWin, S, S0, end, r, d, n, anchor, best = null, bestN = Infinity, bestR = null, cItp = false, hitItp = false, g, dn = vehDayNum;
-    for (i = log.length - 1; i >= 0; i--){ if (log[i] && typeof log[i] === "object" && typeof log[i].insp_done === "string" && vehRealDate(log[i].prev)){ e = log[i]; break; } }
+    for (i = log.length - 1; i >= 0; i--){ if (vehLawLogVal(log[i])){ e = log[i]; break; } }
     if (!e) return null;
     E = (vehRealDate(e.insp_ext) && e.insp_ext > e.prev) ? e.insp_ext : e.prev;
     r0 = vehLawPick(ok, v, cls, E);
     if (!r0 || !vehLawWinHas(r0)) return null;
     s = vehRealDate(e.insp_done) ? e.insp_done : "";
     ap = (r0.win_basis === "apply" && vehRealDate(e.insp_apply)) ? e.insp_apply : "";
-    var at = r0.win_basis === "apply" ? ap : s;
+    // 독립 검토 2: 건설기계 신청일 비움 + 수검일이 신청 기간 시작보다 앞 = 신청(수검보다 늦을 수 없음)도 기간 전이 확실 → 기간 밖으로 판정
+    var early = !!(r0.win_basis === "apply" && !ap && s && dn(s) < dn(E) - r0.win_before);
+    var at = r0.win_basis === "apply" ? (ap || (early ? s : "")) : s;
     inWin = !at || (dn(at) >= dn(E) - r0.win_before && dn(at) <= dn(E) + r0.win_after);
     S0 = (inWin || !s) ? vehAddDays(E, 1) : vehAddDays(s, 1);
+    var chk = [];
+    if (at && !inWin && dn(at) > dn(E) + r0.win_after && dn(at) <= dn(E) + r0.win_after + VEH_LAW_HOLI) chk.push("holi");
+    if (!inWin && r0.win_basis === "apply") chk.push("ceq");
+    if (!inWin && r0.win_basis === "pass" && vehLawComp(r0)) chk.push("comp");
+    if (r0.win_basis === "apply" && !ap && s && dn(s) > dn(E) + r0.win_after) chk.push("ceqlate");
     S = S0; end = vehAddDays(S0, -1); anchor = v.insp_due ? v.insp_due : today;
     for (g = 0; g < 600; g++){
       r = vehLawPick(ok, v, cls, end);
@@ -10947,18 +10960,26 @@
     }
     if (!best) return null;
     return Object.assign({ st: "ok", date: best, diff: v.insp_due ? dn(v.insp_due) - dn(best) : null, rule: bestR.id, cite: vehLawCite(bestR),
-      chain: { prev: e.prev, ext: E !== e.prev ? E : "", done: s, apply: ap, basis: r0.win_basis, inWin: inWin, start: S0 } }, hitItp ? { interp: true } : {}, (hitItp && cls === "ceq") ? { ceq: true } : {});
+      chain: { prev: e.prev, ext: E !== e.prev ? E : "", done: s, apply: ap, basis: r0.win_basis, inWin: inWin, start: S0, early: early, chk: chk } }, hitItp ? { interp: true } : {}, (hitItp && cls === "ceq") ? { ceq: true } : {});
   }
   // 칩 아래 한 줄(펼침·폰·수정 창) · 칸은 마우스 글 — 기산한 근거
   function vehLawChainTxt(r){
     var c = r && r.chain, p;
     if (!c) return "";
     p = ["종전 만기 " + c.prev + (c.ext ? "(연장·유예 만료일 " + c.ext + ")" : "")];
-    if (c.basis === "apply") p.push(c.apply ? "신청일 " + c.apply + "(신청 기간 " + (c.inWin ? "안" : "밖") + ")" : "신청일 비움(신청 기간 안으로 봄)");
+    if (c.basis === "apply") p.push(c.apply ? "신청일 " + c.apply + "(신청 기간 " + (c.inWin ? "안" : "밖") + ")" : (c.early ? "신청일 비움(수검일이 신청 기간 전이라 신청도 기간 전)" : "신청일 비움(신청 기간 안으로 봄)"));
     if (c.done) p.push("수검일 " + c.done + (c.basis === "apply" ? "" : "(검사 기간 " + (c.inWin ? "안" : "밖") + ")"));
     else p.push(c.inWin ? "수검일 비움" + (c.basis === "apply" ? "" : "(검사 기간 안으로 봄)") : "수검일 비움(받은 날을 몰라 종전 만기 다음날로 셈)");
-    return (c.done ? "직전 수검일 기준" : "직전 갱신 기준") + " — " + p.join(", ") + " → " + c.start + "부터 셈";
+    return (c.done ? "직전 수검일 기준" : "직전 갱신 기준") + " — " + p.join(", ") + " → " + c.start + "부터 셈" + vehLawChkTxt(c.chk);
   }
+  // 독립 검토 3: 원문만으로 정할 수 없는 판정 — 계산은 그대로, 글에 '확인 필요'
+  var VEH_LAW_CHK = {
+    holi: "기간 끝날이 토요일·공휴일이면 그다음 날까지 기간 안일 수 있음(민법 161조)",
+    ceq: "만료 뒤 소유권을 넘겨받은 회차는 이전등록일부터 신청 기간을 세고, 이른 신청도 종전 만기 다음날부터일 수 있음(건설기계관리법 시행규칙 23조①⑤)",
+    comp: "종합검사 대상 차는 기간 안에 신청해 적합 판정을 받았는지로 셈(종합검사 규칙 9조①) — 신청이 기간 안이었으면 종전 만기 다음날부터일 수 있음",
+    ceqlate: "신청일을 몰라 신청 기간 안으로 봤으나 수검일이 신청 기간 뒤 — 신청이 기간 안이었는지"
+  };
+  function vehLawChkTxt(a){ var t = (Array.isArray(a) ? a : []).map(function(k){ return VEH_LAW_CHK[k]; }).filter(Boolean); return t.length ? " · 확인 필요: " + t.join(" / ") : ""; }
   // 순수 계산 — { st:"na" } 대상 아님(매각·말소예정·검사보류) / { st:"none", miss|why } 기준 없음 / { st:"ok", date, diff(운영부 날짜 − 제안, 날짜 없으면 null), rule }
   //   만료일 줄: k회차 만료일 = 최초등록일 + 누적 개월(첫 회 first_m 있으면 그것, 그 뒤 회차마다 그때 차령에 맞는 행의 every_m을 더함)을 한 번에 더한 날(+ 첫 행 first_adj_days)
   //   — 앞 회차 결과에 다시 더하지 않음(말일 밀림 방지, 검토 반영) · 법정 기산 방식(종전 만료일 다음 날부터 등)은 근거 표 승격 전 원문 대조(문서 초안 '승격 전 확인할 것')
@@ -11019,7 +11040,7 @@
     else if (r.st !== "ok" && r.bad){ cls = "pre"; t = (mode === "det" ? "법정 검사 제안 <b>기준 없음</b>" : (mode === "modal" ? "법정 제안: 기준 없음" : "기준 없음")) + " — " + esc(r.bad.join("·")) + " 확인"; }   // 검토 반영: 틀린 값
     else if (r.st !== "ok" && r.why === "day"){ cls = "pre"; t = mode === "det" ? "법정 검사 제안 <b>기준 없음</b> — 최초등록일이 " + esc(String(r.day + 1)) + "일 이후(월말)라 법정 계산 확인 필요" : (mode === "modal" ? "법정 제안: 기준 없음 — 월말 등록(계산 확인 필요)" : "기준 없음 — 월말 등록"); }   // P1 판13 근거 행 day_max
     else if (r.st !== "ok"){ cls = "pre"; t = mode === "det" ?"법정 검사 제안 <b>기준 없음</b> — " + (r.miss ? "넣을 칸: " + esc(r.miss.join("·")) : "근거 표에 맞는 행 없음") :(mode === "modal" ? "법정 제안: 기준 없음 — " + (r.miss ? "속성 입력" : "근거 표에 맞는 행 없음") : "기준 없음 — 입력"); }
-    else { cls = r.diff === 0 ? "ok" : "am"; t = (mode === "modal" ? "법정 제안: " : (mode === "det" ? "법정 검사 제안 " : "제안 ")) + (mode === "det" ? "<b>" + esc(r.date) + "</b>" : esc(r.date)) + " · " + (r.diff === null ? "운영부 날짜 없음" : vehLawDiffTxt(r.diff)) + (r.chain && mode === "cell" ? (r.chain.done ? " · 수검일 기준" : " · 직전 갱신 기준") : ""); }
+    else { cls = r.diff === 0 ? "ok" : "am"; t = (mode === "modal" ? "법정 제안: " : (mode === "det" ? "법정 검사 제안 " : "제안 ")) + (mode === "det" ? "<b>" + esc(r.date) + "</b>" : esc(r.date)) + " · " + (r.diff === null ? "운영부 날짜 없음" : vehLawDiffTxt(r.diff)) + (r.chain && mode === "cell" ? (r.chain.done ? " · 수검일 기준" : " · 직전 갱신 기준") + (r.chain.chk && r.chain.chk.length ? " · 확인 필요" : "") : ""); }
     // P1 판38: 이어 센 제안 = 기산 근거 한 줄(초록) + 차령 안내 · 누적식 = 종전 안내 그대로
     var note = (r.st === "ok" && r.chain ? vehLawChainTxt(r) : "") + vehLawNote(r);
     return '<span class="vl-b ' + cls + '" title="' + esc((r.cite ? "근거 " + r.cite + " · " : "") + "표시만 — 검사 만기는 넣은 날짜 그대로" + (note ? " · " + note : "")) + '">' + t + '</span>'
@@ -11057,8 +11078,15 @@
     if (x.insp_apply && x.insp_apply > today) return "검사 신청일이 오늘 뒤입니다.";
     if (x.insp_apply && x.insp_done && x.insp_apply > x.insp_done) return "검사 신청일이 수검일보다 뒤입니다.";
     if (x.insp_ext && vehRealDate(prev) && !(x.insp_ext > prev)) return "연장(유예) 만료일은 종전 검사 만기(" + prev + ")보다 뒤여야 합니다.";
+    // 독립 검토 5: 말이 안 되는 날짜(오기) — 넉넉한 범위만(VEH_INSP_SPAN_M·VEH_EXT_SPAN_M — 서버 vehLawEx 같은 값)
+    var base = vehRealDate(prev) ? prev : today, lo = vehAddMonths(base, -VEH_INSP_SPAN_M), hi = vehAddMonths(base, VEH_INSP_SPAN_M);
+    if ((x.insp_done && (x.insp_done < lo || x.insp_done > hi)) || (x.insp_apply && (x.insp_apply < lo || x.insp_apply > hi))) return (x.insp_done && (x.insp_done < lo || x.insp_done > hi) ? "수검일" : "검사 신청일") + "이 " + (vehRealDate(prev) ? "종전 검사 만기(" + prev + ")" : "오늘") + "와 너무 멀리 떨어져 있습니다 — 날짜를 확인해 주세요.";
+    if (x.insp_ext && x.insp_ext > vehAddMonths(base, VEH_EXT_SPAN_M)) return "연장(유예) 만료일이 " + (vehRealDate(prev) ? "종전 검사 만기(" + prev + ")" : "오늘") + "보다 너무 뒤입니다 — 날짜를 확인해 주세요.";
     return "";
   }
+  // 독립 검토 5: 범위(개월) — 조문에 상한이 없어 오기만 거르는 넉넉한 값. 수검일·신청일 = 종전 만기 앞뒤(정기검사는 만기 근처에 받음 · 기간 밖 이른·늦은 수검도 넉넉히 들어감)
+  //   연장(유예) 만료일 = 종전 만기 뒤(시행규칙 75조 — 사유 종료까지 · 상한 조문 없음). 정상 입력이 막히면 이 값을 늘림(서버 VEH_INSP_SPAN_M·VEH_EXT_SPAN_M 같이)
+  var VEH_INSP_SPAN_M = 36, VEH_EXT_SPAN_M = 24;
   function vehLawLogPush(v, e){ if (!v || !e) return; v.insp_log = (Array.isArray(v.insp_log) ? v.insp_log : []).concat([e]).slice(-VEH_LOG_MAX); }
   //   P1 판38: 셋째 값(있으면) = 완료 창의 새 칸 — 보낼 law에 insp_done(""도)·넣은 신청일·연장 만료일을 더함(서버 vehLawEx가 검사 · 판38 줄 표시)
   function vehLawArg(vid, date){   // 지시 완료 창(veh_due_set)이 함께 보낼 제안 — 승격 아니면 null(요청 글 그대로)
@@ -11140,6 +11168,8 @@
     el = document.getElementById("vehLawHint"); if (el){ el.innerHTML = vehLawOn() ? vehLawBadge(vehLawCalc(f, VEH_LAW.rows, todayStr()), "modal") : ""; el.style.display = vehLawOn() ? "" : "none"; }
     // P1 판38: 검사 기록 칸·건설기계 안내는 승격됐을 때만(판27 원칙 — 승격 전 화면 그대로) · 신청일은 건설기계만
     ["vehInspRec", "vehCeqHint"].forEach(function(id){ el = document.getElementById(id); if (el) el.style.display = vehLawOn() ? "" : "none"; });
+    // 독립 검토 6: 새 차 만들기는 만기 갱신이 아니라 기록 줄이 안 남음 — 검사 기록 칸을 감춤(넣은 값이 소리 없이 버려지지 않게)
+    el = document.getElementById("vehInspRec"); if (el && !editingVehId) el.style.display = "none";
     el = document.getElementById("vehInspApply"); if (el) el.disabled = !ceq;
     el = document.getElementById("vehInsHint"); if (el){ el.textContent = (ins && ins !== f.insurer) ? "표에는 '" + ins + "'(으)로 보임 · 저장된 글은 그대로" : ""; el.style.display = (ins && ins !== f.insurer) ? "" : "none"; }
   }
