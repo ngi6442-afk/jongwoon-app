@@ -1976,7 +1976,9 @@ async function handlePushSend(event, d, R) {
       ids = tc.adminIds.filter(function (id) { return id !== c.member.id; });   // 본인 행동 알림은 본인 제외
       if (nfP && nfP.events.task_review === 'issuer_approver' && /^task-rv-/.test(tagP)) {
         const atP = await assignRead(store(DATA));
-        if (atP.approver_id && atP.approver_id !== c.member.id) ids = [atP.approver_id];
+        let hrKeep = false;   // C185 판2 재확인 1: 승인권자가 관리자가 아니고 그 지시가 입·퇴사 지시(hr:·acct:)면 관리자 전원 그대로(지시 문서를 못 읽으면 관리자 전원 쪽) · 승인권자가 관리자·빈칸이면 종전 글자째
+        if (atP.approver_id && tc.adminIds.indexOf(atP.approver_id) < 0) { try { const trP = await blobGet(store(DATA), colKey('tasks')); const tdP = (trP.ok && trP.data && Array.isArray(trP.data.items)) ? trP.data.items : null; const tP = tdP ? tdP.find(function (x) { return x && x.id === tagP.slice(8); }) : null; hrKeep = !tdP || !!(tP && /^(?:hr|acct):/.test(String(tP.auto_key || ''))); } catch (e) { hrKeep = true; } }
+        if (atP.approver_id && atP.approver_id !== c.member.id && !hrKeep) ids = [atP.approver_id];
       }
     }
     else ids = [to];
@@ -3122,6 +3124,19 @@ async function handleAutotaskDryPut(event, d, R) {
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   return jr(200, { status: 'OK', request_id: R, ts: doc.ts });
 }
+// C185 판2 검토 3·재확인 3: 규칙들이 쓰는 배정표 줄 상태(ok = 재직 담당 · empty = 빈칸 · gone = 재직자 아님 · unknown = 못 읽음) — 콘솔 '켤까요?' 막힘(autotask_get)과 켜기 거절(autotask_set)이 같은 함수
+async function autotaskAssignState(st, ruleIds) {
+  const out = {};
+  try {
+    const as = await licAssignStrict(st), ms = as.ok ? await assignMembers() : null;
+    (ruleIds || []).forEach(function (k) { ((AUTOTASK_SRV_RULES[k] || {}).uses || []).forEach(function (pfx) {
+      if (!as.ok || !ms) { out[pfx] = 'unknown'; return; }
+      const w = as.rules && as.rules[pfx] && as.rules[pfx].who_id ? String(as.rules[pfx].who_id) : '';
+      out[pfx] = !w ? 'empty' : (hasOwn(ms, w) ? 'ok' : 'gone');
+    }); });
+  } catch (e) { (ruleIds || []).forEach(function (k) { ((AUTOTASK_SRV_RULES[k] || {}).uses || []).forEach(function (pfx) { out[pfx] = 'unknown'; }); }); }
+  return out;
+}
 async function handleAutotaskGet(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
@@ -3137,15 +3152,7 @@ async function handleAutotaskGet(event, d, R) {
       veh_items = items.slice(0, 60).map(function (it) { const v = by[it.id] || {}; return { id: it.id, no: String(v.no || ''), due: it.due, days: it.days, state: String(v.state || ''), kind: String(v.kind || '').slice(0, 20) }; }); }
   } catch (e) {}
   // C185 판2 검토 3: 범위 밖 규칙이 쓰는 배정표 줄의 지금 상태(ok = 재직 담당 · empty = 빈칸 · gone = 담당이 재직자 아님 · unknown = 못 읽음) — 콘솔 '켤까요?' 줄이 이것으로 막힘을 정함(이름 없음)
-  const assign_state = {};
-  try {
-    const as = await licAssignStrict(st), ms = as.ok ? await assignMembers() : null;
-    Object.keys(AUTOTASK_SRV_RULES).forEach(function (k) { (AUTOTASK_SRV_RULES[k].uses || []).forEach(function (pfx) {
-      if (!as.ok || !ms) { assign_state[pfx] = 'unknown'; return; }
-      const w = as.rules && as.rules[pfx] && as.rules[pfx].who_id ? String(as.rules[pfx].who_id) : '';
-      assign_state[pfx] = !w ? 'empty' : (hasOwn(ms, w) ? 'ok' : 'gone');
-    }); });
-  } catch (e) {}
+  const assign_state = await autotaskAssignState(st, Object.keys(AUTOTASK_SRV_RULES));
   return jr(200, Object.assign({ status: 'OK', request_id: R, dry: dry, veh_items: veh_items, assign_state: assign_state }, autotaskPublic(a)));
 }
 async function handleAutotaskSet(event, d, R) {
@@ -3156,6 +3163,10 @@ async function handleAutotaskSet(event, d, R) {
   if (!autotaskValid(rule, mode)) return jr(400, { status: 'REJECTED', error_code: 'BAD_RULE', request_id: R });
   if (mode === 'live' && !autotaskReady(rule)) return jr(400, { status: 'REJECTED', error_code: 'RULE_NOT_READY', request_id: R });   // C185 판1 — 계획 함수가 없는 규칙('준비 중')은 켤 수 없다(관리자 카드·PM 콘솔 길 모두 여기)
   const st = store(DATA);
+  if (mode === 'live' && ((AUTOTASK_SRV_RULES[rule] || {}).uses || []).length) {   // C185 판2 재확인 3: 쓰는 배정표 줄 담당이 하나라도 빈칸·재직자 아님·못 읽음이면 켜기 거절(낡은 화면의 [ㄱ]도 — PM 콘솔 길도 여기) · 연습·끔은 그대로
+    const asS = await autotaskAssignState(st, [rule]);
+    if (Object.keys(asS).some(function (p) { return asS[p] !== 'ok'; })) return jr(400, { status: 'REJECTED', error_code: 'ASSIGN_NEEDED', request_id: R });
+  }
   const a = await autotaskRead(st);
   if (d.base !== undefined && Number(d.base) !== Number(a.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'AUTOTASK_STALE', request_id: R });
   if (a.rules[rule] === mode && !(a.stale && a.stale[rule])) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });   // C185 판2(ⓙ 2): 문서엔 live로 남은 준비 안 된 규칙을 연습으로 저장 = 문서를 고쳐 씀(막지 않음)

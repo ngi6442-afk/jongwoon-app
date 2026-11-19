@@ -13346,7 +13346,7 @@ function J91a(x) { return JSON.stringify(x); }
     const r1 = await run('', D3), r2 = await run('uHQ', D3), r3 = await run('uadmin', D3);
     const r4 = await run('', { 'device:dB': { status: 'approved', member_id: 'uX' }, 'device:dN9': { status: 'approved', member_id: 'uN9' } }, (k) => (k === 'device:dB' ? 'STORAGE_READ_FAILED' : null));
     o.nullDev = r1.r.ok && r1.st === 'review' && r4.st === 'open';
-    o.apv = r2.st === 'review' && r2.pushes.length === 0 && r3.pushes.length === 1 && JSON.stringify(r3.pushes[0].ids) === '["uadmin"]' && r1.pushes.length === 1;
+    o.apv = r2.st === 'review' && r2.pushes.length === 1 && r2.pushes[0].ids.indexOf('uadmin') >= 0 && r2.pushes[0].ids.indexOf('uHQ') < 0 && /입·퇴사/.test(r2.pushes[0].p.title) && r3.pushes.length === 1 && JSON.stringify(r3.pushes[0].ids) === '["uadmin"]' && r1.pushes.length === 1;
     o.ok = Object.keys(o).every((k) => o[k] === true); return o;
   };
   const evFillThrowQ = (src) => { const m = compQ(EVPQ, src || SRCQ.ev); m.RULES.hr_join.plan = () => ({ events: [{ subj: 'uFZ', tasks: [{ key: 'hr:uFZ:join:' + addQ(3) + ':1', title: 't', detail: '', due: addQ(3), vals: [] }] }], subjects: Object.defineProperty({ uFZ: ['hr:uFZ:join:' + addQ(3) + ':1'] }, 'uFZ2', { enumerable: true, get() { throw new Error('boom'); } }) }); return m; };
@@ -13366,12 +13366,12 @@ function J91a(x) { return JSON.stringify(x); }
     const MR = [["      else if (n === 'hrbg') inp.hrbg = (await bgReadBad(st, HR_BG_KEYS)) ?", "      else if (n === 'hrbg') inp.hrbg = false ?"],
       ["      if (write) dueBack.forEach(", '      if (false) dueBack.forEach('], ["    if (JSON.stringify(t.scope || []) !== JSON.stringify(want)) { t.scope = want; n++; }", ''],
       ["    hrScopeFix(doc.items);   // C185 판2 검토 8: 입·퇴사 지시(hr:·acct:) 공개 범위 = 서버가", '    // 걷음'], ["  hrScopeFix([t]);   // C185 판2 검토 8", '  // 걷음'],
-      ["if (seenT[t.id]) return null; seenT[t.id] = 1;", 'seenT[t.id] = 1;'], ["assign_state[pfx] = !w ? 'empty' : (hasOwn(ms, w) ? 'ok' : 'gone');", "assign_state[pfx] = !w ? 'empty' : 'ok';"]];
+      ["if (seenT[t.id]) return null; seenT[t.id] = 1;", 'seenT[t.id] = 1;'], ["out[pfx] = !w ? 'empty' : (hasOwn(ms, w) ? 'ok' : 'gone');", "out[pfx] = !w ? 'empty' : 'ok';"]];
     const kR = [];
     for (const [a, b] of MR) { let v; try { const ms = mutQ(SRCQ.gw, a, b); v = (await chkRQ(compQ(GWPQ, ms), gwWithQ(evFillThrowQ(), ms))).o.ok; } catch (e) { v = 'err ' + e.message; } kR.push(v); }
     T('C185 판2 검토 ② 결함 사본 ' + kR.length + '개(근거 못 읽음을 미승격으로 · 기한 되돌림 걷음 · 공개 범위 맞춤 걷음 · 저장 맞춤 걷음 · [내 것 아님] 맞춤 걷음 · 같은 id 두 벌 · 퇴사 담당을 ok로) = 모두 ✗', kR.every((v) => v === false), JSON.stringify(kR));
     const C0 = await chkCQ(require(CRPQ));
-    T('C185 판2 검토 ③ 완료 판정 크론: 지운 기기(null)·객체 아닌 기기 값 = 건너뜀(계정 신호 그대로 켜짐 — 운영 백업 34개 중 8개가 null) · 기기 하나 못 읽음 = 신호 끔 · 승인권자가 관리자가 아니면 입·퇴사 지시 승인 대기 알림 0(승인 대기는 그대로) · 관리자 승인권자·승인권자 없음 = 1발', C0.ok, JSON.stringify(C0));
+    T('C185 판2 검토 ③ 완료 판정 크론: 지운 기기(null)·객체 아닌 기기 값 = 건너뜀(계정 신호 그대로 켜짐 — 운영 백업 34개 중 8개가 null) · 기기 하나 못 읽음 = 신호 끔 · 승인권자가 관리자가 아니면 입·퇴사 지시는 그 사람 알림 0 · 관리자 따로 1발(재확인 2 · 승인 대기는 그대로) · 관리자 승인권자·승인권자 없음 = 1발', C0.ok, JSON.stringify(C0));
     const MC = [["if (!r.ok) { devs = null; break; } if (r.data && typeof r.data === 'object') devs.push(", "if (!(r.ok && r.data && typeof r.data === 'object')) { devs = null; break; } devs.push("],
       ["const cands = (apv && (((tc && tc.adminIds) || []).indexOf(apv) < 0)) ? p.candidates.filter(function (x) { return !hrId[x.id]; }) : p.candidates;", 'const cands = p.candidates;']];
     const kC = [];
@@ -13379,6 +13379,92 @@ function J91a(x) { return JSON.stringify(x); }
     T('C185 판2 검토 ③ 결함 사본 ' + kC.length + '개(지운 기기에 신호 끔 · 승인권자 거름 걷음) = 모두 ✗', kC.every((v) => v === false), JSON.stringify(kC));
   } catch (e) { T('C185 판2 검토 검사 실행', false, String(e && e.stack || e).slice(0, 500)); }
   finally { pushMock.sendTo = sendSaveQ; require.cache[rpEVQ] = keepEVQ; const s = JSON.parse(snapQ); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; }
+}
+
+{ // ---- C185 판2 재확인 반영(a17bc53 재검토 — 보임·개인정보 '고친 뒤 합침') ----
+  //   1 승인권자가 관리자가 아니면 입·퇴사 지시가 승인 요청(push_send task-rv-)·아침 요약(gw-todo-cron)으로 그 사람에게 가지 않음 · 2 완료 신호 크론에서 뺀 입·퇴사 후보 = 관리자 따로 1발 · 3 autotask_set·PM 콘솔 켜기 = 배정표 줄 담당 빈칸·재직자 아님·못 읽음이면 거절
+  const fsR = require('fs'), ModR = require('module');
+  const GWPR = join(FN, 'gw-data.js'), TDPR = join(FN, 'gw-todo-cron.js'), CRPR = join(FN, 'gw-doneif-cron.js');
+  const SRCR = { gw: fsR.readFileSync(GWPR, 'utf8'), td: fsR.readFileSync(TDPR, 'utf8'), cr: fsR.readFileSync(CRPR, 'utf8') };
+  const compR = (file, src) => { const m = new ModR(file); m.filename = file; m.paths = ModR._nodeModulePaths(dirname(file)); m._compile(src, file); return m.exports; };
+  const mutR = (src, from, to) => { if (src.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return src.replace(from, () => to); };
+  const clR = (mod) => async (body, tok, dev) => { const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+  const snapR = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  const TDR = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+  const pushesR = [], sendSaveR = pushMock.sendTo;
+  const UST = { id: 'uST', name: '승인직원R', admin: false, perms: { tasks: 'do' } }, UHR = { id: 'uHR', name: '인사직원R', admin: false, perms: { tasks: 'do' } }, UGO = { id: 'uGoneR', name: '퇴사R', admin: false, perms: {}, leave_date: '2020-01-01' };
+  const seedR = (o) => { o = o || {}; const s = JSON.parse(snapR); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null;
+    ['settings:autotask', 'it:autotask:dry', 'settings:assign', 'settings:notify', 'settings:doneif', 'it:doneif:last'].forEach((k) => { delete mem.gw_data[k]; });
+    Object.keys(mem.gw_data).filter((k) => /^(ver:|veridx:|priv:|todo:sent:)/.test(k)).forEach((k) => { delete mem.gw_data[k]; });
+    mem.gw_users['member:uST'] = UST; mem.gw_users['member:uHR'] = UHR; mem.gw_users['member:uGoneR'] = UGO;
+    mem.gw_data['col:tasks'] = { schema: 1, updated_at: 7, items: [
+      { id: 'thr1', title: '입사(12/01) 1/8 근로계약서', auto_key: 'hr:uNR:join:2026-12-01:1', status: 'open', who_id: 'uHR', scope: ['uHR'], due: TDR },
+      { id: 'tac1', title: '입사(12/01) 8/8 계정', auto_key: 'acct:uNR:join:2026-12-01', status: 'open', who_id: 'uadmin', scope: ['uadmin'], due: TDR },
+      { id: 'tnm1', title: '보통 자동', auto_key: 'cert:c1', status: 'open', who_id: 'uHR', due: TDR }] };
+    mem.gw_data['settings:assign'] = { schema: 1, rules: Object.assign({ 'hr:': { who_id: 'uHR' }, 'acct:': { who_id: 'uadmin' } }, o.rules || {}), approver_id: o.apv === undefined ? 'uST' : o.apv, prev: null, updated_at: 5, updated_by: 'x' };
+    mem.gw_data['settings:notify'] = { schema: 1, events: { task_review: 'issuer_approver', due_digest: 'summary' }, prev: null, updated_at: Date.now() - 30 * 86400000, updated_by: 'x' };
+  };
+  // 1-가 승인 요청(완료 요청 알림) — 앱이 보내는 꼴 그대로(__admins__ · 꼬리표 task-rv-<지시 id> · 제목에 지시 제목)
+  const chkSR = async (gw) => {
+    const c = clR(gw), o = {}, tH = issueSession(UHR).token;
+    const rv = async (apv, id, fg) => { seedR({ apv: apv }); pushesR.length = 0; blobsMock.hooks.failGet = fg || null;
+      const r = await c({ action: 'push_send', to: '__admins__', title: '승인요청: x', body: 'y', tag: 'task-rv-' + id }, tH, 'dev1'); blobsMock.hooks.failGet = null;
+      return { code: r.code, to: pushesR.map((p) => p.ids.join(',')).join('|') }; };
+    const a1 = await rv('uST', 'thr1'), a2 = await rv('uST', 'tac1'), a3 = await rv('uST', 'tnm1'), a4 = await rv('uadmin', 'thr1'), a5 = await rv('', 'thr1'), a6 = await rv('uST', 'thr1', (k) => (k === 'col:tasks' ? 'STORAGE_READ_FAILED' : null)), a7 = await rv('uST', 'zzz');
+    const ADM = (await pushMock.tierCtx()).adminIds.join(',');   // 시험 명부의 재직 관리자 전원(보낸 사람 = 비관리자라 빠질 사람 없음)
+    o.rv = ADM.split(',').indexOf('uadmin') >= 0 && ADM.split(',').indexOf('uST') < 0 && a1.to === ADM && a2.to === ADM && a3.to === 'uST' && a4.to === 'uadmin' && a5.to === ADM && a6.to === ADM && a7.to === 'uST' && [a1, a2, a3, a4, a5, a6, a7].every((x) => x.code === 200);
+    o.I = { a1, a3, a6 };
+    // 1-나 아침 요약(due_digest = summary) — 비관리자 승인권자에게 가는 수에서 입·퇴사 지시 뺌 · 관리자·빈칸은 그대로
+    const dg = async (apv, td) => { seedR({ apv: apv }); pushesR.length = 0; const out = JSON.parse((await td.handler({})).body || '{}'); const p = pushesR.find((x) => /^task-digest-/.test(String(x.p.tag || ''))); return { d: out.digest, to: p ? p.ids.join(',') : '', title: p ? p.p.title : '', body: p ? p.p.body : '' }; };
+    const td = compR(TDPR, gw.__tdSrc || SRCR.td);
+    const d1 = await dg('uST', td), d2 = await dg('uadmin', td), d3 = await dg('', td);
+    o.digest = d1.to === 'uST' && d1.title === '자동 지시 요약 1건' && /오늘 기한·경과 1건 · 담당 없음 0건/.test(d1.body) && d1.d.hr_out === 2
+      && d2.to === 'uadmin' && d2.title === '자동 지시 요약 3건' && /오늘 기한·경과 3건/.test(d2.body) && d2.d.hr_out === undefined && d3.to === ADM && d3.title === '자동 지시 요약 3건';
+    o.I.dg = [d1.title, d1.d, d2.title, d3.title];
+    // 3 켜기 거절 — autotask_set·PM 콘솔(pmcon_decide) 모두 · 연습·끔은 그대로
+    const set = async (rules, mode, how) => { seedR({ rules: rules }); mem.gw_data['settings:autotask'] = { schema: 1, rules: { hr_join: mode === 'dry' ? 'off' : 'dry' }, updated_at: 3, updated_by: 'x' };
+      if (how === 'pm') { const g = await c({ action: 'pmcon_get' }, tokA, 'dev1'); return c({ action: 'pmcon_decide', kind: 'autotask', row: 'autotask:hr_join:' + mode, choice: 'ok', grade: 'R1', q: 'q', rec: 'r', args: { rule: 'hr_join', mode: mode }, set_base: 3, base: g.body.updated_at }, tokA, 'dev1'); }
+      return c({ action: 'autotask_set', rule: 'hr_join', mode: mode, base: 3 }, tokA); };
+    const s1 = await set({ 'hr:': { who_id: '' } }, 'live'), s2 = await set({ 'acct:': { who_id: 'uGoneR' } }, 'live'), s3 = await set({}, 'live'), s4 = await set({ 'hr:': { who_id: '' } }, 'dry'), s5 = await set({ 'hr:': { who_id: '' } }, 'live', 'pm');
+    const live5 = mem.gw_data['settings:autotask'].rules.hr_join;
+    seedR(); mem.gw_data['settings:autotask'] = { schema: 1, rules: { hr_join: 'dry' }, updated_at: 3, updated_by: 'x' }; blobsMock.hooks.failGet = (k) => (k === 'settings:assign' ? 'STORAGE_READ_FAILED' : null);
+    const s6 = await c({ action: 'autotask_set', rule: 'hr_join', mode: 'live', base: 3 }, tokA); blobsMock.hooks.failGet = null;
+    o.set = s1.code === 400 && s1.body.error_code === 'ASSIGN_NEEDED' && s2.code === 400 && s2.body.error_code === 'ASSIGN_NEEDED' && s3.code === 200 && s4.code === 200 && s5.code !== 200 && s5.body.error_code === 'ASSIGN_NEEDED' && live5 === 'dry' && s6.code === 400 && s6.body.error_code === 'ASSIGN_NEEDED';
+    o.I.set = [s1.code, s2.code, s3.code, s4.code, s5.code, s5.body.error_code, live5, s6.code];
+    o.ok = o.rv === true && o.digest === true && o.set === true; return o;
+  };
+  // 2 완료 신호 크론 — 비관리자 승인권자에게서 뺀 입·퇴사 후보는 관리자 전원에게 따로(후보가 전부 입·퇴사여도 알림 감)
+  const chkDR = async (cron) => {
+    const run = async (apv, items) => { seedR({ apv: apv }); mem.gw_data['settings:doneif'] = { schema: 1, on: true, updated_at: 1 }; pushesR.length = 0;
+      mem.gw_data['col:tasks'] = { schema: 1, items: items, updated_at: 5 }; mem.gw_users['device:dN9R'] = { status: 'approved', member_id: 'uNR' };
+      await cron.run(blobsMock.store('gw_data'), Date.parse(TDR + 'T05:03:00Z')); return pushesR.map((p) => p.ids.join(',') + ':' + p.p.title).join('|'); };
+    const AC = { id: 'ac1', title: '입사(12/01) 8/8 계정', auto_key: 'acct:uNR:join:2026-12-01', status: 'open', who_id: 'uadmin' };
+    const p1 = await run('uST', [AC]), p2 = await run('uadmin', [AC]), p3 = await run('', [AC]), ADM = (await pushMock.tierCtx()).adminIds.join(',');
+    const ok = ADM.split(',').indexOf('uST') < 0 && p1 === ADM + ':승인 대기 1건(앱 기준 · 입·퇴사)' && p2 === 'uadmin:승인 대기 1건(앱 기준)' && p3 === ADM + ':승인 대기 1건(앱 기준)';
+    return { ok, p1, p2, p3 };
+  };
+  try {
+    pushMock.sendTo = async (ids, p) => { pushesR.push({ ids: ids.slice(), p: p }); return { sent: ids.length, removed: 0 }; };
+    const S0 = await chkSR(gwd);
+    T('C185 판2 재확인 ①③ 승인권자가 관리자가 아닐 때(실제 서버·아침 요약 크론): 승인 요청 task-rv- = 입사·계정 지시는 관리자 전원 그대로(보통 자동 지시·없는 id = 승인권자 1인 종전) · 지시 문서 못 읽음 = 관리자 쪽 · 승인권자가 관리자·빈칸 = 종전 · 아침 요약 = 그 사람 수에서 입·퇴사 2건 뺌(제목 1건·본문 수도) · 관리자·빈칸 = 3건 그대로 · 켜기 거절 ASSIGN_NEEDED(인사 빈칸 · 계정 퇴사자 · 배정표 못 읽음 · PM 콘솔 길도 — 스위치 그대로) · 재직 담당 = 켬 200 · 연습으로 = 200',
+      S0.ok, JSON.stringify(S0));
+    const MS = [["        if (atP.approver_id && atP.approver_id !== c.member.id && !hrKeep) ids = [atP.approver_id];", "        if (atP.approver_id && atP.approver_id !== c.member.id) ids = [atP.approver_id];"],
+      ["hrKeep = !tdP || !!(tP && /^(?:hr|acct):/.test(String(tP.auto_key || '')));", "hrKeep = !!(tP && /^(?:hr|acct):/.test(String(tP.auto_key || '')));"],
+      ["    if (Object.keys(asS).some(function (p) { return asS[p] !== 'ok'; })) return jr(400,", "    if (Object.keys(asS).some(function (p) { return asS[p] === 'empty'; })) return jr(400,"],
+      ["      out[pfx] = !w ? 'empty' : (hasOwn(ms, w) ? 'ok' : 'gone');", "      out[pfx] = !w ? 'empty' : 'ok';"]];
+    const kS = [];
+    for (const [a, b] of MS) { let v; try { v = (await chkSR(compR(GWPR, mutR(SRCR.gw, a, b)))).ok; } catch (e) { v = 'err ' + e.message; } kS.push(v); }
+    const MT = [["      const autos = hrOut ? autos0.filter(", "      const autos = false ? autos0.filter("], ["      const hrOut = !!(apv && !(ctx && Array.isArray(ctx.adminIds) && ctx.adminIds.indexOf(apv) >= 0));", "      const hrOut = !!(apv && ctx && Array.isArray(ctx.adminIds) && ctx.adminIds.indexOf(apv) < 0 && false);"]];
+    for (const [a, b] of MT) { let v; try { const g = Object.assign({}, gwd, { __tdSrc: mutR(SRCR.td, a, b) }); v = (await chkSR(g)).ok; } catch (e) { v = 'err ' + e.message; } kS.push(v); }
+    T('C185 판2 재확인 ①③ 결함 사본 ' + kS.length + '개(승인 요청 거름 걷음 · 문서 못 읽음을 승인권자 쪽 · 켜기 거절을 빈칸만 · 퇴사 담당을 ok · 요약 거름 걷음 · 요약 관리자 판정 걷음) = 모두 ✗', kS.every((v) => v === false), JSON.stringify(kS));
+    const D0 = await chkDR(require(CRPR));
+    T('C185 판2 재확인 ② 완료 판정 크론: 비관리자 승인권자에게서 뺀 입·퇴사 후보 = 관리자 전원 1발(제목 "승인 대기 n건(앱 기준 · 입·퇴사)") · 승인권자가 관리자·빈칸 = 종전 1발', D0.ok, JSON.stringify(D0));
+    const MD = [["      if (hrC.length && adm.length) {", "      if (false) {"]];
+    const kD = [];
+    for (const [a, b] of MD) { let v; try { v = (await chkDR(compR(CRPR, mutR(SRCR.cr, a, b)))).ok; } catch (e) { v = 'err ' + e.message; } kD.push(v); }
+    T('C185 판2 재확인 ② 결함 사본 ' + kD.length + '개(관리자 따로 알림 걷음) = 모두 ✗', kD.every((v) => v === false), JSON.stringify(kD));
+  } catch (e) { T('C185 판2 재확인 검사 실행', false, String(e && e.stack || e).slice(0, 500)); }
+  finally { pushMock.sendTo = sendSaveR; const s = JSON.parse(snapR); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; }
 }
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

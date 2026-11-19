@@ -33818,6 +33818,7 @@ function dutyStage(nx){
       if (res.status !== 200){
         var applied = !!(res.body && res.body.applied);
         if (res.body && res.body.error_code === "PMCON_MARKS_FULL") alert("보류함이 가득 찼습니다(" + (res.body.max || 60) + "개) — 보류함에서 [다시 열기]로 비운 뒤 다시 눌러 주세요.");
+        else if (res.body && res.body.error_code === "ASSIGN_NEEDED") alert("배정표 담당을 먼저 정해 주세요 — 이 규칙이 쓰는 배정표 줄의 담당이 비었거나 재직자가 아닙니다.");   // C185 판2 재확인 3: 서버가 켜기를 거절(낡은 화면에서 [ㄱ]이 열려 있어도)
         else if (res.body && res.body.error_code === "RULE_NOT_READY") alert("아직 준비 중인 규칙이라 켤 수 없습니다.");   // C185 판1 검토 G: 서버가 준비 중 규칙의 켜기를 거절(낡은 화면 등) — 영문 코드 대신
         else if (!(res.body && res.body.error_code === "NO_CHANGE")) alert("저장 실패 (" + ((res.body && res.body.error_code) || res.status) + ")" + (applied ? " — 설정은 바뀌었고 누른 기록만 남지 못했습니다" : ""));
         renderPmcon(); return;
@@ -33966,6 +33967,7 @@ function dutyStage(nx){
     gwCall("gw-data", { action: "pmcon_decide", kind: "autotask", row: "autotask:" + k + ":" + mode, grade: "R1", due: "", q: nm + " — " + txt, rec: txt, choice: "ok", args: { rule: k, mode: mode }, set_base: Number(b.updated_at) || 0, val: txt, base: pmconState.base }).then(function(res){
       evrCardBusy = false;
       if (res.status === 409){ apprToastShow("다른 곳에서 방금 바뀌었습니다 — 다시 불러왔습니다"); renderPmcon(); return; }
+      if (res.status !== 200 && res.body && res.body.error_code === "ASSIGN_NEEDED"){ alert("배정표 담당을 먼저 정해 주세요 — 이 규칙이 쓰는 배정표 줄의 담당이 비었거나 재직자가 아닙니다."); renderPmcon(); return; }   // C185 판2 재확인 3
       if (res.status !== 200){ alert(res.body && res.body.error_code === "RULE_NOT_READY" ? "아직 준비 중인 규칙이라 켤 수 없습니다." : "저장 실패 (" + ((res.body && res.body.error_code) || res.status) + ")"); renderPmcon(); return; }
       apprToastShow(txt + " — 적용했습니다(누른 기록에 남음)");
       renderPmcon();

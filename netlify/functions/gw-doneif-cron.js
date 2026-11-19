@@ -83,6 +83,14 @@ async function run(st, nowMs) {
         await push.sendTo(to, { title: '승인 대기 ' + (cands === p.candidates ? last.moved : cands.length) + '건(앱 기준)', body: body.slice(0, 200), url: './', tag: 'task-appbase-' + today }, { ctx: tc, primaryOnly: true, by: '앱 기준' });
         last.notified = to.length;
       }
+      // C185 판2 재확인 2: 승인권자 알림에서 뺀 입·퇴사 후보는 관리자 전원에게 따로 1발(후보가 전부 입·퇴사여도 승인 대기 알림이 누군가에게 감)
+      const hrC = cands === p.candidates ? [] : p.candidates.filter(function (x) { return hrId[x.id]; });
+      const adm = (tc && tc.adminIds) || [];
+      if (hrC.length && adm.length) {
+        const bodyH = hrC.slice(0, 3).map(function (c) { return c.title.slice(0, 28); }).join(' · ') + (hrC.length > 3 ? ' 외 ' + (hrC.length - 3) + '건' : '') + ' — 지시함 [오늘 승인 일괄]';
+        await push.sendTo(adm, { title: '승인 대기 ' + hrC.length + '건(앱 기준 · 입·퇴사)', body: bodyH.slice(0, 200), url: './', tag: 'task-appbase-hr-' + today }, { ctx: tc, primaryOnly: true, by: '앱 기준' });
+        last.notified += adm.length;
+      }
     } catch (e) {}
   }
   try { await blobSet(st, D.DONEIF_LAST, last); } catch (e) {}

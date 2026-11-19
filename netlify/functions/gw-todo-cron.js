@@ -60,14 +60,18 @@ exports.handler = async function (event) {
     if (nfr.ok && nfr.data && nfr.data.events && nfr.data.events.due_digest === 'summary') {
       const tr = await blobGet(st, 'col:tasks');
       const tasks = (tr.ok && tr.data && Array.isArray(tr.data.items)) ? tr.data.items : [];
-      const autos = tasks.filter(function (x) { return x && x.auto_key && x.del !== 1 && x.status !== 'done'; });
-      const due = autos.filter(function (x) { return x.due && String(x.due) <= today; }).length;
-      const noWho = autos.filter(function (x) { return !x.who_id; }).length;
+      const autos0 = tasks.filter(function (x) { return x && x.auto_key && x.del !== 1 && x.status !== 'done'; });
       const ar = await blobGet(st, 'settings:assign');
       const apv = (ar.ok && ar.data && ar.data.approver_id) ? String(ar.data.approver_id) : '';
+      // C185 판2 재확인 1: 승인권자가 관리자가 아니면(명부를 못 읽어 모르면 아닌 쪽) 그 사람에게 가는 수에서 입·퇴사 지시(hr:·acct: — 담당·관리자만 보는 지시)를 뺌 · 관리자에게 보낼 때는 그대로
+      const hrOut = !!(apv && !(ctx && Array.isArray(ctx.adminIds) && ctx.adminIds.indexOf(apv) >= 0));
+      const autos = hrOut ? autos0.filter(function (x) { return !/^(?:hr|acct):/.test(String(x.auto_key || '')); }) : autos0;
+      const due = autos.filter(function (x) { return x.due && String(x.due) <= today; }).length;
+      const noWho = autos.filter(function (x) { return !x.who_id; }).length;
       let to = apv ? [apv] : ((ctx && ctx.adminIds) || []);
       if (gateOn) to = to.filter(function (id) { return !!activeSet[id]; });
       digest = { autos: autos.length, due: due, no_who: noWho, to: to.length };
+      if (hrOut) digest.hr_out = autos0.length - autos.length;
       if (autos.length && to.length) {
         await push.sendTo(to, { title: '자동 지시 요약 ' + autos.length + '건', body: '오늘 기한·경과 ' + due + '건 · 담당 없음 ' + noWho + '건 — 지시함 자동 만기 구역에서 확인', url: './', tag: 'task-digest-' + today }, ctx ? { ctx: ctx, primaryOnly: true } : { primaryOnly: true });
         digest.sent = true;
