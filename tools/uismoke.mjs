@@ -1456,7 +1456,7 @@ try {
     && /apprPendingCreates\.push\(\{ cid: cid, mid: myId\(\), kind: kind, title: \("\[계약\] "/.test(sc) && /t\.status = "review"; t\.done_at = todayStr\(\); t\.done_by = "결재함 상신\("/.test(sc)
     && /function csFetchServerContract\(id\)/.test(sc) && !/contractSha = json\.sha/.test(sc) && /function csSyncFromServer\(c, sc\)/.test(sc) && !/csAdoptIfAhead/.test(html) && /var localAhead = \(lq\.cur \|\| 0\) > \(q\.cur \|\| 0\), base = localAhead \? lq : q/.test(sc) && /if \(csEmpty\(m\.vals\) && !csEmpty\(o\.vals\)\) m\.vals = o\.vals;/.test(sc)
     && /if \(s\.appr\.cid\)\{ if \(x\.cid === s\.appr\.cid\) it = x; return; \}/.test(sc) && /c = findProc\(id\) \|\| c;   \/\/ 응답 대기 중/.test(sc) && /s\.appr\.status = "미전송"; changed = true;/.test(sc) && /Date\.now\(\) - \(Date\.parse\(it\.decided_at\) \|\| 0\) < 20000\) return;/.test(sc)
-    && /function csSaveNow\(\)/.test(sc) && /c\.updated = todayStr\(\); csSaveNow\(\); renderContracts\(\);/.test(sc) && /apprToastShow\("계약을 이 기기에서 찾지 못했습니다/.test(sc) && /function csApprDropped\(ref, cid\)/.test(sc) && /typeof csApprDropped === "function"\)\{ try \{ csApprDropped\(p\.ref, p\.cid\); \}/.test(html)
+    && /function csSaveNow\(\)/.test(sc) && /c\.updated = todayStr\(\); if \(typeof conSaveOut !== "undefined" && conSaveOut > 0\) scheduleContractSave\(\); else csSaveNow\(\); renderContracts\(\);/.test(sc) && /apprToastShow\("결재 결과를 계약 단계에 아직 옮기지 못했습니다/.test(sc) && /function csApprDropped\(ref, cid\)/.test(sc) && /typeof csApprDropped === "function"\)\{ try \{ csApprDropped\(p\.ref, p\.cid\); \}/.test(html)
     && /function csAlignTasksAll\(\)/.test(sc) && /if \(typeof csAlignTasksAll === "function"\)\{ try \{ csAlignTasksAll\(\); \}/.test(html)
     && /if\(c\.scen && csApprKindOf\(c, s\) && !\(s\.appr && s\.appr\.status==="승인"\)\)\{/.test(html) && /return adv===false \? "locked" : "done";/.test(html) && /var adv = advanceProc\(t\);   \/\/ v384 2차 F5/.test(html)
     && /indexOf\("con:"\) === 0\)\{   \/\/ v384/.test(html) && /indexOf\("con:"\) === 0 && typeof csApprOnDecided === "function"\)\{ try \{ csApprOnDecided\(it\); \}/.test(html) && /csApprSync\(c\); h \+= csStagesHtml\(c\);/.test(html) && /csApprSync\(c, true\); return; \}/.test(html) && /data-cs-done="' \+ esc\(c\.id\) \+ '\|' \+ esc\(key\) \+ '">' \+ esc\(ak\) \+ ' 상신</.test(html), '');
@@ -16071,7 +16071,8 @@ try {
   const syn = synP24(html);
   const fnStart = html.indexOf('  function csApprRef('), fnEnd = html.indexOf('}', fnStart);
   const synMut = synP24(html.slice(0, fnEnd) + html.slice(fnEnd + 1));   // 결함 사본: 임의 함수(csApprRef)의 닫는 괄호 하나를 지움
-  const synMut2 = synP24(html.replace('snap: it.snap })){ c.updated = todayStr(); csSaveNow(); renderContracts(); }   // 3차 재검토', 'snap: it.snap })){   // 3차 재검토 c.updated = todayStr(); csSaveNow(); renderContracts(); }'));   // 결함 사본: 54e5eea 꼴 그대로
+  // P1 판40: 그 줄 꼴이 바뀜(끝 주석을 윗줄로 · 저장 겹침 가름) — 같은 결함(줄 가운데 주석이 본문·닫는 괄호를 삼킴)을 새 줄 꼴에 만듦
+  const synMut2 = synP24(html.replace('snap: it.snap })){ c.updated = todayStr(); if (typeof conSaveOut', 'snap: it.snap })){   // 3차 재검토 c.updated = todayStr(); if (typeof conSaveOut'));   // 결함 사본: 54e5eea 꼴 그대로
   T('P1 판24 앱 스크립트 전체 문법: index.html 인라인 스크립트 ' + syn.n + '개 전부 node:vm 파싱 오류 0(실행 안 함) · 결함 사본 2개(함수 닫는 괄호 하나 지움 · 54e5eea 꼴 주석이 본문을 삼킴) = 오류로 잡힘',
     syn.n >= 1 && syn.errs.length === 0 && synMut.errs.length > 0 && synMut2.errs.length > 0, JSON.stringify({ syn, mut: synMut.errs.slice(0, 2), mut2: synMut2.errs.slice(0, 2) }));
   T('P1 판24-③ 화면: 계약 저장 400 CON_APPR_REQUIRED = "계약 저장이 거절됐습니다 … 다시 불러옵니다" 알림 1번 + 서버 값 다시 읽기 1번(실행 — 실제 doSaveContracts) · (검토 B9) 서버 오류 500 APPROVALS_READ_FAILED·502 = "저장되지 않았습니다 … 다시 불러옵니다" 알림 1번 + 다시 읽기 · 다른 400·200 = 알림 0·다시 읽기 0(종전) · 결재 대상 판정 두 벌(앱 csApprKindOf = 서버 _lib/conappr apprKindOf, 표본 ' + SP24.length + ' · 다름 0 · 결재 대상 ≥ 8) · (5차) 400 CON_APPR_REVOKED = "이미 승인된 변경계약은 되돌릴 수 없습니다 …" 알림 + 다시 읽기 · 200 con_kept(서버가 승인 차수를 지킴) = 알림 없이 다시 읽기 · 결함 사본 5개(거절 알림 걷음·5xx 알림 걷음·되돌리기 글 걷음·이월 뒤 다시 읽기 걷음·앱 판정표만 바꿈) = 모두 ✗',
@@ -17499,7 +17500,8 @@ try {
       const g = E.api.find('kR').client;
       E.hold = null; await E.release('PUT200');
       E.other('kR', (s) => { s.client = 'C0'; });
-      await E.release('PUT409'); await E.fire();
+      // P1 판40: 앞 저장이 나가 있는 동안의 결정은 바로 또 보내지 않고 저장 예약 → 타이머가 돌 때 저장(409 → 병합 → 200) — 끝 결과는 종전과 같음
+      await E.fire();
       R.j5b = g + '|' + E.sv('kR').client + '|' + E.sv('kR').pipes[0].stages[1].status + '|' + E.toasts.length;
       R.j5bok = R.j5b === 'C0|C0|done|0'; }
     // 충돌 알림이 남는 꼴(검토 G10~G15·G24): 이 화면 값이 실제로 이긴 진행·단계 칸은 알림 그대로 — 줄 칸 · 단계 키 · 서버가 뺀 단계가 남음 · 계약 둘(앞 계약 알림을 뒤 계약이 지우지 않음) · 기한 표시 이름
@@ -18521,6 +18523,273 @@ try {
   T('P1 판24j 계약 밖 14곳 + 체크 해제 칸 단위(실행 — 실제 공통 길·낙관락 가짜 서버·실제 읽기·저장·409 다시 읽기·병합·doLoad·doSave·toggleItem): ① 자료 15벌(14곳 + 체크 추가 항목) 다른 기기 상태 칸 + 이 화면 다른 칸 = 둘 다·알림 0 · ② 저장 200 뒤 다른 기기가 다시 고친 칸 = 다른 기기 값(차량·휴가·가족친화·현장 대장·홍보) · ③ 같은 칸 = 이 화면 값 + 알림 1(칸 이름 = 화면 글) · ④ 혼자 쓰는 화면 저장 본문 = 종전 병합 사본과 같음(15벌) · ⑤ 차량 만기 표식(알림에서 뺌)·검사 기록 합집합·문서함 지운 사본·서버에서 빠진 문서·영구 삭제한 차량 · ⑥ 받은 사본 없음·예외 = 종전 · ⑦ 체크 해제 지운 표시·옛 판 문서 섞임 · ⑧ 지시 반려 vs 승인 = 반려 덩어리 · ⑨ 옛 판 읽기·로그아웃 사이 읽기 버림(기준 시각도)·나가 있는 저장 중 읽기 병합 · (독립 검토 반영) ⑦-다 옛 판 기기의 다시 체크 남음(X2)·같은 날 체크→해제→체크·회차 키 바뀜 · ⑧-나 묶음 첫 칸만 같은 충돌 알림 · ⑩ 화면 계산 칸 거짓 충돌 0 · ⑪ 차량 만기 서버 동작 뒤 다른 기기 만기 남음 · ⑫ 비관리자 휴가 승인 + 사유 · ⑬ 비관리자 문서함 일부 목록 · ⑭ 지운 문서 + 옛 화면 고침 · 서버에서 빠진 줄 중 고친 줄 남음 · 늦은 옛 판 200 · 나가 있는 저장 0 · 영구 삭제 뒤 다른 기기 고침 남음 · 저장 타이머 창 고침 남음(차량·휴가·체크리스트) · ② 15벌 전부 · 결함 사본 ' + KJ.length + '개 = 각자 맡은 검사 ✗',
     badJ.length === 0 && KJr.every((x) => x.ok), JSON.stringify({ bad: badJ.map((k) => k + '=' + (RJ.I[k] || '')), mut: KJr.filter((x) => !x.ok) }));
 } catch (e) { console.log('  (P1 판24j 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── P1 판40(11/19 운영 장애 — 결재함에서 청구 검수를 승인했는데 계약 단계가 안 넘어가고 지시 탭 [승인]이 막힘): 승인한 기기의 계약 목록에 그 계약이 없으면(앱을 켠 뒤 생긴 계약) 반영을 못 하고 알림 글만 띄우고 끝나던 길 · 다시 해 보는 길 없음
+//   (실행 — 실제 공통 길 window.fetch + 낙관락 가짜 서버(base 409 → 이월 → 결재 대조 scan·judge) + 실제 loadContracts·doSaveContracts·mergeContracts·csApprOnDecided·csApprSync·csApprTake·csApprApply·advanceProc·materializeStage·csOnDone·csAlignTasksAll·apprRefresh · 가짜 시계·타이머)
+//   S1 켠 뒤 생긴 계약 3건 승인(운영 A·B·C 꼴) · S1b 쉬지 않고 연달아 · S1c 들인 사본의 기준 사본 · S2 반려 · S3 상신 기록 없는 기기 + 버린 사본 → 다시 · S3b 상신 저장이 늦게 올라옴 · S3c 끝내 없는 계약
+//   S4 결재함 목록 대조(이미 어긋난 자료 스스로 풀기 — 순서 둘·반려·건드리지 않는 것·횟수 상한) · S5 지시 탭 [승인] 가드에서 다시 확인 · S6 정상 흐름 그대로
+try {
+  const fnH40 = (src, name) => { const i = src.search(new RegExp('\\n  function ' + name + '\\(')); if (i < 0) throw new Error('함수 없음 ' + name); let d = 0, st = false; for (let j = i + 1; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i + 1, j + 1); } } throw new Error('중괄호 ' + name); };
+  const hasH40 = (src, name) => src.search(new RegExp('\\n  function ' + name + '\\(')) >= 0;
+  const varH40 = (src, name) => { const m = new RegExp('\\n  var ' + name + ' ?=[^\\n]*').exec(src); if (!m) throw new Error('변수 없음 ' + name); return m[0].slice(1); };
+  const wrapH40 = (src) => { const a = '  window.fetch = function(url, opts){'; const i = src.indexOf(a); if (i < 0) throw new Error('fetch 대역 없음'); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 2); } } throw new Error('대역 짝'); };
+  const tickH40 = () => new Promise((r) => setImmediate(r));
+  const cloneH40 = (x) => (x === undefined ? undefined : JSON.parse(JSON.stringify(x)));
+  const CAH40 = createRequire(import.meta.url)(join(ROOT, 'netlify', 'functions', '_lib', 'conappr.js'));
+  const FNH40 = ['mTime', 'mergeDel', 'csKeepApproved', 'mgPlain', 'mgKey', 'mgEq', 'mgCopy', 'mgKeysOf', 'mgKind', 'mgWalkKey', 'mgWalkRows', 'conBaseSet', 'conBaseLate', 'conStageIds', 'conProgOf', 'conProgSet', 'conDocsView', 'conWalk3', 'conW3Label', 'conMerge3', 'conConflictToast', 'conSyncKeep', 'conBaseAdvance', 'conCfKept',
+    'mergeContracts', 'doSaveContracts', 'scheduleContractSave', 'loadContracts', 'liveContracts', 'csValEditNote', 'csValEditsApply', 'csValEditsDone', 'csValMerge', 'conIsArr', 'csTitle',
+    'csFetchServerContract', 'csEmpty', 'csApprRank', 'csMergeDocs', 'csChgRank', 'csChgMerge', 'csSyncFromServer', 'csApprPending', 'csApprFind', 'csApprSync', 'csApprTake', 'csApprApply', 'csApprRef', 'csApprOnDecided', 'csSaveNow', 'conStatusFix', 'csAlignTasksAll',
+    'b64EncodeUnicode', 'b64DecodeUnicode', '_ghResp', 'emptyDoc', '_urlCollection', 'saveConflictStop', 'saveConflictToast', 'apprRefresh'];
+  const NEWH40 = ['csApprHealList', 'csApprHeal', 'csApprHealLoaded'];
+  const STUBH40 = new Set(['genId', 'memberName', 'myName', 'myId', 'saveTasksCache', 'scheduleTasksSave', 'renderTasks', 'renderSummary', 'renderContracts', 'alert', 'conBillToRec', 'apprToastShow', 'loadTasks', 'fetch', 'gwCall', 'setTimeout', 'clearTimeout', 'confirm', 'esc', 'csSiteDone', 'conStageDue', 'canSee', 'canDo', 'todayStr', 'findProc', 'csDocsLost', 'csStageDocItems', 'getToken', 'ghHeaders', 'b64EncodeUnicode', 'b64DecodeUnicode', 'runAwardAutoCon', 'conBldgAutoTry', 'renderDashboard', 'curMember', 'isAdmin', 'apprBadgeRender', 'apprOpen', 'apprWaitItems', 'apprHoldItems']);
+  const closeH40 = (H, roots, have) => { const all = new Set([...H.matchAll(/\n  function ([A-Za-z_$][\w$]*)\(/g)].map((m) => m[1])); const got = new Map(); const q = roots.slice(); while (q.length) { const n = q.shift(); if (got.has(n) || STUBH40.has(n) || have.has(n) || !all.has(n)) continue; const b = fnH40(H, n); got.set(n, b); for (const m of b.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g)) q.push(m[1]); } return [...got.keys()]; };
+  const varBlockH40 = (H, name) => { const i = H.search(new RegExp('\\n  var ' + name + ' = \\{')); if (i < 0) throw new Error('변수 없음 ' + name); let d = 0; for (let j = H.indexOf('{', i); j < H.length; j++) { if (H[j] === '{') d++; else if (H[j] === '}') { d--; if (d === 0) return H.slice(i + 1, j + 1) + ';'; } } throw new Error('중괄호 ' + name); };
+  const srcH40 = new Map();
+  const NOWH40 = Date.parse('2026-11-19T01:40:00Z'), DH40 = '2026-11-19';
+  // 가짜 서버(gw-data 꼴): 계약 문서 { items, updated_at } · 저장 = base 대조 409 → 이월 → 결재 대조(scan·judge) → updated_at · 결재함 목록 · 지시는 서버 목록(srvTasks)을 loadTasks 대역이 늦게 들임
+  const mkH40 = (H, items, approvals, tasks0) => {
+    const env = { now: NOWH40, clock: 1000, timers: [], toasts: [], alerts: 0, warns: 0, renders: 0, hold: null, held: [], log: [], bills: 0, loadTasksN: 0, srvTasks: [],
+      srv: { doc: { schema: 1, items: cloneH40(items), updated_at: 1000 }, approvals: cloneH40(approvals || []) } };
+    const gwCallH40 = (fn, b) => {
+      if (b.action === 'approvals_list') { env.log.push('LIST'); return Promise.resolve({ status: 200, body: { items: cloneH40(env.srv.approvals), base: 1 } }); }
+      let ans;
+      if (b.action === 'get') {
+        env.log.push('GET ' + env.srv.doc.updated_at); ans = { status: 200, body: { doc: cloneH40(env.srv.doc) } };
+        if (env.hold && env.hold('GET')) return new Promise((res) => env.held.push({ kind: 'GET', go: () => res(ans) }));
+        return Promise.resolve(ans);
+      }
+      if (b.action === 'save') {
+        const prev = env.srv.doc, oldItems = prev.items, its = cloneH40(b.doc.items || []);
+        if (b.base !== undefined && prev.updated_at && Number(b.base) !== Number(prev.updated_at)) { env.log.push('PUT base ' + b.base + ' → 409'); ans = { status: 409, body: { error_code: 'STALE_BASE' } }; }
+        else {
+          let kept = CAH40.carryStale(oldItems, its); if (CAH40.bareCand(oldItems, its)) kept = kept.concat(CAH40.carryBare(oldItems, its, env.srv.approvals));
+          const bad = CAH40.judge(CAH40.scan(oldItems, its), env.srv.approvals);
+          if (bad.length) { env.log.push('PUT → 400'); ans = { status: 400, body: { error_code: bad.every((x) => x.why === 'APPR_REVOKED') ? 'CON_APPR_REVOKED' : 'CON_APPR_REQUIRED' } }; }
+          else { env.srv.doc = { schema: 1, items: its, updated_at: ++env.clock }; env.log.push('PUT base ' + b.base + ' → 200 ' + env.clock); ans = { status: 200, body: { updated_at: env.clock, con_kept: kept.length ? kept : undefined } }; }
+        }
+        if (env.hold && env.hold('PUT', ans.status)) return new Promise((res) => env.held.push({ kind: 'PUT' + ans.status, go: () => res(ans) }));
+        return Promise.resolve(ans);
+      }
+      return Promise.resolve({ status: 200, body: {} });
+    };
+    let src = srcH40.get(H);
+    if (!src) {
+      const names = FNH40.concat(NEWH40.filter((n) => hasH40(H, n)));
+      const newVars = ['CS_APPR_RETRY_MS', 'CS_APPR_HEAL_MAX'].filter((v) => new RegExp('\\n  var ' + v + ' ?=').test(H)).map((v) => varH40(H, v)).join('\n');
+      src = ['var window = {}; var _colBase = {}, _col409 = {}, _col409t = {}, _COL409_MS = 30000, _colRead403 = {};',
+        'function _rawFetch(){ throw new Error("raw"); } function onSessionInvalid(){} function gwToast(m){ ENV.toasts.push(String(m)); } function imColOn(){ return false; }',
+        ['CON_APPR_REJECT_MSG', 'CON_APPR_REVOKED_MSG', 'CON_SAVE_FAIL_MSG', 'CON_DUP_ID_MSG', 'CON_APPR_OLD_MSG', 'csApprSyncAt', 'csValEdits', 'csSaveDoneSeq', 'conBase', 'CON_W3_SKIP', 'CON_W3_LBL', 'CON_W3_CI'].map((v) => varH40(H, v)).join('\n'), newVars,
+        'var contracts = [], contractSha = null, contractSaveTimer = null, contractsPending = false, CONTRACT_API = "https://api.github.com/repos/x/contents/data/contracts.json", autoGenReady = {}, apprPendingCreates = [];',
+        'var apprItems = [], apprBase = 0, apprBossPresent = true, apprPmPresent = true, apprEverLoaded = false, apprLoadFailed = false, apprGradesLive = null, apprAutoOpen = false, document = { getElementById: function(){ return null; } };',
+        'function curMember(){ return { id: "uA" }; } function isAdmin(){ return ENV.admin !== false; } function apprBadgeRender(){} function apprOpen(){} function apprWaitItems(){ return []; } function apprHoldItems(){ return []; }',
+        'function getToken(){ return "t"; } function ghHeaders(){ return {}; } function alert(){ ENV.alerts++; } function renderTasks(){} function renderSummary(){} function renderDashboard(){} function runAwardAutoCon(){} function conBldgAutoTry(){}',
+        'function todayStr(){ return "2026-11-19"; } function saveTasksCache(){} function scheduleTasksSave(){} function conBillToRec(){ ENV.bills++; } function apprToastShow(m){ ENV.toasts.push(m); } function myName(){ return "시험A"; } function myId(){ return "uA"; }',
+        // 지시 읽기 대역 — 서버 지시 목록을 응답처럼 늦게 들이고(이 기기에 없는 것만) 실제 csAlignTasksAll을 돌림(실제 loadTasks 성공 뒤와 같은 순서)
+        'function loadTasks(){ ENV.loadTasksN++; Promise.resolve().then(function(){ ENV.srvTasks.forEach(function(t){ if (!findTask(t.id)) tasks.push(JSON.parse(JSON.stringify(t))); }); csAlignTasksAll(); }); }',
+        'var tasks = [], genN = 0;', 'function genId(p){ return p + "A" + (++genN); } function memberName(){ return ""; } function csSiteDone(){ return false; } function conStageDue(){ return null; } function canSee(){ return true; } function canDo(){ return true; } function confirm(){ return false; }',
+        ['CON_PROC_SRC', 'CON_MAP', 'CON_ADDED', 'SITE_KIND', 'CON_APPR_KINDS', 'STAGE_DOC_MAP'].map((v) => varH40(H, v)).join('\n'), varBlockH40(H, 'STAGE_DOCS'),
+        closeH40(H, ['materializeStage', 'advanceProc', 'findTask', 'csApprApply', 'csChgOpenAt', 'conDueOn', 'csOnDone', 'csApprKindOf'], new Set(names)).map((n) => fnH40(H, n)).join('\n'),
+        'function csDocsLost(){ return false; } function csStageDocItems(s){ if (conIsArr(s.docs)) return s.docs; return (s.dk || []).map(function(k, i){ return { k: k + ":" + i, t: k, n: "", st: "todo" }; }); }',
+        'function findProc(id){ return contracts.filter(function(c){ return c && c.id === id; })[0] || null; }',
+        'function renderContracts(){ ENV.renders++; }',
+        'var console = { warn: function(){ ENV.warns++; }, log: function(){} };',
+        names.map((n) => fnH40(H, n)).join('\n'), wrapH40(H), 'var fetch = window.fetch;',
+        'return { get: function(){ return contracts; }, find: findProc, load: loadContracts, sched: scheduleContractSave, decided: csApprOnDecided, advance: advanceProc, refresh: apprRefresh, tasks: function(){ return tasks; }, setTasks: function(v){ tasks = v; }, base: function(){ return conBase; },',
+        '  heal: (typeof csApprHeal === "function") ? csApprHeal : null, healList: (typeof csApprHealList === "function") ? csApprHealList : null, healN: function(){ return (typeof csApprHealN !== "undefined") ? csApprHealN : {}; }, setAppr: function(v){ apprItems = v; } };'].join('\n');
+      srcH40.set(H, src);
+    }
+    const fakeDate = { now: () => env.now, parse: (s) => Date.parse(s) };
+    env.api = new Function('ENV', 'gwCall', 'setTimeout', 'clearTimeout', 'Date', 'btoa', 'atob', 'TextEncoder', 'TextDecoder', src)(env, gwCallH40, (fn) => { env.timers.push(fn); return env.timers.length; }, (id) => { if (id) env.timers[id - 1] = null; }, fakeDate,
+      (s) => Buffer.from(s, 'binary').toString('base64'), (s) => Buffer.from(s, 'base64').toString('binary'), TextEncoder, TextDecoder);
+    env.api.setTasks(cloneH40(tasks0 || []));
+    env.flush = async () => { for (let k = 0; k < 40; k++) await tickH40(); };
+    env.fire = async () => { for (let n = 0; n < 60; n++) { const i = env.timers.findIndex((x) => x); if (i < 0) break; const fn = env.timers[i]; env.timers[i] = null; fn(); await env.flush(); } };
+    env.left = () => env.timers.filter((x) => x).length;
+    env.release = async (kind) => { const i = env.held.findIndex((h) => h.kind === kind); if (i < 0) return false; const h = env.held.splice(i, 1)[0]; h.go(); await env.flush(); };
+    env.other = (id, f) => { const it = env.srv.doc.items.filter((x) => x.id === id)[0]; f(it); env.srv.doc = { schema: 1, items: env.srv.doc.items, updated_at: ++env.clock }; };
+    env.add = (c) => { env.srv.doc = { schema: 1, items: env.srv.doc.items.concat([cloneH40(c)]), updated_at: ++env.clock }; };
+    env.sv = (id) => env.srv.doc.items.filter((x) => x.id === id)[0];
+    env.puts = () => env.log.filter((l) => l.indexOf('PUT') === 0).map((l) => (l.split('→ ')[1] || l).split(' ')[0]).join(',');
+    env.gets = () => env.log.filter((l) => l.indexOf('GET') === 0).length;
+    // 결재함에서 이 기기가 결정(서버 결재 문서부터 바뀜 — approval_decide 200 뒤 apprDecide가 csApprOnDecided를 부르는 순서)
+    env.decide = (cid, st) => { const it = env.srv.approvals.filter((x) => x.cid === cid)[0]; it.status = st; it.decided_at = new Date(env.now).toISOString(); it.decided_by = { id: 'uA', name: '시험A' }; if (st === '반려') it.reason = '사유'; env.api.decided(cloneH40(it)); };
+    env.st = (id) => { const c = env.sv(id), s = c ? c.pipes[0].stages[1] : null; return s ? (s.status + '/' + (s.appr ? s.appr.status : '-')) : '없음'; };
+    env.doneTasks = () => env.api.tasks().filter((t) => t.status === 'done' && t.proc_id).length;
+    return env;
+  };
+  // 운영 A·B·D와 같은 꼴: 시나리오 계약의 마지막 단계 '청구 및 입금확인'(결재 종류 청구 검수) · 상신 기록 '대기'(상신 번호만) · 그 단계 지시는 완료 요청(review)
+  const kCH40 = (id, n, noAppr) => ({ id, scen: { type: 'dredge', pub: false, ver: 1 }, type: 'dredge', status: 'active', updated: '2026-11-18', title: 'T' + n, client: 'C' + n, contract_info: { amount: 1000 },
+    pipes: [{ key: 'main', cur: 1, stages: [{ name: '작업 수행', due: 'manual', status: 'done', done_at: '2026-11-18' }, Object.assign({ name: '청구 및 입금확인', due: 'manual', status: 'open', task_id: 't' + n }, noAppr ? {} : { appr: { cid: 'c' + n, kind: '청구 검수', at: '2026-11-18T02:31:00.000Z', by: '기안', by_id: 'uS', status: '대기' } })] }] });
+  const kOH40 = () => ({ id: 'kO', status: 'active', updated: '2026-11-18', title: 'O0', client: 'P0', pipes: [{ key: 'main', cur: 0, stages: [{ name: '작업', status: 'open' }] }] });
+  const apH40 = (n, id, st, at) => ({ id: 'a' + n, cid: 'c' + n, ref: 'con:' + id + '|main|1', kind: '청구 검수', status: st || '대기', created: '2026-11-18T02:31:02.000Z', by: { id: 'uS', name: '기안' }, decided_at: (st === '승인' || st === '반려') ? (at || '2026-11-19T01:12:00.000Z') : undefined, reason: st === '반려' ? '사유' : undefined });
+  const tkH40 = (n, id, st) => ({ id: 't' + n, proc_id: id, pipe: 'main', stage_i: 1, stage_name: '청구 및 입금확인', title: 'J' + n, status: st || 'review', done_at: '2026-11-18', done_by: '결재함 상신(청구 검수)', updated: '2026-11-18' });
+  const runH40 = async (H) => {
+    const R = {};
+    // S1(운영 A·B·C 꼴): 승인하는 기기는 계약 3건이 생기기 전에 켜짐 → 다른 기기가 계약 3건을 만들고 상신 → 이 기기가 결재함에서 차례로 승인 → 세 단계 모두 서버에서 완료·승인 · 계약 종결 · 지시 닫힘 · 알림 0
+    { const E = mkH40(H, [kOH40()], [], []);
+      E.api.load(); await E.flush();
+      for (const n of [1, 2, 3]) { E.add(kCH40('k' + n, n)); E.srv.approvals.push(apH40(n, 'k' + n)); E.srvTasks.push(tkH40(n, 'k' + n)); }
+      for (const n of [1, 2, 3]) { E.decide('c' + n, '승인'); await E.flush(); await E.fire(); }
+      R.s1 = [E.st('k1'), E.st('k2'), E.st('k3')].join(',') + '|' + E.sv('k1').status + '|' + (E.sv('k1').pipes[0].stages[1].appr.id || '-') + '|지시 ' + E.doneTasks() + '|알림 ' + E.toasts.length + '/' + E.alerts + '|남은 타이머 ' + E.left();
+      R.s1ok = R.s1 === 'done/승인,done/승인,done/승인|done|a1|지시 3|알림 0/0|남은 타이머 0'; }
+    // S1b: 같은 꼴에서 세 건을 쉬지 않고 연달아 승인(응답을 기다리지 않음)
+    { const E = mkH40(H, [kOH40()], [], []);
+      E.api.load(); await E.flush();
+      for (const n of [1, 2, 3]) { E.add(kCH40('k' + n, n)); E.srv.approvals.push(apH40(n, 'k' + n)); E.srvTasks.push(tkH40(n, 'k' + n)); }
+      for (const n of [1, 2, 3]) E.decide('c' + n, '승인');
+      await E.flush(); await E.fire(); await E.fire();
+      R.s1b = [E.st('k1'), E.st('k2'), E.st('k3')].join(',') + '|지시 ' + E.doneTasks() + '|알림 ' + E.toasts.length + '/' + E.alerts;
+      R.s1b += '|' + E.puts();
+      R.s1bok = R.s1b === 'done/승인,done/승인,done/승인|지시 3|알림 0/0|409,200,200'; }
+    // S1c: 들인 사본의 기준 사본 — 들인 뒤 저장이 409로 돌아오는 사이 다른 기기가 그 계약 거래처를 고침 → 병합 = 다른 기기 거래처 남음 + 이 기기 승인·진행
+    { const E = mkH40(H, [kOH40()], [], []);
+      E.api.load(); await E.flush();
+      E.add(kCH40('k1', 1)); E.srv.approvals.push(apH40(1, 'k1')); E.srvTasks.push(tkH40(1, 'k1'));
+      E.hold = (k, st) => k === 'PUT' && st === 409; E.decide('c1', '승인'); await E.flush(); E.hold = null;
+      E.other('k1', (s) => { s.client = 'C-다른'; }); await E.release('PUT409'); await E.fire();
+      R.s1c = E.st('k1') + '|' + E.sv('k1').client + '|' + E.toasts.length; R.s1cok = R.s1c === 'done/승인|C-다른|0'; }
+    // S2: 반려도 같은 길(켠 뒤 생긴 계약) — 단계는 열림 그대로 · 상신 기록 '반려' · 사유
+    { const E = mkH40(H, [kOH40()], [], []);
+      E.api.load(); await E.flush();
+      E.add(kCH40('k1', 1)); E.srv.approvals.push(apH40(1, 'k1')); E.srvTasks.push(tkH40(1, 'k1'));
+      E.decide('c1', '반려'); await E.flush(); await E.fire();
+      R.s2 = E.st('k1') + '|' + (E.sv('k1').pipes[0].stages[1].appr.reason || '-') + '|' + E.sv('k1').status + '|' + E.toasts.length; R.s2ok = R.s2 === 'open/반려|사유|active|0'; }
+    // S3: 계약은 이 기기에 있는데 상신 전에 켬(상신 기록 없음) + 승인 직후 읽은 서버 사본을 버림(다른 계약 저장이 나가 있는 순간) → 종전 = 알림 글만 띄우고 끝 → 잠시 뒤 다시 해 단계 완료
+    { const E = mkH40(H, [kCH40('k1', 1, true), kOH40()], [], [tkH40(1, 'k1', 'open')]);
+      E.api.load(); await E.flush();
+      E.other('k1', (s) => { s.pipes[0].stages[1].appr = kCH40('k1', 1).pipes[0].stages[1].appr; }); E.srv.approvals.push(apH40(1, 'k1'));
+      const c = E.api.find('kO'); c.title = 'O-A'; c.updated = DH40; E.api.sched();
+      E.hold = (k) => k === 'PUT'; { const i = E.timers.findIndex((x) => x); const f = E.timers[i]; E.timers[i] = null; f(); await E.flush(); } E.hold = null;
+      E.decide('c1', '승인'); await E.flush();
+      const mid = E.st('k1') + '/' + E.toasts.length + '/' + E.left();
+      await E.release('PUT409'); await E.fire(); await E.fire();
+      R.s3 = mid + '|' + E.st('k1') + '|' + E.sv('kO').title + '|지시 ' + E.doneTasks() + '|알림 ' + E.toasts.length; R.s3ok = R.s3 === 'open/대기/0/1|done/승인|O-A|지시 1|알림 0'; }
+    // S3b: 상신한 기기의 계약 저장이 아직 서버에 없음(결재 카드만 먼저 올라옴) → 다시 해 보는 사이 올라오면 반영
+    { const E = mkH40(H, [kCH40('k1', 1, true), kOH40()], [apH40(1, 'k1')], [tkH40(1, 'k1', 'open')]);
+      E.api.load(); await E.flush();
+      E.decide('c1', '승인'); await E.flush();
+      E.other('k1', (s) => { s.pipes[0].stages[1].appr = kCH40('k1', 1).pipes[0].stages[1].appr; });
+      await E.fire(); await E.fire();
+      R.s3b = E.st('k1') + '|' + E.toasts.length; R.s3bok = R.s3b === 'done/승인|0'; }
+    // S3c: 서버에 끝내 없는 계약 — 정한 횟수만 다시 하고 알림 글 1번 · 타이머 남지 않음
+    { const E = mkH40(H, [kOH40()], [Object.assign(apH40(9, 'kX'))], []);
+      E.api.load(); await E.flush(); const g0 = E.gets();
+      E.decide('c9', '승인'); await E.flush(); await E.fire(); await E.fire();
+      R.s3c = (E.gets() - g0) + '|' + E.toasts.length + '|' + E.left() + '|' + E.puts(); R.s3cok = R.s3c === '6|1|0|'; }
+    // S4a(운영 A·B·D 풀기 — 이미 어긋난 자료): 서버 = 결재 3건 승인 · 단계 상신 기록 '대기'. 관리자 기기가 앱을 켬(계약 목록 → 결재함 목록) → 사람 손 없이 세 단계 완료·계약 종결·지시 닫힘
+    { const E = mkH40(H, [kCH40('k1', 1), kCH40('k2', 2), kCH40('k3', 3), kOH40()], [apH40(1, 'k1', '승인'), apH40(2, 'k2', '승인'), apH40(3, 'k3', '승인')], [tkH40(1, 'k1'), tkH40(2, 'k2'), tkH40(3, 'k3')]);
+      E.api.load(); await E.flush(); const l0 = E.log.length; E.api.refresh(); await E.flush(); await E.fire();
+      const hn = E.api.healN(), seq = E.log.slice(l0).map((l) => l[0]).join('');
+      R.s4a = [E.st('k1'), E.st('k2'), E.st('k3')].join(',') + '|' + [E.sv('k1').status, E.sv('k2').status, E.sv('k3').status].join(',') + '|지시 ' + E.doneTasks() + '|알림 ' + E.toasts.length + '/' + E.alerts + '|' + E.puts() + '|횟수 ' + ['c1', 'c2', 'c3'].map((k) => hn[k] || 0).join('') + '|' + E.left() + '|' + seq;
+      // 요청 순서: 결재함 목록(L) → 계약마다 차례로 서버 사본(G)·결재함 목록(L) → 저장 한 번(P)
+      R.s4aok = R.s4a === 'done/승인,done/승인,done/승인|done,done,done|지시 3|알림 0/0|200|횟수 111|0|LGLGLGLP'; }
+    // S4b: 결재함 목록이 계약 목록보다 먼저 온 순서 — 계약 목록을 읽은 뒤 견줌
+    { const E = mkH40(H, [kCH40('k1', 1), kOH40()], [apH40(1, 'k1', '승인')], [tkH40(1, 'k1')]);
+      E.api.refresh(); await E.flush(); E.api.load(); await E.flush(); await E.fire();
+      R.s4b = E.st('k1') + '|지시 ' + E.doneTasks(); R.s4bok = R.s4b === 'done/승인|지시 1'; }
+    // S4c: 반려로 결정된 것도 견줌 → 상신 기록 '반려'(다시 상신 길) · 단계 열림
+    { const E = mkH40(H, [kCH40('k1', 1), kOH40()], [apH40(1, 'k1', '반려')], [tkH40(1, 'k1')]);
+      E.api.load(); await E.flush(); E.api.refresh(); await E.flush(); await E.fire();
+      R.s4c = E.st('k1'); R.s4cok = R.s4c === 'open/반려'; }
+    // S4d(건드리지 않는 것): 아직 대기인 결재 · 승인 뒤 20초 안(결정한 기기 먼저) · 대상(ref)이 다른 결재 · 다시 상신한 새 번호(옛 반려 카드) · 직원(결재함 목록 안 읽음) → 동기화 읽기 0
+    { const out = [];
+      for (const [aps, admin, mut] of [[[apH40(1, 'k1')], true], [[apH40(1, 'k1', '승인', new Date(NOWH40 - 5000).toISOString())], true], [[Object.assign(apH40(1, 'k1', '승인'), { ref: 'con:k1|main|0' })], true], [[apH40(1, 'k1', '반려')], true, (s) => { s.pipes[0].stages[1].appr.cid = 'c1b'; }], [[apH40(1, 'k1', '승인')], false]]) {
+        const k = kCH40('k1', 1); if (mut) mut(k);
+        const E = mkH40(H, [k, kOH40()], aps, [tkH40(1, 'k1')]); E.admin = admin;
+        E.api.load(); await E.flush(); const g0 = E.gets(); E.api.refresh(); await E.flush(); await E.fire();
+        out.push((E.gets() - g0) + ':' + E.st('k1'));
+      }
+      R.s4d = out.join(','); R.s4dok = R.s4d === '0:open/대기,0:open/대기,0:open/대기,0:open/대기,0:open/대기';
+      // 20초가 지난 뒤 다음 목록에서는 견줌
+      const E = mkH40(H, [kCH40('k1', 1), kOH40()], [apH40(1, 'k1', '승인', new Date(NOWH40 - 5000).toISOString())], [tkH40(1, 'k1')]);
+      E.api.load(); await E.flush(); E.api.refresh(); await E.flush(); await E.fire(); const a = E.st('k1');
+      E.now += 30000; E.api.refresh(); await E.flush(); await E.fire();
+      R.s4d2 = a + '→' + E.st('k1'); R.s4dok = R.s4dok && R.s4d2 === 'open/대기→done/승인'; }
+    // S4e: 같은 상신을 견주는 횟수는 한 번 켠 동안 정한 수까지(동기화가 끝내 못 옮기는 꼴 — 여기서는 동기화가 읽는 결재함 목록이 계속 '대기') → 읽기가 끝없이 늘지 않음
+    { const E = mkH40(H, [kCH40('k1', 1), kOH40()], [apH40(1, 'k1')], [tkH40(1, 'k1')]);
+      E.api.load(); await E.flush(); const g0 = E.gets(); let n = 0;
+      if (E.api.heal) for (let k = 0; k < 6; k++) { n += E.api.heal([apH40(1, 'k1', '승인')]) ? 1 : 0; await E.flush(); await E.fire(); }
+      R.s4e = n + '|' + (E.gets() - g0) + '|' + ((E.api.healN().c1) || 0) + '|' + E.st('k1'); R.s4eok = R.s4e === '2|6|6|open/대기'; }
+    // S4f: 응답이 끝내 안 오는 동기화 하나가 대조를 영영 막지 않음 — 도는 중에는 겹쳐 돌리지 않고(0), 2분 뒤 다음 목록에서는 다시 돌림
+    { const E = mkH40(H, [kCH40('k1', 1), kOH40()], [apH40(1, 'k1', '승인')], [tkH40(1, 'k1')]);
+      E.api.load(); await E.flush();
+      const h = (E.api.heal || (() => 0));
+      E.hold = (k) => k === 'GET'; const a = h(cloneH40(E.srv.approvals)); await E.flush();
+      const b = h(cloneH40(E.srv.approvals));
+      E.hold = null; E.now += 121000; const c = h(cloneH40(E.srv.approvals)); await E.flush(); await E.fire();
+      R.s4f = a + '|' + b + '|' + c + '|' + E.st('k1'); R.s4fok = R.s4f === '1|0|1|done/승인'; }
+    // S5(지시 탭 [승인] — PM 화면 증상): 결재함은 승인인데 이 기기 단계 기록은 '대기' → [승인] = 알림 1번(막음 — 종전과 같음) + 그 자리에서 결재함 결과 다시 확인 → 단계 완료 · 지시 완료
+    { const E = mkH40(H, [kCH40('k1', 1), kOH40()], [apH40(1, 'k1', '승인')], [tkH40(1, 'k1')]); E.admin = false;
+      E.api.load(); await E.flush();
+      const r = E.api.advance(E.api.tasks()[0]); const mid = String(r) + '/' + E.alerts + '/' + E.api.tasks()[0].status;
+      await E.flush(); await E.fire();
+      R.s5 = mid + '|' + E.st('k1') + '|' + E.api.tasks()[0].status + '|' + E.sv('k1').status + '|' + E.alerts; R.s5ok = R.s5 === 'false/1/review|done/승인|done|done|1';
+      // 상신이 아직 대기인 단계 · 상신 자체가 없는 단계 = 막힌 그대로(알림 1번 · 단계 열림 · 지시 완료 요청)
+      const out = [];
+      for (const [k, aps] of [[kCH40('k1', 1), [apH40(1, 'k1')]], [kCH40('k1', 1, true), []]]) {
+        const F = mkH40(H, [k, kOH40()], aps, [tkH40(1, 'k1')]); F.admin = false; F.api.load(); await F.flush();
+        const g0 = F.gets(); const r2 = F.api.advance(F.api.tasks()[0]); await F.flush(); await F.fire();
+        out.push(String(r2) + '/' + F.alerts + '/' + F.st('k1') + '/' + F.api.tasks()[0].status + '/' + (F.gets() - g0) + '/' + F.puts());
+      }
+      R.s5b = out.join(','); R.s5ok = R.s5ok && R.s5b === 'false/1/open/대기/review/1/200,false/1/open/-/review/0/'; }
+    // S6(정상 흐름 그대로): 계약·상신 기록이 있는 기기의 승인 = 바로 완료(다시 하기 타이머 없음) · 같은 결정 두 번 = 한 번과 같음 · 반려 뒤 다시 상신(새 번호) → 승인 = 완료
+    { const E = mkH40(H, [kCH40('k1', 1), kOH40()], [apH40(1, 'k1')], [tkH40(1, 'k1')]);
+      E.api.load(); await E.flush();
+      E.decide('c1', '승인'); await E.flush(); const t0 = E.left(); await E.fire();
+      const a = E.st('k1') + '|' + E.puts() + '|' + E.api.tasks()[0].status;
+      E.api.decided(cloneH40(E.srv.approvals[0])); await E.flush(); await E.fire();
+      const F = mkH40(H, [kCH40('k1', 1), kOH40()], [apH40(1, 'k1')], [tkH40(1, 'k1')]);
+      F.api.load(); await F.flush();
+      F.decide('c1', '반려'); await F.flush(); await F.fire();
+      const b = F.st('k1');
+      const s = F.api.find('k1').pipes[0].stages[1]; s.appr = { cid: 'c1b', kind: '청구 검수', at: '2026-11-19T01:39:00.000Z', by: '기안', by_id: 'uS', status: '대기' }; F.api.sched(); await F.fire();
+      F.srv.approvals.push(Object.assign(apH40(1, 'k1'), { id: 'a1b', cid: 'c1b' }));
+      F.api.refresh(); await F.flush(); await F.fire(); const b2 = F.st('k1');
+      F.decide('c1b', '승인'); await F.flush(); await F.fire();
+      R.s6 = a + '|' + E.puts() + '|' + E.bills + '|' + b + '→' + b2 + '→' + F.st('k1') + '|' + (F.sv('k1').pipes[0].stages[1].appr.id) + '|' + (E.toasts.length + F.toasts.length);
+      R.s6ok = R.s6 === 'done/승인|200|done|200|1|open/반려→open/대기→done/승인|a1b|0'; }
+    // S6b: 계약·상신 기록이 다 있는 기기(상신 뒤에 켬)에서 세 건 승인 — 차례로 · 쉬지 않고 연달아 = 모두 완료 · 알림 0(수리 전에도 되던 길 — 이번 장애의 길이 아님을 가름)
+    { const out = [];
+      for (const fast of [false, true]) {
+        const E = mkH40(H, [kCH40('k1', 1), kCH40('k2', 2), kCH40('k3', 3), kOH40()], [apH40(1, 'k1'), apH40(2, 'k2'), apH40(3, 'k3')], [tkH40(1, 'k1'), tkH40(2, 'k2'), tkH40(3, 'k3')]); E.admin = false;
+        E.api.load(); await E.flush();
+        for (const n of [1, 2, 3]) { E.decide('c' + n, '승인'); if (!fast) { await E.flush(); await E.fire(); } }
+        await E.flush(); await E.fire(); await E.fire();
+        out.push([E.st('k1'), E.st('k2'), E.st('k3')].join(',') + '|지시 ' + E.doneTasks() + '|알림 ' + E.toasts.length + '/' + E.alerts);
+      }
+      R.s6b = out.join(' · '); R.s6bok = R.s6b === 'done/승인,done/승인,done/승인|지시 3|알림 0/0 · done/승인,done/승인,done/승인|지시 3|알림 0/0'; }
+    R.ok = Object.keys(R).filter((k) => /ok$/.test(k)).every((k) => R[k]);
+    return R;
+  };
+  const onceH40 = (src, a, b) => { if (src.split(a).length !== 2) throw new Error('결함 자리 아님: ' + a.slice(0, 60)); return src.replace(a, () => b); };
+  const KGH40 = [
+    ['      if (!c && sc){\n', '      if (false){\n'],
+    ['        if (typeof conBase !== "undefined" && conBase) conBase[id] = JSON.parse(JSON.stringify(sc));\n', ''],
+    ['        if (typeof loadTasks === "function") loadTasks();\n        sc = null;', '        sc = null;'],
+    ['        if (tn < CS_APPR_RETRY_MAX){ setTimeout(function(){ csApprOnDecided(it, tn + 1); }, CS_APPR_RETRY_MS); return; }\n', ''],
+    ['if (tn < CS_APPR_RETRY_MAX){', 'if (tn < 99){'],
+    ['c.updated = todayStr(); if (typeof conSaveOut !== "undefined" && conSaveOut > 0) scheduleContractSave(); else csSaveNow(); renderContracts(); }', 'c.updated = todayStr(); csSaveNow(); renderContracts(); }'],
+    ['        if (typeof csApprHeal === "function"){ try { csApprHeal(apprItems); } catch(e){} }\n', ''],
+    [' if (typeof csApprHealLoaded === "function"){ try { csApprHealLoaded(); } catch(e){} }', ''],
+    ['      if (s.appr && (s.appr.status === "대기" || s.appr.status === "보류") && typeof csApprSync === "function"){ try { csApprSync(c, true); } catch(e){} }\n', ''],
+    ['    return csFetchServerContract(id).then(function(sc){\n      c = findProc(id) || c;', '    csFetchServerContract(id).then(function(sc){\n      c = findProc(id) || c;'],
+    ['        if (x.status === "승인" && x.decided_at && now - (Date.parse(x.decided_at) || 0) < 20000) return;\n', ''],
+    ['if (!x || x.ref !== csApprRef(c, p, i) || (csApprHealN[x.cid] || 0) >= CS_APPR_HEAL_MAX) return;', 'if (!x || (csApprHealN[x.cid] || 0) >= CS_APPR_HEAL_MAX) return;'],
+    ['if (!x || x.ref !== csApprRef(c, p, i) || (csApprHealN[x.cid] || 0) >= CS_APPR_HEAL_MAX) return;', 'if (!x || x.ref !== csApprRef(c, p, i)) return;'],
+    ['indexOf("con:") === 0 && (x.status === "승인" || x.status === "반려")) by[x.cid] = x; });', 'indexOf("con:") === 0 && x.status === "승인") by[x.cid] = x; });'],
+    ['s.appr.cid && s.appr.status !== "승인" && s.appr.status !== "반려") ? by[s.appr.cid] : null;', 's.appr.cid) ? by[s.appr.cid] : null;'],
+    ['      if (pn < 2 && csApprHealList(items).length) setTimeout(function(){ csApprHeal(items, pn + 1); }, CS_APPR_RETRY_MS);\n', ''],
+    ['(csApprHealBusy && Date.now() - csApprHealAt < 120000)', 'csApprHealBusy'],
+  ];
+  const RH40 = await runH40(html);
+  // 결함 사본 — 고친 줄마다(빼거나 되돌리면 위 길 가운데 하나가 ✗)
+  const KH40r = [];
+  for (const [a, b] of KGH40) { let r; try { r = await runH40(onceH40(html, a, b)); } catch (e) { r = { ok: false, threw: e.message }; } KH40r.push(!r.ok); }
+  T('P1 판40 결재함 승인 뒤 계약 단계 반영(실행 — 실제 공통 길·낙관락 가짜 서버·실제 csApprOnDecided·csApprSync·csApprHeal·advanceProc·apprRefresh·loadContracts·doSaveContracts): S1 앱을 켠 뒤 다른 기기가 만든 계약 3건을 결재함에서 승인 = 서버 사본을 들여 세 단계 완료·승인·계약 종결·지시 3건 닫힘·알림 0(수리 전: 단계 대기 그대로·저장 0·알림 글만) · S1b 쉬지 않고 연달아 승인 = 저장 409 한 번·충돌 멈춤 알림 0 · S1c 들인 뒤 다른 기기가 고친 거래처 남음(기준 사본) · S2 반려 = 상신 기록 반려·단계 열림 · S3 상신 기록 없는 기기가 사본을 버린 회차 = 잠시 뒤 다시 해 완료 · S3b 상신한 기기의 계약 저장이 늦게 올라와도 반영 · S3c 서버에 없는 계약 = 다섯 번 다시 하고 알림 1번·타이머 0 · S4a 이미 어긋난 서버 자료(결재 승인 3 · 단계 대기 3 — 운영 A·B·D)를 관리자 기기가 켜면 결재함 목록 대조로 사람 손 없이 완료(계약마다 차례로 · 저장 1번) · S4b 결재함 목록이 먼저 온 순서 · S4c 반려 대조 · S4d 대기·승인 뒤 20초 안·대상이 다른 결재·다시 상신한 새 번호·직원 = 읽기 0 · S4e 같은 상신 대조 횟수 상한 · S4f 응답 없는 동기화가 대조를 2분 넘게 막지 않음 · S5 지시 탭 [승인] = 알림 1번 뒤 그 자리에서 결재함 다시 확인 → 단계·지시 완료(대기·상신 없음은 막힌 그대로) · S6 계약·상신 기록이 있는 기기 승인·같은 결정 두 번·반려 뒤 다시 상신 → 승인 = 종전과 같음 · S6b 계약·상신 기록을 든 기기의 세 건 승인(차례로 · 쉬지 않고) = 모두 완료(수리 전에도 되던 길)',
+    RH40.ok, JSON.stringify(RH40));
+  T('P1 판40 결함 사본 ' + KGH40.length + '개(없는 계약 들이기 걷음 · 들인 사본의 기준 사본 없음 · 지시 다시 읽기 없음 · 다시 하기 없음 · 다시 하기 끝없음 · 저장 겹쳐 보내기 · 결재함 목록 대조 걷음 · 계약 읽은 뒤 대조 걷음 · 지시 탭 가드 다시 확인 걷음 · 차례로 돌리기 걷음 · 20초 규칙 걷음 · 대상 짝 안 봄 · 횟수 상한 없음 · 반려 대조 뺌 · 결정된 단계도 대조 · 남은 것 한 번 더 걷음 · 도는 중 표시 2분 무시 걷음) = 모두 ✗',
+    KGH40.length === 17 && KH40r.every((x) => x), JSON.stringify(KH40r));
+} catch (e) { console.log('  (P1 판40 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ── v489(판24f — 계약 저장 충돌 병합을 칸 단위로 · 원장 C196): 실행 검사는 위 'P1 판24f' 블록 · 여기는 문서·판 번호 정확 검사 + 칸 단위 병합을 부르는 줄·기준 사본을 세우는 줄 등 고정 글 12줄이 그대로 한 번씩 있는지 — 다음 판은 기준 줄·sw를 '489 이상'으로 풀 것
 try {
