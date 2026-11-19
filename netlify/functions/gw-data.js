@@ -74,6 +74,18 @@ function taskRecHiddenFor(member, t) {
   if ((t.from_id && t.from_id === member.id) || (t.from && t.from === member.name)) return false;
   return true;
 }
+// C185 판2: 입·퇴사 지시(키 hr:·acct:)는 담당·관리자만 — 담당(who_id)·공개 범위(scope)·지시자가 아니면 비관리자에게 숨김(미래 퇴사일·입사 사실이 다른 직원에게 드러나지 않게).
+//   키 꼴은 넓게(hr:·acct:로 시작하면 — 서버 실행기만 만드는 꼴, 앱 저장은 이 꼴을 못 단다)
+function taskHrHiddenFor(member, t) {
+  if (!member || member.admin || !t) return false;
+  if (!/^(?:hr|acct):/.test(String(t.auto_key || ''))) return false;
+  if (member.id && t.who_id === member.id) return false;
+  if (Array.isArray(t.scope) && member.id && t.scope.indexOf(member.id) >= 0) return false;
+  if (t.from_id && t.from_id === member.id) return false;
+  return true;
+}
+// 비관리자에게 숨는 지시 = 기성 연동 지시(v464 — 기성 숨김 직원) ∨ 입·퇴사 지시(C185 판2). 읽기 거름·저장 이월이 이 한 함수를 부른다
+function taskHiddenFor(member, t) { return taskRecHiddenFor(member, t) || taskHrHiddenFor(member, t); }
 // 인가된 기기만 데이터 접근. 관리자는 항상 허용.
 async function deviceApproved(event, member) {
   if (member.admin) return true;
@@ -311,8 +323,8 @@ async function handleGet(event, d, R) {
     const ds = await docSettings(store(DATA));
     doc = Object.assign({}, doc, { items: doc.items.filter(function (it) { return docVisible(c.member, it, ds); }) });
   }
-  if (col === 'tasks' && !c.member.admin && Array.isArray(doc.items)) {   // v464 C078 ①: 기성 숨김 직원에게 기성 연동 지시 빼고
-    doc = Object.assign({}, doc, { items: doc.items.filter(function (t) { return !taskRecHiddenFor(c.member, t); }) });
+  if (col === 'tasks' && !c.member.admin && Array.isArray(doc.items)) {   // v464 C078 ①: 기성 숨김 직원에게 기성 연동 지시 빼고 · C185 판2: 입·퇴사 지시는 담당·관리자만
+    doc = Object.assign({}, doc, { items: doc.items.filter(function (t) { return !taskHiddenFor(c.member, t); }) });
   }
   return jr(200, { status: 'OK', collection: col, doc, can_write: p === 'do', request_id: R });
 }
@@ -451,13 +463,14 @@ async function handleSave(event, d, R) {
     purgeExpiredBids(doc, cutO);
   }
   // v395 배정표(기반 1·9): 자동 지시의 서버 배정 who_id(who_by 'assign')는 클라 사본이 공란으로 올려도 이월 + 남은 공란은 배정표로 채움
-  if (col === 'tasks' && !c.member.admin && Array.isArray(doc.items) && permOf(c.member, 'receivables') === 'hide') {
+  // C185 판2(계획 검토 1): 진입 조건을 비관리자 전원으로 — 기성 '보기' 직원도 입·퇴사 지시를 받지 않았으니 그 저장이 숨은 지시를 지우지 않게 이월(기성 갈래는 taskRecHiddenFor 안에서 숨김 직원에게만 참 — 종전 그대로)
+  if (col === 'tasks' && !c.member.admin && Array.isArray(doc.items)) {
     // v464 C078 ①: 이 직원은 기성 연동 지시를 받지 않았다 — 빠진 지시는 서버 원본 이월, 사본에 남은 같은 id(받기 전 캐시)도 서버 원본으로. 못 읽었으면 지시가 지워질 수 있어 저장 거부
     if (prevReadFailed) return jr(500, { status: 'ERROR', error_code: 'PREV_READ_FAILED', request_id: R });
-    const hidOld = {}; oldItems.forEach(function (o) { if (o && o.id && taskRecHiddenFor(c.member, o)) hidOld[o.id] = o; });
+    const hidOld = {}; oldItems.forEach(function (o) { if (o && o.id && taskHiddenFor(c.member, o)) hidOld[o.id] = o; });
     const seenT = {};
     doc.items = doc.items.map(function (t) { if (t && t.id && hidOld[t.id]) { seenT[t.id] = 1; return hidOld[t.id]; } return t; })
-      .filter(function (t) { return !(t && taskRecHiddenFor(c.member, t) && !(t.id && hidOld[t.id])); });   // 서버에 없던 기성 연동 지시를 이 직원이 새로 만들 길은 없음(입금확인·미수 45일은 관리자·기성 화면에서) — 버림
+      .filter(function (t) { return !(t && taskHiddenFor(c.member, t) && !(t.id && hidOld[t.id])); });   // 서버에 없던 기성 연동 지시를 이 직원이 새로 만들 길은 없음(입금확인·미수 45일은 관리자·기성 화면에서) — 버림
     Object.keys(hidOld).forEach(function (id) { if (!seenT[id]) doc.items.push(hidOld[id]); });
   }
   if (col === 'tasks' && Array.isArray(doc.items)) {
@@ -1017,6 +1030,7 @@ async function handleAutotaskIngest(event, d, R) {
   if (srvIds.length) { try { srvIn = await evInput(st, srvIds); } catch (e) { srvIn = {}; } }   // 입력(명부·배정표·차량·대장·계약·근거 승격)을 지시 문서보다 먼저 한 번 — 지시 읽기~쓰기 사이를 늘리지 않게
   const r = await blobGet(st, colKey('tasks'));
   if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: 'TASKS_READ_FAILED', request_id: R });   // C185 판1 검토 C: 지시 문서를 못 읽었으면 쓰지 않는다(종전엔 빈 문서로 보고 덮어 기존 지시가 사라짐). 없는 문서 = 실 blobs.js ok·null(·시험 가짜 저장소 NOT_FOUND)만 빈 문서
+  if (r.ok && r.data && !Array.isArray(r.data.items)) return jr(500, { status: 'ERROR', error_code: 'TASKS_READ_FAILED', request_id: R });   // C185 판2(ⓙ 7): 읽히긴 했는데 꼴이 깨진 문서(items 배열 아님)도 덮지 않음
   const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
   await verSnapshot('tasks', doc, '정기봇', true);
   const today = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
@@ -1089,7 +1103,8 @@ async function handleAutotaskIngest(event, d, R) {
   const notifyItems = quiet ? [] : doc.items.filter(function (t) { return t && t.auto_key && t.who_id && notLd(t) && !licNew[t.id] && (t.created === today && !have0[t.auto_key] || blankBefore[t.id]); });   // P1 판20 인허가 기한 지시는 아래 licDutyNotify 한 길
   for (let i = notifyItems.length - 1; i >= 0; i--) if (srvNew.indexOf(notifyItems[i]) >= 0) notifyItems.splice(i, 1);   // C185 판1 검토 A: 실행기가 만든 지시는 저장 뒤 알림(아래) — 일반 알림 길(저장 앞 · 종전 그대로)에서 뺌
   let notified = 0;
-  if (notifyItems.length) notified = await notifyAutoCreated(st, notifyItems, '정기봇');
+  const notSeen = {};   // C185 판2(ⓙ 1): 일반·실행기 알림을 받은 사람(응답 notified = 사람 수 한 번씩)
+  if (notifyItems.length) notified = await notifyAutoCreated(st, notifyItems, '정기봇', { seen: notSeen });
   const blockTxt = blocked ? ' · 스위치 막음 ' + blocked + '(' + Object.keys(blockedBy).map(function (k) { return k + ' ' + blockedBy[k] + ' — ' + (k === 'unknown' ? '허용 꼴 밖' : sw.rules[k]); }).join(', ') + ')' : '';   // v453 규칙 이름·건수·스위치 값만(키·본문 없음)
   const licTxt = !lic ? '' : (lic.skip ? ' · 인허가 기한 건너뜀(' + lic.skip + ')' : ((lic.bundled || lic.made || lic.bumped || lic.moved || lic.next || lic.no_who || lic.reopened) ? ' · 인허가 기한 ' + (lic.bundled ? '묶음 ' + lic.bundled + ' · ' : '') + '새 ' + lic.made + ' · 단계 올림 ' + lic.bumped + (lic.moved ? ' · 담당 옮김 ' + lic.moved : '') + (lic.next ? ' · 다음 회차 ' + lic.next : '') + (lic.reopened ? ' · 다시 엶 ' + lic.reopened : '') + (lic.no_who ? ' · 담당 없음 ' + lic.no_who + '행' : '') : ''));   // P1 판20 수·행 수만
   if (made || fixed || assigned || (lic && lic.touched) || srvTouched) {
@@ -1104,9 +1119,9 @@ async function handleAutotaskIngest(event, d, R) {
   if (lic && lic.notify) { licSent = await licDutyNotify(lic.notify, today); delete lic.notify; }   // 저장된 뒤에만(저장 실패면 위에서 500으로 끝남)
   if (lic) lic.notified = licSent;
   let srvSent = 0;
-  if (srvNew.length) srvSent = await notifyAutoCreated(st, srvNew, '정기봇');   // C185 판1 검토 A: 실행기 지시의 담당 알림은 저장이 된 뒤에만(저장 실패면 위에서 500 — 지시 없는 알림·재시도 때 겹친 알림 없음)
+  if (srvNew.length) srvSent = await notifyAutoCreated(st, srvNew, '정기봇', { tag: 'auto-srv', seen: notSeen });   // C185 판1 검토 A: 실행기 지시의 담당 알림은 저장이 된 뒤에만(저장 실패면 위에서 500 — 지시 없는 알림·재시도 때 겹친 알림 없음)
   const srvOut = srv ? EV.botSum(srv) : null;   // 검토 E: 봇에 돌려주는 칸은 수만(담당 id 목록 없음)
-  return jr(200, Object.assign({ status: 'OK', made: made, redo: redo, fixed: fixed, assigned: assigned, notified: notified + srvSent, blocked: blocked, blocked_rules: blockedBy, request_id: R }, lic ? { lic: lic } : {}, srvOut ? { srv: srvOut } : {}, quiet ? { only: only ? 'lic_duty' : 'srv' } : {}));   // C185 판1: srv = 범위 밖 규칙별 수(live 규칙이 있을 때만)
+  return jr(200, Object.assign({ status: 'OK', made: made, redo: redo, fixed: fixed, assigned: assigned, notified: srvSent ? Object.keys(notSeen).length : notified, blocked: blocked, blocked_rules: blockedBy, request_id: R }, lic ? { lic: lic } : {}, srvOut ? { srv: srvOut } : {}, quiet ? { only: only ? 'lic_duty' : 'srv' } : {}));   // C185 판1: srv = 범위 밖 규칙별 수(live 규칙이 있을 때만)
 }
 
 // P1 판20 인허가 기한 지시 — 입력 모으기(한 곳). 탭(lic_month_get)과 같은 원천: 근거 승격본 자동 회차 행(licBgRead → licBgOut 칸) · col:licenses duties·items · 배정표(엄격 — 못 읽으면 건너뜀, 빈 표로 보지 않음).
@@ -2755,7 +2770,9 @@ async function notifyLeaves(st, oldItems, newItems, member) {
   }
   return out;
 }
-async function notifyAutoCreated(st, items, by) {
+// C185 판2(ⓙ 1): opts.tag = 알림 꼬리표 머리(기본 'auto-new' — 실행기 지시는 'auto-srv'라 같은 날 같은 담당의 일반 자동 지시 알림을 덮지 않음) · opts.seen = 보낸 담당 id를 모으는 표(응답 사람 수를 한 번만 세게)
+async function notifyAutoCreated(st, items, by, opts) {
+  const tagHead = (opts && typeof opts.tag === 'string' && opts.tag) ? opts.tag : 'auto-new', seen = (opts && opts.seen && typeof opts.seen === 'object') ? opts.seen : null;
   try {
     const nf = await notifyRead(st); if (nf.events.task_auto_create !== 'assignee') return 0;
     const byWho = {};
@@ -2767,8 +2784,8 @@ async function notifyAutoCreated(st, items, by) {
     for (const who of whos) {
       const list = byWho[who];
       const body = list.slice(0, 3).map(function (t) { return String(t.title || '').slice(0, 30) + (t.due ? ' ~' + t.due : ''); }).join(' · ') + (list.length > 3 ? ' 외 ' + (list.length - 3) + '건' : '');
-      await push.sendTo([who], { title: '자동 지시 ' + list.length + '건', body: body.slice(0, 200), url: './', tag: 'auto-new-' + who + '-' + today }, { ctx: tc, primaryOnly: true, by: by || '자동' });
-      n++;
+      await push.sendTo([who], { title: '자동 지시 ' + list.length + '건', body: body.slice(0, 200), url: './', tag: tagHead + '-' + who + '-' + today }, { ctx: tc, primaryOnly: true, by: by || '자동' });
+      n++; if (seen) seen[who] = 1;
     }
     return n;
   } catch (e) { return 0; }
@@ -3029,7 +3046,8 @@ async function autotaskRead(st) {
       const rules = autotaskDefaults();
       Object.keys(r.data.rules).forEach(function (k) { if (autotaskValid(k, r.data.rules[k])) rules[k] = r.data.rules[k]; });
       Object.keys(rules).forEach(function (k) { if (rules[k] === 'live' && !autotaskReady(k)) rules[k] = 'dry'; });   // C185 판1 검토 I: 준비 안 된 규칙이 문서에 live로 남아 있어도(되돌린 배포·직접 쓰기) 유효 값은 연습 — 문서는 고쳐 쓰지 않음
-      return { rules: rules, since: autotaskSince(r.data.since), prev: r.data.prev || null, updated_at: r.data.updated_at || 0, updated_by: r.data.updated_by || '' };   // C185 판1 since = 규칙별 켠 시각(ms)
+      const stale = {}; Object.keys(r.data.rules).forEach(function (k) { if (r.data.rules[k] === 'live' && hasOwn(rules, k) && rules[k] !== 'live') stale[k] = 1; });   // C185 판2(ⓙ 2): 문서엔 live인데 유효 값을 연습으로 내린 규칙(그 규칙을 연습으로 저장하면 '값이 같음'으로 막지 않게)
+      return { rules: rules, stale: stale, since: autotaskSince(r.data.since), prev: r.data.prev || null, updated_at: r.data.updated_at || 0, updated_by: r.data.updated_by || '' };   // C185 판1 since = 규칙별 켠 시각(ms)
     }
   } catch (e) {}
   return { rules: autotaskDefaults(), since: {}, prev: null, updated_at: 0, updated_by: '' };
@@ -3112,7 +3130,7 @@ async function handleAutotaskSet(event, d, R) {
   const st = store(DATA);
   const a = await autotaskRead(st);
   if (d.base !== undefined && Number(d.base) !== Number(a.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'AUTOTASK_STALE', request_id: R });
-  if (a.rules[rule] === mode) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
+  if (a.rules[rule] === mode && !(a.stale && a.stale[rule])) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });   // C185 판2(ⓙ 2): 문서엔 live로 남은 준비 안 된 규칙을 연습으로 저장 = 문서를 고쳐 씀(막지 않음)
   const next = Object.assign({}, a.rules); next[rule] = mode;
   // C185 판1 켠 시각: live가 아닌 데서 live로 바뀌는 저장에서 그 규칙만 지금 시각 · live에서 내리면 지움(다시 켜면 새로 찍혀 그 사이 사건은 세지 않음) · 직전 판에도 같이 · 값이 있을 때만 칸
   const since = Object.assign({}, a.since || {});
@@ -3135,7 +3153,7 @@ async function handleAutotaskRevert(event, d, R) {
   if (!a.prev || !a.prev.rules) return jr(400, { status: 'REJECTED', error_code: 'NO_PREV', request_id: R });
   if (d.base !== undefined && Number(d.base) !== Number(a.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'AUTOTASK_STALE', request_id: R });
   const rules = autotaskDefaults(); Object.keys(a.prev.rules).forEach(function (k) { if (autotaskValid(k, a.prev.rules[k])) rules[k] = a.prev.rules[k]; });
-  if (Object.keys(rules).some(function (k) { return rules[k] === 'live' && !autotaskReady(k); })) return jr(400, { status: 'REJECTED', error_code: 'RULE_NOT_READY', request_id: R });   // C185 판1 — 준비 안 된 규칙을 되돌림으로 켜지 않음
+  Object.keys(rules).forEach(function (rk) { if (rules[rk] === 'live' && !autotaskReady(rk)) rules[rk] = 'dry'; });   // C185 판2(ⓙ 8): 직전 판에 준비 안 된 규칙의 live가 있으면 그 규칙만 연습으로 낮춰 진행(종전 400 대신)   // C185 판1 — 준비 안 된 규칙을 되돌림으로 켜지 않음
   // C185 판1 켠 시각: 되돌린 결과 새로 live가 된 규칙 = 지금 시각 · 그대로 live인 규칙 = 지금 값 · 나머지 = 없음
   const now0 = Date.now(), since = {};
   Object.keys(rules).forEach(function (k) { if (rules[k] !== 'live') return; if (a.rules[k] !== 'live') since[k] = now0; else if (a.since && a.since[k]) since[k] = a.since[k]; });

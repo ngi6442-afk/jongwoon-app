@@ -53,6 +53,7 @@ const CAP = 10;        // 한 규칙이 한 실행에 새로 만들 사건(사�
 const DRY_WIN = 30;    // 연습 요약 = 최근 30일에 생긴 사건을 켰다면(보여 주기용)
 const DAY = 86400000;
 const TITLE_MAX = 120;   // 지시 제목 상한(ingest·실행기가 만들 때와 같음)
+const PLAN_TITLE_MAX = 100, PLAN_DETAIL_MAX = 430;   // C185 판2(ⓙ 3): 계획 함수가 내는 글 상한 — 표시 머리(20자 안팎)·까닭 줄(60자 안팎)을 붙여도 120·500 안
 // 검토 E: 봇에 돌려주는 규칙별 칸은 수와 건너뜀 까닭만(담당 id 목록·근거 행 id 없음)
 const BOT_KEYS = ['mode', 'events', 'tasks', 'no_who', 'no_due', 'marked', 'unmarked', 'gone', 'old', 'skip'];
 function botSum(res) { const o = {}; Object.keys(res || {}).forEach(function (k) { const s = res[k] || {}, b = {}; BOT_KEYS.forEach(function (f) { if (s[f] !== undefined) b[f] = s[f]; }); o[k] = b; }); return o; }
@@ -145,6 +146,8 @@ function run(id, input, ctx, tasks, opt, write) {
     });
   });
   if (bad) { sum.skip = 'PII'; out.txt = id + ' 멈춤(글 검사)'; return out; }
+  // C185 판2(ⓙ 3): 계획 함수 글 길이 — 제목 100자·본문 430자 넘으면 그 규칙을 그 실행에 0건(옛 지시 표시 머리·까닭 줄을 붙여도 120·500자 안에서 잘리지 않게 — 틀에서 한 번, 모든 규칙)
+  if (plans.some(function (mk) { return mk.some(function (e) { return String(e.x.title || '').length > PLAN_TITLE_MAX || String(e.x.detail || '').length > PLAN_DETAIL_MAX; }); })) { sum.skip = 'TEXT_LONG'; out.txt = id + ' 멈춤(글 길이)'; return out; }
   const by = {};
   plans.forEach(function (mk) {
     mk.forEach(function (e) {
@@ -175,4 +178,62 @@ function run(id, input, ctx, tasks, opt, write) {
   return out;
 }
 
-module.exports = { KEY_RE, isEvKey, isEvLike, ruleOfKey, subjOf, RULES, RULE_IDS, BASE_NEEDS, CAP, DRY_WIN, ready, needsOf, kstDay, ctxFor, emptySum, skipSum, notReadySum, MARK, MARK_WHY, markedKind, markTask, unmarkTask, run, botSum, TITLE_MAX };
+// ---- C185 판2 ① 입사(hr_join) — 계획 함수(착수계획 ⓒ ① · 판2 행) ----
+//   사건 = 삭제·시험 계정·지입차주·이미 퇴사가 아닌 회원 ∧ 입사일이 달력 날짜 ∧ 입사일 ≥ 켠 날(KST) ∧ (등록 시각 created ≥ 켠 시각 ∨ 재입사 표식 join_ev.at0 ≥ 켠 시각 — 표식을 찍는 일은 판3)
+//   지시 = 아래 항목 표 한 줄에 하나(인사 7 + 계정 1) · 키에 회원 id·입사일·번호(같은 사람·같은 날짜·같은 항목은 한 번) · 글에 이름 없음(대상은 회원 id — 화면 [인사 카드] 단추가 잇는다)
+//   공개 범위 = 담당만(priv) · 끼워 넣는 값(vals) = 입사일(MM/DD)뿐 · 기한 = 인사 근거 승격일 때만(짝 근거 행이 승격본에 있고 calc 참일 때 · 사규 항목은 입사일 그대로) — 아니면 기한 없이
+//   입사일을 고치면 새 키로 다시 생기고 옛 날짜의 열린 지시엔 '날짜 바뀜' 표시(틀 run이 subjects로) · 입사일을 지우면 표시만 · 되돌리면 표시가 떨어짐
+//   항목을 더하거나 빼는 일 = HR_JOIN_ITEMS 한 줄 + servertest 'C185 판2' 표본(항목 수·키·제목)
+const HR_JOIN_ITEMS = [   // no(키 번호 — 바꾸지 말 것) · pre(키 접두어 = 배정표 줄) · t(제목 꼬리) · due(day0 = 입사일 · day14 = 입사일 + 14일 · '' = 기한 없음) · row(짝 인사 근거 행 id — '' = 사규 기준) · d(본문)
+  { no: 1, pre: 'hr:', t: '근로계약서 작성·교부', due: 'day0', row: 'law.lsa.17', d: '근로계약서를 작성해 교부합니다(아르바이트는 아르바이트 양식).' },
+  { no: 2, pre: 'hr:', t: '4대보험 취득 신고', due: 'day14', row: 'law.nhi.8-2', d: '건강보험은 취득일부터 14일 안, 고용보험·국민연금은 다음 달 15일까지 신고합니다(기한은 빠른 쪽). 신고한 날 [완료]를 눌러 주세요.' },
+  { no: 3, pre: 'hr:', t: '서약서 작성', due: 'day0', row: '', d: '규정 준수 및 정보보호 서약서를 받습니다.' },
+  { no: 4, pre: 'hr:', t: 'GPS 동의서(운전 업무자만)', due: '', row: '', d: '차량 운전 업무를 맡는 경우에만 차량 GPS 동의서를 받습니다. 해당 없으면 [완료]를 눌러 주세요.' },
+  { no: 5, pre: 'hr:', t: '규정 전달·채용 때 안전보건교육', due: '', row: '', d: '취업규칙·사내 규정을 전달하고 채용 때 안전보건교육을 합니다. 교육 기록은 안전 › 체크 칸에 남깁니다.' },
+  { no: 6, pre: 'hr:', t: '보호구 지급', due: 'day0', row: '', d: '업무에 맞는 보호구를 지급합니다.' },
+  { no: 7, pre: 'acct:', t: '계정 부여·관리대장 등재', due: 'day0', row: '', d: '그룹웨어 계정을 만들고 계정 관리대장에 적습니다. 그 직원의 기기가 승인되면 승인 대기로 올라갑니다(기기를 쓰지 않는 직원은 [완료]).' },
+  { no: 8, pre: 'hr:', t: '비상연락처 확보', due: 'day0', row: '', d: '비상연락처를 받아 인사 카드에 적습니다.' },
+];
+const HR_JOIN_TAIL = ' 대상 직원은 지시 펼침의 [인사 카드]에서 확인합니다.';
+function hrJoinKey(mid, hire, it) { return it.pre === 'acct:' ? 'acct:' + mid + ':join:' + hire : 'hr:' + mid + ':join:' + hire + ':' + it.no; }
+function realDate(s) { if (!isDate(s)) return false; const t = new Date(s + 'T00:00:00Z'); return !isNaN(t.getTime()) && t.toISOString().slice(0, 10) === s; }
+function addDaysK(s, n) { return new Date(Date.parse(s + 'T00:00:00Z') + n * DAY).toISOString().slice(0, 10); }
+function retiredK(m, today) { const ld = m && m.leave_date; return !!ld && String(ld) < today; }   // _lib/tier.js retired와 같은 식(오늘 = 실행 날짜)
+function planHrJoin(input, ctx) {
+  const ms = Array.isArray(input.members) ? input.members : [];
+  const hb = input.hrbg || null, bgOn = !!(hb && hb.on === true && hb.bg && Array.isArray(hb.bg.rows));
+  const rowOk = {};
+  if (bgOn) hb.bg.rows.forEach(function (r) { if (r && typeof r.id === 'string' && r.calc === true) rowOk[r.id] = 1; });
+  const out = { events: [], subjects: {}, old: 0, no_row: [], ref: { new: 0, no_hire: 0, jiip: 0, test: 0, del: 0, retired: 0, rejoin: 0, past12: 0, bg_off: bgOn ? 0 : 1 } };
+  const noRow = {}, today = ctx.today, y1 = addDaysK(today, -365);
+  ms.forEach(function (m) {
+    if (!m || typeof m.id !== 'string' || !m.id) return;
+    const hire = String(m.hire_date || ''), hireOk = realDate(hire);
+    if (m.del !== 1) out.subjects[m.id] = hireOk ? HR_JOIN_ITEMS.map(function (it) { return hrJoinKey(m.id, hire, it); }) : [];
+    if (m.del !== 1 && !m.test_acct && m.emp_type !== '지입차주' && hireOk && hire >= y1 && hire <= today) out.ref.past12++;   // 참고: 지난 12개월 입사(소급 없음)
+    const rej = !!(m.join_ev && Number(m.join_ev.at0) >= ctx.since);
+    if (!(Number(m.created) >= ctx.since) && !rej) return;
+    out.ref.new++;
+    if (m.del === 1) { out.ref.del++; return; }
+    if (m.test_acct) { out.ref.test++; return; }
+    if (m.emp_type === '지입차주') { out.ref.jiip++; return; }
+    if (retiredK(m, today)) { out.ref.retired++; return; }
+    if (!hireOk) { out.ref.no_hire++; return; }
+    if (hire < ctx.since_day) { out.old++; return; }   // 늦은 등록(이미 일하던 사람) — 소급 없음
+    if (rej) out.ref.rejoin++;
+    const md = hire.slice(5).replace('-', '/'), n = HR_JOIN_ITEMS.length;
+    out.events.push({ subj: m.id, tasks: HR_JOIN_ITEMS.map(function (it) {
+      let due = '';
+      if (bgOn && it.due) {
+        if (it.row && !rowOk[it.row]) noRow[it.row] = 1;
+        else due = it.due === 'day14' ? addDaysK(hire, 14) : hire;
+      }
+      return { key: hrJoinKey(m.id, hire, it), title: '입사(' + md + ') ' + it.no + '/' + n + ' ' + it.t, detail: (it.d + HR_JOIN_TAIL).trim(), due: due, vals: [md], priv: true };
+    }) });
+  });
+  out.no_row = Object.keys(noRow);
+  return out;
+}
+RULES.hr_join.plan = planHrJoin;
+
+module.exports = { KEY_RE, isEvKey, isEvLike, ruleOfKey, subjOf, RULES, RULE_IDS, BASE_NEEDS, CAP, DRY_WIN, ready, needsOf, kstDay, ctxFor, emptySum, skipSum, notReadySum, MARK, MARK_WHY, markedKind, markTask, unmarkTask, run, botSum, TITLE_MAX, PLAN_TITLE_MAX, PLAN_DETAIL_MAX, HR_JOIN_ITEMS, hrJoinKey, planHrJoin };

@@ -1684,7 +1684,7 @@ try {
     && /action: "notify_get"/.test(html) && /"notify_set"/.test(html) && /"notify_revert"/.test(html)
     && /async function handleNotifyGet/.test(gwd) && /async function handleNotifySet/.test(gwd) && /async function handleNotifyRevert/.test(gwd)
     && /action === 'notify_get'/.test(gwd) && /action === 'notify_set'/.test(gwd) && /action === 'notify_revert'/.test(gwd)
-    && /suppressed: 'task_auto_create'/.test(gwd) && /task_review === 'issuer_approver'/.test(gwd) && (gwd.match(/await notifyAutoCreated\(/g) || []).length === 3 /* C185 판1 검토 A: + ingest 실행기 지시의 저장 뒤 1곳(srvSent) */ && /if \(srvNew\.length\) srvSent = await notifyAutoCreated\(st, srvNew, '정기봇'\);/.test(gwd)
+    && /suppressed: 'task_auto_create'/.test(gwd) && /task_review === 'issuer_approver'/.test(gwd) && (gwd.match(/await notifyAutoCreated\(/g) || []).length === 3 /* C185 판1 검토 A: + ingest 실행기 지시의 저장 뒤 1곳(srvSent) */ && /if \(srvNew\.length\) srvSent = await notifyAutoCreated\(st, srvNew, '정기봇', \{ tag: 'auto-srv', seen: notSeen \}\);/.test(gwd) /* C185 판2(ⓙ 1): 실행기 알림 꼬리표 따로·사람 수 한 번 */
     && /due_digest === 'summary'/.test(todo) && /task-digest-/.test(todo)
     && Number((swv.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 396);
 } catch (e) { console.log('  (v396 검사 생략 — ' + e.message + ')'); fails++; }
@@ -19833,6 +19833,93 @@ try {
   T('v500 문서·판 번호(정확 검사): FEATURES 기준 v500 (2026-11-19)·v500 절(C185 판1) · TESTLIST v500 칸 14(화면·운영 확인 11 · 게이트 [x] 3) · MANUAL 점검 카드 줄·배정표 문장(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 17줄 한 번씩 · sw jw-shell-v500 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL 둘·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
     r500.ok && M500.every((v) => v === false), JSON.stringify({ r: r500.info, mut: M500 }));
 } catch (e) { console.log('  (v500 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── C185 판2 입사 자동 지시 — 화면 몫(착수계획 판2 행 · ⓙ 3·5·6·9) ──
+//   ① 지시 거름 taskVisible(실행): 입·퇴사 지시 = 담당·공개 범위·지시자·관리자만(공개 범위가 비어도 전체 공개 아님) · 다른 지시는 종전 그대로
+//   ② [인사 카드] 단추(실행): 입·퇴사 지시 펼침에만 · 인사 탭을 볼 수 있는 사람에게만 · 누름 = 그 회원 id로 카드 열기
+//   ③ 콘솔·카드(실행): 담당 없음뿐 줄 = 막힘 글·[카드 열기] 배정표·셈에서 빠짐 · 판정 경계(skip 있음·no_who 0) · 켜졌는데 요약 없음 = '켠 뒤 첫 집계 전' · 글 길이 멈춤 줄 · 입사 참고 수 글 · renderPmcon 셈·카드 자리
+try {
+  const fnP2 = (name, src) => { src = src || html; const i = src.indexOf('function ' + name + '('); if (i < 0 || src.indexOf('function ' + name + '(', i + 1) >= 0) throw new Error('함수 없음·둘: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('함수 끝 없음: ' + name); };
+  const stP2 = (re, src) => { const m = (src || html).match(re); if (!m) throw new Error('문장 없음: ' + re); return m[0]; };
+  // ① taskVisible
+  const visBox = (src) => new Function('U', [
+    'function isAdmin(){ return !!(U && U.admin); } function myId(){ return U ? U.id : ""; } function myName(){ return U ? U.name : ""; } function curMember(){ return U; }',
+    'function canSee(m){ return !!(U && (U.admin || (U.perms && U.perms[m] && U.perms[m] !== "hide"))); } function findRec(){ return null; } function recVisible(){ return true; }',
+    fnP2('taskForMe', src), fnP2('scopeIncludes', src), fnP2('taskVisible', src), 'return taskVisible;'].join('\n'));
+  const chkVis = (src) => {
+    const A = { id: 'uA', name: '관리', admin: true }, W = { id: 'uW', name: '직원', admin: false, perms: {} }, H = { id: 'uH', name: '인사', admin: false, perms: {} };
+    const T1 = { auto_key: 'hr:uN:join:2026-12-01:1', who_id: 'uH', scope: ['uH'], from: '자동' }, T2 = { auto_key: 'acct:uN:join:2026-12-01', who_id: 'uA', scope: ['uA'], from: '자동' };
+    const T3 = { auto_key: 'hr:uN:join:2026-12-01:2', who_id: '', scope: [], from: '자동' }, T4 = { title: '보통', who_id: 'uX', scope: [], from: '관리' }, T5 = { auto_key: 'cert:c1', who_id: '', scope: [], from: '자동' };
+    const vW = visBox(src)(W), vH = visBox(src)(H), vA = visBox(src)(A);
+    return !vW(T1) && !vW(T2) && !vW(T3) && vW(T4) && vW(T5) && vH(T1) && !vH(T2) && !vH(T3) && vA(T1) && vA(T2) && vA(T3);
+  };
+  T('C185 판2 ① 지시 거름 taskVisible(실행): 입·퇴사 지시 = 직원 0 · 담당(공개 범위 = 담당) 자기 것만 · 공개 범위 빈 입·퇴사 지시도 비관리자 0 · 관리자 전부 · 보통 지시·다른 자동 지시는 종전대로 보임', chkVis());
+  // ② [인사 카드]
+  const btnBox = (src) => new Function('U', 'LOG', [
+    'function esc(s){ return String(s); } function isAdmin(){ return !!(U && U.admin); } function canDo(m){ return !!(U && U.admin); } function canSee(m){ return !!(U && (U.admin || (U.perms && U.perms[m] && U.perms[m] !== "hide"))); }',
+    'function canActTask(){ return true; } function canApproveTask(){ return false; } function csTaskChg(){ return false; } function taskNotMineBtn(){ return false; }',
+    'function findTask(id){ return LOG.tasks[id]; } function taskVisible(){ return true; } function taskHrCardOpen(mid){ LOG.open.push(mid); } function toggleTaskDone(){} function approveTask(){} function rejectTask(){} function setTaskStatus(){} function openTaskModal(){} function openStageDoc(){} function taskNotMine(){} function taskSheetDelete(){}',
+    fnP2('taskSheetBtn', src), fnP2('taskSheetDetBtns', src), fnP2('taskSheetAct', src), 'return { btns: taskSheetDetBtns, act: taskSheetAct };'].join('\n'));
+  const chkBtn = (src) => {
+    const LOG = { open: [], tasks: { h1: { id: 'h1', auto_key: 'hr:uN7:join:2026-12-01:1', status: 'open' }, a1: { id: 'a1', auto_key: 'acct:uN7:join:2026-12-01', status: 'open' }, c1: { id: 'c1', auto_key: 'cert:c1', status: 'open' } } };
+    const ad = btnBox(src)({ id: 'uA', admin: true }, LOG), hrv = btnBox(src)({ id: 'uH', admin: false, perms: { hr: 'view' } }, LOG), no = btnBox(src)({ id: 'uW', admin: false, perms: {} }, LOG);
+    const has = (h) => h.indexOf('data-tsk-act="hrcard"') >= 0;
+    const ok1 = has(ad.btns(LOG.tasks.h1)) && has(ad.btns(LOG.tasks.a1)) && !has(ad.btns(LOG.tasks.c1)) && !has(hrv.btns(LOG.tasks.h1)) && !has(no.btns(LOG.tasks.h1));
+    ad.act('hrcard', 'a1'); no.act('hrcard', 'h1'); ad.act('hrcard', 'c1');
+    return ok1 && JSON.stringify(LOG.open) === '["uN7"]';
+  };
+  T('C185 판2 ② [인사 카드] 단추(실행): 입·퇴사 지시(hr·acct) 펼침에만 · 관리자 = 보임(인사 탭과 같은 판정 — 앱 hr 권한 판정 0곳 규칙 v430) · 비관리자 = 없음(인사 권한이 있어도) · 누름 = 키의 회원 id로 카드 열기(권한 없음·다른 지시 = 안 엶)', chkBtn());
+  // ③ 콘솔 줄·카드
+  const FN3 = ['esc', 'pmconPlan', 'pmconRowsAutotask', 'pmconLicWhy', 'evrSeen', 'evrIds', 'evrMd', 'evrSumTxt', 'evrLiveRow', 'evrRows', 'evrCardRender', 'evrCardSet'];
+  const box3 = (src) => new Function('__o', [
+    'var pmconSeq = __o.seq || 1, pmconState = { canWrite: true, base: 555 }, calls = [], toasts = [];',
+    'function todayStr(){ return "2026-11-20"; } function memberName(id){ return id === "u1" ? "담당가" : ""; } function apprToastShow(m){ toasts.push(m); } function renderPmcon(){}',
+    'var confirm = function(){ return true; }, alert = function(m){ toasts.push("alert:" + m); }; function gwCall(fn, b){ calls.push(b); return Promise.resolve({ status: 200, body: {} }); }',
+    [/var EVR_STOP = \{[^}]+\};/, /EVR_STOP\.TEXT_LONG = "[^"]+";/, /var EVR_SKIP = \{[^}]+\};/, /var evrLast = null, evrCardBusy = false;/, /var AUTO_RULE_ORDER = \[[^\]]+\];/, /var PMCON_PLAN = \{[^\n]+\};/].map((re) => stP2(re, src)).join('\n'),
+    FN3.map((n) => fnP2(n, src)).join('\n'),
+    'return { rows: pmconRowsAutotask, card: evrCardRender, setSeq: function(n){ pmconSeq = n; } };'].join('\n'));
+  const BJ = (o) => { o = o || {}; const ms = { lic_duty: { label: '인허가' }, hr_join: { label: '입사 체크리스트 지시', ready: true }, hr_leave: { label: '퇴사 체크리스트 지시', ready: false } };
+    return { rules: Object.assign({ lic_duty: 'live', hr_join: 'dry', hr_leave: 'dry' }, o.rules || {}), since: o.since || {}, meta: {}, meta_srv: ms, updated_at: 44, dry: o.dry === null ? null : { rules: Object.assign({}, o.dry || {}) } }; };
+  const SJ = (x) => Object.assign({ mode: 'dry', ready: true, win: 30, events: 1, tasks: 8, who: [{ id: 'u1', n: 8 }], no_who: 0, no_due: 0, marked: 0, unmarked: 0, gone: 0, old: 0, no_row: [], skip: '', ref: {} }, x || {});
+  const chk3 = (src) => {
+    const o = {}, mk = (x) => box3(src)(x || {});
+    const r1 = mk().rows(BJ({ dry: { hr_join: SJ({ tasks: 0, events: 0, who: [], no_who: 8 }) } })).find((r) => r.id === 'autotask:hr_join:live');
+    o.blocked = !!r1 && r1.block === '배정표 담당을 먼저 정해 주세요' && r1.card === 'assignCard' && r1.nocount === true && r1.why.indexOf('[ㄱ]을 누르면') < 0 && /배정표 카드에서 담당을 먼저/.test(r1.why);
+    const r2 = mk().rows(BJ({ dry: { hr_join: SJ() } })).find((r) => r.id === 'autotask:hr_join:live');
+    o.open = !!r2 && !r2.block && !r2.nocount && !r2.card && r2.why.indexOf('[ㄱ]을 누르면 바로 켜지고') >= 0;
+    const r3 = mk().rows(BJ({ dry: { hr_join: SJ({ tasks: 0, events: 0, who: [], no_who: 2, skip: 'MEMBERS_UNAVAILABLE' }) } })).find((r) => r.id === 'autotask:hr_join:live');
+    const r4 = mk().rows(BJ({ dry: { hr_join: SJ({ tasks: 0, events: 0, who: [], no_who: 0 }) } })).find((r) => r.id === 'autotask:hr_join:live');
+    o.edges = !!r3 && !r3.block && !!r4 && !r4.block;   // 판1 재확인 N27·N28: 건너뜀(skip) 있음·담당 없음 0 = 막지 않음
+    const r5 = mk().rows(BJ({ rules: { hr_join: 'live' }, dry: { hr_join: SJ({ mode: 'live', win: 0, skip: 'TEXT_LONG', tasks: 0 }) } })).find((r) => r.id === 'autotask:hr_join:dry');
+    o.textLong = !!r5 && /길이 상한을 넘어 멈춰 있습니다/.test(r5.why);
+    const c1 = mk({ seq: 3 }); c1.rows(BJ({ rules: { hr_join: 'live' }, dry: null })); const e1 = { innerHTML: '', querySelectorAll: () => [] }; c1.card(e1);
+    o.firstNoSum = /입사 체크리스트 지시<\/b> — 켜짐[\s\S]*?켠 뒤 첫 집계 전/.test(e1.innerHTML) && e1.innerHTML.indexOf('아직 연습 집계가 없습니다') < 0;
+    const c2 = mk({ seq: 4 }); c2.rows(BJ({ dry: { hr_join: SJ({ ref: { no_hire: 2, bg_off: 1, past12: 5 } }) } })); const e2 = { innerHTML: '', querySelectorAll: () => [] }; c2.card(e2);
+    o.refTxt = /입사일이 비어 아직 세지 않은 2명/.test(e2.innerHTML) && /인사 근거 승격 전이라 기한 없이/.test(e2.innerHTML) && /참고: 지난 12개월 입사 5명/.test(e2.innerHTML) && !/hr_join|no_hire|past12|bg_off/.test(e2.innerHTML.replace(/data-evr-set="[^"]*"/g, ''));
+    o.ok = Object.values(o).every((v) => v === true); return o;
+  };
+  const R3 = chk3();
+  const rp = fnP2('renderPmcon');
+  const static3 = /var pn = pend\.filter\(function\(r\)\{ return !r\.nocount; \}\)\.length;/.test(rp) && rp.indexOf('hd.textContent = "정할 것 " + pn') > 0 && rp.indexOf('bd.textContent = String(pn)') > 0 && rp.indexOf('r.k = r.card ? Object.assign({}, k, { card: r.card }) : k;') > 0;
+  T('C185 판2 ③ 콘솔·카드(실행): 담당 없음뿐 켜기 줄 = [ㄱ] 닫힘·막힘 글(\'[ㄱ]을 누르면…\' 없음)·[카드 열기] = 배정표 카드·셈에서 빠짐(ⓙ 5 — renderPmcon 머리·배지 = 셈 빠진 수) · 만들 지시 있음 = 종전 · 건너뜀 있음·담당 없음 0 = 막지 않음(ⓙ 9) · 글 길이 멈춤 줄(ⓙ 3) · 켜졌는데 요약 없음 = "켠 뒤 첫 집계 전"(ⓙ 6) · 입사 참고 수 글(입사일 빈칸·승격 전·지난 12개월 — 내부 칸 이름 0)',
+    R3.ok && static3, JSON.stringify(Object.assign({ static3 }, R3)));
+  const mutH2 = (from, to) => { if (html.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); return html.replace(from, () => to); };
+  const MV = [['if (t && /^(?:hr|acct):/.test(String(t.auto_key || ""))) return !!(t.scope && t.scope.length && scopeIncludes(t.scope, curMember()));', ''],
+    ['return !!(t.scope && t.scope.length && scopeIncludes(t.scope, curMember()));', 'return scopeIncludes(t.scope, curMember());']];
+  const MB = [['if (/^(?:hr|acct):[^:]+:/.test(String(t.auto_key || "")) && isAdmin()) b.push(', 'if (/^(?:hr|acct):[^:]+:/.test(String(t.auto_key || ""))) b.push('],
+    ['var hm = /^(?:hr|acct):([^:]+):/.exec(String(t.auto_key || "")); if (hm && isAdmin()) taskHrCardOpen(hm[1]);', 'taskHrCardOpen(String(t.auto_key || "").split(":")[1]);']];
+  const M3 = [['card: noWhoOnly ? "assignCard" : "", nocount: noWhoOnly,', 'card: "", nocount: false,'],
+    ['why: noWhoOnly ? evrSumTxt(s) + " 담당이 없어 켜도 지시가 생기지 않습니다', 'why: false ? evrSumTxt(s) + " 담당이 없어 켜도 지시가 생기지 않습니다'],
+    ['var noWhoOnly = !(Number(s.tasks) > 0) && Number(s.no_who) > 0 && !s.skip;', 'var noWhoOnly = !(Number(s.tasks) > 0) && Number(s.no_who) >= 0;'],
+    ['if (m.ready === true && cur === "live" && !s) line =', 'if (false) line ='], ['EVR_STOP.TEXT_LONG = "지시 글이 길이 상한을 넘어 멈춰 있습니다";', 'EVR_STOP.TEXT_LONG = "x";'],
+    ['if (Number(rf.no_hire)) p.push(', 'if (false) p.push(']];
+  const kV = MV.map(([a, b]) => { try { return chkVis(mutH2(a, b)); } catch (e) { return 'err ' + e.message; } });
+  const kB = MB.map(([a, b]) => { try { return chkBtn(mutH2(a, b)); } catch (e) { return 'err ' + e.message; } });
+  const k3 = M3.map(([a, b]) => { try { return chk3(mutH2(a, b)).ok; } catch (e) { return 'err ' + e.message; } });
+  T('C185 판2 ①②③ 결함 사본 ' + (MV.length + MB.length + M3.length) + '개(입·퇴사 거름 걷음 · 빈 공개 범위를 전체 공개로 · 인사 권한 없이 단추 · 누름 권한 걷음 · 막힌 줄 카드·셈 걷음 · 막힌 줄 글 · 판정 경계 느슨 · 요약 없음 글 걷음 · 글 길이 멈춤 글 걷음 · 참고 수 글 걷음) = 모두 ✗',
+    kV.concat(kB, k3).every((v) => v === false), JSON.stringify({ kV, kB, k3 }));
+} catch (e) { console.log('  (C185 판2 검사 생략 — ' + e.message + ')'); fails++; }
+
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

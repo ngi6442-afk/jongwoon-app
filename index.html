@@ -5331,6 +5331,7 @@
     } else {
       if (canActTask(t)) b.push(taskSheetBtn("done", id, "완료", "appr-btn"));
       if (t.proc_id && canDo("con") && t.pipe !== "chg" && !csTaskChg(t)) b.push(taskSheetBtn("doc", id, "📄 서류"));
+      if (/^(?:hr|acct):[^:]+:/.test(String(t.auto_key || "")) && isAdmin()) b.push(taskSheetBtn("hrcard", id, "인사 카드", "", "이 지시의 대상 직원 인사 카드를 엽니다"));   // C185 판2 입·퇴사 지시 → 대상 직원 카드(인사 탭과 같게 관리자만)
       if (canDo("tasks")) b.push(t.status === "hold" ? taskSheetBtn("resume", id, "재개") : taskSheetBtn("hold", id, "보류"));
       if (canDo("tasks")) b.push(taskSheetBtn("edit", id, "수정"));
       if (taskNotMineBtn(t)) b.push(taskSheetBtn("notmine", id, "내 것 아님", "", "이 자동 지시의 담당에서 빠집니다"));   // 조건은 taskNotMineBtn(v413) 그대로
@@ -5378,6 +5379,7 @@
     else if (act === "edit") openTaskModal(id);
     else if (act === "doc"){ if (t.proc_id && canDo("con") && t.pipe !== "chg" && !csTaskChg(t)) openStageDoc(t.proc_id, t.stage_name || ""); }
     else if (act === "notmine") taskNotMine(id);
+    else if (act === "hrcard"){ var hm = /^(?:hr|acct):([^:]+):/.exec(String(t.auto_key || "")); if (hm && isAdmin()) taskHrCardOpen(hm[1]); }   // C185 판2 [인사 카드]
     else if (act === "del") taskSheetDelete([id], true);
   }
   // 위임 배선 하나 — root(표 칸 또는 펼침 칸) 안의 data-tsk-act 버튼. 처리 열 누름은 행 펼침으로 번지지 않는다(부품 vsInteractive가 버튼 누름은 행 토글을 건너뜀)
@@ -32013,6 +32015,7 @@ function dutyStage(nx){
     if (isAdmin()) return true;
     if (taskForMe(t)) return true;
     if (t && ((t.from_id && t.from_id===myId()) || (t.from && t.from===myName()))) return true;  // 지시자는 자기 지시 항상 열람
+    if (t && /^(?:hr|acct):/.test(String(t.auto_key || ""))) return !!(t.scope && t.scope.length && scopeIncludes(t.scope, curMember()));   // C185 판2: 입·퇴사 지시는 담당·관리자만(서버 taskHrHiddenFor와 같은 줄 — 공개 범위가 비어도 전체 공개로 보지 않음)
     // v440 검토: 기성 연동 지시(입금확인 rec_id · 미수 45일 자동 auto_key 'rec:<기성 id>:…')는 제목에 거래처·금액이 들어간다 — 기성의 빈 공개범위(직접 등록·홈택스·계약 연동 기본 [])를
     //   그대로 받아 '전체공개' 지시가 되면 기성 숨김 직원(지시는 봄)에게 지시 탭·전역 검색·캘린더로 보였다(서버는 지시를 숨김 권한자에게도 통째로 내려 준다 — 기성 읽기 403과 어긋남).
     //   담당·지시자·공개범위에 이름이 든 사람(위 두 줄)이 아니면 그 기성을 볼 수 있을 때만(기성 권한 + recVisible) — 기성을 아직 못 받았으면(목록에 없음) 종전 규칙. 넓히지 않고 좁히기만 한다
@@ -32687,6 +32690,12 @@ function dutyStage(nx){
     if (form){ form.classList.remove("hr-inline"); document.getElementById("memberEditBackdrop").appendChild(form); }
     var panel = document.getElementById("hrNewPanel"); if (panel){ panel.style.display = "none"; panel.innerHTML = ""; }
     hrNewOpen = false;
+  }
+  // C185 판2: 지시 펼침 [인사 카드] — 인사 탭으로 가서 그 직원 카드를 펼침(카드가 그려진 뒤 · 없는 회원이면 탭만)
+  function taskHrCardOpen(mid){
+    if (!isAdmin()) return;   // 인사 탭 = 관리자 전용(applyPerms)
+    switchTab("hr");
+    setTimeout(function(){ if (hrOpenId !== mid) hrToggle(mid); var el = document.querySelector('[data-hr-toggle="' + String(mid).replace(/["\\]/g, "") + '"]'); if (el && el.scrollIntoView) el.scrollIntoView({ block: "start" }); }, 300);
   }
   function hrToggle(id){
     if (hrOpenId === id){ hrCollapse(); return; }
@@ -33469,7 +33478,7 @@ function dutyStage(nx){
         try { list = k.rows(res.body) || []; } catch(e){ bad.push(k.label); return; }
         var plan = pmconPlan(k.kind);
         list.forEach(function(r){
-          r.kind = k.kind; r.grade = r.grade || k.grade; r.k = k;
+          r.kind = k.kind; r.grade = r.grade || k.grade; r.k = r.card ? Object.assign({}, k, { card: r.card }) : k;   // C185 판2(ⓙ 5): 줄이 [카드 열기] 자리를 따로 주면(담당 먼저 줄 = 배정표 카드) 그 줄만
           if (plan){ r.due = plan.due; r.def = plan.def || r.def; }
           byId[r.id] = r;
           if (marks[r.id]) held.push(r); else pend.push(r);
@@ -33479,10 +33488,11 @@ function dutyStage(nx){
       pend.sort(function(a, b){ return (a.grade === b.grade ? 0 : (a.grade === "R2" ? -1 : 1)) || String(a.due || "9").localeCompare(String(b.due || "9")); });
       var canWrite = !!(gOk && g.body.can_write);
       pmconState = { byId: byId, base: gOk ? (Number(g.body.updated_at) || 0) : null, canWrite: canWrite, marks: marks, live: bad.length ? null : Object.keys(byId) };   // live = 지금 그린 줄 전부(보류함 자리 낼 때 화면에 없는 표시부터 버림) — 조회 하나라도 실패면 보내지 않음
-      var r2 = pend.filter(function(r){ return r.grade === "R2"; }).length;
-      var hd = document.getElementById("pmconHead"); if (hd) hd.textContent = "정할 것 " + pend.length + (held.length ? " · 보류 " + held.length : "");
-      var rc = document.getElementById("pmconRowsCnt"); if (rc) rc.textContent = pend.length + (pend.length ? " · R2 " + r2 + " · R1 " + (pend.length - r2) : "");
-      var bd = document.getElementById("pmconTabBadge"); if (bd){ bd.textContent = String(pend.length); bd.classList.toggle("hide", !pend.length); }
+      var pn = pend.filter(function(r){ return !r.nocount; }).length;   // C185 판2(ⓙ 5): 같은 빈 담당을 두 번 세지 않음(막힌 켜기 줄 = 배정표 줄과 같은 일)
+      var r2 = pend.filter(function(r){ return r.grade === "R2" && !r.nocount; }).length;
+      var hd = document.getElementById("pmconHead"); if (hd) hd.textContent = "정할 것 " + pn + (held.length ? " · 보류 " + held.length : "");
+      var rc = document.getElementById("pmconRowsCnt"); if (rc) rc.textContent = pn + (pn ? " · R2 " + r2 + " · R1 " + (pn - r2) : "");
+      var bd = document.getElementById("pmconTabBadge"); if (bd){ bd.textContent = String(pn); bd.classList.toggle("hide", !pn); }
       var btns = function(r, inHold){
         if (!canWrite) return '<div class="pc-btns"><span class="pc-who">정하실 분: PM</span></div>';
         var id = esc(r.id);
@@ -33871,6 +33881,7 @@ function dutyStage(nx){
   //   자료 = 콘솔 줄 함수가 받은 autotask_get 응답을 이 그리기 회차(pmconSeq)로 남긴 것(차량 근거 카드와 같은 방식 — 따로 부르지 않음). 화면 글에 규칙 id·키 꼴을 싣지 않는다(이름은 서버 meta_srv 라벨).
   var evrLast = null, evrCardBusy = false;
   var EVR_STOP = { TOO_MANY: "한 번에 생길 사건이 10건을 넘어 멈춰 있습니다", PII: "지시 글에 직원 이름이 섞여 멈춰 있습니다", NO_SINCE: "켠 시각 기록이 없어 멈춰 있습니다" };
+  EVR_STOP.TEXT_LONG = "지시 글이 길이 상한을 넘어 멈춰 있습니다";   // C185 판2(ⓙ 3) 틀의 글 길이 검사
   var EVR_SKIP = { ERROR: "계산하다 오류가 났습니다", MEMBERS_UNAVAILABLE: "직원 명부를 읽지 못했습니다", ASSIGN_UNAVAILABLE: "배정표를 읽지 못했습니다", READ_FAILED: "자료를 읽지 못했습니다", TASKS_READ_FAILED: "지시를 읽지 못했습니다" };
   function evrSeen(b){ evrLast = { seq: pmconSeq, b: b }; }
   function evrIds(b){ return Object.keys((b && b.meta_srv) || {}).filter(function(k){ return k !== "lic_duty"; }); }
@@ -33887,6 +33898,10 @@ function dutyStage(nx){
     if (s.gone) p.push("지워진 지시와 같아 다시 만들지 않는 " + s.gone + "건");
     if (s.marked) p.push("날짜·상태가 바뀌어 확인 표시가 붙은 옛 지시 " + s.marked + "건");
     if ((s.no_row || []).length) p.push("근거 표에 없어 기한을 세지 못한 항목 " + s.no_row.length + "개");
+    var rf = s.ref || {};   // C185 판2 규칙별 참고 수(입사: 입사일 빈칸 · 기한 없이(근거 미승격) · 지난 12개월 입사)
+    if (Number(rf.no_hire)) p.push("입사일이 비어 아직 세지 않은 " + Number(rf.no_hire) + "명");
+    if (Number(rf.bg_off)) p.push("인사 근거 승격 전이라 기한 없이");
+    if (rf.past12 !== undefined) p.push("참고: 지난 12개월 입사 " + (Number(rf.past12) || 0) + "명(켠 뒤 일만 — 소급 없음)");
     return p.join(" · ") + ".";
   }
   // '켤까요?' 줄 — 검토 G: [ㄱ]은 누르는 즉시 켬(예고는 사람이 먼저) · 만들 지시 0건인데 담당이 없어 못 만드는 것만 있으면 [ㄱ]을 닫고 배정표 담당부터
@@ -33894,7 +33909,8 @@ function dutyStage(nx){
     var noWhoOnly = !(Number(s.tasks) > 0) && Number(s.no_who) > 0 && !s.skip;
     return { id: "autotask:" + k + ":live", q: nm + " — 켤까요?", recTxt: noWhoOnly ? "그대로(담당 먼저)" : "켬(실제 발행)", curTxt: "연습(발행 0)", args: { rule: k, mode: "live" }, def: "keep",
       block: noWhoOnly ? "배정표 담당을 먼저 정해 주세요" : "",
-      why: evrSumTxt(s) + " [ㄱ]을 누르면 바로 켜지고 다음 평일 08:10 실행부터 지시가 생깁니다(켠 뒤에 생긴 일만 — 지난 일 소급 없음). 직원에게 새로 가는 알림이라 누르기 사흘 전에 예고해 주세요. 되돌리기: 이 화면 '범위 밖 자동 지시 규칙' 카드 [연습으로]·[끄기](이미 생긴 지시는 남음).", setBase: b.updated_at || 0 };
+      card: noWhoOnly ? "assignCard" : "", nocount: noWhoOnly,   // C185 판2(ⓙ 5): 막힌 줄 = [카드 열기]가 배정표 카드로 · 같은 빈 담당(배정표 줄)과 두 번 세지 않음
+      why: noWhoOnly ? evrSumTxt(s) + " 담당이 없어 켜도 지시가 생기지 않습니다 — 배정표 카드에서 담당을 먼저 정해 주세요." : evrSumTxt(s) + " [ㄱ]을 누르면 바로 켜지고 다음 평일 08:10 실행부터 지시가 생깁니다(켠 뒤에 생긴 일만 — 지난 일 소급 없음). 직원에게 새로 가는 알림이라 누르기 사흘 전에 예고해 주세요. 되돌리기: 이 화면 '범위 밖 자동 지시 규칙' 카드 [연습으로]·[끄기](이미 생긴 지시는 남음).", setBase: b.updated_at || 0 };
   }
   function evrRows(b){
     var out = [], rules = b.rules || {}, ms = b.meta_srv || {}, dr = (b.dry && b.dry.rules) || {};
@@ -33920,6 +33936,7 @@ function dutyStage(nx){
       if (m.ready !== true) st = "준비 중" + (cur === "off" ? "(꺼짐)" : "");
       else st = cur === "live" ? "켜짐" + (evrMd(since[k]) ? " · 켠 날 " + evrMd(since[k]) : "") : (cur === "off" ? "꺼짐" : "연습");
       if (m.ready === true && cur !== "off") line = '<br><span style="color:var(--sub);">' + esc(s && s.mode && s.mode !== cur ? (cur === "live" ? "켠 뒤 첫 집계 전(다음 평일 08:10 정기업무 봇 뒤에 채워짐)." : "바꾼 뒤 첫 집계 전(다음 평일 08:10 정기업무 봇 뒤에 채워짐).") : evrSumTxt(s)) + '</span>';   // 검토 G: 켠 직후엔 연습 때 글 대신
+      if (m.ready === true && cur === "live" && !s) line = '<br><span style="color:var(--sub);">켠 뒤 첫 집계 전(다음 평일 08:10 정기업무 봇 뒤에 채워짐).</span>';   // C185 판2(ⓙ 6): 켜졌는데 연습 요약 문서가 없음 = '아직 연습 집계가 없습니다' 대신
       if (cur === "live") act = cw ? '<br><button type="button" class="mini-btn" data-evr-set="' + esc(k) + ':dry">연습으로</button> <button type="button" class="mini-btn" data-evr-set="' + esc(k) + ':off">끄기</button>' : ' <span class="pc-who">바꾸실 분: PM</span>';
       return '<li><b>' + esc(m.label || "자동 지시 규칙") + '</b> — ' + esc(st) + line + act + '</li>';
     });

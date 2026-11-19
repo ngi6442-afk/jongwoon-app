@@ -12421,11 +12421,11 @@ function J91a(x) { return JSON.stringify(x); }
     o.key = good.every((k) => E.isEvKey(k)) && !bad.some((k) => E.isEvKey(k)) && E.isEvLike('hr:x') && E.isEvLike('acct:') && E.isEvLike('ks:x') && E.isEvLike('veh:v1:ev:x') && !E.isEvLike('veh:v1:insp:2026-12-01') && !E.isEvLike('lic:x')
       && E.ruleOfKey(good[0]) === 'hr_join' && E.ruleOfKey(good[1]) === 'hr_leave' && E.ruleOfKey(good[2]) === 'hr_join' && E.ruleOfKey(good[3]) === 'ks_report' && E.ruleOfKey(good[4]) === 'veh_event' && E.ruleOfKey('veh:v1:insp:2026-12-01') === ''
       && E.subjOf(good[0]) === 'u1' && E.subjOf(good[4]) === 'v82수1234' && E.subjOf(good[3]) === '2027';
-    o.table = JSON.stringify(E.RULE_IDS) === JSON.stringify(NEW5C) && NEW5C.every((k) => E.ready(k) === false) && E.CAP === 10 && E.DRY_WIN === 30 && JSON.stringify(E.needsOf('ks_report')) === '["assign","members","sites","contracts"]';
+    o.table = JSON.stringify(E.RULE_IDS) === JSON.stringify(NEW5C) && NEW5C.every((k) => E.ready(k) === (k === 'hr_join')) && E.CAP === 10 && E.DRY_WIN === 30 && JSON.stringify(E.needsOf('ks_report')) === '["assign","members","sites","contracts"]';
     const nowMs = Date.parse(TDC + 'T03:00:00Z');
     const c1 = E.ctxFor('hr_join', 'live', 0, nowMs, TDC), c2 = E.ctxFor('ks_report', 'live', 0, nowMs, TDC), c3 = E.ctxFor('hr_join', 'dry', 0, nowMs, TDC), c4 = E.ctxFor('hr_join', 'live', nowMs, nowMs, TDC);
     o.ctx = c1.skip === 'NO_SINCE' && !c2.skip && c3.ctx.win === 30 && c3.ctx.since_day === addC(-30) && c4.ctx.since_day === TDC && c4.ctx.since === nowMs;
-    const nr = E.run('hr_join', {}, c3.ctx, [], {}, true);
+    const nr = E.run('hr_leave', {}, c3.ctx, [], {}, true);   // 판2: 입사는 준비됨 — 준비 안 된 표본은 퇴사로
     o.notReady = JSON.stringify(nr.sum) === '{"mode":"dry","ready":false}' && nr.made.length === 0;
     // 계획 함수를 끼운 사본으로 실행 표본
     const F = evWith(esrc, fakePlanC);
@@ -12488,10 +12488,10 @@ function J91a(x) { return JSON.stringify(x); }
       seedC(); pushesC.length = 0;
       const g1 = await c({ action: 'autotask_get' }, tokA);
       const ms = g1.body.meta_srv || {};
-      o.get = g1.code === 200 && Object.keys(ms).join() === 'lic_duty,' + NEW5C.join() && NEW5C.every((k) => ms[k].ready === false && ms[k].prefix && !/hr_|veh_|ks_|acct/.test(ms[k].label)) && ms.lic_duty.ready !== false
+      o.get = g1.code === 200 && Object.keys(ms).join() === 'lic_duty,' + NEW5C.join() && NEW5C.every((k) => ms[k].ready === (k === 'hr_join') && ms[k].prefix && !/hr_|veh_|ks_|acct/.test(ms[k].label)) && ms.lic_duty.ready !== false
         && Object.keys(g1.body.meta).length === 3 && NEW5C.every((k) => g1.body.rules[k] === 'dry') && JSON.stringify(g1.body.since) === '{}';
       const n0 = auditMock.logs.length;
-      const s1 = await c({ action: 'autotask_set', rule: 'hr_join', mode: 'live', base: 0 }, tokA);
+      const s1 = await c({ action: 'autotask_set', rule: 'hr_leave', mode: 'live', base: 0 }, tokA);   // 판2: 준비 안 된 표본 = 퇴사
       const pg = await c({ action: 'pmcon_get' }, tokA, 'dev1');
       const s1b = await c({ action: 'pmcon_decide', kind: 'autotask', row: 'autotask:ks_report:live', choice: 'ok', grade: 'R1', args: { rule: 'ks_report', mode: 'live' }, set_base: 0, base: pg.body.updated_at }, tokA, 'dev1');
       o.notReady = s1.code === 400 && s1.body.error_code === 'RULE_NOT_READY' && s1b.code === 400 && s1b.body.error_code === 'RULE_NOT_READY' && !mem.gw_data['settings:autotask'] && auditMock.logs.length === n0;
@@ -12528,7 +12528,7 @@ function J91a(x) { return JSON.stringify(x); }
       mem.gw_data['settings:autotask'] = { schema: 1, rules: { hr_leave: 'off' }, updated_at: 9, updated_by: 'uadmin' };
       const d1 = await c({ action: 'autotask_dry_put', key: KEYC, day: TDC, run: 'stC', dry: { site_missing: { mode: 'dry', count: 0 }, hr_join: { forged: 1, tasks: 9 }, hr_leave: { forged: 1 }, veh_event: { mode: 'live' } } });
       const dr = (mem.gw_data['it:autotask:dry'] || {}).rules || {};
-      o.dry = d1.code === 200 && JSON.stringify(dr.hr_join) === '{"mode":"dry","ready":false}' && JSON.stringify(dr.veh_event) === '{"mode":"dry","ready":false}' && dr.hr_leave === undefined
+      o.dry = d1.code === 200 && !!dr.hr_join && dr.hr_join.mode === 'dry' && dr.hr_join.ready === true && dr.hr_join.forged === undefined && dr.hr_join.tasks === 0 && JSON.stringify(dr.veh_event) === '{"mode":"dry","ready":false}' && dr.hr_leave === undefined
         && ['veh_ceq31', 'ks_report'].every((k) => JSON.stringify(dr[k]) === '{"mode":"dry","ready":false}') && dr.site_missing.count === 0 && JSON.stringify(mem.gw_data['col:tasks']) === tasks0 && pushesC.length === 0;
       // ingest: 서버 규칙이 하나도 live가 아님 — 표식 lic_duty·srv·없음 모두 지시 글자째 그대로(표식 호출) · 응답 srv 칸 없음 · 표식 srv = 받은 항목·숨길 키 안 돎
       const i1 = await c({ action: 'autotask_ingest', key: KEYC, items: [], only: 'lic_duty' });
@@ -12667,7 +12667,7 @@ function J91a(x) { return JSON.stringify(x); }
     const E0 = await chkEC(GWF);
     T('C185 판1 ③ 실행기 e2e(시험 계획 함수를 끼운 사본 — 판2 본문 아님): 켬 + 표식 srv = 새 2건(담당 배정표·이름 0·켠 날보다 앞 1명 old) · made 0(관리자 "정기업무"에 안 섞임) · 받은 항목·숨길 키 안 돎·다른 지시 글자째 그대로 · 담당 알림 1발(notifyAutoCreated 한 호출) · 감사 수만 · 같은 날 다시 0·알림 0 · 날짜 바뀜 = 새 2 + 옛 2 표시 → 되돌림 = 표시 떨어짐(글자째 원래대로)·새 2 표시 · 지운 지시 = gone · 연습 요약(live) = 미리 보기·지시 그대로·이름 0 · 사건 11 = 0건 TOO_MANY(요약에도) · 값에 이름 = 0건 PII · 켠 시각 없음 = NO_SINCE · 연습 = ingest 칸 없음·요약 30일 · 담당 퇴사 = 그 항목만 안 만듦 · 표식 없는 호출 = 알림 1번',
       E0.o.ok, JSON.stringify(E0.o.ok ? E0.o : E0));
-    const ME = [["  if (srvNew.length) srvSent = await notifyAutoCreated(st, srvNew, '정기봇');", ''],   // 검토 A 반영: 실행기 지시 알림은 저장 뒤 한 줄
+    const ME = [["  if (srvNew.length) srvSent = await notifyAutoCreated(st, srvNew, '정기봇', { tag: 'auto-srv', seen: notSeen });", ''],   // 검토 A 반영: 실행기 지시 알림은 저장 뒤 한 줄
       ["  if (made || fixed || assigned || (lic && lic.touched) || srvTouched) {", '  if (made || fixed || assigned || (lic && lic.touched)) {'],
       ["  const srvIds = EV.RULE_IDS.filter(function (k) { return sw.rules[k] === 'live' && autotaskReady(k); });", "  const srvIds = EV.RULE_IDS.filter(function (k) { return sw.rules[k] !== 'off' && autotaskReady(k); });"],
       ["er.made.forEach(function (t) { srvNew.push(t); });", "er.made.forEach(function (t) { srvNew.push(t); made++; });"]];
@@ -12747,9 +12747,9 @@ function J91a(x) { return JSON.stringify(x); }
     const rm = E.run('hr_join', { members: [M('u1')] }, ctx, tm, opt(), true);
     o.markScope = tm[0].title === 'L' && tm[1].title === 'D' && tm[2].title === 'X' && tm[3].title.indexOf(E.MARK.date) === 0 && rm.sum.marked === 1;
     // H: 표시를 붙여도 120자
-    const th = []; E.run('hr_join', { members: [M('u2', { x_long: 1 })] }, ctx, th, opt(), true);
-    const len0 = th[0].title.length; E.run('hr_join', { members: [M('u2', { x_long: 1, x_join: addK(4) })] }, ctx, th, opt(), true);
-    o.titleMax = len0 > 100 && th[0].title.length === 120 && th[0].title.indexOf(E.MARK.date) === 0;
+    const th = [{ title: 'ㄱ'.repeat(110), detail: '' }]; E.markTask(th[0], 'date', TDK);   // 판2: 계획 함수 글은 틀이 100자로 막으므로(ⓙ 3) 표시 자르기는 markTask로 직접
+    const tl = [], rl = E.run('hr_join', { members: [M('u2', { x_long: 1 })] }, ctx, tl, opt(), true);
+    o.titleMax = th[0].title.length === 120 && th[0].title.indexOf(E.MARK.date) === 0 && rl.sum.skip === 'TEXT_LONG' && tl.length === 0;
     // E: 봇 요약은 수만
     const bs = E.botSum({ hr_join: Object.assign(E.emptySum('live'), { who: [{ id: 'uA', n: 2 }], no_row: ['law.x'], ref: { a: 1 }, tasks: 2 }) });
     o.botSum = JSON.stringify(Object.keys(bs.hr_join).sort()) === JSON.stringify(['events', 'gone', 'marked', 'mode', 'no_due', 'no_who', 'old', 'skip', 'tasks', 'unmarked']) && bs.hr_join.tasks === 2;
@@ -12790,22 +12790,22 @@ function J91a(x) { return JSON.stringify(x); }
       const byIdK = () => { const m = {}; tasksK().forEach((t) => { m[t.id] = t; }); return m; };
       o.hide = f1.code === 200 && f1.body.fixed === 1 && byIdK().tks.del === undefined && byIdK().tc1.del === 1;
       // I: 준비 안 된 규칙이 문서에 live = 유효 값 연습(facts·get·ingest) · 문서는 그대로 · 복원도 낮춤
-      seedK({ rules: { hr_join: 'live' } });
+      seedK({ rules: { hr_join: 'dry', hr_leave: 'live' } });   // 판2: 준비 안 된 표본 = 퇴사
       const sw0 = JSON.stringify(mem.gw_data['settings:autotask']);
       const i1 = await c({ action: 'autotask_get' }, tokA), i2 = await c({ action: 'autotask_facts', key: KEYK });
       const i3 = await c({ action: 'autotask_ingest', key: KEYK, items: [], only: 'srv' });
-      const bk = { schema: 1, rules: { hr_join: 'live', lic_duty: 'dry' }, updated_at: 1, updated_by: 'x' };
+      const bk = { schema: 1, rules: { hr_leave: 'live', lic_duty: 'dry' }, updated_at: 1, updated_by: 'x' };
       const i4 = await c({ action: 'backup_put', secret: KEYK, restore: true, store: 'gw_data', key: 'settings:autotask', data: bk, confirm: true });
-      o.notReadyLive = i1.body.rules.hr_join === 'dry' && i2.body.rules.hr_join === 'dry' && i3.body.srv === undefined && i4.code === 200 && mem.gw_data['settings:autotask'].rules.hr_join === 'dry';
-      o.notReadyDoc = sw0.indexOf('"hr_join":"live"') > 0;
+      o.notReadyLive = i1.body.rules.hr_leave === 'dry' && i2.body.rules.hr_leave === 'dry' && i3.body.srv === undefined && i4.code === 200 && mem.gw_data['settings:autotask'].rules.hr_leave === 'dry';
+      o.notReadyDoc = sw0.indexOf('"hr_leave":"live"') > 0;
       // G03: 되돌림 결과가 준비 안 된 규칙 live = 400 · G04: 되돌림이 새로 켠 규칙의 켠 시각 = 되돌림 직전 이후(옛 값 되살리지 않음)
       seedK({ rules: { hr_join: 'dry' } });
-      mem.gw_data['settings:autotask'] = { schema: 1, rules: { lic_duty: 'dry' }, prev: { rules: { hr_join: 'live' }, updated_at: 1 }, updated_at: 20, updated_by: 'x' };
+      mem.gw_data['settings:autotask'] = { schema: 1, rules: { lic_duty: 'dry' }, prev: { rules: { hr_leave: 'live' }, updated_at: 1 }, updated_at: 20, updated_by: 'x' };
       const r1 = await c({ action: 'autotask_revert', base: 20 }, tokA);
       mem.gw_data['settings:autotask'] = { schema: 1, rules: { lic_duty: 'dry' }, prev: { rules: { lic_duty: 'live' }, since: { lic_duty: 1000 }, updated_at: 1 }, updated_at: 21, updated_by: 'x' };
       const tR = Date.now();
       const r2 = await c({ action: 'autotask_revert', base: 21 }, tokA);
-      o.revert = r1.code === 400 && r1.body.error_code === 'RULE_NOT_READY' && r2.code === 200 && mem.gw_data['settings:autotask'].since.lic_duty >= tR;
+      o.revert = r1.code === 200 && r1.body.rules.hr_leave === 'dry' && r2.code === 200 && mem.gw_data['settings:autotask'].since.lic_duty >= tR;
       // G05: 켠 시각 칸 거름(모르는 규칙·음수·글자 = 버림)
       mem.gw_data['settings:autotask'] = { schema: 1, rules: { wk_missing: 'live' }, since: { lic_duty: -5, bogus: 100, hr_join: 'abc', wk_missing: 7 }, updated_at: 22, updated_by: 'x' };
       const g5 = await c({ action: 'autotask_get' }, tokA);
@@ -12910,7 +12910,7 @@ function J91a(x) { return JSON.stringify(x); }
       ["  hideKeys.slice(0, 200).filter(function (k) { return !EV.isEvLike(k); }).forEach(function (k) {", '  hideKeys.slice(0, 200).forEach(function (k) {'],
       ["      Object.keys(rules).forEach(function (k) { if (rules[k] === 'live' && !autotaskReady(k)) rules[k] = 'dry'; });", ''],
       ["  Object.keys(rules).forEach(function (k) { if (rules[k] === 'live' && !autotaskReady(k)) { rules[k] = 'dry'; if (lowered.indexOf(k) < 0) lowered.push(k); } });", ''],
-      ["  if (Object.keys(rules).some(function (k) { return rules[k] === 'live' && !autotaskReady(k); })) return", '  if (false) return'],
+      ["  Object.keys(rules).forEach(function (rk) { if (rules[rk] === 'live' && !autotaskReady(rk)) rules[rk] = 'dry'; });", ''],
       ["if (a.rules[k] !== 'live') since[k] = now0; else if (a.since && a.since[k]) since[k] = a.since[k];", "if (a.prev && a.prev.since && a.prev.since[k]) since[k] = a.prev.since[k]; else if (a.rules[k] !== 'live') since[k] = now0; else if (a.since && a.since[k]) since[k] = a.since[k];"],
       ["if (autotaskRuleTbl(k) && isFinite(v) && v > 0) out[k] = v;", 'out[k] = o[k];'],
       ["  const quiet = only || d.only === 'srv';", "  const quiet = d.only === 'srv' ? false : only;"]];
@@ -12921,7 +12921,7 @@ function J91a(x) { return JSON.stringify(x); }
     const E0 = await chkEK(GWK);
     T('C185 판1 검토 ③ 실행기 보강(시험 계획 함수 — 판2~ 본문 아님): 저장 실패 = 500·알림 0 · 두 번 실패 뒤 성공 = 알림 1발(A) · 표식 없는 호출도 실행기 지시는 저장 뒤 1발(A) · 봇 응답 srv = 수만(E) · 한 규칙 쓰다 예외 = 그 규칙 지시 되돌림·ERROR·다른 규칙 그대로(D) · 차량 못 읽음 = 그 규칙만 건너뜀 · 배정표·명부 못 읽음 = 전부 건너뜀(G18·G21) · 명부에 있는 퇴사 담당 = 안 만듦(G19) · 퇴사자 이름 = PII(G20) · 서버 규칙만 건너뛴 날 감사 1줄(G17) · 요약 PII = 그 칸만 빠짐(G23)',
       E0.o.ok, JSON.stringify(E0.o.ok ? E0.o : E0));
-    const ME = [["  if (srvNew.length) srvSent = await notifyAutoCreated(st, srvNew, '정기봇');", ''],
+    const ME = [["  if (srvNew.length) srvSent = await notifyAutoCreated(st, srvNew, '정기봇', { tag: 'auto-srv', seen: notSeen });", ''],
       ["  for (let i = notifyItems.length - 1; i >= 0; i--) if (srvNew.indexOf(notifyItems[i]) >= 0) notifyItems.splice(i, 1);", "  srvNew.forEach(function (t) { if (notifyItems.indexOf(t) < 0) notifyItems.push(t); });"],
       ["      if (write) { tasks.length = n0; back.forEach(function (b) { b[0].title = b[1]; b[0].detail = b[2]; b[0].updated = b[3]; }); }", ''],
       ["  const srvOut = srv ? EV.botSum(srv) : null;", '  const srvOut = srv;'],
@@ -12931,6 +12931,273 @@ function J91a(x) { return JSON.stringify(x); }
     T('C185 판1 검토 ③ 결함 사본 ' + ME.length + '개(저장 뒤 알림 걷음 · 일반 알림 길에 섞음(저장 앞) · 실패 규칙 되돌림 걷음 · 봇 응답에 담당 id · 입력 못 읽어도 돎) = 모두 ✗', kE.every((v) => v === false), JSON.stringify(kE));
   } catch (e) { T('C185 판1 검토 검사 실행', false, String(e && e.stack || e).slice(0, 500)); }
   finally { pushMock.sendTo = sendSaveK; pushMock.loadMembers = loadSaveK; require.cache[rpEVK] = keepEVK; const s = JSON.parse(snapK); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; }
+}
+
+{ // ---- C185 판2 ① 입사 자동 지시(hr_join — 착수계획 판2 행 · ⓒ ① · ⓙ 1~3·5~11) ----
+  //   ① 계획 함수(_lib/evrules planHrJoin — 실제 본문): 사건 표본 · 항목 표 · 기한(승격·미승격·행 없음) · 이름 0 · 공개 범위 · 표시 · 담당 없음
+  //   ② 실제 gw-data e2e: 연습 = 지시 0·알림 0·요약 · 켬 = 8건(담당 둘·담당만 공개) · 비관리자 읽기·저장 이월·알림 · 다음 실행 0 · 꼬리표·사람 수(ⓙ 1) · 스위치 문서 live 잔존 연습 저장(ⓙ 2) · 깨진 지시 문서(ⓙ 7) · 되돌림 낮춤(ⓙ 8)
+  //   ③ 완료 신호(_lib/doneif · gw-doneif-cron): 계정 = 승인 기기 1대 이상(매 시 첫 회차만 읽음) · 체크 항목 = 사람 [완료]
+  //   ④ 판1 재확인이 남긴 빈 검사(ⓙ 9): 실제 꼴 '없음' · 표시 붙인 뒤 예외 되돌림 · 봇 키 acct:·hr: 빈 값 · ingest 바깥 감싸기 · 읽기 실패 확인 자리 · 복원 낮춤 목록 · 숨김 넓은 꼴
+  const fsJ = require('fs'), ModJ = require('module');
+  const EVPJ = join(FN, '_lib', 'evrules.js'), GWPJ = join(FN, 'gw-data.js'), DIPJ = join(FN, '_lib', 'doneif.js'), CRPJ = join(FN, 'gw-doneif-cron.js');
+  const rpEVJ = require.resolve(EVPJ), keepEVJ = require.cache[rpEVJ], rpDIJ = require.resolve(DIPJ), keepDIJ = require.cache[rpDIJ];
+  const SRCJ = { ev: fsJ.readFileSync(EVPJ, 'utf8'), gw: fsJ.readFileSync(GWPJ, 'utf8'), di: fsJ.readFileSync(DIPJ, 'utf8'), cr: fsJ.readFileSync(CRPJ, 'utf8') };
+  const compJ = (file, src) => { const m = new ModJ(file); m.filename = file; m.paths = ModJ._nodeModulePaths(dirname(file)); m._compile(src, file); return m.exports; };
+  const mutJ = (src, from, to) => { if (src.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return src.replace(from, () => to); };
+  const clJ = (mod) => async (body, tok, dev) => { const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+  const gwWithJ = (ev, gsrc) => { require.cache[rpEVJ] = { id: rpEVJ, filename: rpEVJ, loaded: true, exports: ev }; try { return compJ(GWPJ, gsrc || SRCJ.gw); } finally { require.cache[rpEVJ] = keepEVJ; } };
+  const snapJ = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  const KEYJ = 'test-ingest-key', TDJ = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+  const addJ = (n, base) => new Date(Date.parse((base || TDJ) + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+  const mdJ = (d) => d.slice(5).replace('-', '/');
+  const pushesJ = [], sendSaveJ = pushMock.sendTo, loadSaveJ = pushMock.loadMembers;
+  const HRBG = (rows) => ({ on: true, bg: { rows: rows || [{ id: 'law.lsa.17', calc: true }, { id: 'law.nhi.8-2', calc: true }] } });
+  // ① 계획 함수
+  const chkPJ = (E) => {
+    const o = {};
+    const nowMs = Date.parse(TDJ + 'T03:00:00Z'), since = nowMs - 1000, ctx = E.ctxFor('hr_join', 'live', since, nowMs, TDJ).ctx;
+    const H = addJ(2), HP = addJ(-3);
+    const M = (id, extra) => Object.assign({ id: id, name: '가짜' + id, created: nowMs, hire_date: H }, extra || {});
+    const opt = (x) => Object.assign({ rules: { 'hr:': { who_id: 'uHR' }, 'acct:': { who_id: 'uAC' } }, active: { uHR: '인사담당', uAC: '계정담당' }, names: ['가짜uA', '가짜uB', '인사담당', '계정담당'], mkId: (() => { let n = 0; return () => 'j' + (++n); })() }, x || {});
+    const T8 = E.HR_JOIN_ITEMS;
+    o.items = T8.length === 8 && T8.filter((x) => x.pre === 'acct:').length === 1 && T8.filter((x) => x.pre === 'hr:').length === 7 && T8.map((x) => x.no).join() === '1,2,3,4,5,6,7,8'
+      && E.hrJoinKey('u1', '2026-12-01', T8[6]) === 'acct:u1:join:2026-12-01' && E.hrJoinKey('u1', '2026-12-01', T8[0]) === 'hr:u1:join:2026-12-01:1' && T8.every((x) => E.isEvKey(E.hrJoinKey('u1', '2026-12-01', x)));
+    const t1 = [];
+    const ms = [M('uA'), M('uOld', { hire_date: HP }), M('uPre', { created: since - 5000 }), M('uNo', { hire_date: '' }), M('uBad', { hire_date: '2026-02-30' }), M('uJ', { emp_type: '지입차주' }), M('uT', { test_acct: true }), M('uD', { del: 1 }),
+      M('uR', { leave_date: addJ(-1) }), M('uRe', { created: since - 9e9, join_ev: { at0: nowMs } })];
+    const r1 = E.run('hr_join', { members: ms, hrbg: HRBG() }, ctx, t1, opt(), true);
+    const a = t1.filter((t) => /:uA:/.test(t.auto_key));
+    o.events = r1.sum.events === 2 && r1.sum.tasks === 16 && r1.sum.old === 1 && t1.length === 16 && a.length === 8
+      && JSON.stringify(r1.sum.ref) === JSON.stringify({ new: 9, no_hire: 2, jiip: 1, test: 1, del: 1, retired: 1, rejoin: 1, past12: r1.sum.ref.past12, bg_off: 0 }) && t1.some((t) => /:uRe:/.test(t.auto_key));
+    o.keysTitles = a.map((t) => t.auto_key).join() === T8.map((x) => E.hrJoinKey('uA', H, x)).join() && a[0].title === '입사(' + mdJ(H) + ') 1/8 근로계약서 작성·교부' && a[6].title === '입사(' + mdJ(H) + ') 7/8 계정 부여·관리대장 등재'
+      && a.every((t) => t.title.length <= 100 && !/가짜|인사담당|계정담당|uA/.test(t.title + t.detail));
+    o.who = a.filter((t) => t.who_id === 'uHR').length === 7 && a.filter((t) => t.who_id === 'uAC').length === 1 && a.every((t) => JSON.stringify(t.scope) === JSON.stringify([t.who_id]) && t.who_by === 'assign')   // 공개 범위 = 담당만(priv · ⓙ 10)
+      && JSON.stringify(r1.sum.who) === '[{"id":"uAC","n":2},{"id":"uHR","n":14}]';
+    o.due = a[0].due === H && a[1].due === addJ(14, H) && a[2].due === H && a[3].due === '' && a[4].due === '' && a[5].due === H && a[6].due === H && a[7].due === H && r1.sum.no_due === 4 && r1.sum.no_row.length === 0;
+    const t2 = []; const r2 = E.run('hr_join', { members: [M('uA')], hrbg: null }, ctx, t2, opt(), true);
+    const t3 = []; const r3 = E.run('hr_join', { members: [M('uA')], hrbg: HRBG([{ id: 'law.nhi.8-2', calc: true }, { id: 'law.lsa.17', calc: false }]) }, ctx, t3, opt(), true);
+    o.dueOff = t2.every((t) => t.due === '') && r2.sum.ref.bg_off === 1 && t3[0].due === '' && t3[1].due === addJ(14, H) && t3[2].due === H && JSON.stringify(r3.sum.no_row) === '["law.lsa.17"]';
+    // 같은 키 다시 = 0 · 입사일 빈칸 → 채우면 8 · 입사일 고침 = 새 8 + 옛 8 표시 → 되돌림 = 표시 떨어짐 · 입사일 지움 = 표시만
+    const r4 = E.run('hr_join', { members: ms, hrbg: HRBG() }, ctx, t1, opt(), true);
+    const t5 = []; E.run('hr_join', { members: [M('uNo', { hire_date: '' })] }, ctx, t5, opt(), true); const n5a = t5.length; const r5 = E.run('hr_join', { members: [M('uNo', { hire_date: H })] }, ctx, t5, opt(), true);
+    o.again = r4.sum.tasks === 0 && t1.length === 16 && n5a === 0 && r5.sum.tasks === 8;
+    const H2 = addJ(5), tA = JSON.parse(JSON.stringify(a));
+    const r6 = E.run('hr_join', { members: [M('uA', { hire_date: H2 })] }, ctx, t1, opt(), true);
+    const markedOld = t1.filter((t) => /:uA:/.test(t.auto_key) && t.auto_key.indexOf(H) > 0).every((t) => t.title.indexOf(E.MARK.date) === 0);
+    const r7 = E.run('hr_join', { members: [M('uA')] }, ctx, t1, opt(), true);
+    const back = tA.every((x) => { const t = t1.find((y) => y.auto_key === x.auto_key); return t && t.title === x.title && t.detail === x.detail; });
+    const r8 = E.run('hr_join', { members: [M('uA', { hire_date: '' })] }, ctx, t1, opt(), true);
+    o.redate = r6.sum.tasks === 8 && r6.sum.marked === 8 && markedOld && r7.sum.tasks === 0 && r7.sum.unmarked === 8 && back && r8.sum.tasks === 0 && r8.sum.marked === 16;
+    // 담당 없음 = 만들지 않음 · 계정 담당만 없음 = 7건
+    const t9 = []; const r9 = E.run('hr_join', { members: [M('uA')] }, ctx, t9, opt({ rules: {} }), true);
+    const t10 = []; const r10 = E.run('hr_join', { members: [M('uA')] }, ctx, t10, opt({ rules: { 'hr:': { who_id: 'uHR' } } }), true);
+    o.noWho = t9.length === 0 && r9.sum.no_who === 8 && r9.sum.events === 0 && t10.length === 7 && r10.sum.no_who === 1;
+    // 끼워 넣는 값 = 입사일(MM/DD)뿐 · 연습 = 30일 창(등록·입사일)
+    let vals = []; const PF = E.planHrJoin({ members: [M('uA')], hrbg: HRBG() }, ctx); PF.events.forEach((ev) => ev.tasks.forEach((x) => { vals = vals.concat(x.vals); }));
+    const dctx = E.ctxFor('hr_join', 'dry', 0, nowMs, TDJ).ctx;
+    const rd = E.run('hr_join', { members: [M('uA', { created: nowMs - 20 * 86400000, hire_date: addJ(-20) }), M('uB', { created: nowMs - 40 * 86400000 })], hrbg: HRBG() }, dctx, [], opt(), false);
+    o.valsDry = vals.length === 8 && vals.every((v) => v === mdJ(H)) && PF.events[0].tasks.every((x) => x.priv === true) && rd.sum.events === 1 && rd.sum.tasks === 8 && rd.sum.mode === 'dry';
+    o.ok = Object.keys(o).every((k) => o[k] === true);
+    return o;
+  };
+  // ② 실제 gw-data e2e
+  const UV = { id: 'uVIEW', name: '보기직원', admin: false, perms: { tasks: 'do', receivables: 'view' } }, UH = { id: 'uHRJ', name: '인사직원', admin: false, perms: { tasks: 'do', hr: 'do' } };
+  const seedJ = (o) => { o = o || {}; const s = JSON.parse(snapJ); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; pushMock.loadMembers = loadSaveJ;
+    ['settings:autotask', 'it:autotask:dry', 'settings:assign', 'settings:notify', 'settings:doneif', 'it:doneif:last', 'col:vehicles', 'col:licenses', 'bg:lic:law:v1'].forEach((k) => { delete mem.gw_data[k]; });
+    Object.keys(mem.gw_data).filter((k) => k.indexOf('ver:') === 0 || k.indexOf('veridx:') === 0).forEach((k) => { delete mem.gw_data[k]; });
+    Object.keys(mem.gw_users).filter((k) => k.indexOf('device:') === 0 && k !== 'device:dev1').forEach((k) => { delete mem.gw_users[k]; });
+    mem.gw_users['member:uVIEW'] = UV; mem.gw_users['member:uHRJ'] = UH;
+    mem.gw_data['col:tasks'] = { schema: 1, items: [{ id: 'tg1', title: '보통 지시', status: 'open', who_id: 'uVIEW', who: '보기직원', scope: [] }], updated_at: 100 };
+    mem.gw_data['settings:assign'] = { schema: 1, rules: { 'hr:': { who_id: 'uHRJ' }, 'acct:': { who_id: 'uadmin' } }, approver_id: '', prev: null, updated_at: 5, updated_by: 'x' };
+    mem.gw_data['settings:notify'] = { schema: 1, events: { task_auto_create: 'assignee' }, prev: null, updated_at: Date.now() - 30 * 86400000, updated_by: 'x' };
+    if (o.live) mem.gw_data['settings:autotask'] = { schema: 1, rules: { hr_join: 'live' }, since: { hr_join: Date.now() - 1000 }, updated_at: 9, updated_by: 'uadmin' };
+  };
+  const newMemJ = (id, extra) => { mem.gw_users['member:' + id] = Object.assign({ id: id, name: '새직원' + id, admin: false, perms: {}, created: Date.now(), hire_date: addJ(3) }, extra || {}); };
+  const tasksJ = () => mem.gw_data['col:tasks'].items;
+  const hrJ = () => tasksJ().filter((t) => /^(hr|acct):/.test(String(t.auto_key || '')));
+  const chkEJ = async (gw) => {
+    const c = clJ(gw), o = {}, I = {};
+    try {
+      // 연습(기본) = 지시 0·알림 0·요약만(이름·회원 id 0)
+      seedJ(); pushesJ.length = 0; newMemJ('uN1');
+      const t0 = JSON.stringify(mem.gw_data['col:tasks']);
+      const g0 = await c({ action: 'autotask_get' }, tokA);
+      const d0 = await c({ action: 'autotask_dry_put', key: KEYJ, day: TDJ, run: 'stJ', dry: {} });
+      const i0 = await c({ action: 'autotask_ingest', key: KEYJ, items: [], only: 'srv' });
+      const i0b = await c({ action: 'autotask_ingest', key: KEYJ, items: [] });
+      const sd = mem.gw_data['it:autotask:dry'].rules.hr_join, sdS = JSON.stringify(sd);
+      o.dry = g0.body.meta_srv.hr_join.ready === true && g0.body.rules.hr_join === 'dry' && d0.code === 200 && sd.mode === 'dry' && sd.ready === true && sd.events === 1 && sd.tasks === 8 && sd.win === 30
+        && JSON.stringify(Object.keys(sd).sort()) === JSON.stringify(['events', 'gone', 'marked', 'mode', 'no_due', 'no_row', 'no_who', 'old', 'ready', 'ref', 'skip', 'tasks', 'unmarked', 'who', 'win'])
+        && !/새직원|uN1|인사직원/.test(sdS) && i0.body.srv === undefined && i0b.body.srv === undefined && JSON.stringify(mem.gw_data['col:tasks']) === t0 && pushesJ.length === 0;
+      I.dry = sd;
+      // 켬(관리자 스위치 — 켠 시각) → 새 직원 등록 + 입사일 → 실행 = 8건(인사 7 · 계정 1) · 담당만 공개 · 알림 = 담당 둘 각 1발(auto-srv 꼬리표) · made 0
+      seedJ(); pushesJ.length = 0;
+      const s1 = await c({ action: 'autotask_set', rule: 'hr_join', mode: 'live', base: 0 }, tokA);
+      newMemJ('uN1');
+      const e1 = await c({ action: 'autotask_ingest', key: KEYJ, items: [], only: 'srv' });
+      const H = hrJ();
+      o.live = s1.code === 200 && e1.code === 200 && e1.body.made === 0 && e1.body.srv.hr_join.tasks === 8 && e1.body.srv.hr_join.who === undefined && H.length === 8
+        && H.filter((t) => t.who_id === 'uHRJ').length === 7 && H.filter((t) => t.who_id === 'uadmin').length === 1 && H.every((t) => JSON.stringify(t.scope) === JSON.stringify([t.who_id]) && !/새직원|uN1/.test(t.title + t.detail))
+        && pushesJ.length === 2 && pushesJ.every((x) => /^auto-srv-/.test(x.p.tag) && !/새직원/.test(x.p.title + x.p.body)) && e1.body.notified === 2;
+      I.live = [s1.code, e1.body, pushesJ.map((x) => x.p.tag)];
+      // 비관리자 읽기: 기성 '보기' 직원 = 입·퇴사 지시 0 · 인사 담당 = 자기 7건만(계정 1건 안 보임) · 관리자 = 8
+      const tV = issueSession(UV).token, tH = issueSession(UH).token;
+      const gv = await c({ action: 'get', collection: 'tasks' }, tV, 'dev1'), gh = await c({ action: 'get', collection: 'tasks' }, tH, 'dev1'), ga = await c({ action: 'get', collection: 'tasks' }, tokA);
+      const hrOf = (b) => (b.doc.items || []).filter((t) => /^(hr|acct):/.test(String(t.auto_key || '')));
+      o.read = gv.code === 200 && hrOf(gv.body).length === 0 && gv.body.doc.items.some((t) => t.id === 'tg1') && gh.code === 200 && hrOf(gh.body).length === 7 && hrOf(gh.body).every((t) => t.who_id === 'uHRJ') && hrOf(ga.body).length === 8;
+      // 저장 이월: 인사 담당이 한 건 [완료](승인 대기)·메모 → 보기 직원이 다른 지시 [완료] 저장 → 서버 8건 그대로(담당 고친 칸까지)
+      const sh = JSON.parse(JSON.stringify(gh.body.doc)); const hx = sh.items.find((t) => /^hr:/.test(t.auto_key)); hx.status = 'review'; hx.memo = '처리 중';
+      const p1 = await c({ action: 'save', collection: 'tasks', base: mem.gw_data['col:tasks'].updated_at, doc: sh }, tH, 'dev1');
+      const sv = JSON.parse(JSON.stringify((await c({ action: 'get', collection: 'tasks' }, tV, 'dev1')).body.doc)); sv.items.find((t) => t.id === 'tg1').status = 'review';
+      const p2 = await c({ action: 'save', collection: 'tasks', base: mem.gw_data['col:tasks'].updated_at, doc: sv }, tV, 'dev1');
+      const after = hrJ(), hx2 = after.find((t) => t.id === hx.id);
+      blobsMock.hooks.failGet = (k) => (k === 'col:tasks' ? 'STORAGE_READ_FAILED' : null);
+      const p3 = await c({ action: 'save', collection: 'tasks', base: mem.gw_data['col:tasks'].updated_at, doc: sv }, tV, 'dev1');
+      blobsMock.hooks.failGet = null;
+      o.carry = p1.code === 200 && p2.code === 200 && after.length === 8 && !!hx2 && hx2.status === 'review' && hx2.memo === '처리 중' && tasksJ().find((t) => t.id === 'tg1').status === 'review' && p3.code === 500 && p3.body.error_code === 'PREV_READ_FAILED';
+      I.carry = [p1.code, p1.body.error_code, p2.code, p2.body.error_code, after.length, p3.code];
+      // 다음 실행 = 새로 0·알림 0
+      const n0 = pushesJ.length;
+      const e2 = await c({ action: 'autotask_ingest', key: KEYJ, items: [], only: 'srv' });
+      o.next = e2.body.srv.hr_join.tasks === 0 && hrJ().length === 8 && pushesJ.length === n0;
+      // ⓙ 1: 같은 날 같은 담당에게 일반 자동 지시 + 실행기 지시 = 꼬리표 둘(덮지 않음) · 응답 사람 수는 한 번씩
+      seedJ({ live: true }); pushesJ.length = 0; mem.gw_data['settings:assign'].rules['cert:'] = { who_id: 'uadmin' }; newMemJ('uN2');
+      const e3 = await c({ action: 'autotask_ingest', key: KEYJ, items: [{ auto_key: 'cert:c955', title: '증명서' }] });
+      const tags = pushesJ.map((x) => x.p.tag).sort();
+      o.tag = e3.body.srv.hr_join.tasks === 8 && pushesJ.length === 3 && tags.filter((x) => /^auto-new-uadmin-/.test(x)).length === 1 && tags.filter((x) => /^auto-srv-uadmin-/.test(x)).length === 1 && tags.filter((x) => /^auto-srv-uHRJ-/.test(x)).length === 1 && e3.body.notified === 2;
+      I.tag = [tags, e3.body.notified];
+      // ⓙ 2: 문서엔 live로 남은 준비 안 된 규칙(퇴사)을 연습으로 저장 = 200·문서 고침(값이 같음으로 막지 않음) · 준비된 규칙은 같은 값이면 종전대로 NO_CHANGE
+      seedJ(); mem.gw_data['settings:autotask'] = { schema: 1, rules: { hr_leave: 'live', hr_join: 'dry' }, updated_at: 12, updated_by: 'x' };
+      const k1 = await c({ action: 'autotask_set', rule: 'hr_leave', mode: 'dry', base: 12 }, tokA);
+      const k2 = await c({ action: 'autotask_set', rule: 'hr_join', mode: 'dry', base: mem.gw_data['settings:autotask'].updated_at }, tokA);
+      o.staleSet = k1.code === 200 && mem.gw_data['settings:autotask'].rules.hr_leave === 'dry' && k2.code === 400 && k2.body.error_code === 'NO_CHANGE';
+      // ⓙ 7: 지시 문서가 읽히긴 했는데 꼴이 깨짐(items 배열 아님) = 500·안 씀
+      seedJ({ live: true }); newMemJ('uN3'); mem.gw_data['col:tasks'] = { schema: 1, items: { x: 1 }, updated_at: 3 };
+      const bad0 = JSON.stringify(mem.gw_data['col:tasks']);
+      const b1 = await c({ action: 'autotask_ingest', key: KEYJ, items: [{ auto_key: 'cert:c956', title: '가짜' }] });
+      o.broken = b1.code === 500 && b1.body.error_code === 'TASKS_READ_FAILED' && JSON.stringify(mem.gw_data['col:tasks']) === bad0;
+      // ⓙ 8: 되돌림 — 직전 판에 준비 안 된 규칙 live = 그 규칙만 연습으로 낮춰 진행
+      seedJ(); mem.gw_data['settings:autotask'] = { schema: 1, rules: { lic_duty: 'dry' }, prev: { rules: { hr_leave: 'live', lic_duty: 'live' }, updated_at: 1 }, updated_at: 30, updated_by: 'x' };
+      const v1 = await c({ action: 'autotask_revert', base: 30 }, tokA);
+      o.revert = v1.code === 200 && mem.gw_data['settings:autotask'].rules.hr_leave === 'dry' && mem.gw_data['settings:autotask'].rules.lic_duty === 'live';
+    } catch (e) { o.err = String((e && e.stack) || e).slice(0, 300); blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; }
+    o.ok = ['dry', 'live', 'read', 'carry', 'next', 'tag', 'staleSet', 'broken', 'revert'].every((k) => o[k] === true);
+    return { o, I };
+  };
+  // ③ 완료 신호
+  const chkDJ = async (DI, cron) => {
+    const o = {};
+    const k1 = DI.parseKey('acct:u1:join:2026-12-01'), k2 = DI.parseKey('hr:u1:join:2026-12-01:3'), k3 = DI.parseKey('hr:u1:join:2026-12-01'), k4 = DI.parseKey('acct:u1:join:2026-12-01:3');
+    o.parse = k1.dom === 'acct' && k1.col === 'devices' && k1.id === 'u1' && k1.kind === 'join' && k2.dom === 'hr' && k2.col === '__none' && k2.no === 3 && k3 === null && k4 === null && DI.parseKey('lic:L1:duty:5:2026-03-31').dom === 'licduty';
+    const T = { auto_key: 'acct:u1:join:2026-12-01' };
+    const S = (devs) => DI.signalFor(T, { __rows: { devices: devs } });
+    o.sig = S([{ member_id: 'u1', status: 'approved' }]).ok === true && S([{ member_id: 'u1', status: 'pending' }]).ok === false && S([{ member_id: 'u2', status: 'approved' }]).ok === false && S(null).why === 'no_rows'
+      && DI.signalFor({ auto_key: 'hr:u1:join:2026-12-01:1' }, {}).ok === false && DI.signalFor({ auto_key: 'acct:u1:leave:2026-12-01' }, { __rows: { devices: [{ member_id: 'u1', status: 'approved' }] } }).ok === false;
+    // 크론: 매 시 첫 회차(분 0~9)만 기기를 읽음 · 승인 기기 → 계정 지시 승인 대기 · 체크 항목은 그대로
+    seedJ(); mem.gw_data['settings:doneif'] = { schema: 1, on: true, updated_at: 1 };
+    mem.gw_data['col:tasks'] = { schema: 1, items: [{ id: 'ac1', title: '입사 계정', auto_key: 'acct:uN9:join:2026-12-01', status: 'open', who_id: 'uadmin' }, { id: 'hr1', title: '입사 체크', auto_key: 'hr:uN9:join:2026-12-01:1', status: 'open', who_id: 'uHRJ' }], updated_at: 5 };
+    mem.gw_users['device:dN9'] = { id: 'dN9', status: 'approved', member_id: 'uN9' };
+    const base = Date.parse(TDJ + 'T05:00:00Z');
+    const c1 = await cron.run(blobsMock.store('gw_data'), base + 15 * 60000);
+    const st1 = mem.gw_data['col:tasks'].items.find((t) => t.id === 'ac1').status;
+    const c2 = await cron.run(blobsMock.store('gw_data'), base + 3 * 60000);
+    const a2 = mem.gw_data['col:tasks'].items.find((t) => t.id === 'ac1'), h2 = mem.gw_data['col:tasks'].items.find((t) => t.id === 'hr1');
+    o.cron = c1.ok && st1 === 'open' && c2.ok && a2.status === 'review' && a2.done_by === '앱 기준' && /acct\.device 1/.test(a2.done_src || '') && h2.status === 'open';
+    o.ok = Object.keys(o).every((k) => o[k] === true);
+    return o;
+  };
+  // ④ 판1 재확인 빈 검사(ⓙ 9)
+  const chkXJ = async (gw, gwThrow, gwMark) => {
+    const c = clJ(gw), o = {};
+    try {
+      // 실제 꼴 '없음'({ok:true,data:null}) = 빈 문서로 만듦(500 아님)
+      seedJ(); mem.gw_data['col:tasks'] = null;   // 가짜 저장소가 null 값을 { ok: true, data: null } 로 줌 = 실제 blobs.js의 '없음' 꼴(가짜 저장소의 키 없음은 NOT_FOUND)
+      const x1 = await c({ action: 'autotask_ingest', key: KEYJ, items: [{ auto_key: 'cert:c957', title: '가짜' }] });
+      o.realNone = x1.code === 200 && x1.body.made === 1 && mem.gw_data['col:tasks'].items.length === 1;
+      // 읽기 실패 확인 자리 = 판 스냅샷 앞(실패 때 ver: 키를 남기지 않음)
+      seedJ(); const v0 = Object.keys(mem.gw_data).filter((k) => /^ver(idx)?:/.test(k)).length;
+      blobsMock.hooks.failGet = (k) => (k === 'col:tasks' ? 'STORAGE_READ_FAILED' : null);
+      const x2 = await c({ action: 'autotask_ingest', key: KEYJ, items: [] });
+      blobsMock.hooks.failGet = null;
+      o.failSpot = x2.code === 500 && Object.keys(mem.gw_data).filter((k) => /^ver(idx)?:/.test(k)).length === v0;
+      // 봇 키 설정 적용: acct: 값 넣기·hr: 빈 값(지우기) = 400 BAD_PREFIX
+      seedJ();
+      const y1 = await c({ action: 'settings_apply', key: KEYJ, target: 'assign', mark: 'r1-c185b', confirm: true, base: 5, changes: { 'acct:': 'uwork' } });
+      const y2 = await c({ action: 'settings_apply', key: KEYJ, target: 'assign', mark: 'r1-c185b', confirm: true, base: 5, changes: { 'hr:': '' } });
+      o.botKey = y1.code === 400 && y1.body.error_code === 'BAD_PREFIX' && y2.code === 400 && y2.body.error_code === 'BAD_PREFIX' && mem.gw_data['settings:assign'].rules['hr:'].who_id === 'uHRJ';
+      // 숨김 요청의 넓은 꼴(hr:로 시작하는 꼴 밖 키)도 안 숨김
+      seedJ(); tasksJ().push({ id: 'tl', title: '느슨한 키', auto_key: 'hr:loose', status: 'open' }, { id: 'tc', title: '보통', auto_key: 'cert:c3', status: 'open' });
+      const z1 = await c({ action: 'autotask_ingest', key: KEYJ, items: [], hide_keys: ['hr:loose', 'cert:c3'] });
+      o.hideLike = z1.body.fixed === 1 && tasksJ().find((t) => t.id === 'tl').del === undefined && tasksJ().find((t) => t.id === 'tc').del === 1;
+      // 복원 낮춤 목록에 준비 안 된 규칙(문서엔 live)
+      seedJ(); mem.gw_data['settings:autotask'] = { schema: 1, rules: { hr_leave: 'live' }, updated_at: 3, updated_by: 'x' };
+      const n0 = auditMock.logs.length;
+      const w1 = await c({ action: 'backup_put', secret: KEYJ, restore: true, store: 'gw_data', key: 'settings:autotask', data: { schema: 1, rules: { hr_leave: 'live' }, updated_at: 2, updated_by: 'x' }, confirm: true });
+      const au = auditMock.logs.slice(n0).map((e) => e.ev && e.ev[0] && e.ev[0].t).join(' | ');
+      o.lowered = w1.code === 200 && /스위치 live 복원 안 함 \[hr_leave\]/.test(au) && mem.gw_data['settings:autotask'].rules.hr_leave === 'dry';
+      // ingest 바깥 감싸기: 실행기 전체가 던져도 200·규칙 ERROR·다른 지시는 그대로
+      seedJ({ live: true }); newMemJ('uN4');
+      const q1 = await clJ(gwThrow)({ action: 'autotask_ingest', key: KEYJ, items: [{ auto_key: 'cert:c958', title: '가짜' }] });
+      o.outer = q1.code === 200 && q1.body.srv.hr_join.skip === 'ERROR' && q1.body.made === 1 && hrJ().length === 0;
+      // 표시를 붙인 뒤 예외 = 그 규칙 표시 되돌림(제목·본문 원래대로)·저장 안 함
+      seedJ({ live: true }); tasksJ().push({ id: 'mA', title: '입사 옛 지시', detail: '본문', auto_key: 'hr:uMA:join:2026-01-02:1', status: 'open', who_id: 'uHRJ' }, { id: 'mB', title: '입사 B', detail: '', auto_key: 'hr:uMB:join:2026-01-03:1', status: 'open', who_id: 'uHRJ' });
+      const m1 = await clJ(gwMark)({ action: 'autotask_ingest', key: KEYJ, items: [{ auto_key: 'cert:c959', title: '가짜' }] });   // 봇 항목 1건 = 저장이 일어나는 날(되돌림이 빠지면 표시가 저장됨)
+      const mA = tasksJ().find((t) => t.id === 'mA');
+      o.markBack = m1.code === 200 && m1.body.srv.hr_join.skip === 'ERROR' && m1.body.made === 1 && !!mA && mA.title === '입사 옛 지시' && mA.detail === '본문';
+    } catch (e) { o.err = String((e && e.stack) || e).slice(0, 300); blobsMock.hooks.failGet = null; }
+    o.ok = ['realNone', 'failSpot', 'botKey', 'hideLike', 'lowered', 'outer', 'markBack'].every((k) => o[k] === true);
+    return o;
+  };
+  const evThrowJ = (src) => { const m = compJ(EVPJ, src || SRCJ.ev); const real = m.needsOf; let n = 0; m.needsOf = function (id) { n++; if (n > 1) throw new Error('boom'); return real(id); }; return m; };   // evInput 한 번은 통과 · 실행기(evExec)에서 던짐
+  const evMarkJ = (src) => { const m = compJ(EVPJ, src || SRCJ.ev); m.RULES.hr_join.plan = () => ({ events: [], subjects: Object.defineProperty({ uMA: [] }, 'uMB', { enumerable: true, get() { throw new Error('boom'); } }) }); return m; };
+  try {
+    pushMock.sendTo = async (ids, p) => { pushesJ.push({ ids: ids.slice(), p: p }); return { sent: ids.length, removed: 0 }; };
+    const EV0 = require(EVPJ);
+    const P0 = chkPJ(EV0);
+    T('C185 판2 ① 입사 계획 함수(실제 본문): 항목 표 8(인사 7 + 계정 1 · 키 번호 고정) · 켠 뒤 등록·입사일이 켠 날 이후 = 8건 · 재입사 표식 = 8건 · 입사일이 켠 날보다 앞 = 0·old · 켜기 전 등록 = 0 · 입사일 빈칸·달력에 없는 날 = 0·no_hire · 지입차주·시험·삭제·퇴사 = 0·수 · 제목 "입사(MM/DD) n/8 …"·100자 안·이름 0 · 담당 = 배정표(인사 7·계정 1)·공개 범위 = 담당만 · 기한(승격: 입사일·+14일·기한 없음 / 미승격 = 전부 빈칸·bg_off / 행 calc 거짓 = 그 항목만 빈칸·no_row) · 같은 키 다시 0 · 빈칸 → 채우면 8 · 입사일 고침 = 새 8 + 옛 8 표시 → 되돌림 = 표시 떨어짐(글자째) · 지움 = 표시만 · 담당 없음 = 안 만듦(계정만 없음 = 7) · 끼워 넣는 값 = 입사일뿐 · 연습 30일 창',
+      P0.ok, JSON.stringify(P0));
+    const MP = [["    if (hire < ctx.since_day) { out.old++; return; }", ''], ["    if (!(Number(m.created) >= ctx.since) && !rej) return;", '    if (false) return;'],
+      ["    if (m.test_acct) { out.ref.test++; return; }", ''], ["    if (m.emp_type === '지입차주') { out.ref.jiip++; return; }", ''], ["    if (m.del === 1) { out.ref.del++; return; }", ''], ["    if (retiredK(m, today)) { out.ref.retired++; return; }", ''],
+      ["vals: [md], priv: true }", 'vals: [md], priv: false }'], ["due = it.due === 'day14' ? addDaysK(hire, 14) : hire;", 'due = hire;'], ["        if (it.row && !rowOk[it.row]) noRow[it.row] = 1;\n        else due", '        due'],
+      ["const hire = String(m.hire_date || ''), hireOk = realDate(hire);", "const hire = String(m.hire_date || ''), hireOk = isDate(hire);"],
+      ["    if (m.del !== 1) out.subjects[m.id] = hireOk ?", '    if (false) out.subjects[m.id] = hireOk ?']];
+    const kP = MP.map(([a, b]) => { try { return chkPJ(compJ(EVPJ, mutJ(SRCJ.ev, a, b))).ok; } catch (e) { return 'err ' + e.message; } });
+    T('C185 판2 ① 결함 사본 ' + MP.length + '개(켠 날보다 앞도 셈 · 켜기 전 등록도 셈 · 시험 계정·지입차주·삭제·퇴사 안 거름 · 공개 범위 걷음 · +14일 걷음 · 근거 행 확인 걷음 · 달력 검사 느슨 · 표시 주체 걷음) = 모두 ✗', kP.every((v) => v === false), JSON.stringify(kP));
+    const R0 = await chkEJ(gwd);
+    T('C185 판2 ② e2e(실제 서버): 연습(기본) = 요약만(입사 1명·8건·칸 목록 고정·이름·회원 id 0)·ingest 지시 0·알림 0 · 켬 → 새 직원 등록 + 입사일 → 8건(인사 담당 7·계정 담당 1·담당만 공개·글에 이름 0)·made 0·알림 담당 둘 각 1발(auto-srv 꼬리표·이름 0) · 비관리자 읽기: 기성 "보기" 직원 0건·인사 담당 자기 7건만 · 인사 담당 [완료]·메모 뒤 보기 직원이 다른 지시 저장 = 서버 8건·완료·메모 그대로 · 직전 문서 못 읽은 비관리자 저장 500 · 다음 실행 0·알림 0 · (ⓙ 1) 같은 날 일반 + 실행기 알림 = 꼬리표 둘·응답 사람 수 한 번씩 · (ⓙ 2) 문서엔 live인 준비 안 된 규칙 연습 저장 = 200 · (ⓙ 7) 깨진 지시 문서 = 500·안 씀 · (ⓙ 8) 되돌림 = 준비 안 된 live만 연습으로',
+      R0.o.ok, JSON.stringify(R0.o.ok ? R0.o : R0));
+    const MR = [["function taskHiddenFor(member, t) { return taskRecHiddenFor(member, t) || taskHrHiddenFor(member, t); }", 'function taskHiddenFor(member, t) { return taskRecHiddenFor(member, t); }'],
+      ["  if (col === 'tasks' && !c.member.admin && Array.isArray(doc.items)) {\n    // v464 C078 ①", "  if (col === 'tasks' && !c.member.admin && Array.isArray(doc.items) && permOf(c.member, 'receivables') === 'hide') {\n    // v464 C078 ①"],
+      ["items: doc.items.filter(function (t) { return !taskHiddenFor(c.member, t); }) });", 'items: doc.items.filter(function (t) { return !taskRecHiddenFor(c.member, t); }) });'],
+      ["  if (!/^(?:hr|acct):/.test(String(t.auto_key || ''))) return false;\n  if (member.id && t.who_id === member.id) return false;", "  if (!/^(?:hr):/.test(String(t.auto_key || ''))) return false;\n  if (member.id && t.who_id === member.id) return false;"],
+      ["'정기봇', { tag: 'auto-srv', seen: notSeen });", "'정기봇', { seen: notSeen });"], ["notified: srvSent ? Object.keys(notSeen).length : notified,", 'notified: notified + srvSent,'],
+      ["if (a.rules[rule] === mode && !(a.stale && a.stale[rule])) return", 'if (a.rules[rule] === mode) return'],
+      ["  if (r.ok && r.data && !Array.isArray(r.data.items)) return jr(500, { status: 'ERROR', error_code: 'TASKS_READ_FAILED', request_id: R });", ''],
+      ["  Object.keys(rules).forEach(function (rk) { if (rules[rk] === 'live' && !autotaskReady(rk)) rules[rk] = 'dry'; });", '']];
+    const kR = [];
+    for (const [a, b] of MR) { let v; try { v = (await chkEJ(compJ(GWPJ, mutJ(SRCJ.gw, a, b)))).o.ok; } catch (e) { v = 'err ' + e.message; } kR.push(v); }
+    T('C185 판2 ② 결함 사본 ' + MR.length + '개(입·퇴사 거름 걷음 · 저장 이월을 기성 숨김 직원만 · 읽기 거름을 기성만 · 계정 키 거름 빠짐 · 실행기 알림 꼬리표 같음 · 사람 두 번 셈 · 문서 live 잔존 연습 저장 막음 · 깨진 지시 문서 덮음 · 되돌림 낮춤 걷음) = 모두 ✗', kR.every((v) => v === false), JSON.stringify(kR));
+    const D0 = await chkDJ(require(DIPJ), require(CRPJ));
+    T('C185 판2 ③ 완료 신호: 키 읽기(acct = 기기 · hr = 사람 [완료] · 꼴 어긋남 = 없음 · 인허가 기한 갈래 그대로) · 계정 = 그 직원 승인 기기 1대 이상(대기·남의 기기·못 읽음·퇴사 계정 = 아님) · 크론 = 매 시 첫 회차만 기기 읽음(분 15 = 그대로 · 분 3 = 승인 대기·앱 기준·acct.device 1) · 체크 항목 그대로', D0.ok, JSON.stringify(D0));
+    const MD = [["return n >= 1 ? { ok: true, why: 'acct.device ' + n }", "return n >= 0 ? { ok: true, why: 'acct.device ' + n }"], ["d.member_id === k.id && d.status === 'approved'", 'd.member_id === k.id'],
+      ["  if (k.kind !== 'join') return { ok: false, why: 'manual' };\n", ''], ["  if (hrm && (hrm[1] === 'hr') === !!hrm[5]) return", '  if (hrm) return']];
+    const kD = [];
+    for (const [a, b] of MD) { let v; try { require.cache[rpDIJ] = { id: rpDIJ, filename: rpDIJ, loaded: true, exports: compJ(DIPJ, mutJ(SRCJ.di, a, b)) }; v = (await chkDJ(require.cache[rpDIJ].exports, compJ(CRPJ, SRCJ.cr))).ok; } catch (e) { v = 'err ' + e.message; } finally { require.cache[rpDIJ] = keepDIJ; } kD.push(v); }
+    { let v; try { v = (await chkDJ(require(DIPJ), compJ(CRPJ, mutJ(SRCJ.cr, 'if (new Date(nowMs).getUTCMinutes() < 10) {', 'if (true) {')))).ok; } catch (e) { v = 'err ' + e.message; } kD.push(v); }
+    T('C185 판2 ③ 결함 사본 ' + kD.length + '개(기기 0대도 신호 · 대기 기기도 · 퇴사 계정도 기기 신호 · 꼴 어긋난 키 받음 · 매 회차 기기 읽음) = 모두 ✗', kD.every((v) => v === false), JSON.stringify(kD));
+    const X0 = await chkXJ(gwd, gwWithJ(evThrowJ()), gwWithJ(evMarkJ()));
+    T('C185 판2 ④ 판1 재확인 빈 검사(ⓙ 9): 실제 꼴 없음(ok·null) = 빈 문서로 만듦 · 읽기 실패 확인이 판 스냅샷 앞(ver 키 안 남김) · 봇 키 acct: 넣기·hr: 빈 값 = 400 · 숨김 요청 넓은 꼴(hr:loose) 안 숨김 · 복원 낮춤 목록에 준비 안 된 규칙 · ingest 바깥 감싸기(실행기 전체 예외 = 200·ERROR·다른 지시 그대로) · 표시 붙인 뒤 예외 = 그 규칙 표시 되돌림·안 씀', X0.ok, JSON.stringify(X0));
+    const MX = [["  if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: 'TASKS_READ_FAILED', request_id: R });", "  if (!(r.ok && r.data) && r.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: 'TASKS_READ_FAILED', request_id: R });"],
+      ["const ASSIGN_HUMAN_ONLY = { 'hr:': 1, 'acct:': 1, 'ks:': 1 };", "const ASSIGN_HUMAN_ONLY = { 'hr:': 1, 'ks:': 1 };"], ['      if (own(ASSIGN_HUMAN_ONLY, k)) return', '      if (own(ASSIGN_HUMAN_ONLY, k) && who) return'],
+      ['.filter(function (k) { return !EV.isEvLike(k); }).forEach', '.filter(function (k) { return !EV.isEvKey(k); }).forEach'], [" if (lowered.indexOf(k) < 0) lowered.push(k); } });", ' } });'],
+      ["    catch (e) { srv = {}; srvIds.forEach(function (k) { srv[k] = EV.skipSum('live', 'ERROR'); }); srvTxt = ' · 서버 규칙 건너뜀(ERROR)'; }", '    catch (e) { throw e; }'],
+      [' back.forEach(function (b) { b[0].title = b[1]; b[0].detail = b[2]; b[0].updated = b[3]; });', '']];
+    const kX = [];
+    for (const [a, b] of MX) { let v; try { const ms = mutJ(SRCJ.gw, a, b); v = (await chkXJ(compJ(GWPJ, ms), gwWithJ(evThrowJ(), ms), gwWithJ(evMarkJ(), ms))).ok; } catch (e) { v = 'err ' + e.message; } kX.push(v); }
+    { let v; try { const ms = mutJ(SRCJ.gw, "  if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: 'TASKS_READ_FAILED', request_id: R });", '').replace("  await verSnapshot('tasks', doc, '정기봇', true);\n", "  await verSnapshot('tasks', doc, '정기봇', true);\n  if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: 'TASKS_READ_FAILED', request_id: R });\n"); v = (await chkXJ(compJ(GWPJ, ms), gwWithJ(evThrowJ(), ms), gwWithJ(evMarkJ(), ms))).ok; } catch (e) { v = 'err ' + e.message; } kX.push(v); }
+    T('C185 판2 ④ 결함 사본 ' + kX.length + '개(실제 꼴 없음을 500 · 봇 키 acct: 받음 · hr: 빈 값 받음 · 숨김 가드 정확한 꼴만 · 복원 낮춤 목록 빠짐 · 바깥 감싸기 걷음 · 표시 되살리기 걷음 · 읽기 실패 확인을 스냅샷 뒤로) = 모두 ✗', kX.every((v) => v === false), JSON.stringify(kX));
+  } catch (e) { T('C185 판2 검사 실행', false, String(e && e.stack || e).slice(0, 500)); }
+  finally { pushMock.sendTo = sendSaveJ; pushMock.loadMembers = loadSaveJ; require.cache[rpEVJ] = keepEVJ; require.cache[rpDIJ] = keepDIJ; const s = JSON.parse(snapJ); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; }
 }
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

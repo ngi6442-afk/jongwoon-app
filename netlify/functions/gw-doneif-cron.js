@@ -2,13 +2,14 @@
 // 공통 done_if 워커(공통 기반 2, v397) — netlify.toml schedule "*/10 * * * *". 도메인별 10분 크론 신설 금지(이 함수 하나가 공용).
 // settings:doneif.on=false(기본) → 계획만 it:doneif:last에 기록(dry-run, 데이터 불변). on=true → review 전환 + 전환 전 일일 스냅샷 1회 +
 // clog:appr 해시 체인 + 감사 '앱기준전환' + 승인권자 1발(배정표 approver_id, 없으면 관리자 전원). 되돌리기 = 지시 카드 [완료요청 취소]/[반려](반려는 신호 끔).
-const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
+const { setupBlobContext, store, blobGet, blobSet, blobList } = require('./_lib/blobs');
 const push = require('./_lib/push');
 const audit = require('./_lib/audit');
 const D = require('./_lib/doneif');
 const { stamp } = require('./_lib/cronstamp');   // v398 실행 흔적 it:cron:<fn>:last
 
 const DATA = 'gw_data';
+const USERS = 'gw_users';   // C185 판2 입사 계정 신호(device:* — 읽기만)
 const FILES = 'gw_files';   // P1 판19 증빙 보관함 색인(proof:__index__) — 읽기만
 function kstToday(ms) { return new Date(ms + 9 * 3600000).toISOString().slice(0, 10); }
 
@@ -25,6 +26,18 @@ async function run(st, nowMs) {
   const recs = { __rows: {}, __now: nowMs };
   if (need.workers) need.asbestos = true;   // v417 카드 10: wk 월 지시 신호는 명부+대장(참여 범위) 둘 다 본다
   for (const col of Object.keys(need)) {
+    if (col === '__none') continue;   // C185 판2 입·퇴사 체크 항목(hr:) — 사람 [완료]만, 읽을 것 없음
+    if (col === 'devices') {   // C185 판2 입사 계정(acct:) 신호 — gw_users device:* 를 하나씩 읽어야 해서 열린 계정 지시가 있을 때 매 시 첫 회차(분 0~9)에만 · 못 읽음·그 밖 회차 = null(신호 없음)
+      let devs = null;
+      if (new Date(nowMs).getUTCMinutes() < 10) {
+        try {
+          const us = store(USERS), l = await blobList(us, 'device:');
+          if (l && l.ok) { devs = []; for (const k of l.keys) { if (String(k).indexOf('device:') !== 0) continue; const r = await blobGet(us, k); if (r.ok && r.data && typeof r.data === 'object') devs.push({ member_id: r.data.member_id, status: r.data.status }); else { devs = null; break; } } }
+        } catch (e) { devs = null; }
+      }
+      recs.__rows.devices = devs;
+      continue;
+    }
     if (col === 'proof') {   // P1 판19 증명서 신호: 열린 증명서 지시가 있을 때만 증빙 보관함 색인 하나를 읽는다(파일 본문 안 읽음). 읽기 실패·없음·깨진 꼴 = null(신호 없음)
       let pr = null;
       try { pr = await blobGet(store(FILES), 'proof:__index__'); } catch (e) { pr = null; }
