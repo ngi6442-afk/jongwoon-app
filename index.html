@@ -33802,6 +33802,7 @@ function dutyStage(nx){
       if (res.status !== 200){
         var applied = !!(res.body && res.body.applied);
         if (res.body && res.body.error_code === "PMCON_MARKS_FULL") alert("보류함이 가득 찼습니다(" + (res.body.max || 60) + "개) — 보류함에서 [다시 열기]로 비운 뒤 다시 눌러 주세요.");
+        else if (res.body && res.body.error_code === "RULE_NOT_READY") alert("아직 준비 중인 규칙이라 켤 수 없습니다.");   // C185 판1 검토 G: 서버가 준비 중 규칙의 켜기를 거절(낡은 화면 등) — 영문 코드 대신
         else if (!(res.body && res.body.error_code === "NO_CHANGE")) alert("저장 실패 (" + ((res.body && res.body.error_code) || res.status) + ")" + (applied ? " — 설정은 바뀌었고 누른 기록만 남지 못했습니다" : ""));
         renderPmcon(); return;
       }
@@ -33888,15 +33889,21 @@ function dutyStage(nx){
     if ((s.no_row || []).length) p.push("근거 표에 없어 기한을 세지 못한 항목 " + s.no_row.length + "개");
     return p.join(" · ") + ".";
   }
+  // '켤까요?' 줄 — 검토 G: [ㄱ]은 누르는 즉시 켬(예고는 사람이 먼저) · 만들 지시 0건인데 담당이 없어 못 만드는 것만 있으면 [ㄱ]을 닫고 배정표 담당부터
+  function evrLiveRow(b, k, nm, s){
+    var noWhoOnly = !(Number(s.tasks) > 0) && Number(s.no_who) > 0 && !s.skip;
+    return { id: "autotask:" + k + ":live", q: nm + " — 켤까요?", recTxt: noWhoOnly ? "그대로(담당 먼저)" : "켬(실제 발행)", curTxt: "연습(발행 0)", args: { rule: k, mode: "live" }, def: "keep",
+      block: noWhoOnly ? "배정표 담당을 먼저 정해 주세요" : "",
+      why: evrSumTxt(s) + " [ㄱ]을 누르면 바로 켜지고 다음 평일 08:10 실행부터 지시가 생깁니다(켠 뒤에 생긴 일만 — 지난 일 소급 없음). 직원에게 새로 가는 알림이라 누르기 사흘 전에 예고해 주세요. 되돌리기: 이 화면 '범위 밖 자동 지시 규칙' 카드 [연습으로]·[끄기](이미 생긴 지시는 남음).", setBase: b.updated_at || 0 };
+  }
   function evrRows(b){
     var out = [], rules = b.rules || {}, ms = b.meta_srv || {}, dr = (b.dry && b.dry.rules) || {};
     evrIds(b).forEach(function(k){
       var m = ms[k] || {}, cur = rules[k], s = dr[k] || null, nm = m.label || "자동 지시 규칙";
       if (cur === "off") out.push({ id: "autotask:" + k + ":dry", q: nm + " — 꺼진 규칙을 연습 모드(발행 0)로 되돌릴까요?", recTxt: "연습(발행 0)", curTxt: "꺼짐", args: { rule: k, mode: "dry" }, def: "rec",
         why: "연습 모드는 매일 평일 08:10에 '켰으면 생겼을 지시'만 세고 지시·알림을 만들지 않습니다.", setBase: b.updated_at || 0 });
-      else if (cur === "dry" && m.ready === true && s && s.ready !== false) out.push({ id: "autotask:" + k + ":live", q: nm + " — 켤까요?", recTxt: "켬(실제 발행)", curTxt: "연습(발행 0)", args: { rule: k, mode: "live" }, def: "keep",
-        why: evrSumTxt(s) + " 켜면 켠 뒤에 생긴 일만 지시합니다(지난 일 소급 없음). 직원에게 새로 가는 알림이라 사흘 전 예고 뒤에 켭니다. 되돌리기: 이 화면 '범위 밖 자동 지시 규칙' 카드 [연습으로]·[끄기](이미 생긴 지시는 남음).", setBase: b.updated_at || 0 });
-      else if (cur === "live" && s && EVR_STOP[s.skip]) out.push({ id: "autotask:" + k + ":dry", q: nm + " — 멈춰 있습니다. 연습으로 내릴까요?", recTxt: "연습(발행 0)", curTxt: "켜짐(멈춤)", args: { rule: k, mode: "dry" }, def: "keep",
+      else if (cur === "dry" && m.ready === true && s && s.ready !== false && s.mode === "dry") out.push(evrLiveRow(b, k, nm, s));   // 검토 G·H04: 연습 때 센 요약만(낡은 '준비 중' 요약·켜진 때 요약으로는 줄 없음)
+      else if (cur === "live" && s && s.mode === "live" && EVR_STOP[s.skip]) out.push({ id: "autotask:" + k + ":dry", q: nm + " — 멈춰 있습니다. 연습으로 내릴까요?", recTxt: "연습(발행 0)", curTxt: "켜짐(멈춤)", args: { rule: k, mode: "dry" }, def: "keep",
         why: EVR_STOP[s.skip] + ". 맞는 일이면 막는 기준을 고쳐야 하고(개발), 아니면 연습으로 내립니다. 무응답이면 그대로 멈춰 있습니다(지시 0).", setBase: b.updated_at || 0 });
     });
     return out;
@@ -33912,12 +33919,12 @@ function dutyStage(nx){
       var m = ms[k] || {}, cur = b.rules[k], s = dr[k] || null, st, act = "", line = "";
       if (m.ready !== true) st = "준비 중" + (cur === "off" ? "(꺼짐)" : "");
       else st = cur === "live" ? "켜짐" + (evrMd(since[k]) ? " · 켠 날 " + evrMd(since[k]) : "") : (cur === "off" ? "꺼짐" : "연습");
-      if (m.ready === true && cur !== "off") line = '<br><span style="color:var(--sub);">' + esc(evrSumTxt(s)) + '</span>';
+      if (m.ready === true && cur !== "off") line = '<br><span style="color:var(--sub);">' + esc(s && s.mode && s.mode !== cur ? (cur === "live" ? "켠 뒤 첫 집계 전(다음 평일 08:10 정기업무 봇 뒤에 채워짐)." : "바꾼 뒤 첫 집계 전(다음 평일 08:10 정기업무 봇 뒤에 채워짐).") : evrSumTxt(s)) + '</span>';   // 검토 G: 켠 직후엔 연습 때 글 대신
       if (cur === "live") act = cw ? '<br><button type="button" class="mini-btn" data-evr-set="' + esc(k) + ':dry">연습으로</button> <button type="button" class="mini-btn" data-evr-set="' + esc(k) + ':off">끄기</button>' : ' <span class="pc-who">바꾸실 분: PM</span>';
       return '<li><b>' + esc(m.label || "자동 지시 규칙") + '</b> — ' + esc(st) + line + act + '</li>';
     });
     el.innerHTML = head + '<ul style="margin:6px 0 4px;padding-left:18px;font-size:12.5px;line-height:1.6;">' + li.join("") + '</ul>'
-      + '<div class="pc-none">켜기는 연습 결과가 쌓인 뒤 위 \'정할 것\' 줄로 합니다. 켠 뒤에 생긴 일만 지시합니다.</div>';
+      + '<div class="pc-none">' + (ids.every(function(k){ return (ms[k] || {}).ready !== true; }) ? "준비 중인 규칙은 계산이 들어온 뒤 켤 수 있습니다." : "켜기는 연습 결과가 쌓인 뒤 위 '정할 것' 줄로 합니다. 켠 뒤에 생긴 일만 지시합니다.") + '</div>';   // 검토 G: 지금 상태에 맞는 안내
     Array.prototype.forEach.call(el.querySelectorAll ? el.querySelectorAll("[data-evr-set]") : [], function(btn){ btn.addEventListener("click", function(){ var p = btn.getAttribute("data-evr-set").split(":"); evrCardSet(b, p[0], p[1]); }); });
   }
   function evrCardSet(b, k, mode){
@@ -33928,7 +33935,7 @@ function dutyStage(nx){
     gwCall("gw-data", { action: "pmcon_decide", kind: "autotask", row: "autotask:" + k + ":" + mode, grade: "R1", due: "", q: nm + " — " + txt, rec: txt, choice: "ok", args: { rule: k, mode: mode }, set_base: Number(b.updated_at) || 0, val: txt, base: pmconState.base }).then(function(res){
       evrCardBusy = false;
       if (res.status === 409){ apprToastShow("다른 곳에서 방금 바뀌었습니다 — 다시 불러왔습니다"); renderPmcon(); return; }
-      if (res.status !== 200){ alert("저장 실패 (" + ((res.body && res.body.error_code) || res.status) + ")"); renderPmcon(); return; }
+      if (res.status !== 200){ alert(res.body && res.body.error_code === "RULE_NOT_READY" ? "아직 준비 중인 규칙이라 켤 수 없습니다." : "저장 실패 (" + ((res.body && res.body.error_code) || res.status) + ")"); renderPmcon(); return; }
       apprToastShow(txt + " — 적용했습니다(누른 기록에 남음)");
       renderPmcon();
     }).catch(function(){ evrCardBusy = false; alert("저장 실패(네트워크) — 다시 시도해주세요."); });

@@ -52,6 +52,10 @@ const BASE_NEEDS = ['assign', 'members'];
 const CAP = 10;        // 한 규칙이 한 실행에 새로 만들 사건(사람·차·묶음) 상한 — 넘으면 그 실행 0건 + skip TOO_MANY(켠 시각이 잘못됐을 때의 안전판)
 const DRY_WIN = 30;    // 연습 요약 = 최근 30일에 생긴 사건을 켰다면(보여 주기용)
 const DAY = 86400000;
+const TITLE_MAX = 120;   // 지시 제목 상한(ingest·실행기가 만들 때와 같음)
+// 검토 E: 봇에 돌려주는 규칙별 칸은 수와 건너뜀 까닭만(담당 id 목록·근거 행 id 없음)
+const BOT_KEYS = ['mode', 'events', 'tasks', 'no_who', 'no_due', 'marked', 'unmarked', 'gone', 'old', 'skip'];
+function botSum(res) { const o = {}; Object.keys(res || {}).forEach(function (k) { const s = res[k] || {}, b = {}; BOT_KEYS.forEach(function (f) { if (s[f] !== undefined) b[f] = s[f]; }); o[k] = b; }); return o; }
 function hasOwn(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
 function ready(id) { return hasOwn(RULES, id) && typeof RULES[id].plan === 'function'; }
 function needsOf(id) { const o = {}; BASE_NEEDS.concat(hasOwn(RULES, id) ? RULES[id].needs : []).forEach(function (n) { o[n] = 1; }); return Object.keys(o); }
@@ -80,7 +84,7 @@ const MARK_WHY = { date: '※ 날짜가 바뀌어 지금 기록과 맞지 않는
   state: '※ 상태가 바뀌어 지금 기록과 맞지 않는 지시입니다 — 확인한 뒤 이 지시를 지워 주세요.' };
 function markedKind(t) { const ti = String((t && t.title) || ''); return ti.indexOf(MARK.date) === 0 ? 'date' : (ti.indexOf(MARK.state) === 0 ? 'state' : ''); }
 function markTask(t, kind, today) {
-  t.title = MARK[kind] + String(t.title || '');
+  t.title = (MARK[kind] + String(t.title || '')).slice(0, TITLE_MAX);   // 검토 H: 표시를 붙여도 제목 120자 — 표시는 남기고 뒤를 자름(뗄 때 잘린 뒤는 돌아오지 않음)
   const d = String(t.detail || '');
   if (d.indexOf(MARK_WHY[kind]) < 0) t.detail = (d ? d + '\n' : '') + MARK_WHY[kind];
   t.updated = today;
@@ -171,4 +175,4 @@ function run(id, input, ctx, tasks, opt, write) {
   return out;
 }
 
-module.exports = { KEY_RE, isEvKey, isEvLike, ruleOfKey, subjOf, RULES, RULE_IDS, BASE_NEEDS, CAP, DRY_WIN, ready, needsOf, kstDay, ctxFor, emptySum, skipSum, notReadySum, MARK, MARK_WHY, markedKind, markTask, unmarkTask, run };
+module.exports = { KEY_RE, isEvKey, isEvLike, ruleOfKey, subjOf, RULES, RULE_IDS, BASE_NEEDS, CAP, DRY_WIN, ready, needsOf, kstDay, ctxFor, emptySum, skipSum, notReadySum, MARK, MARK_WHY, markedKind, markTask, unmarkTask, run, botSum, TITLE_MAX };

@@ -1684,7 +1684,7 @@ try {
     && /action: "notify_get"/.test(html) && /"notify_set"/.test(html) && /"notify_revert"/.test(html)
     && /async function handleNotifyGet/.test(gwd) && /async function handleNotifySet/.test(gwd) && /async function handleNotifyRevert/.test(gwd)
     && /action === 'notify_get'/.test(gwd) && /action === 'notify_set'/.test(gwd) && /action === 'notify_revert'/.test(gwd)
-    && /suppressed: 'task_auto_create'/.test(gwd) && /task_review === 'issuer_approver'/.test(gwd) && (gwd.match(/await notifyAutoCreated\(/g) || []).length === 2
+    && /suppressed: 'task_auto_create'/.test(gwd) && /task_review === 'issuer_approver'/.test(gwd) && (gwd.match(/await notifyAutoCreated\(/g) || []).length === 3 /* C185 판1 검토 A: + ingest 실행기 지시의 저장 뒤 1곳(srvSent) */ && /if \(srvNew\.length\) srvSent = await notifyAutoCreated\(st, srvNew, '정기봇'\);/.test(gwd)
     && /due_digest === 'summary'/.test(todo) && /task-digest-/.test(todo)
     && Number((swv.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 396);
 } catch (e) { console.log('  (v396 검사 생략 — ' + e.message + ')'); fails++; }
@@ -19695,7 +19695,7 @@ try {
   T('C185 판1 ① 배선: 점검 카드 = PMCON_CHECKS.push 1줄(차량 근거 카드 뒤 · 그리기 함수는 그 사이) · 구분 칸 짧은 이름 +3(입·퇴사·계정·실적 신고) · 콘솔 줄 함수 = 응답을 카드에 넘기고(evrSeen) 인허가 기한 밖 줄이 있을 때만 evrRows · 앱 소스에 새 키 꼴을 만드는 곳 0(:ev: 0) · 관리자 카드 규칙 3건 그대로', w1);
   // ② 콘솔 줄 실행
   const VARSC = [stC(/var EVR_STOP = \{[^}]+\};/), stC(/var EVR_SKIP = \{[^}]+\};/), stC(/var evrLast = null, evrCardBusy = false;/), stC(/var AUTO_RULE_ORDER = \[[^\]]+\];/), stC(/var PMCON_PLAN = \{[^\n]+\};/)];
-  const FNSC = ['esc', 'pmconPlan', 'pmconRowsAutotask', 'pmconLicWhy', 'evrSeen', 'evrIds', 'evrMd', 'evrSumTxt', 'evrRows', 'evrCardRender', 'evrCardSet'];
+  const FNSC = ['esc', 'pmconPlan', 'pmconRowsAutotask', 'pmconLicWhy', 'evrSeen', 'evrIds', 'evrMd', 'evrSumTxt', 'evrLiveRow', 'evrRows', 'evrCardRender', 'evrCardSet'];
   const boxC = (src) => {
     const get = (n) => fnC.call(null, n);
     const body = (src ? FNSC.map((n) => { const i = src.indexOf('function ' + n + '('); let d = 0, s2 = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; s2 = true; } else if (ch === '}') { d--; if (s2 && d === 0) return src.slice(i, j + 1); } } return ''; }) : FNSC.map(get)).join('\n');
@@ -19703,7 +19703,7 @@ try {
       'var pmconSeq = __o.seq || 1, pmconState = __o.state === undefined ? { canWrite: true, base: 555 } : __o.state, calls = [], toasts = [], renders = 0;',
       'function todayStr(){ return "2026-11-20"; } function memberName(id){ return id === "u1" ? "담당가" : ""; } function apprToastShow(m){ toasts.push(m); } function renderPmcon(){ renders++; }',
       'var confirm = function(){ return __o.confirm !== false; }, alert = function(m){ toasts.push("alert:" + m); };',
-      'function gwCall(fn, b){ calls.push(JSON.parse(JSON.stringify(b))); return Promise.resolve({ status: 200, body: { applied: true } }); }',
+      'function gwCall(fn, b){ calls.push(JSON.parse(JSON.stringify(b))); return Promise.resolve(__o.res || { status: 200, body: { applied: true } }); }',
       (src ? [/var EVR_STOP = \{[^}]+\};/, /var EVR_SKIP = \{[^}]+\};/, /var evrLast = null, evrCardBusy = false;/, /var AUTO_RULE_ORDER = \[[^\]]+\];/, /var PMCON_PLAN = \{[^\n]+\};/].map((re) => stC(re, src)) : VARSC).join('\n'),
       body,
       'return { rows: pmconRowsAutotask, card: evrCardRender, seen: evrSeen, set: evrCardSet, calls: calls, toasts: toasts, setSeq: function(n){ pmconSeq = n; } };'].join('\n'));
@@ -19723,7 +19723,7 @@ try {
     const b1 = mk({}).rows(BC({ ready: { hr_join: true }, dry: { hr_join: SUMC() } }));
     const L = b1.find((r) => r.id === 'autotask:hr_join:live');
     o.live = b1.length === 1 && !!L && L.def === 'keep' && JSON.stringify(L.args) === '{"rule":"hr_join","mode":"live"}' && L.setBase === 44 && L.q === LBL.hr_join + ' — 켤까요?'
-      && /최근 30일에 생긴 일을 켰다면 지시 8건\(사건 1\)/.test(L.why) && /담당가 7건/.test(L.why) && /배정표 담당 1건/.test(L.why) && /켠 날보다 앞선 일이라 뺀 1건/.test(L.why) && /사흘 전 예고/.test(L.why) && /\[연습으로\]·\[끄기\]/.test(L.why) && !IDRE.test(L.why + L.q);
+      && /최근 30일에 생긴 일을 켰다면 지시 8건\(사건 1\)/.test(L.why) && /담당가 7건/.test(L.why) && /배정표 담당 1건/.test(L.why) && /켠 날보다 앞선 일이라 뺀 1건/.test(L.why) && /사흘 전에 예고/.test(L.why) && /\[ㄱ\]을 누르면 바로 켜지고 다음 평일 08:10 실행부터/.test(L.why) && /\[연습으로\]·\[끄기\]/.test(L.why) && !IDRE.test(L.why + L.q) && !L.block && L.recTxt === '켬(실제 발행)';
     const b2 = mk({}).rows(BC({ rules: { ks_report: 'off' } }));
     o.off = b2.length === 1 && b2[0].id === 'autotask:ks_report:dry' && b2[0].def === 'rec' && JSON.stringify(b2[0].args) === '{"rule":"ks_report","mode":"dry"}';
     const b3 = mk({}).rows(BC({ ready: { veh_event: true }, rules: { veh_event: 'live' }, dry: { veh_event: SUMC({ mode: 'live', win: 0, skip: 'TOO_MANY', tasks: 0 }) } }));
@@ -19734,11 +19734,19 @@ try {
       && b3b.length === 1 && /직원 이름이 섞여/.test(b3b[0].why) && b4.length === 0 && b5.length === 0;
     const b6 = mk({}).rows(BC({ dry: { hr_join: SUMC() } }));   // 준비 안 됨인데 요약이 있어도 켜기 줄 없음
     o.notReady = b6.length === 0;
+    // 검토 G·H04·H18: 만들 지시 0·담당 없음뿐 = [ㄱ] 닫힘(추천 그대로·배정표 먼저) · 낡은 요약(ready false·켜진 때 요약)으로는 켜기 줄 없음 · 켠 시각 없는 live = 멈춤 글
+    const b7 = mk({}).rows(BC({ ready: { hr_join: true }, dry: { hr_join: SUMC({ tasks: 0, events: 0, who: [], no_who: 3 }) } }));
+    o.noWho = b7.length === 1 && b7[0].block === '배정표 담당을 먼저 정해 주세요' && b7[0].recTxt === '그대로(담당 먼저)' && b7[0].def === 'keep';
+    const b8 = mk({}).rows(BC({ ready: { hr_join: true }, dry: { hr_join: { mode: 'dry', ready: false } } })), b9 = mk({}).rows(BC({ ready: { hr_join: true }, dry: { hr_join: SUMC({ mode: 'live', win: 0 }) } }));
+    o.stale = b8.length === 0 && b9.length === 0;
+    const b10 = mk({}).rows(BC({ ready: { veh_event: true }, rules: { veh_event: 'live' }, dry: { veh_event: SUMC({ mode: 'live', win: 0, skip: 'NO_SINCE', tasks: 0 }) } }));
+    const b11 = mk({}).rows(BC({ ready: { veh_event: true }, rules: { veh_event: 'live' }, dry: { veh_event: SUMC({ mode: 'dry', skip: 'TOO_MANY', tasks: 0 }) } }));
+    o.noSince = b10.length === 1 && /켠 시각 기록이 없어 멈춰 있습니다/.test(b10[0].why) && b11.length === 0;
     o.ok = Object.values(o).every((v) => v === true); return o;
   };
   const mkC = (src) => (o) => boxC(src)(o);
   const R2 = chkRowsC(mkC(null));
-  T('C185 판1 ② 콘솔 줄(실행): 지금(5줄 준비 중) = 줄 0 · 준비됨 ∧ 연습 ∧ 요약 = "… — 켤까요?" 1줄(무응답 그대로·값 live·set_base·글 = 최근 30일 지시 수·담당 이름·켠 날보다 앞·사흘 전 예고·되돌리기) · 꺼짐 = 연습으로(추천) · 켜짐 ∧ 사건 막이·이름 검사 멈춤 = "멈춰 있습니다 — 연습으로 내릴까요?"(무응답 그대로) · 켜짐(정상·읽기 실패) = 줄 없음 · 준비 안 됨 = 요약이 있어도 줄 없음 · 글에 내부 id·키·까닭 코드 0', R2.ok, JSON.stringify(R2));
+  T('C185 판1 ② 콘솔 줄(실행): 지금(5줄 준비 중) = 줄 0 · 준비됨 ∧ 연습 ∧ 요약 = "… — 켤까요?" 1줄(무응답 그대로·값 live·set_base·글 = 최근 30일 지시 수·담당 이름·켠 날보다 앞·사흘 전 예고·되돌리기) · 꺼짐 = 연습으로(추천) · 켜짐 ∧ 사건 막이·이름 검사 멈춤 = "멈춰 있습니다 — 연습으로 내릴까요?"(무응답 그대로) · 켜짐(정상·읽기 실패) = 줄 없음 · 준비 안 됨 = 요약이 있어도 줄 없음 · 글에 내부 id·키·까닭 코드 0 · (검토) [ㄱ] = 바로 켬 안내 · 담당 없음뿐 = [ㄱ] 닫힘·추천 그대로 · 낡은 요약(ready false·켜진 때) = 줄 없음 · 켠 시각 없음 멈춤 글', R2.ok, JSON.stringify(R2));
   // ③ 점검 카드
   const elC = () => { const btns = []; return { innerHTML: '', style: {}, querySelectorAll: function () { const out = []; const re = /data-evr-set="([^"]+)"/g; let m; while ((m = re.exec(this.innerHTML))) { const v = m[1]; out.push({ getAttribute: () => v, addEventListener: (ev, f) => { btns.push({ v, f }); } }); } return out; }, btns }; };
   const chkCardC = async (mk) => {
@@ -19759,13 +19767,31 @@ try {
     o.stale = /불러오지 못했습니다/.test(e4.innerHTML);
     const q = mk({ seq: 8, confirm: false }); q.rows(BC({ ready: { hr_join: true }, rules: { hr_join: 'live' } })); const e5 = elC(); q.card(e5); e5.btns[1] && e5.btns[1].f();
     o.cancel = q.calls.length === 0;
+    // 검토 G·H13·H21: 끝 안내 = 다섯 줄 다 준비 중이면 '계산이 들어온 뒤' · 하나라도 준비됨이면 종전 안내 · 준비 중 규칙엔 요약이 있어도 요약 줄 없음 · 켠 직후(요약 mode ≠ 스위치) = '켠 뒤 첫 집계 전' · PM 아님 = 누름 함수가 안 보냄 · 서버 RULE_NOT_READY = 한국어 안내
+    const v1 = e1.innerHTML.replace(/<[^>]+>/g, ' ');
+    o.noteAll = /준비 중인 규칙은 계산이 들어온 뒤 켤 수 있습니다/.test(v1) && v2.indexOf('켜기는 연습 결과가 쌓인 뒤') >= 0 && v2.indexOf('계산이 들어온 뒤 켤 수') < 0;
+    const h13 = mk({ seq: 9 }); h13.rows(BC({ dry: { hr_join: SUMC() } })); const e6 = elC(); h13.card(e6);
+    o.noSumNotReady = e6.innerHTML.indexOf('켰다면') < 0 && e6.innerHTML.indexOf('<br>') < 0;
+    const fr = mk({ seq: 10 }); fr.rows(BC({ ready: { hr_join: true }, rules: { hr_join: 'live' }, since: { hr_join: SINCE }, dry: { hr_join: SUMC() } })); const e7 = elC(); fr.card(e7);
+    o.firstRun = /켠 뒤 첫 집계 전/.test(e7.innerHTML) && e7.innerHTML.indexOf('켰다면') < 0;
+    const h21 = mk({ seq: 11, state: { canWrite: false, base: 555 } }); h21.set(BC({ ready: { hr_join: true }, rules: { hr_join: 'live' } }), 'hr_join', 'dry');
+    o.setPm = h21.calls.length === 0;
+    const nr = mk({ seq: 12, res: { status: 400, body: { error_code: 'RULE_NOT_READY' } } }); nr.set(BC({ ready: { hr_join: true }, rules: { hr_join: 'live' } }), 'hr_join', 'dry'); await new Promise((r) => setTimeout(r, 0));
+    o.notReadyMsg = nr.toasts.indexOf('alert:아직 준비 중인 규칙이라 켤 수 없습니다.') >= 0 && fnC('pmconAct').indexOf('else if (res.body && res.body.error_code === "RULE_NOT_READY") alert("아직 준비 중인 규칙이라 켤 수 없습니다.");') > 0;
     o.ok = Object.values(o).every((v) => v === true); return o;
   };
   const R3 = await chkCardC(mkC(null));
-  T('C185 판1 ③ 점검 카드(실행): 지금 = 5줄 "준비 중"(라벨·단추 0·내부 id 0·인허가 기한 줄 없음) · 켜진 규칙 = "켜짐 · 켠 날 12/1"·오늘 실행 수·[연습으로]·[끄기] · 꺼짐 표시 · [연습으로] = pmcon_decide(종류 autotask·줄 autotask:<규칙>:dry·R1·ok·args·set_base 44·base 555) · PM 아님 = 단추 0·"바꾸실 분: PM" · 다른 그리기 회차 응답 = 불러오지 못함 · 확인 창 취소 = 안 보냄', R3.ok, JSON.stringify(R3));
+  T('C185 판1 ③ 점검 카드(실행): 지금 = 5줄 "준비 중"(라벨·단추 0·내부 id 0·인허가 기한 줄 없음) · 켜진 규칙 = "켜짐 · 켠 날 12/1"·오늘 실행 수·[연습으로]·[끄기] · 꺼짐 표시 · [연습으로] = pmcon_decide(종류 autotask·줄 autotask:<규칙>:dry·R1·ok·args·set_base 44·base 555) · PM 아님 = 단추 0·"바꾸실 분: PM" · 다른 그리기 회차 응답 = 불러오지 못함 · 확인 창 취소 = 안 보냄 · (검토) 끝 안내 = 다섯 줄 준비 중이면 "계산이 들어온 뒤" · 준비 중 규칙엔 요약 줄 없음 · 켠 직후 "켠 뒤 첫 집계 전" · PM 아님 = 누름 함수가 안 보냄 · RULE_NOT_READY = 한국어 안내(콘솔 줄 누름도)', R3.ok, JSON.stringify(R3));
   const mutHC = (from, to) => { if (html.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); return html.replace(from, () => to); };
-  const MC = [['else if (cur === "dry" && m.ready === true && s && s.ready !== false) out.push(', 'else if (cur === "dry" && s) out.push('],
-    ['else if (cur === "live" && s && EVR_STOP[s.skip]) out.push(', 'else if (false) out.push('],
+  const MC = [['else if (cur === "dry" && m.ready === true && s && s.ready !== false && s.mode === "dry") out.push(', 'else if (cur === "dry" && s) out.push('],
+    ['else if (cur === "live" && s && s.mode === "live" && EVR_STOP[s.skip]) out.push(', 'else if (false) out.push('],
+    ['else if (cur === "dry" && m.ready === true && s && s.ready !== false && s.mode === "dry") out.push(', 'else if (cur === "dry" && m.ready === true && s && s.ready !== false) out.push('],   // 검토 H04 낡은 요약 거름 걷음
+    ['var noWhoOnly = !(Number(s.tasks) > 0) && Number(s.no_who) > 0 && !s.skip;', 'var noWhoOnly = false;'],   // 검토 G 담당 없음뿐인데 [ㄱ] 열림
+    ['esc(s && s.mode && s.mode !== cur ? (cur === "live" ?', 'esc(false ? (cur === "live" ?'],   // 검토 G 켠 직후에도 연습 글
+    ['(ids.every(function(k){ return (ms[k] || {}).ready !== true; }) ? "준비 중인 규칙은', '(false ? "준비 중인 규칙은'],   // 검토 G 끝 안내 고정
+    ['alert(res.body && res.body.error_code === "RULE_NOT_READY" ? "아직 준비 중인 규칙이라 켤 수 없습니다." : "저장 실패 ("', 'alert(false ? "" : "저장 실패 ("'],   // 검토 G 영문 코드
+    ['[ㄱ]을 누르면 바로 켜지고 다음 평일 08:10 실행부터 지시가 생깁니다', '켜면 다음 실행부터 지시가 생깁니다'],
+    ['if (evrCardBusy || !pmconState || !pmconState.canWrite || pmconState.base === null) return;', 'if (evrCardBusy || !pmconState || pmconState.base === null) return;'],   // 검토 H21
     ['args: { rule: k, mode: "live" }, def: "keep",', 'args: { rule: k, mode: "live" }, def: "rec",'],
     ['if (cur === "live") act = cw ?', 'if (cur === "live") act = true ?'],
     ['var b = evrLast && evrLast.seq === pmconSeq ? evrLast.b : null;', 'var b = evrLast ? evrLast.b : null;'],
