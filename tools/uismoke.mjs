@@ -19627,11 +19627,11 @@ try {
     const FT = ["`advanceProc`", "`csApprMine(s)`", "`csApprHealLoaded`", "원장 C221"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = "<p>(2026-11 v498) (계약 › 단계) 결재함에서 계약 단계·청구 검수를 승인하면 그 계약의 단계";
-    const ok = /기준: v498 \(2026-11-19\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 8 && gate.length === 3 && scr.length === 5 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 498 && ftv.length > 0 && mF.length === 0 && cb.length === 8 && gate.length === 3 && scr.length === 5 && !cb.some((l) => /\(PM/.test(l))
       && d.man.indexOf(MAN) > 0 && !/csAppr|advanceProc|conSaveOut|apprRefresh|loadContracts|conBase|CS_APPR|scheduleContractSave|409|412|gwCall/.test(cut(d.man, MAN, '\n'))
       && d.cl.indexOf('**P1 판40(v498') > 0
       && FIX498.every((x) => d.ix.split(x).length === 2)
-      && /SHELL_CACHE = 'jw-shell-v498'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 498;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX498.map((x) => d.ix.split(x).length - 1) } };
   };
   const r498 = chk498(D498);
@@ -19644,6 +19644,36 @@ try {
   T('v498 문서·판 번호(정확 검사): FEATURES 기준 v498 (2026-11-19)·v498 절(판40) · TESTLIST v498 칸 8(화면 확인 5 · 게이트 [x] 3) · MANUAL 결재 승인 뒤 단계 반영 글(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 21줄 한 번씩 · sw jw-shell-v498 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
     r498.ok && M498.every((v) => v === false), JSON.stringify({ r: r498.info, mut: M498 }));
 } catch (e) { console.log('  (v498 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v499(판39 — 휴직 종류와 근속·계약직 2년 날짜 · 원장 C182): 실행 검사는 위 'P1 판39' 블록 · 여기는 문서·판 번호 정확 검사 + 고정 글 19줄(실행 검사가 못 지키는 고침 줄 — 빼면 ✗)
+try {
+  const rd499 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D499 = { ft: rd499('FEATURES.md'), tl: rd499('TESTLIST.md'), sw: rd499('sw.js'), man: rd499('MANUAL.html'), cl: rd499('CLAUDE.md'), ix: rd499('index.html') };
+  const FIX499 = ["    <select id=\"loaKind\"><option value=\"\">- 고르기 -</option><option value=\"child\">육아휴직</option><option value=\"injury\">업무상 부상·질병 휴업</option><option value=\"other\">그 밖의 휴직</option></select>", "    <div style=\"font-size:12px;color:var(--sub);margin:-2px 2px 8px;\">고르기: 육아휴직 · 업무상 부상·질병 휴업 · 그 밖의 휴직(개인 사정·업무 밖 질병 등)</div>", "휴직 종류·시작·종료 예정일을 적어 면담을 신청합니다.", "    <input type=\"text\" id=\"loaReason\" placeholder=\"사유 (선택)\" autocomplete=\"off\">", "    <span class=\"fld-label\">그 밖의 휴직 누적일수 (근속에서 제외 · 확인 필요)</span>", "    <span class=\"fld-label\">육아휴직 누적일수 (근속 포함 · 계약직 2년에서 제외)</span>", "    <input type=\"number\" id=\"meLoaChild\" min=\"0\" max=\"3650\" step=\"1\" placeholder=\"0\" autocomplete=\"off\">", "  .loa-kind-sel{font-size:12px;padding:1px 4px;border:1px solid var(--line);border-radius:5px;background:#fff;color:inherit;max-width:100%;}   /* P1 판39 승인 줄 휴직 종류 고르기(관리자·승인 전) */", "  @media (max-width:859px){ .loa-kind-sel{font-size:16px;} }", "    Array.prototype.forEach.call(host.querySelectorAll(\"[data-rs-kind]\"),function(el){ el.addEventListener(\"change\",function(){ loaKindSet(el.getAttribute(\"data-rs-kind\"), el.value); }); });", "if(!confirm((l.type===\"loa\" ? \"휴직 종류: \"+(LOA_KIND[l.loa_kind]||\"(종류 없음 — 지금처럼 근속에서 뺌)\")+\"\\n\" : \"\")+cfg.approveConfirm)) return;", "        else if (ec === \"BAD_LOA_DAYS\") e2.textContent = \"육아휴직 누적일수는 0~3650 사이 숫자로 넣거나 비워 주세요.\";", "        else if (ec === \"BAD_LOA_KIND\") e2.textContent = \"휴직 종류 값이 올바르지 않습니다.\";", "loa_kind:\"휴직종류\", loa_days_child:\"육아휴직누적\", ", "    if(k===\"injury\") return \"근속에서 빼지 않음\";", "        alert(\"복직 처리 완료\" + (days ? \" · 휴직 \"+days+\"일이 \" + (kind === \"other\" ? \"근속에서 제외됐습니다.\" : \"근속에서 빠지지 않습니다.\") : \".\"));", "    if (!confirm(\"복직 처리할까요?\\n\" + (LOA_KIND[m.loa_kind] || \"휴직(종류 없음)\") + \" \" + (startD ? startD+\"~\"+todayStr()+\" (\"+days+\"일) — \"+what+\".\" : \"기간 정보 없음\"))) return;", "if(l.type===\"loa\" && l.loa_kind===\"child\" && !isDate(l.end)){ alert(LOA_CHILD_END_MSG); return; } if(!confirm(", "chT=r.child>0 ? \" + 육아휴직 \"+r.child+\"일(남녀고용평등법 19조⑤ — 사용기간에서 제외)\" : \"\";"];
+  const chk499 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v499 (11/19)', '\n### '), tlv = cut(d.tl, '\n## v499 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`loa_kind`", "`loa_days_child`", "`loaKindMergeFix`", "원장 C182"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = "<p>(2026-11 v499) (휴가 › 휴직) 휴직 면담을 신청할 때 <b>휴직 종류</b>(육아휴직 ·";
+    const ok = /기준: v499 \(2026-11-19\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 8 && gate.length === 3 && scr.length === 5 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf(MAN) > 0 && !/loa_kind|loa_days|loaKind|serviceInfo|ctChildDays|contractPlan|mergeLeaves|LOA_|member_upsert|imSt|gwCall/.test(cut(d.man, MAN, '\n'))
+      && d.cl.indexOf('**P1 판39(v499') > 0
+      && FIX499.every((x) => d.ix.split(x).length === 2)
+      && /SHELL_CACHE = 'jw-shell-v499'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX499.map((x) => d.ix.split(x).length - 1) } };
+  };
+  const r499 = chk499(D499);
+  const mu499 = (k, f) => chk499(Object.assign({}, D499, { [k]: f(D499[k]) })).ok;
+  const M499 = [mu499('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v498 (')), mu499('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v498'")),
+    mu499('ft', (s) => s.split('`loa_kind`').join('loa_kind')),
+    mu499('man', (s) => s.replace('<p>(2026-11 v499) ', '<p>')), mu499('cl', (s) => s.replace('**P1 판39(v499', 'P1 판39(')),
+    mu499('tl', (s) => s.replace('\n- [x] (AI) `uismoke` \'P1 판39\'', '\n- (AI) `uismoke` \'P1 판39\''))]
+    .concat(FIX499.map((x) => mu499('ix', (s) => s.replace(x, ''))));
+  T('v499 문서·판 번호(정확 검사): FEATURES 기준 v499 (2026-11-19)·v499 절(판39) · TESTLIST v499 칸 8(화면 확인 5 · 게이트 [x] 3) · MANUAL 휴직 종류 글(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 19줄 한 번씩 · sw jw-shell-v499 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
+    r499.ok && M499.every((v) => v === false), JSON.stringify({ r: r499.info, mut: M499 }));
+} catch (e) { console.log('  (v499 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
