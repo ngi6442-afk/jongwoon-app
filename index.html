@@ -15026,10 +15026,12 @@
       if (typeof conSaveOut !== "undefined" && conSaveOut > 0) conSaveOut--;
       if(resp.status===401) return;
       // 판24g(C201 J4): 409 뒤 다시 읽기가 실패(5xx·네트워크)하면 병합·기준 사본 세우기를 하지 않음 — 종전엔 빈 목록으로 기준 사본을 지워 다음 병합이 칸 단위가 아닌 통째 고르기(같은 날이면 이 화면 통째)였다. 1.4초 뒤 다시 저장(409가 이어지면 공통 길의 3번째 멈춤 알림)
-      if(resp.status===409||resp.status===422){ return fetch(CONTRACT_API,{headers:ghHeaders()}).then(function(r){ if(r.status!==404&&!r.ok) return { gwReadFail: 1 }; return r.status===404?null:r.json();}, function(){ return { gwReadFail: 1 }; }).then(function(j){ if(j&&j.gwReadFail){ scheduleContractSave(); return; } if(j){ var up={}; try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} contracts=mergeContracts(contracts, up.items||[]); if (typeof conBaseSet === "function") conBaseSet(up.items||[]); contractSha=j.sha; if (typeof renderContracts === "function") renderContracts(); } return doSaveContracts(); }); }
+      if(resp.status===409||resp.status===422){ return fetch(CONTRACT_API,{headers:ghHeaders()}).then(function(r){ if(r.status!==404&&!r.ok) return { gwReadFail: 1 }; return r.status===404?null:r.json();}, function(){ return { gwReadFail: 1 }; }).then(function(j){ if(j&&j.gwReadFail){ scheduleContractSave(); return; } if(j){ var up={}; try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} if (typeof csApprHealSeen === "function"){ try { csApprHealSeen(up.items||[]); } catch(e){} } contracts=mergeContracts(contracts, up.items||[]); if (typeof conBaseSet === "function") conBaseSet(up.items||[]); contractSha=j.sha; if (typeof renderContracts === "function") renderContracts(); } return doSaveContracts(); }); }
       // P1 판24-③: 서버가 결재 없는 단계 완료·결재함에 없는 승인·상신 사본 바뀜을 거절(400 CON_APPR_REQUIRED) — 조용히 넘기지 않고 알린 뒤 서버 값으로 다시 읽는다(이 저장에 같이 들어간 다른 고침도 서버에 없음)
-      if(resp.status===400){ return resp.json().then(function(json){ var ec=(json&&json.error_code)||""; contractSha=json&&json.content&&json.content.sha; contractsPending=false; if (typeof csValEditsDone === "function") csValEditsDone(sentSeq); if(ec==="CON_APPR_REQUIRED"){ alert(CON_APPR_REJECT_MSG); loadContracts(); } else if(ec==="CON_APPR_REVOKED"){ alert(CON_APPR_REVOKED_MSG); loadContracts(); } else if(ec==="CON_DUP_ID"){ alert(CON_DUP_ID_MSG); loadContracts(); } }); }   // 5차 B: 승인된 변경계약 되돌리기 거절은 그 까닭의 글
+      if(resp.status===400){ return resp.json().then(function(json){ var ec=(json&&json.error_code)||""; if (typeof csApprHealFail === "function") csApprHealFail(400); contractSha=json&&json.content&&json.content.sha; contractsPending=false; if (typeof csValEditsDone === "function") csValEditsDone(sentSeq); if(ec==="CON_APPR_REQUIRED"){ alert(CON_APPR_REJECT_MSG); loadContracts(); } else if(ec==="CON_APPR_REVOKED"){ alert(CON_APPR_REVOKED_MSG); loadContracts(); } else if(ec==="CON_DUP_ID"){ alert(CON_DUP_ID_MSG); loadContracts(); } }); }   // 5차 B: 승인된 변경계약 되돌리기 거절은 그 까닭의 글
       // P1 판24-③ 검토(11/15 B9): 서버 오류(5xx — 결재함 못 읽음 APPROVALS_READ_FAILED 포함)도 조용히 넘기지 않는다(종전: 저장 대기 표시만 풀려 결재한 기기엔 '진행됨'으로 보이고 서버엔 없음)
+      // P1 판40 검토 N2: 자동 풀기(csApprHeal)가 방금 보낸 저장의 5xx는 알림 창 없이 서버 값으로 다시 읽기만(사람이 고친 것이 실리지 않은 저장 — 다음 결재함 목록 때 다시 풂) · 그 밖의 5xx는 아래 종전 줄 그대로
+      if(resp.status>=500 && typeof csApprHealFail === "function" && csApprHealFail(resp.status)){ contractsPending=false; if (typeof csValEditsDone === "function") csValEditsDone(sentSeq); loadContracts(); return; }
       if(resp.status>=500){ return resp.json().catch(function(){ return {}; }).then(function(json){ contractsPending=false; if (typeof csValEditsDone === "function") csValEditsDone(sentSeq); alert(CON_SAVE_FAIL_MSG + (json && json.error_code ? " (" + json.error_code + ")" : "")); loadContracts(); }); }
       // 11/16(남은 것 2 — 재현됨): 이월 응답 뒤 다시 읽을 때, 이 저장을 보낸 뒤 고친 내용(디바운스로 아직 안 나간 것)이 있으면 대기 표시를 다시 세워
       //   다시 읽기가 통째로 덮지 않고 병합(mergeContracts — 로컬 고침은 남고 승인 차수만 서버 값 csKeepApproved)하게 한다. 그 고침은 걸려 있는 디바운스 저장이 보낸다
@@ -16527,6 +16529,14 @@
   }
   var csApprSyncAt = {};
   function csApprPending(c){ return (c.pipes || []).some(function(p){ return (p.stages || []).some(function(s){ return s.appr && s.appr.status !== "승인" && s.appr.status !== "반려"; }); }); }
+  // P1 판40 검토 B1: 이 기기가 그 상신의 결재함 항목을 받을 수 있는가 — 결재함 전체를 받는 관리자이거나 그 상신을 올린 본인(by_id · 없으면 이름). 서버 handleApprovalsList와 같은 가름
+  function csApprMine(s){
+    var a = s && s.appr, me = (typeof myId === "function") ? myId() : "";
+    if (!a) return false;
+    if (typeof isAdmin === "function" && isAdmin()) return true;
+    if (a.by_id) return !!me && a.by_id === me;
+    return !!a.by && typeof myName === "function" && a.by === myName();
+  }
   // 결재함 항목 찾기 — cid가 있으면 cid만(재상신 뒤 옛 반려 카드를 다시 집지 않게), 없으면 같은 ref 중 상신 시각 이후 가장 최근(created)
   function csApprFind(items, c, p, i, s){
     var ref = csApprRef(c, p, i), it = null;
@@ -16562,6 +16572,8 @@
       if (scGot && !sc) return null;
       if (sc && csSyncFromServer(c, sc)) renderContracts();
       if (!csApprPending(c)) return null;
+      // 판40 검토 B1: 이 기기가 결재함 항목을 받을 수 있는 대기 상신(관리자 · 올린 본인)이 하나도 없으면 결재함 목록을 읽지 않음
+      if (typeof csApprMine === "function" && !(c.pipes || []).some(function(p){ return (p.stages || []).some(function(s){ return s && s.appr && s.appr.status !== "승인" && s.appr.status !== "반려" && csApprMine(s); }); })) return null;
       return gwCall("gw-data", { action: "approvals_list" });
     }).then(function(res){
       if (!(res && res.status === 200 && res.body && Array.isArray(res.body.items))) return;
@@ -16569,6 +16581,9 @@
       var changed = false;
       (c.pipes || []).forEach(function(p){ (p.stages || []).forEach(function(s, i){
         if (!s.appr || s.appr.status === "승인" || s.appr.status === "반려") return;
+        // 판40 검토 B1(원천 — v384부터): 서버 결재함 목록은 관리자가 아니면 자기가 올린 상신만 준다 — 남이 올린 상신은 목록에 없는 것이 정상이므로
+        //   '카드 없음 → 미전송' 규칙도 결재 반영도 하지 않음(종전: 상신자가 아닌 직원이 단계 탭을 열면 2분 지난 대기 상신이 '미전송'으로 저장돼 [상신]이 다시 열림)
+        if (typeof csApprMine === "function" && !csApprMine(s)) return;
         var it = csApprFind(res.body.items, c, p, i, s);
         if (!it){
           if (s.appr.status !== "미전송" && !apprPendingCreates.some(function(q){ return q && q.cid === s.appr.cid; }) && Date.now() - (Date.parse(s.appr.at || "") || 0) > 120000){ s.appr.status = "미전송"; changed = true; }
@@ -16598,12 +16613,18 @@
   //   결재함은 승인인데 단계의 상신 기록은 '대기'로 남고(누가 그 계약 단계 탭을 열 때까지), 지시 탭 [승인]은 그 '대기'를 보고 막혔다(11/19 승인 5건 가운데 4건).
   //   ① 이 기기에 계약이 없으면 서버 사본을 그대로 들임(이 기기가 고친 것이 없는 계약이라 낡은 사본 거름과 무관 · 기준 사본도 그 사본 — 저장은 409 → 다시 읽어 칸 단위 병합)
   //   ② 그래도 못 옮긴 회차는 CS_APPR_RETRY_MS 뒤 다시(CS_APPR_RETRY_MAX 번) — 끝내 못 하면 알림 글 · 그 뒤는 결재함 목록 대조(csApprHeal)가 맡음
+  //   검토 N5: 다시 하기는 결정한 사람의 세션에서만 — 그사이 로그아웃·계정 전환이면 그만둠(다음 사람 기기가 반영하고 결정자 이름이 다음 사람으로 적히던 길) · 결정자 이름은 처음 부를 때 굳힘
   var CS_APPR_RETRY_MS = 4000, CS_APPR_RETRY_MAX = 5;
-  function csApprOnDecided(it, tryN){
+  function csApprWho(){ return (typeof myId === "function") ? (myId() || "") : ""; }
+  function csApprOnDecided(it, tryN, who){
     var cp = String(it && it.ref || "").slice(4).split("|"), id = cp[0], tn = Number(tryN) || 0;
     if (!id) return;
+    var me = (typeof myId === "function") ? (myId() || "") : "";
+    if (who === undefined){ who = me; if (it && !it.decided_by) it = Object.assign({}, it, { decided_by: { name: myName() } }); }
+    else if (who !== me) return;
     var seq0 = (typeof csSaveDoneSeq !== "undefined") ? csSaveDoneSeq : 0, gen0 = (typeof conBaseGen !== "undefined") ? conBaseGen : 0;
     csFetchServerContract(id).then(function(sc){
+      if (who !== ((typeof myId === "function") ? (myId() || "") : "")) return;
       var c = findProc(id);
       if (sc && sc.gwReadFail) sc = null;   // 판24g 검토 X2r: 읽기 실패 표시는 사본이 아님 — 결정한 기기라 결재 반영·저장은 로컬 단계에 그대로
       if (!c && sc){
@@ -16621,7 +16642,7 @@
       var p = c ? (c.pipes || []).filter(function(q){ return q.key === cp[1]; })[0] : null, i = Number(cp[2]);
       if (!p || !p.stages[i] || !p.stages[i].appr){
         // 판40 ②: 이 회차에 못 옮김 — 잠시 뒤 다시(서버 사본부터 다시 읽음)
-        if (tn < CS_APPR_RETRY_MAX){ setTimeout(function(){ csApprOnDecided(it, tn + 1); }, CS_APPR_RETRY_MS); return; }
+        if (tn < CS_APPR_RETRY_MAX){ setTimeout(function(){ csApprOnDecided(it, tn + 1, who); }, CS_APPR_RETRY_MS); return; }
         if (typeof apprToastShow === "function") apprToastShow("결재 결과를 계약 단계에 아직 옮기지 못했습니다 — 앱을 새로 고치면 자동으로 반영됩니다(또는 계약 탭에서 그 계약의 단계·서류 탭)");
         return;
       }
@@ -16635,7 +16656,52 @@
   //   승인 뒤 20초 안의 건은 건너뜀(결정한 기기의 저장이 먼저 — csApprSync와 같은 규칙) · 사본을 버린 회차로 남은 것이 있으면 CS_APPR_RETRY_MS 뒤 한 번 더(세 번까지) · 돌려줌 = 이번에 돌린 계약 수
   //   같은 상신을 한 번 켠 동안 CS_APPR_HEAL_MAX 번까지만(서버가 그 반영을 거절하는 꼴이 있어도 되풀이가 끝없지 않게) · 결재함 항목의 대상(ref)이 그 단계와 같을 때만(서버 결재 대조와 같은 짝)
   //   도는 중 표시(csApprHealBusy)는 2분이 지나면 무시(응답이 끝내 안 온 동기화 하나가 오래 켜 둔 화면의 대조를 영영 막지 않게)
-  var CS_APPR_HEAL_MAX = 6, csApprHealN = {}, csApprHealBusy = false, csApprHealAt = 0;
+  // 검토 반영(N1·N2·N5 · 기성 확인 창):
+  //   N1 겹침 창: 계약 하나를 풀 때마다 저장을 바로 보내고(예약 1.4초 없음) 그 저장이 끝난 뒤 다음 계약 — 두 기기가 같은 계약을 같이 풀 수 있는 창 = 한 기기가 서버 사본을 읽고 그 저장이 들어가기까지
+  //   기성 확인 창: 자동으로 풀 때는 단계를 넘기는 순간에 묻지 않고(csApprHealSt bill "wait" → conBillToRec가 "due"로만 적음) 저장이 끝난 뒤 한 건씩, 어느 계약인지와 자동 반영임을 밝혀 물음(csApprHealBillAsk) —
+  //     그 저장이 409였고 다시 읽은 서버 사본에서 그 단계가 이미 끝나 있으면(다른 기기가 먼저 넘김 — csApprHealSeen) 이 기기는 묻지 않음 · 서버 사본에 기성 연결(rec_id)이 이미 있어도 묻지 않음
+  //   N2 저장 실패: 거절(400)이면 풀던 상신은 이 세션에서 더 풀지 않음(알림 1번) · 5xx면 알림 창 없이 다음 결재함 목록 때(횟수 상한을 쓰지 않음) · 실패 뒤 다시 읽기(loadContracts)는 대조를 한 번 건너뜀(csApprHealHold)
+  //   N5: '남은 것 한 번 더'는 같은 사람의 세션에서만
+  var CS_APPR_HEAL_MAX = 6, csApprHealN = {}, csApprHealBusy = false, csApprHealAt = 0, csApprHealSt = {}, csApprHealHold = false, csApprHealStop = false, csApprHealOutAt = 0;
+  // 계약 저장이 다 끝날 때까지(나가 있는 저장 0 · 저장 대기 없음) — 0.3초마다 보고 30초면 그만(false)
+  function csSaveSettled(){
+    return new Promise(function(res){
+      var n = 0;
+      (function chk(){
+        if ((typeof conSaveOut === "undefined" || conSaveOut === 0) && !contractsPending) res(true);
+        else if (++n > 100) res(false);
+        else setTimeout(chk, 300);
+      })();
+    });
+  }
+  // 저장 실패 뒤(doSaveContracts 400·5xx) — 돌려줌 = 알림 창을 띄우지 않아도 되는가(자동 풀기가 방금 보낸 저장의 5xx)
+  function csApprHealFail(status){
+    var quiet = status !== 400 && Date.now() - csApprHealOutAt < 30000;
+    csApprHealHold = true; csApprHealStop = true;
+    Object.keys(csApprHealSt).forEach(function(k){
+      var h = csApprHealSt[k]; h.bill = "skip";
+      (h.cids || []).forEach(function(cid){ if (status === 400) csApprHealN[cid] = CS_APPR_HEAL_MAX; else if (csApprHealN[cid] > 0) csApprHealN[cid]--; });
+    });
+    return quiet;
+  }
+  // 저장 409 뒤 다시 읽은 서버 목록 — 지금 풀고 있는 계약의 그 단계가 서버에서 이미 끝나 있으면 다른 기기가 먼저 넘긴 것: 기성 확인은 그 기기 몫
+  function csApprHealSeen(remote){
+    (remote || []).forEach(function(rc){
+      var h = rc && csApprHealSt[rc.id];
+      if (!h || h.bill === "skip") return;
+      if ((rc.pipes || []).some(function(p){ return (p.stages || []).some(function(s){ return s && s.status === "done" && s.appr && (h.cids || []).indexOf(s.appr.cid) >= 0; }); })) h.bill = "skip";
+    });
+  }
+  // 자동으로 푼 계약의 기성 확인 — 저장이 끝난 뒤 · 서버 사본에 기성 연결이 없을 때만 · 한 건씩
+  function csApprHealBillAsk(id, ok, who){
+    var h = csApprHealSt[id]; delete csApprHealSt[id];
+    if (!h || h.bill !== "due" || !ok || who !== csApprWho()) return null;
+    return csFetchServerContract(id).then(function(sc){
+      var c = findProc(id);
+      if (!c || who !== csApprWho() || (sc && !sc.gwReadFail && sc.rec_id)) return;
+      conBillToRec(c, "결재함에서 승인된 청구 검수를 계약에 반영했습니다(자동 반영).\n");
+    });
+  }
   function csApprHealList(items){
     var by = {}, out = [], now = Date.now();
     if (!Array.isArray(items) || typeof contracts === "undefined" || !Array.isArray(contracts)) return out;
@@ -16651,20 +16717,69 @@
     });
     return out;
   }
-  function csApprHeal(items, pass){
-    var hits = csApprHealList(items), ids = [], q = Promise.resolve(), pn = Number(pass) || 0;
+  function csApprHeal(items, pass, who){
+    var hits, ids = [], cids = {}, q = Promise.resolve(), pn = Number(pass) || 0;
+    if (who === undefined) who = csApprWho(); else if (who !== csApprWho()) return 0;
+    hits = csApprHealList(items);
     if (!hits.length || (csApprHealBusy && Date.now() - csApprHealAt < 120000) || typeof csApprSync !== "function") return 0;
-    csApprHealBusy = true; csApprHealAt = Date.now();
-    hits.forEach(function(h){ csApprHealN[h.cid] = (csApprHealN[h.cid] || 0) + 1; if (ids.indexOf(h.id) < 0) ids.push(h.id); });
-    ids.forEach(function(id){ q = q.then(function(){ var c = findProc(id); return c ? csApprSync(c, true) : null; }).catch(function(){}); });
+    csApprHealBusy = true; csApprHealAt = Date.now(); if (!pn) csApprHealStop = false;
+    hits.forEach(function(h){ csApprHealN[h.cid] = (csApprHealN[h.cid] || 0) + 1; if (ids.indexOf(h.id) < 0){ ids.push(h.id); cids[h.id] = []; } cids[h.id].push(h.cid); });
+    ids.forEach(function(id){
+      q = q.then(function(){
+        var c = findProc(id), pend0 = contractsPending;
+        if (!c || who !== csApprWho()) return false;
+        csApprHealSt[id] = { cids: cids[id], bill: "wait", at: Date.now() };
+        return Promise.resolve(csApprSync(c, true)).then(function(){
+          // 넘긴 것이 있으면 저장을 바로(이 화면에 먼저 걸려 있던 저장 대기가 있었으면 그 예약 저장에 같이 실려 나감 — 그때는 '자동 풀기의 저장'으로 적지 않음: 5xx 알림 창 가름)
+          if (contractsPending && !pend0){ csApprHealOutAt = Date.now(); csSaveNow(); }
+          return csSaveSettled();
+        });
+      }).then(function(ok){ return csApprHealBillAsk(id, ok, who); }).catch(function(){ delete csApprHealSt[id]; });
+    });
     q.then(function(){
       csApprHealBusy = false;
-      if (pn < 2 && csApprHealList(items).length) setTimeout(function(){ csApprHeal(items, pn + 1); }, CS_APPR_RETRY_MS);
+      if (pn < 2 && !csApprHealStop && csApprHealList(items).length) setTimeout(function(){ csApprHeal(items, pn + 1, who); }, CS_APPR_RETRY_MS);
     });
     return ids.length;
   }
   // 계약 목록을 읽은 뒤(loadContracts) — 결재함 목록을 이미 받아 둔 기기(관리자)는 그 목록으로 바로 견줌(앱을 켤 때 결재함 응답이 계약 목록보다 먼저 온 순서)
-  function csApprHealLoaded(){ if (typeof apprItems !== "undefined" && Array.isArray(apprItems) && apprItems.length) csApprHeal(apprItems); }
+  //   검토 N2: 저장 실패 뒤의 다시 읽기는 한 번 건너뜀(거절 알림 → 다시 읽기 → 다시 풀기 → 거절 알림이 되풀이되던 길)
+  function csApprHealLoaded(){
+    if (csApprHealHold){ csApprHealHold = false; return; }
+    if (typeof apprItems !== "undefined" && Array.isArray(apprItems) && apprItems.length) csApprHeal(apprItems);
+  }
+  // 검토 N4(지시 탭 [승인] 가드): 알림을 띄우기 전에 결재함을 먼저 확인(CS_APPR_GUARD_MS 안에 답이 없거나 실패면 종전 글) —
+  //   이미 승인됐으면 그 사실을 알리고 단계를 넘김(csApprSync — 승인 뒤 20초 안이면 그 뒤에) · 반려면 다시 상신 안내 + 단계 기록 반려 · 정말 대기면 종전 글만(저장 없음)
+  var CS_APPR_GUARD_MS = 5000;
+  function csApprGuardAsk(c, p, i){
+    var s = p.stages[i], id = c.id, cid = s.appr.cid, ref = csApprRef(c, p, i), who = csApprWho(), done = false, timer = null;
+    var oldMsg = "이 단계는 결재함에 상신돼 있습니다(" + s.appr.kind + " " + s.appr.status + ") — 결재함에서 승인되면 단계가 넘어갑니다. 지시는 완료 요청 상태로 둡니다.";
+    // 넘기기 — 결재 동기화가 그 회차에 못 옮겼으면(저장과 겹쳐 서버 사본을 버린 회차 등) CS_APPR_RETRY_MS 뒤 다시(세 번까지 — '넘깁니다'라고 알린 뒤 조용히 끝나지 않게)
+    var sync = function(wait){
+      var n = 0, go = function(){
+        var c2 = findProc(id);
+        if (!c2 || who !== csApprWho()) return;
+        Promise.resolve(csApprSync(c2, true)).then(function(){
+          var c3 = findProc(id), p3 = c3 ? (c3.pipes || []).filter(function(q){ return q.key === p.key; })[0] : null, s3 = p3 ? p3.stages[i] : null;
+          if (s3 && s3.appr && s3.appr.cid === cid && s3.appr.status !== "승인" && s3.appr.status !== "반려" && ++n < 3) setTimeout(go, CS_APPR_RETRY_MS);
+        });
+      };
+      if (wait > 0) setTimeout(go, wait); else go();
+    };
+    var fin = function(it){
+      if (done) return; done = true; if (timer) clearTimeout(timer);
+      if (who !== csApprWho()) return;
+      if (it && it.status === "승인"){ alert("결재함에서 이미 승인됐습니다(" + s.appr.kind + ") — 단계를 넘깁니다."); sync(it.decided_at ? 20500 - (Date.now() - (Date.parse(it.decided_at) || 0)) : 0); }
+      else if (it && it.status === "반려"){ alert("결재함에서 반려됐습니다(" + s.appr.kind + (it.reason ? " — " + it.reason : "") + ") — 계약 탭 단계 카드에서 다시 상신해 주세요. 지시는 완료 요청 상태로 둡니다."); sync(0); }
+      else alert(oldMsg);
+    };
+    timer = setTimeout(function(){ fin(null); }, CS_APPR_GUARD_MS);
+    gwCall("gw-data", { action: "approvals_list" }).then(function(res){
+      var it = null;
+      if (res && res.status === 200 && res.body && Array.isArray(res.body.items)) res.body.items.forEach(function(x){ if (x && x.cid && x.cid === cid && x.ref === ref) it = x; });
+      fin(it);
+    }, function(){ fin(null); });
+  }
   // 승인된 단계를 진행 — 지시를 승인 완료로 닫고 advanceProc(다음 단계 생성·청구면 기성 등록). 지시가 없으면 단계만 진행(청구면 기성 연동은 같게)
   function csApprApply(c, p, i){
     var s = p.stages[i], t = s.task_id ? findTask(s.task_id) : null;
@@ -17084,9 +17199,10 @@
     }
     if(c.scen && csApprKindOf(c, s) && !(s.appr && s.appr.status==="승인")){   // v384 검토 J·2차 F2: 결재 대상 단계(계약서·청구)는 상신 전후 모두 지시 탭으로 넘어가지 않는다 — 지시는 완료 요청으로
       t.status="review"; t.done_at=t.done_at||todayStr(); t.approved_by=null; t.approved_at=null; t.updated=todayStr();
-      alert(s.appr ? ("이 단계는 결재함에 상신돼 있습니다(" + s.appr.kind + " " + s.appr.status + ") — 결재함에서 승인되면 단계가 넘어갑니다. 지시는 완료 요청 상태로 둡니다.") : ("이 단계(" + csApprKindOf(c, s) + ")는 결재함 상신이 필요합니다 — 계약 탭 단계 카드의 [상신]을 눌러 주세요. 지시는 완료 요청 상태로 둡니다."));
-      // P1 판40: 막을 때 결재함 결과를 그 자리에서 다시 확인 — 결재함은 이미 승인인데 이 기기 단계 기록만 '대기'로 남은 경우 단계·지시가 바로 넘어감(csApprSync — 단계 탭을 여는 것과 같은 길)
-      if (s.appr && (s.appr.status === "대기" || s.appr.status === "보류") && typeof csApprSync === "function"){ try { csApprSync(c, true); } catch(e){} }
+      // P1 판40(검토 N4·B1 반영): 이미 상신된(대기·보류) 단계이고 이 기기가 그 결재함 항목을 받을 수 있으면(관리자 · 올린 본인 — csApprMine) 알림 전에 결재함을 먼저 확인(csApprGuardAsk —
+      //   이미 승인이면 그렇게 알리고 단계를 넘김 · 정말 대기면 아래와 같은 글). 그 밖(상신 없음 · 미전송 · 남이 올린 상신을 보는 관리자 아닌 지시자)은 종전 알림만 — 결재함을 읽지 않고 단계 기록도 건드리지 않음
+      if (s.appr && (s.appr.status === "대기" || s.appr.status === "보류") && typeof csApprGuardAsk === "function" && typeof gwCall === "function" && csApprMine(s)) csApprGuardAsk(c, pipe, t.stage_i);
+      else alert(s.appr ? ("이 단계는 결재함에 상신돼 있습니다(" + s.appr.kind + " " + s.appr.status + ") — 결재함에서 승인되면 단계가 넘어갑니다. 지시는 완료 요청 상태로 둡니다.") : ("이 단계(" + csApprKindOf(c, s) + ")는 결재함 상신이 필요합니다 — 계약 탭 단계 카드의 [상신]을 눌러 주세요. 지시는 완료 요청 상태로 둡니다."));
       return false;
     }
     s.status="done"; s.done_at=todayStr();
@@ -17099,12 +17215,15 @@
     if(/청구/.test(t.stage_name||"")) setTimeout(function(){ conBillToRec(c); }, 150);   // 청구 완료 → 기성(미수) 연동
   }
   // 청구 단계 완료 → 기성(미수)에 청구 건 자동 등록(중복 방지: c.rec_id)
-  function conBillToRec(c){
+  //   P1 판40 검토: lead = 확인 창 맨 앞에 붙일 한 줄(자동 풀기가 넘긴 계약임을 밝힘) · 자동 풀기가 지금 넘기는 계약(csApprHealSt bill "wait" — 2분 안)이면 여기서 묻지 않고 '물을 것 있음'만 적음(저장이 끝난 뒤 csApprHealBillAsk가 다시 부름)
+  function conBillToRec(c, lead){
     if(!canDo("rec")) return;   // 기성 권한 없으면 담당자가 기성 탭에서 등록
     if(c.rec_id && receivables.some(function(r){ return r.id===c.rec_id && r.del!==1; })) return;
+    var hw = (typeof csApprHealSt !== "undefined" && csApprHealSt) ? csApprHealSt[c.id] : null;
+    if (hw && Date.now() - (hw.at || 0) < 120000){ if (hw.bill === "wait") hw.bill = "due"; return; }
     var ci=c.contract_info||{};
     var amt=conAmtEff(c);   // v382 정산액(준공 단계 입력)이 있으면 정산액
-    if(!confirm("청구 단계 완료 — 기성(미수)에 청구 건을 등록할까요?\n"+(c.client||"발주처?")+" · "+(c.title||c.label)+(amt?" · "+fmtAmount(amt)+"원":" · 금액 미확인(기성에서 입력)"))) return;
+    if(!confirm((lead||"")+"청구 단계 완료 — 기성(미수)에 청구 건을 등록할까요?\n"+(c.client||"발주처?")+" · "+(c.title||c.label)+(amt?" · "+fmtAmount(amt)+"원":" · 금액 미확인(기성에서 입력)"))) return;
     var today=todayStr();
     var r={ id:genId("r"), client:c.client||"", site:c.site||"", desc:(c.title||c.label||""),
       co:((c.type==="asbestos"||c.type==="demolition")?"con":"env"),   // 두 회사 규칙: 석면·철거=건설, 운반·폐기물·준설=환경
