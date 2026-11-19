@@ -12272,4 +12272,113 @@ function J91a(x) { return JSON.stringify(x); }
   finally { const s = JSON.parse(snapY); mem.gw_users = s.u; mem.gw_data = s.d; }
 }
 
+{ // ---- P1 판38(원장 C166 · 착수 ㄱ C191 — PM 11/19) 지시 완료 창의 새 칸(이번 수검일·검사 신청일·연장(유예) 만료일) — veh_due_set 기록·검증 + 차량 저장 기록 합치기(vehLogUnion·vehLogKeep)
+  //   law 안 insp_done 키가 있으면(판38 앱) 기록 줄에 새 칸 · 차량 줄 연장 만료일(insp_ext)은 기록으로 옮기고 비움(감사 f에 같이) · 키가 없으면(옛 앱) 종전 그대로 · 보험 지시는 새 칸을 보지 않음
+  //   검사: 날짜 꼴 BAD_INSP_DATE · 수검일·신청일 오늘(KST) 뒤 INSP_FUTURE · 신청일 > 수검일 INSP_ORDER · 연장 만료일 ≤ 종전 만기 INSP_EXT_EARLY — 거절은 쓰기 전(차량·버전 링·감사 그대로) · 권한(배정표 담당은 그 차 그 칸만)은 종전 순서 그대로 먼저
+  //   근거 표·스위치는 시험 값(가짜). 결함 사본(gw-data 한 곳을 바꿔 메모리에서 컴파일)에서는 실패해야 한다.
+  const fs38 = require('fs'), Mod38 = require('module');
+  const FILE38 = join(FN, 'gw-data.js'), SRC38 = fs38.readFileSync(FILE38, 'utf8');
+  const load38 = (src) => { const m = new Mod38(FILE38); m.filename = FILE38; m.paths = Mod38._nodeModulePaths(dirname(FILE38)); m._compile(src, FILE38); return m.exports; };
+  const mut38 = (from, to) => { if (SRC38.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return SRC38.replace(from, () => to); };
+  const caller38 = (mod) => async (body, tok, dev) => { const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+  const snap38 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  const reset38 = () => { const s = JSON.parse(snap38); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; };
+  const MA38 = { id: 'u38a', name: '차량담당38', admin: false, perms: { tasks: 'do', veh: 'view' } }, MB38 = { id: 'u38b', name: '다른38', admin: false, perms: { tasks: 'do', veh: 'view' } };
+  const tA38 = issueSession(MA38).token, tB38 = issueSession(MB38).token;
+  const KST38 = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10), TMR38 = new Date(Date.now() + 33 * 3600000).toISOString().slice(0, 10);
+  const BG38 = () => ({ schema: 1, ver: 'test-38', sha: 'abcdef0123456789', rows: [{ id: 't.car.38', grade: '실측', cites: [{ law: '시험' }], cls: 'car', every_m: 12, win_before: 90, win_after: 31, win_basis: 'pass' }], attr: { size: ['대형'] } });
+  const TK38 = (id, key, who, extra) => Object.assign({ id, title: '지시 ' + id, auto_key: key, who_id: who || 'uwork', who: '', status: 'open', from: '자동', due: '' }, extra || {});
+  const seed38 = (opt) => { reset38(); opt = opt || {};
+    Object.assign(mem.gw_users, { 'member:u38a': MA38, 'member:u38b': MB38 });
+    mem.gw_data['bg:veh:law:v1'] = BG38(); mem.gw_data['settings:veh'] = { bg_ver: opt.off ? 'test-0' : 'test-38' };
+    mem.gw_data['settings:assign'] = { schema: 1, rules: { 'veh:': { who_id: 'u38a' } }, approver_id: '', prev: null, updated_at: 5, updated_by: 'x' };
+    mem.gw_data['col:vehicles'] = { schema: 1, items: [{ id: 'w38', no: '00가3801', state: '운행', insp_due: '2026-10-31', insp_ext: '2026-11-15', ins_due: '2026-12-20', updated: '2026-10-01' },
+      { id: 'x38', no: '00가3802', state: '운행', insp_due: '2026-09-30', updated: '2026-10-01' }], updated_at: 38000, updated_by: 'x' };
+    mem.gw_data['col:tasks'] = { schema: 1, items: [TK38('k1', 'veh:w38:insp:2026-10-31'), TK38('k2', 'veh:w38:ins:2026-12-20'), TK38('ka', 'veh:w38:insp:2026-10-31', 'u38a'), TK38('kb', 'veh:x38:insp:2026-09-30', 'u38b')], updated_at: 38100, updated_by: 'x' };
+    Object.keys(mem.gw_data).filter((k) => k.indexOf('ver:vehicles:') === 0 || k === 'veridx:vehicles').forEach((k) => { delete mem.gw_data[k]; }); };
+  const W38 = () => mem.gw_data['col:vehicles'].items.find((v) => v.id === 'w38');
+  const set38 = (c, tok, task, date, law) => c(Object.assign({ action: 'veh_due_set', task_id: task, date: date, base_due: task === 'k2' ? '2026-12-20' : (task === 'kb' ? '2026-09-30' : '2026-10-31') }, law ? { law } : {}), tok, 'dev1');
+  const L38 = (o) => Object.assign({ proposed: '2027-11-15', rule: 't.car.38' }, o);
+  const chkA38 = async (c) => {   // 기록 — 새 칸 · 연장 만료일 옮김·비움 · 감사 · 옛 앱 · 비움 · 보험 · 승격 아님
+    const out = {};
+    seed38(); const a0 = auditMock.logs.length;
+    const r1 = await set38(c, tokW, 'k1', '2027-11-15', L38({ insp_done: '2026-11-10', insp_ext: '2026-11-15' }));
+    const l1 = (W38().insp_log || [])[0] || {}, au = auditMock.logs.slice(a0);
+    out.rec = r1.code === 200 && l1.insp_done === '2026-11-10' && l1.insp_ext === '2026-11-15' && !('insp_apply' in l1) && l1.prev === '2026-10-31' && l1.confirmed === '2027-11-15' && l1.proposed === '2027-11-15' && l1.diff === 0 && l1.src === 'task'
+      && !('insp_ext' in W38()) && W38().insp_due === '2027-11-15' && JSON.stringify(r1.body.law_log) === JSON.stringify(l1)
+      && au.length === 1 && JSON.stringify(au[0].ev[0].f) === JSON.stringify({ insp_due: ['2026-10-31', '2027-11-15'], insp_ext: ['2026-11-15', ''] });
+    seed38(); const r2 = await set38(c, tokW, 'k1', '2027-11-15', L38());
+    const l2 = (W38().insp_log || [])[0] || {};
+    out.oldApp = r2.code === 200 && !('insp_done' in l2) && !('insp_ext' in l2) && W38().insp_ext === '2026-11-15';
+    seed38(); const r3 = await set38(c, tokW, 'k1', '2027-11-15', L38({ insp_done: '', insp_apply: '', insp_ext: '' }));
+    const l3 = (W38().insp_log || [])[0] || {};
+    out.blank = r3.code === 200 && l3.insp_done === '' && !('insp_apply' in l3) && !('insp_ext' in l3) && !('insp_ext' in W38());
+    seed38(); const r4 = await set38(c, tokW, 'k1', '2027-11-15', L38({ insp_done: KST38, insp_apply: KST38 }));
+    const l4 = (W38().insp_log || [])[0] || {};
+    out.today = r4.code === 200 && l4.insp_done === KST38 && l4.insp_apply === KST38;
+    seed38(); const r5 = await set38(c, tokW, 'k2', '2027-12-20', L38({ insp_done: TMR38, insp_ext: '2020-01-01' }));
+    out.ins = r5.code === 200 && !('insp_log' in W38()) && W38().insp_ext === '2026-11-15' && W38().ins_due === '2027-12-20';
+    seed38({ off: true }); const r6 = await set38(c, tokW, 'k1', '2027-11-15', L38({ insp_done: '2026-11-10' }));
+    out.off = r6.code === 200 && !('insp_log' in W38()) && W38().insp_ext === '2026-11-15' && !('law_log' in r6.body);
+    return { ok: Object.keys(out).every((k) => out[k] === true), info: out };
+  };
+  const chkB38 = async (c) => {   // 거절 — 꼴·미래·순서·종전 만기 앞 연장 · 쓰기 전(차량·버전 링·감사 그대로) · 권한 순서
+    const got = [];
+    seed38(); const v0 = JSON.stringify(mem.gw_data['col:vehicles']), a0 = auditMock.logs.length;
+    const exp = [[L38({ insp_done: '2026-02-30' }), 'BAD_INSP_DATE:insp_done'], [L38({ insp_done: 20261110 }), 'BAD_INSP_DATE:insp_done'], [L38({ insp_done: '1999-12-31' }), 'BAD_INSP_DATE:insp_done'],
+      [L38({ insp_done: TMR38 }), 'INSP_FUTURE:insp_done'], [L38({ insp_done: '2026-11-10', insp_apply: TMR38 }), 'INSP_FUTURE:insp_apply'], [L38({ insp_done: '2026-11-10', insp_apply: '2026-11-11' }), 'INSP_ORDER:insp_apply'],
+      [L38({ insp_done: '', insp_ext: '2026-10-31' }), 'INSP_EXT_EARLY:insp_ext'], [L38({ insp_done: '', insp_ext: '2026-10-30' }), 'INSP_EXT_EARLY:insp_ext'], [L38({ insp_done: '', insp_ext: '2026/12/01' }), 'BAD_INSP_DATE:insp_ext']];
+    for (const [law, ec] of exp) { const r = await set38(c, tokW, 'k1', '2027-11-15', law); const e = (r.body.error_code || '') + ':' + (r.body.field || ''); if (r.code !== 400 || e !== ec) got.push(ec + ' → ' + r.code + '/' + e); }
+    const same = JSON.stringify(mem.gw_data['col:vehicles']) === v0 && !Object.keys(mem.gw_data).some((k) => k.indexOf('ver:vehicles:') === 0) && auditMock.logs.length === a0;
+    // 권한: 배정표 차량 담당 = 그 지시의 그 차 검사 칸 + 새 칸 · 다른 차(배정표 밖 담당) = 403(새 칸이 틀려도 권한이 먼저) · 날짜가 이미 바뀐 칸 = 403
+    seed38(); const pA = await set38(c, tA38, 'ka', '2027-11-15', L38({ insp_done: '2026-11-10' }));
+    const okA = pA.code === 200 && ((W38().insp_log || [])[0] || {}).insp_done === '2026-11-10' && mem.gw_data['col:vehicles'].items.find((v) => v.id === 'x38').insp_due === '2026-09-30';
+    seed38(); const v1 = JSON.stringify(mem.gw_data['col:vehicles']);
+    const pB = await set38(c, tB38, 'kb', '2027-09-30', L38({ insp_done: TMR38 })), pC = await set38(c, tA38, 'kb', '2027-09-30', L38({ insp_done: '2026-11-10' }));
+    const okB = pB.code === 403 && pB.body.error_code === 'NO_WRITE' && pC.code === 403 && JSON.stringify(mem.gw_data['col:vehicles']) === v1;
+    return { ok: got.length === 0 && same && okA && okB, info: { got, same, okA, pA: pA.code, okB, pB: pB.code + '/' + pB.body.why, pC: pC.code + '/' + pC.body.why } };
+  };
+  const chkC38 = async (c) => {   // 차량 저장 기록 합치기 — 새 칸을 모르는 사본이 같은 줄을 보내도 새 칸 남음 · 반대로 서버 줄에 없던 새 칸은 채움 · 다른 줄은 더함
+    seed38(); await set38(c, tokW, 'k1', '2027-11-15', L38({ insp_done: '2026-11-10', insp_ext: '2026-11-15' }));
+    const srv = JSON.parse(JSON.stringify(W38().insp_log[0])), bare = Object.assign({}, srv); delete bare.insp_done; delete bare.insp_ext;
+    const stale = { id: 'w38', no: '00가3801', state: '운행', insp_due: '2027-11-15', ins_due: '2026-12-20', note: '옛 화면', updated: KST38, insp_log: [bare] };
+    const s1 = await c({ action: 'save', collection: 'vehicles', base: mem.gw_data['col:vehicles'].updated_at, doc: { schema: 1, items: [stale, mem.gw_data['col:vehicles'].items.find((v) => v.id === 'x38')] } }, tokW, 'dev1');
+    const L1 = W38().insp_log || [];
+    const keep = s1.code === 200 && L1.length === 1 && L1[0].insp_done === '2026-11-10' && L1[0].insp_ext === '2026-11-15' && W38().note === '옛 화면';
+    W38().insp_log = [bare];
+    const other = { at: '2026-11-01', prev: '', confirmed: '2026-10-31', proposed: '', rule: '', diff: null, by: 'x', src: 'edit', insp_done: '' };
+    const s2 = await c({ action: 'save', collection: 'vehicles', base: mem.gw_data['col:vehicles'].updated_at, doc: { schema: 1, items: [Object.assign({}, stale, { insp_log: [other, srv] }), mem.gw_data['col:vehicles'].items.find((v) => v.id === 'x38')] } }, tokW, 'dev1');
+    const L2 = W38().insp_log || [];
+    const fill = s2.code === 200 && L2.length === 2 && L2[0].at === '2026-11-01' && L2[1].insp_done === '2026-11-10' && L2[1].insp_ext === '2026-11-15';
+    return { ok: keep && fill, info: { keep, fill, s1: s1.code, s2: s2.code, L1, L2 } };
+  };
+  try {
+    const c0 = caller38(load38(SRC38)), RA = await chkA38(c0), RB = await chkB38(c0), RC = await chkC38(c0);
+    T('P1 판38 ① veh_due_set 새 칸 기록: 수검일·연장 만료일 → 기록 줄(응답 law_log 같은 값)·차량 줄 연장 만료일 비움·감사 f {insp_due, insp_ext[이전, ""]} · 옛 앱(insp_done 키 없음) = 종전 줄·연장 칸 그대로 · 비움 = insp_done ""만 · 오늘(KST) = 받음 · 보험 지시 = 새 칸 안 봄(미래 날짜여도 200·연장 칸 그대로) · 승격 아님 = 기록·law_log 없음·연장 칸 그대로', RA.ok, JSON.stringify(RA.info));
+    T('P1 판38 ② veh_due_set 새 칸 검사: 달력에 없는 날·숫자·1999년·빗금 꼴 = 400 BAD_INSP_DATE · 수검일·신청일 내일 = 400 INSP_FUTURE · 신청일 > 수검일 = 400 INSP_ORDER · 연장 만료일 ≤ 종전 만기 = 400 INSP_EXT_EARLY(어긋난 칸 field) · 거절은 쓰기 전(차량·버전 링·감사 그대로) · 배정표 차량 담당 = 그 지시 그 차만(다른 차 그대로) · 배정표 밖 담당·다른 차 지시 = 403 NO_WRITE(새 칸이 틀려도 권한이 먼저)', RB.ok, JSON.stringify(RB.info));
+    T('P1 판38 ③ 차량 저장 기록 합치기(vehLogKeep·vehLogUnion): 새 칸을 모르는 사본이 같은 기록 줄을 보내도 서버 줄의 수검일·연장 만료일 남음(메모는 들어감) · 서버 줄에 없던 새 칸은 들어온 사본 값으로 채움 · 다른 줄은 더함(at 순)', RC.ok, JSON.stringify(RC.info));
+    const MUT38 = [
+      ["  if (lawLog && lx.ex) { Object.assign(lawLog, lx.ex); delete wv.insp_ext; }", "  if (lawLog && lx.ex) { delete wv.insp_ext; }"],
+      ["  if (lawLog && lx.ex) { Object.assign(lawLog, lx.ex); delete wv.insp_ext; }", "  if (lawLog && lx.ex) { Object.assign(lawLog, lx.ex); }"],
+      ["  if (!lx.ok) return jr(400, { status: 'REJECTED', error_code: lx.code, field: lx.f, request_id: R });\n", ''],
+      ["    if (k !== 'insp_ext' && s > today) return { ok: false, code: 'INSP_FUTURE', f: k };\n", ''],
+      ["  if (ex.insp_apply && ex.insp_done && ex.insp_apply > ex.insp_done) return { ok: false, code: 'INSP_ORDER', f: 'insp_apply' };\n", ''],
+      ["  if (ex.insp_ext && vehDueDate(cur) && !(ex.insp_ext > cur)) return { ok: false, code: 'INSP_EXT_EARLY', f: 'insp_ext' };\n", ''],
+      ["  const lx = field === 'insp_due' ? vehLawEx(", "  const lx = true ? vehLawEx("],
+      ["    if (s == null || s === '') { if (k === 'insp_done') ex[k] = ''; continue; }", "    if (s == null || s === '') continue;"],
+      ["['insp_done', 'insp_apply', 'insp_ext'].forEach(function (n) { const cur = (f || e)[n]; if (typeof x[n] === 'string' && (cur === undefined || (cur === '' && x[n] !== ''))) { f = f || Object.assign({}, e); f[n] = x[n]; } });", ''],
+      ["  if (extWas !== null) f.insp_ext = [extWas, ''];\n", ''],
+      ["!Object.prototype.hasOwnProperty.call(law, 'insp_done')) return { ok: true, ex: null };", "false) return { ok: true, ex: null };"],
+      ["    if (!vehDueDate(s)) return { ok: false, code: 'BAD_INSP_DATE', f: k };\n", ''],
+    ];
+    const kill = [];
+    for (const [from, to] of MUT38) {
+      let k; try { const cm = caller38(load38(mut38(from, to))); k = !((await chkA38(cm)).ok && (await chkB38(cm)).ok && (await chkC38(cm)).ok); } catch (e) { k = 'err ' + e.message; }
+      if (k !== true) kill.push(from.trim().slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k));
+    }
+    T('P1 판38 ④ 결함 사본 ' + MUT38.length + '개(새 칸 안 남김·연장 칸 안 비움·거절 걷음·미래·순서·종전 만기 앞 연장 검사 걷음·보험 지시도 검사·비운 수검일 안 남김·합집합 채움 걷음·감사 연장 칸 걷음·옛 앱 요청도 새 줄·날짜 꼴 걷음) = 모두 ✗', kill.length === 0, kill.join(' | '));
+  } catch (e) { T('P1 판38 검사 실행', false, String(e && e.stack || e).slice(0, 500)); }
+  finally { reset38(); }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

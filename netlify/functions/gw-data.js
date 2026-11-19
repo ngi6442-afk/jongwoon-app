@@ -2059,6 +2059,9 @@ async function handleVehDueSet(event, d, R) {
   if (!vehDo && cur !== m[3]) return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', why: 'DATE_MOVED', cur: cur, request_id: R });   // 담당 갈래는 그 지시의 그 날짜 칸만
   if (d.base_due !== undefined && String(d.base_due == null ? '' : d.base_due) !== cur) return jr(409, { status: 'CONFLICT', error_code: 'VEH_DUE_STALE', cur: cur, request_id: R });
   if (cur === date) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
+  // P1 판38(C166): 검사 칸이면 law 안 새 칸(이번 수검일·검사 신청일·연장 만료일) 꼴·미래·순서 검사 — 틀리면 쓰기 전에 400(차량·버전 링·감사 그대로)
+  const lx = field === 'insp_due' ? vehLawEx(d.law, cur, new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10)) : { ok: true, ex: null };
+  if (!lx.ok) return jr(400, { status: 'REJECTED', error_code: lx.code, field: lx.f, request_id: R });
   await verSnapshot('vehicles', rv.data, c.member.name, false);
   // 검토 S2: 스냅샷(블롭 읽기·쓰기 여러 번) 사이에 끝난 일반 차량 저장을 덮지 않게 쓰기 직전 다시 읽는다 — 문서가 바뀌었으면 새 문서의 그 줄에 적용(그 칸이 그 사이 바뀌었으면 409 · 줄이 없어졌으면 404).
   //   조건부 쓰기가 없어 다시 읽기와 쓰기 사이 창은 남는다(handleSave와 같은 알려진 한계 — 창만 좁힘)
@@ -2076,11 +2079,15 @@ async function handleVehDueSet(event, d, R) {
   wv[field] = date; wv.updated = today;
   wv.due_set = Object.assign({}, (wv.due_set && typeof wv.due_set === 'object') ? wv.due_set : {}); wv.due_set[field] = { prev: cur, at: now };   // 검토 S1: 낡은 사본 되돌림 보호 표식(vehDueGuard·앱 vehDueMergeKeep)
   const lawLog = (field === 'insp_due' && d.law && (await vehBgState(st)).on) ? vehLawLog(d.law, cur, date, today, c.member.id, 'task') : null;   // P1 판27: 법정 검사 제안이 켜진 앱이 보낸 제안 날짜와 확정 날짜(검사 칸만 · 승격일 때만 — 검토 반영, 못 읽으면 기록 안 함 · 표시 기록, 값 판정 없음)
+  // P1 판38: 판38 앱이 보낸 줄(insp_done 칸 있음)이면 새 칸을 기록 줄에 더하고, 차량 줄의 연장 만료일(그 회차 몫)은 기록으로 옮겨졌으니 비움 — 옛 앱 요청은 종전 그대로
+  const extWas = (lawLog && lx.ex && Object.prototype.hasOwnProperty.call(wv, 'insp_ext')) ? String(wv.insp_ext == null ? '' : wv.insp_ext) : null;
+  if (lawLog && lx.ex) { Object.assign(lawLog, lx.ex); delete wv.insp_ext; }
   if (lawLog) wv.insp_log = (Array.isArray(wv.insp_log) ? wv.insp_log : []).concat([lawLog]).slice(-VEH_LOG_MAX);
   wdoc.updated_by = c.member.id; wdoc.updated_at = now;
   const w = await blobSet(st, colKey('vehicles'), wdoc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   const f = {}; f[field] = [cur, date];
+  if (extWas !== null) f.insp_ext = [extWas, ''];
   const au = await appendAudit({ ts: now, by: c.member.name, bid: c.member.id, col: 'vehicles', ev: [{ op: '수정', id: wv.id, t: String(wv.no || wv.id).slice(0, 40) + ' · 지시 완료 창(' + (vehDo ? '차량 수행' : '배정 담당') + ' · 지시 ' + t.id + ')', f: f }] });
   return jr(200, Object.assign({ status: 'OK', vehicle: { id: wv.id, field: field, value: date, prev: cur, updated: today }, updated_at: now, audit: au !== false, request_id: R }, lawLog ? { law_log: lawLog } : {}));   // P1 판27: 앱이 로컬 줄에도 같은 기록을 붙임(다음 통째 저장이 지우지 않게)
 }
@@ -2100,6 +2107,23 @@ function vehLawLog(law, prev, confirmed, today, by, src) {
   if (rule.length > 60 || /[\u0000-\u001f\u007f]/.test(rule)) return null;
   const days = p ? Math.round((Date.parse(confirmed + 'T00:00:00Z') - Date.parse(p + 'T00:00:00Z')) / 86400000) : null;
   return { at: today, prev: prev || '', confirmed: confirmed, proposed: p, rule: p ? rule : '', diff: days, by: String(by || '').slice(0, 40), src: src };
+}
+// P1 판38(원장 C166 · 착수 ㄱ C191): 지시 완료 창이 law 안에 보낸 새 칸 — law 에 insp_done 키가 있을 때만(판38 앱 · "" = 비움, 옛 앱은 키 없음 → ex null = 종전 그대로)
+//   insp_done(이번 수검일)·insp_apply(건설기계 검사 신청일) = 'YYYY-MM-DD' 달력에 있는 날 · 오늘(KST) 뒤 금지 · 신청일 ≤ 수검일 / insp_ext(연장·유예 만료일) = 날짜 · 종전 만기(cur)보다 뒤
+//   앱 vehLawExWhy와 같은 규칙. 반환 { ok, ex } 또는 { ok:false, code, f }
+function vehLawEx(law, cur, today) {
+  if (!law || typeof law !== 'object' || Array.isArray(law) || !Object.prototype.hasOwnProperty.call(law, 'insp_done')) return { ok: true, ex: null };
+  const ex = {};
+  for (const k of ['insp_done', 'insp_apply', 'insp_ext']) {
+    const s = law[k];
+    if (s == null || s === '') { if (k === 'insp_done') ex[k] = ''; continue; }
+    if (!vehDueDate(s)) return { ok: false, code: 'BAD_INSP_DATE', f: k };
+    if (k !== 'insp_ext' && s > today) return { ok: false, code: 'INSP_FUTURE', f: k };
+    ex[k] = s;
+  }
+  if (ex.insp_apply && ex.insp_done && ex.insp_apply > ex.insp_done) return { ok: false, code: 'INSP_ORDER', f: 'insp_apply' };
+  if (ex.insp_ext && vehDueDate(cur) && !(ex.insp_ext > cur)) return { ok: false, code: 'INSP_EXT_EARLY', f: 'insp_ext' };
+  return { ok: true, ex: ex };
 }
 // 승격 판정 한 곳(읽기·기록 같이 씀): 근거 표 꼴 맞음 ∧ settings:veh.bg_ver = 그 판 ver. 어느 쪽이든 못 읽으면 on false(기록 안 함 — fail-closed)
 async function vehBgState(st) {
@@ -2172,7 +2196,17 @@ function vehLogUnion(a, b) {
   const seen = {}, out = [];
   [].concat(Array.isArray(a) ? a : [], Array.isArray(b) ? b : []).forEach(function (e) { if (!e || typeof e !== 'object') return; const k = [e.at, e.confirmed, e.src].join('|'); if (seen[k]) return; seen[k] = 1; out.push(e); });
   out.sort(function (p, q) { const x = String(p.at || ''), y = String(q.at || ''); return x < y ? -1 : (x > y ? 1 : 0); });
-  return out.slice(-VEH_LOG_MAX);
+  // P1 판38(C166): 같은 줄이 한쪽에만 수검일·검사 신청일·연장 만료일을 가졌으면 그 칸을 채운 사본으로(새 칸을 모르는 사본이 먼저 와도 지워지지 않게) — 앱 vehLogUnion과 같은 규칙
+  const all = [].concat(Array.isArray(a) ? a : [], Array.isArray(b) ? b : []);
+  return out.map(function (e) {
+    let f = null;
+    const k = [e.at, e.confirmed, e.src].join('|');
+    all.forEach(function (x) {
+      if (!x || typeof x !== 'object' || x === e || [x.at, x.confirmed, x.src].join('|') !== k) return;
+      ['insp_done', 'insp_apply', 'insp_ext'].forEach(function (n) { const cur = (f || e)[n]; if (typeof x[n] === 'string' && (cur === undefined || (cur === '' && x[n] !== ''))) { f = f || Object.assign({}, e); f[n] = x[n]; } });
+    });
+    return f || e;
+  }).slice(-VEH_LOG_MAX);
 }
 function vehLogKeep(oldItems, items) {
   const oldById = {};
