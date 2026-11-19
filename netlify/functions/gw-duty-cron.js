@@ -54,6 +54,10 @@ function bodyOf(items) {
 function ctAddYears(d, y) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d || '')); if (!m) return ''; const yy = Number(m[1]) + y; let dd = m[3]; if (m[2] === '02' && dd === '29') { const leap = (yy % 4 === 0 && yy % 100 !== 0) || yy % 400 === 0; if (!leap) dd = '28'; } return yy + '-' + m[2] + '-' + dd; }
 function ctAgeAt(birth, at) { const b = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(birth || '')), a = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(at || '')); if (!b || !a) return null; let age = Number(a[1]) - Number(b[1]); if (Number(a[2]) < Number(b[2]) || (Number(a[2]) === Number(b[2]) && Number(a[3]) < Number(b[3]))) age--; return age; }
 function ctDays(from, to) { const f = Date.UTC(+from.slice(0, 4), +from.slice(5, 7) - 1, +from.slice(8, 10)), t = Date.UTC(+to.slice(0, 4), +to.slice(5, 7) - 1, +to.slice(8, 10)); return Math.round((t - f) / 86400000); }
+// P1 판39(C182): 남녀고용평등법 제19조⑤ — 기간제근로자의 육아휴직 기간은 기간제법 제4조 사용기간에서 제외. 전환일 = 입사일 + 2년 + 육아휴직 일수
+//   (복직한 육아휴직 누적 loa_days_child + 진행 중 육아휴직 loa_start~오늘). 앱 index.html ctChildDays·ctRadar와 같은 식(두 벌 — uismoke 'P1 판39'가 같은 표본으로 대조)
+function ctChildDays(m, today) { let n = Math.max(0, Math.floor(Number(m.loa_days_child) || 0)); if (m.on_loa === true && m.loa_kind === 'child' && /^\d{4}-\d{2}-\d{2}$/.test(String(m.loa_start || '')) && /^\d{4}-\d{2}-\d{2}$/.test(String(today || ''))) { const od = ctDays(m.loa_start, today); if (od > 0) n += od; } return n; }
+function ctAddDays(d, n) { return new Date(Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10)) + n * 86400000).toISOString().slice(0, 10); }
 function contractPlan(members, sentDoc, today) {
   const sent = (sentDoc && sentDoc.keys && typeof sentDoc.keys === 'object') ? sentDoc.keys : {};
   const items = [];
@@ -62,7 +66,10 @@ function contractPlan(members, sentDoc, today) {
     if (m.test_acct === true) return;   // P1 판9 ④ 시험 계정(v447 표식)은 인사 관리 대상이 아니다 — 앱 ctRadar와 같은 규칙(gw-todo-cron도 이 함수를 부른다)
     if (m.leave_date && String(m.leave_date) < today) return;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(m.hire_date || ''))) return;
-    const conv = ctAddYears(m.hire_date, 2), days = ctDays(today, conv), age = ctAgeAt(m.birth, m.hire_date);
+    // P1 판39: 멱등 키는 복직한 육아휴직까지만 넣은 날(keyConv) — 진행 중 육아휴직은 날마다 전환일이 하루씩 밀려 키가 매일 바뀌면 같은 단계 알림이 매일 나감(남은 일수는 휴직 중 그대로라 단계도 그대로)
+    const child = ctChildDays(m, today), base = Math.max(0, Math.floor(Number(m.loa_days_child) || 0));
+    const conv2 = ctAddYears(m.hire_date, 2), conv = child > 0 ? ctAddDays(conv2, child) : conv2, keyConv = base > 0 ? ctAddDays(conv2, base) : conv2;
+    const days = ctDays(today, conv), age = ctAgeAt(m.birth, m.hire_date);
     if (age !== null && age >= 55) return;   // 예외
     let stage = null;
     if (age === null) { if (days <= 90) stage = 'unknown'; }
@@ -70,9 +77,11 @@ function contractPlan(members, sentDoc, today) {
     else if (days <= 30) stage = 'd30';
     else if (days <= 90) stage = 'd90';
     if (!stage) return;
-    const key = 'ct:' + m.id + ':' + conv + ':' + stage;
+    const key = 'ct:' + m.id + ':' + keyConv + ':' + stage;
     if (stage === 'over' ? sent[key] === today : !!sent[key]) return;
-    items.push({ id: m.id, name: String(m.name || ''), conv: conv, days: days, stage: stage, key: key });
+    const it = { id: m.id, name: String(m.name || ''), conv: conv, days: days, stage: stage, key: key };
+    if (child > 0) it.child = child;
+    items.push(it);
   });
   items.sort(function (a, b) { return a.days - b.days; });
   return items;
@@ -126,3 +135,4 @@ exports.plan = plan;
 exports.bodyOf = bodyOf;
 exports.contractPlan = contractPlan;   // v368
 exports.contractBody = contractBody;
+exports.ctChildDays = ctChildDays;   // P1 판39 — 앱 ctChildDays와 대조(uismoke 'P1 판39')

@@ -12272,4 +12272,98 @@ function J91a(x) { return JSON.stringify(x); }
   finally { const s = JSON.parse(snapY); mem.gw_users = s.u; mem.gw_data = s.d; }
 }
 
+// ===== P1 판39(11/19 — 원장 C182): 휴직 종류와 근속·계약직 2년 — ① gw-auth member_upsert 새 칸(loa_kind 표 안 값·빈 값 = 칸째 지움 · loa_days_child 0 이상 숫자·0 = 칸째 지움)
+//   값 검사 400(어떤 칸도 바꾸기 전 — 같은 요청의 다른 칸 그대로)·감사 줄(AUD_FIELDS)·권한(회원 저장 = 관리자만 — 휴직 승인·복직과 같은 축)·비관리자 회원 목록에 새 칸 없음
+//   ② gw-duty-cron contractPlan 날짜 = 입사일 + 2년 + 육아휴직 일수(남녀고용평등법 제19조⑤) · 진행 중 육아휴직 포함 · 멱등 키는 복직한 누적까지(진행 중엔 날마다 같은 키) · 휴직 칸 없는 회원은 종전과 같은 키
+//   ③ 결함 사본(gw-auth·gw-duty-cron 소스 한 곳을 바꿔 메모리에서 컴파일) = ✗
+{
+  const fs39 = require('fs'), Mod39 = require('module');
+  const FA39 = join(FN, 'gw-auth.js'), SA39 = fs39.readFileSync(FA39, 'utf8'), FD39 = join(FN, 'gw-duty-cron.js'), SD39 = fs39.readFileSync(FD39, 'utf8');
+  const load39 = (file, src) => { const m = new Mod39(file); m.filename = file; m.paths = Mod39._nodeModulePaths(FN); m._compile(src, file); return m.exports; };
+  const mut39 = (src, from, to) => { if (src.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return src.replace(from, () => to); };
+  const saved39 = JSON.parse(JSON.stringify(mem.gw_users));
+  const chkA39 = async (gwa) => {
+    const call = async (body, tok) => { const x = await gwa.handler({ httpMethod: 'POST', headers: { authorization: tok ? 'Bearer ' + tok : '' }, body: JSON.stringify(body) }); return { code: x.statusCode, body: JSON.parse(x.body || '{}') }; };
+    mem.gw_users = {
+      'member:uadm39': { id: 'uadm39', name: '관리자39', role: '관리자', admin: true, perms: {}, tier: 'pm' },
+      'member:uw39': { id: 'uw39', name: '직원39', role: '직원', admin: false, perms: { tasks: 'do' }, emp_type: '계약직', hire_date: '2025-06-02', loa_days: 5 },
+      'member:uv39': { id: 'uv39', name: '직원39b', role: '직원', admin: false, perms: { tasks: 'do' } },
+      'name:직원39': 'uw39', 'name:직원39b': 'uv39', 'device:dev1': { status: 'approved' },
+    };
+    const tA = issueSession(mem.gw_users['member:uadm39']).token, tW = issueSession(mem.gw_users['member:uw39']).token, tV = issueSession(mem.gw_users['member:uv39']).token;
+    const u = () => mem.gw_users['member:uw39'], o = {};
+    const a0 = auditMock.logs.length;
+    // 휴직 승인(앱 setLeaveStatus와 같은 몸) → 종류 저장 · 감사 줄에 loa_kind
+    let r = await call({ action: 'member_upsert', id: 'uw39', on_loa: true, loa_start: '2025-12-01', loa_end: '', loa_kind: 'child' }, tA);
+    const ev1 = auditMock.logs.slice(a0).reduce((x, l) => x.concat(l.ev || []), []).filter((e) => e.id === 'uw39');
+    o.appr = r.code === 200 && u().loa_kind === 'child' && u().on_loa === true && ev1.length === 1 && Array.isArray((ev1[0].f || {}).loa_kind) && u().loa_days === 5;
+    // 복직(앱 doReinstate 육아휴직 몸) → 육아휴직 누적만 · 그 밖 누적(loa_days) 그대로 · 감사 줄에 loa_days_child
+    const a1 = auditMock.logs.length;
+    r = await call({ action: 'member_upsert', id: 'uw39', on_loa: false, loa_end: '2026-03-10', loa_days_child: 99 }, tA);
+    const ev2 = auditMock.logs.slice(a1).reduce((x, l) => x.concat(l.ev || []), []).filter((e) => e.id === 'uw39');
+    o.rein = r.code === 200 && u().loa_days_child === 99 && u().loa_days === 5 && u().loa_kind === 'child' && ev2.length === 1 && Array.isArray((ev2[0].f || {}).loa_days_child);
+    // 인사 카드가 같은 값을 다시 보냄 = 감사 줄 0 · 0·빈 종류 = 칸째 지움
+    const a2 = auditMock.logs.length;
+    r = await call({ action: 'member_upsert', id: 'uw39', loa_days: 5, loa_days_child: 99 }, tA);
+    const quiet = r.code === 200 && auditMock.logs.slice(a2).reduce((x, l) => x.concat(l.ev || []), []).filter((e) => e.id === 'uw39').length === 0;
+    r = await call({ action: 'member_upsert', id: 'uw39', loa_days_child: 0, loa_kind: '' }, tA);
+    o.clear = quiet && r.code === 200 && !('loa_days_child' in u()) && !('loa_kind' in u());
+    // 값 검사 — 어떤 칸도 바꾸기 전 400(같은 요청의 직급·다른 칸 그대로)
+    await call({ action: 'member_upsert', id: 'uw39', loa_kind: 'other', loa_days_child: 10 }, tA);
+    const before = JSON.stringify(u());
+    const bad = [];
+    for (const b of [{ loa_kind: 'abc' }, { loa_kind: 'toString' }, { loa_kind: { child: 1 } }, { loa_kind: ['child'] }, { loa_days_child: -1 }, { loa_days_child: 'x' }, { loa_days_child: { n: 1 } }, { loa_days_child: '1e999' }]) {
+      const x = await call(Object.assign({ action: 'member_upsert', id: 'uw39', rank: '대리' }, b), tA); bad.push(x.code + ':' + x.body.error_code);
+    }
+    o.bad = bad.join(',') === '400:BAD_LOA_KIND,400:BAD_LOA_KIND,400:BAD_LOA_KIND,400:BAD_LOA_KIND,400:BAD_LOA_DAYS,400:BAD_LOA_DAYS,400:BAD_LOA_DAYS,400:BAD_LOA_DAYS' && JSON.stringify(u()) === before;
+    // 권한: 직원 본인·다른 직원의 회원 저장 = 403 ADMIN_ONLY(휴직 승인·복직은 관리자 화면만 — 지금과 같은 축) · 값 그대로
+    const w1 = await call({ action: 'member_upsert', id: 'uw39', loa_kind: 'child', loa_days_child: 500 }, tW), w2 = await call({ action: 'member_upsert', id: 'uw39', loa_kind: 'child' }, tV);
+    o.perm = w1.code === 403 && w1.body.error_code === 'ADMIN_ONLY' && w2.code === 403 && JSON.stringify(u()) === before;
+    // 회원 목록: 다른 직원(비관리자)에게 새 칸 없음 · 본인·관리자에게는 있음
+    const lv = await call({ action: 'member_list' }, tV), lw = await call({ action: 'member_list' }, tW), la = await call({ action: 'member_list' }, tA);
+    const pick = (l) => (l.body.members || []).find((m) => m.id === 'uw39') || {};
+    o.list = !('loa_kind' in pick(lv)) && !('loa_days_child' in pick(lv)) && !('loa_days' in pick(lv)) && pick(lw).loa_kind === 'other' && pick(lw).loa_days_child === 10 && pick(la).loa_days_child === 10;
+    o.ok = o.appr && o.rein && o.clear && o.bad && o.perm && o.list;
+    return o;
+  };
+  const chkD39 = (dc) => {
+    const C = { emp_type: '계약직', hire_date: '2025-06-02', birth: '1990-01-01' }, o = {};
+    const it1 = dc.contractPlan([Object.assign({ id: 'k1', loa_days_child: 99 }, C)], { keys: {} }, '2027-07-01')[0];
+    o.acc = !!it1 && it1.conv === '2027-09-09' && it1.days === 70 && it1.stage === 'd90' && it1.child === 99 && it1.key === 'ct:k1:2027-09-09:d90';
+    const on = Object.assign({ id: 'k2', on_loa: true, loa_kind: 'child', loa_start: '2027-03-15' }, C);
+    const d1 = dc.contractPlan([on], { keys: {} }, '2027-04-10')[0], d2 = dc.contractPlan([on], { keys: {} }, '2027-04-11')[0];
+    o.on = !!d1 && !!d2 && d1.conv === '2027-06-28' && d2.conv === '2027-06-29' && d1.days === 79 && d2.days === 79 && d1.key === 'ct:k2:2027-06-02:d90' && d2.key === d1.key;
+    const sentOn = { keys: { [d1.key]: '2027-04-10' } };
+    o.once = dc.contractPlan([on], sentOn, '2027-04-11').length === 0;
+    const oth = Object.assign({ id: 'k3', on_loa: true, loa_kind: 'other', loa_start: '2027-03-15', loa_days_child: 0 }, C), inj = Object.assign({ id: 'k4', on_loa: true, loa_kind: 'injury', loa_start: '2027-03-15' }, C);
+    const plain = Object.assign({ id: 'k5' }, C);
+    const p = dc.contractPlan([oth, inj, plain], { keys: {} }, '2027-04-10');
+    o.other = p.length === 3 && p.every((x) => x.conv === '2027-06-02' && x.days === 53 && x.stage === 'd90' && !('child' in x)) && p.map((x) => x.key).join(',') === 'ct:k3:2027-06-02:d90,ct:k4:2027-06-02:d90,ct:k5:2027-06-02:d90';
+    o.ok = o.acc && o.on && o.once && o.other;
+    return o;
+  };
+  try {
+    const A39 = await chkA39(load39(FA39, SA39)), D39 = chkD39(load39(FD39, SD39));
+    T('P1 판39 ① 회원 저장 새 칸(실행 — 실제 gw-auth): 휴직 승인 몸 = loa_kind 저장·감사 줄 · 복직 몸 = 육아휴직 누적만(그 밖 누적 그대로)·감사 줄 · 같은 값 다시 = 감사 0 · 0·빈 종류 = 칸째 지움 · 표 밖 종류(글·상속 키·객체·배열) 400 BAD_LOA_KIND · 음수·글·객체·무한 400 BAD_LOA_DAYS(레코드 글자째 그대로) · 직원 저장 403 ADMIN_ONLY · 다른 직원 목록에 휴직 칸 없음(본인·관리자 있음)',
+      A39.ok && /const AUD_FIELDS = \[[^\]]*'loa_days','loa_kind','loa_days_child','leave_date'/.test(SA39), JSON.stringify(A39));
+    T('P1 판39 ② contractPlan 날짜(실행): 입사 2025-06-02 + 육아휴직 99일 = 2027-09-09(2027-07-01 D-70 d90) · 진행 중 육아휴직(2027-03-15~) = 날마다 하루씩 밀린 전환일·남은 79일 그대로·같은 멱등 키(다음 날 다시 안 나감) · 진행 중 그 밖·업무상 부상·휴직 없음 = 2027-06-02 종전 키',
+      D39.ok, JSON.stringify(D39));
+    const MA39 = [["  if (d.loa_kind !== undefined && d.loa_kind !== null && d.loa_kind !== '' && !(typeof d.loa_kind === 'string' && Object.prototype.hasOwnProperty.call(LOA_KINDS, d.loa_kind))) return", '  if (false) return'],
+      ["!((typeof d.loa_days_child === 'number' || typeof d.loa_days_child === 'string') && Number.isFinite(Number(d.loa_days_child)) && Number(d.loa_days_child) >= 0)) return", '!(Number(d.loa_days_child) >= -9)) return'],
+      ["  if (d.loa_kind !== undefined) { const lk = String(d.loa_kind || ''); if (lk) m.loa_kind = lk; else delete m.loa_kind; }\n", ''],
+      ["const lc = Number(d.loa_days_child) || 0; if (lc > 0) m.loa_days_child = lc; else delete m.loa_days_child; }", 'm.loa_days_child = Number(d.loa_days_child) || 0; }'],
+      ["'loa_days','loa_kind','loa_days_child','leave_date'", "'loa_days','leave_date'"],
+      ['const LOA_KINDS = { child: 1, injury: 1, other: 1 };', 'const LOA_KINDS = { child: 1, injury: 1, other: 1, abc: 1 };']];
+    const kA39 = [];
+    for (const [a, b] of MA39) { let v; try { v = (await chkA39(load39(FA39, mut39(SA39, a, b)))).ok; } catch (e) { v = 'err ' + e.message; } kA39.push(v); }
+    const MD39 = [['conv = child > 0 ? ctAddDays(conv2, child) : conv2', 'conv = conv2'], ["if (m.on_loa === true && m.loa_kind === 'child' && /^", 'if (false && /^'],
+      ["const key = 'ct:' + m.id + ':' + keyConv + ':' + stage;", "const key = 'ct:' + m.id + ':' + conv + ':' + stage;"], ['    if (child > 0) it.child = child;\n', ''],
+      ["if (m.on_loa === true && m.loa_kind === 'child' &&", "if (m.on_loa === true &&"]];
+    const kD39 = MD39.map(([a, b]) => { try { return chkD39(load39(FD39, mut39(SD39, a, b))).ok; } catch (e) { return 'err ' + e.message; } });
+    T('P1 판39 ③ 결함 사본 ' + (MA39.length + MD39.length) + '개(종류 값 검사 없음 · 일수 값 검사 느슨 · 종류 안 씀 · 0일도 남김 · 감사 칸 빠짐 · 종류 표 넓힘 · 서버 2년 육아휴직 안 더함 · 진행 중 육아휴직 빼먹음 · 멱등 키 날마다 바뀜 · 반영 일수 안 실음 · 진행 중 그 밖 휴직도 더함) = 모두 ✗',
+      kA39.concat(kD39).every((v) => v === false), JSON.stringify({ kA39, kD39 }));
+  } catch (e) { T('P1 판39 검사 실행', false, String(e && e.stack || e).slice(0, 500)); }
+  finally { mem.gw_users = saved39; }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

@@ -111,6 +111,9 @@ const ROLE_OPEN = { '팀장': 1, '직원': 1, '현장직': 1 };
 // v447 회원 소속 회사(corp) — 안전 설정(gw-data 안전 설정 키) 회사별 상시근로자 수 두 키와 같은 값(env 종운환경 · con 종운건설). 그 밖 값은 400 BAD_CORP
 //   v472(PM 11/14 18:48 "중복재적 표시도"): both = 두 회사 중복 재적(읽는 쪽은 '양쪽 회사에 다 나옴'으로 — 안전 현황 회사 칩)
 const MEMBER_CORP = { env: 1, con: 1, both: 1 };
+// P1 판39(C182): 휴직 종류(loa_kind) — 앱 LOA_KIND와 같은 키(child 육아휴직 · injury 업무상 부상·질병 휴업 · other 그 밖의 휴직). 그 밖 값은 400 BAD_LOA_KIND
+//   loa_days = 그 밖의 휴직 누적(근속에서 뺌 — 종류 칸 전 값 포함) · loa_days_child = 육아휴직 누적(근속 포함 · 계약직 2년 날짜를 늦춤 — gw-duty-cron contractPlan)
+const LOA_KINDS = { child: 1, injury: 1, other: 1 };
 function roleOpen(r) { return Object.prototype.hasOwnProperty.call(ROLE_OPEN, String(r || '')); }
 // 일반 직책 기본 권한 — 앱 ROLE_PRESET과 같은 값(uismoke v430이 3직책 전부 대조, servertest가 직원 줄 대조). 관리자가 만든 회원의 perms는 클라 값이 아니라 이 표에서 온다(권한 상승 차단).
 //   v430 safety: 3직책 모두 숨김(PM 11/9 ② "권민지 1명" — 팀장도 숨김, 부여는 권한관리 표에서 한 분씩)
@@ -321,6 +324,9 @@ async function handleMemberUpsert(st, event, d, R) {
   if (d.test_acct !== undefined && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   // P1 판22 검토 11/14 ⑨: 퇴사일은 빈 값 또는 달력에 있는 YYYY-MM-DD만(' 2026-11-14'·'2026-1-5'·'…T00:00'은 로그인 차단은 퇴사로 보는데 자동 회수는 형식 오류로 건너뛰던 어긋남) — 어떤 칸도 바꾸기 전에 400
   if (d.leave_date !== undefined && d.leave_date !== null && d.leave_date !== '' && !devauto.validDate(d.leave_date)) return jr(400, { status: 'REJECTED', error_code: 'BAD_LEAVE_DATE', request_id: R });
+  // P1 판39(C182): 휴직 종류는 표 안 값·빈 값만 · 육아휴직 누적일수는 0 이상 유한 숫자(빈 값·null = 0) — 어떤 칸도 바꾸기 전에 400
+  if (d.loa_kind !== undefined && d.loa_kind !== null && d.loa_kind !== '' && !(typeof d.loa_kind === 'string' && Object.prototype.hasOwnProperty.call(LOA_KINDS, d.loa_kind))) return jr(400, { status: 'REJECTED', error_code: 'BAD_LOA_KIND', request_id: R });
+  if (d.loa_days_child !== undefined && d.loa_days_child !== null && d.loa_days_child !== '' && !((typeof d.loa_days_child === 'number' || typeof d.loa_days_child === 'string') && Number.isFinite(Number(d.loa_days_child)) && Number(d.loa_days_child) >= 0)) return jr(400, { status: 'REJECTED', error_code: 'BAD_LOA_DAYS', request_id: R });
   // 자기 계정의 role·name·dev·admin·tier 변경 금지(S1(b) — 개발자 예외 없음: 다른 개발자·대표가 바꾼다). 자기 등급 상승·이름 색인 탈취의 뿌리를 닫는다
   if (self) {
     const selfChange = nameChange || roleChange
@@ -402,6 +408,9 @@ async function handleMemberUpsert(st, event, d, R) {
   if (d.on_loa !== undefined) m.on_loa = !!d.on_loa;
   if (d.loa_start !== undefined) m.loa_start = String(d.loa_start || '');
   if (d.loa_end !== undefined) m.loa_end = String(d.loa_end || '');
+  // P1 판39(C182): 값 검사는 위(어떤 칸도 바꾸기 전) · 빈 종류·0일은 칸째 지움(인사 카드가 늘 같이 보내도 '없음 → 0' 감사 줄이 생기지 않게 — office와 같은 까닭)
+  if (d.loa_kind !== undefined) { const lk = String(d.loa_kind || ''); if (lk) m.loa_kind = lk; else delete m.loa_kind; }
+  if (d.loa_days_child !== undefined) { const lc = Number(d.loa_days_child) || 0; if (lc > 0) m.loa_days_child = lc; else delete m.loa_days_child; }
   // v447 안전 › 체크 칸(사람별 표)이 쓰는 회원 칸 4개 — 필드별 복사(보내지 않은 칸은 그대로). 켜짐만 저장하고 꺼짐·빈 값은 칸째 지운다
   //   (인사 카드는 네 칸을 늘 함께 보내므로 '없음 → false'를 남기면 저장마다 감사 줄이 생긴다). 사무직(office) = 정기교육 반기 6시간·일반건강진단 2년 ·
   //   관리감독자 지정(supervisor) = 정기교육 연 16시간 · 소속 회사(corp) = env 종운환경·con 종운건설 · 시험 계정(test_acct) = 체크 칸 표·빠진 항목·합계 · 인사 명부 인원 수(맨 아래 '시험 계정' 묶음에만)·계약직 레이더·연차 현황·휴가 대기 수에서 뺌(P1 판9 — 로그인·권한·기기는 그대로)
@@ -428,7 +437,7 @@ async function handleMemberUpsert(st, event, d, R) {
   // 감사 로그: 회원 필드 변경(이전값→새값). PIN은 값 미기록('변경'만), 해시·비밀값 제외.
   try {
     const f = {};
-    const AUD_FIELDS = ['name','uid','role','admin','dev','tier','rank','dept','annual_days','birth','hire_date','emp_type','annual_basis','loa_days','leave_date','annual_paid','annual_base','annual_base_date','seq','on_loa','loa_start','loa_end','office','supervisor','corp','test_acct','quals'];   // v447 회원 칸 4개(사무직·관리감독자 지정·소속 회사·시험 계정)
+    const AUD_FIELDS = ['name','uid','role','admin','dev','tier','rank','dept','annual_days','birth','hire_date','emp_type','annual_basis','loa_days','loa_kind','loa_days_child','leave_date','annual_paid','annual_base','annual_base_date','seq','on_loa','loa_start','loa_end','office','supervisor','corp','test_acct','quals'];   // v447 회원 칸 4개(사무직·관리감독자 지정·소속 회사·시험 계정)
     const b = before || {};
     for (const k of AUD_FIELDS) {
       const a = b[k], v = m[k];

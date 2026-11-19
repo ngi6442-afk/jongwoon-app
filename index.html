@@ -1064,6 +1064,8 @@
   .ask-ex button{background:transparent;border:1px solid var(--line);border-radius:16px;padding:5px 11px;font-size:12.5px;color:var(--sub);cursor:pointer;}
   .need-chip{display:inline-block;background:#FBF3DF;border:1px solid #E5D3A4;color:#7a5b12;
     border-radius:6px;padding:0 6px;font-size:11px;font-weight:700;white-space:nowrap;}
+  .loa-kind-sel{font-size:12px;padding:1px 4px;border:1px solid var(--line);border-radius:5px;background:#fff;color:inherit;max-width:100%;}   /* P1 판39 승인 줄 휴직 종류 고르기(관리자·승인 전) */
+  @media (max-width:859px){ .loa-kind-sel{font-size:16px;} }
   .jw-sheet-wrap{overflow-x:auto;margin:2px 0 8px;}   /* 넘치면 표만 굴러간다 — 본문은 가로로 안 밀린다 */
   .asb-hd{display:flex;align-items:center;gap:8px;width:100%;background:transparent;border:none;
     padding:11px 4px;cursor:pointer;text-align:left;font-size:14px;color:var(--text);
@@ -3049,13 +3051,17 @@
 <div class="modal-backdrop" id="loaBackdrop">
   <div class="modal">
     <h3>휴직 면담 신청</h3>
-    <p style="margin-bottom:12px;line-height:1.6;">절차: <b>①면담 신청</b> → 관리자 <b>②면담완료</b> → 근로자 <b>③휴직 본신청</b> → 관리자 <b>④승인</b>(휴직 상태 반영).<br>휴직 시작·종료 예정일과 사유를 적어 면담을 신청합니다.</p>
+    <p style="margin-bottom:12px;line-height:1.6;">절차: <b>①면담 신청</b> → 관리자 <b>②면담완료</b> → 근로자 <b>③휴직 본신청</b> → 관리자 <b>④승인</b>(휴직 상태 반영).<br>휴직 종류·시작·종료 예정일을 적어 면담을 신청합니다.</p>
+    <!-- P1 판39(C182): 휴직 종류(필수) — 근속·계약직 2년 계산이 종류로 갈림. 값은 LOA_KIND와 같은 키 -->
+    <span class="fld-label">휴직 종류</span>
+    <select id="loaKind"><option value="">- 고르기 -</option><option value="child">육아휴직</option><option value="injury">업무상 부상·질병 휴업</option><option value="other">그 밖의 휴직</option></select>
+    <div style="font-size:12px;color:var(--sub);margin:-2px 2px 8px;">고르기: 육아휴직 · 업무상 부상·질병 휴업 · 그 밖의 휴직(개인 사정·업무 밖 질병 등)</div>
     <span class="fld-label">휴직 시작 예정일</span>
     <input type="date" id="loaStart">
     <span class="fld-label">종료 예정일 (미정이면 비움)</span>
     <input type="date" id="loaEnd">
     <span class="fld-label">사유</span>
-    <input type="text" id="loaReason" placeholder="사유 (예: 육아휴직·병가·개인)" autocomplete="off">
+    <input type="text" id="loaReason" placeholder="사유 (선택)" autocomplete="off">
     <button class="primary" id="loaSave">면담 신청</button>
     <button class="secondary" id="loaCancel">취소</button>
   </div>
@@ -3478,8 +3484,11 @@
     <label class="dg-check" id="meTestWrap"><input type="checkbox" id="meTestAcct"> 시험 계정 (안전 체크 칸 표·인사 명부 인원 수·계약직 레이더·연차 현황에서 빠지고, 인사 명부 맨 아래 '시험 계정' 묶음에 남음)</label>
     <span class="fld-label">연차 부여 기준</span>
     <select id="meBasis"><option value="hire">입사일 기준</option><option value="fiscal">회계연도(1/1) 기준</option></select>
-    <span class="fld-label">휴직 누적일수 (근속에서 제외)</span>
+    <!-- P1 판39(C182): 휴직 누적 1칸 → 2칸. meLoa = 그 밖의 휴직(종류 없는 옛 값 포함 — 지금처럼 근속에서 뺌) · meLoaChild = 육아휴직(근속 포함 · 계약직 2년 날짜를 늦춤) -->
+    <span class="fld-label">그 밖의 휴직 누적일수 (근속에서 제외 · 확인 필요)</span>
     <input type="number" id="meLoa" min="0" step="1" placeholder="0" autocomplete="off">
+    <span class="fld-label">육아휴직 누적일수 (근속 포함 · 계약직 2년에서 제외)</span>
+    <input type="number" id="meLoaChild" min="0" step="1" placeholder="0" autocomplete="off">
     <span class="fld-label">퇴사일 (재직 중이면 비움)</span>
     <input type="date" id="meLeave">
     <label class="dg-check"><input type="checkbox" id="mePaidAnnual"> 연차수당 포함 근로자 (연차 대신 수당)</label>
@@ -18387,8 +18396,9 @@
   // P1 판24j(C209): 칸 단위(공용 imMerge) — 승인(상태·승인자·승인일)·취소 요청·면담 단계는 각각 한 덩어리 · 이름표 = 휴가 신청 창·목록 글 · 알림 이름 = 유형·시작일(직원 이름은 안 씀)
   function mergeLeaves(local,remote){ if (typeof imMerge === "function") return imMerge("leaves", local, remote, {
       name: function(l){ return (leaveTypeLabel(l.type) + " " + (l.start || "")).trim() || "휴가"; },
-      lbl: { type: "유형", start: "기간", end: "기간", reason: "사유", days: "기간", status: "승인", cancel_req: "휴가 취소", stage: "사직·휴직 단계", member_id: "신청자" },   // 검토 반영: stage는 면담 대기·본신청 대기·휴직 중·복직까지 — '면담'만이 아님
-      grp: [["status", "approver", "approved_at"], ["cancel_req", "cancel_req_at", "cancel_approver"], ["stage", "interview_at", "interviewer", "applied_at"]]
+      lbl: { type: "유형", start: "기간", end: "기간", reason: "사유", days: "기간", status: "승인", cancel_req: "휴가 취소", stage: "사직·휴직 단계", member_id: "신청자", loa_kind: "휴직 종류" },   // 검토 반영: stage는 면담 대기·본신청 대기·휴직 중·복직까지 — '면담'만이 아님
+      // P1 판39(C182): 휴직 종류(loa_kind)는 승인 묶음에 같이 — 승인한 화면의 종류가 인사기록에 들어가므로(관리자 승인 전 고침) 승인 상태와 따로 갈리지 않게
+      grp: [["status", "approver", "approved_at"], ["cancel_req", "cancel_req_at", "cancel_approver"], ["stage", "interview_at", "interviewer", "applied_at"]].map(function(g){ return g[0] === "status" ? g.concat(["loa_kind"]) : g; })
     });
     var byId={}; (local||[]).forEach(function(l){if(l&&l.id)byId[l.id]=l;}); (remote||[]).forEach(function(x){if(!x||!x.id)return;var c=byId[x.id];if(!c){byId[x.id]=x;}else{var w=(x.updated||"")>(c.updated||"")?x:c;var m=Object.assign({},(w===x?c:x),w);if(c.del===1||x.del===1)m.del=mergeDel(c,x);byId[x.id]=m;}}); return Object.keys(byId).map(function(k){return byId[k];}); }
   function doSaveLeaves(){
@@ -18413,12 +18423,14 @@
     var d=Math.round((e-s)/86400000)+1; return d>0?d:0;
   }
   // 근속(휴직 제외) 일수/연수
+  // P1 판39(C182): 빼는 것은 '그 밖의 휴직'뿐 — loa_days는 이제 그 밖의 휴직 누적(종류 칸이 생기기 전 값 포함). 육아휴직(남녀고용평등법 제19조④ 근속 포함)·
+  //   업무상 부상·질병 휴업(근로기준법 제60조⑥ 출근 간주)은 빼지 않음. 육아휴직 누적(loa_days_child)은 계약직 2년 레이더만 씀. 종류 없는 진행 중 휴직 = 지금처럼 뺌
   function serviceInfo(m, asOf){
     if(!m || !isDate(m.hire_date)) return null;
     var h=new Date(m.hire_date+"T00:00:00"), a=new Date((asOf||todayStr())+"T00:00:00");
     var days=Math.floor((a-h)/86400000) - (m.loa_days||0);
     // 진행 중 휴직(복직 전)도 근속에서 실시간 제외 — 복직 시 loa_days에 합산되어 이중차감 없음
-    if(m.on_loa && isDate(m.loa_start)){ var od=Math.floor((a-new Date(m.loa_start+"T00:00:00"))/86400000); if(od>0) days-=od; }
+    if(m.on_loa && isDate(m.loa_start) && m.loa_kind!=="child" && m.loa_kind!=="injury"){ var od=Math.floor((a-new Date(m.loa_start+"T00:00:00"))/86400000); if(od>0) days-=od; }
     if(days<0) days=0;
     return { days:days, months:Math.floor(days/30), years:days/365 };
   }
@@ -18431,6 +18443,7 @@
     var addl=Math.floor((Math.floor(si.years)-1)/2);                 // 3년차부터 매2년 +1
     return Math.min(15 + Math.max(0,addl), 25);
   }
+  // P1 판39(C182): 첫해 빼는 loa_days = 그 밖의 휴직 누적만(육아휴직은 loa_days_child로 따로 쌓여 빼지 않음 · 진행 중 휴직은 종전대로 첫해에 안 뺌)
   function fiscalAnnual(m, asOf){
     var h=new Date(m.hire_date+"T00:00:00"), a=new Date((asOf||todayStr())+"T00:00:00");
     var hy=h.getFullYear(), ay=a.getFullYear();
@@ -18636,6 +18649,15 @@
       approveConfirm:"휴직을 승인할까요? 휴직 상태가 인사기록에 반영됩니다.",
       rejectConfirm:"휴직 신청을 반려할까요?" }
   };
+  // P1 판39(C182): 휴직 종류 — 휴직 줄 loa_kind · 승인하면 회원 loa_kind. 육아휴직 = 남녀고용평등법 제19조④(근속 포함)·⑤(기간제 사용기간에서 제외) ·
+  //   업무상 부상·질병 휴업 = 근로기준법 제60조⑥(출근 간주) · 그 밖의 휴직 = 근속에서 뺌(지금과 같음 — 취업규칙 제17조①과 다를 수 있어 노무사 확인 전, AI가 정하지 않음)
+  var LOA_KIND = { child:"육아휴직", injury:"업무상 부상·질병 휴업", other:"그 밖의 휴직" };
+  function loaKindNote(k){
+    if(k==="child") return "근속에 포함 · 계약직이면 2년 날짜를 휴직 일수만큼 늦춤";
+    if(k==="injury") return "근속에 포함";
+    if(k==="other") return "근속에서 뺌(지금과 같음) — 취업규칙 제17조①과 다를 수 있어 노무사 확인 전";
+    return "";
+  }
   function reqLineRowHtml(l){
     var cfg = REQ_LINE[l.type] || REQ_LINE.resign;
     var nm = dispName(memberName(l.member_id)) || l.member_name || "-";
@@ -18658,9 +18680,17 @@
     }
     var meta='<span>'+cfg.predict+' '+esc(period)+'</span>';
     if(l.interview_at) meta+='<span class="author-chip">면담완료 '+esc(l.interview_at)+'</span>';
+    // P1 판39(C182): 휴직 종류 칩(제목 줄 — 그 밖의 휴직은 '근속 처리 확인 필요') · 관리자는 승인 전까지 종류를 고르기로 고침 · 종류 설명 한 줄
+    var kRow="";
+    if(l.type==="loa"){
+      var lk=LOA_KIND[l.loa_kind] ? l.loa_kind : "";
+      if(lk) chip='<span class="scope-chip">'+LOA_KIND[lk]+'</span>'+(lk==="other"?' <span class="need-chip">근속 처리 확인 필요</span>':'')+' '+chip;
+      if(adm && l.status==="pending") meta+='<span>종류 <select class="loa-kind-sel" data-rs-kind="'+l.id+'" aria-label="휴직 종류 고치기">'+(lk?'':'<option value="" selected>(종류 없음)</option>')+Object.keys(LOA_KIND).map(function(k){ return '<option value="'+k+'"'+(k===lk?' selected':'')+'>'+LOA_KIND[k]+'</option>'; }).join("")+'</select></span>';
+      if(lk) kRow='<div class="item-meta"><span>'+esc(loaKindNote(lk))+'</span></div>';
+    }
     if(l.reason) meta+='<span>'+esc(l.reason)+'</span>';
     if(l.approver) meta+='<span class="author-chip">'+esc(dispName(l.approver))+'</span>';
-    return '<div class="item"><div class="item-body"><div class="item-title">'+esc(nm)+' · <b style="color:'+cfg.color+';">'+cfg.word+'</b> '+chip+leaveTestChip(l)+'</div><div class="item-meta">'+meta+'</div></div><div class="task-ctrl">'+ctrl+'</div></div>';
+    return '<div class="item"><div class="item-body"><div class="item-title">'+esc(nm)+' · <b style="color:'+cfg.color+';">'+cfg.word+'</b> '+chip+leaveTestChip(l)+'</div><div class="item-meta">'+meta+'</div>'+kRow+'</div><div class="task-ctrl">'+ctrl+'</div></div>';
   }
   function bindLeaveHandlers(host){
     function wire(attr,fn){ Array.prototype.forEach.call(host.querySelectorAll("["+attr+"]"),function(el){ el.addEventListener("click",function(){ fn(el.getAttribute(attr)); }); }); }
@@ -18674,8 +18704,17 @@
     // 사직·휴직 단계 전환(공통)
     wire("data-rs-interview", function(id){ if(!isAdmin()) return; var l=findLeave(id); if(!l) return; var cfg=REQ_LINE[l.type]||REQ_LINE.resign; if(!confirm(cfg.interviewConfirm)) return; if(l.stage==="interview_req"){ l.stage="interview_done"; l.interview_at=todayStr(); l.interviewer=myName()||""; l.updated=todayStr(); scheduleLeavesSave(); renderLeaves(); renderDashboard(); } });
     wire("data-rs-apply", function(id){ var l=findLeave(id); if(!l||l.member_id!==getMemberId()||l.stage!=="interview_done") return; var cfg=REQ_LINE[l.type]||REQ_LINE.resign; if(!confirm(cfg.applyConfirm)) return; l.stage="resign_req"; l.applied_at=todayStr(); l.updated=todayStr(); scheduleLeavesSave(); renderLeaves(); renderDashboard(); });
-    wire("data-rs-approve", function(id){ if(!isAdmin()) return; var l=findLeave(id); if(!l||(l.stage||"resign_req")!=="resign_req") return; var cfg=REQ_LINE[l.type]||REQ_LINE.resign; if(!confirm(cfg.approveConfirm)) return; setLeaveStatus(id,"approved"); });
+    wire("data-rs-approve", function(id){ if(!isAdmin()) return; var l=findLeave(id); if(!l||(l.stage||"resign_req")!=="resign_req") return; var cfg=REQ_LINE[l.type]||REQ_LINE.resign; if(!confirm((l.type==="loa" ? "휴직 종류: "+(LOA_KIND[l.loa_kind]||"(종류 없음 — 지금처럼 근속에서 뺌)")+"\n" : "")+cfg.approveConfirm)) return; setLeaveStatus(id,"approved"); });
     wire("data-rs-reject", function(id){ if(!isAdmin()) return; var l=findLeave(id); if(!l) return; var cfg=REQ_LINE[l.type]||REQ_LINE.resign; if(confirm(cfg.rejectConfirm)) setLeaveStatus(id,"rejected"); });
+    // P1 판39(C182): 관리자가 승인 전에 휴직 종류를 고침(승인 줄 고르기) — 승인하면 이 종류가 인사기록에 들어감
+    Array.prototype.forEach.call(host.querySelectorAll("[data-rs-kind]"),function(el){ el.addEventListener("change",function(){ loaKindSet(el.getAttribute("data-rs-kind"), el.value); }); });
+  }
+  function loaKindSet(id, k){
+    if(!isAdmin() || !LOA_KIND[k]) return false;
+    var l=findLeave(id); if(!l || l.type!=="loa" || l.status!=="pending") return false;
+    l.loa_kind=k; l.updated=todayStr();
+    scheduleLeavesSave(); renderLeaves(); renderDashboard();
+    return true;
   }
   function setLeaveStatus(id,status){
     if(!isAdmin()) return;
@@ -18684,7 +18723,8 @@
     if(l.type==="resign" || l.type==="loa") l.stage = (status==="approved" ? (l.type==="resign"?"resigned":"onloa") : "rejected");
     // 휴직 승인 → 휴직 상태 인사기록 반영
     if(l.type==="loa" && status==="approved" && l.member_id && isDate(l.start)){
-      gwCall("gw-auth", { action:"member_upsert", id:l.member_id, on_loa:true, loa_start:l.start, loa_end:(l.end||"") }).then(function(res){
+      // P1 판39(C182): 승인한 휴직 종류를 인사기록에 같이(종류 없는 옛 신청 = 빈 값 → 지금처럼 근속에서 뺌)
+      gwCall("gw-auth", { action:"member_upsert", id:l.member_id, on_loa:true, loa_start:l.start, loa_end:(l.end||""), loa_kind:(LOA_KIND[l.loa_kind] ? l.loa_kind : "") }).then(function(res){
         if(res.status===200 && res.body && res.body.member){
           for(var i=0;i<members.length;i++){ if(members[i].id===res.body.member.id){ members[i]=res.body.member; break; } }
           try{ saveUsersCache(); }catch(e){}
@@ -18728,6 +18768,7 @@
   }
   function openLoa(){
     var me=getMemberId(); if(!me){ alert("로그인 회원 정보가 없습니다."); return; }
+    document.getElementById("loaKind").value="";
     document.getElementById("loaStart").value=todayStr();
     document.getElementById("loaEnd").value="";
     document.getElementById("loaReason").value="";
@@ -18735,12 +18776,14 @@
   }
   function saveLoa(){
     var me=getMemberId(); if(!me){ alert("로그인 회원 정보가 없습니다."); return; }
+    var kind=document.getElementById("loaKind").value;
     var start=document.getElementById("loaStart").value;
     var end=document.getElementById("loaEnd").value;
+    if(!LOA_KIND[kind]){ alert("휴직 종류를 고르세요."); return; }
     if(!isDate(start)){ alert("휴직 시작 예정일을 선택하세요."); return; }
     if(end && isDate(end) && end<start){ alert("종료 예정일이 시작일보다 빠릅니다."); return; }
     if(!confirm("휴직 면담을 신청할까요? 관리자 면담완료 후 휴직 본신청이 가능합니다.")) return;
-    var l={ id:genId("lv"), member_id:me, member_name:myName()||"", type:"loa", stage:"interview_req",
+    var l={ id:genId("lv"), member_id:me, member_name:myName()||"", type:"loa", stage:"interview_req", loa_kind:kind,
       start:start, end:(isDate(end)?end:""), days:0, reason:document.getElementById("loaReason").value.trim(),
       status:"pending", approver:"", applied:todayStr(), updated:todayStr() };
     leaves.push(l);
@@ -32445,26 +32488,32 @@ function dutyStage(nx){
   function ctAddYears(d, y){ var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d||"")); if(!m) return ""; var yy=Number(m[1])+y, mm=m[2], dd=m[3]; if(mm==="02"&&dd==="29"){ var leap=(yy%4===0&&yy%100!==0)||yy%400===0; if(!leap) dd="28"; } return yy+"-"+mm+"-"+dd; }
   function ctAgeAt(birth, at){ var b=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(birth||"")), a=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(at||"")); if(!b||!a) return null; var age=Number(a[1])-Number(b[1]); if(Number(a[2])<Number(b[2])||(Number(a[2])===Number(b[2])&&Number(a[3])<Number(b[3]))) age--; return age; }
   function ctDays(from, to){ var f=Date.UTC(+from.slice(0,4),+from.slice(5,7)-1,+from.slice(8,10)), t=Date.UTC(+to.slice(0,4),+to.slice(5,7)-1,+to.slice(8,10)); return Math.round((t-f)/86400000); }
-  // 재직 계약직 m → null(대상 아님) | {state:'exempt'|'unknown'|'due'|'over', conv, days, age, why}
+  // P1 판39(C182): 남녀고용평등법 제19조⑤ — 기간제근로자의 육아휴직 기간은 기간제법 제4조 사용기간에서 제외. 전환일 = 입사일 + 2년 + 육아휴직 일수
+  //   (복직한 육아휴직 누적 loa_days_child + 진행 중 육아휴직 loa_start~오늘 — 일수는 복직 처리와 같은 날짜 차). 서버 gw-duty-cron ctChildDays·contractPlan과 같은 식(두 벌 — uismoke 'P1 판39'가 같은 표본으로 대조)
+  function ctChildDays(m, today){ var n=Math.max(0, Math.floor(Number(m.loa_days_child)||0)); if(m.on_loa===true && m.loa_kind==="child" && /^\d{4}-\d{2}-\d{2}$/.test(String(m.loa_start||"")) && /^\d{4}-\d{2}-\d{2}$/.test(String(today||""))){ var od=ctDays(m.loa_start, today); if(od>0) n+=od; } return n; }
+  function ctAddDays(d, n){ var t=new Date(Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10))+n*86400000); return t.toISOString().slice(0,10); }
+  // 재직 계약직 m → null(대상 아님) | {state:'exempt'|'unknown'|'due'|'over', conv, days, age, why, child}
   function ctRadar(m, today){
     if(!m || m.emp_type!=="계약직" || m.del===1) return null;
     if(m.test_acct===true) return null;   // P1 판9 ④ 시험 계정은 인사 관리 대상 아님(서버 contractPlan과 같은 규칙)
     if(m.leave_date && String(m.leave_date) < String(today)) return null;   // 퇴사자
     if(!/^\d{4}-\d{2}-\d{2}$/.test(String(m.hire_date||""))) return { state:"unknown", why:"입사일 없음" };
-    var conv=ctAddYears(m.hire_date, CT_YEARS), age=ctAgeAt(m.birth, m.hire_date);
-    if(age===null) return { state:"unknown", why:"생년월일 없음", conv: conv };
-    if(age>=CT_EXEMPT_AGE) return { state:"exempt", age: age, conv: conv };
+    var child=ctChildDays(m, today), conv=ctAddYears(m.hire_date, CT_YEARS), age=ctAgeAt(m.birth, m.hire_date);
+    if(child>0) conv=ctAddDays(conv, child);
+    if(age===null) return { state:"unknown", why:"생년월일 없음", conv: conv, child: child };
+    if(age>=CT_EXEMPT_AGE) return { state:"exempt", age: age, conv: conv, child: child };
     var days=ctDays(today, conv);
-    return { state: days<0 ? "over" : "due", conv: conv, days: days, age: age };
+    return { state: days<0 ? "over" : "due", conv: conv, days: days, age: age, child: child };
   }
   function ctChipHtml(m, today){
     var r=ctRadar(m, today||todayStr()); if(!r) return "";
     var red='background:#FBE7E3;color:#B0332A;';
+    var ch=r.child>0 ? " · 육아휴직 "+r.child+"일 반영" : "", chT=r.child>0 ? " + 육아휴직 "+r.child+"일(남녀고용평등법 19조⑤ — 사용기간에서 제외)" : "";
     if(r.state==="exempt") return ' <span class="scope-chip" title="기간제법 4조①4호 — 근로계약 체결 시 55세 이상은 2년 제한 예외(입사 시 '+r.age+'세). 최종 판단은 노무사 확인">계약직 · 55세 이상 예외</span>';
     if(r.state==="unknown") return ' <span class="review-chip" title="기간제법 4조 2년 시계를 세려면 입사일·생년월일이 필요합니다">계약직 · '+esc(r.why)+' — 판정 불가</span>';
-    if(r.state==="over") return ' <span class="review-chip" style="'+red+'" title="기간제법 4조② — 2년을 초과해 사용하면 기간의 정함이 없는 근로계약으로 봅니다(전환일 '+esc(r.conv)+'). 노무사 확인 필요">무기계약 간주 — 2년 초과 '+(-r.days)+'일</span>';
+    if(r.state==="over") return ' <span class="review-chip" style="'+red+'" title="기간제법 4조② — 2년을 초과해 사용하면 기간의 정함이 없는 근로계약으로 봅니다(전환일 '+esc(r.conv)+chT+'). 노무사 확인 필요">무기계약 간주 — 2년 초과 '+(-r.days)+'일'+(ch?' ('+ch.slice(3)+')':'')+'</span>';
     var cls = r.days<=CT_AMBER ? "review-chip" : "scope-chip", st = r.days<=CT_RED ? red : "";
-    return ' <span class="'+cls+'"'+(st?' style="'+st+'"':'')+' title="기간제법 4조 — 입사 '+esc(m.hire_date)+' + 2년 = '+esc(r.conv)+'. 그 전에 계약 종료·정규직 전환·재계약 중 하나를 정해야 합니다(노무사 확인)">무기계약 전환 D-'+r.days+' ('+esc(r.conv)+')</span>';
+    return ' <span class="'+cls+'"'+(st?' style="'+st+'"':'')+' title="기간제법 4조 — 입사 '+esc(m.hire_date)+' + 2년'+chT+' = '+esc(r.conv)+'. 그 전에 계약 종료·정규직 전환·재계약 중 하나를 정해야 합니다(노무사 확인)">무기계약 전환 D-'+r.days+' ('+esc(r.conv)+ch+')</span>';
   }
   // @ct-radar-end
   // v472(PM 11/14 18:48 "일용직/지입차주 선택 기능 … 중복재적 표시도"): 인사 › 직원 줄 표시 3종 — 저장값만 읽는다(emp_type · corp)
@@ -32638,7 +32687,7 @@ function dutyStage(nx){
   var MOD_LABEL = {tasks:"지시", veh:"차량", hw:"화관법", rec:"기성·수금", stmt:"월말명세서", lic:"인허가", safety:"안전", site:"현장", check:"주기 체크", con:"계약", cli:"거래처", doc:"문서함", bid:"입찰", wk:"일용직", quote:"견적서", promo:"홍보"};   // check 권한은 주기 체크리스트 영역만 제어(내게 온 지시·내 할 일은 전원) — 탭 이름(내 업무)과 구분 · hw = 화관법 탭(v431 열 · v434 탭 숨김·폐기물 제출 수행 검사)
   // ---- 감사 로그 뷰어(관리자 전용, 서버 기록 열람) ----
   var AUDIT_COL_LABEL = {tasks:"지시", vehicles:"차량", receivables:"기성", licenses:"인허가", checklist:"업무", documents:"문서함", clients:"거래처", contracts:"계약", leaves:"휴가", family:"가족친화", member:"회원", login:"로그인", progress:"진척도", pmcon:"PM 콘솔", mchk:"월 점검", corp_reg:"법인 등기", stmt:"월말명세서", rnote:"연구노트", hr:"인사", files:"파일", safety:"안전 설정"};   // v436 safety = 현황 ⑤ 안전 설정(settings:safety) 고침(uismoke v436 ⑧이 safety를 끝으로 대조) · 29 판② stmt = gw-stmt 감사(거래처 목록·저장·되돌리기·차량 별칭)
-  var AUDIT_FIELD_LABEL = {status:"상태", title:"제목", who:"담당", who_id:"담당", due:"기한", amount:"금액", paid:"입금", del:"삭제", scope:"공개범위", stage:"단계", cancel_req:"취소요청", name:"이름", role:"직책", rank:"직급", dept:"부서", admin:"관리자", perms:"권한", hire_date:"입사일", leave_date:"퇴사일", seq:"연번", annual_base:"잔여연차기준", annual_base_date:"기준일", annual_days:"연차수동", loa_days:"휴직누적", on_loa:"휴직중", loa_start:"휴직시작", loa_end:"휴직종료", annual_paid:"연차수당포함", emp_type:"고용형태", birth:"생년월일", annual_basis:"연차기준", reason:"사유", approver:"승인자", done_by:"완료자", detail:"상세", recur:"반복", hl:"하이라이트", mismatch:"불일치", PIN:"PIN", tier:"관리자등급", deleted_at:"삭제일", deleted_by:"삭제자", restored_at:"복구일", restored_by:"복구자",
+  var AUDIT_FIELD_LABEL = {status:"상태", title:"제목", who:"담당", who_id:"담당", due:"기한", amount:"금액", paid:"입금", del:"삭제", scope:"공개범위", stage:"단계", cancel_req:"취소요청", name:"이름", role:"직책", rank:"직급", dept:"부서", admin:"관리자", perms:"권한", hire_date:"입사일", leave_date:"퇴사일", seq:"연번", annual_base:"잔여연차기준", annual_base_date:"기준일", annual_days:"연차수동", loa_days:"휴직누적", loa_kind:"휴직종류", loa_days_child:"육아휴직누적", on_loa:"휴직중", loa_start:"휴직시작", loa_end:"휴직종료", annual_paid:"연차수당포함", emp_type:"고용형태", birth:"생년월일", annual_basis:"연차기준", reason:"사유", approver:"승인자", done_by:"완료자", detail:"상세", recur:"반복", hl:"하이라이트", mismatch:"불일치", PIN:"PIN", tier:"관리자등급", deleted_at:"삭제일", deleted_by:"삭제자", restored_at:"복구일", restored_by:"복구자",
     "kosha.stage":"KOSHA 단계", "kosha.apply_no":"접수번호", "kosha.applied_on":"접수일", "kosha.review_on":"심사일", "kosha.decided_on":"인정일(결정일)", "kosha.expires_on":"만료일", "kosha.rate_year":"요율 연도", "kosha.checks":"사후점검", "headcount.env":"상시근로자 종운환경", "headcount.con":"상시근로자 종운건설"};   // v436 검토: 안전 설정 감사 줄의 바뀐 칸(f) — 서버 gw-data SAFETY_FIELD_LABEL과 같은 글(uismoke v436 ⑧이 대조), 없으면 감사 화면에 영어 경로(kosha.stage)가 그대로 나왔다
   var auditMonthCur = "";
   function auditMonthShift(delta){
@@ -33871,6 +33920,8 @@ function dutyStage(nx){
     document.getElementById("meTestWrap").style.display = isAdmin() ? "" : "none";   // 시험 계정 표식은 관리자만
     document.getElementById("meBasis").value = m ? (m.annual_basis||"hire") : "hire";
     document.getElementById("meLoa").value = (m && m.loa_days) ? m.loa_days : "";
+    // P1 판39(C182): 육아휴직 누적일수 칸
+    document.getElementById("meLoaChild").value = (m && m.loa_days_child) ? m.loa_days_child : "";
     document.getElementById("meLeave").value = m ? (m.leave_date||"") : "";
     document.getElementById("mePaidAnnual").checked = !!(m && m.annual_paid);
     document.getElementById("meAnnual").value = (m && typeof m.annual_days==="number") ? m.annual_days : "";
@@ -33953,6 +34004,7 @@ function dutyStage(nx){
     var baseRaw = document.getElementById("meAnnualBase").value;
     var seqRaw = document.getElementById("meSeq").value;
     var loaRaw = document.getElementById("meLoa").value;
+    var loaChildRaw = document.getElementById("meLoaChild").value;
     // 모듈별 권한은 '권한관리' 화면에서만 편집. 인사 카드 저장은 기존 권한을 보존(perms 미전송).
     // 신규 회원만 직책 프리셋으로 초기 권한 부여.
     var uidRaw = cleanIdent(document.getElementById("meUid").value).toLowerCase();
@@ -33971,6 +34023,7 @@ function dutyStage(nx){
       emp_type: document.getElementById("meEmp").value,
       annual_basis: document.getElementById("meBasis").value,
       loa_days: loaRaw === "" ? 0 : Number(loaRaw),
+      loa_days_child: loaChildRaw === "" ? 0 : Number(loaChildRaw),
       leave_date: document.getElementById("meLeave").value || "",
       annual_paid: document.getElementById("mePaidAnnual").checked,
       office: document.getElementById("meOffice").checked, supervisor: document.getElementById("meSupervisor").checked,
@@ -34010,6 +34063,8 @@ function dutyStage(nx){
         else if (ec === "LAST_PM") e2.textContent = "마지막 PM은 강등·관리자 해제·퇴사 처리할 수 없습니다 — 다른 관리자를 먼저 PM으로 지정하세요.";
         else if (ec === "TIER_NOT_ADMIN" || ec === "BAD_TIER") e2.textContent = "관리자 등급은 관리자 직책에만 지정할 수 있습니다.";
         else if (ec === "BAD_LEAVE_DATE") e2.textContent = "퇴사일은 달력에 있는 날짜(YYYY-MM-DD)로 넣거나 비워 주세요.";   // P1 판22 검토 11/14 ⑨
+        else if (ec === "BAD_LOA_DAYS") e2.textContent = "육아휴직 누적일수는 0 이상의 숫자로 넣거나 비워 주세요.";
+        else if (ec === "BAD_LOA_KIND") e2.textContent = "휴직 종류 값이 올바르지 않습니다.";
         else e2.textContent = "저장 실패 (" + (ec || res.status) + ")";
         e2.classList.add("show"); return;
       }
@@ -34034,17 +34089,23 @@ function dutyStage(nx){
     var startD = isDate(m.loa_start) ? m.loa_start : "";
     var days = 0;
     if (startD){ var s=new Date(startD+"T00:00:00"), t=new Date(todayStr()+"T00:00:00"); days=Math.max(0, Math.round((t-s)/86400000)); }
-    if (!confirm("복직 처리할까요?\n휴직 " + (startD ? startD+"~"+todayStr()+" ("+days+"일)이 근속에서 제외(휴직 누적일수에 가산)" : "기간 정보 없음") + "됩니다.")) return;
-    var newLoa = (Number(m.loa_days)||0) + days;
+    // P1 판39(C182): 종류에 맞는 칸에 더함 — 육아휴직 = 육아휴직 누적(근속 포함 · 계약직 2년 날짜를 늦춤) · 업무상 부상·질병 휴업 = 쌓지 않음(근속 포함 · 따로 쓰는 계산 없음) ·
+    //   그 밖의 휴직·종류 없는 옛 휴직 = 그 밖의 휴직 누적(지금처럼 근속에서 뺌)
+    var kind = (m.loa_kind === "child" || m.loa_kind === "injury") ? m.loa_kind : "other";
+    var what = kind === "child" ? "근속에 포함되고 육아휴직 누적일수에 가산(계약직 2년 날짜를 늦춤)" : (kind === "injury" ? "근속에 포함(누적일수에 가산하지 않음)" : "근속에서 제외(그 밖의 휴직 누적일수에 가산)");
+    if (!confirm("복직 처리할까요?\n" + (LOA_KIND[m.loa_kind] || "휴직(종류 없음)") + " " + (startD ? startD+"~"+todayStr()+" ("+days+"일)이 "+what : "기간 정보 없음") + "됩니다.")) return;
+    var up = { action:"member_upsert", id:id, on_loa:false, loa_end:todayStr() };
+    if (kind === "child") up.loa_days_child = (Number(m.loa_days_child)||0) + days;
+    else if (kind === "other") up.loa_days = (Number(m.loa_days)||0) + days;
     // 휴직 기록도 종료(캘린더 반영)
     liveLeaves().forEach(function(l){ if(l.member_id===id && l.type==="loa" && l.status==="approved" && (l.stage==="onloa"||!l.stage)){ l.end=todayStr(); l.stage="reinstated"; l.updated=todayStr(); } });
     scheduleLeavesSave();
-    gwCall("gw-auth", { action:"member_upsert", id:id, on_loa:false, loa_days:newLoa, loa_end:todayStr() }).then(function(res){
+    gwCall("gw-auth", up).then(function(res){
       if (res.status===200 && res.body && res.body.member){
         for (var i=0;i<members.length;i++){ if(members[i].id===res.body.member.id){ members[i]=res.body.member; break; } }
         try{ saveUsersCache(); }catch(e){}
         closeMemberEdit(); drawHrRoster(); render();
-        alert("복직 처리 완료" + (days ? " · 휴직 "+days+"일이 근속에서 제외됐습니다." : "."));
+        alert("복직 처리 완료" + (days ? " · 휴직 "+days+"일이 " + (kind === "other" ? "근속에서 제외됐습니다." : "근속에 포함됩니다.") : "."));
       } else { alert("복직 처리 실패. 다시 시도해 주세요."); }
     }).catch(function(){ alert("복직 처리 중 통신 오류."); });
   }

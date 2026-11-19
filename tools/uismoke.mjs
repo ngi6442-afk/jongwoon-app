@@ -19351,6 +19351,202 @@ try {
     r497.ok && M497.every((v) => v === false), JSON.stringify({ r: r497.info, mut: M497 }));
 } catch (e) { console.log('  (v497 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ── P1 판39(11/19 — 원장 C182 · 착수 C191): 휴직 종류와 근속·계약직 2년 날짜 — 실제 계산·저장 함수(serviceInfo·computeAnnual·fiscalAnnual·ctRadar·ctChipHtml·
+//   reqLineRowHtml·loaKindSet·saveLoa·setLeaveStatus·doReinstate·saveMemberEdit·mergeLeaves(imMerge))를 떼어 실행 + 서버 contractPlan·ctChildDays와 같은 표본으로 대조 + 결함 사본
+//   근거: 남녀고용평등법 제19조④(육아휴직 근속 포함)·⑤(기간제 사용기간에서 제외) · 근로기준법 제60조⑥(업무상 부상·질병 휴업 출근 간주) — 그 밖의 휴직은 지금처럼 뺌(노무사 확인 전)
+//   종류 없는 옛 기록 = 지금 계산과 같음(근속에서 뺌 · 복직하면 그 밖의 휴직 누적) — 시안 ③·④ '비워 두면' 줄 · 배포 날 바뀌는 사람 0(운영 꼴 표본 = 휴직 칸 없는 회원)
+try {
+  const f39 = (src, name) => { const i = src.indexOf('\n  function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('끝 없음: ' + name); };
+  const b39 = (src, a, b) => { const i = src.indexOf(a), j = src.indexOf(b, i + 1); if (i < 0 || j < i) throw new Error('구간 없음: ' + a.slice(0, 40)); return src.slice(i, j); };
+  const req39 = createRequire(import.meta.url);
+  const FN39 = join(ROOT, 'netlify', 'functions');
+  const SDC39 = readFileSync(join(FN39, 'gw-duty-cron.js'), 'utf8');
+  const loadDc39 = (src) => { const ex = {}; new Function('require', 'exports', 'module', src)(() => ({}), ex, { exports: ex }); return ex; };
+  const TD39 = '2026-11-16';
+  // 앱 실행 틀: 실제 함수 원문 + 대역(저장·그리기·서버 호출은 기록만 — 저장 함수 자체는 실제)
+  const app39 = (H, ENV) => {
+    const el = (id) => { if (!ENV.els[id]) ENV.els[id] = { id, value: '', checked: false, textContent: '', disabled: false, placeholder: '', style: {}, classList: { add() {}, remove() {} } }; return ENV.els[id]; };
+    ENV.el = el; ENV.calls = ENV.calls || []; ENV.alerts = ENV.alerts || []; ENV.log = ENV.log || []; ENV.els = ENV.els || {};
+    const code = [
+      'var members = ENV.members, leaves = ENV.leaves, editingMemberId = ENV.edit || null, hrOpenId = null, hrNewOpen = false, eduPersonFrom = "";',
+      'function todayStr(){ return ENV.today; } function isDate(s){ return /^\\d{4}-\\d{2}-\\d{2}$/.test(String(s||"")); }',
+      'function isAdmin(){ return !!ENV.admin; } function isDev(){ return false; } function getMemberId(){ return ENV.me; } function myName(){ return "관리자가"; }',
+      'function esc(x){ return String(x == null ? "" : x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }',
+      'function dispName(x){ return x; } function memberName(id){ return "가짜" + id; } function leaveTestChip(){ return ""; }',
+      'function findLeave(id){ return leaves.filter(function(l){ return l.id===id; })[0]; } function findMember(id){ return members.filter(function(m){ return m.id===id; })[0]; }',
+      'function liveLeaves(){ return leaves.filter(function(l){ return l && l.del!==1; }); }',
+      'function scheduleLeavesSave(){ ENV.log.push("save"); } function renderLeaves(){} function renderDashboard(){} function render(){} function drawHrRoster(){} function saveUsersCache(){} function switchTab(){} function genId(p){ return p + "_new"; }',
+      'function closeMemberEdit(){ editingMemberId = null; } function hrStarted(){ return true; } function tierOfMember(){ return ""; } function cleanIdent(s){ return String(s||""); } function eduPersonSaved(){}',
+      'var ROLE_PRESET = { "직원": { perms: {} } }, EDU_QUAL = [];',
+      'function gwCall(fn, body){ ENV.calls.push(JSON.parse(JSON.stringify(body))); var res = { status: 200, body: { member: Object.assign({}, findMember(body.id) || {}, body) } }; return { then: function(f){ f(res); return { catch: function(){} }; } }; }',
+      'var confirm = function(m){ ENV.log.push("confirm:" + m); return true; }, alert = function(m){ ENV.alerts.push(m); };',
+      'var document = { getElementById: function(id){ return ENV.el(id); } };',
+      b39(H, '\n  var REQ_LINE = {', '\n  function reqLineRowHtml(l){'),
+      f39(H, 'reqLineRowHtml'), f39(H, 'loaKindSet'), f39(H, 'setLeaveStatus'), f39(H, 'openLoa'), f39(H, 'saveLoa'), f39(H, 'doReinstate'), f39(H, 'saveMemberEdit'),
+      f39(H, 'serviceInfo'), f39(H, 'computeAnnual'), f39(H, 'fiscalAnnual'),
+      b39(H, '// @ct-radar-start', '// @ct-radar-end'),
+      'return { serviceInfo: serviceInfo, computeAnnual: computeAnnual, fiscalAnnual: fiscalAnnual, ctRadar: ctRadar, ctChipHtml: ctChipHtml, ctChildDays: ctChildDays, row: reqLineRowHtml, kindSet: loaKindSet,',
+      '  setLeaveStatus: setLeaveStatus, openLoa: openLoa, saveLoa: saveLoa, doReinstate: doReinstate, saveMemberEdit: saveMemberEdit, setEdit: function(id){ editingMemberId = id; } };'].join('\n');
+    return new Function('ENV', code)(ENV);
+  };
+  // 휴가 병합: 실제 mergeLeaves + 그것이 부르는 im 병합 함수(이름을 따라 걷어 모음 · 알림·그리기만 대역)
+  const merge39 = (H) => {
+    const all = new Set([...H.matchAll(/\n  function ([A-Za-z_$][\w$]*)\(/g)].map((m) => m[1])), got = new Map(), q = ['mergeLeaves', 'imBaseSetAt'];
+    const STUB = { conConflictToast: 1, leaveTypeLabel: 1, saveConflictToast: 1 };
+    while (q.length) { const n = q.shift(); if (got.has(n) || STUB[n] || !all.has(n)) continue; const b = f39(H, n); got.set(n, b); for (const m of b.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g)) q.push(m[1]); }
+    return new Function('ENV', 'var _colBase = {};\nfunction conConflictToast(c){ ENV.cf.push(c); } function leaveTypeLabel(t){ return t; } function saveConflictToast(){}\n' + [...got.values()].join('\n') + '\nreturn { merge: mergeLeaves, base: imBaseSetAt };');
+  };
+  const chk39 = (H, SDC) => {
+    const o = {};
+    const A = (env) => { const d0 = { members: [], leaves: [], today: TD39, admin: true, me: 'a0', els: {} }; Object.keys(d0).forEach((k) => { if (!(k in env)) env[k] = d0[k]; }); return app39(H, env); };
+    // ① 근속·연차(가짜 예 1 — 입사 2023-03-02 · 육아휴직 365일 → 근속 3.7년 · 연차 16일 / 종류 없는 옛 누적·그 밖의 휴직 365일 = 2.7년 · 15일 지금과 같음)
+    const a = A({});
+    const yrs = (m, d) => { const s = a.serviceInfo(m, d || TD39); return s ? Math.floor(s.years * 10) / 10 : null; };
+    const H1 = { hire_date: '2023-03-02' };
+    o.svc = [yrs(Object.assign({ loa_days_child: 365 }, H1)), a.computeAnnual(Object.assign({ loa_days_child: 365 }, H1), TD39), yrs(Object.assign({ loa_days: 365 }, H1)), a.computeAnnual(Object.assign({ loa_days: 365 }, H1), TD39)].join(',');
+    // 진행 중 휴직 종류별(시작 2025-11-16 = 365일째): 육아·업무상 부상 = 빼지 않음 · 그 밖·종류 없음 = 뺌(지금과 같음)
+    const on = (k) => Object.assign({ on_loa: true, loa_start: '2025-11-16' }, k ? { loa_kind: k } : {}, H1);
+    o.onk = ['child', 'injury', 'other', ''].map((k) => yrs(on(k))).join(',');
+    // 1년 도달(입사 2025-10-01 · 오늘 411일째): 육아휴직 60일 = 15일(1년 넘음) · 그 밖 60일 = 11일(1년 전 — 월 개근 상한)
+    o.y1 = [a.computeAnnual({ hire_date: '2025-10-01', loa_days_child: 60 }, TD39), a.computeAnnual({ hire_date: '2025-10-01', loa_days: 60 }, TD39)].join(',');
+    // 회계연도 기준 첫해(입사 2026-03-02 · 259일): 육아휴직 60일 = 8 · 그 밖 60일 = 6
+    o.fy = [a.computeAnnual({ hire_date: '2026-03-02', annual_basis: 'fiscal', loa_days_child: 60 }, TD39), a.computeAnnual({ hire_date: '2026-03-02', annual_basis: 'fiscal', loa_days: 60 }, TD39), a.fiscalAnnual({ hire_date: '2026-03-02', loa_days_child: 60 }, TD39)].join(',');
+    // ② 계약직 2년(가짜 예 2 — 입사 2025-06-02 · 육아휴직 99일 → 2027-09-09 · 칩 '육아휴직 99일 반영') · 진행 중 육아휴직(2025-12-01~2026-03-10 = 99일) 같은 날 · 진행 중 그 밖 = 그대로
+    const C2 = { emp_type: '계약직', hire_date: '2025-06-02', birth: '1990-01-01' };
+    const r2 = a.ctRadar(Object.assign({ loa_days_child: 99 }, C2), TD39), r2n = a.ctRadar(C2, TD39);
+    const r2on = a.ctRadar(Object.assign({ on_loa: true, loa_kind: 'child', loa_start: '2025-12-01' }, C2), '2026-03-10');
+    const r2ot = a.ctRadar(Object.assign({ on_loa: true, loa_kind: 'other', loa_start: '2025-12-01' }, C2), '2026-03-10');
+    const chip2 = a.ctChipHtml(Object.assign({ loa_days_child: 99 }, C2), TD39), chipN = a.ctChipHtml(C2, TD39);
+    const chipO = a.ctChipHtml({ emp_type: '계약직', hire_date: '2024-01-02', birth: '1990-01-01', loa_days_child: 30 }, '2026-03-01');
+    o.ct = [r2.conv, r2.days, r2.child, r2n.conv, r2n.days, r2on.conv, r2on.child, r2ot.conv].join(',');
+    o.chip = chip2.indexOf('>무기계약 전환 D-297 (2027-09-09 · 육아휴직 99일 반영)</span>') > 0 && chipN.indexOf('>무기계약 전환 D-198 (2027-06-02)</span>') > 0 && chipN.indexOf('육아휴직') < 0
+      && chipO.indexOf('>무기계약 간주 — 2년 초과 28일 (육아휴직 30일 반영)</span>') > 0;
+    // ③ 앱·서버 두 벌 대조(같은 표본·여러 날): ctChildDays 같음 · 서버가 알림 단계를 낸 날은 전환일·남은 일수 같음 · 진행 중 육아휴직의 멱등 키는 날이 바뀌어도 같음
+    const dc = loadDc39(SDC);
+    const S = [Object.assign({ id: 'c1', loa_days_child: 99 }, C2), Object.assign({ id: 'c2', on_loa: true, loa_kind: 'child', loa_start: '2025-12-01' }, C2), Object.assign({ id: 'c3', on_loa: true, loa_kind: 'child', loa_start: '2025-12-01', loa_days_child: 40 }, C2),
+      Object.assign({ id: 'c4', on_loa: true, loa_kind: 'other', loa_start: '2025-12-01', loa_days_child: 10 }, C2), Object.assign({ id: 'c5', on_loa: true, loa_kind: 'injury', loa_start: '2026-01-05' }, C2), { id: 'c6', emp_type: '계약직', hire_date: '2024-02-29', birth: '1990-01-01', loa_days_child: 31 },
+      { id: 'c7', emp_type: '계약직', hire_date: '2025-06-02', loa_days_child: 120 }, Object.assign({ id: 'c8' }, C2), Object.assign({ id: 'c9', loa_days_child: '7' }, C2), Object.assign({ id: 'c10', on_loa: true, loa_kind: 'child', loa_start: '2027-08-01' }, C2),
+      Object.assign({ id: 'c11', on_loa: true, loa_kind: 'child', loa_start: '2027-03-15', loa_days_child: 3 }, C2)];
+    const DAYS = ['2025-12-20', '2026-03-10', '2026-11-16', '2027-03-15', '2027-05-01', '2027-06-20', '2027-08-15', '2027-09-01', '2027-09-30', '2027-11-01', '2028-01-10', '2027-04-10', '2027-04-11'];
+    let cmp = 0, hit = 0; const diff = [];
+    S.forEach((m) => DAYS.forEach((d) => {
+      cmp++; const ca = a.ctChildDays(m, d), cs = dc.ctChildDays(m, d); if (ca !== cs) diff.push(m.id + '@' + d + ' child ' + ca + '/' + cs);
+      const ra = a.ctRadar(m, d), it = dc.contractPlan([m], { keys: {} }, d)[0];
+      if (it) { hit++; if (!ra || ra.conv !== it.conv || (ra.days !== undefined && ra.days !== it.days) || ctD39(d, ra.conv) !== it.days || (it.child || 0) !== ra.child) diff.push(m.id + '@' + d + ' ' + (ra && ra.conv) + '/' + it.conv); }
+      else if (ra && ra.state !== 'exempt' && ((ra.state === 'unknown' && ra.conv && ctD39(d, ra.conv) <= 90) || (ra.days !== undefined && ra.days <= 90))) diff.push(m.id + '@' + d + ' 서버 빠짐');
+    }));
+    const k1 = dc.contractPlan([S[10]], { keys: {} }, '2027-04-10')[0], k2 = dc.contractPlan([S[10]], { keys: {} }, '2027-04-11')[0];
+    const kOn = !!(k1 && k2 && k1.key === k2.key && k1.conv !== k2.conv && k1.stage === k2.stage);
+    o.two = diff.length === 0 && hit >= 20 && kOn; o.twoInfo = { cmp, hit, diff: diff.slice(0, 5), kOn, k1: k1 && k1.key, k2: k2 && k2.key };
+    // ④ 운영 꼴 표본(휴직 칸 없는 회원 — 운영 휴직 기록 0명) = 고치기 전(624fa1c)과 같은 근속·연차·2년 칩·서버 알림 줄
+    o.prod = PROD39(H, SDC, a, dc);
+    // ⑤ 승인 줄(관리자·승인 전): 종류 칩 · 고르기(종류 고침 — 관리자만·승인 전만) · 그 밖의 휴직 = '근속 처리 확인 필요' · 종류 없는 옛 줄 = 칩 없음 + '(종류 없음)'
+    const L = (id, k, st) => Object.assign({ id, member_id: 'm1', type: 'loa', stage: 'resign_req', start: '2027-01-04', end: '2027-12-31', status: st || 'pending' }, k ? { loa_kind: k } : {});
+    const rowA = A({}).row, rowE = A({ admin: false, me: 'm1' }).row;
+    const hc = rowA(L('l1', 'child')), ho = rowA(L('l2', 'other')), hn = rowA(L('l3', '')), hap = rowA(L('l4', 'injury', 'approved')), he = rowE(L('l1', 'child'));
+    o.row = hc.indexOf('<span class="scope-chip">육아휴직</span> <span class="review-chip">승인 대기</span>') > 0 && hc.indexOf('data-rs-kind="l1"') > 0 && hc.indexOf('<option value="child" selected>육아휴직</option>') > 0
+      && hc.indexOf('근속에 포함 · 계약직이면 2년 날짜를 휴직 일수만큼 늦춤') > 0 && hc.indexOf('근속 처리 확인 필요') < 0
+      && ho.indexOf('<span class="scope-chip">그 밖의 휴직</span> <span class="need-chip">근속 처리 확인 필요</span>') > 0 && ho.indexOf('취업규칙 제17조①과 다를 수 있어 노무사 확인 전') > 0
+      && hn.indexOf('scope-chip') < 0 && hn.indexOf('<option value="" selected>(종류 없음)</option>') > 0
+      && hap.indexOf('<span class="scope-chip">업무상 부상·질병 휴업</span>') > 0 && hap.indexOf('data-rs-kind') < 0 && he.indexOf('data-rs-kind') < 0 && he.indexOf('<span class="scope-chip">육아휴직</span>') > 0;
+    // ⑥ 종류 고침(실제 loaKindSet): 관리자·승인 전 = 고침·저장 예약 · 직원·승인 뒤·표 밖 값 = 그대로
+    const E6 = { leaves: [L('l1', 'child'), L('l2', 'child', 'approved')] }, k6 = A(E6);
+    const kr = [k6.kindSet('l1', 'other'), k6.kindSet('l2', 'other'), k6.kindSet('l1', 'nope')];
+    const E6b = { leaves: [L('l1', 'child')], admin: false, me: 'm1' }, k6b = A(E6b).kindSet('l1', 'other');
+    o.kind = kr.join(',') === 'true,false,false' && E6.leaves[0].loa_kind === 'other' && E6.leaves[1].loa_kind === 'child' && E6.log.indexOf('save') >= 0 && k6b === false && E6b.leaves[0].loa_kind === 'child';
+    // ⑦ 면담 신청(실제 saveLoa): 종류 없으면 막힘(알림 · 줄 0) · 고르면 줄에 loa_kind
+    const E7 = { leaves: [], me: 'm1', els: {} }, s7 = A(E7);
+    s7.openLoa(); E7.els.loaStart.value = '2027-01-04'; E7.els.loaEnd.value = '2027-12-31'; s7.saveLoa();
+    const blocked = E7.leaves.length === 0 && E7.alerts.indexOf('휴직 종류를 고르세요.') >= 0;
+    E7.els.loaKind.value = 'child'; s7.saveLoa();
+    o.apply = blocked && E7.leaves.length === 1 && E7.leaves[0].loa_kind === 'child' && E7.leaves[0].stage === 'interview_req';
+    // ⑧ 승인(실제 setLeaveStatus): 인사기록 저장에 종류가 같이 감 · 종류 없는 옛 줄 = 빈 값(지금처럼 뺌) · 승인 확인 창에 종류 글
+    const E8 = { leaves: [L('l1', 'injury'), L('l2', '')], members: [{ id: 'm1' }] }, s8 = A(E8);
+    s8.setLeaveStatus('l1', 'approved'); s8.setLeaveStatus('l2', 'approved');
+    const up8 = E8.calls.filter((c) => c.action === 'member_upsert');
+    o.appr = up8.length === 2 && up8[0].loa_kind === 'injury' && up8[0].on_loa === true && up8[1].loa_kind === '' && E8.leaves[0].status === 'approved';
+    // ⑨ 복직 처리(실제 doReinstate — 휴직 시작 2025-12-01 · 오늘 2026-03-10 = 99일): 육아 → 육아휴직 누적만 · 그 밖·종류 없음 → 그 밖 누적만 · 업무상 부상 → 둘 다 안 쌓음
+    const re = (k) => { const m = Object.assign({ id: 'm1', on_loa: true, loa_start: '2025-12-01', loa_days: 5, loa_days_child: 7 }, k ? { loa_kind: k } : {}); const E9 = { members: [m], leaves: [], edit: 'm1', today: '2026-03-10' }; A(E9).doReinstate(); const c = E9.calls[0] || {}; return [c.on_loa, 'loa_days' in c ? c.loa_days : '-', 'loa_days_child' in c ? c.loa_days_child : '-'].join('/'); };
+    o.rein = ['child', 'other', '', 'injury'].map(re).join(',');
+    // ⑩ 인사 카드 저장(실제 saveMemberEdit): 육아휴직 누적일수 칸 → loa_days_child · 빈 칸 = 0 · 그 밖 칸은 loa_days 그대로
+    const E10 = { members: [{ id: 'm1' }], edit: 'm1', els: {} }, s10 = A(E10);
+    s10.setEdit('m1'); E10.el('meName').value = '가짜직원'; E10.el('meRole').value = '직원'; E10.el('meLoa').value = '12'; E10.el('meLoaChild').value = '99'; s10.saveMemberEdit();
+    const p10 = E10.calls[0] || {};
+    E10.calls.length = 0; s10.setEdit('m1'); E10.el('meLoaChild').value = ''; s10.saveMemberEdit();
+    const p10b = E10.calls[0] || {};
+    o.card = p10.loa_days_child === 99 && p10.loa_days === 12 && p10b.loa_days_child === 0;
+    o.cardFill = /document\.getElementById\("meLoaChild"\)\.value = \(m && m\.loa_days_child\) \? m\.loa_days_child : "";/.test(f39(H, 'openMemberEdit'));
+    // ⑪ 휴가 병합(실제 mergeLeaves → imMerge): 종류는 승인 묶음과 같이 — 이 화면(종류만 고침) vs 다른 기기(옛 종류로 승인) = 한쪽 덩어리 통째(승인 + 새 종류가 섞이지 않음)
+    const ENV11 = { cf: [] }, M = merge39(H)(ENV11);
+    const B0 = L('l1', 'child'); B0.updated = '2026-11-10';
+    M.base('leaves', [JSON.parse(JSON.stringify(B0))], 1);
+    const loc = Object.assign(JSON.parse(JSON.stringify(B0)), { loa_kind: 'other', updated: '2026-11-18' });
+    const srv = Object.assign(JSON.parse(JSON.stringify(B0)), { status: 'approved', approver: '관리자나', approved_at: '2026-11-18', updated: '2026-11-18' });
+    const mg = M.merge([loc], [srv])[0];
+    const mixed = mg.status === 'approved' && mg.loa_kind === 'other';
+    // 한쪽만 바꿈(다른 기기가 종류만 고침) = 그 값 그대로 들어옴
+    M.base('leaves', [JSON.parse(JSON.stringify(B0))], 1);
+    const mg2 = M.merge([JSON.parse(JSON.stringify(B0))], [Object.assign(JSON.parse(JSON.stringify(B0)), { loa_kind: 'injury', updated: '2026-11-18' })])[0];
+    o.merge = !mixed && (mg.status === 'pending' ? mg.loa_kind === 'other' : mg.loa_kind === 'child') && mg2.loa_kind === 'injury'; o.mergeInfo = { st: mg.status, k: mg.loa_kind, k2: mg2.loa_kind };
+    const ok = o.svc === '3.7,16,2.7,15' && o.onk === '3.7,3.7,2.7,2.7' && o.y1 === '15,11' && o.fy === '8,6,8' && o.ct === '2027-09-09,297,99,2027-06-02,198,2027-09-09,99,2027-06-02' && o.chip
+      && o.two && o.prod.ok && o.row && o.kind && o.apply && o.appr && o.rein === 'false/-/106,false/104/-,false/104/-,false/-/-' && o.card && o.cardFill && o.merge;
+    return { ok, o };
+  };
+  function ctD39(f, t) { return Math.round((Date.UTC(+t.slice(0, 4), +t.slice(5, 7) - 1, +t.slice(8, 10)) - Date.UTC(+f.slice(0, 4), +f.slice(5, 7) - 1, +f.slice(8, 10))) / 86400000); }
+  // 운영 꼴 표본: 휴직 칸이 하나도 없는 회원 14명(정규직·계약직·입사일 없음·생년월일 없음·55세 이상·회계연도·수동 연차·퇴사자·윤년 입사) × 날 5개 — 고치기 전 원문(624fa1c)과 글자째 같음
+  function PROD39(H, SDC, a, dc) {
+    let OLD, ODC, src = 'git 624fa1c';
+    try { OLD = execSync('git show 624fa1c:index.html', { cwd: ROOT, maxBuffer: 1 << 27 }).toString('utf8'); ODC = execSync('git show 624fa1c:netlify/functions/gw-duty-cron.js', { cwd: ROOT, maxBuffer: 1 << 24 }).toString('utf8'); }
+    catch (e) { return { ok: false, src: 'git 원문 못 읽음 — ' + e.message.slice(0, 80) }; }
+    const o = new Function('ENV', 'function todayStr(){ return ENV.today; } function isDate(s){ return /^\\d{4}-\\d{2}-\\d{2}$/.test(String(s||"")); } function esc(x){ return String(x == null ? "" : x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }\n'
+      + f39(OLD, 'serviceInfo') + f39(OLD, 'computeAnnual') + f39(OLD, 'fiscalAnnual') + b39(OLD, '// @ct-radar-start', '// @ct-radar-end') + '\nreturn { serviceInfo: serviceInfo, computeAnnual: computeAnnual, ctRadar: ctRadar, ctChipHtml: ctChipHtml };')({ today: TD39 });
+    const odc = loadDc39(ODC);
+    const P = [{ id: 'p1', emp_type: '정규직', hire_date: '2019-04-01', birth: '1980-02-03' }, { id: 'p2', emp_type: '계약직', hire_date: '2025-06-02', birth: '1990-01-01' }, { id: 'p3', emp_type: '계약직', hire_date: '2025-12-29', birth: '1964-08-07' },
+      { id: 'p4', emp_type: '계약직', hire_date: '2026-09-17' }, { id: 'p5', emp_type: '계약직', hire_date: '2024-02-29', birth: '1990-01-01' }, { id: 'p6', emp_type: '정규직', hire_date: '2026-03-02', annual_basis: 'fiscal' },
+      { id: 'p7', emp_type: '정규직', hire_date: '2022-01-10', annual_days: 18 }, { id: 'p8', emp_type: '정규직', hire_date: '2018-05-05', leave_date: '2026-10-31' }, { id: 'p9', emp_type: '', hire_date: '' },
+      { id: 'p10', emp_type: '지입차주' }, { id: 'p11', emp_type: '계약직', hire_date: '2025-02-03', birth: '1995-05-05', test_acct: true }, { id: 'p12', emp_type: '정규직', hire_date: '2025-11-20', annual_basis: 'fiscal' },
+      { id: 'p13', emp_type: '계약직', hire_date: '2024-11-25', birth: '1988-12-31' }, { id: 'p14', emp_type: '정규직', hire_date: '2010-07-01', loa_days: 0, on_loa: false }];
+    const D = ['2026-11-16', '2026-12-31', '2027-01-01', '2027-05-20', '2027-12-30'];
+    let same = 0, n = 0; const bad = [];
+    P.forEach((m) => D.forEach((d) => {
+      n++;
+      const x = [JSON.stringify(a.serviceInfo(m, d)), a.computeAnnual(m, d), a.ctChipHtml(m, d), JSON.stringify(dc.contractPlan([m], { keys: {} }, d))].join('|');
+      const y = [JSON.stringify(o.serviceInfo(m, d)), o.computeAnnual(m, d), o.ctChipHtml(m, d), JSON.stringify(odc.contractPlan([m], { keys: {} }, d))].join('|');
+      if (x === y) same++; else bad.push(m.id + '@' + d);
+    }));
+    return { ok: same === n && n === 70, src, same, n, bad: bad.slice(0, 5) };
+  }
+  const r39 = chk39(html, SDC39);
+  const mH39 = (from, to) => { if (html.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return html.replace(from, () => to); };
+  const mS39 = (from, to) => { if (SDC39.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님(서버): ' + from.slice(0, 60)); return SDC39.replace(from, () => to); };
+  const MU39 = [
+    ['진행 중 육아·업무상 부상도 뺌', 'h', ' && m.loa_kind!=="child" && m.loa_kind!=="injury"){ var od=', '){ var od='],
+    ['복직 육아휴직을 그 밖 누적에', 'h', '    if (kind === "child") up.loa_days_child = (Number(m.loa_days_child)||0) + days;\n    else if (kind === "other") up.loa_days', '    if (kind === "x") up.loa_days_child = 0;\n    else up.loa_days'],
+    ['업무상 부상을 그 밖으로', 'h', '    var kind = (m.loa_kind === "child" || m.loa_kind === "injury") ? m.loa_kind : "other";', '    var kind = (m.loa_kind === "child") ? m.loa_kind : "other";'],
+    ['앱 2년에 육아휴직 안 더함', 'h', '    if(child>0) conv=ctAddDays(conv, child);', ''],
+    ['앱 진행 중 육아휴직 빼먹음', 'h', 'if(m.on_loa===true && m.loa_kind==="child" && /^\\d{4}', 'if(false && /^\\d{4}'],
+    ['칩 반영 글 없음', 'h', 'var ch=r.child>0 ? " · 육아휴직 "+r.child+"일 반영" : ""', 'var ch=""'],
+    ['면담 신청 종류 필수 아님', 'h', '    if(!LOA_KIND[kind]){ alert("휴직 종류를 고르세요."); return; }\n', ''],
+    ['면담 신청 줄에 종류 안 넣음', 'h', 'stage:"interview_req", loa_kind:kind,', 'stage:"interview_req",'],
+    ['승인 때 종류 안 보냄', 'h', ', loa_kind:(LOA_KIND[l.loa_kind] ? l.loa_kind : "") })', ' })'],
+    ['종류 고침 관리자 검사 없음', 'h', '    if(!isAdmin() || !LOA_KIND[k]) return false;', '    if(!LOA_KIND[k]) return false;'],
+    ['종류 고침 승인 뒤에도', 'h', 'if(!l || l.type!=="loa" || l.status!=="pending") return false;\n    l.loa_kind=k;', 'if(!l || l.type!=="loa") return false;\n    l.loa_kind=k;'],
+    ['직원에게도 고르기', 'h', '      if(adm && l.status==="pending") meta+=\'<span>종류 <select', '      if(l.status==="pending") meta+=\'<span>종류 <select'],
+    ['그 밖 확인 필요 칩 없음', 'h', '(lk==="other"?\' <span class="need-chip">근속 처리 확인 필요</span>\':\'\')', '\'\''],
+    ['인사 카드 육아휴직 칸 안 보냄', 'h', '      loa_days_child: loaChildRaw === "" ? 0 : Number(loaChildRaw),\n', ''],
+    ['인사 카드 육아휴직 칸 안 채움', 'h', '    document.getElementById("meLoaChild").value = (m && m.loa_days_child) ? m.loa_days_child : "";', ''],
+    ['병합 종류가 승인 묶음 밖', 'h', '.map(function(g){ return g[0] === "status" ? g.concat(["loa_kind"]) : g; })', ''],
+    ['서버 2년에 육아휴직 안 더함', 's', 'conv = child > 0 ? ctAddDays(conv2, child) : conv2', 'conv = conv2'],
+    ['서버 진행 중 육아휴직 빼먹음', 's', 'if (m.on_loa === true && m.loa_kind === \'child\' && /^', 'if (false && /^'],
+    ['서버 멱등 키가 날마다 바뀜', 's', "const key = 'ct:' + m.id + ':' + keyConv + ':' + stage;", "const key = 'ct:' + m.id + ':' + conv + ':' + stage;"]];
+  const K39 = MU39.map(([nm, w, from, to]) => { try { return chk39(w === 'h' ? mH39(from, to) : html, w === 's' ? mS39(from, to) : SDC39).ok; } catch (e) { return nm + ' err ' + e.message.slice(0, 80); } });
+  T('P1 판39 휴직 종류·근속·계약직 2년(실행 — 실제 serviceInfo·computeAnnual·fiscalAnnual·ctRadar·ctChipHtml·reqLineRowHtml·loaKindSet·saveLoa·setLeaveStatus·doReinstate·saveMemberEdit·mergeLeaves + 서버 contractPlan·ctChildDays): '
+    + '입사 2023-03-02 육아휴직 365일 = 3.7년·16일(그 밖·옛 누적 = 2.7년·15일) · 진행 중 육아·업무상 부상 = 안 뺌 · 그 밖·종류 없음 = 뺌 · 1년 도달·회계연도 첫해 · 계약직 2025-06-02 + 육아휴직 99일 = 2027-09-09(진행 중 같음) · 칩 \'육아휴직 99일 반영\' · '
+    + '앱·서버 두 벌 같은 표본 대조 · 진행 중 육아휴직 알림 키 고정 · 운영 꼴 표본(휴직 0명) 고치기 전과 같음 · 승인 줄 종류 칩·고르기(관리자·승인 전)·그 밖 확인 필요 · 종류 필수 · 승인 때 종류 전달 · 복직 누적 칸 · 인사 카드 2칸 · 병합 승인 묶음',
+    r39.ok, JSON.stringify(r39.o).slice(0, 1500));
+  T('P1 판39 결함 사본 ' + K39.length + '개(진행 중 휴직 종류·복직 누적 칸·앱/서버 2년 육아휴직·칩 글·종류 필수·신청 줄 종류·승인 전달·종류 고침 권한/시점·직원 고르기·확인 필요 칩·인사 카드 저장/채움·병합 묶음·서버 멱등 키) = 모두 ✗',
+    K39.every((v) => v === false), JSON.stringify(MU39.map((m, i) => m[0] + ':' + K39[i])));
+} catch (e) { console.log('  (P1 판39 검사 생략 — ' + e.message + ')'); fails++; }
 // ── v498(판40 — 결재함 승인 뒤 계약 단계 반영 · 11/19 운영 장애 · 원장 C221): 실행 검사는 위 'P1 판40' 블록 · 여기는 문서·판 번호 정확 검사 + 고정 글 21줄(실행 검사가 못 지키는 고침 줄 — 빼면 ✗)
 try {
   const rd498 = (p) => readFileSync(join(ROOT, p), 'utf8');
