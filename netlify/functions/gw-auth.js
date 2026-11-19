@@ -114,6 +114,8 @@ const MEMBER_CORP = { env: 1, con: 1, both: 1 };
 // P1 판39(C182): 휴직 종류(loa_kind) — 앱 LOA_KIND와 같은 키(child 육아휴직 · injury 업무상 부상·질병 휴업 · other 그 밖의 휴직). 그 밖 값은 400 BAD_LOA_KIND
 //   loa_days = 그 밖의 휴직 누적(근속에서 뺌 — 종류 칸 전 값 포함) · loa_days_child = 육아휴직 누적(근속 포함 · 계약직 2년 날짜를 늦춤 — gw-duty-cron contractPlan)
 const LOA_KINDS = { child: 1, injury: 1, other: 1 };
+// 검토 반영: 육아휴직 누적일수 위 한도(10년) — 아주 큰 값이 저장되면 2년 날짜 계산(앱·크론)이 RangeError로 죽음. 앱·크론 ctChildDays도 같은 한도로 자름
+const LOA_DAYS_MAX = 3650;
 function roleOpen(r) { return Object.prototype.hasOwnProperty.call(ROLE_OPEN, String(r || '')); }
 // 일반 직책 기본 권한 — 앱 ROLE_PRESET과 같은 값(uismoke v430이 3직책 전부 대조, servertest가 직원 줄 대조). 관리자가 만든 회원의 perms는 클라 값이 아니라 이 표에서 온다(권한 상승 차단).
 //   v430 safety: 3직책 모두 숨김(PM 11/9 ② "권민지 1명" — 팀장도 숨김, 부여는 권한관리 표에서 한 분씩)
@@ -324,9 +326,9 @@ async function handleMemberUpsert(st, event, d, R) {
   if (d.test_acct !== undefined && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   // P1 판22 검토 11/14 ⑨: 퇴사일은 빈 값 또는 달력에 있는 YYYY-MM-DD만(' 2026-11-14'·'2026-1-5'·'…T00:00'은 로그인 차단은 퇴사로 보는데 자동 회수는 형식 오류로 건너뛰던 어긋남) — 어떤 칸도 바꾸기 전에 400
   if (d.leave_date !== undefined && d.leave_date !== null && d.leave_date !== '' && !devauto.validDate(d.leave_date)) return jr(400, { status: 'REJECTED', error_code: 'BAD_LEAVE_DATE', request_id: R });
-  // P1 판39(C182): 휴직 종류는 표 안 값·빈 값만 · 육아휴직 누적일수는 0 이상 유한 숫자(빈 값·null = 0) — 어떤 칸도 바꾸기 전에 400
+  // P1 판39(C182): 휴직 종류는 표 안 값·빈 값만 · 육아휴직 누적일수는 0~3650 유한 숫자(빈 값·null = 0) — 어떤 칸도 바꾸기 전에 400
   if (d.loa_kind !== undefined && d.loa_kind !== null && d.loa_kind !== '' && !(typeof d.loa_kind === 'string' && Object.prototype.hasOwnProperty.call(LOA_KINDS, d.loa_kind))) return jr(400, { status: 'REJECTED', error_code: 'BAD_LOA_KIND', request_id: R });
-  if (d.loa_days_child !== undefined && d.loa_days_child !== null && d.loa_days_child !== '' && !((typeof d.loa_days_child === 'number' || typeof d.loa_days_child === 'string') && Number.isFinite(Number(d.loa_days_child)) && Number(d.loa_days_child) >= 0)) return jr(400, { status: 'REJECTED', error_code: 'BAD_LOA_DAYS', request_id: R });
+  if (d.loa_days_child !== undefined && d.loa_days_child !== null && d.loa_days_child !== '' && !((typeof d.loa_days_child === 'number' || typeof d.loa_days_child === 'string') && Number.isFinite(Number(d.loa_days_child)) && Number(d.loa_days_child) >= 0 && Number(d.loa_days_child) <= LOA_DAYS_MAX)) return jr(400, { status: 'REJECTED', error_code: 'BAD_LOA_DAYS', request_id: R });
   // 자기 계정의 role·name·dev·admin·tier 변경 금지(S1(b) — 개발자 예외 없음: 다른 개발자·대표가 바꾼다). 자기 등급 상승·이름 색인 탈취의 뿌리를 닫는다
   if (self) {
     const selfChange = nameChange || roleChange

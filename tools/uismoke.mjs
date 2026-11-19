@@ -19392,9 +19392,9 @@ try {
   // 휴가 병합: 실제 mergeLeaves + 그것이 부르는 im 병합 함수(이름을 따라 걷어 모음 · 알림·그리기만 대역)
   const merge39 = (H) => {
     const all = new Set([...H.matchAll(/\n  function ([A-Za-z_$][\w$]*)\(/g)].map((m) => m[1])), got = new Map(), q = ['mergeLeaves', 'imBaseSetAt'];
-    const STUB = { conConflictToast: 1, leaveTypeLabel: 1, saveConflictToast: 1 };
+    const STUB = { conConflictToast: 1, leaveTypeLabel: 1, saveConflictToast: 1, apprToastShow: 1 };
     while (q.length) { const n = q.shift(); if (got.has(n) || STUB[n] || !all.has(n)) continue; const b = f39(H, n); got.set(n, b); for (const m of b.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g)) q.push(m[1]); }
-    return new Function('ENV', 'var _colBase = {};\nfunction conConflictToast(c){ ENV.cf.push(c); } function leaveTypeLabel(t){ return t; } function saveConflictToast(){}\n' + [...got.values()].join('\n') + '\nreturn { merge: mergeLeaves, base: imBaseSetAt };');
+    return new Function('ENV', 'var _colBase = {};\nfunction conConflictToast(c){ ENV.cf.push(c); } function leaveTypeLabel(t){ return t; } function saveConflictToast(){} function apprToastShow(m){ ENV.toast.push(m); }\n' + [...got.values()].join('\n') + '\nreturn { merge: mergeLeaves, base: imBaseSetAt };');
   };
   const chk39 = (H, SDC) => {
     const o = {};
@@ -19426,15 +19426,18 @@ try {
     const S = [Object.assign({ id: 'c1', loa_days_child: 99 }, C2), Object.assign({ id: 'c2', on_loa: true, loa_kind: 'child', loa_start: '2025-12-01' }, C2), Object.assign({ id: 'c3', on_loa: true, loa_kind: 'child', loa_start: '2025-12-01', loa_days_child: 40 }, C2),
       Object.assign({ id: 'c4', on_loa: true, loa_kind: 'other', loa_start: '2025-12-01', loa_days_child: 10 }, C2), Object.assign({ id: 'c5', on_loa: true, loa_kind: 'injury', loa_start: '2026-01-05' }, C2), { id: 'c6', emp_type: '계약직', hire_date: '2024-02-29', birth: '1990-01-01', loa_days_child: 31 },
       { id: 'c7', emp_type: '계약직', hire_date: '2025-06-02', loa_days_child: 120 }, Object.assign({ id: 'c8' }, C2), Object.assign({ id: 'c9', loa_days_child: '7' }, C2), Object.assign({ id: 'c10', on_loa: true, loa_kind: 'child', loa_start: '2027-08-01' }, C2),
-      Object.assign({ id: 'c11', on_loa: true, loa_kind: 'child', loa_start: '2027-03-15', loa_days_child: 3 }, C2)];
+      Object.assign({ id: 'c11', on_loa: true, loa_kind: 'child', loa_start: '2027-03-15', loa_days_child: 3 }, C2),
+      Object.assign({ id: 'c12', loa_days_child: 7.9 }, C2), Object.assign({ id: 'c13', on_loa: true, loa_kind: 'child', loa_start: '2026-06-01', loa_end: '2026-08-31', loa_days_child: 2.5 }, C2),
+      Object.assign({ id: 'c14', loa_days_child: 1e9 }, C2), Object.assign({ id: 'c15', on_loa: true, loa_kind: 'child', loa_start: '2027-03-15', loa_end: '2027-04-10' }, C2)];
     const DAYS = ['2025-12-20', '2026-03-10', '2026-11-16', '2027-03-15', '2027-05-01', '2027-06-20', '2027-08-15', '2027-09-01', '2027-09-30', '2027-11-01', '2028-01-10', '2027-04-10', '2027-04-11'];
     let cmp = 0, hit = 0; const diff = [];
-    S.forEach((m) => DAYS.forEach((d) => {
+    S.forEach((m) => DAYS.forEach((d) => { try { one39(m, d); } catch (e) { diff.push(m.id + '@' + d + ' 던짐 ' + e.constructor.name); } }));
+    function one39(m, d) {
       cmp++; const ca = a.ctChildDays(m, d), cs = dc.ctChildDays(m, d); if (ca !== cs) diff.push(m.id + '@' + d + ' child ' + ca + '/' + cs);
       const ra = a.ctRadar(m, d), it = dc.contractPlan([m], { keys: {} }, d)[0];
       if (it) { hit++; if (!ra || ra.conv !== it.conv || (ra.days !== undefined && ra.days !== it.days) || ctD39(d, ra.conv) !== it.days || (it.child || 0) !== ra.child) diff.push(m.id + '@' + d + ' ' + (ra && ra.conv) + '/' + it.conv); }
       else if (ra && ra.state !== 'exempt' && ((ra.state === 'unknown' && ra.conv && ctD39(d, ra.conv) <= 90) || (ra.days !== undefined && ra.days <= 90))) diff.push(m.id + '@' + d + ' 서버 빠짐');
-    }));
+    }
     const k1 = dc.contractPlan([S[10]], { keys: {} }, '2027-04-10')[0], k2 = dc.contractPlan([S[10]], { keys: {} }, '2027-04-11')[0];
     const kOn = !!(k1 && k2 && k1.key === k2.key && k1.conv !== k2.conv && k1.stage === k2.stage);
     o.two = diff.length === 0 && hit >= 20 && kOn; o.twoInfo = { cmp, hit, diff: diff.slice(0, 5), kOn, k1: k1 && k1.key, k2: k2 && k2.key };
@@ -19450,10 +19453,10 @@ try {
       && hn.indexOf('scope-chip') < 0 && hn.indexOf('<option value="" selected>(종류 없음)</option>') > 0
       && hap.indexOf('<span class="scope-chip">업무상 부상·질병 휴업</span>') > 0 && hap.indexOf('data-rs-kind') < 0 && he.indexOf('data-rs-kind') < 0 && he.indexOf('<span class="scope-chip">육아휴직</span>') > 0;
     // ⑥ 종류 고침(실제 loaKindSet): 관리자·승인 전 = 고침·저장 예약 · 직원·승인 뒤·표 밖 값 = 그대로
-    const E6 = { leaves: [L('l1', 'child'), L('l2', 'child', 'approved')] }, k6 = A(E6);
-    const kr = [k6.kindSet('l1', 'other'), k6.kindSet('l2', 'other'), k6.kindSet('l1', 'nope')];
+    const E6 = { leaves: [L('l1', 'child'), L('l2', 'child', 'approved'), { id: 'l9', member_id: 'm1', type: 'annual', start: '2026-12-01', status: 'pending' }, L('l8', 'child', 'rejected')] }, k6 = A(E6);
+    const kr = [k6.kindSet('l1', 'other'), k6.kindSet('l2', 'other'), k6.kindSet('l1', 'nope'), k6.kindSet('l9', 'other'), k6.kindSet('l8', 'injury')];
     const E6b = { leaves: [L('l1', 'child')], admin: false, me: 'm1' }, k6b = A(E6b).kindSet('l1', 'other');
-    o.kind = kr.join(',') === 'true,false,false' && E6.leaves[0].loa_kind === 'other' && E6.leaves[1].loa_kind === 'child' && E6.log.indexOf('save') >= 0 && k6b === false && E6b.leaves[0].loa_kind === 'child';
+    o.kind = kr.join(',') === 'true,false,false,false,false' && E6.leaves[0].loa_kind === 'other' && E6.leaves[1].loa_kind === 'child' && !('loa_kind' in E6.leaves[2]) && E6.leaves[3].loa_kind === 'child' && E6.log.indexOf('save') >= 0 && k6b === false && E6b.leaves[0].loa_kind === 'child';
     // ⑦ 면담 신청(실제 saveLoa): 종류 없으면 막힘(알림 · 줄 0) · 고르면 줄에 loa_kind
     const E7 = { leaves: [], me: 'm1', els: {} }, s7 = A(E7);
     s7.openLoa(); E7.els.loaStart.value = '2027-01-04'; E7.els.loaEnd.value = '2027-12-31'; s7.saveLoa();
@@ -19461,10 +19464,10 @@ try {
     E7.els.loaKind.value = 'child'; s7.saveLoa();
     o.apply = blocked && E7.leaves.length === 1 && E7.leaves[0].loa_kind === 'child' && E7.leaves[0].stage === 'interview_req';
     // ⑧ 승인(실제 setLeaveStatus): 인사기록 저장에 종류가 같이 감 · 종류 없는 옛 줄 = 빈 값(지금처럼 뺌) · 승인 확인 창에 종류 글
-    const E8 = { leaves: [L('l1', 'injury'), L('l2', '')], members: [{ id: 'm1' }] }, s8 = A(E8);
-    s8.setLeaveStatus('l1', 'approved'); s8.setLeaveStatus('l2', 'approved');
+    const E8 = { leaves: [L('l1', 'injury'), L('l2', ''), L('l3', 'xyz'), L('l4', 'toString')], members: [{ id: 'm1' }] }, s8 = A(E8);
+    s8.setLeaveStatus('l1', 'approved'); s8.setLeaveStatus('l2', 'approved'); s8.setLeaveStatus('l3', 'approved'); s8.setLeaveStatus('l4', 'approved');
     const up8 = E8.calls.filter((c) => c.action === 'member_upsert');
-    o.appr = up8.length === 2 && up8[0].loa_kind === 'injury' && up8[0].on_loa === true && up8[1].loa_kind === '' && E8.leaves[0].status === 'approved';
+    o.appr = up8.length === 4 && up8[0].loa_kind === 'injury' && up8[0].on_loa === true && up8[1].loa_kind === '' && up8[2].loa_kind === '' && up8[3].loa_kind === '' && E8.leaves[0].status === 'approved';
     // ⑨ 복직 처리(실제 doReinstate — 휴직 시작 2025-12-01 · 오늘 2026-03-10 = 99일): 육아 → 육아휴직 누적만 · 그 밖·종류 없음 → 그 밖 누적만 · 업무상 부상 → 둘 다 안 쌓음
     const re = (k) => { const m = Object.assign({ id: 'm1', on_loa: true, loa_start: '2025-12-01', loa_days: 5, loa_days_child: 7 }, k ? { loa_kind: k } : {}); const E9 = { members: [m], leaves: [], edit: 'm1', today: '2026-03-10' }; A(E9).doReinstate(); const c = E9.calls[0] || {}; return [c.on_loa, 'loa_days' in c ? c.loa_days : '-', 'loa_days_child' in c ? c.loa_days_child : '-'].join('/'); };
     o.rein = ['child', 'other', '', 'injury'].map(re).join(',');
@@ -19476,20 +19479,35 @@ try {
     const p10b = E10.calls[0] || {};
     o.card = p10.loa_days_child === 99 && p10.loa_days === 12 && p10b.loa_days_child === 0;
     o.cardFill = /document\.getElementById\("meLoaChild"\)\.value = \(m && m\.loa_days_child\) \? m\.loa_days_child : "";/.test(f39(H, 'openMemberEdit'));
-    // ⑪ 휴가 병합(실제 mergeLeaves → imMerge): 종류는 승인 묶음과 같이 — 이 화면(종류만 고침) vs 다른 기기(옛 종류로 승인) = 한쪽 덩어리 통째(승인 + 새 종류가 섞이지 않음)
-    const ENV11 = { cf: [] }, M = merge39(H)(ENV11);
-    const B0 = L('l1', 'child'); B0.updated = '2026-11-10';
-    M.base('leaves', [JSON.parse(JSON.stringify(B0))], 1);
-    const loc = Object.assign(JSON.parse(JSON.stringify(B0)), { loa_kind: 'other', updated: '2026-11-18' });
-    const srv = Object.assign(JSON.parse(JSON.stringify(B0)), { status: 'approved', approver: '관리자나', approved_at: '2026-11-18', updated: '2026-11-18' });
-    const mg = M.merge([loc], [srv])[0];
-    const mixed = mg.status === 'approved' && mg.loa_kind === 'other';
-    // 한쪽만 바꿈(다른 기기가 종류만 고침) = 그 값 그대로 들어옴
-    M.base('leaves', [JSON.parse(JSON.stringify(B0))], 1);
-    const mg2 = M.merge([JSON.parse(JSON.stringify(B0))], [Object.assign(JSON.parse(JSON.stringify(B0)), { loa_kind: 'injury', updated: '2026-11-18' })])[0];
-    o.merge = !mixed && (mg.status === 'pending' ? mg.loa_kind === 'other' : mg.loa_kind === 'child') && mg2.loa_kind === 'injury'; o.mergeInfo = { st: mg.status, k: mg.loa_kind, k2: mg2.loa_kind };
+    // ⑪ 휴가 병합(실제 mergeLeaves → imMerge → loaKindMergeFix) — 검토 반영: 종류는 승인 묶음 밖, 승인·반려가 갈리면 결정한 쪽의 종류
+    //   A 낡은 화면(승인 대기로 보임)이 종류만 고침 · 서버는 다른 관리자가 승인 = 승인 그대로(승인자·단계 onloa)·그때의 종류 · 이 화면 고침 버림 + 알림 '휴직 종류'
+    //   A2 같은데 서버는 반려 = 반려 그대로·그때의 종류 · B 이 화면이 승인 · 서버는 승인 대기인 채 종류만 바뀜 = 이 화면 승인·이 화면 종류 + 알림
+    //   C 둘 다 승인 대기에서 종류를 다르게 = 이 화면 값 + 겹침 알림 칸 이름 '휴직 종류' · D 서버만 종류 고침 = 서버 종류·알림 0 · E 연차 줄 = 손대지 않음
+    const J39 = (x) => JSON.parse(JSON.stringify(x));
+    const B0 = Object.assign(L('l1', 'child'), { updated: '2026-11-10', interview_at: '2026-11-05', applied_at: '2026-11-06' });
+    const mrg = (loc, srv, base) => { const E = { cf: [], toast: [] }, M = merge39(H)(E); M.base('leaves', [J39(base || B0)], 1); const m = M.merge([J39(loc)], [J39(srv)])[0]; return { m, cf: E.cf.map((c) => c.map((e) => e.lbl).join(',')).join('|'), toast: E.toast.join('|') }; };
+    const mA = mrg(Object.assign(J39(B0), { loa_kind: 'other', updated: '2026-11-19' }), Object.assign(J39(B0), { status: 'approved', approver: '관리자을', approved_at: '2026-11-19', stage: 'onloa', updated: '2026-11-19' }));
+    const mA2 = mrg(Object.assign(J39(B0), { loa_kind: 'other', updated: '2026-11-19' }), Object.assign(J39(B0), { status: 'rejected', approver: '관리자을', approved_at: '2026-11-19', stage: 'rejected', updated: '2026-11-19' }));
+    const mB = mrg(Object.assign(J39(B0), { status: 'approved', approver: '관리자갑', approved_at: '2026-11-19', stage: 'onloa', updated: '2026-11-19' }), Object.assign(J39(B0), { loa_kind: 'injury', updated: '2026-11-19' }));
+    const mC = mrg(Object.assign(J39(B0), { loa_kind: 'other', updated: '2026-11-19' }), Object.assign(J39(B0), { loa_kind: 'injury', updated: '2026-11-19' }));
+    const mD = mrg(J39(B0), Object.assign(J39(B0), { loa_kind: 'injury', updated: '2026-11-19' }));
+    const AN = { id: 'a1', member_id: 'm1', type: 'annual', start: '2026-12-01', status: 'pending', updated: '2026-11-10' };
+    const mE = mrg(Object.assign(J39(AN), { reason: 'x', updated: '2026-11-19' }), Object.assign(J39(AN), { status: 'approved', approver: '관리자을', updated: '2026-11-19' }), AN);
+    o.merge = mA.m.status === 'approved' && mA.m.approver === '관리자을' && mA.m.stage === 'onloa' && mA.m.loa_kind === 'child' && /먼저 승인·반려/.test(mA.toast) && /휴직 종류/.test(mA.toast)
+      && mA2.m.status === 'rejected' && mA2.m.stage === 'rejected' && mA2.m.loa_kind === 'child' && /휴직 종류/.test(mA2.toast)
+      && mB.m.status === 'approved' && mB.m.approver === '관리자갑' && mB.m.loa_kind === 'child' && /이 화면 값으로/.test(mB.toast)
+      && mC.m.loa_kind === 'other' && mC.cf === '휴직 종류' && mC.toast === '' && mD.m.loa_kind === 'injury' && mD.toast === '' && mD.cf === ''
+      && mE.m.status === 'approved' && mE.m.reason === 'x' && mE.toast === '';
+    o.mergeInfo = { A: [mA.m.status, mA.m.stage, mA.m.loa_kind, mA.toast.slice(0, 30)], A2: [mA2.m.status, mA2.m.loa_kind], B: [mB.m.status, mB.m.loa_kind], C: [mC.m.loa_kind, mC.cf], D: mD.m.loa_kind };
+    // ⑫ 검토 반영: 예정 종료일 지난 진행 중 육아휴직(복직 처리 잊음) = 종료일에서 멈춤(2026-06-01~08-31 = 91일) → 2027-09-01 · 2027-06-10 D-83 서버 알림 d90 · 2028-01-02 over · 종료일 전에는 오늘까지
+    const OV = Object.assign({ id: 'ov', on_loa: true, loa_kind: 'child', loa_start: '2026-06-01', loa_end: '2026-08-31' }, C2);
+    const rv1 = a.ctRadar(OV, '2027-06-10'), rv0 = a.ctRadar(OV, '2026-07-01'), sv1 = dc.contractPlan([OV], { keys: {} }, '2027-06-10')[0], sv2 = dc.contractPlan([OV], { keys: {} }, '2028-01-02')[0];
+    o.overdue = rv1.conv === '2027-09-01' && rv1.days === 83 && rv1.child === 91 && rv0.child === 30 && !!sv1 && sv1.stage === 'd90' && sv1.conv === '2027-09-01' && !!sv2 && sv2.stage === 'over';
+    // ⑬ 검토 반영: 육아휴직 누적 아주 큰 값(옛 값·직접 저장) = 3650에서 자름 — 칩·서버 알림이 죽지 않음 · 소수 누적(7.9) = 7(앱·서버 같게 내림)
+    let big = ''; try { const rb = a.ctRadar(Object.assign({ loa_days_child: 1e9 }, C2), TD39); const cb = a.ctChipHtml(Object.assign({ loa_days_child: '1e9' }, C2), TD39); const sb = dc.contractPlan([Object.assign({ id: 'b', loa_days_child: 1e9 }, C2), Object.assign({ id: 'b2', loa_days_child: 2e8 }, C2)], { keys: {} }, '2037-05-01'); big = rb.child + '/' + (cb.indexOf('육아휴직 3650일 반영') > 0) + '/' + sb.length; } catch (e) { big = 'THROW ' + e.constructor.name; }
+    o.big = big === '3650/true/2' && a.ctChildDays({ loa_days_child: 7.9 }, TD39) === 7 && dc.ctChildDays({ loa_days_child: 7.9 }, TD39) === 7;
     const ok = o.svc === '3.7,16,2.7,15' && o.onk === '3.7,3.7,2.7,2.7' && o.y1 === '15,11' && o.fy === '8,6,8' && o.ct === '2027-09-09,297,99,2027-06-02,198,2027-09-09,99,2027-06-02' && o.chip
-      && o.two && o.prod.ok && o.row && o.kind && o.apply && o.appr && o.rein === 'false/-/106,false/104/-,false/104/-,false/-/-' && o.card && o.cardFill && o.merge;
+      && o.two && o.prod.ok && o.row && o.kind && o.apply && o.appr && o.rein === 'false/-/106,false/104/-,false/104/-,false/-/-' && o.card && o.cardFill && o.merge && o.overdue && o.big;
     return { ok, o };
   };
   function ctD39(f, t) { return Math.round((Date.UTC(+t.slice(0, 4), +t.slice(5, 7) - 1, +t.slice(8, 10)) - Date.UTC(+f.slice(0, 4), +f.slice(5, 7) - 1, +f.slice(8, 10))) / 86400000); }
@@ -19535,16 +19553,30 @@ try {
     ['그 밖 확인 필요 칩 없음', 'h', '(lk==="other"?\' <span class="need-chip">근속 처리 확인 필요</span>\':\'\')', '\'\''],
     ['인사 카드 육아휴직 칸 안 보냄', 'h', '      loa_days_child: loaChildRaw === "" ? 0 : Number(loaChildRaw),\n', ''],
     ['인사 카드 육아휴직 칸 안 채움', 'h', '    document.getElementById("meLoaChild").value = (m && m.loa_days_child) ? m.loa_days_child : "";', ''],
-    ['병합 종류가 승인 묶음 밖', 'h', '.map(function(g){ return g[0] === "status" ? g.concat(["loa_kind"]) : g; })', ''],
+    ['병합 뒷손질 없음', 'h', '      fix: function(m, r, pre){ loaKindMergeFix(m, r, pre); }', '      fix: function(m, r, pre){ }'],
+    ['병합 종류를 승인 묶음에 다시', 'h', 'grp: [["status", "approver", "approved_at"], ["cancel_req", "cancel_req_at", "cancel_approver"], ["stage", "interview_at", "interviewer", "applied_at"]],\n      // P1 판39 검토', 'grp: [["status", "approver", "approved_at", "loa_kind"], ["cancel_req", "cancel_req_at", "cancel_approver"], ["stage", "interview_at", "interviewer", "applied_at"]],\n      // P1 판39 검토'],
+    ['병합 서버 결정 종류 안 따름', 'h', '    if (pre.status === "pending" && r.status !== "pending" && m.status === r.status){', '    if (false){'],
+    ['병합 이 화면 결정 종류 안 지킴', 'h', '    } else if (pre.status !== "pending" && r.status === "pending" && m.status === pre.status){', '    } else if (false){'],
+    ['병합 서버 결정 알림 없음', 'h', 'apprToastShow("다른 기기가 먼저 승인·반려해 이 화면의 고침은 저장하지 않았습니다 — " + nm + " · 휴직 종류");', 'nm;'],
+    ['승인 때 종류 거름 없음', 'h', ', loa_kind:(LOA_KIND[l.loa_kind] ? l.loa_kind : "") })', ', loa_kind:(l.loa_kind||"") })'],
+    ['종류 표에 상속 이름', 'h', 'Object.assign(Object.create(null), { child:', 'Object.assign({}, { child:'],
+    ['종류 고침 휴직 줄 검사 없음', 'h', 'if(!l || l.type!=="loa" || l.status!=="pending") return false;', 'if(!l || l.status!=="pending") return false;'],
+    ['앱 예정 종료일에서 안 멈춤', 'h', 'var to=(/^\\d{4}-\\d{2}-\\d{2}$/.test(String(m.loa_end||"")) && String(m.loa_end) < String(today)) ? String(m.loa_end) : String(today);', 'var to=String(today);'],
+    ['서버 예정 종료일에서 안 멈춤', 's', "const to = (/^\\d{4}-\\d{2}-\\d{2}$/.test(String(m.loa_end || '')) && String(m.loa_end) < String(today)) ? String(m.loa_end) : String(today);", 'const to = String(today);'],
+    ['앱 3650 자름 없음', 'h', 'var n=Math.min(3650, Math.max(0, Math.floor(Number(m.loa_days_child)||0)));', 'var n=Math.max(0, Math.floor(Number(m.loa_days_child)||0));'],
+    ['서버 3650 자름 없음(진행 일수)', 's', 'let n = Math.min(3650, Math.max(0, Math.floor(Number(m.loa_days_child) || 0)));', 'let n = Math.max(0, Math.floor(Number(m.loa_days_child) || 0));'],
+    ['서버 3650 자름 없음(멱등 키)', 's', 'base = Math.min(3650, Math.max(0, Math.floor(Number(m.loa_days_child) || 0)));', 'base = Math.max(0, Math.floor(Number(m.loa_days_child) || 0));'],
+    ['앱 내림 없음', 'h', 'var n=Math.min(3650, Math.max(0, Math.floor(Number(m.loa_days_child)||0)));', 'var n=Math.min(3650, Math.max(0, Number(m.loa_days_child)||0));'],
+    ['서버 내림 없음', 's', 'let n = Math.min(3650, Math.max(0, Math.floor(Number(m.loa_days_child) || 0)));', 'let n = Math.min(3650, Math.max(0, Number(m.loa_days_child) || 0));'],
     ['서버 2년에 육아휴직 안 더함', 's', 'conv = child > 0 ? ctAddDays(conv2, child) : conv2', 'conv = conv2'],
     ['서버 진행 중 육아휴직 빼먹음', 's', 'if (m.on_loa === true && m.loa_kind === \'child\' && /^', 'if (false && /^'],
     ['서버 멱등 키가 날마다 바뀜', 's', "const key = 'ct:' + m.id + ':' + keyConv + ':' + stage;", "const key = 'ct:' + m.id + ':' + conv + ':' + stage;"]];
   const K39 = MU39.map(([nm, w, from, to]) => { try { return chk39(w === 'h' ? mH39(from, to) : html, w === 's' ? mS39(from, to) : SDC39).ok; } catch (e) { return nm + ' err ' + e.message.slice(0, 80); } });
   T('P1 판39 휴직 종류·근속·계약직 2년(실행 — 실제 serviceInfo·computeAnnual·fiscalAnnual·ctRadar·ctChipHtml·reqLineRowHtml·loaKindSet·saveLoa·setLeaveStatus·doReinstate·saveMemberEdit·mergeLeaves + 서버 contractPlan·ctChildDays): '
     + '입사 2023-03-02 육아휴직 365일 = 3.7년·16일(그 밖·옛 누적 = 2.7년·15일) · 진행 중 육아·업무상 부상 = 안 뺌 · 그 밖·종류 없음 = 뺌 · 1년 도달·회계연도 첫해 · 계약직 2025-06-02 + 육아휴직 99일 = 2027-09-09(진행 중 같음) · 칩 \'육아휴직 99일 반영\' · '
-    + '앱·서버 두 벌 같은 표본 대조 · 진행 중 육아휴직 알림 키 고정 · 운영 꼴 표본(휴직 0명) 고치기 전과 같음 · 승인 줄 종류 칩·고르기(관리자·승인 전)·그 밖 확인 필요 · 종류 필수 · 승인 때 종류 전달 · 복직 누적 칸 · 인사 카드 2칸 · 병합 승인 묶음',
+    + '앱·서버 두 벌 같은 표본 대조 · 진행 중 육아휴직 알림 키 고정 · 운영 꼴 표본(휴직 0명) 고치기 전과 같음 · 승인 줄 종류 칩·고르기(관리자·승인 전)·그 밖 확인 필요 · 종류 필수 · 승인 때 종류 전달 · 복직 누적 칸 · 인사 카드 2칸 · 검토 반영: 병합(낡은 화면 종류 고침이 남의 승인·반려를 안 풂 · 결정한 쪽 종류 · 알림 휴직 종류) · 예정 종료일 지난 육아휴직 = 종료일에서 멈춤(앱·서버) · 누적 3650 자름·소수 내림 · 이상한 종류(xyz·toString) 승인 때 빈 값 · 연차 줄 종류 고침 막음',
     r39.ok, JSON.stringify(r39.o).slice(0, 1500));
-  T('P1 판39 결함 사본 ' + K39.length + '개(진행 중 휴직 종류·복직 누적 칸·앱/서버 2년 육아휴직·칩 글·종류 필수·신청 줄 종류·승인 전달·종류 고침 권한/시점·직원 고르기·확인 필요 칩·인사 카드 저장/채움·병합 묶음·서버 멱등 키) = 모두 ✗',
+  T('P1 판39 결함 사본 ' + K39.length + '개(진행 중 휴직 종류·복직 누적 칸·앱/서버 2년 육아휴직·칩 글·종류 필수·신청 줄 종류·승인 전달·종류 고침 권한/시점·직원 고르기·확인 필요 칩·인사 카드 저장/채움·서버 멱등 키 · 검토 반영: 병합 뒷손질·묶음 되돌림·결정 쪽 종류 두 갈래·알림·승인 종류 거름·상속 이름·휴직 줄 검사·종료일 멈춤 앱/서버·3650 앱/서버 2곳·내림 앱/서버) = 모두 ✗',
     K39.every((v) => v === false), JSON.stringify(MU39.map((m, i) => m[0] + ':' + K39[i])));
 } catch (e) { console.log('  (P1 판39 검사 생략 — ' + e.message + ')'); fails++; }
 // ── v498(판40 — 결재함 승인 뒤 계약 단계 반영 · 11/19 운영 장애 · 원장 C221): 실행 검사는 위 'P1 판40' 블록 · 여기는 문서·판 번호 정확 검사 + 고정 글 21줄(실행 검사가 못 지키는 고침 줄 — 빼면 ✗)

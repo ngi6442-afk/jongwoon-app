@@ -56,7 +56,8 @@ function ctAgeAt(birth, at) { const b = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(
 function ctDays(from, to) { const f = Date.UTC(+from.slice(0, 4), +from.slice(5, 7) - 1, +from.slice(8, 10)), t = Date.UTC(+to.slice(0, 4), +to.slice(5, 7) - 1, +to.slice(8, 10)); return Math.round((t - f) / 86400000); }
 // P1 판39(C182): 남녀고용평등법 제19조⑤ — 기간제근로자의 육아휴직 기간은 기간제법 제4조 사용기간에서 제외. 전환일 = 입사일 + 2년 + 육아휴직 일수
 //   (복직한 육아휴직 누적 loa_days_child + 진행 중 육아휴직 loa_start~오늘). 앱 index.html ctChildDays·ctRadar와 같은 식(두 벌 — uismoke 'P1 판39'가 같은 표본으로 대조)
-function ctChildDays(m, today) { let n = Math.max(0, Math.floor(Number(m.loa_days_child) || 0)); if (m.on_loa === true && m.loa_kind === 'child' && /^\d{4}-\d{2}-\d{2}$/.test(String(m.loa_start || '')) && /^\d{4}-\d{2}-\d{2}$/.test(String(today || ''))) { const od = ctDays(m.loa_start, today); if (od > 0) n += od; } return n; }
+//   검토 반영: 진행 중 일수는 예정 종료일(loa_end)이 있고 이미 지났으면 거기서 멈춤(복직 처리를 잊어도 전환일이 끝없이 밀리지 않게) · 누적은 0~3650(gw-auth 저장 한도 — 옛 큰 값도 크론이 죽지 않게)
+function ctChildDays(m, today) { let n = Math.min(3650, Math.max(0, Math.floor(Number(m.loa_days_child) || 0))); if (m.on_loa === true && m.loa_kind === 'child' && /^\d{4}-\d{2}-\d{2}$/.test(String(m.loa_start || '')) && /^\d{4}-\d{2}-\d{2}$/.test(String(today || ''))) { const to = (/^\d{4}-\d{2}-\d{2}$/.test(String(m.loa_end || '')) && String(m.loa_end) < String(today)) ? String(m.loa_end) : String(today); const od = ctDays(m.loa_start, to); if (od > 0) n += od; } return n; }
 function ctAddDays(d, n) { return new Date(Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10)) + n * 86400000).toISOString().slice(0, 10); }
 function contractPlan(members, sentDoc, today) {
   const sent = (sentDoc && sentDoc.keys && typeof sentDoc.keys === 'object') ? sentDoc.keys : {};
@@ -67,7 +68,7 @@ function contractPlan(members, sentDoc, today) {
     if (m.leave_date && String(m.leave_date) < today) return;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(m.hire_date || ''))) return;
     // P1 판39: 멱등 키는 복직한 육아휴직까지만 넣은 날(keyConv) — 진행 중 육아휴직은 날마다 전환일이 하루씩 밀려 키가 매일 바뀌면 같은 단계 알림이 매일 나감(남은 일수는 휴직 중 그대로라 단계도 그대로)
-    const child = ctChildDays(m, today), base = Math.max(0, Math.floor(Number(m.loa_days_child) || 0));
+    const child = ctChildDays(m, today), base = Math.min(3650, Math.max(0, Math.floor(Number(m.loa_days_child) || 0)));
     const conv2 = ctAddYears(m.hire_date, 2), conv = child > 0 ? ctAddDays(conv2, child) : conv2, keyConv = base > 0 ? ctAddDays(conv2, base) : conv2;
     const days = ctDays(today, conv), age = ctAgeAt(m.birth, m.hire_date);
     if (age !== null && age >= 55) return;   // 예외

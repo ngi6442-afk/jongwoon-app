@@ -12312,10 +12312,10 @@ function J91a(x) { return JSON.stringify(x); }
     await call({ action: 'member_upsert', id: 'uw39', loa_kind: 'other', loa_days_child: 10 }, tA);
     const before = JSON.stringify(u());
     const bad = [];
-    for (const b of [{ loa_kind: 'abc' }, { loa_kind: 'toString' }, { loa_kind: { child: 1 } }, { loa_kind: ['child'] }, { loa_days_child: -1 }, { loa_days_child: 'x' }, { loa_days_child: { n: 1 } }, { loa_days_child: '1e999' }]) {
+    for (const b of [{ loa_kind: 'abc' }, { loa_kind: 'toString' }, { loa_kind: { child: 1 } }, { loa_kind: ['child'] }, { loa_days_child: -1 }, { loa_days_child: 'x' }, { loa_days_child: { n: 1 } }, { loa_days_child: '1e999' }, { loa_days_child: 3651 }, { loa_days_child: 1e9 }, { loa_kind: 'constructor' }]) {
       const x = await call(Object.assign({ action: 'member_upsert', id: 'uw39', rank: '대리' }, b), tA); bad.push(x.code + ':' + x.body.error_code);
     }
-    o.bad = bad.join(',') === '400:BAD_LOA_KIND,400:BAD_LOA_KIND,400:BAD_LOA_KIND,400:BAD_LOA_KIND,400:BAD_LOA_DAYS,400:BAD_LOA_DAYS,400:BAD_LOA_DAYS,400:BAD_LOA_DAYS' && JSON.stringify(u()) === before;
+    o.bad = bad.join(',') === '400:BAD_LOA_KIND,400:BAD_LOA_KIND,400:BAD_LOA_KIND,400:BAD_LOA_KIND,400:BAD_LOA_DAYS,400:BAD_LOA_DAYS,400:BAD_LOA_DAYS,400:BAD_LOA_DAYS,400:BAD_LOA_DAYS,400:BAD_LOA_DAYS,400:BAD_LOA_KIND' && JSON.stringify(u()) === before;
     // 권한: 직원 본인·다른 직원의 회원 저장 = 403 ADMIN_ONLY(휴직 승인·복직은 관리자 화면만 — 지금과 같은 축) · 값 그대로
     const w1 = await call({ action: 'member_upsert', id: 'uw39', loa_kind: 'child', loa_days_child: 500 }, tW), w2 = await call({ action: 'member_upsert', id: 'uw39', loa_kind: 'child' }, tV);
     o.perm = w1.code === 403 && w1.body.error_code === 'ADMIN_ONLY' && w2.code === 403 && JSON.stringify(u()) === before;
@@ -12323,7 +12323,10 @@ function J91a(x) { return JSON.stringify(x); }
     const lv = await call({ action: 'member_list' }, tV), lw = await call({ action: 'member_list' }, tW), la = await call({ action: 'member_list' }, tA);
     const pick = (l) => (l.body.members || []).find((m) => m.id === 'uw39') || {};
     o.list = !('loa_kind' in pick(lv)) && !('loa_days_child' in pick(lv)) && !('loa_days' in pick(lv)) && pick(lw).loa_kind === 'other' && pick(lw).loa_days_child === 10 && pick(la).loa_days_child === 10;
-    o.ok = o.appr && o.rein && o.clear && o.bad && o.perm && o.list;
+    // 검토 반영: 위 한도 3650은 받음(10년)
+    const max = await call({ action: 'member_upsert', id: 'uw39', loa_days_child: 3650 }, tA);
+    o.max = max.code === 200 && u().loa_days_child === 3650;
+    o.ok = o.appr && o.rein && o.clear && o.bad && o.max && o.perm && o.list;
     return o;
   };
   const chkD39 = (dc) => {
@@ -12339,17 +12342,25 @@ function J91a(x) { return JSON.stringify(x); }
     const plain = Object.assign({ id: 'k5' }, C);
     const p = dc.contractPlan([oth, inj, plain], { keys: {} }, '2027-04-10');
     o.other = p.length === 3 && p.every((x) => x.conv === '2027-06-02' && x.days === 53 && x.stage === 'd90' && !('child' in x)) && p.map((x) => x.key).join(',') === 'ct:k3:2027-06-02:d90,ct:k4:2027-06-02:d90,ct:k5:2027-06-02:d90';
-    o.ok = o.acc && o.on && o.once && o.other;
+    // 검토 반영: 예정 종료일 지난 진행 중 육아휴직(복직 처리 잊음) = 종료일에서 멈춤 → 2027-09-01 · 2027-06-10 d90 · 2028-01-02 over(종전엔 전환일이 날마다 밀려 영영 안 나감)
+    const ov = Object.assign({ id: 'k6', on_loa: true, loa_kind: 'child', loa_start: '2026-06-01', loa_end: '2026-08-31' }, C);
+    const v1 = dc.contractPlan([ov], { keys: {} }, '2027-06-10')[0], v2 = dc.contractPlan([ov], { keys: {} }, '2028-01-02')[0];
+    o.overdue = !!v1 && v1.conv === '2027-09-01' && v1.days === 83 && v1.stage === 'd90' && v1.child === 91 && !!v2 && v2.stage === 'over';
+    // 검토 반영: 옛 큰 값(1e9)이 든 회원이 있어도 크론이 죽지 않음(3650에서 자름) · 다른 회원 알림 그대로
+    let big; try { big = dc.contractPlan([Object.assign({ id: 'k7', loa_days_child: 1e9 }, C), Object.assign({ id: 'k8' }, C)], { keys: {} }, '2027-04-10').map((x) => x.id + ':' + (x.child || 0)).join(','); } catch (e) { big = 'THROW ' + e.constructor.name; }
+    o.big = big === 'k8:0';
+    o.ok = o.acc && o.on && o.once && o.other && o.overdue && o.big;
     return o;
   };
   try {
     const A39 = await chkA39(load39(FA39, SA39)), D39 = chkD39(load39(FD39, SD39));
-    T('P1 판39 ① 회원 저장 새 칸(실행 — 실제 gw-auth): 휴직 승인 몸 = loa_kind 저장·감사 줄 · 복직 몸 = 육아휴직 누적만(그 밖 누적 그대로)·감사 줄 · 같은 값 다시 = 감사 0 · 0·빈 종류 = 칸째 지움 · 표 밖 종류(글·상속 키·객체·배열) 400 BAD_LOA_KIND · 음수·글·객체·무한 400 BAD_LOA_DAYS(레코드 글자째 그대로) · 직원 저장 403 ADMIN_ONLY · 다른 직원 목록에 휴직 칸 없음(본인·관리자 있음)',
+    T('P1 판39 ① 회원 저장 새 칸(실행 — 실제 gw-auth): 휴직 승인 몸 = loa_kind 저장·감사 줄 · 복직 몸 = 육아휴직 누적만(그 밖 누적 그대로)·감사 줄 · 같은 값 다시 = 감사 0 · 0·빈 종류 = 칸째 지움 · 표 밖 종류(글·상속 키·객체·배열) 400 BAD_LOA_KIND · 음수·글·객체·무한 400 BAD_LOA_DAYS(레코드 글자째 그대로) · 직원 저장 403 ADMIN_ONLY · 다른 직원 목록에 휴직 칸 없음(본인·관리자 있음) · 검토 반영: 3651·1e9 = 400 BAD_LOA_DAYS · 3650 받음 · 상속 이름 constructor = 400 BAD_LOA_KIND',
       A39.ok && /const AUD_FIELDS = \[[^\]]*'loa_days','loa_kind','loa_days_child','leave_date'/.test(SA39), JSON.stringify(A39));
-    T('P1 판39 ② contractPlan 날짜(실행): 입사 2025-06-02 + 육아휴직 99일 = 2027-09-09(2027-07-01 D-70 d90) · 진행 중 육아휴직(2027-03-15~) = 날마다 하루씩 밀린 전환일·남은 79일 그대로·같은 멱등 키(다음 날 다시 안 나감) · 진행 중 그 밖·업무상 부상·휴직 없음 = 2027-06-02 종전 키',
+    T('P1 판39 ② contractPlan 날짜(실행): 입사 2025-06-02 + 육아휴직 99일 = 2027-09-09(2027-07-01 D-70 d90) · 진행 중 육아휴직(2027-03-15~) = 날마다 하루씩 밀린 전환일·남은 79일 그대로·같은 멱등 키(다음 날 다시 안 나감) · 진행 중 그 밖·업무상 부상·휴직 없음 = 2027-06-02 종전 키 · 검토 반영: 예정 종료일 지난 진행 중 육아휴직 = 종료일에서 멈춤(2027-09-01 · d90 · 뒤에 over) · 옛 큰 값 회원이 있어도 크론 안 죽음',
       D39.ok, JSON.stringify(D39));
     const MA39 = [["  if (d.loa_kind !== undefined && d.loa_kind !== null && d.loa_kind !== '' && !(typeof d.loa_kind === 'string' && Object.prototype.hasOwnProperty.call(LOA_KINDS, d.loa_kind))) return", '  if (false) return'],
-      ["!((typeof d.loa_days_child === 'number' || typeof d.loa_days_child === 'string') && Number.isFinite(Number(d.loa_days_child)) && Number(d.loa_days_child) >= 0)) return", '!(Number(d.loa_days_child) >= -9)) return'],
+      ["!((typeof d.loa_days_child === 'number' || typeof d.loa_days_child === 'string') && Number.isFinite(Number(d.loa_days_child)) && Number(d.loa_days_child) >= 0 && Number(d.loa_days_child) <= LOA_DAYS_MAX)) return", '!(Number(d.loa_days_child) >= -9)) return'],
+      ['Number(d.loa_days_child) >= 0 && Number(d.loa_days_child) <= LOA_DAYS_MAX)) return', 'Number(d.loa_days_child) >= 0)) return'],
       ["  if (d.loa_kind !== undefined) { const lk = String(d.loa_kind || ''); if (lk) m.loa_kind = lk; else delete m.loa_kind; }\n", ''],
       ["const lc = Number(d.loa_days_child) || 0; if (lc > 0) m.loa_days_child = lc; else delete m.loa_days_child; }", 'm.loa_days_child = Number(d.loa_days_child) || 0; }'],
       ["'loa_days','loa_kind','loa_days_child','leave_date'", "'loa_days','leave_date'"],
@@ -12358,9 +12369,12 @@ function J91a(x) { return JSON.stringify(x); }
     for (const [a, b] of MA39) { let v; try { v = (await chkA39(load39(FA39, mut39(SA39, a, b)))).ok; } catch (e) { v = 'err ' + e.message; } kA39.push(v); }
     const MD39 = [['conv = child > 0 ? ctAddDays(conv2, child) : conv2', 'conv = conv2'], ["if (m.on_loa === true && m.loa_kind === 'child' && /^", 'if (false && /^'],
       ["const key = 'ct:' + m.id + ':' + keyConv + ':' + stage;", "const key = 'ct:' + m.id + ':' + conv + ':' + stage;"], ['    if (child > 0) it.child = child;\n', ''],
-      ["if (m.on_loa === true && m.loa_kind === 'child' &&", "if (m.on_loa === true &&"]];
+      ["if (m.on_loa === true && m.loa_kind === 'child' &&", "if (m.on_loa === true &&"],
+      ["const to = (/^\\d{4}-\\d{2}-\\d{2}$/.test(String(m.loa_end || '')) && String(m.loa_end) < String(today)) ? String(m.loa_end) : String(today);", 'const to = String(today);'],
+      ['let n = Math.min(3650, Math.max(0, Math.floor(Number(m.loa_days_child) || 0)));', 'let n = Math.max(0, Math.floor(Number(m.loa_days_child) || 0));'],
+      ['base = Math.min(3650, Math.max(0, Math.floor(Number(m.loa_days_child) || 0)));', 'base = Math.max(0, Math.floor(Number(m.loa_days_child) || 0));']];
     const kD39 = MD39.map(([a, b]) => { try { return chkD39(load39(FD39, mut39(SD39, a, b))).ok; } catch (e) { return 'err ' + e.message; } });
-    T('P1 판39 ③ 결함 사본 ' + (MA39.length + MD39.length) + '개(종류 값 검사 없음 · 일수 값 검사 느슨 · 종류 안 씀 · 0일도 남김 · 감사 칸 빠짐 · 종류 표 넓힘 · 서버 2년 육아휴직 안 더함 · 진행 중 육아휴직 빼먹음 · 멱등 키 날마다 바뀜 · 반영 일수 안 실음 · 진행 중 그 밖 휴직도 더함) = 모두 ✗',
+    T('P1 판39 ③ 결함 사본 ' + (MA39.length + MD39.length) + '개(종류 값 검사 없음 · 일수 값 검사 느슨 · 종류 안 씀 · 0일도 남김 · 감사 칸 빠짐 · 종류 표 넓힘 · 서버 2년 육아휴직 안 더함 · 진행 중 육아휴직 빼먹음 · 멱등 키 날마다 바뀜 · 반영 일수 안 실음 · 진행 중 그 밖 휴직도 더함 · 검토 반영: 3650 한도 걷음·종료일 멈춤 걷음·진행 일수 자름 걷음·멱등 키 자름 걷음) = 모두 ✗',
       kA39.concat(kD39).every((v) => v === false), JSON.stringify({ kA39, kD39 }));
   } catch (e) { T('P1 판39 검사 실행', false, String(e && e.stack || e).slice(0, 500)); }
   finally { mem.gw_users = saved39; }
