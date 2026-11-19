@@ -3326,16 +3326,19 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   // save: 새 자동 지시 → 배정표로 담당 채움 → 담당자 본인 1발(우선기기)
   mem.gw_data['settings:assign'] = { schema: 1, rules: { 'veh:': { who_id: 'uwork' } }, approver_id: '', prev: null, updated_at: 5, updated_by: 'x' };
   mem.gw_data['col:tasks'] = { schema: 1, items: [] };
+  // 11/20 날짜 고정 실패 수리: 시험 지시 기한 = 오늘(KST) + n일(종전 고정 2026-11-20·25·28·12-01 — 그 날이 지나면 아침 요약 '기한·경과' 수가 늘어 깨졌음)
+  const kd50 = (n) => new Date(Date.now() + 9 * 3600000 + n * 86400000).toISOString().slice(0, 10);
+  const A50 = kd50(5), B50 = kd50(10), C50 = kd50(15), E50 = kd50(8);   // 차량 정기검사는 30일 안(31~90일은 veh_insp90 규칙 몫이라 연습이면 ingest가 막음) · 종전 간격과 비슷하게
   pushMock.calls.length = 0;
   r50 = await call({ action: 'save', collection: 'tasks', doc: { schema: 1, items: [
-    { id: 't_a50', title: '12가3456 정기검사 갱신', auto_key: 'veh:1:insp:2026-11-20', who_id: '', who: '', status: 'open', from: '자동', due: '2026-11-20' },
-    { id: 't_b50', title: '12가3456 보험 갱신', auto_key: 'veh:1:ins:2026-11-25', who_id: '', who: '', status: 'open', from: '자동', due: '2026-11-25' },
-    { id: 't_c50', title: '인허가 갱신(배정 없음)', auto_key: 'lic:1:exp:2026-12-01', who_id: '', who: '', status: 'open', from: '자동', due: '2026-12-01' }] } }, tokA);
+    { id: 't_a50', title: '12가3456 정기검사 갱신', auto_key: 'veh:1:insp:' + A50, who_id: '', who: '', status: 'open', from: '자동', due: A50 },
+    { id: 't_b50', title: '12가3456 보험 갱신', auto_key: 'veh:1:ins:' + B50, who_id: '', who: '', status: 'open', from: '자동', due: B50 },
+    { id: 't_c50', title: '인허가 갱신(배정 없음)', auto_key: 'lic:1:exp:' + C50, who_id: '', who: '', status: 'open', from: '자동', due: C50 }] } }, tokA);
   const pc50 = pushMock.calls.filter((p) => /^auto-new-uwork-/.test(p.tag || ''));
-  T('50 save: veh 2건 담당 채움 → 담당자 1묶음 푸시("자동 지시 2건", 제목·기한) · 담당 없는 lic는 발송 없음', r50.code === 200 && pc50.length === 1 && /자동 지시 2건/.test(pc50[0].title) && /정기검사 갱신 ~2026-11-20/.test(pc50[0].body) && pushMock.calls.length === 1, JSON.stringify(pushMock.calls));
+  T('50 save: veh 2건 담당 채움 → 담당자 1묶음 푸시("자동 지시 2건", 제목·기한) · 담당 없는 lic는 발송 없음', r50.code === 200 && pc50.length === 1 && /자동 지시 2건/.test(pc50[0].title) && pc50[0].body.indexOf('정기검사 갱신 ~' + A50) >= 0 && pushMock.calls.length === 1, JSON.stringify(pushMock.calls));
   // ingest: 새 항목 + 공란 backfill → 담당자 1발 · notified 1
   pushMock.calls.length = 0;
-  r50 = await call({ action: 'autotask_ingest', key: 'test-ingest-key', items: [{ auto_key: 'veh:2:insp:2026-11-28', title: '34나5678 정기검사 갱신', due: '2026-11-28' }] });
+  r50 = await call({ action: 'autotask_ingest', key: 'test-ingest-key', items: [{ auto_key: 'veh:2:insp:' + E50, title: '34나5678 정기검사 갱신', due: E50 }] });
   T('50 ingest: 새 veh 항목 → 담당 채움 + 담당자 1발 · notified 1', r50.code === 200 && r50.body.assigned === 1 && r50.body.notified === 1 && pushMock.calls.length === 1 && /자동 지시 1건/.test(pushMock.calls[0].title), JSON.stringify(r50.body) + JSON.stringify(pushMock.calls));
   // 완료 요청 → 승인권자 1인
   r50 = await call({ action: 'notify_set', event: 'task_review', value: 'issuer_approver', base: base50 }, tokA); base50 = r50.body.updated_at;
@@ -4092,7 +4095,10 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const q5 = r63.code === 200 && sent63.length === 2;
   T('63 휴가 알림: 신청 → 관리자 1발(신청자 제외·우선기기·이름만, 사유·기간 없음) · 변경 없는 재저장 0 · 승인 → 신청자 1발(태그 leave-res-id) · 끄면 0(결과·신청)', q1 && q2 && q3 && q4 && q5, JSON.stringify([q1, q2, q3, q4, q5, sent63.map((x) => [x.ids, x.p.title, x.p.tag])]));
   // 레이더 이식 — 계약직 회원 1명(입사 2025-01-10 → 전환 2027-01-10, 오늘 기준 D-60~70 → d90) → PM(여기선 관리자 uadmin=tier pm) 1발 + duty:sent 키 · 두 번째 실행 0발
-  mem.gw_users['member:uct63'] = { id: 'uct63', name: '계약직원', admin: false, perms: {}, emp_type: '계약직', hire_date: '2025-01-10', birth: '1990-05-05' };
+  // 11/20 날짜 고정 실패 수리: 전환일 = 오늘(KST) + 65일(2월 29일이면 66일) · 입사 = 그 2년 전(종전 고정 2025-01-10 — 12/12쯤부터 d90 창을 벗어나 깨졌음)
+  const cv63 = (() => { for (const n of [65, 66]) { const d = new Date(Date.now() + 9 * 3600000 + n * 86400000).toISOString().slice(0, 10); if (d.slice(5) !== '02-29') return d; } })();
+  const hire63 = (Number(cv63.slice(0, 4)) - 2) + cv63.slice(4);
+  mem.gw_users['member:uct63'] = { id: 'uct63', name: '계약직원', admin: false, perms: {}, emp_type: '계약직', hire_date: hire63, birth: '1990-05-05' };
   Object.keys(mem.gw_data).forEach((k) => { if (/^priv:[^:]+:mytasks$/.test(k) || /^todo:sent:/.test(k)) delete mem.gw_data[k]; });
   delete mem.gw_data['duty:sent'];
   const cron63 = require(join(FN, 'gw-todo-cron.js'));
@@ -4104,8 +4110,8 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const o2 = JSON.parse((await cron63.handler({})).body || '{}');
   const rad2 = sent63.slice(n0).filter((x) => /^ct-/.test(x.p.tag));
   T('63 레이더 이식: 계약직 1명 d90 → ct- 태그 1발(PM 우선기기, 기간제법 §4① 호수 본문) · duty:sent ct:uct63:2027-01-10:d90 기록 · 같은 날 재실행 0발(멱등) · 응답 radar',
-    o1.ok === true && o1.radar && o1.radar.items === 1 && o1.radar.sent === 1 && rad.length === 1 && rad[0].ids.join() === 'uadmin' && rad[0].o.primaryOnly === true && /§4①/.test(rad[0].p.body) && /계약직원 D-\d+\(2027-01-10\)/.test(rad[0].p.body)
-    && ctKeys.length === 1 && ctKeys[0] === 'ct:uct63:2027-01-10:d90' && o2.radar && o2.radar.items === 0 && rad2.length === 1, JSON.stringify([o1.radar, o2.radar, ctKeys, rad.map((x) => x.p)]));
+    o1.ok === true && o1.radar && o1.radar.items === 1 && o1.radar.sent === 1 && rad.length === 1 && rad[0].ids.join() === 'uadmin' && rad[0].o.primaryOnly === true && /§4①/.test(rad[0].p.body) && new RegExp('계약직원 D-\\d+\\(' + cv63 + '\\)').test(rad[0].p.body)
+    && ctKeys.length === 1 && ctKeys[0] === 'ct:uct63:' + cv63 + ':d90' && o2.radar && o2.radar.items === 0 && rad2.length === 1, JSON.stringify([o1.radar, o2.radar, ctKeys, rad.map((x) => x.p)]));
   pushMock.sendTo = savedSend63;
   delete mem.gw_users['member:uct63']; delete mem.gw_data['col:leaves']; delete mem.gw_data['settings:notify']; delete mem.gw_data['duty:sent'];
 }
@@ -10601,28 +10607,29 @@ function J91a(x) { return JSON.stringify(x); }
     const f1 = await put({ period: PREV21, fail: 'LEAK_NAME' }), f1s = st(), f2 = await put({ period: PREV21, fail: 'LEAK_NAME', text: 'x' }), f3 = await put({ period: PREV21, fail: 'bad code' });
     const pg = await put({ ping: true }), pgs = st();
     // 흔적 판정(검토 ③): 확정 안 된 채 다음다음 달 4일을 넘긴 초안 = ok false · 확정하면 ok
+    //   11/20 날짜 고정 실패 수리: 고정 시계·고정 달을 2036~2037로(종전 2026-11·12·2027-01 — 실제 오늘 2027-01부터 이 시험이 만든 지난달 초안과 겹쳐 깨졌음)
     const g0d = JSON.stringify(mem.gw_data);
-    mem.gw_data['rnote:2026-11'] = { schema: 1, period: '2026-11', status: 'draft', text: 'x', updated_at: 1 }; mem.gw_data['rnote:2027-01'] = { schema: 1, period: '2027-01', status: 'draft', text: 'x', updated_at: 1 };
-    const FEB10 = Date.UTC(2027, 1, 10, 1), JAN03 = Date.UTC(2027, 0, 3, 1), JAN04 = Date.UTC(2027, 0, 4, 1);
-    const ds1 = await RM.dueState(FEB10); mem.gw_data['rnote:2026-11'].status = 'confirmed'; const ds2 = await RM.dueState(FEB10); mem.gw_data['rnote:2026-11'].status = 'draft';
+    mem.gw_data['rnote:2036-11'] = { schema: 1, period: '2036-11', status: 'draft', text: 'x', updated_at: 1 }; mem.gw_data['rnote:2037-01'] = { schema: 1, period: '2037-01', status: 'draft', text: 'x', updated_at: 1 };
+    const FEB10 = Date.UTC(2037, 1, 10, 1), JAN03 = Date.UTC(2037, 0, 3, 1), JAN04 = Date.UTC(2037, 0, 4, 1);
+    const ds1 = await RM.dueState(FEB10); mem.gw_data['rnote:2036-11'].status = 'confirmed'; const ds2 = await RM.dueState(FEB10); mem.gw_data['rnote:2036-11'].status = 'draft';
     const ds3 = await RM.dueState(JAN03), ds4 = await RM.dueState(JAN04);
-    const back = JSON.parse(g0d); delete mem.gw_data['rnote:2026-11']; delete mem.gw_data['rnote:2027-01']; Object.keys(back).forEach((k) => { if (!(k in mem.gw_data)) mem.gw_data[k] = back[k]; });
+    const back = JSON.parse(g0d); delete mem.gw_data['rnote:2036-11']; delete mem.gw_data['rnote:2037-01']; Object.keys(back).forEach((k) => { if (!(k in mem.gw_data)) mem.gw_data[k] = back[k]; });
     P.E = f1.code === 200 && f1s.ok === false && /LEAK_NAME/.test(f1s.note) && f2.code === 400 && f2.body.error_code === 'BAD_FAIL' && f3.code === 400 && pg.code === 200 && pg.body.due === PREV21 && pg.body.due_ok === true && pgs.ok === true && pgs.fn === 'rnote'
-      && ds1.ok === false && /확정 안 된 초안 2026-11/.test(ds1.note) && ds2.ok === true && ds3.ok === true && ds4.ok === false;
+      && ds1.ok === false && /확정 안 된 초안 2036-11/.test(ds1.note) && ds2.ok === true && ds3.ok === true && ds4.ok === false;
     I.E = { f1: f1.code, f1s, f2: f2.code, f3: f3.code, pg: pg.body, ds: [ds1, ds2, ds3, ds4] };
-    // 원장 C174 ②: 1~3일(봇이 묻기·저장)에도 오래 미확정 초안 경고가 흔적에 남음 · ③ 한 달만 못 읽으면 흔적 ok false('읽지 못한 달') — 2027-02-02 KST, 2026-11 초안이 확정 안 된 채
+    // 원장 C174 ②: 1~3일(봇이 묻기·저장)에도 오래 미확정 초안 경고가 흔적에 남음 · ③ 한 달만 못 읽으면 흔적 ok false('읽지 못한 달') — 2037-02-02 KST, 2036-11 초안이 확정 안 된 채
     const g1d = JSON.stringify(mem.gw_data);
-    mem.gw_data['rnote:2026-11'] = { schema: 1, period: '2026-11', status: 'draft', text: 'x', updated_at: 1 }; mem.gw_data['rnote:2027-01'] = { schema: 1, period: '2027-01', status: 'draft', text: 'x', updated_at: 1 };
-    const FEB02 = Date.UTC(2027, 1, 2, 1);
-    const w1 = await RM.put({ period: '2027-01', probe: true }, FEB02), w1s = st();
-    const w2 = await RM.put({ period: '2026-12', text: CLEAN21, meta: meta21, rules_ver: RV21, rules_fp: RM.RULES_FP }, FEB02), w2s = st();
-    mem.gw_data['rnote:2026-11'].status = 'confirmed'; const w3 = await RM.put({ period: '2027-01', probe: true }, FEB02), w3s = st();
-    blobsMock.hooks.failGet = (k) => k === 'rnote:2026-11'; const w4 = await RM.dueState(Date.UTC(2027, 1, 10, 1)); const w5 = await RM.put({ period: '2027-01', probe: true }, FEB02), w5s = st(); blobsMock.hooks.failGet = null;
-    const back1 = JSON.parse(g1d); delete mem.gw_data['rnote:2026-11']; delete mem.gw_data['rnote:2027-01']; delete mem.gw_data['rnote:2026-12']; Object.keys(back1).forEach((k) => { if (!(k in mem.gw_data)) mem.gw_data[k] = back1[k]; });
-    P.E2 = w1.code === 200 && w1.body.exists === true && w1s.ok === false && /확정 안 된 초안 2026-11/.test(w1s.note) && /2027-01분 이미 있음/.test(w1s.note)
-      && w2.code === 200 && w2.body.saved === true && w2s.ok === false && /2026-12분 초안 저장/.test(w2s.note) && /확정 안 된 초안 2026-11/.test(w2s.note)
+    mem.gw_data['rnote:2036-11'] = { schema: 1, period: '2036-11', status: 'draft', text: 'x', updated_at: 1 }; mem.gw_data['rnote:2037-01'] = { schema: 1, period: '2037-01', status: 'draft', text: 'x', updated_at: 1 };
+    const FEB02 = Date.UTC(2037, 1, 2, 1);
+    const w1 = await RM.put({ period: '2037-01', probe: true }, FEB02), w1s = st();
+    const w2 = await RM.put({ period: '2036-12', text: CLEAN21, meta: meta21, rules_ver: RV21, rules_fp: RM.RULES_FP }, FEB02), w2s = st();
+    mem.gw_data['rnote:2036-11'].status = 'confirmed'; const w3 = await RM.put({ period: '2037-01', probe: true }, FEB02), w3s = st();
+    blobsMock.hooks.failGet = (k) => k === 'rnote:2036-11'; const w4 = await RM.dueState(Date.UTC(2037, 1, 10, 1)); const w5 = await RM.put({ period: '2037-01', probe: true }, FEB02), w5s = st(); blobsMock.hooks.failGet = null;
+    const back1 = JSON.parse(g1d); delete mem.gw_data['rnote:2036-11']; delete mem.gw_data['rnote:2037-01']; delete mem.gw_data['rnote:2036-12']; Object.keys(back1).forEach((k) => { if (!(k in mem.gw_data)) mem.gw_data[k] = back1[k]; });
+    P.E2 = w1.code === 200 && w1.body.exists === true && w1s.ok === false && /확정 안 된 초안 2036-11/.test(w1s.note) && /2037-01분 이미 있음/.test(w1s.note)
+      && w2.code === 200 && w2.body.saved === true && w2s.ok === false && /2036-12분 초안 저장/.test(w2s.note) && /확정 안 된 초안 2036-11/.test(w2s.note)
       && w3.code === 200 && w3s.ok === true && !/확정 안 된/.test(w3s.note)
-      && w4.ok === false && /읽지 못한 달 2026-11/.test(w4.note) && w5.code === 200 && w5s.ok === false && /읽지 못한 달 2026-11/.test(w5s.note);
+      && w4.ok === false && /읽지 못한 달 2036-11/.test(w4.note) && w5.code === 200 && w5s.ok === false && /읽지 못한 달 2036-11/.test(w5s.note);
     I.E2 = { w1: w1s, w2: w2s, w3: w3s, w4, w5: w5s };
     // ④ 읽기 — 목록·가장 오래된 초안·가장 최근 확정본 · can_write = PM만
     mem.gw_data['rnote:' + OLD21] = { schema: 1, period: OLD21, status: 'draft', text: '옛 초안', bot_text: '옛 초안', updated_at: 5, created_at: 5 };
