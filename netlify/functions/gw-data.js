@@ -2081,21 +2081,27 @@ async function handleVehDueSet(event, d, R) {
   const lawLog = (field === 'insp_due' && d.law && (await vehBgState(st)).on) ? vehLawLog(d.law, cur, date, today, c.member.id, 'task') : null;   // P1 판27: 법정 검사 제안이 켜진 앱이 보낸 제안 날짜와 확정 날짜(검사 칸만 · 승격일 때만 — 검토 반영, 못 읽으면 기록 안 함 · 표시 기록, 값 판정 없음)
   // P1 판38: 판38 앱이 보낸 줄(insp_done 칸 있음)이면 새 칸을 기록 줄에 더하고, 차량 줄의 연장 만료일(그 회차 몫)은 기록으로 옮겨졌으니 비움 — 옛 앱 요청은 종전 그대로
   const extWas = (lawLog && lx.ex && Object.prototype.hasOwnProperty.call(wv, 'insp_ext')) ? String(wv.insp_ext == null ? '' : wv.insp_ext) : null;
-  // 독립 검토 4: 요청에 연장 만료일이 없어도(낡은 완료 창 · 다른 기기가 그 사이 넣음) 그때 차량 줄에 있는 연장 만료일(종전 만기 뒤 날짜)을 기록 줄로 옮긴 뒤 비움 — 지우기만 하지 않게
-  //   재검토(11/19): 단, 창이 보여 준 값(ext_was)이 지금 차량 줄 값과 같고 사람이 칸을 비워 보냈으면(clr) 일부러 지운 것 — 옮기지 않고 지움(수정 창 길과 같은 결과)
-  if (lawLog && lx.ex && !lx.ex.insp_ext && extWas && vehDueDate(extWas) && vehDueDate(cur) && extWas > cur && !(lx.clr && lx.was === extWas)) lx.ex.insp_ext = extWas;
-  //   5차 검토(11/19): 같은 회차 정정(새 만기가 종전 만기의 검사 기간 폭 안 — 제안 근거 행 기준)이면 수검일·신청일은 기록하지 않음(오타 만기가 출발점이 되지 않게 · 앱 vehLawSame 같은 규칙)
+  //   6차 검토(11/19): 연장 만료일의 한살이(앱 vehLawLogEntry 같은 규칙) — 같은 회차 정정(vehLawSameS — 수검일·신청일 유무와 관계없이)이면 수검일·신청일 뺌 · 연장은 기록에 안 실음
+  //   기록 줄로 옮기고 차량 줄을 비우는 것은 '갱신 꼴 저장'(vehLawRenewS — 새 만기가 E(종전 만기·연장·수검일/신청일)의 기간 폭 안)일 때만 · 그 밖은 차량 줄 연장 칸 그대로(요청에 새 연장 값이 있으면 그 값 · 일부러 지움이면 지움)
   let inspDropped = false;
-  if (lawLog && lx.ex && (lx.ex.insp_done || lx.ex.insp_apply) && vehLawSameS((await vehBgState(st)).bg, lawLog.rule, cur, date)) { lx.ex.insp_done = ''; delete lx.ex.insp_apply; inspDropped = true; }
-  if (lawLog && lx.ex) { Object.assign(lawLog, lx.ex); delete wv.insp_ext; }
+  if (lawLog && lx.ex) {
+    const bgL = (await vehBgState(st)).bg, newExt = lx.ex.insp_ext || '', cleared = !!(lx.clr && lx.was === extWas);
+    const carry = (!newExt && extWas && vehDueDate(extWas) && vehDueDate(cur) && extWas > cur && !cleared) ? extWas : '';
+    if (vehLawSameS(bgL, lawLog.rule, cur, date)) { inspDropped = !!(lx.ex.insp_done || lx.ex.insp_apply); lx.ex.insp_done = ''; delete lx.ex.insp_apply; delete lx.ex.insp_ext; }
+    else if (vehLawRenewS(bgL, lawLog.rule, cur, date, Object.assign({}, lx.ex, (newExt || carry) ? { insp_ext: newExt || carry } : {}))) { if (newExt || carry) lx.ex.insp_ext = newExt || carry; delete wv.insp_ext; }
+    else delete lx.ex.insp_ext;
+    if (Object.prototype.hasOwnProperty.call(wv, 'insp_ext') || newExt) { if (newExt && !Object.prototype.hasOwnProperty.call(lx.ex, 'insp_ext')) wv.insp_ext = newExt; else if (cleared && !lx.ex.insp_ext) delete wv.insp_ext; }
+    Object.assign(lawLog, lx.ex);
+  }
   if (lawLog) wv.insp_log = (Array.isArray(wv.insp_log) ? wv.insp_log : []).concat([lawLog]).slice(-VEH_LOG_MAX);
   wdoc.updated_by = c.member.id; wdoc.updated_at = now;
   const w = await blobSet(st, colKey('vehicles'), wdoc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   const f = {}; f[field] = [cur, date];
-  if (extWas !== null) f.insp_ext = [extWas, ''];
+  const extNow = Object.prototype.hasOwnProperty.call(wv, 'insp_ext') ? String(wv.insp_ext == null ? '' : wv.insp_ext) : '';
+  if (extWas !== null && extWas !== extNow) f.insp_ext = [extWas, extNow]; else if (extWas === null && extNow) f.insp_ext = ['', extNow];
   const au = await appendAudit({ ts: now, by: c.member.name, bid: c.member.id, col: 'vehicles', ev: [{ op: '수정', id: wv.id, t: String(wv.no || wv.id).slice(0, 40) + ' · 지시 완료 창(' + (vehDo ? '차량 수행' : '배정 담당') + ' · 지시 ' + t.id + ')', f: f }] });
-  return jr(200, Object.assign({ status: 'OK', vehicle: { id: wv.id, field: field, value: date, prev: cur, updated: today }, updated_at: now, audit: au !== false, request_id: R }, inspDropped ? { insp_dropped: true } : {}, lawLog ? { law_log: lawLog } : {}));   // P1 판27: 앱이 로컬 줄에도 같은 기록을 붙임(다음 통째 저장이 지우지 않게)
+  return jr(200, Object.assign({ status: 'OK', vehicle: { id: wv.id, field: field, value: date, prev: cur, updated: today }, updated_at: now, audit: au !== false, request_id: R }, inspDropped ? { insp_dropped: true } : {}, (lawLog && lx.ex) ? { ext_now: extNow } : {}, lawLog ? { law_log: lawLog } : {}));   // P1 판27: 앱이 로컬 줄에도 같은 기록을 붙임(다음 통째 저장이 지우지 않게)
 }
 // ---- P1 판26·27(원장 T476·T451 · 시안 판3 ① · PM 11/13 18:14 '45. 판3 ㄱ') 차량 법정 검사 제안 ----
 //   근거 표 bg:veh:law:v1(차량 법령 근거 — 판13 초안·11/20 승격 카드 ②)은 settings:veh.bg_ver 가 그 판 ver 와 같을 때만 '승격'(계약 bg:contract:law:v1 · settings:contract.bg_ver 와 같은 꼴).
@@ -2141,14 +2147,32 @@ function vehLawEx(law, cur, today, date) {
   return { ok: true, ex: ex, clr: clr, was: was };
 }
 // 조문에 상한이 없어 오기만 거르는 넉넉한 값(개월) — 정기검사는 만기 근처에 받음(기간 밖 이른·늦은 수검도 들어감) · 연장·유예는 사유 종료까지(시행규칙 75조 — 상한 없음). 정상 입력이 막히면 늘림(앱과 같이)
-const VEH_INSP_SPAN_M = 36, VEH_EXT_SPAN_M = 24;
+const VEH_INSP_SPAN_M = 36, VEH_EXT_SPAN_M = 120;
 // P1 판38 5차 검토: 같은 회차 정정 — 근거 표에서 제안 근거 행(rule id)의 검사 기간 폭(win_before·win_after 0~366 정수) 안에 새 만기가 드는가(앱 vehLawSame 같은 규칙)
 function vehLawSameS(bg, rule, prev, conf) {
+  const r = vehLawRowS(bg, rule);
+  if (!r || !vehDueDate(prev) || !vehDueDate(conf)) return false;
+  return vehDayNumS(conf) >= vehDayNumS(prev) - r.win_before && vehDayNumS(conf) <= vehDayNumS(prev) + r.win_after;
+}
+// 6차 검토: 근거 행 거름(앱 vehLawRowOk·vehLawWinHas와 같은 꼴 — 실측·조문 인용·주기·기간 칸 셋)
+function vehLawRowS(bg, rule) {
+  const okN = function (n, lo, hi) { return Number.isInteger(n) && n >= lo && n <= hi; };
   const r = (bg && Array.isArray(bg.rows) ? bg.rows : []).filter(function (x) { return x && typeof x === 'object' && x.id === rule; })[0];
-  const okN = function (n) { return Number.isInteger(n) && n >= 0 && n <= 366; };
-  if (!r || !rule || !okN(r.win_before) || !okN(r.win_after) || !vehDueDate(prev) || !vehDueDate(conf)) return false;
-  const dn = function (s) { return Math.round(Date.parse(s + 'T00:00:00Z') / 86400000); };
-  return dn(conf) >= dn(prev) - r.win_before && dn(conf) <= dn(prev) + r.win_after;
+  if (!r || !rule || r.grade !== '실측' || !Array.isArray(r.cites) || !r.cites.length || (r.cls !== 'car' && r.cls !== 'ceq') || !okN(r.every_m, 1, 120)) return null;
+  return (okN(r.win_before, 0, 366) && okN(r.win_after, 0, 366) && (r.win_basis === 'pass' || r.win_basis === 'apply')) ? r : null;
+}
+function vehDayNumS(s) { return Math.round(Date.parse(s + 'T00:00:00Z') / 86400000); }
+// 6차 검토: '갱신 꼴 저장' — 새 만기가 E(종전 만기·연장·수검일/신청일로 센 그 회차 만료일 — 민법 160조②③)의 검사 기간 폭 안(앱 vehLawRenewOk 같은 규칙)
+function vehLawRenewS(bg, rule, prev, conf, ex) {
+  const r = vehLawRowS(bg, rule), dn = vehDayNumS;
+  if (!r || !vehDueDate(prev) || !vehDueDate(conf)) return false;
+  const E = (ex && vehDueDate(ex.insp_ext) && ex.insp_ext > prev) ? ex.insp_ext : prev;
+  const s = ex && vehDueDate(ex.insp_done) ? ex.insp_done : '', ap = (r.win_basis === 'apply' && ex && vehDueDate(ex.insp_apply)) ? ex.insp_apply : '';
+  const early = !!(r.win_basis === 'apply' && !ap && s && dn(s) < dn(E) - r.win_before), at = r.win_basis === 'apply' ? (ap || (early ? s : '')) : s;
+  const inWin = !at || (dn(at) >= dn(E) - r.win_before && dn(at) <= dn(E) + r.win_after);
+  const S0 = new Date((dn((inWin || !s) ? E : s) + 1) * 86400000).toISOString().slice(0, 10);
+  const t = vehAddMonthsS(S0, r.every_m), end = +t.slice(8, 10) < +S0.slice(8, 10) ? t : new Date((dn(t) - 1) * 86400000).toISOString().slice(0, 10);
+  return dn(conf) >= dn(end) - r.win_before && dn(conf) <= dn(end) + r.win_after;
 }
 function vehAddMonthsS(s, n) {   // 앱 vehAddMonths와 같은 말일 맞춤
   const y = +s.slice(0, 4), m = +s.slice(5, 7) - 1 + n, d = +s.slice(8, 10), yy = y + Math.floor(m / 12), mm = ((m % 12) + 12) % 12, last = new Date(Date.UTC(yy, mm + 1, 0)).getUTCDate();
@@ -2224,6 +2248,9 @@ async function handleVehBgSet(event, d, R) {
 function vehLogUnion(a, b) {
   const seen = {}, out = [];
   [].concat(Array.isArray(a) ? a : [], Array.isArray(b) ? b : []).forEach(function (e) { if (!e || typeof e !== 'object') return; const k = [e.at, e.confirmed, e.src].join('|'); if (seen[k]) return; seen[k] = 1; out.push(e); });
+  // 6차 검토(M2): 열쇠가 같아도 새 칸 값이 양쪽 다 있고 서로 다르면(같은 날 같은 새 만기로 두 화면이 갱신) 두 줄 다 남김 — 앱 깨끗 조건 ⑤(같은 만기에서 두 번 떠남)로 '확인 필요' · 앱 vehLogUnion 같은 규칙
+  const keyL = function (e) { return [e.at, e.confirmed, e.src].join('|'); };
+  [].concat(Array.isArray(a) ? a : [], Array.isArray(b) ? b : []).forEach(function (e) { if (!e || typeof e !== 'object' || out.indexOf(e) >= 0) return; const k = keyL(e), same = out.filter(function (o) { return keyL(o) === k; }); if (same.length && same.every(function (o) { return vehLogClash(o, e); })) out.push(e); });
   out.sort(function (p, q) { const x = String(p.at || ''), y = String(q.at || ''); return x < y ? -1 : (x > y ? 1 : 0); });
   // P1 판38(C166): 같은 줄이 한쪽에만 수검일·검사 신청일·연장 만료일을 가졌으면 그 칸을 채운 사본으로(새 칸을 모르는 사본이 먼저 와도 지워지지 않게) — 앱 vehLogUnion과 같은 규칙
   const all = [].concat(Array.isArray(a) ? a : [], Array.isArray(b) ? b : []);
@@ -2231,12 +2258,13 @@ function vehLogUnion(a, b) {
     let f = null;
     const k = [e.at, e.confirmed, e.src].join('|');
     all.forEach(function (x) {
-      if (!x || typeof x !== 'object' || x === e || [x.at, x.confirmed, x.src].join('|') !== k) return;
+      if (!x || typeof x !== 'object' || x === e || [x.at, x.confirmed, x.src].join('|') !== k || vehLogClash(x, e)) return;
       ['insp_done', 'insp_apply', 'insp_ext'].forEach(function (n) { const cur = (f || e)[n]; if (typeof x[n] === 'string' && (cur === undefined || (cur === '' && x[n] !== ''))) { f = f || Object.assign({}, e); f[n] = x[n]; } });
     });
     return f || e;
   }).slice(-VEH_LOG_MAX);
 }
+function vehLogClash(p, q) { return ['insp_done', 'insp_apply', 'insp_ext'].some(function (n) { return typeof p[n] === 'string' && typeof q[n] === 'string' && p[n] !== '' && q[n] !== '' && p[n] !== q[n]; }); }
 function vehLogKeep(oldItems, items) {
   const oldById = {};
   (oldItems || []).forEach(function (o) { if (o && o.id && Array.isArray(o.insp_log) && o.insp_log.length) oldById[o.id] = o; });
