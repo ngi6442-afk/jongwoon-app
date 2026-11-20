@@ -20235,10 +20235,10 @@ try {
     const FT = ['`category`', '`cliSheetDocs`', '`cliSheetDocNote`', '`cliRelatedDocs`', '`collectors/onbid.py`', '155cc25', '원장 C147'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const docs = cut(d.ix, '  function cliSheetDocs(r){', '\n  }');
-    const ok = /기준: v504 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 1 && op.length === 1
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 504 && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 1 && op.length === 1
       && d.man.indexOf('관련 문서는 제목에 상호가 들어간 문서함 문서입니다') > 0 && d.man.indexOf('제목이나 분류에 상호가') < 0
       && docs.length > 0 && docs.indexOf('category') < 0 && d.ix.indexOf('"문서함 제목에 상호가 들어간 문서 — ') > 0 && d.ix.indexOf('문서함 제목·분류에 상호') < 0
-      && d.cl.indexOf('**거래처 관련 문서 제목만(v504') > 0 && /SHELL_CACHE = 'jw-shell-v504'/.test(d.sw);
+      && d.cl.indexOf('**거래처 관련 문서 제목만(v504') > 0 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 504;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, op: op.length, docs: docs.length } };
   };
   const rQ = chkQ(DQ);
@@ -20251,6 +20251,31 @@ try {
   T('v504 문서·판 번호(정확 검사): FEATURES 기준 v504 (2026-11-20)·v504 절(C147 ②) · TESTLIST v504 칸 4(운영 확인 1 · 시험 화면 [x] 1 · 게이트 [x] 2) · MANUAL 관련 문서 \'제목에\' · index cliSheetDocs 분류 칸 0·안내 글 \'제목에\' · CLAUDE.md 한 줄 · sw jw-shell-v504 · 결함 사본(기준 줄·sw·FEATURES 글·MANUAL 옛 글·분류 조건 되살림·옛 안내 글·CLAUDE 줄·TESTLIST 칸) 8건 다 잡힘',
     rQ.ok && MQ.every((v) => v === false), JSON.stringify({ r: rQ.info, mut: MQ }));
 } catch (e) { console.log('  (v504 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v505(C220 — 근거 재확인 표시 괄호 메모 오탐 · 원장 C220): 실행 검사는 위 'C220' 블록 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd505 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D505 = { ft: rd505('FEATURES.md'), tl: rd505('TESTLIST.md'), sw: rd505('sw.js'), man: rd505('MANUAL.html'), cl: rd505('CLAUDE.md') };
+  const chk505 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v505 (11/20)', '\n### '), tlv = cut(d.tl, '\n## v505 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`licRkParse`", "`licRkMemoSpans`", "원장 C220"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v505 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C220(v505') > 0
+      && /SHELL_CACHE = 'jw-shell-v505'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r505 = chk505(D505);
+  const mu505 = (k, f) => chk505(Object.assign({}, D505, { [k]: f(D505[k]) })).ok;
+  const M505 = [mu505('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v504 (')), mu505('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v504'")),
+    mu505('ft', (s) => s.split('`licRkParse`').join('licRkParse')),
+    mu505('cl', (s) => s.replace('**C220(v505', 'C220(')),
+    mu505('tl', (s) => s.replace('\n- [x] (AI) `uismoke` \'C220\'', '\n- (AI) `uismoke` \'C220\''))];
+  T('v505 문서·판 번호(정확 검사): FEATURES 기준 v505 (2026-11-20)·v505 절(C220) · TESTLIST v505 칸 4(화면·운영 확인 2 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v505 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
+    r505.ok && M505.every((v) => v === false), JSON.stringify({ r: r505.info, mut: M505 }));
+} catch (e) { console.log('  (v505 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
