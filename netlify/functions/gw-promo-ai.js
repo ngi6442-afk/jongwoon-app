@@ -137,7 +137,7 @@ async function handleLearnGet(st, c, d, R) {
   try { const PQ = require('./_lib/promoqual'); const qr = await blobGet(st, PQ.QUAL_KEY); quality = PQ.summary(qr.ok ? qr.data : null); } catch (e) { quality = null; }
   // 체크 10 품질 고리 3단계(원천) — 품질 자동 학습 상태(promoai:qlearn: 모델이 쓴 품질 규칙·이번 목표 항목·끄기). 읽기만, 실패하면 이 칸만 null
   let qlearn = null;
-  try { const QL = require('./_lib/promoqlearn'); const qq = await blobGet(st, QL.QLEARN_KEY); qlearn = QL.cardOf(qq.ok ? qq.data : null, Date.now()); } catch (e) { qlearn = null; }
+  try { const QL = require('./_lib/promoqlearn'); const qq = await blobGet(st, QL.QLEARN_KEY); const qo = await QL.offOf(blobGet, st, qq.ok ? qq.data : null); qlearn = QL.cardOf(qq.ok ? qq.data : null, Date.now(), qo.ok ? qo.off : undefined); if (qlearn && !qo.ok) qlearn.off_error = String(qo.code || ''); } catch (e) { qlearn = null; }
   return jr(200, { ok: true, lessons: { off: L.off, rules: L.rules, exemplars: Object.keys(L.exemplars).map(function (k) { const e = L.exemplars[k]; return { key: k, promo_id: String(e.promo_id || ''), title: String(e.title || ''), ts: Number(e.ts) || 0, chars: String(e.excerpt || '').length }; }), gaps: L.gaps.slice(-20), stats: L.stats, updated_at: L.updated_at, summary: PL.gapSummary(L) },
     pairs: pairs.pairs, pairs_error: pairs.ok ? '' : pairs.code, qlearn: qlearn, quality: quality, layout: layout, request_id: R });
 }
@@ -196,12 +196,9 @@ async function handleLearnSet(st, c, d, R) {
     if (!w.ok) return jr(500, { ok: false, code: w.code || 'PAIR_WRITE_FAILED', request_id: R });
   } else if (typeof d.qoff === 'boolean') {
     // 체크 10 품질 고리 3단계(원천) — 품질 자동 학습 끄기·켜기(PM 손은 이 스위치뿐). 골격 스위치(off — 편집 간극 학습)와 따로다.
+    //   v504 C122 N3(11/20): 스위치는 따로 열쇠(QOFF_KEY)에만 쓴다 — 학습 문서(promoai:qlearn)를 읽고 통째로 다시 쓰지 않으니, 그새 들어온 학습 결과를 옛 규칙으로 덮지 않고 워커도 이 값을 덮지 못한다.
     const QL = require('./_lib/promoqlearn');
-    const qq = await blobGet(st, QL.QLEARN_KEY);
-    if (!qq.ok && qq.code !== 'NOT_FOUND') return jr(500, { ok: false, code: qq.code || 'QLEARN_READ_FAILED', request_id: R });
-    const q = QL.normQL(qq.ok ? qq.data : null);
-    q.off = d.qoff; q.updated_at = Date.now();
-    const w = await blobSet(st, QL.QLEARN_KEY, q);
+    const w = await blobSet(st, QL.QOFF_KEY, { off: d.qoff, ts: Date.now(), by: String(c.member.id || '') });
     if (!w.ok) return jr(500, { ok: false, code: w.code || 'QLEARN_WRITE_FAILED', request_id: R });
     ev = '품질 학습 ' + (d.qoff ? '끔' : '켬');
   } else return jr(400, { ok: false, code: 'NO_CHANGE', request_id: R });

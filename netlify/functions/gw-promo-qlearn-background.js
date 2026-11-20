@@ -62,7 +62,9 @@ exports.handler = async function (event, context) {
     const qr = await blobGet(st, QL.QLEARN_KEY);
     if (!qr.ok) { console.log('[품질 학습] 시작 읽기 실패 ' + (qr.code || '') + ' — 모델 호출 안 함'); return; }   // 검토 gen F2(c)
     const q0 = QL.normQL(qr.data);
-    if (q0.off) { await release('', ''); return; }   // 기동 뒤 꺼졌으면 잠금만 푼다
+    const o0 = await QL.offOf(blobGet, st, qr.data);   // v504 C122 N3 — 끄기는 따로 열쇠(없으면 문서 off)
+    if (!o0.ok) { await release('QOFF_READ_FAILED', o0.code); return; }
+    if (o0.off) { await release('', ''); return; }   // 기동 뒤 꺼졌으면 잠금만 푼다
     if (!process.env.GW_ANTHROPIC_KEY) { await release('ENV_MISSING'); return; }
     const lib = loadLib();
     if (!lib) { await release('LIB_MISSING'); return; }

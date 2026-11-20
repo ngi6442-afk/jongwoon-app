@@ -24413,7 +24413,8 @@
   }
   function promoQLearnHtml(q){
     var h = '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0 4px;"><b>품질 자동 학습 — 본보기 대비 모자란 항목에서 모델이 배운 규칙</b>'
-      + (q ? '<button type="button" class="mini-btn" data-pq-off="' + (q.off ? "0" : "1") + '" style="margin:0;' + (q.off ? 'background:#FAF0E4;color:#a8651f;' : '') + '">' + (q.off ? "꺼짐 — 켜기" : "켜짐 — 끄기") + '</button>' : '')
+      + (q && q.off_error ? '<span style="font-size:12px;color:#a8651f;">켜짐·꺼짐 상태를 못 읽음 — 잠시 뒤 다시 열기</span>' : '')   /* v504 C122 N3 검토: 끄기 열쇠를 못 읽으면 옛 값으로 '켜짐'을 보이지 않음 */
+      + (q && !q.off_error ? '<button type="button" class="mini-btn" data-pq-off="' + (q.off ? "0" : "1") + '" style="margin:0;' + (q.off ? 'background:#FAF0E4;color:#a8651f;' : '') + '">' + (q.off ? "꺼짐 — 켜기" : "켜짐 — 끄기") + '</button>' : '')
       + '<span style="color:var(--sub);">(3단계·원천: 다음 생성에 직원 규칙 아래로 들어감 · 부딪히면 직원 쪽 · 생성 뒤 다시 쓰기 없음)</span></div>';
     if (!q) return h + '<div class="empty-line">품질 학습 현황을 읽지 못했습니다.</div>';
     var st = q.stats || {};

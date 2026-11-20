@@ -3222,8 +3222,9 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   rp = await callP({ action: 'pl_set', off: false }, tokA);
   T('48 pl_set 켜기', rp.code === 200 && rp.body.lessons.off === false);
   // 체크 10 품질 고리 3단계(원천) — pl_get qlearn 칸 · pl_set qoff(품질 자동 학습 끄기·켜기 — 골격 스위치 off와 따로). 나머지는 tools/promoqlearn_check.mjs
+  const ql48b = JSON.stringify(mem.gw_data['promoai:qlearn'] === undefined ? null : mem.gw_data['promoai:qlearn']);   // v504 C122 N3 — 스위치는 학습 문서를 건드리지 않음
   rp = await callP({ action: 'pl_set', qoff: true }, tokA);
-  T('48(체크 10 3단계) pl_set qoff 끄기 → promoai:qlearn off · 골격 lessons.off 그대로(false) · 감사로그 "품질 학습 끔" · pl_get qlearn.off', rp.code === 200 && rp.body.qlearn && rp.body.qlearn.off === true && mem.gw_data['promoai:qlearn'].off === true && rp.body.lessons.off === false && auditMock.logs.some((l) => l.col === 'promo' && l.ev[0].op === '블로그학습' && l.ev[0].t === '품질 학습 끔'), JSON.stringify(rp.body.qlearn));
+  T('48(체크 10 3단계) pl_set qoff 끄기 → 따로 열쇠 promoai:qlearn_off off(v504 N3 — 학습 문서 promoai:qlearn은 그대로) · 골격 lessons.off 그대로(false) · 감사로그 "품질 학습 끔" · pl_get qlearn.off', rp.code === 200 && rp.body.qlearn && rp.body.qlearn.off === true && mem.gw_data['promoai:qlearn_off'].off === true && JSON.stringify(mem.gw_data['promoai:qlearn'] === undefined ? null : mem.gw_data['promoai:qlearn']) === ql48b && rp.body.lessons.off === false && auditMock.logs.some((l) => l.col === 'promo' && l.ev[0].op === '블로그학습' && l.ev[0].t === '품질 학습 끔'), JSON.stringify(rp.body.qlearn));
   rp = await callP({ action: 'pl_set', qoff: false }, tokW, 'dev1');
   T('48(체크 10 3단계) pl_set qoff 비관리자 → 403', rp.code === 403);
   rp = await callP({ action: 'pl_set', qoff: false }, tokA);

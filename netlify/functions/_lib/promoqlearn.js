@@ -12,6 +12,10 @@
 const PQ = require('./promoqual');
 
 const QLEARN_KEY = 'promoai:qlearn';
+// v504 C122 N3(11/20): 끄기 스위치는 따로 열쇠 — 스위치(pl_set qoff)만 이 열쇠를 쓰고, 크론·워커는 읽기만 한다.
+//   전에는 스위치와 학습 결과가 promoai:qlearn 한 문서를 통째로 읽고 써서, 읽기~쓰기 사이에 서로 덮었다
+//   (워커 합치기가 그새 끈 것을 켬으로, 스위치가 그새 학습된 규칙을 옛 규칙으로). 열쇠가 없으면(스위치를 한 번도 안 누름) 문서의 off를 그대로 본다.
+const QOFF_KEY = 'promoai:qlearn_off';
 const QL_VER = 'ql1-20261113';
 const MAX_QRULES = 10;
 const QRULE_CHARS = 120;
@@ -272,12 +276,23 @@ function markKick(ql0, sig, now) {
   ql.tries += 1; ql.lock_ts = now; ql.code = ''; ql.detail = ''; ql.updated_at = now;
   return ql;
 }
+// 끄기 스위치 읽기(v504 C122 N3) — get = blobGet. 열쇠에 off(참·거짓)가 있으면 그 값, 열쇠가 없으면(blobGet은 ok·null) 문서(raw)의 off,
+//   읽기 오류면 ok:false(부르는 쪽이 켬으로 보지 않는다)
+async function offOf(get, st, raw) {
+  const o = await get(st, QOFF_KEY);
+  if (!o || !o.ok) return { ok: false, code: (o && o.code) || 'QOFF_READ_FAILED' };
+  if (o.data && typeof o.data === 'object' && typeof o.data.off === 'boolean') return { ok: true, off: o.data.off, src: 'key' };
+  return { ok: true, off: !!(raw && typeof raw === 'object' && raw.off === true), src: 'doc' };
+}
 // 크론 ⑥ — 판정이 '기동'이면 잠금·시도를 적고 워커를 부른다. 반환은 로그용 요약. 골격 키는 읽기만.
 async function kick(st, now) {
   const B = require('./blobs');
   const qr = await B.blobGet(st, QLEARN_KEY);
   if (!qr.ok && qr.code !== 'NOT_FOUND') return { error: qr.code || 'QL_READ_FAILED' };
   const ql = normQL(qr.ok ? qr.data : null);
+  const o1 = await offOf(B.blobGet, st, qr.ok ? qr.data : null);
+  if (!o1.ok) return { error: o1.code };
+  ql.off = o1.off;
   if (ql.off) return { skipped: 'off' };
   if (ql.lock_ts && now - ql.lock_ts < LOCK_TTL_MS) return { skipped: 'running' };
   const q = await B.blobGet(st, PQ.QUAL_KEY);
@@ -292,7 +307,9 @@ async function kick(st, now) {
   const re = await B.blobGet(st, QLEARN_KEY);
   if (!re.ok) return { error: re.code || 'QL_READ_FAILED' };
   const cur = normQL(re.data);
-  if (cur.off) return { skipped: 'off' };
+  const o2 = await offOf(B.blobGet, st, re.data);
+  if (!o2.ok) return { error: o2.code };
+  if (o2.off) return { skipped: 'off' };
   if (cur.lock_ts && now - cur.lock_ts < LOCK_TTL_MS) return { skipped: 'running' };
   if (cur.basis_sig === d.sig && !cur.code) return { skipped: 'same' };
   const nq = markKick(cur, d.sig, now);
@@ -315,8 +332,9 @@ function focusText(f, fmt) {
   const nowTxt = (f.now === null || f.now === undefined || isNaN(Number(f.now))) ? '' : '최근 초안 ' + k(f.now) + u + ' → ';
   return g.say + '(' + nowTxt + '목표 ' + tgt + ')';
 }
-function injectOf(raw, fmt) {
+function injectOf(raw, fmt, offv) {
   const ql = normQL(raw);
+  if (typeof offv === 'boolean') ql.off = offv;   // v504 C122 N3 — 따로 열쇠의 끄기(offOf)
   if (ql.off || !ql.rules.length) return null;
   const F = (fmt && typeof fmt.koNum === 'function' && typeof fmt.koCount === 'function') ? fmt : null;
   // 목표 줄은 모델이 규칙을 쓴 항목만(배포 전 검토 loop F1) — 코치가 직원 규칙과 부딪혀 규칙을 안 쓴 항목은 목표 줄에서도 빠진다
@@ -328,8 +346,9 @@ function injectOf(raw, fmt) {
 }
 
 // ---- 카드(pl_get) ----
-function cardOf(raw, now) {
+function cardOf(raw, now, offv) {
   const ql = normQL(raw);
+  if (typeof offv === 'boolean') ql.off = offv;   // v504 C122 N3 — 따로 열쇠의 끄기(offOf)
   now = now || Date.now();
   return {
     ver: ql.ver, off: ql.off, rules: ql.rules,
@@ -341,10 +360,10 @@ function cardOf(raw, now) {
 }
 
 module.exports = {
-  QLEARN_KEY, QL_VER, MAX_QRULES, QRULE_CHARS, RECENT_N, FOCUS_N, LOCK_TTL_MS, RETRY_MS, CREDIT_WAIT_MS, MIN_GAP_MS, MAX_TRIES, HIST_MAX, CODES, GOAL, DENY, DENY_RE,
+  QLEARN_KEY, QOFF_KEY, QL_VER, MAX_QRULES, QRULE_CHARS, RECENT_N, FOCUS_N, LOCK_TTL_MS, RETRY_MS, CREDIT_WAIT_MS, MIN_GAP_MS, MAX_TRIES, HIST_MAX, CODES, GOAL, DENY, DENY_RE,
   recentDrafts, itemStats, focusOf, basisSig, exValue, critText,
   QLEARN_SYSTEM, QLEARN_SCHEMA, buildQLearnPrompt,
   cleanRule, normQRules, normQL, normFocus, mergeQL,
-  decide, markKick, kick,
+  decide, markKick, kick, offOf,
   focusText, injectOf, cardOf,
 };

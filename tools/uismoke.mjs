@@ -1578,7 +1578,7 @@ try {
     /QUAL_KEY = 'promoai:quality'/.test(pq) && /async function sweep\(st, doc, now\)/.test(pq) && /function summary\(raw\)/.test(pq) && /function planFromBody\(body, nImg, prof, tags\)/.test(pq) && existsSync(join(ROOT, 'netlify', 'functions', '_lib', 'promoqual_ex.json'))
     && /try \{ quality = await require\('\.\/_lib\/promoqual'\)\.sweep\(st, doc, now\); \}/.test(cron) && /quality: quality, layout: layout, request_id: R/.test(papi)
     && /function promoQualHtml\(q\)\{/.test(html) && /h \+= promoQualHtml\(res\.body\.quality\);/.test(html)
-    && !/promoqual/.test(gen) && !/score10/.test(gen) && !/promoqlearn/.test(genLib + genLw + genJob) && (genWk.match(/promoqlearn/g) || []).length === 1 && /QL\.injectOf\(qr\.ok \? qr\.data : null, lib\)/.test(genWk)
+    && !/promoqual/.test(gen) && !/score10/.test(gen) && !/promoqlearn/.test(genLib + genLw + genJob) && (genWk.match(/promoqlearn/g) || []).length === 1 && /QL\.injectOf\(qr\.ok \? qr\.data : null, lib, qo\.off\)/.test(genWk)
     && !/promoqual|promoQual|quality/.test(post) && existsSync(join(ROOT, 'tools', 'promoqual_check.mjs')),
     '어느 고리가 빠졌는지 node tools/promoqual_check.mjs ⑥으로 확인');
 } catch (e) { console.log('  (체크 10 품질 고리 검사 생략 — ' + e.message + ')'); fails++; }
@@ -1603,11 +1603,11 @@ try {
   const ql3 = rdF('_lib/promoqlearn.js'), qw3 = rdF('gw-promo-qlearn-background.js'), pl3 = rdF('_lib/promolearn.js'), lw3 = rdF('gw-promo-learn-background.js');
   const cr3 = rdF('gw-promo-ai-cron.js'), pai3 = rdF('_lib/promoai.js'), papi3 = rdF('gw-promo-ai.js'), wk3 = rdF('gw-promo-ai-run-background.js', 'latin1');
   T('체크 10 3단계(원천): _lib/promoqlearn.js(promoai:qlearn · kick · decide · injectOf) · 워커 gw-promo-qlearn-background(내부 토큰·골격 키 안 씀) · 골격 파일(promolearn·학습 워커)은 품질 학습을 모름 · 크론 ⑥ try 안 늦은 require · buildPrompt [완성도 목표] = 직원 규칙 블록 아래·부딪히면 직원 쪽 · 생성 워커 주입·재조립 · pl_get qlearn·pl_set qoff · 카드 일치율 흐름·품질 학습 칸 · 게이트 tools/promoqlearn_check.mjs',
-    /QLEARN_KEY = 'promoai:qlearn'/.test(ql3) && /async function kick\(st, now\)/.test(ql3) && /function decide\(ql0, Q0, lessonsRules, now\)/.test(ql3) && /function injectOf\(raw, fmt\)/.test(ql3)
+    /QLEARN_KEY = 'promoai:qlearn'/.test(ql3) && /async function kick\(st, now\)/.test(ql3) && /function decide\(ql0, Q0, lessonsRules, now\)/.test(ql3) && /function injectOf\(raw, fmt, offv\)/.test(ql3)
     && /v\.payload\.mid !== '__promoai__'/.test(qw3) && !/blobSet\([^)]*LESSONS/.test(qw3) && !/qlearn|promoqlearn/.test(pl3) && !/qlearn|promoqlearn/.test(lw3)
     && /try \{ qlearn = await require\('\.\/_lib\/promoqlearn'\)\.kick\(st, now\); \}/.test(cr3) && /out\.qlearn = qlearn;/.test(cr3) && !/^const .*require\('\.\/_lib\/promoqlearn'\)/m.test(cr3)
     && pai3.indexOf('[직원이 고치는 패턴 — 자동 학습 ') > 0 && pai3.indexOf('[직원이 고치는 패턴 — 자동 학습 ') < pai3.indexOf('[완성도 목표 — 품질 자동 학습 ') && /부딪히면 직원 쪽을 따릅니다/.test(pai3) && !/promoqlearn/.test(pai3)
-    && /QL\.injectOf\(qr\.ok \? qr\.data : null, lib\)/.test(wk3) && /delete input\.qrules; delete input\.qfocus;/.test(wk3)
+    && /QL\.injectOf\(qr\.ok \? qr\.data : null, lib, qo\.off\)/.test(wk3) && /delete input\.qrules; delete input\.qfocus;/.test(wk3)
     // 배포 전 검토 반영(11/13): 금지 문자열이면 품질 자료 먼저(골격 되돌림 앞) · 실명·지명 거름 · 응답 상한 8000·MAX_TOKENS 따로 · 짝 시간순
     && wk3.indexOf('if (!g1.ok && (input.qrules || input.qfocus))') > 0 && wk3.indexOf('if (!g1.ok && (input.qrules || input.qfocus))') < wk3.indexOf('if (!g1.ok && (input.exemplar || input.lessons')
     && /const DENY = \[/.test(ql3) && /MAX_TOKENS = 8000/.test(qw3) && /stop_reason === 'max_tokens'/.test(qw3) && /pairs: out\.slice\(0, LEARN_LIST\)/.test(papi3)
@@ -20262,9 +20262,9 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ["`licRkParse`", "`licRkMemoSpans`", "원장 C220"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v505 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 505 && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
       && d.cl.indexOf('**C220(v505') > 0
-      && /SHELL_CACHE = 'jw-shell-v505'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 505;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r505 = chk505(D505);
@@ -20276,6 +20276,29 @@ try {
   T('v505 문서·판 번호(정확 검사): FEATURES 기준 v505 (2026-11-20)·v505 절(C220) · TESTLIST v505 칸 4(화면·운영 확인 2 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v505 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
     r505.ok && M505.every((v) => v === false), JSON.stringify({ r: r505.info, mut: M505 }));
 } catch (e) { console.log('  (v505 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v506(체크 10 C122 N3 — 품질 학습 끄기 스위치 따로 열쇠): 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '504 이상'으로 풀 것
+try {
+  const rdQ = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DQ = { ft: rdQ('FEATURES.md'), tl: rdQ('TESTLIST.md'), sw: rdQ('sw.js') };
+  const chkQ = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v506 (11/20)', '\n### '), tlv = cut(d.tl, '\n## v506 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), op = cb.filter((l) => /^- \[ \] \(운영 확인\)/.test(l));
+    const FT = ['`promoai:qlearn_off`', '`QOFF_KEY`', '`offOf`', '`kick`', '`injectOf`', '`cardOf`', '`cleanRule`', '거르기_전수표_20261120.md', '0/36'];
+    const GATE = ['uismoke', 'servertest', 'consheet_check', 'proctpl_check', 'settletest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check', 'paycalc_check', 'stmtread_a_check', 'stmtread_b_check', 'stmtread_c_check', 'stmtread_d_check', 'stmtmail_check'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0), last = gate[gate.length - 1] || '';
+    const ok = /기준: v506 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => last.indexOf('`' + g + '`') > 0) && /SHELL_CACHE = 'jw-shell-v506'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
+  };
+  const rQ = chkQ(DQ);
+  const muQ = (k, f) => chkQ(Object.assign({}, DQ, { [k]: f(DQ[k]) })).ok;
+  const MQ = [muQ('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v505 (')), muQ('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v505'")),
+    muQ('ft', (s) => s.split('`promoai:qlearn_off`').join('promoai:qlearn_off')), muQ('tl', (s) => { const k = s.lastIndexOf('`paycalc_check`'); return s.slice(0, k) + 'paycalc_check' + s.slice(k + 15); })];
+  T('v506 문서·판 번호(정확 검사): FEATURES 기준 v506 (2026-11-20)·v506 절(따로 열쇠 promoai:qlearn_off·QOFF_KEY·offOf·kick·injectOf·cardOf · 전수 표 cleanRule 0/36) · TESTLIST v506 칸 4(운영 확인 1 · AI [x] 3(게이트 줄 2) · 게이트 18종) · sw jw-shell-v506 · 결함 사본 ' + MQ.length + '개 = 모두 ✗',
+    rQ.ok && MQ.every((v) => v === false), JSON.stringify({ r: rQ.info, mut: MQ }));
+} catch (e) { console.log('  (v506 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

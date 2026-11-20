@@ -1626,3 +1626,9 @@
 - [ ] (AI 운영 확인 — C220) 인허가 › 의무 대장 85행(방치폐기물 이행보증 — 건폐법)에 '근거 재확인 필요' 배지 없음 · 34~39·75행(폐기물관리법 인용)은 배지 그대로 · 배지 행 수 36(배포 전 37) · 이번 달 칸 85행 배지 없음·기한 그대로
 - [x] (AI) `uismoke` 'C220'(실제 인용 읽기 함수 — 괄호 메모 꼴 · 놓치면 안 되는 꼴(별지 서식·「」·괄호 뒤 조문·쉼표 뒤 조문·이름 없는 법·영·규칙)은 고치기 전과 같은 인용 · 불변식 무작위 2만 건(새 인용 ⊆ 옛 인용 · 새로 생기는 인용 0) · 결함 사본) · 운영 백업 사본 98행 대조(표시 37 → 36 · 인용 읽기가 달라진 행 85 하나) — ✓ AI 11/20
 - [x] (AI) `uismoke` · `servertest` · `autorulestest` · `paycalc_check` 전부 통과 + node --check(함수·_lib·sw) + 앱 스크립트 전체 파싱 오류 0 · v504 문서 검사를 이 판 이상으로 풀고 v505 문서·판 번호 정확 검사 — 숫자는 커밋 메시지
+
+## v506 — 체크 10 품질 학습 끄기 스위치 따로 열쇠(C122 N3)
+- [x] (AI) `promoqlearn_check` ⑧-2 4건(따로 열쇠 읽기·크론·주입·카드·정적) · ⑩ 배선 · ⑪ 상태 못 읽음 카드 · `servertest` 48 pl_set qoff(열쇠에만 씀 — 학습 문서 그대로) — ✓ AI 11/20
+- [x] (AI) 거르기 전수 표 어긋남 0/36(09_조사_문서\10_블로그완성도_자료_20261110\거르기_전수표_20261120.md) — ✓ AI 11/20
+- [ ] (운영 확인) 배포 뒤 다음 품질 학습 회차(크론 ⑥)가 종전처럼 돎(운영에는 아직 열쇠 없음 — 문서 off:false 그대로 읽음) · 관리자 카드 품질 학습 켜짐 표시 그대로
+- [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `paycalc_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` 통과 · v505 문서 검사를 이 판 이상으로 풀고 v506 문서·판 번호 정확 검사 — ✓ AI 11/20

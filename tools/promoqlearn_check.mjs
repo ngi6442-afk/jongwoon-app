@@ -271,6 +271,59 @@ const qdoc = Object.assign(QL.normQL(null), { rules: [{ id: 'q1', text: '사진�
   } finally { global.fetch = realFetch; process.env.URL = savedUrl || ''; down = false; clearHooks(); }
 }
 
+// ---- ⑧-2 끄기 스위치 따로 열쇠(v504 C122 N3, 11/20) — 스위치와 학습 결과가 한 문서를 통째로 읽고 써서 서로 덮던 창을 없앰 ----
+{
+  const realFetch = global.fetch; const kicks = [];
+  global.fetch = async (url, o) => { kicks.push(String(url)); return { ok: true, status: 202 }; };
+  const savedUrl = process.env.URL; process.env.URL = 'https://jw.test';
+  try {
+    clearHooks();
+    const B = { blobGet: blobsMock.blobGet };
+    mem.gw_data = {};
+    const a1 = await QL.offOf(B.blobGet, 'gw_data', { off: true });
+    const a2 = await QL.offOf(B.blobGet, 'gw_data', { off: false });
+    mem.gw_data[QL.QOFF_KEY] = { off: false, ts: 1 };
+    const a3 = await QL.offOf(B.blobGet, 'gw_data', { off: true });
+    mem.gw_data[QL.QOFF_KEY] = { off: true, ts: 2 };
+    const a4 = await QL.offOf(B.blobGet, 'gw_data', { off: false });
+    mem.gw_data[QL.QOFF_KEY] = { ts: 3 };
+    const a5 = await QL.offOf(B.blobGet, 'gw_data', { off: true });
+    getHooks[QL.QOFF_KEY] = () => READ_FAIL;
+    const a6 = await QL.offOf(B.blobGet, 'gw_data', { off: false });
+    clearHooks();
+    T('⑧-2 offOf: 열쇠 없음(ok·null) = 문서 off 그대로 · 열쇠 off(참·거짓)가 문서보다 먼저 · off 칸 없는 열쇠 = 문서 · 읽기 오류 = ok:false(켬으로 보지 않음)',
+      QL.QOFF_KEY === 'promoai:qlearn_off' && a1.ok && a1.off === true && a1.src === 'doc' && a2.off === false && a3.off === false && a3.src === 'key' && a4.off === true && a4.src === 'key' && a5.off === true && a5.src === 'doc' && a6.ok === false && a6.code === 'STORAGE_READ_FAILED',
+      JSON.stringify([a1, a3, a4, a5, a6]));
+    // 크론: 문서는 켬인데 열쇠가 끔 → 기동 0·저장 안 함 / 열쇠 읽기 오류 → error·기동 0 / 두 번째(쓰기 직전) 열쇠 읽기에서 꺼짐 → off
+    mem.gw_data = { 'promoai:quality': Q, 'promoai:lessons': LES, [QL.QOFF_KEY]: { off: true, ts: 1 } };
+    let r = await QL.kick('gw_data', NOW);
+    const k1 = kicks.length, w1 = 'promoai:qlearn' in mem.gw_data;
+    delete mem.gw_data[QL.QOFF_KEY]; getHooks[QL.QOFF_KEY] = () => READ_FAIL;
+    const r2 = await QL.kick('gw_data', NOW);
+    clearHooks(); getHooks[QL.QOFF_KEY] = (n) => (n === 2 ? { ok: true, data: { off: true, ts: 5 } } : null);
+    const r3 = await QL.kick('gw_data', NOW);
+    clearHooks();
+    T('⑧-2 크론: 열쇠가 끔이면 건너뜀(off)·학습 문서 안 씀 · 열쇠 읽기 오류면 error·기동 0 · 쓰기 직전 다시 읽은 열쇠가 끔이면 off·기동 0',
+      r.skipped === 'off' && k1 === 0 && w1 === false && r2.error === 'STORAGE_READ_FAILED' && r3.skipped === 'off' && kicks.length === 0 && !('promoai:qlearn' in mem.gw_data),
+      JSON.stringify([r, r2, r3, kicks.length]));
+    // 생성 주입·카드: 넘긴 끔 값이 문서 값보다 먼저
+    const qOn = Object.assign({}, qdoc, { off: false }), qOff = Object.assign({}, qdoc, { off: true });
+    T('⑧-2 생성 주입·카드: injectOf(문서 켬, 끔) = null · injectOf(문서 끔, 켬) = 규칙 실림 · 값 안 넘기면 종전대로 문서 off · cardOf 셋째 값이 off',
+      QL.injectOf(qOn, L, true) === null && QL.injectOf(qOff, L, false) !== null && QL.injectOf(qOff, L, false).rules.length === qdoc.rules.length && QL.injectOf(qOff, L) === null && QL.injectOf(qOn, L) !== null
+      && QL.cardOf(qOn, NOW, true).off === true && QL.cardOf(qOff, NOW, false).off === false && QL.cardOf(qOff, NOW).off === true);
+    // 정적: 열쇠를 쓰는 곳은 스위치 한 곳뿐 · 스위치 갈래는 학습 문서를 쓰지 않음 · 워커·크론은 열쇠를 읽기만
+    const rd2 = (p, enc) => fs.readFileSync(join(FN, p), enc || 'utf8');
+    const files = ['_lib/promoqlearn.js', 'gw-promo-ai.js', 'gw-promo-qlearn-background.js', 'gw-promo-ai-cron.js', '_lib/promolearn.js', 'gw-promo-learn-background.js'].map((p) => [p, rd2(p)]).concat([['gw-promo-ai-run-background.js', rd2('gw-promo-ai-run-background.js', 'latin1')]]);
+    const setters = files.filter(([p, s]) => /blobSet\([^)]*QOFF_KEY/.test(s)).map(([p]) => p);
+    const papi2 = rd2('gw-promo-ai.js'), qi = papi2.indexOf("} else if (typeof d.qoff === 'boolean') {"), qj = papi2.indexOf('} else return jr(400', qi), qbr = papi2.slice(qi, qj);
+    const qw2 = rd2('gw-promo-qlearn-background.js');
+    T('⑧-2 정적: QOFF_KEY 쓰기는 gw-promo-ai.js 스위치 갈래 한 곳 · 그 갈래는 학습 문서(QLEARN_KEY)를 읽지도 쓰지도 않음 · 학습 워커는 시작 때 offOf로 읽고 못 읽으면 QOFF_READ_FAILED',
+      setters.length === 1 && setters[0] === 'gw-promo-ai.js' && qi > 0 && qj > qi && /blobSet\(st, QL\.QOFF_KEY, \{ off: d\.qoff, ts: Date\.now\(\), by: /.test(qbr) && !/QLEARN_KEY/.test(qbr)
+      && /const o0 = await QL\.offOf\(blobGet, st, qr\.data\);/.test(qw2) && /if \(!o0\.ok\) \{ await release\('QOFF_READ_FAILED', o0\.code\); return; \}/.test(qw2) && /if \(o0\.off\) \{ await release\('', ''\); return; \}/.test(qw2),
+      JSON.stringify(setters));
+  } finally { global.fetch = realFetch; process.env.URL = savedUrl || ''; clearHooks(); }
+}
+
 // ---- ⑨ 생성 워커 통합(가짜 모델): 품질 규칙·목표 줄이 입력에 실리고, 끄면 안 실림 · 금지 문자열에 걸리면 품질 자료만 먼저 뺌(검토 gen F1) ----
 {
   const worker = require(join(FN, 'gw-promo-ai-run-background.js'));
@@ -318,8 +371,8 @@ const qdoc = Object.assign(QL.normQL(null), { rules: [{ id: 'q1', text: '사진�
   T('⑩ 크론 ⑥: try 안에서 늦게 부름 · 결과 로그 out.qlearn(①~⑤ 칸 줄은 그대로) · 모듈 맨 위 require 없음',
     /try \{ qlearn = await require\('\.\/_lib\/promoqlearn'\)\.kick\(st, now\); \} catch \(e\) \{ qlearn = \{ error: /.test(cron) && /out\.qlearn = qlearn;/.test(cron) && /learn: learn, quality: quality \}/.test(cron) && !/^const .*require\('\.\/_lib\/promoqlearn'\)/m.test(cron));
   T('⑩ pl_get qlearn 칸(try·실패면 null — quality·layout 순서 그대로) · pl_set qoff(관리자·감사 "품질 학습 끔/켬" — 골격 off와 따로) · 생성 워커 주입 · 금지 문자열 단계적 되돌림(품질 자료 먼저, 골격 되돌림 줄은 2단계 모양 그대로)',
-    /try \{ const QL = require\('\.\/_lib\/promoqlearn'\); const qq = await blobGet\(st, QL\.QLEARN_KEY\); qlearn = QL\.cardOf\(/.test(papi) && /qlearn: qlearn, quality: quality, layout: layout, request_id: R/.test(papi) && /\} else if \(typeof d\.qoff === 'boolean'\) \{/.test(papi) && /ev = '품질 학습 ' \+ \(d\.qoff \? '끔' : '켬'\);/.test(papi)
-    && /QL\.injectOf\(qr\.ok \? qr\.data : null, lib\)/.test(wk) && /if \(!g1\.ok && \(input\.qrules \|\| input\.qfocus\)\) \{\r\n/.test(wk) && /delete input\.qrules; delete input\.qfocus;\r\n/.test(wk)
+    /try \{ const QL = require\('\.\/_lib\/promoqlearn'\); const qq = await blobGet\(st, QL\.QLEARN_KEY\); const qo = await QL\.offOf\(blobGet, st, qq\.ok \? qq\.data : null\); qlearn = QL\.cardOf\(qq\.ok \? qq\.data : null, Date\.now\(\), qo\.ok \? qo\.off : undefined\);/.test(papi) && /qlearn: qlearn, quality: quality, layout: layout, request_id: R/.test(papi) && /\} else if \(typeof d\.qoff === 'boolean'\) \{/.test(papi) && /ev = '품질 학습 ' \+ \(d\.qoff \? '끔' : '켬'\);/.test(papi)
+    && /const qi = qo\.ok \? QL\.injectOf\(qr\.ok \? qr\.data : null, lib, qo\.off\) : null;\r\n/.test(wk) && /if \(!g1\.ok && \(input\.qrules \|\| input\.qfocus\)\) \{\r\n/.test(wk) && /delete input\.qrules; delete input\.qfocus;\r\n/.test(wk)
     && /if \(!g1\.ok && \(input\.exemplar \|\| input\.lessons \|\| \(input\.recent_heads && input\.recent_heads\.length\)\)\) \{/.test(wk) && /delete input\.exemplar; delete input\.lessons; delete input\.recent_heads;   \/\/ 2/.test(wk)
     && wk.indexOf('if (!g1.ok && (input.qrules || input.qfocus))') < wk.indexOf('if (!g1.ok && (input.exemplar || input.lessons'));
   T('⑩ 짝 목록(검토 loop F2): 키 이름순 자르기 없음 · 전부 읽어 시간순 정렬 뒤 40건 · 간극 칸은 숫자로만', !/\.sort\(\)\.slice\(-LEARN_LIST\)/.test(papi) && /return \{ ok: true, pairs: out\.slice\(0, LEARN_LIST\) \};/.test(papi) && /gap: gapOf\(p\.gap\)/.test(papi));
@@ -349,6 +402,8 @@ const qdoc = Object.assign(QL.normQL(null), { rules: [{ id: 'q1', text: '사진�
     !!F && /본문 일치율 흐름/.test(h3) && /09\/12 <b>95%<\/b>.* → .*10\/12 <b>100%<\/b>.* → .*10\/15 <b>100%<\/b>.* → .*11\/11 <b>100%<\/b>/.test(h3) && /직원 수정 없음 3편 연속\(일치율 100%\)/.test(h3) && !/직원 수정 없음/.test(h2) && F.h([]) === '', (h3 || '').slice(0, 300));
   const card = F && F.q({ off: false, rules: [{ id: 'q1', item: 'D1', n: 2, text: '사진마다 판독표 장비를 쓴다.' }, { id: 'q2', item: 'ALL', n: 1, text: '전체 규칙' }], focus: [{ code: 'D1', say: '현장 문장 비율', avg: 0, now: 13, target: 35, cmp: 'ge', unit: '퍼센트', ex: 45, bound: true, ruled: true }, { code: 'X1', say: '연결어미', avg: 0.5, now: 53, target: 90, target2: 120, cmp: 'range', unit: '개(문장 백 개당)', ex: 104, ruled: false }, { code: 'C3', say: '결함 없애기', nodisp: true, avg: 1, ruled: false }], summary: '요약', learned_at: NOW, n_drafts: 2, code: '', tries: 0, running: false, stats: { calls: 1, tokens: 1200, fail_calls: 2, fail_tokens: 9000 } });
   const cardOff = F && F.q({ off: true, rules: [], focus: [], stats: {} });
+  const cardErr = F && F.q({ off: false, off_error: 'STORAGE_READ_FAILED', rules: [], focus: [], stats: {} });
+  T('⑪ 끄기 열쇠를 못 읽으면(v504 N3 검토) 카드는 "켜짐·꺼짐 상태를 못 읽음" · 끄기·켜기 버튼 없음(옛 값으로 켜짐을 보이지 않음)', !!cardErr && /켜짐·꺼짐 상태를 못 읽음/.test(cardErr) && !/data-pq-off/.test(cardErr) && /data-pq-off/.test(cardOff), (cardErr || '').slice(0, 300));
   T('⑪ 품질 학습 칸: 켜짐 — 끄기 버튼(data-pq-off="1")·꺼짐 — 켜기(="0") · 목표 칩 "13% → 35% 이상 · 판독표만큼"·"53 → 90~120(문장 백 개당)"(규칙 없는 항목은 흐리게)·결함은 숫자 없이 · 규칙(항목 칩·전체) · 요금 나간 실패 2회 · 읽기 실패 문구 · 저장 호출은 카드 바깥(send)만',
     !!F && /data-pq-off="1"[^>]*>켜짐 — 끄기/.test(card) && /data-pq-off="0"[^>]*>꺼짐 — 켜기/.test(cardOff) && /D1 현장 문장 비율 13% → 35% 이상 · 판독표만큼/.test(card) && /opacity:\.55;[^>]*>X1 연결어미 53 → 90~120\(문장 백 개당\)/.test(card) && />C3 결함 없애기</.test(card)
     && /D1 현장 문장<\/span><span style="flex:1;">사진마다 판독표 장비를 쓴다\./.test(card) && />전체<\/span>/.test(card) && /요금 나간 실패 2회/.test(card) && /읽지 못했습니다/.test(F.q(null)) && !/gwCall/.test(src)
