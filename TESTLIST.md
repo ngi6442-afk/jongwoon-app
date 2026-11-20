@@ -1689,3 +1689,13 @@
 - [x] (AI) `servertest` C265(위장 올리기 400·공개 주소 415·nosniff) · C257(남의 사진·보기 권한·붙은 사진 거절 · 본인 고아 지움 · 옛 첨부 이름 판정 · 읽기 실패 503) · `uismoke` 앱 배선 — ✓ AI 11/20
 - [ ] (운영 확인) 홍보 탭 [+ 현장 기록] → 사진 → [취소] → "버릴까요?" [확인] 뒤 그 사진이 서버에서 지워짐(감사 기록 "첨부삭제") · [취소]에서 창만 닫으면 다음 [+ 현장 기록]에 사진이 이어 보임
 - [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `paycalc_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` 통과 · v515 문서 검사를 이 판 이상으로 풀고 v516 문서·판 번호 정확 검사 — ✓ AI 11/20
+
+## v517 — C225 판 A — 서버 읽기 실패 때 덮어쓰기 막기(서버만)
+- [ ] (AI 운영 확인 — C225 판A) 관리자 휴가 승인·지시 저장·일감 [지금 수집]·증빙 넣기/지우기·계약 서류 ☑·기록물/문서함 열람·노선 추가·[알림 켜기]·기기 승인 — 모두 종전과 같이 됨(오류 배너 없음)
+- [ ] (AI 운영 확인 — C225 판A) 결재·지시 알림이 폰에 옴 · 알림함에 새 줄 · `push:keys` 공개키가 배포 전과 같음(키 값은 적지 않고 같음/다름만)
+- [ ] (AI 운영 확인 — C225 판A) 다음 날 아침 감시 요약에서 gw-doneif-cron·학습 크론 스탬프 ok(읽기 실패가 없으면 종전과 같음)
+- [ ] (AI 운영 확인 — C225 판A) 다음 수집 회차 bids.yml ingest 200·results.yml 녹색
+- [ ] (AI 운영 확인 — C225 판A) 함수 로그 1주 — `STORAGE_WRITE_BLOCKED`·`PREV_READ_FAILED`·`BIDS_READ_FAILED`·`MEMBERS_READ_FAILED`·`RECLOG_FAILED` 응답 수(0이 아니면 그때 무엇을 막았는지 원장에)
+- [ ] (AI 시험 화면 대상 — C225 판A) 시험 서버·가짜 저장소로 저장소 읽기 실패를 일으켜 화면 글을 실제로 봄 — 지시·차량·기성·인허가 저장 = 오프라인 띠 · 휴가·입찰·견적·홍보·공매·거래처·내 할 일·문서함 저장 = '○○ 저장에 실패했습니다(서버 응답 500)' · 계약 저장 = 안내 끝 (PREV_READ_FAILED) · 계약 첨부 [×] 500 때 화면이 첨부를 빼는지 · 기록물·문서함 열람 logged:false가 화면에 안 보이는지(이 판은 화면 무변 — 본 것을 C238 화면 몫으로)
+- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v516 e95471d 위 · d697e82 · 자기 clone + 자료 저장소 옆) uismoke ✓ 905 · servertest 1415(운영 1396 + C225 19) · 14종 0 · node --check 101 · 인라인 파싱 오류 0 · paycalc_check 10 · autorulestest 8 · stmtmail_check 54 · CR 0(바꾼 11파일 바이트로 셈) — ✓ AI 11/20
+- [x] (AI) `servertest` C225 블록 19칸 · 결함 사본 92개(동작 90 + 정적 2) 모두 ✗(두 번째 검토에서 살아남던 7개 포함) · 전수 회귀 '고친 판도 잃음' 0 · 정상 길 글자째 차이 0 · C185 112상태 틀 차이 0 · 발송 표식(검토자 틀 h_mark 70 · rv 16 · marks3 16 · marks4 6장면): 같은 알림이 운영 판보다 여러 번 나가는 장면 0 · 운영 판이 잃던 알림을 다음 회차에 한 번 살리는 장면 1(rv s6) · 문의 속도 제한 3장면은 다른 문의 1건 더(지금 동작 유지) — ✓ AI 11/20

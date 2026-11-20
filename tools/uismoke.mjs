@@ -20736,8 +20736,8 @@ try {
     const FT = ['`_lib/imgsniff.js`', '`X-Content-Type-Options: nosniff`', '`promoUploadDiscard`', '`promoUploadReset`', '`promoOrphanDelCheck`', '`bid`', '441장', '63건'];
     const GATE = ['uismoke', 'servertest', 'consheet_check', 'proctpl_check', 'settletest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check', 'paycalc_check', 'stmtread_a_check', 'stmtread_b_check', 'stmtread_c_check', 'stmtread_d_check', 'stmtmail_check'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0), last = gate[gate.length - 1] || '';
-    const ok = /기준: v516 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
-      && GATE.every((g) => last.indexOf('`' + g + '`') > 0) && /SHELL_CACHE = 'jw-shell-v516'/.test(d.sw);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 516 && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => last.indexOf('`' + g + '`') > 0) && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 516;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
   };
   const rQ = chkQ(DQ);
@@ -20752,6 +20752,31 @@ try {
   T('v516 문서·판 번호(정확 검사): FEATURES 기준 v516 (2026-11-20)·v516 절(imgsniff·nosniff·promoUploadDiscard·promoUploadReset·promoOrphanDelCheck·bid) · TESTLIST v516 칸 3(운영 확인 1 · AI [x] 2 · 게이트 18종) · sw jw-shell-v516 · 결함 사본 ' + MQ.length + '개 = 모두 ✗',
     rQ.ok && MQ.every((v) => v === false), JSON.stringify({ r: rQ.info, mut: MQ }));
 } catch (e) { console.log('  (v516 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v517(C225 판A — 서버 읽기 실패 · 원장 C225): 실행 검사는 servertest 'C225' 블록 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd517 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D517 = { ft: rd517('FEATURES.md'), tl: rd517('TESTLIST.md'), sw: rd517('sw.js'), man: rd517('MANUAL.html'), cl: rd517('CLAUDE.md') };
+  const chk517 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v517 (11/20)', '\n### '), tlv = cut(d.tl, '\n## v517 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`STORAGE_WRITE_BLOCKED`", "원장 C225"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v517 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 8 && gate.length === 2 && scr.length === 6 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C225 판A(v517') > 0
+      && /SHELL_CACHE = 'jw-shell-v517'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r517 = chk517(D517);
+  const mu517 = (k, f) => chk517(Object.assign({}, D517, { [k]: f(D517[k]) })).ok;
+  const M517 = [mu517('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v516 (')), mu517('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v516'")),
+    mu517('ft', (s) => s.split('`STORAGE_WRITE_BLOCKED`').join('STORAGE_WRITE_BLOCKED')),
+    mu517('cl', (s) => s.replace('**C225 판A(v517', 'C225 판A(')),
+    mu517('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v516 e95471d 위 · d697e82 · 자기 clone + 자료 저장소 옆) uismoke ✓ 905 · servertest 1415(운영 1396 + C225 19) · 14종 0 · node --check 101 · 인라인 파싱 오류 0 · paycalc_check 10 · autorulestest 8 · stmtmail_check 54 · CR 0(바꾼 11파일 바이트로 셈) — ✓ AI 11/20', '\n- (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v516 e95471d 위 · d697e82 · 자기 clone + 자료 저장소 옆) uismoke ✓ 905 · servertest 1415(운영 1396 + C225 19) · 14종 0 · node --check 101 · 인라인 파싱 오류 0 · paycalc_check 10 · autorulestest 8 · stmtmail_check 54 · CR 0(바꾼 11파일 바이트로 셈) — ✓ AI 11/20'))];
+  T('v517 문서·판 번호(정확 검사): FEATURES 기준 v517 (2026-11-20)·v517 절(C225 판A) · TESTLIST v517 칸 8(화면·운영 확인 6 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v517 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
+    r517.ok && M517.every((v) => v === false), JSON.stringify({ r: r517.info, mut: M517 }));
+} catch (e) { console.log('  (v517 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
