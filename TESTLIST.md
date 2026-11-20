@@ -1643,3 +1643,9 @@
 - [x] (AI 시험 화면 대상) 시험 서버(v508 + 11/20 백업 사본) 폰 380·412 관리자·기성 수행 직원: 14줄 눌림 0·가림 0·화면 밖 0 · 641 이상 무변 — ✓ AI 11/20
 - [x] (AI) `uismoke` v508(CSS 묶음·결함 사본) · v508 C147 ①(폰 옛 거래처 검색 5계정) · v441 ⑪ 새 해시 · v507 문서 검사를 이 판 이상으로 풂 — ✓ AI 11/20
 - [x] (AI) `servertest` · `consheet_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` 등 게이트 18종 통과(끝 게이트 이름은 백틱 없이 — v506 검사가 TESTLIST 마지막 백틱 paycalc_check 자리를 봄) — ✓ AI 11/20
+
+## v509 — 체크 29 판⑩: 월말명세서 12월 첫 실사용 전 막힐 자리(계산서 작성일 달 · 다른 회사 계산서 · 계산서 여러 장 합 · 쿠팡 명세 합계 · 받은편지함 거름)
+- [ ] (운영 확인) 12월 초 11월 목록: 계산서가 작성일 달 목록에 있음(12월 작성분이 11월 목록에 없음) · 계산서 여러 장 거래처 상세의 계산서 칸 = 합 · 쿠팡 상세 명세 합계 = 주문 총액 합 · 받은편지함의 급여·카드 서류가 '거래처 고르기'에 없음
+- [x] (AI 시험 화면 대상) 실물 국세청 계산서 19통(10/20~11/19 · 읽기 전용)을 판⑩ 코드로 = 목록 거래처 10통 맞음(3자 대조 뒤에도 그대로) · 목록 밖 9통 · 읽기 실패 0 — ✓ AI 11/20
+- [x] (AI) `stmtmail_check` ⑩ 5건(결함 사본 4) · `uismoke` 29 판⑩ ③-10 3건(결함 사본 4) · `servertest` 91 ④-10 — ✓ AI 11/20
+- [x] (AI) `uismoke` · `servertest` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` · `paycalc_check` 통과 · v503 문서 검사를 이 판 이상으로 풀고 v509 문서·판 번호 정확 검사 — ✓ AI 11/20

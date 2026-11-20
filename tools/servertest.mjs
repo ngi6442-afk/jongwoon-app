@@ -9216,6 +9216,12 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       sv4.code === 200 && J91a(ap4) === J91a([true, false]) && fo4.code === 200 && fo4.body.b64 === b64('sinil_fake.xls') && fo4.body.name === '신일상사-26.10.xls'
       && dl4[0].code === 403 && dl4[0].body.error_code === 'NOT_OWNER' && dl4[1].code === 200 && !mem.gw_files['stmtfile:' + id2] && !mem.gw_data['stmtdrop:2026-10:' + id2],
       JSON.stringify([sv4.code, sv4.body.error_code, ap4, fo4.code, dl4.map((x) => x.code)]));
+    // ④-10 29 판⑩: 메일 에이전트가 넣은 줄(넣은 사람 = 봇)은 다른 수행자도 지움(관리자가 아닌 담당이 엉뚱한 메일 첨부를 못 지워 상한이 차던 길) · 사람이 넣은 남의 줄은 종전대로 403
+    const idB = 'b'.repeat(24);
+    mem.gw_data['stmtdrop:2026-10:' + idB] = { id: idB, ym: '2026-10', name: '메일.pdf', size: 1, kind: 'pdf', sha: 'x', vk: '', how: '', state: 'novendor', by: '__stmtmail__', at: 1 };
+    mem.gw_files['stmtfile:' + idB] = { ym: '2026-10', name: '메일.pdf', size: 1, kind: 'pdf', by: '__stmtmail__', at: 1, data: 'QQ==' };
+    const dlB = await cs91({ action: 'stmt_drop_del', ym: '2026-10', id: idB }, tO, 'dev1');
+    T('91 ④-10 메일 봇이 넣은 첨부 = 다른 수행자(관리자 아님)도 지움 200 · 원본·줄 지워짐', dlB.code === 200 && !mem.gw_files['stmtfile:' + idB] && !mem.gw_data['stmtdrop:2026-10:' + idB], JSON.stringify([dlB.code, dlB.body.error_code]));
     // ⑤ 거래처 찾기 단위 — 실물 10월 파일 이름 꼴 · 둘 걸리면 정하지 않음 · 꺼진 거래처 뺌 · 내용(공급자 상호) · 글 전체는 3자 이상 낱말만
     const RD91 = require(join(FN, '_lib/stmtread.js')), S91 = require(join(FN, '_lib/stmt.js'));
     const SV91 = S91.SEED_VENDORS.map((v) => Object.assign({ active: true }, v));
@@ -9275,7 +9281,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       mut.push(ids.length && ids.some((id) => (mem.gw_data['stmtdrop:2026-10:' + id] || {}).applied) ? '잡힘' : '못 잡음');
     }
     {
-      const G = loadAs(join(FN, 'gw-stmt.js'), cut(ssrc, "if (g.data.by !== c.member.id && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'NOT_OWNER', request_id: R });"));
+      const G = loadAs(join(FN, 'gw-stmt.js'), cut(ssrc, "if (g.data.by !== c.member.id && !c.member.admin && g.data.by !== MAIL.BOT) return jr(403, { status: 'FORBIDDEN', error_code: 'NOT_OWNER', request_id: R });"));
       const one = dropKeys91().map((k) => mem.gw_data[k])[0];
       const r = await callG(G, { action: 'stmt_drop_del', ym: '2026-10', id: one.id }, tO);
       mut.push(r.code === 200 ? '잡힘' : '못 잡음');

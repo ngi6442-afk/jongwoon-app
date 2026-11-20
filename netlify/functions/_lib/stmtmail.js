@@ -12,6 +12,8 @@ const RD = require('./stmtread');
 const CP = require('./stmtcoupang');
 
 const START_DAY = '2026-11-20';   // 11월분부터(PM 11/14 '11월부터는 메일로') — 10월분은 손으로 이미 넣음(같은 파일이라도 묶음 PDF라 sha가 달라 겹침)
+const FIRST_YM = '2026-11';       // 29 판⑩ 메일로 넣는 첫 달(10월은 손으로 넣음)
+const NTS_NAME = /^NTS_|\.xml$/i;  // 계산서 꼴 첨부 이름(국세청 보안 계산서 NTS_eTaxInvoice.html · 대행사 표준 XML)
 const BODY_START = '2026-11-01';  // 29 판⑨ 쿠팡 주문 본문은 주문한 달에 귀속 — 11월 주문부터(10월 이전 쿠팡은 손으로 넣은 적 없음 · PM 11/20 '쿠팡까지 같이')
 const WINDOW_DAYS = 40;            // 매일 돌며 볼 기간
 const READ_MAX = 4300000;          // gw-stmt READ_MAX와 같음
@@ -115,14 +117,15 @@ async function run(io) {
   try { msgs = await io.mailbox.list(since); } catch (e) { sum.ok = false; sum.code = errCode(e); return sum; }
   if (Array.isArray(io.mailbox.missing) && io.mailbox.missing.length) sum.nobox = io.mailbox.missing.length;   // 없는 폴더 수(이름은 남기지 않음)
   msgs.sort(function (a, b) { return a.at - b.at; });
+  // 29 판⑩: 11/20 전 메일은 쿠팡 본문과 계산서 꼴 첨부(NTS_·.xml)만 — 계산서는 작성일 달로 넣으므로 11/1~19에 온 11월 작성 계산서(건별 발행)도 받고, 10월 작성분은 아래에서 거름(10월은 손으로 넣음)
+  const early = function (m, a) { return m.at < sinceAtt && !(a.body || NTS_NAME.test(a.name)); };
   outer:
   for (const m of msgs) {
-    const body = m.atts.some(function (a) { return a.body; });
-    if (m.at < (body ? sinceBody : sinceAtt)) continue;
+    if (m.at < sinceBody || m.atts.every(function (a) { return early(m, a); })) continue;
     sum.msgs++;
     for (const a of m.atts) {
       const sk = m.key + ':' + a.part;
-      if (seen.has(sk)) continue;
+      if (seen.has(sk) || early(m, a)) continue;
       if (io.now() - t0 > io.budget.total) { sum.left++; continue outer; }
       sum.atts++;
       if (a.est > READ_MAX * 1.05) { sum.skip++; seen.add(sk); seenAdd.push(sk); continue; }
@@ -131,9 +134,18 @@ async function run(io) {
       if (!buf.length || buf.length > READ_MAX) { sum.skip++; seen.add(sk); seenAdd.push(sk); continue; }
       if (a.body === 'coupang') {   // 본문 → 주문 표·결제 금액만 남긴 HTML(받는 사람·연락처·주소·계좌 없이) · 주문 표가 없으면(멤버십 등) 저장 안 함
         if (!CP.isCoupangOrder(buf)) { sum.skip++; seen.add(sk); seenAdd.push(sk); continue; }
-        buf = CP.orderHtml(buf, m.at);
+        buf = CP.orderHtml(buf, m.at, m.key);   // 메일 키를 넣어 같은 날 같은 내용의 두 주문도 sha가 갈림(판⑩ 검토)
       }
-      const ym = a.body ? kstDay(m.at).slice(0, 7) : ymOf(m.at);
+      // 29 판⑩(12월 첫 실사용 점검): 국세청 계산서·표준 XML은 내용을 먼저 읽어 ① 받는 회사가 종운환경이 아니면(종운건설 등) 거래처가 맞아도 넣지 않음 ② 귀속 달 = 계산서 작성일의 달(받은 날 20일 규칙 아님 — 건별 발행 계산서가 앞달로 가던 것)
+      const fkind = RD.sniff(buf, a.name) || '';
+      let pre = null;
+      if (fkind === 'nts' || fkind === 'xml') {
+        try { const rr = await RD.readFile(buf, a.name, { ym: '', vk: '', vendor: null }); pre = rr && rr.ok ? rr.result : null; } catch (x) { pre = null; }
+        if (pre && pre.buyer_other) { sum.other = (sum.other || 0) + 1; seen.add(sk); seenAdd.push(sk); continue; }
+      }
+      const invYm = pre && pre.inv && /^\d{4}-\d{2}-\d{2}$/.test(String(pre.inv.date || '')) ? pre.inv.date.slice(0, 7) : (pre && /^\d{4}-\d{2}$/.test(String(pre.ym_hint || '')) ? pre.ym_hint : '');
+      const ym = a.body ? kstDay(m.at).slice(0, 7) : (invYm || ymOf(m.at));
+      if (ym < FIRST_YM) { sum.old = (sum.old || 0) + 1; seen.add(sk); seenAdd.push(sk); continue; }   // 10월 이전 달 = 손으로 넣음
       let list;
       try { list = await dropList(ym); } catch (e) { sum.ok = false; sum.code = 'STORAGE_READ_FAILED'; break outer; }   // 그 달 목록을 못 읽음 — 겹쳐 넣지 않게 멈춤(이미 처리한 것만 표시)
       const sha = crypto.createHash('sha256').update(buf).digest('hex');
@@ -146,13 +158,11 @@ async function run(io) {
       if (!v && smap[fh] && smap[fh].vk && byVk[smap[fh].vk] && byVk[smap[fh].vk].active !== false) { v = byVk[smap[fh].vk]; how = 'mail'; }
       if (!v) { const mv = RD.matchVendor(m.from.name + ' ' + m.subject, act, 2); if (mv) { v = mv; how = 'mail'; } }
       if (!v && !looksStmt(a.name + ' ' + m.subject)) { sum.skip++; seen.add(sk); seenAdd.push(sk); continue; }   // 명세·계산서로 안 보임 — 저장 안 함
-      if (!v && /^(nts|xml)$/.test(RD.sniff(buf, a.name) || '')) {
-        // 29 판⑨: 청구서 폴더의 국세청 계산서는 목록 밖 거래처(폐기물 처리·장비 임대 등)·종운건설 몫이 절반 — 공급자를 읽었는데 목록에 없으면 '거래처 고르기'로 올리지 않음
-        let rr = null;
-        try { rr = await RD.readFile(buf, a.name, { ym: ym, vk: '', vendor: null }); } catch (x) { rr = null; }
-        const res = rr && rr.ok && rr.result;
-        if (res && ((res.vendor && res.vendor.name) || res.buyer_other)) { sum.other = (sum.other || 0) + 1; seen.add(sk); seenAdd.push(sk); continue; }
-      }
+      // 29 판⑩: 받은편지함은 거래처를 찾은 것만 — 낱말(명세·내역·청구…)만으로는 급여명세서·카드 이용대금·보험료 고지 같은 다른 서류까지 '거래처 고르기'로 올라옴(분류 폴더 청구서함·청구서만 낱말로)
+      if (!v && m.box === 'INBOX') { sum.other = (sum.other || 0) + 1; seen.add(sk); seenAdd.push(sk); continue; }
+      // 29 판⑨: 청구서 폴더의 국세청 계산서는 목록 밖 거래처(폐기물 처리·장비 임대 등) 몫이 절반 — 공급자를 읽었는데 목록에 없으면 '거래처 고르기'로 올리지 않음
+      //   판⑩ 검토: 3자 낱말로는 못 찾았지만 2자 낱말(철탑·덕천 등)로 걸리는 거래처가 있으면 버리지 않고 '거래처 고르기'로 올림(철탑공구·덕천셀프세차 꼴)
+      if (!v && pre && pre.vendor && pre.vendor.name && !RD.matchVendor(pre.vendor.name, act, 2)) { sum.other = (sum.other || 0) + 1; seen.add(sk); seenAdd.push(sk); continue; }
       const id = crypto.randomBytes(12).toString('hex');
       const kind = RD.sniff(buf, a.name) || 'etc';
       const name = String(a.name).replace(/\d[\d .\-·_]{7,}\d/g, function (x) { return x.replace(/\D/g, '').length >= 9 ? '…' : x; }).replace(/[\u0000-\u001f]/g, '').slice(0, 120) || '이름 없는 파일';

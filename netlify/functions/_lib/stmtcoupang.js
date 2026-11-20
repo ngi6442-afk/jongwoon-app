@@ -38,7 +38,18 @@ function isCoupangOrder(buf) {
   return /구매\s*상세내역/.test(t) && /쿠팡가/.test(t) && /coupang/i.test(t);
 }
 // 주문 표·결제 금액 부분만 — 남기는 원본(받는 사람·연락처·주소·계좌 없이)
-function orderHtml(buf, at) {
+// 29 판⑩ 검토 반영: ① mk(메일 키 해시)를 넣어 같은 날 같은 내용의 두 주문이 sha로 겹쳐 하나가 버려지지 않게 ② 주문 표 다음 칸 2개 줄에서 주문 표를 닫음(받는 사람 줄이 4칸이어도 안 남게)
+//   ③ 끊는 줄 = 첫 칸이 받는 사람·연락처·주소·배송지 이름표일 때만(상품 이름의 '주소 스티커'로 끊기지 않게) ④ 결제 금액 이름표는 아는 것만 남기고 나머지는 '결제'(계좌·간편이체 글 없이)
+//   ⑤ 남기는 칸에 개인정보 꼴(piiScan)·8자리 넘는 숫자 줄이 있으면 숫자를 지움(금액 칸 제외)
+const PAY_LABEL = /^(상품\s*가격|배송비|할인금액|할인|즉시할인|쿠폰\s*할인|쿠폰|쿠팡캐시|캐시|적립금|적립|총\s*결제금액)$/;
+const STOP = /^(받으시는\s*분|받는\s*사람|받는\s*분|수령인|연락처|휴대폰|전화|주소|배송지|배송\s*주소)/;
+function safeCell(x) {
+  const t = String(x == null ? '' : x);
+  if (won(t) != null) return t;
+  if (S.piiScan(t) || /\d[\d\s\-.]{7,}\d/.test(t)) return t.replace(/\d/g, '');
+  return t;
+}
+function orderHtml(buf, at, mk) {
   const s = buf.toString('utf8');
   const a = s.search(/<table\b[^>]*>(?:(?!<table\b)[\s\S])*?구매\s*상세내역/);
   const r = cellRows(a >= 0 ? s.slice(a) : s);
@@ -47,14 +58,17 @@ function orderHtml(buf, at) {
   for (const cells of r) {
     const j = cells.join(' ');
     if (/구매\s*상세내역/.test(j) && /쿠팡가/.test(j)) { inItems = true; keep.push(cells); continue; }
-    if (/받으시는|연락처|주소/.test(j)) break;
-    if (inItems && cells.length >= 4) { keep.push(cells); continue; }
-    if (/상품\s*가격|배송비|할인|쿠폰|캐시|적립|총\s*결제금액/.test(j) && cells.length === 2) { inPay = true; keep.push(cells); continue; }
-    if (inPay && cells.length === 2 && won(cells[1]) != null) keep.push([/무통장|카드|계좌|페이|은행/.test(cells[0]) ? '결제' : cells[0], cells[1]]);
+    if (STOP.test(String(cells[0] || '').trim())) break;
+    if (inItems && cells.length >= 4) { keep.push(cells.map(safeCell)); continue; }
+    if (cells.length === 2) inItems = false;
+    const lab = String(cells[0] || '').replace(/\s+/g, ' ').trim();
+    if (cells.length === 2 && PAY_LABEL.test(lab)) { inPay = true; keep.push([lab, safeCell(cells[1])]); continue; }
+    if (inPay && cells.length === 2 && won(cells[1]) != null) keep.push(['결제', cells[1]]);
   }
   const esc = function (x) { return String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
   const day = at ? new Date(Number(at) + 9 * 3600000).toISOString().slice(0, 10) : '';
-  return Buffer.from('<!doctype html><html><head><meta charset="utf-8"><meta name="jw-src" content="coupang-order"><title>쿠팡 주문 ' + day + '</title></head><body><p>쿠팡 주문 메일 ' + day + ' — 주문 표·결제 금액만 남김(받는 사람·연락처·주소·결제 계좌는 뺌)</p><table border="1">'
+  const mkh = mk ? String(mk).replace(/[^A-Za-z0-9]/g, '').slice(0, 32) : '';
+  return Buffer.from('<!doctype html><html><head><meta charset="utf-8"><meta name="jw-src" content="coupang-order">' + (mkh ? '<meta name="jw-mail" content="' + mkh + '">' : '') + '<title>쿠팡 주문 ' + day + '</title></head><body><p>쿠팡 주문 메일 ' + day + ' — 주문 표·결제 금액만 남김(받는 사람·연락처·주소·결제 계좌는 뺌)</p><table border="1">'
     + keep.map(function (c) { return '<tr>' + c.map(function (x) { return '<td>' + esc(x) + '</td>'; }).join('') + '</tr>'; }).join('') + '</table></body></html>', 'utf8');
 }
 // 읽기 — { ok, src:'coupang', vendor, rows, basis:'total', inv:null, carry:null, warn } | { ok:false, code }

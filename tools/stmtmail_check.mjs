@@ -187,16 +187,21 @@ function cpHtml(o) {
   T('⑨ 시드 거래처 v13 쿠팡(용구 묶음·작업용구·부가세 포함·잔액형 아님·낱말 쿠팡) · 시드 13곳', VEND.length === 13 && v13 && v13.name === '쿠팡' && v13.group === 'tool' && v13.kind === 'tool' && v13.basis === 'total' && v13.carry === false && J(v13.hint) === J(['쿠팡']), J(v13));
   // 한 번 돌기 — 폴더별 메일(가짜)
   const tax3 = readFileSync(join(FX, 'a_tax3.xml'));
+  // 가짜 계산서 XML 꼴 바꾸기 — 공급자 상호·받는 쪽 번호·작성일(YYYYMMDD — 품목 날짜도 같은 달로)
+  const taxMk = (nm, buyer, ymd) => Buffer.from(tax3.toString('utf8').replace('<NameText>가짜상용서비스</NameText>', '<NameText>' + nm + '</NameText>').replace('<ID>0000000001</ID>', '<ID>' + buyer + '</ID>')
+    .replace('<IssueDateTime>20261030<', '<IssueDateTime>' + ymd + '<').replace(/<PurchaseExpiryDateTime>202610(\d\d)</g, (x, d) => '<PurchaseExpiryDateTime>' + ymd.slice(0, 6) + (Number(d) > 28 ? '28' : d) + '<'), 'utf8');
+  const taxN = taxMk('가짜상용서비스', '0000000001', '20261112');
   const NOW9 = Date.parse('2026-12-03T07:00:00+09:00');
   const M9 = [
     { uid: 11, box: '청구서함', key: 'c1', at: at, from: { addr: 'no-reply@e.coupang.com', name: '쿠팡' }, subject: '[쿠팡] 나*짜님 주문하신 내역을 확인해주세요.', atts: [{ part: '1', name: '쿠팡 주문 2026-11-15.html', est: raw.length, body: 'coupang' }] },
     { uid: 12, box: '청구서함', key: 'c2', at: at + 86400000, from: { addr: 'no-reply@coupang.com', name: '쿠팡' }, subject: '[쿠팡] 주문하신 내역 (표 없음 가짜)', atts: [{ part: '1', name: '쿠팡 주문 2026-11-16.html', est: 100, body: 'coupang' }] },
     { uid: 13, box: '청구서함', key: 'c3', at: Date.parse('2026-12-01T10:00:00+09:00'), from: { addr: 'boss@suyang.test', name: '김가짜' }, subject: '11월 명세', atts: [{ part: '2', name: '수양개발 명세.pdf', est: suyang.length }] },
-    { uid: 14, box: '청구서', key: 'c4', at: Date.parse('2026-11-15T10:00:00+09:00'), from: { addr: 'x@hometax.test', name: '국세청' }, subject: '세금계산서', atts: [{ part: '2', name: 'NTS_x.xml', est: tax3.length }] },
+    { uid: 14, box: '청구서', key: 'c4', at: Date.parse('2026-11-15T10:00:00+09:00'), from: { addr: 'x@hometax.test', name: '국세청' }, subject: '세금계산서', atts: [{ part: '2', name: 'NTS_x.xml', est: taxN.length }] },
     { uid: 15, box: '청구서', key: 'c5', at: Date.parse('2026-12-01T11:00:00+09:00'), from: { addr: 'x@hometax.test', name: '국세청' }, subject: '세금계산서', atts: [{ part: '2', name: 'NTS_y.xml', est: tax3.length }] },
     { uid: 16, box: '청구서함', key: 'c6', at: Date.parse('2026-10-30T10:00:00+09:00'), from: { addr: 'no-reply@e.coupang.com', name: '쿠팡' }, subject: '[쿠팡] 주문하신 내역', atts: [{ part: '1', name: '쿠팡 주문 2026-10-30.html', est: raw.length, body: 'coupang' }] },
+    { uid: 17, box: '청구서함', key: 'c7', at: Date.parse('2026-11-10T10:00:00+09:00'), from: { addr: 'boss@suyang.test', name: '김가짜' }, subject: '10월 명세', atts: [{ part: '2', name: '수양개발 10월.pdf', est: suyang.length }] },
   ];
-  const F9 = { '11:1': raw, '12:1': Buffer.from('<html>멤버십 가짜</html>'), '13:2': suyang, '14:2': tax3, '15:2': tax3, '16:1': raw };
+  const F9 = { '11:1': raw, '12:1': Buffer.from('<html>멤버십 가짜</html>'), '13:2': suyang, '14:2': taxN, '15:2': tax3, '16:1': raw, '17:2': suyang };
   const b9 = mkBox(M9, F9), gets = [];
   b9.get = async function (uid, part, bx) { b9.calls.get++; gets.push(uid + '@' + bx); return F9[uid + ':' + part]; };
   b9.missing = ['없는폴더'];
@@ -209,8 +214,8 @@ function cpHtml(o) {
   T('⑨ 한 번 돌기: 청구서함 쿠팡 주문 = 11월(주문한 달 — 20일 규칙 아님) · 거래처 v13(파일 이름) · 바로 읽음 4줄 · 남긴 원본에 받는 사람·연락처·주소·계좌 없음',
     cp9 && cp9.ym === '2026-11' && cp9.how === 'name' && cp9.state === 'read' && cp9.n === 4 && cp9.src === 'coupang' && /구매 상세내역/.test(cpTxt) && !/유\*가짜|8888|가짜시|99988877766/.test(cpTxt), cp9 && J({ ym: cp9.ym, how: cp9.how, st: cp9.state, n: cp9.n }));
   T('⑨ 한 번 돌기: 청구서함 첨부(12/1 수양) = 11월 목록 v02 · 내려받을 때 그 폴더를 씀', sy9 && sy9.ym === '2026-11' && gets.indexOf('13@청구서함') >= 0 && gets.indexOf('11@청구서함') >= 0, J(gets));
-  T('⑨ 주문 표 없는 쿠팡 본문 = 저장 안 함 · 11/20 전 첨부(청구서 11/15) = 내려받지 않음 · 10월 쿠팡 주문(11/1 전) = 안 봄 · 목록 밖 공급자의 계산서(가짜상용서비스) = 거래처 고르기로 올리지 않음(other)',
-    d9.length === 2 && gets.indexOf('14@청구서') < 0 && gets.indexOf('16@청구서함') < 0 && gets.indexOf('15@청구서') >= 0 && r9.other === 1 && r9.skip === 1 && r9.nov === 0 && r9.nobox === 1, J(r9) + ' ' + J(gets));
+  T('⑨ 주문 표 없는 쿠팡 본문 = 저장 안 함 · 11/20 전 명세 PDF(청구서함 11/10) = 내려받지 않음 · 11/20 전 계산서(11/12 작성 — 판⑩) = 받음 · 10월 쿠팡 주문(11/1 전) = 안 봄 · 목록 밖 공급자의 계산서(가짜상용서비스) = 거래처 고르기로 올리지 않음(other) · 10월 작성 계산서(12/1 받음) = 넣지 않음(old)',
+    d9.length === 2 && gets.indexOf('14@청구서') >= 0 && gets.indexOf('16@청구서함') < 0 && gets.indexOf('17@청구서함') < 0 && gets.indexOf('15@청구서') >= 0 && r9.other === 1 && r9.old === 1 && r9.skip === 1 && r9.nov === 0 && r9.nobox === 1, J(r9) + ' ' + J(gets));
   const all9 = Array.from(s9.m.values()).join('\n') + io9.audits.join('\n');
   T('⑨ 저장·감사에 보낸 이 주소·이름·제목 없음(도메인만)', !/no-reply|김가짜|나\*짜|주문하신 내역|없는폴더/.test(all9.replace(/"data":"[^"]*"/g, '')), (all9.match(/no-reply|김가짜|나\*짜|주문하신 내역|없는폴더/) || [''])[0]);
   const s9b = await M.run(mkIo(s9, f9, Object.assign(mkBox(M9, F9), { get: async () => { throw new Error('내려받으면 안 됨'); } }), { now: () => NOW9 }));
@@ -235,11 +240,12 @@ function cpHtml(o) {
   const MUT = [
     ['폴더 기본 받은편지함만', src9, "const BOXES = ['INBOX', '청구서함', '청구서'];", "const BOXES = ['INBOX'];", () => J(M.mailBoxes('')) === J(['INBOX', '청구서함', '청구서'])],
     ['내려받기 폴더 안 넘김', src9, 'io.mailbox.get(m.uid, a.part, m.box)', 'io.mailbox.get(m.uid, a.part)', null],
-    ['쿠팡 원본 자르기 걷음', src9, 'buf = CP.orderHtml(buf, m.at);', '', null],
-    ['쿠팡 귀속 20일 규칙', src9, "const ym = a.body ? kstDay(m.at).slice(0, 7) : ymOf(m.at)", 'const ym = ymOf(m.at)', null],
-    ['목록 밖 계산서 거름 걷음', src9, "if (res && ((res.vendor && res.vendor.name) || res.buyer_other))", 'if (false)', null],
-    ['첨부 시작일 걸음 걷음', src9, 'if (m.at < (body ? sinceBody : sinceAtt)) continue;', 'if (m.at < sinceBody) continue;', null],
-    ['계좌 줄 그대로 남김', cps, "[/무통장|카드|계좌|페이|은행/.test(cells[0]) ? '결제' : cells[0], cells[1]]", 'cells', null],
+    ['쿠팡 원본 자르기 걷음', src9, 'buf = CP.orderHtml(buf, m.at, m.key);', '', null],
+    ['쿠팡 귀속 20일 규칙', src9, "const ym = a.body ? kstDay(m.at).slice(0, 7) : (invYm || ymOf(m.at));", 'const ym = (invYm || ymOf(m.at));', null],
+    ['목록 밖 계산서 거름 걷음', src9, 'if (!v && pre && pre.vendor && pre.vendor.name && !RD.matchVendor(pre.vendor.name, act, 2)) {', 'if (false) {', null],
+    ['10월 작성 계산서 거름 걷음', src9, 'if (ym < FIRST_YM) {', 'if (false) {', null],
+    ['첨부 시작일 걸음 걷음', src9, 'return m.at < sinceAtt && !(a.body || NTS_NAME.test(a.name));', 'return false;', null],
+    ['계좌 줄 그대로 남김', cps, "keep.push(['결제', cells[1]]);", 'keep.push(cells);', null],
     ['처리 표시 읽기 실패를 없음으로', src9, "if (!r || !r.ok) { const e = new Error('read'); e.readFail = true; throw e; }\n    return", 'return', 'rf'],
     ['첨부 목록 읽기 실패를 빈 목록으로', src9, "if (!l || !l.ok) { const e = new Error('list'); e.readFail = true; throw e; }", '', 'rf'],
     ['폴더 하나만 엶', im9,'for (const box of boxes) {', "for (const box of ['INBOX']) {", null],
@@ -273,7 +279,7 @@ function cpHtml(o) {
         const dx = Array.from(sx.m.keys()).filter((k) => k.indexOf('stmtdrop:') === 0).map((k) => JSON.parse(sx.m.get(k)));
         const cx = dx.filter((d) => d.vk === 'v13')[0];
         const tx = cx && fx.m.get('stmtfile:' + cx.id) ? Buffer.from(JSON.parse(fx.m.get('stmtfile:' + cx.id)).data, 'base64').toString('utf8') : '';
-        if (!cx || cx.ym !== '2026-11' || /8888|99988877766/.test(tx) || dx.length !== 2 || rx.other !== 1 || gx.indexOf('13@청구서함') < 0 || gx.indexOf('14@청구서') >= 0) bad = true;
+        if (!cx || cx.ym !== '2026-11' || /8888|99988877766/.test(tx) || dx.length !== 2 || rx.other !== 1 || rx.old !== 1 || gx.indexOf('13@청구서함') < 0 || gx.indexOf('17@청구서함') >= 0) bad = true;
       } else if (src === cps) {
         const mm = { exports: {} };
         new Function('module', 'exports', 'require', mod)(mm, mm.exports, (p) => require(p.indexOf('./') === 0 ? join(LIB, p.slice(2)) : p));
@@ -285,7 +291,92 @@ function cpHtml(o) {
     } catch (e) { bad = true; }
     if (!bad) caught.push(nm);
   }
-  T('⑨ 결함 사본 ' + MUT.length + '개(폴더 기본·내려받기 폴더·원본 자르기·귀속 달·목록 밖 계산서·첨부 시작일·계좌 줄·읽기 실패 둘·폴더 하나) = 모두 ✗', caught.length === 0, J(caught));
+  T('⑨ 결함 사본 ' + MUT.length + '개(폴더 기본·내려받기 폴더·원본 자르기·귀속 달·목록 밖 계산서·10월 계산서·첨부 시작일·계좌 줄·읽기 실패 둘·폴더 하나) = 모두 ✗', caught.length === 0, J(caught));
+}
+
+// ---- ⑩ 29 판⑩(12월 첫 실사용 점검 반영): 계산서 귀속 = 작성일 달 · 다른 회사 계산서는 거래처가 맞아도 뺌 · 상호 3자 낱말 · 받은편지함은 거래처를 찾은 것만
+{
+  const J = (x) => JSON.stringify(x);
+  const tax3b = readFileSync(join(FX, 'a_tax3.xml'));
+  const mk10 = (nm, buyer, ymd) => Buffer.from(tax3b.toString('utf8').replace('<NameText>가짜상용서비스</NameText>', '<NameText>' + nm + '</NameText>').replace('<ID>0000000001</ID>', '<ID>' + buyer + '</ID>')
+    .replace('<IssueDateTime>20261030<', '<IssueDateTime>' + ymd + '<').replace(/<PurchaseExpiryDateTime>202610(\d\d)</g, (x, d) => '<PurchaseExpiryDateTime>' + ymd.slice(0, 6) + (Number(d) > 28 ? '28' : d) + '<'), 'utf8');
+  const taxMk2 = mk10;
+  const NOW10 = Date.parse('2026-12-04T07:00:00+09:00');
+  const F10 = { '21:2': mk10('오천공구종합상사', '0000000001', '20261203'), '22:2': mk10('오천공구종합상사', '0000000002', '20261128'), '23:2': mk10('오천카센터', '0000000001', '20261125'),
+    '24:2': unknown, '25:2': unknown, '26:2': mk10('오천공구종합상사', '0000000001', '20261110') };
+  const nts = (uid, box, when, nm) => ({ uid: uid, box: box, key: 'x' + uid, at: Date.parse(when), from: { addr: 'x@hometax.test', name: '국세청' }, subject: '세금계산서', atts: [{ part: '2', name: nm, est: 4000 }] });
+  const M10 = [nts(21, '청구서', '2026-12-03T10:00:00+09:00', 'NTS_a.xml'), nts(22, '청구서', '2026-12-01T10:00:00+09:00', 'NTS_b.xml'), nts(23, '청구서', '2026-11-26T10:00:00+09:00', 'NTS_c.xml'),
+    { uid: 24, box: 'INBOX', key: 'x24', at: Date.parse('2026-11-25T10:00:00+09:00'), from: { addr: 'pay@payroll.test', name: '노무' }, subject: '11월 급여명세서', atts: [{ part: '2', name: '급여명세서.pdf', est: unknown.length }] },
+    { uid: 25, box: '청구서함', key: 'x25', at: Date.parse('2026-11-25T10:00:00+09:00'), from: { addr: 'who@nowhere.test', name: '이가짜' }, subject: '11월 거래명세서', atts: [{ part: '2', name: '11월 거래명세서.pdf', est: unknown.length }] },
+    nts(26, '청구서', '2026-11-12T10:00:00+09:00', 'NTS_d.xml')];
+  const run10 = async (Mx) => {
+    const s = mkStore(), f = mkStore(), g = [];
+    const b = mkBox(M10, F10); b.get = async function (uid, part, bx) { g.push(uid); return F10[uid + ':' + part]; };
+    const r = await (Mx || M).run(mkIo(s, f, b, { now: () => NOW10 }));
+    const d = Array.from(s.m.keys()).filter((k) => k.indexOf('stmtdrop:') === 0).map((k) => JSON.parse(s.m.get(k)));
+    return { r, d, g, by: (n) => d.filter((x) => x.name === n)[0] };
+  };
+  const z = await run10();
+  const a = z.by('NTS_a.xml'), dd = z.by('NTS_d.xml');
+  T('⑩ 계산서 귀속 = 작성일 달: 12/3 작성·12/3 받음 = 12월 목록(종전 20일 규칙이면 11월) · 11/10 작성·11/12 받음(11/20 전) = 11월 목록 · 둘 다 오천공구 v11(내용)', a && a.ym === '2026-12' && a.vk === 'v11' && a.how === 'content' && dd && dd.ym === '2026-11' && dd.vk === 'v11', J(z.d.map((x) => [x.name, x.ym, x.vk, x.how, x.state])));
+  T('⑩ 받는 회사가 종운건설인 계산서 = 거래처(오천공구)가 맞아도 넣지 않음 · 오천카센터 = 두 글자 낱말(오천)로 오천공구에 자동으로 붙지 않음 → 거래처 고르기(사람이 고름 — 검토②: 2자로 걸리는 상호는 버리지 않음)', !z.by('NTS_b.xml') && z.by('NTS_c.xml') && z.by('NTS_c.xml').state === 'novendor' && !z.by('NTS_c.xml').vk && z.r.other === 2, J(z.r));
+  T('⑩ 받은편지함 = 거래처를 찾은 것만(급여명세서.pdf 넣지 않음) · 청구서함은 명세 낱말이면 거래처 고르기로(종전대로)', !z.by('급여명세서.pdf') && z.by('11월 거래명세서.pdf') && z.by('11월 거래명세서.pdf').state === 'novendor' && z.r.nov === 2 && z.r.other === 2, J({ other: z.r.other, nov: z.r.nov }));
+  const RDs = readFileSync(join(LIB, 'stmtread.js'), 'utf8');
+  const g1 = await RD.guessVendor(F10['23:2'], 'NTS_c.xml', VEND, '2026-11'), g2 = await RD.guessVendor(F10['21:2'], 'NTS_a.xml', VEND, '2026-12');
+  const fin = RD.finish({ vendor: { name: '영남환경' }, rows: [] }, { ym: '2026-11', vendor: { name: '영남주유소', hint: ['영남주유소', '영남'] } });
+  T('⑩ 상호 대조 3자 이상: 오천카센터 → 거래처 없음 · 오천공구종합상사 → v11 · 영남환경 서류를 영남주유소에 넣으면 다른 거래처 경고', g1 === null && g2 && g2.vk === 'v11' && fin.vendor_mismatch === true, J([g1, g2, fin.warn]));
+  const src10 = readFileSync(join(LIB, 'stmtmail.js'), 'utf8');
+  const MU10 = [
+    ['받는 회사 거름 걷음', src10, 'if (pre && pre.buyer_other) {', 'if (false) {'],
+    ['작성일 귀속 걷음', src10, ': (invYm || ymOf(m.at));', ': ymOf(m.at);'],
+    ['받은편지함 낱말로 받음', src10, "if (!v && m.box === 'INBOX') {", 'if (false) {'],
+    ['상호 두 글자로 대조', RDs, 'const v = vn ? matchVendor(vn, act, 3) : null;', 'const v = vn ? matchVendor(vn, act, 2) : null;'],
+  ];
+  const c10 = [];
+  for (const [nm, src, a1, b1] of MU10) {
+    if (src.indexOf(a1) < 0) { c10.push(nm + ':원문없음'); continue; }
+    let bad = false;
+    try {
+      const mm = { exports: {} };
+      if (src === RDs) {
+        new Function('module', 'exports', 'require', src.split(a1).join(b1))(mm, mm.exports, (p) => require(p.indexOf('./') === 0 ? join(LIB, p.slice(2)) : p));
+        bad = (await mm.exports.guessVendor(F10['23:2'], 'NTS_c.xml', VEND, '2026-11')) !== null;
+      } else {
+        new Function('module', 'exports', 'require', src.split(a1).join(b1))(mm, mm.exports, (p) => require(p.indexOf('./') === 0 ? join(LIB, p.slice(2)) : p));
+        const y = await run10(mm.exports);
+        const ya = y.by('NTS_a.xml');
+        bad = !(ya && ya.ym === '2026-12' && !y.by('NTS_b.xml') && !y.by('급여명세서.pdf'));
+      }
+    } catch (e) { bad = true; }
+    if (!bad) c10.push(nm);
+  }
+  // 판⑩ 독립 검토 반영 6건
+  {
+    const base = cpHtml({ items: [['가짜 물티슈 100매', '13,080원', '1', '13,080원', '가짜상사']], goods: '13,080원', total: '13,080원' });
+    const o1 = CP.orderHtml(base, Date.parse('2026-11-17T09:00:00+09:00'), 'k1'), o2 = CP.orderHtml(base, Date.parse('2026-11-17T15:00:00+09:00'), 'k2');
+    const sh = (b) => require('node:crypto').createHash('sha256').update(b).digest('hex');
+    const s2 = mkStore(), f2 = mkStore();
+    const m2 = [1, 2].map((u) => ({ uid: 30 + u, box: '청구서함', key: 'dup' + u, at: Date.parse('2026-11-17T' + String(u + 8).padStart(2, '0') + ':00:00+09:00'), from: { addr: 'no-reply@e.coupang.com', name: '쿠팡' }, subject: '[쿠팡] 주문하신 내역', atts: [{ part: '1', name: '쿠팡 주문 2026-11-17.html', est: base.length, body: 'coupang' }] }));
+    const b2 = mkBox(m2, { '31:1': base, '32:1': base }); b2.get = async (uid, part) => base;
+    const r2 = await M.run(mkIo(s2, f2, b2, { now: () => Date.parse('2026-11-18T07:00:00+09:00') }));
+    T('⑩-검토① 같은 날 같은 내용의 쿠팡 주문 두 통 = 남기는 원본 sha가 다름(메일 키) → 둘 다 들어감(종전 = 둘째가 같은 파일로 버려짐)', sh(o1) !== sh(o2) && r2.added === 2 && r2.dup === 0, J(r2));
+    const evil = Buffer.from(base.toString('utf8').replace('</tbody>', '<tr><td>받는사람</td><td>홍가짜</td><td>휴대폰</td><td>010-1234-5678</td></tr></tbody>')
+      .replace('<td>가짜은행 99988877766 / 무통장입금</td>', '<td>토스뱅크 1000-1234-5678 간편이체</td>'), 'utf8');
+    const oe = CP.orderHtml(evil, 0, 'k').toString('utf8');
+    T('⑩-검토③④ 주문 표 안의 받는 사람 4칸 줄·간편이체 계좌 글 = 남기는 원본에 이름·번호 없음', !/홍가짜|5678|1234|토스뱅크/.test(oe) && /가짜 물티슈/.test(oe), oe.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 300));
+    const sticker = cpHtml({ items: [['가짜 주소 스티커 100매', '5,000원', '1', '5,000원', '가짜상사']], goods: '5,000원', total: '5,000원' });
+    const rs = CP.readOrder(CP.orderHtml(sticker, Date.parse('2026-11-17T09:00:00+09:00'), 'k'), '');
+    T('⑩-검토⑤ 상품 이름에 \'주소\'가 있어도 주문을 끝까지 읽음', rs.ok && rs.rows.length === 1 && rs.rows[0].amt === 5000, J(rs));
+    const tx2 = taxMk2('철탑공구', '0000000001', '20261120');
+    const g2c = await RD.guessVendor(tx2, 'NTS_e.xml', VEND, '2026-11');
+    const s3 = mkStore(), f3 = mkStore();
+    const b3 = mkBox([{ uid: 41, box: '청구서', key: 'tt', at: Date.parse('2026-11-21T10:00:00+09:00'), from: { addr: 'x@hometax.test', name: '국세청' }, subject: '세금계산서', atts: [{ part: '2', name: 'NTS_e.xml', est: tx2.length }] }], { '41:2': tx2 });
+    const r3 = await M.run(mkIo(s3, f3, b3, { now: () => Date.parse('2026-11-22T07:00:00+09:00') }));
+    T('⑩-검토② 3자 낱말로 못 찾은 상호(철탑공구)라도 2자 낱말로 걸리면 버리지 않고 거래처 고르기로', g2c === null && r3.nov === 1 && !r3.other, J(r3));
+    const gs = readFileSync(join(FN, 'gw-stmt.js'), 'utf8');
+    T('⑩-검토⑥ 사람이 넣은 쿠팡 주문 본문도 주문 표만 남김(gw-stmt handleDrop — 자르기 전 원본이 남지 않게)', /if \(CPN\.isCoupangOrder\(buf\) && !\/<meta name="jw-src" content="coupang-order">\/\.test\(buf\.slice\(0, 600\)\.toString\('utf8'\)\)\) buf = CPN\.orderHtml\(buf, 0, ''\);/.test(gs) && gs.indexOf("buf = CPN.orderHtml") < gs.indexOf("const sha = crypto.createHash('sha256').update(buf)", gs.indexOf('async function handleDrop(')));
+  }
+  T('⑩ 결함 사본 ' + MU10.length + '개(받는 회사·작성일 귀속·받은편지함 낱말·상호 두 글자) = 모두 ✗', c10.length === 0, J(c10));
 }
 RD.readByAi = realAi;
 console.log('\n' + (fail ? '✗ ' : '✓ ') + pass + ' pass, ' + fail + ' fail');

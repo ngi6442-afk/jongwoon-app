@@ -9464,7 +9464,7 @@
     if (ed.draftNew && status !== "doing"){ ed.afterDraft = status; status = "doing"; }
     body = { action: "stmt_save", ym: ed.ym, vk: ed.vk, base: ed.base, basis: ed.basis, status: status, rows: p.rows, inv: p.inv, stated: p.stated, carry: p.carry, vsub: p.vsub, src: ed.src };
     if (ed.draftNew && ed.readDraft){ body.draft_rows = stmtReadDraft(ed); if (ed.draft) body.redraft = true; }
-    if (ed.dropIds && ed.dropIds.length) body.drop_ids = ed.dropIds.slice(0, 10);   // 29 판⑥ 채운 첨부 원본 — 저장되면 서버가 '채움' 표시
+    if (ed.dropIds && ed.dropIds.length) body.drop_ids = ed.dropIds.slice(0, 60);   // 29 판⑩ 10 → 60(서버 DROP_MAX — 쿠팡 주문 11통째부터 '채움'이 안 남던 길)   // 29 판⑥ 채운 첨부 원본 — 저장되면 서버가 '채움' 표시
     ed.saving = true; ed.saveN = ed.editN || 0; ed.msg = "저장 중…"; ed.msgBad = false; stmtEdRefresh();
     gwCall("gw-stmt", body).then(function(res){ if (body.drop_ids && res.status === 200 && res.body && res.body.status === "OK") stmtDropOf(ed.vk).forEach(function(x){ if (body.drop_ids.indexOf(x.id) >= 0 && !x.applied) x.applied = Date.now(); }); stmtEdDone(ed, res, p, "저장했습니다"); }).catch(function(){ if (STMT.ed !== ed) return; ed.saving = false; ed.afterDraft = null; ed.msg = "네트워크 오류 — 저장되지 않았습니다."; ed.msgBad = true; stmtEdRefresh(); });
   }
@@ -9747,22 +9747,22 @@
   // 읽은 결과 → 편집 줄 · 계산서·잔액·명세 합계는 비어 있을 때만 채움 · 줄 금액 기준(부가세 포함/공급가)은 결과가 알려 주면 바꿈 · 넣은 파일 표시(src) · 차량 번호는 차례로 대조
   //   11/14 검토 반영: 계산서(보안 HTML·XML)를 줄이 있는 상세에 넣으면 줄은 그대로 두고 계산서 칸만(안내 순서 'AI 줄 → 계산서 HTML') · 확인 창 취소 = 줄은 두고 빈 칸만 채움 ·
   //   초안은 '읽은 그대로'(ed.readDraft — 첫 저장 전에 사람이 고친 값이 초안에 섞이지 않게) · 한 번이라도 확정된 문서(확정 풀기 중)는 초안을 보내지 않음(서버 DRAFT_ON_FINAL)
-  // 29 판⑨ 쿠팡 주문 덧붙이기 — 이미 있는 줄(날짜·품목·금액이 같음)은 건너뜀
+  // 29 판⑨ 쿠팡 주문 덧붙이기 — 주문(원본 파일) 단위로 한 번씩(같은 날 같은 상품을 두 번 주문해도 둘 다 들어가게 — 줄 글로 겹침을 가리지 않음 · 같은 원본 두 번은 stmtDropFill이 막음)
   function stmtReadAppend(ed, r, name, keep){
-    var sig = function(d, item, amt){ return [String(d || ""), String(item || "").trim(), String(amt == null ? "" : amt).replace(/[^\d-]/g, "")].join("|"); }, have = {}, n = 0, warn = (Array.isArray(r.warn) ? r.warn.slice(0, 8) : []);
-    keep.forEach(function(e){ have[sig(e.date, e.item, e.amt)] = 1; });
+    var n = 0, warn = (Array.isArray(r.warn) ? r.warn.slice(0, 8) : []);
     ed.rows = keep.slice(); ed.readDraft = ed.readDraft || []; ed.readRids = ed.readRids || {};
     r.rows.forEach(function(x){
       var d = x.date ? stmtDateOut(x.date) : "", e;
-      if (have[sig(d, x.item, x.amt)]) return;
       e = stmtNewRow(ed);
       e.date = d; e.item = x.item || ""; e.kind = x.kind || e.kind; e.qty = x.qty == null ? "" : String(x.qty); e.unit = x.unit == null ? "" : String(x.unit);
       e.amt = x.amt == null ? "" : stmtNum(x.amt); e.vat = ""; e.note = x.note || ""; e.how = x.how || "file";
       ed.rows.push(e); ed.readRids[e.r] = 1; n++;
       ed.readDraft.push({ r: e.r, date: x.date || "", veh: "", vraw: "", item: e.item, kind: e.kind, use: "", qty: x.qty == null ? null : String(x.qty), unit: x.unit == null ? null : String(x.unit), amt: x.amt == null ? null : x.amt, vat: null, tire: null, how: e.how, note: e.note });
     });
-    if (!n){ ed.read = { msg: "이미 넣은 주문입니다 — 바꾼 것이 없습니다", warn: warn }; stmtReadShow(ed); return; }
-    ed.src = (ed.src || []).filter(function(s){ return s && s.name !== String(name || "").slice(0, 80); }).concat([{ kind: "htm", name: String(name || "").replace(/\d{10,}/g, "…").slice(0, 80), pages: 0 }]).slice(-10);
+    if (!n){ ed.read = { msg: "읽은 줄이 없습니다", bad: true, warn: warn }; stmtReadShow(ed); return; }
+    // 29 판⑩: 명세 합계 = 주문별 총 결제금액의 합(쿠팡은 계산서가 없어 명세 합계가 없으면 확정 검산이 '대조할 합계 없음'으로 막힘) — 비었으면 이 주문 총액, 숫자면 더함, 사람이 글을 넣었으면 그대로
+    if (r.sum && typeof r.sum.total === "number"){ var st0 = stmtMoney(ed.stated, true); if (st0 === null) ed.stated = stmtNum(r.sum.total); else if (typeof st0 === "number") ed.stated = stmtNum(st0 + r.sum.total); }
+    ed.src =(ed.src || []).filter(function(s){ return s && s.name !== String(name || "").slice(0, 80); }).concat([{ kind: "htm", name: String(name || "").replace(/\d{10,}/g, "…").slice(0, 80), pages: 0 }]).slice(-10);
     ed.dirty = true; ed.editN = (ed.editN || 0) + 1;
     ed.read = { msg: "쿠팡 주문 줄 " + n + "개를 덧붙였습니다 · [저장(작성 중)]을 눌러야 저장됩니다", warn: warn };
     stmtEdRender();
@@ -9791,7 +9791,7 @@
     if (r.basis === "total" || r.basis === "supply"){ if (swap && ed.basis !== r.basis){ ed.basis = r.basis; filled.push("줄 금액 기준 " + (r.basis === "total" ? "부가세 포함" : "공급가 + 세액")); } }
     if (r.inv && stmtAllEmpty(ed.inv, ["date", "supply", "vat", "total"])){ ed.inv = { date: r.inv.date || "", supply: stmtNum(r.inv.supply), vat: stmtNum(r.inv.vat), total: stmtNum(r.inv.total) }; filled.push("계산서"); }
     if (r.carry && stmtAllEmpty(ed.carry, ["prev", "month", "paid", "bal"])){ ed.carry = { prev: stmtNum(r.carry.prev), month: stmtNum(r.carry.month), paid: stmtNum(r.carry.paid), bal: stmtNum(r.carry.bal) }; filled.push("잔액 4칸"); }
-    if (r.sum && r.src !== "coupang" && r.sum.total != null && String(ed.stated == null ? "" : ed.stated).trim() === ""){ ed.stated = stmtNum(r.sum.total); filled.push("명세 합계"); }
+    if (r.sum && r.sum.total != null && String(ed.stated == null ? "" : ed.stated).trim() === ""){ ed.stated = stmtNum(r.sum.total); filled.push("명세 합계"); }
     if (!swap && !filled.length){ ed.read = { msg: "바꾼 것이 없습니다", bad: true, warn: warn }; stmtReadShow(ed); return; }
     if (STMT_READ_SRC[r.src]){ ed.src = (ed.src || []).filter(function(s){ return s && s.name !== String(name || "").slice(0, 80); }).concat([{ kind: STMT_READ_SRC[r.src], name: String(name || "").replace(/\d{10,}/g, "…").slice(0, 80), pages: 0 }]).slice(-10); }
     ed.dirty = true; ed.editN = (ed.editN || 0) + 1;
@@ -9852,7 +9852,7 @@
     if (!m.set) return '<div class="st-mute">📧 메일 자동 받기 — 아직 꺼짐(메일 계정을 넣으면 매일 07:00에 거래처가 보낸 첨부를 이 목록으로 가져옵니다)</div>';
     if (!l) return '<div class="st-mute">📧 메일 자동 받기 — 켜짐, 아직 한 번도 안 돎(매일 07:00)' + run + '</div>';
     if (!l.ok) return '<div class="st-no">📧 메일 받기 실패 ' + esc(stmtMailWhen(l.at)) + ' — ' + esc(STMT_MAIL_ERR[l.code] || ("오류 " + (l.code || ""))) + run + '</div>';
-    h = '📧 메일 자동 받기 — 마지막 ' + esc(stmtMailWhen(l.at)) + ' · 새 원본 ' + (Number(l.added) || 0) + '개' + (l.nov ? ' · <span class="st-no">거래처 고르기 ' + l.nov + '</span>' : '') + (l.fail ? ' · <span class="st-no">못 받음 ' + l.fail + '</span>' : '') + (l.left || l.full ? ' · <span class="st-mute">남은 첨부는 다음 실행에</span>' : '');
+    h = '📧 메일 자동 받기 — 마지막 ' + esc(stmtMailWhen(l.at)) + ' · 새 원본 ' + (Number(l.added) || 0) + '개' + (l.nov ? ' · <span class="st-no">거래처 고르기 ' + l.nov + '</span>' : '') + (l.fail ? ' · <span class="st-no">못 받음 ' + l.fail + '</span>' : '') + (l.other ? ' · <span class="st-mute">목록 밖 거래처·다른 회사 ' + l.other + '</span>' : '') + (l.skip ? ' · <span class="st-mute">명세 아님·너무 큼 ' + l.skip + '</span>' : '') + (l.left || l.full ? ' · <span class="st-mute">남은 첨부는 다음 실행에</span>' : '');
     if (Date.now() - (Number(l.at) || 0) > 2 * 86400000) h += ' · <span class="st-no">2일 넘게 안 돎</span>';
     return '<div>' + h + run + '</div>';
   }
@@ -9917,7 +9917,11 @@
     gwCall("gw-stmt", { action: "stmt_drop_list", ym: ym }).then(function(res){
       var b = res.body || {}, sig = stmtDropSig();
       if (seq !== STMT.dseq || STMT.ym !== ym) return;
-      if (res.status === 200 && b.status === "OK" && Array.isArray(b.list)) STMT.drop = { ym: ym, ok: true, list: b.list };
+      if (res.status === 200 && b.status === "OK" && Array.isArray(b.list)){
+        STMT.drop = { ym: ym, ok: true, list: b.list };
+        // 29 판⑩: 메일 에이전트가 시간이 모자라 미룬 AI 판독(넣은 사람 = 봇 · 읽는 중)은 목록을 연 사람이 부름 — 종전엔 아무도 안 불러 60분 뒤 실패로 바뀜(사람이 넣은 것은 넣을 때 이미 부름)
+        if (canDo("stmt")) b.list.forEach(function(x){ if (x && x.state === "reading" && x.job && x.by === "__stmtmail__") stmtDropKick(x); });
+      }
       else if (!stmtDropMine()) STMT.drop = { ym: ym, ok: false, list: [], msg: "첨부 원본 목록을 읽지 못했습니다(" + ((b && b.error_code) || res.status) + ")" };
       stmtDropRefresh(sig !== stmtDropSig()); stmtDropPump(); stmtDropPollLater(ym);
       if (then) then();
@@ -10024,7 +10028,8 @@
   function stmtDropFill(ed, id, then){
     var x = stmtDropOf(ed.vk).filter(function(e){ return e.id === id; })[0];
     if (!x || STMT.ed !== ed || !stmtEdW(ed) || ed.saving || (ed.read && ed.read.busy)){ if (then) then(); return; }
-    ed.read = { busy: true, msg: "첨부 원본 읽는 중… (" + String(x.name).slice(0, 40) + ")" }; stmtReadShow(ed);
+    if (x.src === "coupang" && (x.applied || (ed.dropIds || []).indexOf(id) >= 0)){ ed.read = { msg: "이미 넣은 주문입니다(같은 원본은 한 번만 덧붙입니다)" }; stmtReadShow(ed); if (then) then(); return; }   // 29 판⑨: 쿠팡은 덧붙이기라 같은 원본 두 번 = 줄 두 벌
+    ed.read = { busy: true, msg: "첨부 원본 읽는 중… ("+ String(x.name).slice(0, 40) + ")" }; stmtReadShow(ed);
     gwCall("gw-stmt", { action: "stmt_drop_get", ym: ed.ym, id: id }).then(function(res){
       var b = res.body || {};
       if (STMT.ed !== ed) return;
@@ -10032,6 +10037,37 @@
       else { ed.read = { msg: stmtReadErr(res, b.entry && b.entry.code), bad: true }; stmtReadShow(ed); }
       if (then) then();
     }).catch(function(){ if (STMT.ed !== ed) return; ed.read = { msg: "네트워크 오류 — 다시 눌러 주세요", bad: true }; stmtReadShow(ed); });
+  }
+  // 29 판⑩ 계산서 여러 장 합치기 — 읽어 둔 결과를 차례로 받아 공급가·세액·합계를 더함(작성일 = 가장 늦은 날) · 받는 회사가 다른 장은 빼고 경고 · withRows = 명세 파일이 없을 때(덕천처럼 계산서가 곧 명세) 품목 줄도 이어 붙임
+  function stmtDropFillInvs(ed, list, withRows){
+    var got = [], i = 0;
+    if (STMT.ed !== ed || !stmtEdW(ed) || ed.saving || (ed.read && ed.read.busy)) return;
+    ed.read = { busy: true, msg: "계산서 " + list.length + "장 읽는 중…" }; stmtReadShow(ed);
+    (function next(){
+      if (STMT.ed !== ed) return;
+      if (i >= list.length){
+        var sum = { date: "", supply: 0, vat: 0, total: 0 }, rows = [], warn = [], ok = 0, ids = [];
+        got.forEach(function(g){
+          var r = g.r;
+          if (!r || !r.inv){ warn.push(String(g.x.name).slice(0, 40) + " — 계산서 칸을 읽지 못해 뺐습니다"); return; }
+          if (r.buyer_other){ warn.push(String(g.x.name).slice(0, 40) + " — 받는 회사가 다른 계산서라 뺐습니다"); return; }
+          sum.supply += Number(r.inv.supply) || 0; sum.vat += Number(r.inv.vat) || 0; sum.total += Number(r.inv.total) || 0;
+          if (String(r.inv.date || "") > sum.date) sum.date = String(r.inv.date || "");
+          if (withRows && Array.isArray(r.rows)) rows = rows.concat(r.rows);
+          ok++; ids.push(g.x.id);
+        });
+        ed.read = null;
+        if (!ok){ ed.read = { msg: "계산서를 읽지 못했습니다", bad: true, warn: warn }; stmtReadShow(ed); return; }
+        stmtReadApply(ed, { src: "nts", rows: rows, inv: sum, warn: ["계산서 " + ok + "장을 더해 계산서 칸을 채웠습니다"].concat(warn) }, "계산서 " + ok + "장");
+        ids.forEach(function(id){ if (ed.dropIds.indexOf(id) < 0) ed.dropIds.push(id); });
+        return;
+      }
+      var x = list[i++];
+      gwCall("gw-stmt", { action: "stmt_drop_get", ym: ed.ym, id: x.id }).then(function(res){
+        var b = res.body || {};
+        got.push({ x: x, r: (res.status === 200 && b.status === "OK") ? b.result : null }); next();
+      }).catch(function(){ got.push({ x: x, r: null }); next(); });
+    })();
   }
   // 상세를 열 때 — 빈 명세(줄·계산서 없음)면 읽어 둔 원본으로 채움: 명세 파일 하나(엑셀·글자 PDF 먼저, 그다음 AI 판독 — 새것 먼저) → 계산서. 확정·채운 원본은 건드리지 않음
   function stmtDropAuto(ed){
@@ -10046,9 +10082,11 @@
       return;
     }
     stm = l.filter(function(x){ return x.src !== "nts" && x.src !== "xml"; }).sort(function(a, b){ return rank(a) - rank(b) || (Number(b.at) || 0) - (Number(a.at) || 0); })[0];
-    inv = l.filter(function(x){ return x.src === "nts" || x.src === "xml"; })[0];
-    if (stm) stmtDropFill(ed, stm.id, function(){ if (inv) setTimeout(function(){ stmtDropFill(ed, inv.id); }, 50); });
-    else if (inv) stmtDropFill(ed, inv.id);
+    inv = l.filter(function(x){ return x.src === "nts" || x.src === "xml"; }).sort(function(a, b){ return (Number(a.at) || 0) - (Number(b.at) || 0); });
+    // 29 판⑩: 계산서가 여러 장(건별 발행)이면 계산서 칸 = 그 달 계산서 합 — 종전엔 첫 장만 채워 나머지 공급가만큼 확정이 막힘
+    var invFill = function(){ if (inv.length === 1) stmtDropFill(ed, inv[0].id); else if (inv.length > 1) stmtDropFillInvs(ed, inv, !stm); };
+    if (stm) stmtDropFill(ed, stm.id, function(){ if (inv.length) setTimeout(invFill, 50); });
+    else invFill();
   }
   function stmtDropAutoStart(ed){ if (!ed || !canDo("stmt")) return; if (stmtDropMine() && STMT.drop.ym === ed.ym) stmtDropAuto(ed); else stmtDropLoad(ed.ym, function(){ stmtDropAuto(ed); }); }
   function stmtDropOnClick(e){
