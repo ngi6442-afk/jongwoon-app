@@ -3088,7 +3088,7 @@ Object.assign(AUTOTASK_SRV_RULES, {
   hr_join: { uses: ['hr:', 'acct:'], label: '입사 체크리스트 지시(입사일 기준 · 인사·계정 담당)', key: 'hr:<회원>:join:<입사일>:<번호> · acct:<회원>:join:<입사일>', prefix: 'hr:', ready: EV.ready('hr_join') },
   hr_leave: { uses: ['hr:', 'acct:'], label: '퇴사 체크리스트 지시(퇴사일 기준 · 인사·계정 담당)', key: 'hr:<회원>:leave:<퇴사일>:<번호> · acct:<회원>:leave:<퇴사일>', prefix: 'hr:', ready: EV.ready('hr_leave') },
   veh_ceq31: { label: '건설기계 정기검사 지시 31일 전(차량 담당)', key: 'veh:<id>:insp:<만료일>', prefix: 'veh:', ready: EV.ready('veh_ceq31') },
-  ks_report: { label: '현장 실적 신고 지시(매년 1/15~2/15 · 실적 신고 담당)', key: 'ks:<신고 연도>', prefix: 'ks:', ready: EV.ready('ks_report') },
+  ks_report: { uses: ['ks:'], label: '현장 실적 신고 지시(매년 1/15~2/15 · 실적 신고 담당)', key: 'ks:<신고 연도>', prefix: 'ks:', ready: EV.ready('ks_report') },   // 판5: 배정표 '현장 실적 신고' 줄 가드(입·퇴사와 같음 — 담당 없이 켜면 지시가 안 생김)
   veh_event: { label: '차량 매각·말소 지시(사건일 기준 · 차량 담당)', key: 'veh:<id>:ev:<sold|dereg>:<사건일>:<main|waste>', prefix: 'veh:', ready: EV.ready('veh_event') },
 });
 function autotaskReady(k) { return hasOwn(AUTOTASK_SRV_RULES, k) ? AUTOTASK_SRV_RULES[k].ready !== false : hasOwn(AUTOTASK_RULES, k); }

@@ -44,6 +44,12 @@ async function run(st, nowMs) {
       }
       continue;
     }
+    if (col === 'ks') {   // C185 판5 실적 신고 신호: 열린 ks: 지시가 있을 때 현장 대장·계약을 읽음 — 못 읽음·깨진 꼴(없음 아님) = null(신호 없음 · 원장 C225) · 지시 = 지금 문서
+      const strict = async function (name) { try { const r = await blobGet(st, 'col:' + name); if (!r.ok) return r.code === 'NOT_FOUND' ? [] : null; if (r.data && !Array.isArray(r.data.items)) return null; return (r.data && r.data.items) || []; } catch (e) { return null; } };
+      const sites = await strict('asbestos'), contracts = await strict('contracts');
+      recs.__rows.ks = (sites && contracts) ? { sites: sites, contracts: contracts, tasks: tdoc.items } : null;
+      continue;
+    }
     if (col === 'proof') {   // P1 판19 증명서 신호: 열린 증명서 지시가 있을 때만 증빙 보관함 색인 하나를 읽는다(파일 본문 안 읽음). 읽기 실패·없음·깨진 꼴 = null(신호 없음)
       let pr = null;
       try { pr = await blobGet(store(FILES), 'proof:__index__'); } catch (e) { pr = null; }

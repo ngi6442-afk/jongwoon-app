@@ -313,4 +313,23 @@ function planVehCeq31(input, ctx) {
 }
 RULES.veh_ceq31.plan = planVehCeq31;
 
-module.exports = { KEY_RE, isEvKey, isEvLike, ruleOfKey, subjOf, RULES, RULE_IDS, BASE_NEEDS, CAP, DRY_WIN, ready, needsOf, kstDay, ctxFor, emptySum, skipSum, notReadySum, MARK, MARK_WHY, markedKind, markTask, unmarkTask, run, botSum, TITLE_MAX, PLAN_TITLE_MAX, PLAN_DETAIL_MAX, HR_JOIN_ITEMS, hrJoinKey, planHrJoin, HR_LEAVE_ITEMS, hrLeaveKey, planHrLeave, CEQ_ROW, planVehCeq31 };
+// ---- C185 판5 ⑤ 현장 실적 신고(ks_report) — 계획 함수(착수계획 ⓒ ⑤ · 판5 행) ----
+//   사건(날짜 상태 — 켠 시각과 견주지 않음) = 오늘(KST)이 그해 1/15~2/15 ∧ 대상(_lib/autorules ksTargets — 지난해 끝난 현장 · 번호 빈칸 · 계약별 할 일 없음) ≥ 1곳 → 묶음 지시 1건(키 ks:<그해> · 기한 그해 2/15 · 본문에 대장 연번)
+//   같은 해 키가 있으면(지운 것 포함) 0 — 틀 run이 셈 · 1/15에 0곳이어도 2/15까지 생기면 그때 1건 · 기간 밖 = 0건 + 참고 수(지금 세면 대상·올해 끝난 현장으로 세면 대상)
+//   담당 = 배정표 ks: 줄 · 글에 현장 이름·거래처 없음(대장 연번만 — 끼워 넣는 값 = 대상 수·연번)
+const KS_SEQ_MAX = 30;
+function planKsReport(input, ctx) {
+  const today = String(ctx.today), y = Number(today.slice(0, 4)), win = AR.ksWindow(today);
+  const t = AR.ksTargets(input.sites, input.contracts, input.tasks, y - 1), pv = AR.ksTargets(input.sites, input.contracts, input.tasks, y);
+  const out = { events: [], old: 0, no_row: [], ref: { ks_win: win ? 1 : 0, ks_done: t.done, ks_numbered: t.numbered, ks_task: t.has_task, ks_target: t.count, ks_no_end: t.no_end, ks_preview: pv.count } };
+  if (!win || !t.count) return out;
+  const seqs = t.seqs.slice(0, KS_SEQ_MAX).map(String), more = t.seqs.length - seqs.length;
+  const seqTxt = seqs.length ? '대장 연번 ' + seqs.join(', ') + (more > 0 ? ' 외 ' + more + '곳' : '') : '대장 연번 없음';
+  out.events.push({ subj: 'ks' + y, tasks: [{ key: 'ks:' + y, title: '지난해 끝난 현장 실적 신고 — 대상 ' + t.count + '건',
+    detail: '통합실적관리시스템 연도별 신고 대상(지난해 끝난 현장 가운데 신고번호가 빈 곳 · 계약별 실적신고 할 일이 있는 현장은 뺌): ' + seqTxt + '. 신고한 뒤 현장 대장이나 계약 실적 단계에 신고번호를 넣으면 승인 대기로 올라갑니다.',
+    due: y + '-' + AR.KS_DUE, vals: [String(t.count)].concat(seqs) }] });
+  return out;
+}
+RULES.ks_report.plan = planKsReport;
+
+module.exports = { KEY_RE, isEvKey, isEvLike, ruleOfKey, subjOf, RULES, RULE_IDS, BASE_NEEDS, CAP, DRY_WIN, ready, needsOf, kstDay, ctxFor, emptySum, skipSum, notReadySum, MARK, MARK_WHY, markedKind, markTask, unmarkTask, run, botSum, TITLE_MAX, PLAN_TITLE_MAX, PLAN_DETAIL_MAX, HR_JOIN_ITEMS, hrJoinKey, planHrJoin, HR_LEAVE_ITEMS, hrLeaveKey, planHrLeave, CEQ_ROW, planVehCeq31, planKsReport };

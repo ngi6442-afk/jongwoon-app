@@ -21562,5 +21562,59 @@ try {
 } catch (e) { console.log('  (C185 판4 검사 생략 — ' + e.message + ')'); fails++; }
 
 
+// ---- C185 판5 ⑤ 현장 실적 신고 — 화면: 앱 csOnDone이 만드는 실적신고 할 일에 con_ref(서버 제외 판정이 읽는 칸 — ⓓ 11 · 검토 8) · 콘솔 글(참고 수·켜기 줄 규칙별 글·낡은 요약)
+try {
+  const fnK5 = (name, src) => { src = src || html; const i = src.indexOf('function ' + name + '('); if (i < 0 || src.indexOf('function ' + name + '(', i + 1) >= 0) throw new Error('함수 없음·둘: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('함수 끝 없음: ' + name); };
+  const stK5 = (re, src) => { const m = (src || html).match(re); if (!m) throw new Error('문장 없음: ' + re); return m[0]; };
+  // ① 실제 csOnDone(+ csNextFeb15) — 계약 종결 = 할 일 1건 · con_ref = 계약 id · 기한 = 다음 2/15 · 같은 제목 열림이면 안 만듦
+  const boxC5 = () => new Function([
+    'var tasks = [], saved = 0; function todayStr(){ return "2026-11-20"; } function genId(){ return "tX"; } function csSiteDone(){} function csSiteKindOf(){ return "asbestos"; } function csTitle(c){ return c.label; }',
+    'function saveTasksCache(){} function scheduleTasksSave(){ saved++; } function scheduleContractSave(){}',
+    'function memberName(){ return ""; } function myName(){ return ""; } function myId(){ return ""; }',   // 운영 v508 뒤 csOnDone이 담당·보낸 사람 칸을 채움 — 이 시험은 con_ref·기한만 봄
+    fnK5('csNextFeb15'), fnK5('csOnDone'), 'return { run: function(c){ csOnDone(c); return tasks; } };'].join('\n'))();
+  const cTask = boxC5().run({ id: 'cK1', scen: 'x', status: 'done', label: '가짜 계약' });
+  const conRefOk = cTask.length === 1 && cTask[0].con_ref === 'cK1' && cTask[0].due === '2027-02-15' && /^실적신고\(2\/15\)/.test(cTask[0].title);
+  T('C185 판5 ① 앱 csOnDone(실행 — 실제 함수): 계약 종결 = 실적신고(2/15) 할 일 1건 · con_ref = 계약 id(서버 실적 신고 지시가 이 칸으로 그 현장을 뺌) · 기한 = 다음 2/15 — 이 판은 csOnDone을 고치지 않음', conRefOk, JSON.stringify(cTask.map((t) => [t.con_ref, t.due])));
+  // ② 콘솔 글
+  const FN5k = ['esc', 'pmconPlan', 'pmconRowsAutotask', 'pmconLicWhy', 'evrSeen', 'evrIds', 'evrMd', 'evrSumTxt', 'evrLiveRow', 'evrRows', 'evrCardRender', 'evrCardSet'];
+  const boxK5 = (src) => new Function([
+    'var pmconSeq = 1, pmconState = { canWrite: true, base: 555 }, calls = [], toasts = [];',
+    'function todayStr(){ return "2026-11-20"; } function memberName(id){ return ""; } function apprToastShow(m){ toasts.push(m); } function renderPmcon(){}',
+    'var confirm = function(){ return true; }, alert = function(m){ toasts.push("alert:" + m); }; function gwCall(fn, b){ calls.push(b); return Promise.resolve({ status: 200, body: {} }); }',
+    [/var EVR_STOP = \{[^}]+\};/, /EVR_STOP\.TEXT_LONG = "[^"]+";/, /var EVR_SKIP = \{[^}]+\};/, /var evrLast = null, evrCardBusy = false;/, /var AUTO_RULE_ORDER = \[[^\]]+\];/, /var PMCON_PLAN = \{[^\n]+\};/].map((re) => stK5(re, src)).join('\n'),
+    FN5k.map((n) => fnK5(n, src)).join('\n'),
+    'return { rows: pmconRowsAutotask, card: evrCardRender, sum: evrSumTxt };'].join('\n'))();
+  const SK = (x, r) => Object.assign({ mode: 'dry', ready: true, win: 0, events: 0, found: 0, tasks: 0, who: [], no_who: 0, no_due: 0, old: 0, gone: 0, marked: 0, no_row: [], skip: '', ref: Object.assign({ ks_win: 0, ks_done: 7, ks_numbered: 2, ks_task: 2, ks_target: 3, ks_no_end: 1, ks_preview: 4 }, r || {}) }, x || {});
+  const BK5 = (o) => { o = o || {}; const ms = { lic_duty: { label: '인허가' }, ks_report: { label: '현장 실적 신고 지시', ready: true, uses: ['ks:'] } };
+    return { rules: Object.assign({ lic_duty: 'live', ks_report: 'dry' }, o.rules || {}), since: {}, meta: {}, meta_srv: ms, updated_at: 44, assign_state: o.ast || { 'ks:': 'ok' }, dry: { rules: Object.assign({}, o.dry || {}) } }; };
+  const chkK5 = (src) => {
+    const b = boxK5(src), o = {};
+    const t1 = b.sum(SK()), t2 = b.sum(SK({ tasks: 1, events: 1, found: 1, who: [{ id: 'u1', n: 1 }] }, { ks_win: 1, ks_no_end: 0 }));
+    o.sum = t1.indexOf('기간 전(1/15~2/15) · 지난해 끝난 현장 7곳(번호 있음 2 · 계약별 할 일 있음 2) → 지금 세면 대상 3곳 · 끝난 날이 빈 종결 1곳(세지 않음) · 미리 보기: 올해 끝난 현장으로 세면 4곳') > 0
+      && t2.indexOf('기간 안 · 지난해 끝난 현장 7곳') > 0 && t2.indexOf('끝난 날이 빈') < 0 && !/ks_|ks:|con_ref/.test(t1 + t2)
+      && t1.indexOf('오늘 실행에 지시 0건(사건 0)') === 0 && t1.indexOf('최근 30일') < 0;   // 서버 요약 win 0(날짜 상태 규칙 — 판4 검토 권고 4와 같은 갈래)
+    const rv = b.rows(BK5({ dry: { ks_report: SK({ tasks: 1, events: 1, found: 1, who: [{ id: 'u1', n: 1 }] }) } })).find((r) => r.id === 'autotask:ks_report:live');
+    const rb = b.rows(BK5({ ast: { 'ks:': 'empty' }, dry: { ks_report: SK() } })).find((r) => r.id === 'autotask:ks_report:live');
+    o.live = !!rv && !rv.block && rv.why.indexOf('(기간 1/15~2/15 안이면 켠 다음 실행에 지난해 끝난 현장 묶음 1건 — 켠 시각과 견주지 않음 · 계약별 실적신고 할 일이 있는 현장은 뺌)') > 0 && rv.why.indexOf('켠 뒤에 생긴 일만') < 0
+      && !!rb && rb.block === '배정표 담당을 먼저 정해 주세요' && rb.nocount === true && rb.card === 'assignCard';   // 배정표 가드(uses ks:) — 입·퇴사와 같은 줄
+    const b2 = boxK5(src); b2.rows(BK5({ dry: { ks_report: { mode: 'dry', ready: false } } })); const e = { innerHTML: '', querySelectorAll: () => [] }; b2.card(e);
+    const tx = e.innerHTML.replace(/<[^>]+>/g, ' '), iK = tx.indexOf('현장 실적 신고 지시');
+    o.stale = iK >= 0 && tx.slice(iK).indexOf('아직 연습 집계가 없습니다(다음 평일 08:10 정기업무 봇 뒤에 보입니다).') > 0;
+    // 켜진 뒤 남은 옛 '준비 중' 요약 = 판3 좁은 재확인 글('켠 뒤 첫 집계 전')
+    const b3 = boxK5(src); b3.rows(BK5({ rules: { ks_report: 'live' }, dry: { ks_report: { mode: 'dry', ready: false } } })); const e3 = { innerHTML: '', querySelectorAll: () => [] }; b3.card(e3);
+    const tx3 = e3.innerHTML.replace(/<[^>]+>/g, ' '), iK3 = tx3.indexOf('현장 실적 신고 지시');
+    o.staleLive = iK3 >= 0 && tx3.slice(iK3).indexOf('켠 뒤 첫 집계 전(') > 0 && tx3.slice(iK3).indexOf('아직 연습 집계가 없습니다') < 0;
+    o.ok = Object.values(o).every((v) => v === true); return o;
+  };
+  const RK5 = chkK5();
+  T('C185 판5 ② 콘솔 글(실행 — 실제 evrSumTxt·evrLiveRow·evrCardRender): 기간 전·안 · 지난해 끝난 현장 n곳(번호 있음 · 계약별 할 일 있음) → 지금 세면 대상 n곳 · 끝난 날 빈 종결 수 · 미리 보기(올해 끝난 현장) · 켜기 줄 규칙별 글 · 배정표 "현장 실적 신고" 빈칸 = 막힘(담당 먼저 · 셈 빠짐) · 낡은 요약 = "아직 연습 집계가 없습니다(…)" · 내부 칸 이름 0',
+    RK5.ok, JSON.stringify(RK5));
+  const mutK5u = (from, to) => { if (html.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); return html.replace(from, () => to); };
+  const MK5 = [['    if (rf.ks_win !== undefined) p.push(', '    if (false) p.push('], ['    EVR_LIVE_NOTE.ks_report = "', '    EVR_LIVE_NOTE.ks_report_x = "']];
+  const kK5 = MK5.map(([a, b]) => { try { return chkK5(mutK5u(a, b)).ok; } catch (e) { return 'err ' + e.message; } });
+  T('C185 판5 ② 결함 사본 ' + kK5.length + '개(참고 수 글 걷음 · 켜기 줄 규칙별 글 걷음) = 모두 ✗', kK5.every((v) => v === false), JSON.stringify(kK5));
+} catch (e) { console.log('  (C185 판5 검사 생략 — ' + e.message + ')'); fails++; }
+
+
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
