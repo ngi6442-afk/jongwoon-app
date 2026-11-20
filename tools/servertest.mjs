@@ -2503,6 +2503,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const savedCol = mem.gw_data['col:promo'];
   const up = await call({ action: 'att_put', kind: 'promo', name: 'a.jpg', type: 'image/jpeg', data: jpg }, t1, 'dev1');
   const id1 = up.body && up.body.id;
+  const bid1 = id1 && mem.gw_files[id1] ? mem.gw_files[id1].bid : null;   // 아래에서 지우기 전에 잡아 둠
   const del = (id, tok) => call({ action: 'att_del', id: id }, tok, 'dev1');
   const rOther = await del(id1, t2), rView = await del(id1, tv);
   mem.gw_data['col:promo'] = { schema: 1, items: [{ id: 'pr257', photos: [{ id: id1, name: 'a.jpg' }] }] };
@@ -2514,7 +2515,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const rOld = await del(idOld, t1);
   const idCon = 'att_' + '8'.repeat(16); mem.gw_files[idCon] = { name: 'c.pdf', type: 'application/pdf', kind: 'contract', data: jpg, by: '홍보257', bid: 'upro257', ts: 1 };
   const rCon = await del(idCon, t1), rBad = await del('mask:' + idCon, t1);
-  T('C257 att_put 홍보: 올린 사람 id(bid) 저장', up.code === 200 && !!id1 && mem.gw_files[id1] && mem.gw_files[id1].bid === 'upro257', up.code + '');
+  T('C257 att_put 홍보: 올린 사람 id(bid) 저장', up.code === 200 && !!id1 && bid1 === 'upro257', up.code + ' ' + bid1);
   T('C257 att_del 좁은 갈래(계약 수행 아님): 남이 올린 사진 403 NOT_OWNER · 홍보 보기 권한 403 NO_WRITE · 기록에 붙은 사진 409 PROMO_PHOTO_IN_USE(안 지움) · 붙지 않은 본인 사진 200·지움·감사 "첨부삭제" · 옛 첨부(bid 없음)는 이름으로 본인 판정 · 계약 첨부 403 · att_ 아닌 id 400',
     rOther.code === 403 && rOther.body.error_code === 'NOT_OWNER' && rView.code === 403 && rView.body.error_code === 'NO_WRITE'
     && rUsed.code === 409 && rUsed.body.error_code === 'PROMO_PHOTO_IN_USE' && rOk.code === 200 && !mem.gw_files[id1] && auditMock.logs.slice(aud0).some((l) => l.ev && l.ev[0] && l.ev[0].op === '첨부삭제')
