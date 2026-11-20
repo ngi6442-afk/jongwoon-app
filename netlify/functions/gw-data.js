@@ -1019,10 +1019,14 @@ const AUTOTASK_KEY_RE = {
   wk: new RegExp('^wk:missing:' + AUTOTASK_MONTH + '$'),
 };
 // 돌려주는 값: 'site_missing'·'wk_missing'·'veh_insp90'(스위치 대상) · ''(기존 4규칙 — 스위치 무관) · 'unknown'(허용 목록 밖 — 늘 막음)
-function autotaskRuleOf(autoKey, today) {
+function autotaskRuleOf(autoKey, today, veh) {
   const k = typeof autoKey === 'string' ? autoKey : '';
   if (AUTOTASK_KEY_RE.site.test(k)) return 'site_missing';
   if (AUTOTASK_KEY_RE.wk.test(k)) return 'wk_missing';
+  // C185 판4 ⑦: 셋째 인자 veh = 그 키의 차 레코드(undefined = 인자 없음·차 없음 = 아래 종전 판정 · null = 차량 문서를 못 읽음) — 정기검사 키가 31일 이상 남았을 때만 봄
+  //   규모 '건설기계' = 31일이면 veh_ceq31(그 스위치로 가름) · 32일 이상이면 늘 막음(90일 규칙에서 뺐으므로) · 차량 문서를 못 읽음 = 건설기계인지 모르므로 31일 이상 정기검사 키를 막음(veh_unread)
+  const mc = veh !== undefined ? AUTOTASK_KEY_RE.veh.exec(k) : null, dc = mc && mc[1] === 'insp' ? AR.dayDiff(mc[2], today) : null;
+  if (dc !== null && dc >= AR.CEQ31) { if (veh === null) return 'veh_unread'; if (AR.isCeq(veh)) return dc === AR.CEQ31 ? 'veh_ceq31' : 'unknown'; }
   // veh:<id>:insp:<만료일>은 기존 D-30과 같은 키 꼴 — 만료일이 오늘(KST)부터 31일 이상이면 D-90 규칙(autorules VEH90_MIN · autotask.py DUE_WINDOW 30과 같은 경계)
   const m = AUTOTASK_KEY_RE.veh.exec(k);
   if (m) {
@@ -1057,10 +1061,16 @@ async function handleAutotaskIngest(event, d, R) {
   doc.items.forEach(function (t) { if (t && t.auto_key) { have[t.auto_key] = t; have0[t.auto_key] = 1; } });
   let made = 0, fixed = 0, blocked = 0;
   const blockedBy = {};
+  // C185 판4 ⑦: 받은 정기검사 키의 차 규모(건설기계 31일 판정)를 보려고 차량 문서를 판정 전에 한 번 — 없음 = 빈 대장 · 못 읽음·깨진 꼴 = null(31일 이상 정기검사 키는 막힘 veh_unread)
+  let vehById = {};
+  if (items.some(function (n) { return /^veh:[^:]+:insp:/.test(String((n && n.auto_key) || '')); })) {
+    try { const rv0 = await blobGet(st, colKey('vehicles')); if (!rv0.ok && rv0.code !== 'NOT_FOUND') vehById = null; else if (rv0.ok && rv0.data && !Array.isArray(rv0.data.items)) vehById = null; else ((rv0.ok && rv0.data && rv0.data.items) || []).forEach(function (v) { if (v && v.id) vehById[v.id] = v; }); } catch (e) { vehById = null; }
+  }
+  const vehOfKey = function (k) { if (vehById === null) return null; const v = vehById[String(k).split(':')[1]]; return v || undefined; };
   for (const n of items.slice(0, 100)) {
     const k = String((n && n.auto_key) || '');
     if (!k || have[k]) continue;
-    const rule = autotaskRuleOf(k, today);
+    const rule = autotaskRuleOf(k, today, vehOfKey(k));   // C185 판4 ⑦: 정기검사 키의 차 규모
     if (rule && (rule === 'unknown' || sw.rules[rule] !== 'live')) { blocked++; blockedBy[rule] = (blockedBy[rule] || 0) + 1; continue; }   // v453
     doc.items.push({ id: 't' + crypto.randomBytes(6).toString('hex'), title: String(n.title || '').slice(0, 120),
       detail: String(n.detail || '').slice(0, 500), who_id: '', who: '', scope: [],

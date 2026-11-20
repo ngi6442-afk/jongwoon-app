@@ -292,4 +292,24 @@ function planHrLeave(input, ctx) {
 }
 RULES.hr_leave.plan = planHrLeave;
 
-module.exports = { KEY_RE, isEvKey, isEvLike, ruleOfKey, subjOf, RULES, RULE_IDS, BASE_NEEDS, CAP, DRY_WIN, ready, needsOf, kstDay, ctxFor, emptySum, skipSum, notReadySum, MARK, MARK_WHY, markedKind, markTask, unmarkTask, run, botSum, TITLE_MAX, PLAN_TITLE_MAX, PLAN_DETAIL_MAX, HR_JOIN_ITEMS, hrJoinKey, planHrJoin, HR_LEAVE_ITEMS, hrLeaveKey, planHrLeave };
+// ---- C185 판4 ⑦ 건설기계 정기검사 31일 전(veh_ceq31) — 계획 함수(착수계획 ⓒ ⑦ · 판4 행) ----
+//   사건(날짜 상태 — 켠 시각과 견주지 않음) = 규모 '건설기계' ∧ 회색 3종 아님 ∧ 검사 만기가 날짜 ∧ 오늘부터 31일(_lib/autorules ceq31) · 키 = 30일 전 지시와 같은 veh:<id>:insp:<만료일>(31일째에 먼저 만들면 30일 전 규칙은 중복으로 건너뜀)
+//   차량 근거 승격(vehbg.on) ∧ 승격본에 ref.ceq.window 행이 있을 때만 — 아니면 그 실행 0건(skip NOT_PROMOTED·NO_ROW · 그동안 30일 전 지시가 그대로 나감) · 참고 수(규모 건설기계 n대·전체 n대·오늘 31일 n대)는 건너뛸 때도 남김
+//   담당 = 배정표 veh: 줄 · 글 = 지금 차량 정기검사 지시와 같은 꼴(차번호 + '정기검사 갱신' — 회사 차 · 지입 구분 없음 = 종전 30일 전 지시와 같음)
+const CEQ_ROW = 'ref.ceq.window';
+function planVehCeq31(input, ctx) {
+  const vs = Array.isArray(input.vehicles) ? input.vehicles : [];
+  const c = AR.ceq31(vs, ctx.today, []), vb = input.vehbg || null;
+  const out = { events: [], old: 0, no_row: [], ref: { ceq_total: c.total, ceq: c.ceq, ceq_d31: c.count } };
+  if (!(vb && vb.on === true)) { out.skip = 'NOT_PROMOTED'; return out; }
+  const rows = (vb.bg && Array.isArray(vb.bg.rows)) ? vb.bg.rows : [];
+  if (!rows.some(function (r) { return r && r.id === CEQ_ROW; })) { out.no_row = [CEQ_ROW]; out.skip = 'NO_ROW'; return out; }
+  c.items.forEach(function (it) {
+    const no = it.no || '차량';
+    out.events.push({ subj: it.id, tasks: [{ key: it.key, title: no + ' 정기검사 갱신', detail: '건설기계 정기검사 만기(' + it.due + ')가 31일 남았습니다. 검사를 받은 뒤 차량 카드의 검사 만기를 고쳐 주세요.', due: it.due, vals: [no, it.due] }] });
+  });
+  return out;
+}
+RULES.veh_ceq31.plan = planVehCeq31;
+
+module.exports = { KEY_RE, isEvKey, isEvLike, ruleOfKey, subjOf, RULES, RULE_IDS, BASE_NEEDS, CAP, DRY_WIN, ready, needsOf, kstDay, ctxFor, emptySum, skipSum, notReadySum, MARK, MARK_WHY, markedKind, markTask, unmarkTask, run, botSum, TITLE_MAX, PLAN_TITLE_MAX, PLAN_DETAIL_MAX, HR_JOIN_ITEMS, hrJoinKey, planHrJoin, HR_LEAVE_ITEMS, hrLeaveKey, planHrLeave, CEQ_ROW, planVehCeq31 };

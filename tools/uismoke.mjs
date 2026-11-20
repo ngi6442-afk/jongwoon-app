@@ -21506,5 +21506,51 @@ try {
 } catch (e) { console.log('  (C185 판3 검토 반영 검사 생략 — ' + e.message + ')'); fails++; }
 
 
+// ---- C185 판4 ⑦ 건설기계 31일 전 — 화면: 앱 runAutoTaskGen에 31·규모 판정 없음(ⓓ 2) · 앱 규모 목록 끝 값 = 서버 상수(ⓓ 3) · 콘솔 글(참고 수·건너뜀 글·켜기 줄 규칙별 글 ⓙ 4·준비된 규칙의 낡은 요약)
+try {
+  const fnV4 = (name, src) => { src = src || html; const i = src.indexOf('function ' + name + '('); if (i < 0 || src.indexOf('function ' + name + '(', i + 1) >= 0) throw new Error('함수 없음·둘: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('함수 끝 없음: ' + name); };
+  const stV4 = (re, src) => { const m = (src || html).match(re); if (!m) throw new Error('문장 없음: ' + re); return m[0]; };
+  const reqV4 = createRequire(import.meta.url), ARV4 = reqV4(join(ROOT, 'netlify', 'functions', '_lib', 'autorules.js'));
+  const gen = fnV4('runAutoTaskGen');
+  const sizeDef = JSON.parse(stV4(/var VEH_SIZE_DEF = (\[[^\]]+\]);/).replace(/^var VEH_SIZE_DEF = /, '').replace(/;$/, ''));
+  T('C185 판4 ① 세 곳 같은 값(정적): 앱 runAutoTaskGen에 31·규모·건설기계 판정 없음(앱은 30일 전 지시만 — 31일은 서버 스위치) · 앱 규모 목록 VEH_SIZE_DEF 끝 값 = 서버 CEQ_SIZE("' + ARV4.CEQ_SIZE + '") · 서버 CEQ31 = 31',
+    !/\b31\b|\.size\b|건설기계|CEQ/.test(gen) && sizeDef[sizeDef.length - 1] === ARV4.CEQ_SIZE && ARV4.CEQ31 === 31, JSON.stringify({ last: sizeDef[sizeDef.length - 1] }));
+  const FN4 = ['esc', 'pmconPlan', 'pmconRowsAutotask', 'pmconLicWhy', 'evrSeen', 'evrIds', 'evrMd', 'evrSumTxt', 'evrLiveRow', 'evrRows', 'evrCardRender', 'evrCardSet'];
+  const box4 = (src) => new Function([
+    'var pmconSeq = 1, pmconState = { canWrite: true, base: 555 }, calls = [], toasts = [];',
+    'function todayStr(){ return "2026-11-20"; } function memberName(id){ return id === "uV" ? "차량담당" : ""; } function apprToastShow(m){ toasts.push(m); } function renderPmcon(){}',
+    'var confirm = function(){ return true; }, alert = function(m){ toasts.push("alert:" + m); }; function gwCall(fn, b){ calls.push(b); return Promise.resolve({ status: 200, body: {} }); }',
+    [/var EVR_STOP = \{[^}]+\};/, /EVR_STOP\.TEXT_LONG = "[^"]+";/, /var EVR_SKIP = \{[^}]+\};/, /var evrLast = null, evrCardBusy = false;/, /var AUTO_RULE_ORDER = \[[^\]]+\];/, /var PMCON_PLAN = \{[^\n]+\};/].map((re) => stV4(re, src)).join('\n'),
+    FN4.map((n) => fnV4(n, src)).join('\n'),
+    'return { rows: pmconRowsAutotask, card: evrCardRender, sum: evrSumTxt };'].join('\n'))();
+  const SV = (x) => Object.assign({ mode: 'dry', ready: true, win: 30, events: 1, found: 1, tasks: 1, who: [{ id: 'uV', n: 1 }], no_who: 0, no_due: 0, old: 0, gone: 0, marked: 0, no_row: [], skip: '', ref: { ceq_total: 12, ceq: 3, ceq_d31: 1 } }, x || {});
+  const BV = (o) => { o = o || {}; const ms = { lic_duty: { label: '인허가' }, hr_join: { label: '입사 체크리스트 지시', ready: true, uses: ['hr:', 'acct:'] }, veh_ceq31: { label: '건설기계 정기검사 지시 31일 전', ready: true } };
+    return { rules: Object.assign({ lic_duty: 'live', hr_join: 'dry', veh_ceq31: 'dry' }, o.rules || {}), since: {}, meta: {}, meta_srv: ms, updated_at: 44, assign_state: { 'hr:': 'ok', 'acct:': 'ok' }, dry: { rules: Object.assign({}, o.dry || {}) } }; };
+  const chkV4 = (src) => {
+    const b = box4(src), o = {};
+    const t1 = b.sum(SV()), t2 = b.sum(SV({ skip: 'NOT_PROMOTED', tasks: 0 })), t3 = b.sum(SV({ skip: 'NO_ROW', tasks: 0 }));
+    o.sum = /최근 30일 기준으로 켰다면 지시 1건\(사건 1\)/.test(t1) && t1.indexOf('규모 건설기계 3대(전체 12대) · 오늘 31일 남은 건설기계 1대') > 0 && t1.indexOf('인사 근거') < 0
+      && t2 === '차량 근거가 승격 전이라 쉬는 중입니다(그동안 30일 전 지시가 그대로 나갑니다) · 규모 건설기계 3대(전체 12대) · 오늘 31일 남은 건설기계 1대.'
+      && t3.indexOf('승격된 차량 근거에 31일 전 기준 행이 없어 쉬는 중') === 0 && !/ceq|NOT_PROMOTED|NO_ROW|ref\./.test(t1 + t2 + t3);
+    const rows = b.rows(BV({ dry: { veh_ceq31: SV(), hr_join: SV({ ref: {} }) } }));
+    const rv = rows.find((r) => r.id === 'autotask:veh_ceq31:live'), rh = rows.find((r) => r.id === 'autotask:hr_join:live');
+    o.live = !!rv && !rv.block && rv.why.indexOf('(켠 날부터 매일 그날 31일 남은 건설기계마다 — 관리자 접속 때 만드는 30일 전 지시는 그대로)') > 0 && rv.why.indexOf('켠 뒤에 생긴 일만') < 0 && rv.why.indexOf('[ㄱ]을 누르면 바로 켜지고') >= 0
+      && !!rh && rh.why.indexOf('(켠 뒤에 생긴 일만 — 지난 일 소급 없음)') > 0;
+    const b2 = box4(src); b2.rows(BV({ dry: { veh_ceq31: { mode: 'dry', ready: false } } })); const e = { innerHTML: '', querySelectorAll: () => [] }; b2.card(e);
+    const tx = e.innerHTML.replace(/<[^>]+>/g, ' '); const iV = tx.indexOf('건설기계 정기검사 지시 31일 전');
+    o.stale = iV >= 0 && tx.slice(iV).indexOf('아직 연습 집계가 없습니다(다음 평일 08:10 정기업무 봇 뒤에 보입니다).') > 0 && tx.slice(iV).indexOf('준비 중 — 계산') < 0;
+    o.ok = Object.values(o).every((v) => v === true); return o;
+  };
+  const RV4 = chkV4();
+  T('C185 판4 ② 콘솔 글(실행 — 실제 evrSumTxt·evrLiveRow·evrCardRender): 연습 요약 = 지시 n건 + "규모 건설기계 n대(전체 n대) · 오늘 31일 남은 건설기계 n대"(인사 근거 글 없음) · 미승격·행 없음 = 쉬는 까닭 + 같은 참고 수(내부 이름 0) · 켜기 줄 = "(켠 날부터 매일 그날 31일 남은 건설기계마다 — 관리자 접속 때 만드는 30일 전 지시는 그대로)"(입사 줄은 종전 글) · 준비된 규칙의 낡은 요약 = "아직 연습 집계가 없습니다(…)"',
+    RV4.ok, JSON.stringify(RV4));
+  const mutV4 = (from, to) => { if (html.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); return html.replace(from, () => to); };
+  const MV4 = [['    if (s.skip && ceqTxt) return', '    if (false) return'], ['    if (ceqTxt) p.push(ceqTxt);', ''], ['    if (EVR_LIVE_NOTE[k]) row.why = row.why.replace(', '    if (false) row.why = row.why.replace('],
+    ['NOT_PROMOTED: "차량 근거가 승격 전이라 쉬는 중입니다(그동안 30일 전 지시가 그대로 나갑니다)", ', '']];
+  const kV4 = MV4.map(([a, b]) => { try { return chkV4(mutV4(a, b)).ok; } catch (e) { return 'err ' + e.message; } });
+  T('C185 판4 ② 결함 사본 ' + kV4.length + '개(건너뛸 때 참고 수 걷음 · 연습 참고 수 걷음 · 켜기 줄 규칙별 글 걷음 · 미승격 글 걷음) = 모두 ✗', kV4.every((v) => v === false), JSON.stringify(kV4));
+} catch (e) { console.log('  (C185 판4 검사 생략 — ' + e.message + ')'); fails++; }
+
+
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

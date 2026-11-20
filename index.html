@@ -34745,13 +34745,15 @@ function dutyStage(nx){
   var evrLast = null, evrCardBusy = false;
   var EVR_STOP = { TOO_MANY: "한 번에 생길 사건이 10건을 넘어 멈춰 있습니다", PII: "지시 글에 직원 이름이 섞여 멈춰 있습니다", NO_SINCE: "켠 시각 기록이 없어 멈춰 있습니다" };
   EVR_STOP.TEXT_LONG = "지시 글이 길이 상한을 넘어 멈춰 있습니다";   // C185 판2(ⓙ 3) 틀의 글 길이 검사
-  var EVR_SKIP = { ERROR: "계산하다 오류가 났습니다", MEMBERS_UNAVAILABLE: "직원 명부를 읽지 못했습니다", ASSIGN_UNAVAILABLE: "배정표를 읽지 못했습니다", READ_FAILED: "자료를 읽지 못했습니다", TASKS_READ_FAILED: "지시를 읽지 못했습니다" };
+  var EVR_SKIP = { NOT_PROMOTED: "차량 근거가 승격 전이라 쉬는 중입니다(그동안 30일 전 지시가 그대로 나갑니다)", NO_ROW: "승격된 차량 근거에 31일 전 기준 행이 없어 쉬는 중입니다(그동안 30일 전 지시가 그대로 나갑니다)", ERROR: "계산하다 오류가 났습니다", MEMBERS_UNAVAILABLE: "직원 명부를 읽지 못했습니다", ASSIGN_UNAVAILABLE: "배정표를 읽지 못했습니다", READ_FAILED: "자료를 읽지 못했습니다", TASKS_READ_FAILED: "지시를 읽지 못했습니다" };
   function evrSeen(b){ evrLast = { seq: pmconSeq, b: b }; }
   function evrIds(b){ return Object.keys((b && b.meta_srv) || {}).filter(function(k){ return k !== "lic_duty"; }); }
   function evrMd(ms){ var n = Number(ms) || 0, t = new Date(n); return (!n || isNaN(t.getTime())) ? "" : (t.getMonth() + 1) + "/" + t.getDate(); }
   function evrSumTxt(s){
     if (!s) return "아직 연습 집계가 없습니다(다음 평일 08:10 정기업무 봇 뒤에 채워짐).";
     if (s.ready === false) return "준비 중 — 계산이 아직 들어오지 않아 켤 수 없습니다.";
+    var ceqTxt = (s.ref && s.ref.ceq_total !== undefined) ? "규모 건설기계 " + (Number(s.ref.ceq) || 0) + "대(전체 " + (Number(s.ref.ceq_total) || 0) + "대) · 오늘 31일 남은 건설기계 " + (Number(s.ref.ceq_d31) || 0) + "대" : "";   // C185 판4 ⑦ 참고 수(건너뛸 때도)
+    if (s.skip && ceqTxt) return (EVR_STOP[s.skip] || EVR_SKIP[s.skip] || "이번에는 세지 못했습니다") + " · " + ceqTxt + ".";
     if (s.skip) return (EVR_STOP[s.skip] || EVR_SKIP[s.skip] || "이번에는 세지 못했습니다") + ".";
     var p = [(s.win ? "최근 " + s.win + "일 기준으로 켰다면 " : "오늘 실행에 ") + "지시 " + (Number(s.tasks) || 0) + "건(사건 " + (Number(s.found !== undefined ? s.found : s.events) || 0) + ")"];   // 판2 검토 6: 사건 = 계획 함수가 낸 사건 수(담당이 없어 만들 지시가 0이어도)
     (s.who || []).forEach(function(w){ p.push((memberName(w.id) || "배정표 담당") + " " + (Number(w.n) || 0) + "건"); });
@@ -34764,6 +34766,7 @@ function dutyStage(nx){
     if ((s.no_row || []).length) p.push("근거 표에 없어 기한을 세지 못한 항목 " + s.no_row.length + "개");
     var rf = s.ref || {};   // C185 판2 규칙별 참고 수(입사: 입사일 빈칸 · 기한 없이(근거 미승격) · 지난 12개월 입사)
     if (Number(rf.no_hire)) p.push("입사일이 비어 아직 세지 않은 " + Number(rf.no_hire) + "명");
+    if (ceqTxt) p.push(ceqTxt);
     if (Number(rf.bg_off)) p.push("인사 근거 승격 전이라 기한 없이");
     if (rf.past12 !== undefined) p.push("참고: 지난 12개월 입사 " + (Number(rf.past12) || 0) + "명(켠 뒤 일만 — 소급 없음)");
     if (Number(rf.rejoin_mark)) p.push("재입사 표식이 찍힌 " + Number(rf.rejoin_mark) + "명(입사 쪽에서 셈)");   // C185 판3 퇴사 규칙 참고 수
@@ -34778,10 +34781,12 @@ function dutyStage(nx){
     var miss = uses.filter(function(p){ return ast[p] !== "ok"; });
     var noWhoOnly = !(Number(s.tasks) > 0) && Number(s.no_who) > 0 && !s.skip;
     var needWho = miss.length > 0 || noWhoOnly, skipped = !!s.skip, blocked = needWho || skipped;
+    var EVR_LIVE_NOTE = { veh_ceq31: "(켠 날부터 매일 그날 31일 남은 건설기계마다 — 관리자 접속 때 만드는 30일 전 지시는 그대로)" };   // C185 판4(ⓙ 4): 켠 시각과 견주지 않는 규칙의 글
     var row = { id: "autotask:" + k + ":live", q: nm + " — 켤까요?", recTxt: needWho ? "그대로(담당 먼저)" : (skipped ? "그대로(다음 집계 뒤)" : "켬(실제 발행)"), curTxt: "연습(발행 0)", args: { rule: k, mode: "live" }, def: "keep",
       block: noWhoOnly ? "배정표 담당을 먼저 정해 주세요" : "",
       card: needWho ? "assignCard" : "pmconChk-evrules", nocount: needWho && miss.length > 0 && miss.every(function(p){ return ast[p] === "empty"; }),   // 검토 5: 막히지 않은 줄의 [카드 열기] = 이 화면 점검 카드
       why: blocked ? evrSumTxt(s) : evrSumTxt(s) + " [ㄱ]을 누르면 바로 켜지고 다음 평일 08:10 실행부터 지시가 생깁니다(켠 뒤에 생긴 일만 — 지난 일 소급 없음). 직원에게 새로 가는 알림이라 누르기 사흘 전에 예고해 주세요. 되돌리기: 이 화면 '범위 밖 자동 지시 규칙' 카드 [연습으로]·[끄기](이미 생긴 지시는 남음).", setBase: b.updated_at || 0 };
+    if (EVR_LIVE_NOTE[k]) row.why = row.why.replace("(켠 뒤에 생긴 일만 — 지난 일 소급 없음)", EVR_LIVE_NOTE[k]);
     if (!row.block && needWho) row.block = "배정표 담당을 먼저 정해 주세요";   // 판2 검토 3: 배정표 줄 빈칸·퇴사자·못 읽음(위 block 줄 = 요약이 담당 없음뿐 — 판1 그대로)
     else if (!row.block && skipped) row.block = "이번 연습 집계를 하지 못했습니다 — 다음 집계 뒤에 정해 주세요";
     return row;

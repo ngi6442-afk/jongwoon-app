@@ -13157,11 +13157,11 @@ function J91a(x) { return JSON.stringify(x); }
     o.key = good.every((k) => E.isEvKey(k)) && !bad.some((k) => E.isEvKey(k)) && E.isEvLike('hr:x') && E.isEvLike('acct:') && E.isEvLike('ks:x') && E.isEvLike('veh:v1:ev:x') && !E.isEvLike('veh:v1:insp:2026-12-01') && !E.isEvLike('lic:x')
       && E.ruleOfKey(good[0]) === 'hr_join' && E.ruleOfKey(good[1]) === 'hr_leave' && E.ruleOfKey(good[2]) === 'hr_join' && E.ruleOfKey(good[3]) === 'ks_report' && E.ruleOfKey(good[4]) === 'veh_event' && E.ruleOfKey('veh:v1:insp:2026-12-01') === ''
       && E.subjOf(good[0]) === 'u1' && E.subjOf(good[4]) === 'v82수1234' && E.subjOf(good[3]) === '2027';
-    o.table = JSON.stringify(E.RULE_IDS) === JSON.stringify(NEW5C) && NEW5C.every((k) => E.ready(k) === (k === 'hr_join' || k === 'hr_leave')) && E.CAP === 10 && E.DRY_WIN === 30 && JSON.stringify(E.needsOf('ks_report')) === '["assign","members","sites","contracts"]';
+    o.table = JSON.stringify(E.RULE_IDS) === JSON.stringify(NEW5C) && NEW5C.every((k) => E.ready(k) === (k === 'hr_join' || k === 'hr_leave' || k === 'veh_ceq31')) && E.CAP === 10 && E.DRY_WIN === 30 && JSON.stringify(E.needsOf('ks_report')) === '["assign","members","sites","contracts"]';
     const nowMs = Date.parse(TDC + 'T03:00:00Z');
     const c1 = E.ctxFor('hr_join', 'live', 0, nowMs, TDC), c2 = E.ctxFor('ks_report', 'live', 0, nowMs, TDC), c3 = E.ctxFor('hr_join', 'dry', 0, nowMs, TDC), c4 = E.ctxFor('hr_join', 'live', nowMs, nowMs, TDC);
     o.ctx = c1.skip === 'NO_SINCE' && !c2.skip && c3.ctx.win === 30 && c3.ctx.since_day === addC(-30) && c4.ctx.since_day === TDC && c4.ctx.since === nowMs;
-    const nr = E.run('veh_ceq31', {}, c3.ctx, [], {}, true);   // 판3: 입사·퇴사는 준비됨 — 준비 안 된 표본은 건설기계 31일 전으로
+    const nr = E.run('veh_event', {}, c3.ctx, [], {}, true);   // 판4: 입사·퇴사·건설기계 31일은 준비됨 — 준비 안 된 표본은 차량 매각·말소로
     o.notReady = JSON.stringify(nr.sum) === '{"mode":"dry","ready":false}' && nr.made.length === 0;
     // 계획 함수를 끼운 사본으로 실행 표본
     const F = evWith(esrc, fakePlanC);
@@ -13224,10 +13224,10 @@ function J91a(x) { return JSON.stringify(x); }
       seedC(); pushesC.length = 0;
       const g1 = await c({ action: 'autotask_get' }, tokA);
       const ms = g1.body.meta_srv || {};
-      o.get = g1.code === 200 && Object.keys(ms).join() === 'lic_duty,' + NEW5C.join() && NEW5C.every((k) => ms[k].ready === (k === 'hr_join' || k === 'hr_leave') && ms[k].prefix && !/hr_|veh_|ks_|acct/.test(ms[k].label)) && ms.lic_duty.ready !== false
+      o.get = g1.code === 200 && Object.keys(ms).join() === 'lic_duty,' + NEW5C.join() && NEW5C.every((k) => ms[k].ready === (k === 'hr_join' || k === 'hr_leave' || k === 'veh_ceq31') && ms[k].prefix && !/hr_|veh_|ks_|acct/.test(ms[k].label)) && ms.lic_duty.ready !== false
         && Object.keys(g1.body.meta).length === 3 && NEW5C.every((k) => g1.body.rules[k] === 'dry') && JSON.stringify(g1.body.since) === '{}';
       const n0 = auditMock.logs.length;
-      const s1 = await c({ action: 'autotask_set', rule: 'veh_ceq31', mode: 'live', base: 0 }, tokA);   // 판3: 준비 안 된 표본 = 건설기계 31일 전
+      const s1 = await c({ action: 'autotask_set', rule: 'veh_event', mode: 'live', base: 0 }, tokA);   // 판4: 준비 안 된 표본 = 차량 매각·말소
       const pg = await c({ action: 'pmcon_get' }, tokA, 'dev1');
       const s1b = await c({ action: 'pmcon_decide', kind: 'autotask', row: 'autotask:ks_report:live', choice: 'ok', grade: 'R1', args: { rule: 'ks_report', mode: 'live' }, set_base: 0, base: pg.body.updated_at }, tokA, 'dev1');
       o.notReady = s1.code === 400 && s1.body.error_code === 'RULE_NOT_READY' && s1b.code === 400 && s1b.body.error_code === 'RULE_NOT_READY' && !mem.gw_data['settings:autotask'] && auditMock.logs.length === n0;
@@ -13265,7 +13265,7 @@ function J91a(x) { return JSON.stringify(x); }
       const d1 = await c({ action: 'autotask_dry_put', key: KEYC, day: TDC, run: 'stC', dry: { site_missing: { mode: 'dry', count: 0 }, hr_join: { forged: 1, tasks: 9 }, hr_leave: { forged: 1 }, veh_event: { mode: 'live' } } });
       const dr = (mem.gw_data['it:autotask:dry'] || {}).rules || {};
       o.dry = d1.code === 200 && !!dr.hr_join && dr.hr_join.mode === 'dry' && dr.hr_join.ready === true && dr.hr_join.forged === undefined && dr.hr_join.tasks === 0 && JSON.stringify(dr.veh_event) === '{"mode":"dry","ready":false}' && dr.hr_leave === undefined
-        && ['veh_ceq31', 'ks_report'].every((k) => JSON.stringify(dr[k]) === '{"mode":"dry","ready":false}') && dr.site_missing.count === 0 && JSON.stringify(mem.gw_data['col:tasks']) === tasks0 && pushesC.length === 0;
+        && ['ks_report'].every((k) => JSON.stringify(dr[k]) === '{"mode":"dry","ready":false}') && !!dr.veh_ceq31 && dr.veh_ceq31.ready === true && dr.site_missing.count === 0 && JSON.stringify(mem.gw_data['col:tasks']) === tasks0 && pushesC.length === 0;
       // ingest: 서버 규칙이 하나도 live가 아님 — 표식 lic_duty·srv·없음 모두 지시 글자째 그대로(표식 호출) · 응답 srv 칸 없음 · 표식 srv = 받은 항목·숨길 키 안 돎
       const i1 = await c({ action: 'autotask_ingest', key: KEYC, items: [], only: 'lic_duty' });
       const i2 = await c({ action: 'autotask_ingest', key: KEYC, items: [{ auto_key: 'cert:c777', title: '가짜' }], hide_keys: ['cert:c1'], only: 'srv' });
@@ -13526,22 +13526,22 @@ function J91a(x) { return JSON.stringify(x); }
       const byIdK = () => { const m = {}; tasksK().forEach((t) => { m[t.id] = t; }); return m; };
       o.hide = f1.code === 200 && f1.body.fixed === 1 && byIdK().tks.del === undefined && byIdK().tc1.del === 1;
       // I: 준비 안 된 규칙이 문서에 live = 유효 값 연습(facts·get·ingest) · 문서는 그대로 · 복원도 낮춤
-      seedK({ rules: { hr_join: 'dry', veh_ceq31: 'live' } });   // 판3: 준비 안 된 표본 = 건설기계 31일 전
+      seedK({ rules: { hr_join: 'dry', veh_event: 'live' } });   // 판4: 준비 안 된 표본 = 차량 매각·말소
       const sw0 = JSON.stringify(mem.gw_data['settings:autotask']);
       const i1 = await c({ action: 'autotask_get' }, tokA), i2 = await c({ action: 'autotask_facts', key: KEYK });
       const i3 = await c({ action: 'autotask_ingest', key: KEYK, items: [], only: 'srv' });
-      const bk = { schema: 1, rules: { veh_ceq31: 'live', lic_duty: 'dry' }, updated_at: 1, updated_by: 'x' };
+      const bk = { schema: 1, rules: { veh_event: 'live', lic_duty: 'dry' }, updated_at: 1, updated_by: 'x' };
       const i4 = await c({ action: 'backup_put', secret: KEYK, restore: true, store: 'gw_data', key: 'settings:autotask', data: bk, confirm: true });
-      o.notReadyLive = i1.body.rules.veh_ceq31 === 'dry' && i2.body.rules.veh_ceq31 === 'dry' && i3.body.srv === undefined && i4.code === 200 && mem.gw_data['settings:autotask'].rules.veh_ceq31 === 'dry';
-      o.notReadyDoc = sw0.indexOf('"veh_ceq31":"live"') > 0;
+      o.notReadyLive = i1.body.rules.veh_event === 'dry' && i2.body.rules.veh_event === 'dry' && i3.body.srv === undefined && i4.code === 200 && mem.gw_data['settings:autotask'].rules.veh_event === 'dry';
+      o.notReadyDoc = sw0.indexOf('"veh_event":"live"') > 0;
       // G03: 되돌림 결과가 준비 안 된 규칙 live = 400 · G04: 되돌림이 새로 켠 규칙의 켠 시각 = 되돌림 직전 이후(옛 값 되살리지 않음)
       seedK({ rules: { hr_join: 'dry' } });
-      mem.gw_data['settings:autotask'] = { schema: 1, rules: { lic_duty: 'dry' }, prev: { rules: { veh_ceq31: 'live' }, updated_at: 1 }, updated_at: 20, updated_by: 'x' };
+      mem.gw_data['settings:autotask'] = { schema: 1, rules: { lic_duty: 'dry' }, prev: { rules: { veh_event: 'live' }, updated_at: 1 }, updated_at: 20, updated_by: 'x' };
       const r1 = await c({ action: 'autotask_revert', base: 20 }, tokA);
       mem.gw_data['settings:autotask'] = { schema: 1, rules: { lic_duty: 'dry' }, prev: { rules: { lic_duty: 'live' }, since: { lic_duty: 1000 }, updated_at: 1 }, updated_at: 21, updated_by: 'x' };
       const tR = Date.now();
       const r2 = await c({ action: 'autotask_revert', base: 21 }, tokA);
-      o.revert = r1.code === 200 && r1.body.rules.veh_ceq31 === 'dry' && r2.code === 200 && mem.gw_data['settings:autotask'].since.lic_duty >= tR;
+      o.revert = r1.code === 200 && r1.body.rules.veh_event === 'dry' && r2.code === 200 && mem.gw_data['settings:autotask'].since.lic_duty >= tR;
       // G05: 켠 시각 칸 거름(모르는 규칙·음수·글자 = 버림)
       mem.gw_data['settings:autotask'] = { schema: 1, rules: { wk_missing: 'live' }, since: { lic_duty: -5, bogus: 100, hr_join: 'abc', wk_missing: 7 }, updated_at: 22, updated_by: 'x' };
       const g5 = await c({ action: 'autotask_get' }, tokA);
@@ -13803,19 +13803,19 @@ function J91a(x) { return JSON.stringify(x); }
       o.tag = e3.body.srv.hr_join.tasks === 8 && pushesJ.length === 3 && tags.filter((x) => /^auto-new-uadmin-/.test(x)).length === 1 && tags.filter((x) => /^auto-srv-uadmin-/.test(x)).length === 1 && tags.filter((x) => /^auto-srv-uHRJ-/.test(x)).length === 1 && e3.body.notified === 2;
       I.tag = [tags, e3.body.notified];
       // ⓙ 2: 문서엔 live로 남은 준비 안 된 규칙(퇴사)을 연습으로 저장 = 200·문서 고침(값이 같음으로 막지 않음) · 준비된 규칙은 같은 값이면 종전대로 NO_CHANGE
-      seedJ(); mem.gw_data['settings:autotask'] = { schema: 1, rules: { veh_ceq31: 'live', hr_join: 'dry' }, updated_at: 12, updated_by: 'x' };   // 판3: 준비 안 된 표본 = 건설기계 31일 전
-      const k1 = await c({ action: 'autotask_set', rule: 'veh_ceq31', mode: 'dry', base: 12 }, tokA);
+      seedJ(); mem.gw_data['settings:autotask'] = { schema: 1, rules: { veh_event: 'live', hr_join: 'dry' }, updated_at: 12, updated_by: 'x' };   // 판4: 준비 안 된 표본 = 차량 매각·말소
+      const k1 = await c({ action: 'autotask_set', rule: 'veh_event', mode: 'dry', base: 12 }, tokA);
       const k2 = await c({ action: 'autotask_set', rule: 'hr_join', mode: 'dry', base: mem.gw_data['settings:autotask'].updated_at }, tokA);
-      o.staleSet = k1.code === 200 && mem.gw_data['settings:autotask'].rules.veh_ceq31 === 'dry' && k2.code === 400 && k2.body.error_code === 'NO_CHANGE';
+      o.staleSet = k1.code === 200 && mem.gw_data['settings:autotask'].rules.veh_event === 'dry' && k2.code === 400 && k2.body.error_code === 'NO_CHANGE';
       // ⓙ 7: 지시 문서가 읽히긴 했는데 꼴이 깨짐(items 배열 아님) = 500·안 씀
       seedJ({ live: true }); newMemJ('uN3'); mem.gw_data['col:tasks'] = { schema: 1, items: { x: 1 }, updated_at: 3 };
       const bad0 = JSON.stringify(mem.gw_data['col:tasks']);
       const b1 = await c({ action: 'autotask_ingest', key: KEYJ, items: [{ auto_key: 'cert:c956', title: '가짜' }] });
       o.broken = b1.code === 500 && b1.body.error_code === 'TASKS_READ_FAILED' && JSON.stringify(mem.gw_data['col:tasks']) === bad0;
       // ⓙ 8: 되돌림 — 직전 판에 준비 안 된 규칙 live = 그 규칙만 연습으로 낮춰 진행
-      seedJ(); mem.gw_data['settings:autotask'] = { schema: 1, rules: { lic_duty: 'dry' }, prev: { rules: { veh_ceq31: 'live', lic_duty: 'live' }, updated_at: 1 }, updated_at: 30, updated_by: 'x' };
+      seedJ(); mem.gw_data['settings:autotask'] = { schema: 1, rules: { lic_duty: 'dry' }, prev: { rules: { veh_event: 'live', lic_duty: 'live' }, updated_at: 1 }, updated_at: 30, updated_by: 'x' };
       const v1 = await c({ action: 'autotask_revert', base: 30 }, tokA);
-      o.revert = v1.code === 200 && mem.gw_data['settings:autotask'].rules.veh_ceq31 === 'dry' && mem.gw_data['settings:autotask'].rules.lic_duty === 'live';
+      o.revert = v1.code === 200 && mem.gw_data['settings:autotask'].rules.veh_event === 'dry' && mem.gw_data['settings:autotask'].rules.lic_duty === 'live';
     } catch (e) { o.err = String((e && e.stack) || e).slice(0, 300); blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; }
     o.ok = ['dry', 'live', 'read', 'carry', 'next', 'tag', 'staleSet', 'broken', 'revert'].every((k) => o[k] === true);
     return { o, I };
@@ -13866,11 +13866,11 @@ function J91a(x) { return JSON.stringify(x); }
       const z1 = await c({ action: 'autotask_ingest', key: KEYJ, items: [], hide_keys: ['hr:loose', 'cert:c3'] });
       o.hideLike = z1.body.fixed === 1 && tasksJ().find((t) => t.id === 'tl').del === undefined && tasksJ().find((t) => t.id === 'tc').del === 1;
       // 복원 낮춤 목록에 준비 안 된 규칙(문서엔 live)
-      seedJ(); mem.gw_data['settings:autotask'] = { schema: 1, rules: { veh_ceq31: 'live' }, updated_at: 3, updated_by: 'x' };   // 판3: 준비 안 된 표본 = 건설기계 31일 전
+      seedJ(); mem.gw_data['settings:autotask'] = { schema: 1, rules: { veh_event: 'live' }, updated_at: 3, updated_by: 'x' };   // 판4: 준비 안 된 표본 = 차량 매각·말소
       const n0 = auditMock.logs.length;
-      const w1 = await c({ action: 'backup_put', secret: KEYJ, restore: true, store: 'gw_data', key: 'settings:autotask', data: { schema: 1, rules: { veh_ceq31: 'live' }, updated_at: 2, updated_by: 'x' }, confirm: true });
+      const w1 = await c({ action: 'backup_put', secret: KEYJ, restore: true, store: 'gw_data', key: 'settings:autotask', data: { schema: 1, rules: { veh_event: 'live' }, updated_at: 2, updated_by: 'x' }, confirm: true });
       const au = auditMock.logs.slice(n0).map((e) => e.ev && e.ev[0] && e.ev[0].t).join(' | ');
-      o.lowered = w1.code === 200 && /스위치 live 복원 안 함 \[veh_ceq31\]/.test(au) && mem.gw_data['settings:autotask'].rules.veh_ceq31 === 'dry';
+      o.lowered = w1.code === 200 && /스위치 live 복원 안 함 \[veh_event\]/.test(au) && mem.gw_data['settings:autotask'].rules.veh_event === 'dry';
       // ingest 바깥 감싸기: 실행기 전체가 던져도 200·규칙 ERROR·다른 지시는 그대로
       seedJ({ live: true }); newMemJ('uN4');
       const q1 = await clJ(gwThrow)({ action: 'autotask_ingest', key: KEYJ, items: [{ auto_key: 'cert:c958', title: '가짜' }] });
@@ -15846,6 +15846,120 @@ function J91a(x) { return JSON.stringify(x); }
     T('C185 판3 검토 반영 ⑦ 크론 결함 사본 ' + kC.length + '개(회원 id 안 봄 · 퇴사 관리자 판정 걷음 · 삭제 판정 걷음) = 모두 ✗', kC.every((v) => v === false), JSON.stringify(kC));
   } catch (e) { T('C185 판3 검토 반영 검사 실행', false, String(e && e.stack || e).slice(0, 500)); }
   finally { pushMock.sendTo = sendSaveW; pushMock.tierCtx = tierSaveW; require.cache[rpDIW] = keepDIW; const s = JSON.parse(snapW); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; blobsMock.hooks.beforeGet = null; }
+}
+
+{ // ---- C185 판4 ⑦ 건설기계 정기검사 31일 전(착수계획 판4 · ⓒ ⑦ · ⓓ 1·2·3·12 · 검토 9·21) ----
+  //   ① 순수(_lib/autorules veh90 건설기계 뺌 · ceq31) + 서버 판정 autotaskRuleOf(차 인자 — 봇 collectors/autotask.py CEQ_SAMPLES와 같은 날짜·같은 표본) ② 계획 함수(승격·행·참고 수) ③ 실제 서버(ingest 차량 읽기·막음·만듦 · 연습 요약) ④ 결함 사본
+  const fsV = require('fs'), ModV = require('module');
+  const ARPV = join(FN, '_lib', 'autorules.js'), EVPV = join(FN, '_lib', 'evrules.js'), GWPV = join(FN, 'gw-data.js');
+  const SRCV = { ar: fsV.readFileSync(ARPV, 'utf8'), ev: fsV.readFileSync(EVPV, 'utf8'), gw: fsV.readFileSync(GWPV, 'utf8') };
+  const rpARV = require.resolve(ARPV), keepARV = require.cache[rpARV], rpEVV = require.resolve(EVPV), keepEVV = require.cache[rpEVV];
+  const compV = (file, src) => { const m = new ModV(file); m.filename = file; m.paths = ModV._nodeModulePaths(dirname(file)); m._compile(src, file); return m.exports; };
+  const mutV = (src, from, to) => { if (src.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return src.replace(from, () => to); };
+  const clV = (mod) => async (body, tok, dev) => { const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+  // gw-data를 시험용으로 컴파일(본문 무변 + 끝에 판정 함수 내보내기 한 줄) — autoroules·evrules 사본을 끼울 수 있게
+  const gwV = (gsrc, ar, ev) => { if (ar) require.cache[rpARV] = { id: rpARV, filename: rpARV, loaded: true, exports: ar }; if (ev) require.cache[rpEVV] = { id: rpEVV, filename: rpEVV, loaded: true, exports: ev };
+    try { return compV(GWPV, (gsrc || SRCV.gw) + '\n;module.exports.__ruleOf = autotaskRuleOf;\n'); } finally { require.cache[rpARV] = keepARV; require.cache[rpEVV] = keepEVV; } };
+  const evV = (esrc, ar) => { if (ar) require.cache[rpARV] = { id: rpARV, filename: rpARV, loaded: true, exports: ar }; try { return compV(EVPV, esrc || SRCV.ev); } finally { require.cache[rpARV] = keepARV; } };
+  const snapV = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  const KEYV = 'test-ingest-key', TDV = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+  const addV = (n, base) => new Date(Date.parse((base || TDV) + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+  // 봇 collectors/autotask.py CEQ_SAMPLES와 같은 표본(오늘 = 2026-11-13 고정 인자 — 실행 날짜와 무관)
+  const CEQ_SAMPLE_TODAY = '2026-11-13';
+  const CEQ_SAMPLES = [['veh:c1:insp:2026-12-14', '건설기계', 'veh_ceq31'], ['veh:c1:insp:2026-12-15', '건설기계', 'unknown'], ['veh:c1:insp:2026-12-13', '건설기계', ''],
+    ['veh:c1:insp:2026-12-14', '대형 화물', 'veh_insp90'], ['veh:c1:insp:2026-12-14', '', 'veh_insp90'], ['veh:c1:ins:2026-12-14', '건설기계', ''],
+    ['veh:c1:insp:2027-02-10', '건설기계', 'unknown'], ['veh:c1:insp:2027-02-10', '대형 화물', 'veh_insp90']];
+  const V = (id, x) => Object.assign({ id: id, no: '가짜' + id, state: '운행', size: '건설기계', insp_due: addV(31) }, x || {});
+  // ① 순수
+  const chkPV = (srcAr, srcEv, srcGw) => {
+    const o = {}, AR2 = compV(ARPV, srcAr || SRCV.ar);
+    const vs = [V('a'), V('b', { insp_due: addV(30) }), V('c', { insp_due: addV(32) }), V('d', { state: '매각' }), V('e', { size: '대형 화물' }), V('f', { del: 1 }), V('g', { insp_due: '' }), V('h', { insp_due: addV(60) })];
+    const c = AR2.ceq31(vs, TDV, []), c2 = AR2.ceq31(vs, TDV, ['veh:a:insp:' + addV(31)]);
+    o.ceq31 = c.count === 1 && c.items[0].id === 'a' && c.items[0].key === 'veh:a:insp:' + addV(31) && c.ceq === 6 && c.total === 7 && c2.count === 0 && c2.overlap === 1;
+    const v9 = AR2.veh90(vs, TDV, []);
+    o.veh90 = v9.items.map((x) => x.id).join() === 'e' && AR2.CEQ_SIZE === '건설기계' && AR2.CEQ31 === 31 && AR2.VEH90_MIN === 31;   // 건설기계(a·c·h)는 31~90일이어도 빠짐 · 대형 화물 31일만
+    const G = gwV(srcGw, AR2, srcEv ? evV(srcEv, AR2) : null);
+    const bad = CEQ_SAMPLES.filter(([k, z, w]) => G.__ruleOf(k, CEQ_SAMPLE_TODAY, { size: z }) !== w).concat(CEQ_SAMPLES.filter(([k, z, w]) => z !== '건설기계' && G.__ruleOf(k, CEQ_SAMPLE_TODAY) !== w));
+    o.ruleOf = bad.length === 0 && G.__ruleOf('veh:c1:insp:2026-12-14', CEQ_SAMPLE_TODAY, null) === 'veh_unread' && G.__ruleOf('veh:c1:insp:2026-12-13', CEQ_SAMPLE_TODAY, null) === '' && G.__ruleOf('veh:c1:insp:2026-12-14', CEQ_SAMPLE_TODAY, undefined) === 'veh_insp90';
+    o.I = bad;
+    // 계획 함수
+    const E = srcEv ? evV(srcEv, AR2) : evV(null, AR2), ctx = E.ctxFor('veh_ceq31', 'dry', 0, Date.parse(TDV + 'T03:00:00Z'), TDV).ctx;
+    const ON = { on: true, bg: { rows: [{ id: 'ref.ceq.window' }] } }, opt = () => ({ rules: { 'veh:': { who_id: 'uVH' } }, active: { uVH: '차량' }, names: ['가짜사람'], mkId: (() => { let n = 0; return () => 'v' + (++n); })() });
+    const t1 = []; const r1 = E.run('veh_ceq31', { vehicles: vs, vehbg: ON }, ctx, t1, opt(), true);
+    const r2 = E.run('veh_ceq31', { vehicles: vs, vehbg: { on: false, why: 'NOT_PROMOTED' } }, ctx, [], opt(), true);
+    const r3 = E.run('veh_ceq31', { vehicles: vs, vehbg: { on: true, bg: { rows: [{ id: 'ref.reg.car' }] } } }, ctx, [], opt(), true);
+    const r4 = E.run('veh_ceq31', { vehicles: vs, vehbg: ON }, ctx, t1, opt(), true);
+    o.plan = r1.sum.tasks === 1 && t1.length === 1 && t1[0].auto_key === 'veh:a:insp:' + addV(31) && t1[0].title === '가짜a 정기검사 갱신' && t1[0].due === addV(31) && t1[0].who_id === 'uVH' && JSON.stringify(t1[0].scope) === '[]'
+      && JSON.stringify(r1.sum.ref) === '{"ceq_total":7,"ceq":6,"ceq_d31":1}' && r2.sum.skip === 'NOT_PROMOTED' && r2.sum.tasks === 0 && r2.sum.ref.ceq === 6 && r3.sum.skip === 'NO_ROW' && JSON.stringify(r3.sum.no_row) === '["ref.ceq.window"]' && r4.sum.tasks === 0
+      && E.ready('veh_ceq31') === true && E.RULES.veh_ceq31.since === false;
+    o.ok = ['ceq31', 'veh90', 'ruleOf', 'plan'].every((k) => o[k] === true); return o;
+  };
+  // ③ 실제 서버
+  const BGV = () => ({ schema: 1, ver: 'v-ceq', sha: 'abcdef0123456789', rows: [{ id: 'ref.ceq.window', grade: '실측' }, { id: 'ref.reg.car', grade: '실측' }], attr: { size: ['대형 화물', '건설기계'] } });
+  const seedV = (o) => { o = o || {}; const s = JSON.parse(snapV); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null;
+    ['settings:autotask', 'it:autotask:dry', 'settings:assign', 'settings:notify'].forEach((k) => { delete mem.gw_data[k]; });
+    mem.gw_users['member:uVHV'] = { id: 'uVHV', name: '차량가짜V', admin: false, perms: { tasks: 'do', veh: 'do' } };
+    mem.gw_data['settings:assign'] = { schema: 1, rules: { 'veh:': { who_id: 'uVHV' } }, approver_id: '', prev: null, updated_at: 5, updated_by: 'x' };
+    mem.gw_data['col:tasks'] = { schema: 1, items: [], updated_at: 3 };
+    mem.gw_data['col:vehicles'] = { schema: 1, items: [V('va'), V('vb', { size: '대형 화물' }), V('vc', { insp_due: addV(40) }), V('vd', { insp_due: addV(30) })], updated_at: 2 };
+    if (o.promo !== false) { mem.gw_data['bg:veh:law:v1'] = BGV(); mem.gw_data['settings:veh'] = { bg_ver: 'v-ceq', bg_sha: 'abcdef0123456789' }; } else { delete mem.gw_data['bg:veh:law:v1']; delete mem.gw_data['settings:veh']; }
+    mem.gw_data['settings:autotask'] = { schema: 1, rules: Object.assign({ veh_insp90: 'dry' }, o.rules || {}), since: {}, updated_at: 9, updated_by: 'x' };
+  };
+  const tasksV = () => mem.gw_data['col:tasks'].items;
+  const chkEV = async (gw) => {
+    const c = clV(gw), o = {}, I = {};
+    try {
+      const ITEMS = [{ auto_key: 'veh:va:insp:' + addV(31), title: '가짜va 정기검사 갱신', due: addV(31) }, { auto_key: 'veh:vc:insp:' + addV(40), title: '가짜vc 정기검사 갱신', due: addV(40) },
+        { auto_key: 'veh:vb:insp:' + addV(31), title: '가짜vb 정기검사 갱신', due: addV(31) }, { auto_key: 'veh:vd:insp:' + addV(30), title: '가짜vd 정기검사 갱신', due: addV(30) }];
+      // 연습: 봇이 31일 건설기계 키를 보내도 = veh_ceq31 막힘 · 40일 건설기계 = unknown(늘 막힘) · 31일 대형 화물 = veh_insp90(연습 = 막힘) · 30일 = 종전 D-30(만듦)
+      seedV(); const i1 = await c({ action: 'autotask_ingest', key: KEYV, items: ITEMS });
+      o.dryBlock = i1.code === 200 && i1.body.made === 1 && JSON.stringify(i1.body.blocked_rules) === JSON.stringify({ veh_ceq31: 1, unknown: 1, veh_insp90: 1 }) && tasksV().length === 1 && tasksV()[0].auto_key === 'veh:vd:insp:' + addV(30);
+      I.dry = [i1.body.made, i1.body.blocked_rules];
+      // 켬: 서버 실행기가 31일 건설기계 1건(담당 = 배정표 veh:) · 봇이 같은 키를 보내면 중복 · 40일은 그대로 막힘
+      seedV({ rules: { veh_ceq31: 'live' } }); const i2 = await c({ action: 'autotask_ingest', key: KEYV, items: [], only: 'srv' });
+      const mk = tasksV().filter((t) => t.auto_key === 'veh:va:insp:' + addV(31));
+      const i3 = await c({ action: 'autotask_ingest', key: KEYV, items: ITEMS.slice(0, 2) });
+      o.live = i2.code === 200 && i2.body.srv.veh_ceq31.tasks === 1 && mk.length === 1 && mk[0].who_id === 'uVHV' && mk[0].title === '가짜va 정기검사 갱신' && mk[0].due === addV(31)
+        && i3.body.made === 0 && JSON.stringify(i3.body.blocked_rules) === '{"unknown":1}' && tasksV().filter((t) => t.auto_key === 'veh:va:insp:' + addV(31)).length === 1;
+      I.live = [i2.body.srv && i2.body.srv.veh_ceq31, i3.body];
+      // 미승격 = 0건·skip NOT_PROMOTED(참고 수는 남음) · 연습 요약 칸
+      seedV({ rules: { veh_ceq31: 'live' }, promo: false }); const i4 = await c({ action: 'autotask_ingest', key: KEYV, items: [], only: 'srv' });
+      seedV(); const d1 = await c({ action: 'autotask_dry_put', key: KEYV, day: TDV, run: 'p4', dry: {} }); const sd = ((mem.gw_data['it:autotask:dry'] || {}).rules || {}).veh_ceq31 || {};
+      o.skipDry = i4.body.srv.veh_ceq31.skip === 'NOT_PROMOTED' && tasksV().length === 0 && d1.code === 200 && sd.ready === true && sd.tasks === 1 && JSON.stringify(sd.ref) === '{"ceq_total":4,"ceq":3,"ceq_d31":1}' && JSON.stringify(sd).indexOf('가짜') < 0;
+      I.sd = sd;
+      // 차량 문서 못 읽음 = 31일 이상 정기검사 키 막힘(veh_unread) · 30일·보험 키는 종전 · 없음(NOT_FOUND) = 종전 판정
+      seedV({ rules: { veh_insp90: 'live' } }); blobsMock.hooks.failGet = (k) => (k === 'col:vehicles' ? 'STORAGE_READ_FAILED' : null);
+      const i5 = await c({ action: 'autotask_ingest', key: KEYV, items: ITEMS }); blobsMock.hooks.failGet = null;
+      seedV({ rules: { veh_insp90: 'live' } }); delete mem.gw_data['col:vehicles'];
+      const i6 = await c({ action: 'autotask_ingest', key: KEYV, items: ITEMS });
+      o.unread = i5.code === 200 && JSON.stringify(i5.body.blocked_rules) === '{"veh_unread":3}' && i5.body.made === 1 && i6.code === 200 && i6.body.made === 4 && i6.body.blocked === 0;
+      I.unread = [i5.body.blocked_rules, i5.body.made, i6.body.made];
+    } catch (e) { o.err = String((e && e.stack) || e).slice(0, 300); blobsMock.hooks.failGet = null; }
+    o.ok = ['dryBlock', 'live', 'skipDry', 'unread'].every((k) => o[k] === true);
+    return { o, I };
+  };
+  try {
+    const P0 = chkPV();
+    T('C185 판4 ① 순수·판정: ceq31(규모 건설기계 ∧ 회색 아님 ∧ 정확히 31일 · 겹친 키 = overlap · 지운 차 뺌 · 건설기계 n대·전체 n대) · veh90에서 건설기계 늘 뺌(31~90일이어도) · autotaskRuleOf 차 인자 = 봇 CEQ_SAMPLES 8과 같은 결과(31일 = veh_ceq31 · 32일 이상 = unknown · 30일·보험 = 종전 · 다른 규모·빈칸 = veh_insp90) · 차량 문서 못 읽음(null) = 31일 이상 veh_unread · 계획 함수(만듦·담당 veh:·글 = 차번호 정기검사 갱신 · 미승격 NOT_PROMOTED · ref.ceq.window 행 없음 NO_ROW·no_row · 참고 수는 남음 · 다시 0)',
+      P0.ok, JSON.stringify(P0));
+    const MPV = [['    if (isCeq(v)) return;   // C185 판4', '    if (false) return;   // C185 판4'], ["    if (dayDiff(v.insp_due, today) !== CEQ31) return;", "    if (dayDiff(v.insp_due, today) < CEQ31) return;"], ["    if (GREY.indexOf(String(v.state || '')) >= 0) return;\n    if (!isDate(v.insp_due)) return;\n    if (dayDiff", "    if (!isDate(v.insp_due)) return;\n    if (dayDiff"],
+      ["    if (have[key]) { overlap++; return; }\n    items.push({ id: v.id, no:", "    items.push({ id: v.id, no:"]];
+    const kP = MPV.map(([a, b]) => { try { return chkPV(mutV(SRCV.ar, a, b)).ok; } catch (e) { return 'err ' + e.message; } });
+    const MPE = [["  if (!(vb && vb.on === true)) { out.skip = 'NOT_PROMOTED'; return out; }", ''], ["  if (!rows.some(function (r) { return r && r.id === CEQ_ROW; })) { out.no_row = [CEQ_ROW]; out.skip = 'NO_ROW'; return out; }", '']];
+    MPE.forEach(([a, b]) => { try { kP.push(chkPV(null, mutV(SRCV.ev, a, b)).ok); } catch (e) { kP.push('err ' + e.message); } });
+    const MPG = [["  if (dc !== null && dc >= AR.CEQ31) { if (veh === null) return 'veh_unread'; if (AR.isCeq(veh)) return dc === AR.CEQ31 ? 'veh_ceq31' : 'unknown'; }", ''],
+      ["if (AR.isCeq(veh)) return dc === AR.CEQ31 ? 'veh_ceq31' : 'unknown'; }", "if (AR.isCeq(veh)) return 'veh_ceq31'; }"], ["{ if (veh === null) return 'veh_unread'; if (AR.isCeq", "{ if (AR.isCeq"]];
+    MPG.forEach(([a, b]) => { try { kP.push(chkPV(null, null, mutV(SRCV.gw, a, b)).ok); } catch (e) { kP.push('err ' + e.message); } });
+    T('C185 판4 ① 결함 사본 ' + kP.length + '개(90일에서 건설기계 안 뺌 · 31일 아닌 날도 · 회색 안 뺌 · 겹친 키 셈 · 미승격 거름 · 행 거름 · 서버 판정 갈래 걷음 · 32일 이상도 31일 규칙 · 못 읽음 걷음) = 모두 ✗', kP.every((v) => v === false), JSON.stringify(kP));
+    const E0 = await chkEV(gwd);
+    T('C185 판4 ③ 실제 서버: 연습 = 봇이 보낸 31일 건설기계 키 막힘(veh_ceq31)·40일 건설기계 늘 막힘(unknown)·31일 대형 화물은 90일 규칙(연습 = 막힘)·30일은 종전 D-30 만듦 · 켬 = 실행기가 31일 건설기계 1건(담당 veh:·글 차번호)·봇이 같은 키를 보내도 중복 · 미승격 = 0건·NOT_PROMOTED · 연습 요약 = 준비됨·지시 1·참고 수(이름 0) · 차량 문서 못 읽음 = 31일 이상 정기검사 키 3건 막힘(veh_unread)·30일은 만듦 · 차량 문서 없음 = 종전 판정',
+      E0.o.ok, JSON.stringify(E0.o.ok ? E0.o : E0));
+    const MEV = [["  let vehById = {};\n  if (items.some(", "  let vehById = {};\n  if (false && items.some("], ["if (!rv0.ok && rv0.code !== 'NOT_FOUND') vehById = null; else if", "if (!rv0.ok) vehById = {}; else if"], ["    const rule = autotaskRuleOf(k, today, vehOfKey(k));", "    const rule = autotaskRuleOf(k, today);"]];
+    const kE = [];
+    for (const [a, b] of MEV) { let v; try { v = (await chkEV(gwV(mutV(SRCV.gw, a, b)))).o.ok; } catch (e) { v = 'err ' + e.message; } kE.push(v); }
+    T('C185 판4 ③ 결함 사본 ' + kE.length + '개(차량 문서 안 읽음 · 못 읽음을 없음으로 · 판정에 차 안 넘김) = 모두 ✗', kE.every((v) => v === false), JSON.stringify(kE));
+  } catch (e) { T('C185 판4 검사 실행', false, String(e && e.stack || e).slice(0, 500)); }
+  finally { require.cache[rpARV] = keepARV; require.cache[rpEVV] = keepEVV; const s = JSON.parse(snapV); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; }
 }
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);
