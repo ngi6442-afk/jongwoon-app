@@ -14994,8 +14994,8 @@ try {
     ['if (ck && ck >= c.date) return false;', 'if (ck && ck > c.date) return false;'],
     ['var ck = [d.confirmed_at, d.recheck_at].filter(isDate).sort().pop() || "";', 'var ck = isDate(d.confirmed_at) ? d.confirmed_at : "";'],
     ['var ck = [d.confirmed_at, d.recheck_at].filter(isDate).sort().pop() || "";', 'var ck = [d.confirmed_at, d.recheck_at].filter(isDate).sort().shift() || "";'],
-    ['if (x === "시행령" || x === "시행규칙"){ refs.push({ base: cur || "*", lv: x === "시행령" ? "영" : "규칙" }); continue; }', ''],
-    ['var m = t.match(/^(.+(?:법|법률))(시행령|시행규칙)$/); if (m){ w.push(m[1]); w.push(m[2]); } else w.push(t);', 'w.push(t);'],
+    ['if (x === "시행령" || x === "시행규칙"){ if (!memo[i]) refs.push({ base: cur || "*", lv: x === "시행령" ? "영" : "규칙" }); continue; }', ''],   // C220: 갈래 글에 메모 가름이 들어가 자리 글자만 옮김(같은 결함)
+    ['if (m){ w.push(m[1]); memo.push(dp); w.push(m[2]); memo.push(dp); } else { w.push(mt[0]); memo.push(dp); }', '{ w.push(mt[0]); memo.push(dp); }'],   // C220: 낱말 읽기가 위치를 보게 바뀌어 같은 결함(붙여 쓴 꼴 안 가름)을 새 글자로
     ['if (ok){ licRk.changed = list; licRk.has = true; }', 'licRk.changed = ok ? list : []; licRk.has = ok;'],
     ['return licRk.has ? licRkMarks(duties, licRk.changed) : {};', 'return licRk.st === "ok" ? licRkMarks(duties, licRk.changed) : {};'],
     ['nm = named(i) || LIC_RK_ABBR[x] || x;', 'nm = named(i) || x;'],
@@ -15017,6 +15017,50 @@ try {
     try { const ra = chk7A(mb).ok, rb = chk7B(mb).ok, rd = chk7D(new Function('ENV', [fn7p(html, 'esc'), fn7p(html, 'isDate'), fn7p(html, 'dutyBadges'), fn7p(html, 'dutyRowHtml'), 'function isAdmin(){ return !!ENV.admin; } function lmDutyDetail(){ return []; }', mb.replace(/^[\s\S]*?(?=  function licRkBadge)/, ''), 'return dutyRowHtml;'].join('\n'))).ok; return !(ra && rb && rd); } catch (e) { return true; } });
   T('P1 판7 ⑥ 결함 사본 ' + MU7.length + '개(단계 가름 없음·풀림 없음·같은 날 안 풀림·약칭·이어받기·번호 순·가운뎃점·여러 낱말 이름·모르는 법령 뺌·모르는 법령 맞춤·날짜 없는 감지·10분 묶음·로그인 전환·읽기 실패를 표로·200 아닌 응답·제목 이스케이프·다른 탭 그림 · 검토 2차: 재확인 날짜 안 봄·늦은 날짜 대신 이른 날짜·단독 시행령/시행규칙·붙여 쓴 이름·실패 때 목록 버림·읽는 중 빈 표·전환 때 앞사람 목록 남김) = 모두 ✗',
     kill7.every((v) => v === true), JSON.stringify(kill7.map((v, i) => (v === true ? 1 : MU7[i][0].slice(0, 40) + ':' + v))));
+  // C220 — 괄호 안 메모의 법령 이름·'법·영·규칙'은 인용이 아님(바로 뒤 조문이 붙을 때만 인용) · law 밖 칸은 안 읽음 — 실제 licRkMarks
+  const chk220 = (blk) => {
+    const X = mk7p(blk, { duties: [], me: 'u1' }).api, got = [];
+    const m = (list, names) => JSON.stringify(Object.keys(X.marks(list, names.map((n) => ({ name: n, date: D7 })))).map(Number));
+    const one = (law) => [{ no: 1, law: law }];
+    const CASES = [
+      ['메모 이름(85행 꼴)', one('가짜폐법 제42조제1항, 영 제19조~제22조(배율 1.5배/3배 — 가짜환경법 2배/5배와 다름)'), ['가짜환경법'], '[]'],
+      ['메모 이름 행의 자기 법령은 그대로', one('가짜폐법 제42조제1항, 영 제19조~제22조(배율 1.5배/3배 — 가짜환경법 2배/5배와 다름)'), ['가짜폐법 시행령'], '[1]'],
+      ['메모 법·영·규칙', one('가짜폐법 제21조제1항(법·영·규칙 전문에 유효기간 조문 부존재)'), ['가짜폐법 시행규칙'], '[]'],
+      ['메모 법·영·규칙 행의 본법은 그대로', one('가짜폐법 제21조제1항(법·영·규칙 전문에 유효기간 조문 부존재)'), ['가짜폐법'], '[1]'],
+      ['메모 단독 시행령', one('가짜폐법 제1조(시행령 전문 부존재)'), ['가짜폐법 시행령'], '[]'],
+      ['메모 …에 관한 규칙', one('가짜폐법 제1조(가짜 검사에 관한 규칙 기준 다름)'), ['가짜 검사에 관한 규칙'], '[]'],
+      ['괄호 안 인용(이름 + 제N조)', one('가짜폐법 제1조(가짜환경법 제3조 준용)'), ['가짜환경법'], '[1]'],
+      ['괄호 안 인용(이름 시행규칙 + 제N조)', one('가짜폐법 제1조(가짜환경법 시행규칙 제2조 준용)'), ['가짜환경법 시행규칙'], '[1]'],
+      ['괄호 안 인용(붙여 쓴 이름 + 별표)', one('가짜폐법 제1조(가짜환경법시행규칙 별표 3)'), ['가짜환경법 시행규칙'], '[1]'],
+      ['괄호 안 인용(법 + 제N조 = 앞 법령)', one('가짜폐법 제1조, 규칙 제2조(모법 법 제25조)'), ['가짜폐법'], '[1]'],
+      ['메모 이름은 이어받기에 안 씀', [{ no: 1, law: '가짜폐법 제1조' }, { no: 2, law: '(가짜환경법 기준 다름) 규칙 제1조' }], ['가짜환경법 시행규칙'], '[]'],
+      ['메모 이름은 이어받기에 안 씀 — 앞 행 법령', [{ no: 1, law: '가짜폐법 제1조' }, { no: 2, law: '(가짜환경법 기준 다름) 규칙 제1조' }], ['가짜폐법 시행규칙'], '[2]'],
+      ['같은 칸 메모 뒤 영 = 앞 법령', one('가짜폐법 제1조(가짜환경법 기준 다름), 영 제2조'), ['가짜환경법 시행령'], '[]'],
+      ['짝 없는 닫는 괄호 뒤 = 괄호 밖', one('가짜폐법 제1조(가 라목1) 나)·가짜환경법 제2조'), ['가짜환경법'], '[1]'],
+      ['짝 없는 닫는 괄호 뒤 새 괄호 = 메모', one('가짜폐법 제1조(가 라목1) 나)·(가짜환경법 기준 다름)'), ['가짜환경법'], '[]'],
+      ['닫히지 않은 괄호 = 끝까지 메모', one('가짜폐법 제1조(메모 가짜환경법 다름'), ['가짜환경법'], '[]'],
+      ['겹친 괄호', one('가짜폐법 제1조(메모 (가) 가짜환경법 기준 다름)'), ['가짜환경법'], '[]'],
+      ['전각 괄호', one('가짜폐법 제1조（가짜환경법 기준 다름）'), ['가짜환경법'], '[]'],
+      ['law 밖 칸 안 읽음', [{ no: 1, law: '가짜폐법 제1조', lic: '가짜환경법 허가', duty: '가짜환경법 신고', basis: '가짜환경법 제3조', precheck: '가짜환경법' }], ['가짜환경법'], '[]'],
+      ['부분 글자 안 맞춤', one('건설가짜폐법 제1조'), ['가짜폐법'], '[]']];
+    CASES.forEach(([nm, list, ns, want]) => { const g = m(list, ns); if (g !== want) got.push(nm + ' ' + g); });
+    return { ok: got.length === 0, info: got };
+  };
+  const r220 = chk220(BLK7);
+  T('C220 ① 괄호 안 메모(실행 — 실제 licRkMarks): 메모의 법령 이름(85행 꼴)·법·영·규칙·단독 시행령·…에 관한 규칙 = 인용 아님(행의 자기 법령은 그대로) · 괄호 안이라도 바로 뒤 제N조·별표 = 인용 · 메모 이름은 이어받기에 안 씀 · 짝 없는 닫는 괄호·닫히지 않은 괄호·겹친 괄호·전각 괄호 · law 밖 칸(인허가·의무·기준·선행확인) 안 읽음 · 부분 글자 안 맞춤', r220.ok, JSON.stringify(r220.info));
+  const MU220 = [
+    ['dp = dep > 0 && !/^\\s*(제\\s*\\d|별표|부칙)/.test(s.slice(mt.index + mt[0].length));', 'dp = false;'],
+    ['dp = dep > 0 && !/^\\s*(제\\s*\\d|별표|부칙)/.test(s.slice(mt.index + mt[0].length));', 'dp = dep > 0;'],
+    ['if (memo[i]) continue;   // 괄호 안 메모의', '//'],
+    ['if (!memo[i]) refs.push({ base: cur || "*", lv: lv }); continue;', 'refs.push({ base: cur || "*", lv: lv }); continue;'],
+    ['if (!memo[i]) refs.push({ base: cur || "*", lv: x === "시행령" ? "영" : "규칙" }); continue; }', 'refs.push({ base: cur || "*", lv: x === "시행령" ? "영" : "규칙" }); continue; }'],
+    ['if (x === "규칙" && (nm = named(i))){ if (memo[i]) continue;', 'if (x === "규칙" && (nm = named(i))){'],
+    ['else if ((s[at] === ")" || s[at] === "）") && dep > 0) dep--;', 'else if (s[at] === ")" || s[at] === "）") dep--;'],
+    ['if (s[at] === "(" || s[at] === "（") dep++;', 'if (s[at] === "(") dep++;'],
+    ['else if ((s[at] === ")" || s[at] === "）") && dep > 0) dep--;', 'else if ((s[at] === ")" || s[at] === "）") && dep > 0) dep = 0;']];
+  const kill220 = MU220.map(([a, b]) => { if (BLK7.split(a).length !== 2) return 'err 자리 ' + a.slice(0, 50); const mb = BLK7.replace(a, () => b); try { return !(chk220(mb).ok && chk7A(mb).ok); } catch (e) { return true; } });
+  T('C220 ② 결함 사본 ' + MU220.length + '개(메모 안 가름=고치기 전·조문 붙은 괄호 인용도 버림·이름 갈래 가름 없음·법영규칙 갈래·단독 시행령 갈래·…에 관한 규칙 갈래·짝 없는 닫는 괄호 음수·전각 괄호·겹친 괄호 한 번에 닫힘) = 모두 ✗',
+    kill220.every((v) => v === true), JSON.stringify(kill220.map((v, i) => (v === true ? 1 : MU220[i][0].slice(0, 40) + ':' + v))));
 } catch (e) { console.log('  ✗ P1 판7 검사 실행 — ' + e.message); fails++; }
 
 // ── v475(Phase 1 판7·10·11·19 + 홈 [완료] 수리 C156 — PM 11/14 19:28 "다음"): C156 정적 검사 + 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '475 이상'으로 풀 것
