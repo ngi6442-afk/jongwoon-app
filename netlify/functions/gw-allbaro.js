@@ -8,6 +8,7 @@
 // 이 함수는 자격증명을 읽지도 않는다(존재 여부만 확인). 값은 워커만 env에서 직접 읽는다.
 // 올바로는 조회 전용이다 — 이 경로로 등록·수정·삭제 요청을 보내는 코드는 없다.
 const crypto = require('crypto');
+const REQSHAPE = require('./_lib/reqshape');   // C240 판 A-1 가르는 칸은 글자만(들머리)
 const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { issueSession, verifyToken, bearer } = require('./_lib/session');
 const { appendAudit } = require('./_lib/audit');
@@ -837,6 +838,7 @@ async function handler(event) {
   setupBlobContext(event);
   let d;
   try { d = JSON.parse(event.body || '{}'); } catch { return jr(400, { ok: false, code: 'INVALID_JSON', request_id: R }); }
+  { const bf = REQSHAPE.badField(d, ['action', 'side', 'job', 'day', 'month', 'key']); if (bf) return jr(400, { ok: false, code: 'BAD_FIELD', field: bf, request_id: R }); }   // C240 판 A-1 가르는 칸은 글자만(배열·객체·숫자 = 400 — 저장소 읽기 전)
   // 봇 전용 읽기(세션 대신 공유 시크릿, v323 후속) — 회원 게이트 앞에서 갈라진다. 그 외 액션은 종전대로 세션·기기승인 필수.
   // v351: 추가 노선을 기본표에 합친다 — 매칭·재정렬·노선 목록·엑셀 내보내기가 전부 같은 표를 본다.
   await loadExtraRoutes(store(DATA));

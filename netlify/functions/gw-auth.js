@@ -6,6 +6,7 @@
 //       name:<lower> = id  (이름 인덱스)
 // PIN은 scrypt 해시로만 저장(평문 저장 안 함). 세션은 HMAC 토큰.
 const crypto = require('crypto');
+const REQSHAPE = require('./_lib/reqshape');   // C240 판 A-1 가르는 칸은 글자만(들머리)
 const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { badBlobKey } = require('./_lib/blobkey');   // v453 검토: 로그인 입력으로 만드는 조회 키(lock:·name:)가 키 이름 검사에 걸리면 저장소 오류(500)가 아니라 틀린 아이디·PIN(401)으로
 const { hashSecret, verifySecret } = require('./_lib/password');
@@ -329,6 +330,7 @@ async function handleMemberUpsert(st, event, d, R) {
   const uidSys = d.uid_clear === true || (d.uid !== undefined && normUid(d.uid) !== '');
   const touchesSystem = (isNew && !openCreate) || adminSys || permsSys || uidSys || (nameChange && !isNew) || (roleChange && !openRole);
   if (touchesSystem && !canDev) return jr(403, { status: 'FORBIDDEN', error_code: 'DEV_ONLY', request_id: R });
+  if (d.pin && !isNew && !self && !canDev) return jr(403, { status: 'FORBIDDEN', error_code: 'DEV_ONLY', request_id: R });   // C240 판 A: 남의 PIN은 set_pin과 같은 개발자 판정(devAllowed = canDev) — 본인 PIN·새 회원 첫 PIN은 그대로
   // v447 회원 칸 검사는 어떤 칸도 바꾸기 전에(아래 이름 색인 지우기보다 앞 — 거절하면 저장 0): 소속 회사는 env·con·빈 값만 · 시험 계정 표식은 관리자만
   //   (회원 저장 자체가 위 ADMIN_ONLY지만, 저장 문이 넓어져도 이 칸은 닫혀 있게 칸 앞에서 한 번 더)
   if (d.corp !== undefined && String(d.corp || '') !== '' && !Object.prototype.hasOwnProperty.call(MEMBER_CORP, String(d.corp))) return jr(400, { status: 'REJECTED', error_code: 'BAD_CORP', request_id: R });
@@ -639,6 +641,7 @@ async function handler(event) {
   setupBlobContext(event);
   let d;
   try { d = JSON.parse(event.body || '{}'); } catch { return jr(400, { status: 'REJECTED', error_code: 'INVALID_JSON', request_id: R }); }
+  { const bf = REQSHAPE.badField(d, ['action', 'id', 'uid', 'name', 'pin', 'cur', 'device']); if (bf) return jr(400, { status: 'REJECTED', error_code: 'BAD_FIELD', field: bf, request_id: R }); }   // C240 판 A-1 가르는 칸은 글자만(배열·객체·숫자 = 400 — 저장소 읽기 전)
   const st = store(USERS);
   try {
     switch (d && d.action) {

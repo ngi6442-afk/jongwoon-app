@@ -6,10 +6,12 @@
 // 인증 = BIDS_INGEST_KEY(수집봇 공유 시크릿 — gw-data ingest 통로와 동일 규약).
 // 중복 안전: 크론 모듈 자체의 잠금(올바로 LOCK)·멱등(화관법 filed_keys·잡 키 덮어쓰기)이 방어한다.
 // v456(원장 C108): 키 비교는 상수시간(_lib/keymatch botKeyOk — gw-data botKeyOk와 같은 규칙, 종전 '!==').
+const REQSHAPE = require('./_lib/reqshape');   // C240 판 A-1 가르는 칸은 글자만(들머리)
 const { botKeyOk } = require('./_lib/keymatch');
 exports.handler = async function (event, context) {
   let d = {};
   try { d = JSON.parse(event.body || '{}'); } catch (e) {}
+  { const bf = REQSHAPE.badField(d, ['key', 'target']); if (bf) return { statusCode: 400, body: JSON.stringify({ ok: false, code: 'BAD_FIELD', field: bf }) }; }   // C240 판 A-1 가르는 칸은 글자만(배열·객체·숫자 = 400 — 저장소 읽기 전)
   if (!botKeyOk(d.key))
     return { statusCode: 403, body: JSON.stringify({ ok: false, code: 'BAD_INGEST_KEY' }) };
   const target = String(d.target || '');

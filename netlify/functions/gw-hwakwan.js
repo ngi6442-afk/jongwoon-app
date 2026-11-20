@@ -9,6 +9,7 @@
 // 제출은 정부 규제 민원이라 되돌릴 수 없다 — 여기서 입력을 화이트리스트로 걸러 잘못된 기동 자체를 막는다.
 // 사람 요청 권한(v434 메뉴 56 4-2): 화관법 권한 hw — 폐기물 제출은 '수행'만, 조회는 '숨김'이면 거절(아래 hwPerm). 크론·워커·지금 실행은 hw를 보지 않는다.
 const crypto = require('crypto');
+const REQSHAPE = require('./_lib/reqshape');   // C240 판 A-1 가르는 칸은 글자만(들머리)
 const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { issueSession, verifyToken, bearer } = require('./_lib/session');
 const { appendAudit } = require('./_lib/audit');
@@ -184,6 +185,7 @@ async function handler(event) {
   setupBlobContext(event);
   let d;
   try { d = JSON.parse(event.body || '{}'); } catch { return jr(400, { ok: false, code: 'INVALID_JSON', request_id: R }); }
+  { const bf = REQSHAPE.badField(d, ['action', 'job']); if (bf) return jr(400, { ok: false, code: 'BAD_FIELD', field: bf, request_id: R }); }   // C240 판 A-1 가르는 칸은 글자만(배열·객체·숫자 = 400 — 저장소 읽기 전)
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { ok: false, code: c.reason || 'NO_SESSION', request_id: R });
   if (!(await deviceApproved(event, c.member))) return jr(403, { ok: false, code: 'DEVICE_NOT_APPROVED', request_id: R });

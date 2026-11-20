@@ -11,6 +11,7 @@
 //   ③ 토큰은 32바이트 난수(추측 불가), ④ 만료 없음(게시글이 영구 참조 — 8/21 개정), ⑤ 인덱스로만 접근(첨부 id 비노출).
 // 애초에 공개 블로그에 실릴 사진이라 성격상 공개 대상이지만, 그래도 기간·범위를 묶어 둔다.
 const crypto = require('crypto');
+const REQSHAPE = require('./_lib/reqshape');   // C240 판 A-1 가르는 칸은 글자만(들머리)
 const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { verifyToken, bearer } = require('./_lib/session');
 const IMG = require('./_lib/imgsniff');   // C265 공개 응답 그림 형식 허용 목록
@@ -114,6 +115,7 @@ exports.handler = async function (event) {
     if (event.httpMethod === 'GET') return await handleImg(event.queryStringParameters || {}, R);
     if (event.httpMethod === 'POST') {
       let d = {}; try { d = JSON.parse(event.body || '{}'); } catch (e) { return jr(400, { status: 'REJECTED', error_code: 'BAD_JSON', request_id: R }); }
+      { const bf = REQSHAPE.badField(d, ['action', 'promo_id']); if (bf) return jr(400, { status: 'REJECTED', error_code: 'BAD_FIELD', field: bf, request_id: R }); }   // C240 판 A-1 가르는 칸은 글자만(배열·객체·숫자 = 400 — 저장소 읽기 전)
       if (d.action === 'share_make') return await handleShareMake(event, d, R);
       return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_ACTION', request_id: R });
     }

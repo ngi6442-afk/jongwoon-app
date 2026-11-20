@@ -1825,9 +1825,18 @@ async function handleProofPut(event, d, R) {
   await blobSet(st, 'proof:__index__', { names: list, meta: meta });
   return jr(200, { status: 'OK', name: name, request_id: R });
 }
+// C240 판 A: 증빙 읽기(목록·본문) = 관리자 또는 기기 승인 + 계약 권한 숨김 아님 — 앱에서 보관함을 여는 길은 계약 탭 서류 창의 적격심사 패킷 생성 뒤
+//   일괄 내려받기(proofBundleOffer — 같은 창이 부르는 tpl_get이 계약 숨김을 403으로 막음)와 관리자 양식 관리(openTplManage)뿐. 넣기·지우기는 종전대로 관리자만
+async function proofReadGate(event, c, R) {
+  if (c.member.admin) return null;
+  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
+  if (permOf(c.member, 'contracts') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
+  return null;
+}
 async function handleProofList(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  const pg = await proofReadGate(event, c, R); if (pg) return pg;
   const st = store(FILES);
   const idx = await blobGet(st, 'proof:__index__');
   const names = (idx.ok && idx.data && Array.isArray(idx.data.names)) ? idx.data.names : [];
@@ -1841,6 +1850,7 @@ async function handleProofList(event, d, R) {
 async function handleProofGet(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  const pg = await proofReadGate(event, c, R); if (pg) return pg;
   const r = await blobGet(store(FILES), 'proof:' + proofSlug(d.name));
   if (!r.ok || !r.data) return jr(404, { status: 'NOT_FOUND', request_id: R });
   return jr(200, { status: 'OK', file: r.data.name, data: r.data.data, request_id: R });
@@ -6465,6 +6475,10 @@ function gzipOut(event, res) {
 // v456(원장 C066): 요청 본문 gzip 풀기 상한 — 로그인 확인보다 먼저 풀리므로 6MB 안의 압축 본문이 수백 MB로 풀려 그 호출이 메모리 초과로 죽던 길(데이터 손상·다른 요청 영향은 없었음).
 //   지금 가장 큰 정상 요청 = 일감 저장(풀린 크기 약 6.7MB) — 32MB면 다섯 배 여유. 넘으면 zlib이 ERR_BUFFER_TOO_LARGE를 던지고 handlerInner가 413 BODY_TOO_LARGE로 돌려준다(종전 400 INVALID_JSON으로 뭉뚱그림).
 const BODY_GZ_MAX = 32 * 1024 * 1024;
+// C240 판 A-1 가르는 칸(글자만 — _lib/reqshape.js): action 갈래 · collection·col 컬렉션 · kind·key·store·mode·only·fn 표 열쇠·갈래 · secret 봇 열쇠
+//   앱(index.html gwCall)·수집기(jongwoon-appdata/collectors)가 이 칸에 늘 글자를 보냄(전수 표 — 막는판A1_문서초안_1120.md ②)
+const REQSHAPE = require('./_lib/reqshape');
+const GWD_STR_FIELDS = ['action', 'collection', 'col', 'kind', 'key', 'store', 'mode', 'only', 'fn', 'secret'];
 function parseBody(event) {
   const h = (event && event.headers) || {};
   const enc = String(h['x-gw-enc'] || h['X-GW-Enc'] || '').toLowerCase();
@@ -6487,6 +6501,8 @@ async function handlerInner(event) {
     if (e && e.code === 'ERR_BUFFER_TOO_LARGE') return jr(413, { status: 'REJECTED', error_code: 'BODY_TOO_LARGE', request_id: R });   // v456 C066 — 풀린 본문이 BODY_GZ_MAX를 넘음
     return jr(400, { status: 'REJECTED', error_code: 'INVALID_JSON', request_id: R });
   }
+  // C240 판 A-1: 가르는 칸은 글자만 — collection 배열(["bids"]·["leaves"])이 COL 열쇠 검사는 통과하고 뒤의 col === '…' 가드를 전부 건너뛰던 길(검토 ㉠) · 같은 꼴 전수 표의 칸 함께
+  { const bf = REQSHAPE.badField(d, GWD_STR_FIELDS); if (bf) return jr(400, { status: 'REJECTED', error_code: bf === 'collection' ? 'UNKNOWN_COLLECTION' : 'BAD_FIELD', field: bf, request_id: R }); }
   try {
     // 비용 실측 결과 조회(임시, 2026-09-10) — 관리자 전용. 계측기를 지울 때 이 분기도 함께 지운다.
     if (d && d.action === 'meter') {

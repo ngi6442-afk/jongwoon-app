@@ -14841,4 +14841,149 @@ function J91a(x) { return JSON.stringify(x); }
     const s = JSON.parse(snap225); mem.gw_users = s.u; mem.gw_data = s.d; mem.gw_files = s.f; blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; }
 }
 
+{ // ---- C240 판 A-1(원장 C240 — 검토 ㉠ 가르는 칸 꼴 우회 + 4578f04에서 지적 없던 증빙 읽기·남의 PIN·gw-duty-cron) ----
+  //   실 핸들러 · 세션은 실 gw-auth login + 실 device_approve(가짜 계정) · 권한·판정 함수를 빈 함수로 바꾸지 않음
+  //   ① 꼴 표: 함수 15개 × 가르는 칸 × 꼴 4(배열·겹 배열·객체·숫자) = 모두 400(칸 이름) · 저장소 그대로
+  //   ② 재현 입력(밑판에서 뚫린 꼴 우회 19 + 증빙 5 + 남의 PIN 3 + 크론 주소 1)이 지금 판에선 막히고 · 고침 줄만 옛 글로 되돌린 중립 사본에선 뚫림
+  //   ③ 글자 정상 요청이 중립 사본과 응답·저장소 글자째 같음 · ④ 결함 사본(고친 줄 하나씩 걷기·넓히기)이 모두 잡힘
+  const fsA1 = require('fs'), ModA1 = require('module');
+  const { hashSecret: hsA1 } = require(join(FN, '_lib', 'password.js'));
+  const compA1 = (file, src) => { const m = new ModA1(file); m.filename = file; m.paths = ModA1._nodeModulePaths(dirname(file)); m._compile(src, file); return m.exports; };
+  const mutA1 = (src, from, to) => { if (src.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 70)); return src.replace(from, () => to); };
+  const J = (x) => JSON.stringify(x === undefined ? null : x);
+  const SHF = ['gw-data.js', 'gw-auth.js', 'gw-allbaro.js', 'gw-stmt.js', 'gw-hwakwan.js', 'gw-ask.js', 'gw-promo-ai.js', 'gw-promo-mask.js', 'gw-promo-img.js', 'gw-gallery-relay.js', 'gw-map-relay.js', 'gw-progress.js', 'gw-cron-kick.js', 'gw-lawwatch.js', 'gw-duty-cron.js'];
+  const SRC = {}; SHF.forEach((f) => { SRC[f] = fsA1.readFileSync(join(FN, f), 'utf8'); });
+  const LIVE = {}; SHF.forEach((f) => { LIVE[f] = require(join(FN, f)); });
+  const guardLine = (f) => { const ls = SRC[f].split('\n').filter((l) => l.indexOf('REQSHAPE.badField(') >= 0); if (ls.length !== 1) throw new Error('가드 줄 ' + ls.length + '개: ' + f); return ls[0] + '\n'; };
+  // 이 판의 고침 줄(지금 글 → 옛 글) — 중립 사본 = 전부 옛 글
+  const FIXA1 = {};
+  SHF.forEach((f) => { FIXA1[f] = f === 'gw-duty-cron.js' ? [] : [[guardLine(f), '']]; });
+  FIXA1['gw-data.js'].push(["  const pg = await proofReadGate(event, c, R); if (pg) return pg;\n  const st = store(FILES);", '  const st = store(FILES);'],
+    ["  const pg = await proofReadGate(event, c, R); if (pg) return pg;\n  const r = await blobGet(store(FILES), 'proof:'", "  const r = await blobGet(store(FILES), 'proof:'"]);
+  FIXA1['gw-auth.js'].push(["  if (d.pin && !isNew && !self && !canDev) return jr(403, { status: 'FORBIDDEN', error_code: 'DEV_ONLY', request_id: R });", '']);
+  FIXA1['gw-duty-cron.js'].push(["  if (event && (event.httpMethod || event.headers)) return { statusCode: 404, body: JSON.stringify({ ok: false, code: 'NOT_SCHEDULED' }) };\n", '']);
+  const build = (over) => { const M = {}; SHF.forEach((f) => { M[f] = over && over[f] !== undefined ? compA1(join(FN, f), over[f]) : LIVE[f]; }); return M; };
+  const neutralSrc = (f) => FIXA1[f].reduce((s, p) => mutA1(s, p[0], p[1]), SRC[f]);
+  const clM = (mod) => async (body, tok, dev, raw) => { const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: raw !== undefined ? raw : JSON.stringify(body) });
+    let b = {}; try { b = JSON.parse((r && r.body) || '{}'); } catch (e) { b = { raw: String(r && r.body).slice(0, 60) }; } delete b.request_id; delete b.updated_at; return { code: r && r.statusCode, body: b }; };
+  const snapA1 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data, f: mem.gw_files || {} });
+  const PW = { s: '7391', a: 'pwA1-admin' };
+  const mk = (id, uid, o) => Object.assign({ id, uid, created: 1 }, o);
+  const UA = { dev: mk('ua1dv', 'ca1dv', { name: '일개발', admin: true, dev: true, tier: 'pm' }), fin: mk('ua1fn', 'ca1fn', { name: '일경리', admin: true, tier: 'admin' }), boss: mk('ua1bs', 'ca1bs', { name: '일대표', admin: true, tier: 'boss', role: '대표' }),
+    eh: mk('ua1eh', 'ca1eh', { name: '일숨김', dept: '운영부', perms: { tasks: 'hide', veh: 'hide', rec: 'hide', lic: 'hide', check: 'hide', con: 'hide', cli: 'hide', doc: 'hide', wk: 'hide' } }),
+    ev: mk('ua1ev', 'ca1ev', { name: '일보기', dept: '운영부', perms: { tasks: 'do', veh: 'do', con: 'view', rec: 'view', check: 'do', doc: 'view', wk: 'do' } }),
+    ed: mk('ua1ed', 'ca1ed', { name: '일수행', dept: '관리부', perms: { tasks: 'do', con: 'do', rec: 'view' } }),
+    ji: mk('ua1ji', 'ca1ji', { name: '일지입', emp_type: '지입차주', perms: { tasks: 'hide', con: 'hide', rec: 'hide', veh: 'hide', doc: 'hide', wk: 'hide', check: 'hide' } }),
+    ts: mk('ua1ts', 'ca1ts', { name: '일시험', test_acct: true, perms: { tasks: 'hide', con: 'hide' } }) };
+  const TOK = {}, DEV = { eh: 'da1eh', ev: 'da1ev', ed: 'da1ed', ji: 'da1ji', ts: 'da1ts' };
+  let snapU = null; const H0 = {};
+  const seedA1 = () => {
+    mem.gw_users = JSON.parse(snapU); blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null;
+    mem.gw_data = { 'col:bids': { schema: 1, updated_at: 10, items: [{ id: 'b1', title: '일감 공고', status: 'new' }] }, 'col:family': { schema: 1, updated_at: 11, items: [{ id: 'f1', member_id: 'ua1ev', type: 'early', date: '2099-01-02' }] },
+      'col:vehicles': { schema: 1, updated_at: 12, items: [{ id: 'v1', no: '가1234', acq_price: 50000000, nodoc_amt: 300000 }] }, 'col:workers': { schema: 1, updated_at: 13, items: [{ id: 'w1', name: '일용', exam: { date: '2099-01-01' } }] },
+      'col:tasks': { schema: 1, updated_at: 14, items: [{ id: 't1', title: '일반', status: 'open', scope: [] }, { id: 't2', title: '입사 준비', who_id: 'uxx', scope: ['uxx'], auto_key: 'hr:uxx:join', status: 'open' }] },
+      'col:documents': { schema: 1, updated_at: 15, items: [{ id: 'd1', title: '법인 서류', cat: '01', status: '등재', scope: [] }, { id: 'd2', title: '일반 양식', cat: '06', status: '등재', scope: [] }] },
+      'col:checklist': { schema: 1, updated_at: 16, scopes: { a: ['ua1dv'] }, assignee: { a: 'ua1dv' }, records: {} } };
+    mem.gw_files = { 'proof:__index__': { names: ['pa1'], meta: {} }, 'proof:pa1': { name: '증빙_가짜.pdf', data: 'JVBERi0xLjQ=', by: '일개발', ts: 1 } };
+    pushMock.calls.length = 0; };
+  const st = () => JSON.stringify({ u: mem.gw_users, d: mem.gw_data, f: mem.gw_files }).replace(/1[6-9]\d{11}/g, 'T').replace(/\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?Z/g, 'ISO').replace(/[0-9a-f]{32,}/g, 'HEX').replace(/\.js:\d+:\d+/g, '.js:L');
+  // ① 꼴 표 — 함수마다 가르는 칸(전수 표) · 기본 요청(칸만 꼴로 바꿈)
+  const SHAPE_T = [['gw-data.js', ['action', 'collection', 'col', 'kind', 'key', 'store', 'mode', 'only', 'fn', 'secret'], { action: 'get', collection: 'tasks' }], ['gw-auth.js', ['action', 'id', 'uid', 'name', 'pin', 'cur', 'device'], { action: 'member_list' }],
+    ['gw-allbaro.js', ['action', 'side', 'job', 'day', 'month', 'key'], { action: 'ab_status' }], ['gw-stmt.js', ['action', 'group', 'via', 'vk', 'ym', 'job'], { action: 'stmt_list', ym: '2099-01' }], ['gw-hwakwan.js', ['action', 'job'], { action: 'hw_status' }],
+    ['gw-ask.js', ['action', 'job'], { action: 'ask_status' }],['gw-promo-ai.js', ['action', 'job', 'promo_id'], { action: 'status' }], ['gw-promo-mask.js', ['action', 'job', 'promo_id', 'att_id'], { action: 'status' }],
+    ['gw-promo-img.js', ['action', 'promo_id'], { action: 'share_make' }], ['gw-gallery-relay.js', ['action', 'promo_id'], { action: 'gallery_publish' }], ['gw-map-relay.js', ['action'], { action: 'map_publish' }], ['gw-progress.js', ['action'], { action: 'get' }],
+    ['gw-cron-kick.js', ['key', 'target'], { key: 'x', target: 'allbaro' }], ['gw-lawwatch.js', ['key'], { key: 'x' }]];
+  const SHAPES = (v) => [[v], [[v]], { 0: v }, 7];
+  const shapeRun = async (M, onlyF) => { const bad = []; let n = 0;
+    for (const [f, fields, base] of SHAPE_T) { if (onlyF && onlyF !== f) continue;
+      for (const k of fields) for (const [i, sh] of SHAPES(base[k] !== undefined ? base[k] : 'x').entries()) for (const who of ['dev', 'eh']) {
+        seedA1(); const s0 = st(); const body = Object.assign({}, base, { [k]: sh }); let r; try { r = await clM(M[f])(body, TOK[who], DEV[who]); } catch (e) { r = { code: 'err ' + e.message, body: {} }; } n++;
+        const code = r.body.error_code || r.body.code || r.body.status;
+        if (!(r.code === 400 && (code === 'BAD_FIELD' || (f === 'gw-data.js' && k === 'collection' && code === 'UNKNOWN_COLLECTION')) && (r.body.field === undefined || r.body.field === k) && st() === s0)) bad.push(f + '.' + k + '#' + i + '/' + who + '=' + r.code + ' ' + code); } }
+    return { n, bad }; };
+  // ② 재현 입력(막혔으면 true)
+  const G = (M) => clM(M['gw-data.js']), A = (M) => clM(M['gw-auth.js']);
+  const has = (r, s) => J(r.body).indexOf(s) >= 0;
+  const ATT = {};
+  for (const [col, s, whos] of [['bids', '일감 공고', ['ev', 'ji']], ['family', 'early', ['ev', 'ji']], ['vehicles', 'acq_price', ['ev']], ['workers', 'exam', ['ev']], ['tasks', 'hr:uxx', ['ev']], ['documents', '법인 서류', ['ev']]])
+    for (const who of whos) for (const [i, sh] of [[0, [col]], [1, [[col]]]]) ATT['get_' + col + '_' + who + '_' + i] = async (M) => { const r = await G(M)({ action: 'get', collection: sh }, TOK[who], DEV[who]); return !(r.code === 200 && has(r, s)); };
+  ATT.save_veh = async (M) => { await G(M)({ action: 'save', collection: ['vehicles'], base: 12, doc: { schema: 1, items: [{ id: 'v1', no: '가1234' }] } }, TOK.ev, DEV.ev); return J(mem.gw_data['col:vehicles']).indexOf('acq_price') >= 0; };
+  ATT.save_task = async (M) => { await G(M)({ action: 'save', collection: ['tasks'], base: 14, doc: { schema: 1, items: [{ id: 't1', title: '일반', status: 'open', scope: [] }] } }, TOK.ev, DEV.ev); return J(mem.gw_data['col:tasks']).indexOf('hr:uxx') >= 0; };
+  ATT.save_check = async (M) => { await G(M)({ action: 'save', collection: ['checklist'], base: 16, doc: { schema: 1, scopes: {}, assignee: {}, records: {} } }, TOK.ev, DEV.ev); return J(mem.gw_data['col:checklist'].scopes) !== '{}'; };
+  ATT.pf_ji = async (M) => { const a = await G(M)({ action: 'proof_list' }, TOK.ji, DEV.ji), b = await G(M)({ action: 'proof_get', name: 'pa1' }, TOK.ji, DEV.ji); return a.code === 403 && a.body.error_code === 'NO_ACCESS' && b.code === 403 && !b.body.data; };
+  ATT.pf_ts = async (M) => { const a = await G(M)({ action: 'proof_get', name: 'pa1' }, TOK.ts, DEV.ts); return a.code === 403 && !a.body.data; };
+  ATT.pf_eh_nodev = async (M) => { const a = await G(M)({ action: 'proof_list' }, TOK.eh), b = await G(M)({ action: 'proof_get', name: 'pa1' }, TOK.eh); return a.code === 403 && a.body.error_code === 'DEVICE_NOT_APPROVED' && b.code === 403 && !b.body.data; };
+  ATT.pf_ev_nodev = async (M) => { const a = await G(M)({ action: 'proof_list' }, TOK.ev), b = await G(M)({ action: 'proof_get', name: 'pa1' }, TOK.ev, 'da1pend'); return a.code === 403 && a.body.error_code === 'DEVICE_NOT_APPROVED' && b.code === 403 && b.body.error_code === 'DEVICE_NOT_APPROVED'; };
+  ATT.pf_ji_pend = async (M) => { const a = await G(M)({ action: 'proof_get', name: 'pa1' }, TOK.ji, 'da1pend'); return a.code === 403 && !a.body.data; };
+  ATT.pin_dev = async (M) => { const r = await A(M)({ action: 'member_upsert', id: 'ua1dv', pin: 'newpass-a1x' }, TOK.fin); return r.code === 403 && r.body.error_code === 'DEV_ONLY' && mem.gw_users['member:ua1dv'].pin_hash === H0.dev; };
+  ATT.pin_boss = async (M) => { const r = await A(M)({ action: 'member_upsert', id: 'ua1bs', pin: 'newpass-a1x', hire_date: '2020-01-01' }, TOK.fin); return r.code === 403 && mem.gw_users['member:ua1bs'].pin_hash === H0.boss && mem.gw_users['member:ua1bs'].hire_date === undefined; };
+  ATT.pin_staff = async (M) => { const r = await A(M)({ action: 'member_upsert', id: 'ua1eh', pin: '1357' }, TOK.fin); return r.code === 403 && mem.gw_users['member:ua1eh'].pin_hash === H0.eh; };
+  ATT.duty_http = async (M) => { mem.gw_data['col:licenses'] = { schema: 1, duties: [], items: [] }; mem.gw_users['member:ua1ct'] = { id: 'ua1ct', name: '일계약직', role: '직원', emp_type: '계약직', hire_date: '2000-01-01', birth: '1990-01-01', perms: {} };
+    const r = await M['gw-duty-cron.js'].handler({ httpMethod: 'POST', headers: {}, body: '{}' }); return r.statusCode === 404 && pushMock.calls.length === 0 && !mem.gw_data['duty:sent']; };
+  // ③ 글자 정상 요청(결과 = 응답 + 저장소 글)
+  const NRM = {};
+  const COLS = ['tasks', 'vehicles', 'workers', 'documents', 'checklist', 'bids', 'family', 'contracts', 'receivables', 'mytasks', 'nope'];
+  for (const col of COLS) for (const who of ['dev', 'ev', 'ji']) NRM['get_' + col + '_' + who] = async (M) => { const r = await G(M)({ action: 'get', collection: col }, TOK[who], DEV[who]); return J(r) + st(); };
+  NRM.save_veh = async (M) => { const r = await G(M)({ action: 'save', collection: 'vehicles', base: 12, doc: { schema: 1, items: [{ id: 'v1', no: '가1234-고침' }] } }, TOK.ev, DEV.ev); return J(r) + st(); };
+  NRM.save_task = async (M) => { const r = await G(M)({ action: 'save', collection: 'tasks', base: 14, doc: { schema: 1, items: [{ id: 't1', title: '일반 고침', status: 'open', scope: [] }] } }, TOK.ev, DEV.ev); return J(r) + st(); };
+  NRM.save_check = async (M) => { const r = await G(M)({ action: 'save', collection: 'checklist', base: 16, doc: { schema: 1, scopes: {}, assignee: {}, records: { x: 1 } } }, TOK.ev, DEV.ev); return J(r) + st(); };
+  NRM.save_admin = async (M) => { const r = await G(M)({ action: 'save', collection: 'bids', base: 10, doc: { schema: 1, items: [] } }, TOK.dev); return J(r) + st(); };
+  NRM.pf_ev = async (M) => { const a = await G(M)({ action: 'proof_list' }, TOK.ev, DEV.ev), b = await G(M)({ action: 'proof_get', name: 'pa1' }, TOK.ev, DEV.ev); return J([a, b]); };
+  NRM.pf_ed = async (M) => J(await G(M)({ action: 'proof_list' }, TOK.ed, DEV.ed));
+  NRM.pf_admin = async (M) => { const a = await G(M)({ action: 'proof_list' }, TOK.dev), c = await G(M)({ action: 'proof_put', name: 'pa2', data: 'QUJD' }, TOK.dev), d = await G(M)({ action: 'proof_del', name: 'pa2' }, TOK.dev); return J([a, c.code, d.code]) + st(); };
+  NRM.pf_put_staff = async (M) => { const c = await G(M)({ action: 'proof_put', name: 'pa3', data: 'QUJD' }, TOK.ev, DEV.ev), d = await G(M)({ action: 'proof_del', name: 'pa1' }, TOK.ev, DEV.ev); return J([c, d]) + st(); };
+  NRM.pin_self = async (M) => { const r = await A(M)({ action: 'member_upsert', id: 'ua1fn', pin: 'pwA1-new-fin', dept: '관리부' }, TOK.fin); return String(r.code) + J(r.body.member && r.body.member.dept) + (mem.gw_users['member:ua1fn'].pin_hash !== H0.fin); };
+  NRM.pin_new = async (M) => { const r = await A(M)({ action: 'member_upsert', name: '일신규', role: '직원', pin: '2468' }, TOK.fin); const m = r.body.member; return String(r.code) + (m ? m.role + J(m.perms) + !!mem.gw_users['member:' + m.id].pin_hash : ''); };
+  NRM.pin_hr = async (M) => { const r = await A(M)({ action: 'member_upsert', id: 'ua1eh', name: '일숨김', role: '직원', hire_date: '2099-01-01' }, TOK.fin); return String(r.code) + (mem.gw_users['member:ua1eh'].pin_hash === H0.eh) + mem.gw_users['member:ua1eh'].hire_date; };
+  NRM.pin_by_dev = async (M) => { const r = await A(M)({ action: 'member_upsert', id: 'ua1eh', pin: '8642' }, TOK.dev); return String(r.code) + (mem.gw_users['member:ua1eh'].pin_hash !== H0.eh); };
+  NRM.setpin_fin = async (M) => { const r = await A(M)({ action: 'set_pin', id: 'ua1eh', pin: '8642' }, TOK.fin); return String(r.code) + r.body.error_code; };
+  NRM.auth_list = async (M) => J(await A(M)({ action: 'member_list' }, TOK.ev));
+  for (const [f, body] of [['gw-stmt.js', { action: 'stmt_list', ym: '2099-01' }], ['gw-allbaro.js', { action: 'ab_status' }], ['gw-allbaro.js', { action: 'ab_day', day: '2099-01-01' }], ['gw-hwakwan.js', { action: 'hw_status' }], ['gw-ask.js', { action: 'nope' }], ['gw-promo-mask.js', { action: 'nope' }], ['gw-progress.js', { action: 'get' }], ['gw-cron-kick.js', { key: 'x', target: 'allbaro' }], ['gw-lawwatch.js', { key: 'x' }]])
+    NRM[f + ':' + body.action] = async (M) => J(await clM(M[f])(body, TOK.ev, DEV.ev)) + st();
+  const runA1 = async (M, only) => { const att = {}, nrm = {};
+    const go = async (tbl, out) => { for (const k of Object.keys(tbl)) { if (only && !only(k)) continue; seedA1(); try { out[k] = await tbl[k](M); } catch (e) { out[k] = 'err ' + e.message; } } };
+    await go(ATT, att); await go(NRM, nrm); return { att, nrm }; };
+  try {
+    const gwaA1 = LIVE['gw-auth.js'];
+    mem.gw_users = JSON.parse(snapA1).u;
+    Object.keys(UA).forEach((k) => { const u = Object.assign({}, UA[k]); const h = hsA1(u.admin ? PW.a : PW.s); u.pin_salt = h.salt; u.pin_hash = h.hash; mem.gw_users['member:' + u.id] = u; mem.gw_users['uid:' + u.uid] = u.id; });
+    const lgs = {};
+    for (const k of Object.keys(UA)) { const r = await clM(gwaA1)({ action: 'login', uid: UA[k].uid, pin: UA[k].admin ? PW.a : PW.s }, null, DEV[k]); lgs[k] = r.code + ':' + r.body.device_status; TOK[k] = r.body.token; }
+    const pend = await clM(gwaA1)({ action: 'login', uid: UA.ji.uid, pin: PW.s }, null, 'da1pend');
+    for (const k of Object.keys(DEV)) await clM(gwaA1)({ action: 'device_approve', device: DEV[k] }, TOK.dev);
+    T('C240 판 A-1 준비: 가짜 계정 8개 실 login 200(관리자 approved · 비관리자 pending) → 실 device_approve 5대 승인 · da1pend pending',
+      Object.keys(UA).every((k) => lgs[k] === '200:' + (UA[k].admin ? 'approved' : 'pending')) && pend.code === 200 && Object.keys(DEV).every((k) => mem.gw_users['device:' + DEV[k]].status === 'approved') && mem.gw_users['device:da1pend'].status === 'pending', J(lgs));
+    snapU = JSON.stringify(mem.gw_users); H0.dev = mem.gw_users['member:ua1dv'].pin_hash; H0.boss = mem.gw_users['member:ua1bs'].pin_hash; H0.eh = mem.gw_users['member:ua1eh'].pin_hash; H0.fin = mem.gw_users['member:ua1fn'].pin_hash;
+    // ① 꼴 표
+    const CUR = build(null), sh = await shapeRun(CUR);
+    T('C240 판 A-1 ① 꼴 표 ' + sh.n + '건(함수 ' + SHAPE_T.length + '개 × 가르는 칸 × 배열·겹 배열·객체·숫자 × 개발자·숨김 직원) = 모두 400 BAD_FIELD(gw-data collection = UNKNOWN_COLLECTION) · field = 그 칸 · 저장소 그대로', sh.bad.length === 0, J(sh.bad.slice(0, 8)));
+    const NEU = build(Object.fromEntries(SHF.map((f) => [f, neutralSrc(f)])));
+    const shN = await shapeRun(NEU);
+    T('C240 판 A-1 ① 같은 꼴 표가 중립 사본(가드 줄만 걷음)에선 ' + shN.bad.length + '/' + shN.n + '건 400이 아님 — 시험이 꼴을 봄', shN.bad.length >= SHAPE_T.length, String(shN.bad.length));
+    // ② ③
+    const RC = await runA1(CUR), RN = await runA1(NEU);
+    const attK = Object.keys(ATT), nb = attK.filter((k) => RC.att[k] !== true), op = attK.filter((k) => RN.att[k] === false);
+    T('C240 판 A-1 ② 재현 입력 ' + attK.length + '건(꼴 우회 19 · 증빙 5 · 남의 PIN 3 · 크론 주소 1)이 지금 판에선 모두 막힘', nb.length === 0, J(nb.map((k) => k + '=' + RC.att[k])));
+    T('C240 판 A-1 ② 같은 입력이 중립 사본에선 ' + attK.length + '건 모두 뚫림', op.length === attK.length, J(attK.filter((k) => RN.att[k] !== false).map((k) => k + '=' + RN.att[k])));
+    const nK = Object.keys(NRM), nd = nK.filter((k) => RC.nrm[k] !== RN.nrm[k] || /^err /.test(RC.nrm[k]));
+    T('C240 판 A-1 ③ 글자 정상 요청 ' + nK.length + '건(컬렉션 읽기 ' + (COLS.length * 3) + ' · 저장 4 · 증빙 화면 4 · 인사 카드·PIN·명부 6 · 다른 함수 9) = 중립 사본과 응답·저장소 글자째 같음', nd.length === 0, J(nd.map((k) => k + ': ' + String(RC.nrm[k]).slice(0, 120) + ' ≠ ' + String(RN.nrm[k]).slice(0, 120))));
+    T('C240 판 A-1 ③ 정상 길이 실제로 돎(관리자 bids 읽기 200 · 계약 보기 직원 증빙 200 · 본인 PIN·새 회원·인사 카드 200 · 남의 set_pin 403)', /"code":200/.test(RC.nrm.get_bids_dev) && /^\[\{"code":200/.test(RC.nrm.pf_ev) && /^200.*true$/.test(RC.nrm.pin_self) && /^200직원/.test(RC.nrm.pin_new) && RC.nrm.pin_hr === '200true2099-01-01' && RC.nrm.pin_by_dev === '200true' && RC.nrm.setpin_fin === '403DEV_ONLY', J([RC.nrm.pin_self, RC.nrm.pin_new, RC.nrm.pin_hr]));
+    // ④ 결함 사본 — 가드 줄 하나씩 걷기(그 함수 꼴 표) · 칸 하나 빼기 · 증빙·PIN·크론 고침 걷기·넓히기
+    const alive = [], killed = [];
+    for (const f of SHF) { if (f === 'gw-duty-cron.js') continue; const r = await shapeRun(build({ [f]: mutA1(SRC[f], guardLine(f), '') }), f); (r.bad.length ? killed : alive).push(f + ' 가드 걷음'); }
+    const listLine = (f) => (f === 'gw-data.js' ? SRC[f].split('\n').filter((l) => l.indexOf('const GWD_STR_FIELDS = [') === 0)[0] + '\n' : guardLine(f));   // gw-data는 칸 목록이 상수 줄
+    for (const [f, fields] of SHAPE_T) for (const k of fields) { const gl = listLine(f), q = "'" + k + "'"; const nl = gl.replace(new RegExp(',? ?' + q + '(?=[,\\]])'), '').replace('[, ', '['); if (nl === gl) { alive.push(f + ' ' + k + ' 못 뺌'); continue; }
+      const r = await shapeRun(build({ [f]: mutA1(SRC[f], gl, nl) }), f); (r.bad.some((b) => b.indexOf('.' + k + '#') >= 0) ? killed : alive).push(f + ' 칸 ' + k + ' 뺌'); }
+    const OTH = [['gw-data.js', FIXA1['gw-data.js'][1][0], FIXA1['gw-data.js'][1][1]], ['gw-data.js', FIXA1['gw-data.js'][2][0], FIXA1['gw-data.js'][2][1]],
+      ['gw-data.js', "  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });\n  if (permOf(c.member, 'contracts') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });\n  return null;", "  if (permOf(c.member, 'contracts') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });\n  return null;"],
+      ['gw-data.js', "  if (permOf(c.member, 'contracts') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });\n  return null;", '  return null;'],
+      ['gw-data.js', "  if (permOf(c.member, 'contracts') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });\n  return null;", "  if (permOf(c.member, 'contracts') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });\n  return null;"],
+      ['gw-auth.js', FIXA1['gw-auth.js'][1][0], ''], ['gw-auth.js', "  if (d.pin && !isNew && !self && !canDev) return jr(403,", '  if (d.pin && !canDev) return jr(403,'],
+      ['gw-duty-cron.js', FIXA1['gw-duty-cron.js'][0][0], ''], ['gw-duty-cron.js', '  if (event && (event.httpMethod || event.headers)) return', '  if (event && event.nope) return']];
+    for (const [f, a, b] of OTH) { let w; try { const R2 = await runA1(build({ [f]: mutA1(SRC[f], a, b) }), (k) => /^(pf_|pin_|setpin|duty|auth_)/.test(k)); w = Object.keys(R2.att).some((k) => R2.att[k] !== true) || Object.keys(R2.nrm).some((k) => R2.nrm[k] !== RN.nrm[k]); } catch (e) { w = 'err'; } (w === true ? killed : alive).push(f + ' ' + a.trim().slice(0, 40)); }
+    T('C240 판 A-1 ④ 결함 사본 ' + (killed.length + alive.length) + '개(가드 줄 걷기 ' + (SHF.length - 1) + ' · 칸 하나씩 빼기 ' + SHAPE_T.reduce((s, x) => s + x[1].length, 0) + ' · 증빙·PIN·크론 ' + OTH.length + ') = 모두 잡힘', alive.length === 0, J(alive));
+  } catch (e) { T('C240 판 A-1 검사 실행', false, String(e && e.stack || e).slice(0, 600)); }
+  finally { const s = JSON.parse(snapA1); mem.gw_users = s.u; mem.gw_data = s.d; mem.gw_files = s.f; blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);
