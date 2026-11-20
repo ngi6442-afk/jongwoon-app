@@ -47,7 +47,7 @@ async function registerDevice(st, event, member) {
   if (member.admin) dev.status = 'approved';
   const pendNote = fresh && dev.status === 'pending';
   if (pendNote) dev.pend_note = now;   // 알림 빚(검토 11/14 ①③) — 이 요청에서 보내면 지우고, 못 보내면(24시간 묶음·3초 상한·표식 못 읽음) 남아 다음 날 아침 크론이 1발
-  const w = await blobSet(st, deviceKey(dv.id), dev);
+  const w = await blobSet(st, deviceKey(dv.id), dev, { force: !dr.ok && dr.code === 'STORAGE_PARSE_FAILED' });   // C225 판 A 검토: 깨진 기기 문서만 새 기록으로 덮음(운영 판처럼 스스로 고쳐짐 · 비관리자는 대기) · 일시 실패는 막힘
   if (pendNote && w && w.ok) {
     try {
       const nr = await devauto.notifyNewPending(member, now);
@@ -493,6 +493,7 @@ async function handleMemberDelete(st, event, d, R) {
   if (!da) return jr(403, { status: 'FORBIDDEN', error_code: 'DEV_ONLY', request_id: R });
   if (!d.id || d.id === c.member.id) return jr(400, { status: 'REJECTED', error_code: 'INVALID_INPUT', request_id: R });
   const r = await blobGet(st, memberKey(d.id));
+  if (!r.ok && r.code !== 'NOT_FOUND') return MEMBERS_FAIL(R);   // C225 판 A 검토: 대상 회원을 못 읽으면 지우지도 않고 200을 주던 길(지운 줄 알지만 계정이 살아 있음)
   const all = await listMembers(st);
   if (all.unavailable) return MEMBERS_FAIL(R);   // C225 판 A: 마지막 개발자·PM 판정을 못 읽은 명부로 하지 않음
   // 마지막 개발자 계정은 삭제 불가 — 시스템 관리 주체가 사라지는 것 방지
@@ -604,12 +605,16 @@ async function handleDeviceSet(st, event, d, R, status) {
   if (!da) return jr(403, { status: 'FORBIDDEN', error_code: 'DEV_ONLY', request_id: R });
   const id = String(d.device || '').trim();
   if (!id) return jr(400, { status: 'REJECTED', error_code: 'INVALID_INPUT', request_id: R });
-  if (status === null) { await blobSet(st, deviceKey(id), null); try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'login', ev: [{ op: '기기삭제', id: id.slice(0, 20), t: '' }] }); } catch (e) {} return jr(200, { status: 'OK', request_id: R }); }
+  // C225 판 A 검토: 삭제가 안 됐으면 감사·200 없이 실패로(아래 승인·해제 갈래와 같음)
+  if (status === null) { const w0 = await blobSet(st, deviceKey(id), null); if (!w0.ok) return jr(500, { status: 'ERROR', error_code: w0.code, request_id: R }); try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'login', ev: [{ op: '기기삭제', id: id.slice(0, 20), t: '' }] }); } catch (e) {} return jr(200, { status: 'OK', request_id: R }); }
   const r = await blobGet(st, deviceKey(id));
   const dev = (r.ok && r.data) ? r.data : { id: id, created: Date.now() };
   dev.status = status; dev.updated = Date.now();
   if (status === 'approved') { delete dev.auto_rev; delete dev.pend_note; }   // P1 판22 검토 11/14 ⑤: 다시 승인하면 '퇴사 회수' 표시·못 보낸 새 기기 알림 빚을 지움
-  await blobSet(st, deviceKey(id), dev);
+  // C225 판 A 검토: 깨진 기기 문서(STORAGE_PARSE_FAILED)만 force로 다시 세움(지킬 자료 없음 — 백업 복원·되돌리기와 같은 규칙) · 일시 실패는 막힘 →
+  //   쓰기가 안 됐으면 감사('기기승인')·200 없이 500(그 코드) — 종전엔 결과를 안 봐 승인했다는 기록만 남고 기기는 그대로였다
+  const w = await blobSet(st, deviceKey(id), dev, { force: !r.ok && r.code === 'STORAGE_PARSE_FAILED' });
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'login', ev: [{ op: status === 'approved' ? '기기승인' : '기기승인취소', id: id.slice(0, 20), t: String(dev.label || dev.member_name || '') }] }); } catch (e) {}
   return jr(200, { status: 'OK', request_id: R });
 }

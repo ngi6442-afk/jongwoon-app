@@ -4316,14 +4316,19 @@ async function handleCdocPurge(event, d, R) {
   if (!it || it.purged) return jr(404, { status: 'REJECTED', error_code: 'NO_FILE', request_id: R });
   if (!it.del) return jr(409, { status: 'CONFLICT', error_code: 'NOT_IN_TRASH', request_id: R });
   if (Date.now() - Number(it.del) < CDOC_TRASH_DAYS * 86400000) return jr(409, { status: 'CONFLICT', error_code: 'TOO_EARLY', days: CDOC_TRASH_DAYS, request_id: R });
+  // C225 판 A 검토: 본문 레코드 읽기는 큰 파일(조각·본 레코드)인지 알려면 꼭 필요 — 못 읽으면(읽기·파싱 실패) 아무것도 지우지 않고 500(다시 할 수 있게).
+  //   본 레코드·본문을 못 지웠으면 '영구 삭제됨' 표식을 남기지 않고 500 — 파기 기록과 남은 파일이 어긋나지 않게(종전엔 결과를 안 봐 표식만 남고 다시 지울 길이 없었다)
   const pr0 = await blobGet(store(FILES), cdocKey(cid, it.i, it.dk, n));
+  if (!pr0.ok && pr0.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: pr0.code || 'STORAGE_READ_FAILED', request_id: R });
   if (pr0.ok && pr0.data && pr0.data.att) {   // v423 큰 파일은 조각과 본 레코드까지
     const am = await blobGet(store(FILES), pr0.data.att);
     if (am.ok && am.data) await BF.attDeleteParts(store(FILES), pr0.data.att, am.data);
-    await blobDelete(store(FILES), pr0.data.att);
+    const aw = await blobDelete(store(FILES), pr0.data.att);   // 본 레코드를 못 읽었으면 층 1이 이 지우기를 막음 → 아래 500(조각을 못 지운 채 표식을 남기지 않음)
+    if (!aw.ok) return jr(500, { status: 'ERROR', error_code: aw.code, request_id: R });
   }
   if (it.att0) await blobDelete(store(FILES), 'parse:' + it.att0);   // v423 판독값도 함께(개인정보 항목의 값이 남지 않게)
-  await blobDelete(store(FILES), cdocKey(cid, it.i, it.dk, n));
+  const bw = await blobDelete(store(FILES), cdocKey(cid, it.i, it.dk, n));
+  if (!bw.ok) return jr(500, { status: 'ERROR', error_code: bw.code, request_id: R });
   it.purged = Date.now(); it.purged_by = c.member.id; it.cur = 0;
   idx.updated_at = Date.now(); idx.updated_by = c.member.id;
   const w = await blobSet(st, cdocIdxKey(cid), idx);
@@ -5577,6 +5582,9 @@ async function handleAttDel(event, d, R) {
   // att_ 프리픽스 강제 — 없으면 tpl:/proof:(proof:__index__ 포함)를 비관리자가 삭제할 수 있다(gw-parse-background와 동일 검사)
   if (String(d.id || '').indexOf('att_') !== 0) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });
   const am0 = await blobGet(store(FILES), String(d.id || ''));
+  // C225 판 A 검토: 첨부 본 레코드를 못 읽으면 보호 검사(서류함 taken·인허가 수령본)를 할 수 없고 본 레코드 지우기도 막힌다 —
+  //   판독값·가린 판만 지우고 200·감사 '첨부삭제'를 남기던 길을 아무것도 지우지 않는 500으로
+  if (!am0.ok && am0.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: am0.code || 'STORAGE_READ_FAILED', request_id: R });
   if (am0.ok && am0.data && am0.data.taken) return jr(409, { status: 'CONFLICT', error_code: 'ALREADY_TAKEN', request_id: R });
   if (am0.ok && am0.data && am0.data.kind === 'lic') return jr(409, { status: 'CONFLICT', error_code: 'LIC_ATT_KEEP', request_id: R });   // P1 판28 인허가 수령본(완료 기록 근거)은 지우는 길 없음   // v423 서류함이 참조하는 조각은 여기서 지우지 않는다(서류함 보관·영구 삭제 경로로)
   if (am0.ok && am0.data && am0.data.parts) await BF.attDeleteParts(store(FILES), String(d.id || ''), am0.data);
