@@ -24828,11 +24828,27 @@
     p.body=document.getElementById("promoDetBody").value;
     paClear(p.id);   // 화면 내용이 기록에 반영되는 시점 — 보관 중인 AI 결과·되돌리기 자료는 역할이 끝난다
   }
-  document.getElementById("promoNewBtn").addEventListener("click",function(){
-    if(!canDo("promo")) return;
+  // C257(11/20): 사진은 고르는 즉시 서버에 올라간다 — 저장 전에 [취소]·[새 기록]으로 버리면 서버에 고아로 남았다(운영 홍보 60건).
+  //   [새 기록]은 저장 안 된 사진(올리는 중 포함)이 있으면 버리지 않고 그 창을 그대로 이어 쓴다. 버리기는 [취소]에서 확인한 때만 — 그 id를 att_del로 지운다.
+  function promoUploadReset(){
     promoUpload={ photos:[], gps:null, shot:null, busy:false };
     document.getElementById("promoThumbs").innerHTML="";
     document.getElementById("promoPhotoInfo").textContent="";
+  }
+  function promoUploadDiscard(){
+    var ids=promoUpload.photos.map(function(p){ return p && p.id; }).filter(function(x){ return /^att_/.test(String(x||"")); });
+    promoUploadReset();
+    var fail=0, n=0;
+    return ids.reduce(function(ch,id){ return ch.then(function(){ return gwCall("gw-data",{action:"att_del",id:id}).then(function(res){ n++; if(res.status!==200) fail++; }).catch(function(){ n++; fail++; }); }); }, Promise.resolve()).then(function(){ return { n:n, fail:fail }; });
+  }
+  document.getElementById("promoNewBtn").addEventListener("click",function(){
+    if(!canDo("promo")) return;
+    if(promoUpload.busy || promoUpload.photos.length){
+      document.getElementById("promoAddStat").textContent="저장 안 된 사진 "+promoUpload.photos.length+"장"+(promoUpload.busy?"(올리는 중)":"")+"을 이어서 씁니다 — 버리려면 [취소].";
+      document.getElementById("promoAddBackdrop").classList.add("show");
+      return;
+    }
+    promoUploadReset();
     document.getElementById("promoAddStat").textContent="";
     ["promoRegion","promoFacility","promoProblem","promoMetric"].forEach(function(i){ var el=document.getElementById(i); el.value=""; delete el.dataset.src; });
     promoFillConSelect("");
@@ -24840,7 +24856,13 @@
   });
   document.getElementById("promoPhotoBtn").addEventListener("click",function(){ document.getElementById("promoPhotoFile").click(); });
   document.getElementById("promoPhotoFile").addEventListener("change",function(){ promoPhotoPick(this.files); this.value=""; });
-  document.getElementById("promoAddCancel").addEventListener("click",function(){ document.getElementById("promoAddBackdrop").classList.remove("show"); });
+  document.getElementById("promoAddCancel").addEventListener("click",function(){
+    var n=promoUpload.photos.length;
+    if(n && !promoUpload.busy && confirm("올린 사진 "+n+"장을 버릴까요?\n[확인] 버림(서버에서 지움) · [취소] 창만 닫기(다음 [+ 현장 기록]에서 이어 씀)")){
+      promoUploadDiscard().then(function(r){ if(r.fail) alert("사진 "+r.fail+"장을 서버에서 지우지 못했습니다("+r.n+"장 중). 관리자에게 알려 주세요."); });
+    }
+    document.getElementById("promoAddBackdrop").classList.remove("show");
+  });
   document.getElementById("promoSave").addEventListener("click",function(){
     var stat=document.getElementById("promoAddStat");
     if(promoUpload.busy){ stat.textContent="사진 업로드가 끝날 때까지 잠시만요."; return; }
@@ -24870,6 +24892,7 @@
     paAutoWait=item.id;
     maskAutoWait=item.id;   // v354 모자이크 — 사진AI와 같이 자동 감지
     schedulePromoSave(); renderPromo();
+    promoUploadReset();   // C257 — 기록에 붙은 사진이라 다음 [새 기록]이 이어 쓰지 않게
     document.getElementById("promoAddBackdrop").classList.remove("show");
   });
   // ---- 완성본 한 장 (2026-08-14 PM 요구: 사진까지 배치된 결과물을 한 번에 복붙) ----

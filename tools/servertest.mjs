@@ -2494,6 +2494,38 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   delete mem.gw_data['col:promo']; delete mem.gw_files[A1]; delete mem.gw_files[A3]; delete mem.gw_data['promo:share:' + 'f'.repeat(64)];
 }
 
+// ===== 42-C257. 홍보 사진 고아 — 홍보 수행 직원이 자기가 올렸지만 어떤 현장 기록에도 붙지 않은 사진만 지움(서버가 직접 확인) =====
+{
+  const jpg = Buffer.concat([Buffer.from('ffd8ffe000104a464946', 'hex'), Buffer.alloc(24, 7)]).toString('base64');
+  const P1 = { id: 'upro257', name: '홍보257', admin: false, perms: { promo: 'do' } }, P2 = { id: 'upro257b', name: '홍보257b', admin: false, perms: { promo: 'do' } }, PV = { id: 'upro257v', name: '홍보보기257', admin: false, perms: { promo: 'view' } };
+  [P1, P2, PV].forEach((m) => { mem.gw_users['member:' + m.id] = m; });
+  const t1 = issueSession(P1).token, t2 = issueSession(P2).token, tv = issueSession(PV).token;
+  const savedCol = mem.gw_data['col:promo'];
+  const up = await call({ action: 'att_put', kind: 'promo', name: 'a.jpg', type: 'image/jpeg', data: jpg }, t1, 'dev1');
+  const id1 = up.body && up.body.id;
+  const del = (id, tok) => call({ action: 'att_del', id: id }, tok, 'dev1');
+  const rOther = await del(id1, t2), rView = await del(id1, tv);
+  mem.gw_data['col:promo'] = { schema: 1, items: [{ id: 'pr257', photos: [{ id: id1, name: 'a.jpg' }] }] };
+  const rUsed = await del(id1, t1);
+  mem.gw_data['col:promo'] = { schema: 1, items: [{ id: 'pr257', photos: [{ id: 'att_' + '0'.repeat(16) }] }] };
+  const aud0 = auditMock.logs.length;
+  const rOk = await del(id1, t1);
+  const idOld = 'att_' + '7'.repeat(16); mem.gw_files[idOld] = { name: 'o.jpg', type: 'image/jpeg', kind: 'promo', data: jpg, by: '홍보257', ts: 1 };
+  const rOld = await del(idOld, t1);
+  const idCon = 'att_' + '8'.repeat(16); mem.gw_files[idCon] = { name: 'c.pdf', type: 'application/pdf', kind: 'contract', data: jpg, by: '홍보257', bid: 'upro257', ts: 1 };
+  const rCon = await del(idCon, t1), rBad = await del('mask:' + idCon, t1);
+  T('C257 att_put 홍보: 올린 사람 id(bid) 저장', up.code === 200 && !!id1 && mem.gw_files[id1] && mem.gw_files[id1].bid === 'upro257', up.code + '');
+  T('C257 att_del 좁은 갈래(계약 수행 아님): 남이 올린 사진 403 NOT_OWNER · 홍보 보기 권한 403 NO_WRITE · 기록에 붙은 사진 409 PROMO_PHOTO_IN_USE(안 지움) · 붙지 않은 본인 사진 200·지움·감사 "첨부삭제" · 옛 첨부(bid 없음)는 이름으로 본인 판정 · 계약 첨부 403 · att_ 아닌 id 400',
+    rOther.code === 403 && rOther.body.error_code === 'NOT_OWNER' && rView.code === 403 && rView.body.error_code === 'NO_WRITE'
+    && rUsed.code === 409 && rUsed.body.error_code === 'PROMO_PHOTO_IN_USE' && rOk.code === 200 && !mem.gw_files[id1] && auditMock.logs.slice(aud0).some((l) => l.ev && l.ev[0] && l.ev[0].op === '첨부삭제')
+    && rOld.code === 200 && !mem.gw_files[idOld] && rCon.code === 403 && !!mem.gw_files[idCon] && rBad.code === 400,
+    JSON.stringify([rOther.code, rView.code, rUsed.code, rOk.code, rOld.code, rCon.code, rBad.code]));
+  const gsrc = require('fs').readFileSync(join(FN, 'gw-data.js'), 'utf8');
+  T('C257 읽기 실패는 지우지 않음(정적): 첨부·col:promo 읽기 실패 = READ_FAILED → 503 PROMO_ORPHAN_READ_FAILED(실패를 "없음"으로 보지 않음 — C225)',
+    /const am = await blobGet\(store\(FILES\), id\);\n  if \(!am\.ok\) return 'READ_FAILED';/.test(gsrc) && /const pr = await blobGet\(store\(DATA\), 'col:promo'\);\n  if \(!pr\.ok\) return 'READ_FAILED';/.test(gsrc) && /if \(pk === 'READ_FAILED'\) return jr\(503, \{ status: 'UNAVAILABLE', error_code: 'PROMO_ORPHAN_READ_FAILED'/.test(gsrc));
+  delete mem.gw_files[idCon]; if (savedCol === undefined) delete mem.gw_data['col:promo']; else mem.gw_data['col:promo'] = savedCol;
+}
+
 // ===== 42-C265. 홍보 사진 형식 — 올릴 때 머리 바이트로 그림만(보낸 type 안 믿음) · 공개 주소는 그림 형식 허용 목록 + nosniff =====
 {
   const IMG = require(join(FN, '_lib/imgsniff.js'));

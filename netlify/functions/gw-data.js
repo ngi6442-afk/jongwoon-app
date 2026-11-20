@@ -5006,7 +5006,7 @@ async function handleAttPut(event, d, R) {
     type = IMG.sniffB64(b64);
     if (!type) return jr(400, { status: 'REJECTED', error_code: 'NOT_IMAGE', request_id: R });
   }
-  const w = await blobSet(store(FILES), id, { name: name, type: type, kind: kind, data: b64, by: c.member.name, ts: Date.now() });
+  const w = await blobSet(store(FILES), id, { name: name, type: type, kind: kind, data: b64, by: c.member.name, bid: String(c.member.id || ''), ts: Date.now() });   // bid = 올린 사람 id(C257 — 홍보 고아 사진 본인 지우기 판정)
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '첨부등록', id: id, t: name.slice(0, 60) }] }); } catch (e) {}
   // 판독은 백그라운드 함수(gw-parse-background)에서 — 첨부는 즉시 완료(타임아웃 방지). promo(현장 사진)는 판독 대상 아님
@@ -5530,10 +5530,32 @@ async function handleAttGet(event, d, R) {
   return jr(200, { status: 'OK', name: r.data.name, type: r.data.type, data: r.data.data, request_id: R });
 }
 
+// C257(11/20): 홍보 수행 직원이 자기가 올렸지만 아직 어떤 현장 기록에도 붙지 않은 사진만 지우는 좁은 갈래 — 서버가 직접 확인한다.
+//   kind promo · 올린 사람 본인(bid, 옛 첨부는 이름) · promo 수행 권한 · col:promo 어떤 기록의 photos에도 없는 id. 읽기 실패면 지우지 않는다(C225 — 실패를 '없음'으로 보지 않음).
+async function promoOrphanDelCheck(member, id) {
+  if (permOf(member, 'promo') !== 'do') return 'NO_WRITE';
+  const am = await blobGet(store(FILES), id);
+  if (!am.ok) return 'READ_FAILED';
+  const m = am.data;
+  if (!m || typeof m !== 'object' || m.kind !== 'promo') return 'NO_WRITE';
+  const mine = m.bid ? String(m.bid) === String(member.id || '') : String(m.by || '') === String(member.name || '');
+  if (!mine) return 'NOT_OWNER';
+  const pr = await blobGet(store(DATA), 'col:promo');
+  if (!pr.ok) return 'READ_FAILED';
+  const items = (pr.data && Array.isArray(pr.data.items)) ? pr.data.items : [];
+  const used = items.some(function (it) { return it && Array.isArray(it.photos) && it.photos.some(function (p) { return p && (p === id || p.id === id); }); });
+  return used ? 'IN_USE' : 'OK';
+}
 async function handleAttDel(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
-  if (permOf(c.member, 'contracts') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
+  if (permOf(c.member, 'contracts') !== 'do') {
+    if (String(d.id || '').indexOf('att_') !== 0) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });
+    const pk = await promoOrphanDelCheck(c.member, String(d.id || ''));
+    if (pk === 'READ_FAILED') return jr(503, { status: 'UNAVAILABLE', error_code: 'PROMO_ORPHAN_READ_FAILED', request_id: R });
+    if (pk === 'IN_USE') return jr(409, { status: 'CONFLICT', error_code: 'PROMO_PHOTO_IN_USE', request_id: R });
+    if (pk !== 'OK') return jr(403, { status: 'FORBIDDEN', error_code: pk === 'NOT_OWNER' ? 'NOT_OWNER' : 'NO_WRITE', request_id: R });
+  }
   // att_ 프리픽스 강제 — 없으면 tpl:/proof:(proof:__index__ 포함)를 비관리자가 삭제할 수 있다(gw-parse-background와 동일 검사)
   if (String(d.id || '').indexOf('att_') !== 0) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });
   const am0 = await blobGet(store(FILES), String(d.id || ''));
