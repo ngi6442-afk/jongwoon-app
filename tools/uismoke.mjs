@@ -20941,11 +20941,11 @@ try {
     const FT = ["`abSheetMerge`", "`abSummary`", "`routeAddImpact`", "`ROUTE_OVERLAP`", "`ROUTE_ADD_BUSY`", "`abNrDraft`", "원장 C244", "원장 C279"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = "(2026-11 v518) 새 줄의 하차지·품목 이름이 기존 줄과 겹쳐 ";
-    const ok = /기준: v518 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 518 && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
       && d.man.indexOf(MAN) > 0
       && d.cl.indexOf('**운반일지 집계·새 노선(v518') > 0
       && FIX518.every((x) => d.ix.split(x).length === 2)
-      && /SHELL_CACHE = 'jw-shell-v518'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 518;   // v519(66 급여 판2)에서 '518 이상'으로 풂
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX518.map((x) => d.ix.split(x).length - 1) } };
   };
   const r518 = chk518(D518);
@@ -21030,6 +21030,29 @@ try {
     gQ.ok && MG.every((x) => x === false), JSON.stringify({ err: gQ.err, mut: MG, o: String(gQ.open || '').slice(0, 300) }));
   T('66 판2 ② 결함 사본 ' + MQ.length + '개(단추 늘 보임 · payOpen 관리자 확인 걷음 · 이름 esc 걷음 · 창 제목 innerHTML · 서버에 없는 동작 · 머리 칸 수 · 확정 달 칸 열림 · 요율 % 자리) = 모두 ✗', MQ.every((v) => v === false), JSON.stringify(MQ));
 } catch (e) { console.log('  (66 판2 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v519(66 급여 판2 — PM 11/20 16:04 'ㄱ'): 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '519 이상'으로 풀 것
+try {
+  const rdR = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DR = { ft: rdR('FEATURES.md'), tl: rdR('TESTLIST.md'), sw: rdR('sw.js'), man: rdR('MANUAL.html'), cl: rdR('CLAUDE.md') };
+  const chkR = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v519 (11/20)', '\n### '), tlv = cut(d.tl, '\n## v519 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), pm = cb.filter((l) => /^- \[ \] \(PM\)/.test(l)), op = cb.filter((l) => /^- \[ \] \(운영 확인\)/.test(l));
+    const FT = ['`gw-pay`', '`_lib/payledger.js`', '`pay:base:<회사>:<회원>`', '`pay:month:<회사>:<달>`', '`pay:conf`', '`KIND_MISMATCH`', '`ROWS_NOT_READY`', '`OVERWRITTEN`', '`BAD_PAY_DOC`', '`lawPick`', '`minus_hours`', '`CALC_CHANGED`', '`ord_month`', '43줄'];
+    const GATE = ['uismoke', 'servertest', 'consheet_check', 'proctpl_check', 'settletest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check', 'paycalc_check', 'stmtread_a_check', 'stmtread_b_check', 'stmtread_c_check', 'stmtread_d_check', 'stmtmail_check'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0), last = gate[gate.length - 1] || '';
+    const ok = /기준: v519 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && pm.length === 1 && op.length === 1
+      && GATE.every((g) => last.indexOf('`' + g + '`') > 0) && /SHELL_CACHE = 'jw-shell-v519'/.test(d.sw) && d.man.indexOf('<li><b>급여 탭</b> (2026-11 v519) — 관리자만 보입니다.') > 0 && d.cl.indexOf('- **66 급여 판2(v519 — 급여 탭') > 0;
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, pm: pm.length, op: op.length } };
+  };
+  const rR = chkR(DR);
+  const muR = (k, f) => chkR(Object.assign({}, DR, { [k]: f(DR[k]) })).ok;
+  const MR = [muR('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v518 (')), muR('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v518'")),
+    muR('ft', (s) => s.split('`KIND_MISMATCH`').join('KIND_MISMATCH')), muR('tl', (s) => s.split('\n## v519 ').join('\n## vX ')), muR('man', (s) => s.replace('<li><b>급여 탭</b>', '<li>급여 탭')), muR('cl', (s) => s.replace('- **66 급여 판2(', '- 66 급여 판2('))];
+  T('v519 문서·판 번호(정확 검사): FEATURES 기준 v519 (2026-11-20)·v519 절(gw-pay·payledger·키 셋·KIND_MISMATCH·ROWS_NOT_READY·OVERWRITTEN·BAD_PAY_DOC·lawPick·minus_hours·43줄) · TESTLIST v519 칸 4(PM 1 · 운영 확인 1 · AI [x] 2 · 게이트 18) · sw v519 · MANUAL 급여 탭 한 줄 · CLAUDE.md 판2 줄 · 결함 사본 ' + MR.length + '개 = 모두 ✗',
+    rR.ok && MR.every((v) => v === false), JSON.stringify({ r: rR.info, mut: MR }));
+} catch (e) { console.log('  (v519 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

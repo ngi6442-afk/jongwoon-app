@@ -1706,3 +1706,9 @@
 - [x] (AI 시험 화면 대상 — 운반일지 집계·새 노선) 시험 서버(11/20 11:21 스냅샷 · 운영부 계정 권한 사본): 10-06·10-07·10-13·11-19 표 칸 합 40·31·33·28 = '올바로 자동' · 새 노선 폼 '왼쪽(L) 번호 — L50 예정' · 기존 줄과 겹치는 이름으로 [추가하고 지정] → 겹침 안내(L6 1묶음 1회·최근 14일) → 취소: 저장 0·넣은 이름·열 그대로 / 확인: 409 뒤 force로 R50 저장·지정 — ✓ AI 11/20
 - [x] (AI) `servertest` 'C279 ①②③'·'C244 워커 abSummary' · `uismoke` 'C244 ①·②'·v351 블록 'C279' 흐름 검사 · 사본 112일 나란히 · 겹침 미리 알림 409회 실행(알린 것 = 실제) · 끝에서 끝 · v517 문서 검사를 이 판 이상으로 풂 — ✓ AI 11/20
 - [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` 등 게이트 전부 통과 + autorulestest + 앱 스크립트 전체 파싱 오류 0 + 시험 서버에서 앱 뜸(끝 게이트 이름은 백틱 없이) — ✓ AI 11/20
+
+## v519 — 66 급여 판2: 급여 탭(회계사무소 급여대장 꼴 · 한 사람 기준 · 하수준설 수당 내역)
+- [ ] (PM) PM 콘솔 '급여 요율 표를 승격할까요?' [ㄱ] · 급여 탭 [단가·기간 설정]에 급여 기간 시작일·지급일·하수준설 단가 세 가지 넣기(받은 수당내역 값)
+- [ ] (운영 확인) 급여 탭: 직원 한 명 기준을 넣으면 그 달 대장 줄에 금액이 나오고, 금액 칸을 눌러 상여·연장 시간을 넣으면 미리 계산이 바뀌며 저장 뒤 대장에 그대로 · 하수준설 대상의 수당 칸 → 날짜 줄 추가 → 총 수당이 수당 칸으로
+- [x] (AI) `servertest` 66 판2 ①~⑨(관문 · 대장 사람·계산 = 같은 함수 직접 호출 · 그 달 값 꼴·낙관락·덮임 · 확정·풀기 · 기준 판 · 설정 · 백업 복원 · 승격 판정 대조 · 결함 사본 21) · `uismoke` 66 판2 ①②(결함 사본 8) · 받은 수당내역 43줄 재현 — ✓ AI 11/20
+- [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `paycalc_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` 통과 · v518 문서 검사를 이 판 이상으로 풀고 v519 문서·판 번호 정확 검사 — ✓ AI 11/20
