@@ -21098,9 +21098,9 @@ try {
     const store = Object.assign({ document, alert: (m) => { alerts.push(String(m)); }, confirm: () => true, todayStr: () => '2026-11-20', setTimeout: () => 0,
       __oldRead: (el) => ({ ok: true, v: el ? String(el.value || '') : '' }), gwCall: (...a) => { calls.push('gwCall'); return thenable; }, gwToast: (m) => { calls.push('gwToast'); alerts.push(String(m)); } }, cfg.stubs ? cfg.stubs(E, mkEl, calls) : {});
     const P = new Proxy(store, { has: (t, k) => typeof k === 'string' && (k in t || !(k in globalThis)), get: (t, k) => (k === Symbol.unscopables ? undefined : (k in t ? t[k] : rec(k))), set: (t, k, v) => { t[k] = v; return true; } });
-    let src = fns.map((n) => { const s = fnC(n); return defect && defect.indexOf(n) >= 0 ? s.split('dateFieldRead(').join('__oldRead(') : s; }).join('\n');
+    let src = fns.map((n) => { let s = fnC(n); if (defect && defect.indexOf(n) >= 0) s = s.split('dateFieldRead(').join('__oldRead('); if (cfg.mut && cfg.mut[n]) s = cfg.mut[n](s); return s; }).join('\n');   // cfg.mut = 결함 사본(함수별 글 바꾸기)
     let out, err = '';
-    try { const api = new Function('P', 'with (P) {\n' + helper + '\n' + src + '\nreturn { ' + fns.map((n) => n + ': ' + n).join(', ') + ' };\n}')(P); out = call(api, E, store); } catch (e) { err = String(e && e.message || e); }
+    try { const api = new Function('P', 'with (P) {\n' + (cfg.mutHelper ? cfg.mutHelper(helper) : helper) + '\n' + src + '\nreturn { ' + fns.map((n) => n + ': ' + n).join(', ') + ' };\n}')(P); out = call(api, E, store); } catch (e) { err = String(e && e.message || e); }
     return { calls, alerts, E, out, err, store };
   };
   const BAD = { type: 'date', value: '', validity: { badInput: true } }, Y6 = { type: 'date', value: '202612-02-01', validity: { badInput: false } };
@@ -21108,13 +21108,13 @@ try {
   // ① 도우미 단위
   const H = run(['dateFieldRead'], (a) => [
     a.dateFieldRead({ value: '', validity: { badInput: true } }), a.dateFieldRead({ value: '2026-02-31', validity: { badInput: false } }), a.dateFieldRead({ value: '202612-02-01', validity: { badInput: false } }),
-    a.dateFieldRead({ value: '', validity: { badInput: false } }), a.dateFieldRead({ value: '2026-11-20', validity: { badInput: false } }), a.dateFieldRead({ value: '1899-12-31' }), a.dateFieldRead({ value: '2100-01-01' }),
+    a.dateFieldRead({ value: '', validity: { badInput: false } }), a.dateFieldRead({ value: '2026-11-20', validity: { badInput: false } }), a.dateFieldRead({ value: '0999-12-31' }), a.dateFieldRead({ value: '2999-12-31' }),
     a.dateFieldRead(null), a.dateFieldRead({ value: '2028-02-29' }), a.dateFieldRead({ value: '2027-02-29' }), a.dateFieldRead({ value: '2026-1-5' })], {});
   const hr = H.out || [];
   const hOk = !H.err && hr[0].ok === false && hr[0].bad === 'input' && hr[0].why === '날짜를 끝까지, 달력에 있는 날로 넣어 주세요' && hr[1].ok === false && hr[1].bad === 'cal' && hr[2].ok === false && hr[2].bad === 'year'
-    && hr[3].ok === true && hr[3].v === '' && hr[4].ok === true && hr[4].v === '2026-11-20' && hr[5].bad === 'year' && hr[6].bad === 'year' && hr[7].ok === true && hr[7].v === ''
+    && hr[3].ok === true && hr[3].v === '' && hr[4].ok === true && hr[4].v === '2026-11-20' && hr[5].bad === 'year' && hr[5].why === '연도는 네 자리로 넣어 주세요' && hr[6].ok === true && hr[6].v === '2999-12-31' && hr[7].ok === true && hr[7].v === ''
     && hr[8].ok === true && hr[9].bad === 'cal' && hr[10].bad === 'form';
-  T('C280 ① 날짜 칸 도우미 dateFieldRead(실행): badInput(값 빈 글자) = 틀린 입력 "날짜를 끝까지, 달력에 있는 날로 넣어 주세요" · 2026-02-31 = 달력 · 202612-02-01(숫자 8자 이어 치기) = 연도 · 1899·2100 = 연도 · 진짜 빈칸 = 빈 값(지움) · 정상·윤일 2028-02-29 = 그대로 · 2027-02-29 = 달력 · 2026-1-5 = 꼴 · 요소 없음 = 빈 값',
+  T('C280 ① 날짜 칸 도우미 dateFieldRead(실행): badInput(값 빈 글자) = 틀린 입력 "날짜를 끝까지, 달력에 있는 날로 넣어 주세요" · 2026-02-31 = 달력 · 202612-02-01(숫자 8자 이어 치기) = 연도 · 0999 = 연도("연도는 네 자리로 넣어 주세요") · 2999-12-31(먼 퇴사 예정) = 통과 · 진짜 빈칸 = 빈 값(지움) · 정상·윤일 2028-02-29 = 그대로 · 2027-02-29 = 달력 · 2026-1-5 = 꼴 · 요소 없음 = 빈 값',
     hOk, H.err || JSON.stringify(hr));
   // ② 자리마다(값 빈 글자 + badInput) — 저장 0 · 안내 · 창 그대로 / 결함 사본 = 저장됨
   const SAVE = /^(schedule\w*Save|save\w*Cache|gwCall|saveMyTasks|saveDocuments|setMyTodoDue|startProcess|cbxStart|cbxContractInto|vehDueFinish|scheduleContractSave)$/;
@@ -21179,7 +21179,7 @@ try {
     const de = mkEl('w1', { type: 'date', value: '', validity: { badInput: true }, attrs: { 'data-cs-wl': 'date' } }), ke = mkEl('w2', { type: 'number', value: '5', attrs: { 'data-cs-wl': 'kg' } });
     return { __c: { id: 'c1', work_log: [] }, __row: { querySelector: () => de, querySelectorAll: () => [de, ke] }, genId: () => 'w9' }; } }, (r) => r.store.__c.work_log.length === 0);
   // 내 할 일
-  add('내 할 일 기한 칸 change(bindTodoDueInputs → setMyTodoDue)', ['bindTodoDueInputs', 'setMyTodoDue'], (a, E, st) => { a.bindTodoDueInputs(st.__host); st.__inp.L.change({ stopPropagation() {} }); }, { stubs: (E, mkEl) => {
+  add('내 할 일 기한 칸 change·blur(bindTodoDueInputs → todoDueFrom → setMyTodoDue)', ['bindTodoDueInputs', 'todoDueFrom', 'setMyTodoDue'], (a, E, st) => { a.bindTodoDueInputs(st.__host); st.__inp.L.change({ stopPropagation() {} }); st.__inp.L.blur({}); }, { stubs: (E, mkEl) => {
     const inp = mkEl('td', { type: 'date', value: '', validity: { badInput: true }, attrs: { 'data-todo-due': 'td1' } }); return { __inp: inp, __host: { querySelectorAll: () => [inp] }, myTodos: [{ id: 'td1', due: '2026-12-15' }], isDate: (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) }; } }, (r) => r.store.myTodos[0].due === '2026-12-15');
   add('내 할 일 더하기 기한(addMyTodo)', ['addMyTodo'], callOf('addMyTodo'), { els: { myTodoInput: { value: 'x' }, myTodoDue: BAD }, stubs: () => ({ myTodoUnread: () => false, myTodos: [], isDate: (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) }) }, (r) => r.store.myTodos.length === 0 && r.E.myTodoInput.value === 'x');
   // 명세서 계산서 작성일
@@ -21241,6 +21241,37 @@ try {
     'famDate', 'eduDate', 'lvStart', 'rsDate', 'loaStart', 'lmDoneAt', 'lmFixTo', 'lmBaseDate', 'drNewD',   // 이미 막힘(isDate·lmDateWhy·빈 값 거절 — 안내 있음)
     'lvEnd', 'loaEnd', 'vehDueDate', 'dgDate', 'dgStartDate', 'dgEndDate'];   // 도우미 검사 뒤·앞에서 읽음(틀리면 도우미가 먼저 막음 — 서류출력은 generateDocs 들머리)
   const extra = rawRead.filter((id) => KEEP.indexOf(id) < 0);
+  // ⑤ 확인 반영(11/20): 키보드로 세 칸을 끝까지 지움 = 값 빈 글자 · badInput 거짓 · input·change 신호 없음(첫 칸 지울 때만 남) — 진짜 빈칸은 저장돼야 함 · 연도는 네 자리만
+  const tdRun = (seq, mut) => {
+    let saves = 0;
+    const r = run(['bindTodoDueInputs', 'todoDueFrom', 'setMyTodoDue'], (a, E, st) => { a.bindTodoDueInputs(st.__host); seq(st.__inp); }, { mut, stubs: (E, mkEl) => {
+      const inp = mkEl('td', { type: 'date', value: '', validity: { badInput: false }, attrs: { 'data-todo-due': 'td1' } });
+      return { __inp: inp, __host: { querySelectorAll: () => [inp] }, myTodos: [{ id: 'td1', due: '2026-12-15' }], saveMyTasks: () => { saves++; }, isDate: (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) }; } }, null);
+    return { saves, due: r.store.myTodos ? r.store.myTodos[0].due : '?', toast: r.alerts.length, err: r.err };
+  };
+  const ev = { stopPropagation() {} };
+  const clr = (inp) => { inp.value = ''; inp.validity = { badInput: false }; inp.L.blur(ev); };   // 끝까지 지움 — 신호 없이 칸을 떠남
+  const nw = (inp) => { inp.value = '2027-01-05'; inp.L.change(ev); inp.L.blur(ev); };   // 맞는 새 날짜 — change 뒤 blur
+  const typ = (inp) => { ['0002', '0020', '0202'].forEach((y) => { inp.value = y + '-01-05'; inp.L.change(ev); }); inp.value = '2028-01-05'; inp.L.change(ev); inp.L.blur(ev); };   // 연도를 치는 도중(범위 밖) → 끝값
+  const half = (inp) => { inp.value = ''; inp.validity = { badInput: true }; inp.L.change(ev); inp.L.blur(ev); };
+  const t1 = tdRun(clr), t2 = tdRun(nw), t3 = tdRun(typ), t4 = tdRun(half);
+  const tdOk = (x) => !x.err;
+  const k5 = tdOk(t1) && t1.saves === 1 && t1.due === '' && t1.toast === 0 && tdOk(t2) && t2.saves === 1 && t2.due === '2027-01-05' && tdOk(t3) && t3.saves === 1 && t3.due === '2028-01-05' && t3.toast === 0 && tdOk(t4) && t4.saves === 0 && t4.due === '2026-12-15' && t4.toast === 1;
+  const M1 = tdRun(clr, { bindTodoDueInputs: (s) => s.replace('todoDueFrom(inp, true); renderMyTodos();', 'renderMyTodos();') });   // 옛 blur(다시 그리기만) = 진짜 빈칸 저장 안 됨
+  const M2 = tdRun(nw, { todoDueFrom: (s) => s.replace('if (!t || String(t.due || "") === r.v) return;', 'if (!t) return;') });   // 같은 값 거름 걷음 = 두 번 보냄
+  const M3 = tdRun(typ, { todoDueFrom: (s) => s.replace('if (warn) gwToast(', 'gwToast(') });   // change에서도 안내 = 치는 도중 토스트
+  const tdDef = [M1.saves === 1 && M1.due === '', M2.saves === 1, M3.toast === 0];
+  // 넣기 박스 카드: 화면 칸을 끝까지 지우고 [시작] → 카드 값도 빈칸
+  const cbRun = (mut) => { const it = { id: 7, form: { d1: '2026-10-01', d2: '2026-10-05' } }; const r = run(['cbxDateWhy'], (a) => a.cbxDateWhy(it), { mut, qsa: (s, E, mkEl) => (s.indexOf('[data-cbx-f^="7|"]') === 0 ? [mkEl('c1', { type: 'date', value: '', validity: { badInput: false }, attrs: { 'data-cbx-f': '7|d1' } }), mkEl('c2', { type: 'date', value: '2026-10-09', attrs: { 'data-cbx-f': '7|d2' } })] : []) }, null); return { why: r.out, form: it.form, err: r.err }; };
+  const c1 = cbRun(), cM = cbRun({ cbxDateWhy: (s) => s.replace(' else if (it.form && k) it.form[k] = r.v;', '') });
+  const k5c = !c1.err && c1.why === '' && c1.form.d1 === '' && c1.form.d2 === '2026-10-09' && cM.form.d1 === '2026-10-01';
+  // 연도: 직원 퇴사 예정 2999-12-31 = 저장 요청 · 202612-02-01 = 막힘 / 결함 사본(옛 1900~2099)
+  const meY = (v, mutHelper) => { const els = meEls('meLeave'); els.meLeave = D(v); const r = run(['saveMemberEdit'], callOf('saveMemberEdit'), { els, stubs: meStub, mutHelper }, null); return r.calls.indexOf('gwCall') >= 0; };
+  const OLDY = (h) => h.replace('if (m[1].length !== 4 || y < 1000)', 'if (m[1].length !== 4 || y < 1900 || y > 2099)');
+  const k5y = meY('2999-12-31') === true && meY('202612-02-01') === false && meY('2026-12-31') === true;
+  const yDef = meY('2999-12-31', OLDY) === false;
+  T('C280 ⑤ 키보드로 끝까지 지움·연도(실행 — 확인 반영): 내 할 일 기한 칸 세 칸 다 지우고 떠남(값 빈 글자 · badInput 거짓 · change 없음) = blur에서 빈 값 저장 1번·안내 0 · 새 날짜 change 뒤 blur = 저장 1번(두 번 아님) · 연도 치는 도중(0002→0020→0202→2028) = 토스트 0·끝값 저장 1번 · 덜 채움 = 저장 0·blur 안내 1 · 넣기 박스 카드 칸 다 지움 = 카드 값 빈칸(맞는 칸은 화면 값) · 직원 퇴사 예정 2999-12-31 = 저장 요청 · 202612-02-01 = 막힘 · 결함 사본 5개(blur 저장 걷음·같은 값 거름 걷음·change 안내·카드 옮겨 적기 걷음·옛 1900~2099) = 모두 잡힘',
+    k5 && k5c && k5y && tdDef.every((x) => x === false) && cM.form.d1 === '2026-10-01' && yDef, JSON.stringify({ t1, t2, t3, t4, c1, k5y, tdDef, cMd1: cM.form.d1, yDef }));
   T('C280 ④ 남은 날짜 칸 `.value` 직접 읽기 = 전수 표의 저장 안 함·이미 막힘·검사 앞 읽기 자리뿐(새 저장 자리가 옛 꼴로 생기면 잡힘 — 표 밖 ' + extra.length + ')', extra.length === 0, '표 밖: ' + extra.join(', '));
 } catch (e) { console.log('  (C280 검사 생략 — ' + e.message + ')'); fails++; }
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');

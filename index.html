@@ -16196,7 +16196,7 @@
   // C280: 카드의 날짜 칸(계약일·착공·준공 — 고치기 펼침일 때만 화면에 있음) 가운데 틀린 입력 → "칸 이름 — 까닭" | ""
   function cbxDateWhy(it){
     var L = { d1: "계약일", d2: "착공일", d3: "준공일" }, out = "";
-    Array.prototype.forEach.call(document.querySelectorAll('[data-cbx-f^="' + it.id + '|"]'), function(el){ var k = String(el.getAttribute("data-cbx-f") || "").split("|")[1], r; if (out || el.type !== "date") return; r = dateFieldRead(el); if (!r.ok) out = (L[k] || "날짜") + " — " + r.why; });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-cbx-f^="' + it.id + '|"]'), function(el){ var k = String(el.getAttribute("data-cbx-f") || "").split("|")[1], r; if (out || el.type !== "date") return; r = dateFieldRead(el); if (!r.ok) out = (L[k] || "날짜") + " — " + r.why; else if (it.form && k) it.form[k] = r.v; });   // C280 확인 반영: 맞는 값(키보드로 다 지운 진짜 빈칸 포함)은 카드 값에 옮겨 적음 — 끝까지 지울 때는 input이 나지 않아 판독 날짜가 남았음
     return out;
   }
   function cbxAct(it, act){
@@ -28150,12 +28150,21 @@
       '<div class="task-ctrl">' + badge + dueIn + '<button class="del-x" data-todo-del="' + t.id + '">×</button></div></div>';
   }
   // 인라인 날짜칸 배선(내 업무 탭·직원 홈 공용) — change만 듣는다(v283 교훈: iOS 날짜 휠은 input을 안 쏜다, 재렌더로 포커스 유실 방지)
+  function todoDueFrom(inp, warn){   // C280 내 할 일 기한 칸 → 저장(맞는 값이고 저장된 기한과 다를 때만) · warn = 틀린 입력이면 안내(blur에서만)
+    var r = dateFieldRead(inp), id = inp.getAttribute("data-todo-due"), t = null, i;
+    if (!r.ok){ if (warn) gwToast("기한 — " + r.why + " (저장하지 않았습니다)", true); return; }
+    for (i = 0; i < myTodos.length; i++){ if (myTodos[i].id === id){ t = myTodos[i]; break; } }
+    if (!t || String(t.due || "") === r.v) return;
+    setMyTodoDue(id, r.v, true);
+  }
   function bindTodoDueInputs(host){
     Array.prototype.forEach.call(host.querySelectorAll("[data-todo-due]"), function(inp){
       inp.addEventListener("click", function(e){ e.stopPropagation(); });
       // change=저장만(재렌더로 피커·포커스가 날아가지 않게), blur=재렌더(배지·정렬 반영) — v310
-      inp.addEventListener("change", function(e){ e.stopPropagation(); var r = dateFieldRead(inp); if (!r.ok){ gwToast("기한 — " + r.why + " (저장하지 않았습니다)", true); return; } setMyTodoDue(inp.getAttribute("data-todo-due"), r.v, true); });   // C280: 틀린 입력(칸 한 자리만 지움·없는 날)은 저장 요청 없이 안내만 — 종전엔 '비움'으로 읽혀 기한이 바로 지워짐(칸을 떠나면 blur 다시 그리기가 저장된 기한을 다시 보임)
-      inp.addEventListener("blur", function(){ renderMyTodos(); });
+      // C280: 칸은 도우미로 읽음 — change = 맞는 값일 때만 저장(틀린 입력·연도를 치는 도중은 조용히 넘김) · blur = 다시 읽어 맞는 값(키보드로 다 지운 진짜 빈칸 포함 — 이때는 change가 안 남)이 저장된 기한과 다르면 저장, 틀린 입력이면 안내만(요청 0 — 다시 그리기가 저장된 기한을 다시 보임)
+      //   저장은 todoDueFrom 한 곳(저장된 기한과 같으면 보내지 않음 — change 뒤 blur가 같은 값을 두 번 보내지 않게)
+      inp.addEventListener("change", function(e){ e.stopPropagation(); todoDueFrom(inp, false); });
+      inp.addEventListener("blur", function(){ todoDueFrom(inp, true); renderMyTodos(); });
     });
   }
   function renderMyTodos(){
@@ -29402,7 +29411,7 @@
   function isDate(v){ return typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v); }
   // @date-field-start — C280(11/20 「원천」): 날짜 칸(type="date") 읽기 도우미 한 곳. 요소 → { ok:true, v } | { ok:false, why, bad }.
   //   브라우저는 덜 채운 날짜·달력에 없는 날(2026-02-31)을 value 빈 글자 + validity.badInput 참으로 준다 — 종전 `.value || ""`는 이것을 '비움'으로 읽어 기존 날짜를 안내 없이 지웠다.
-  //   숫자 8자를 구분 없이 이어 치면 연 칸이 6자리를 받아 '202612-02-01' 같은 값이 생긴다 — 꼴(YYYY-MM-DD)·연도 1900~2099·달력 왕복으로 거른다.
+  //   숫자 8자를 구분 없이 이어 치면 연 칸이 6자리를 받아 '202612-02-01' 같은 값이 생긴다 — 꼴(YYYY-MM-DD)·연도 네 자리(1000~9999)·달력 왕복으로 거른다.
   //   진짜 빈칸(badInput 거짓 · 값 빈 글자)만 빈 값(지움) 그대로. bad: "input"(덜 채움·없는 날 — 값 빈 글자) · "form"(꼴) · "year"(연도 범위) · "cal"(달력)
   var DATE_FIELD_WHY = "날짜를 끝까지, 달력에 있는 날로 넣어 주세요";
   function dateFieldRead(el){
@@ -29413,7 +29422,7 @@
     m = /^(\d+)-(\d{2})-(\d{2})$/.exec(s);
     if (!m) return { ok: false, why: DATE_FIELD_WHY, bad: "form" };
     y = Number(m[1]); mo = Number(m[2]); d = Number(m[3]);
-    if (m[1].length !== 4 || y < 1900 || y > 2099) return { ok: false, why: "연도는 네 자리(1900~2099)로 넣어 주세요", bad: "year" };
+    if (m[1].length !== 4 || y < 1000) return { ok: false, why: "연도는 네 자리로 넣어 주세요", bad: "year" };   // C280 확인 반영: 범위는 '네 자리'(1000~9999)만 — 퇴사 예정 2999-12-31 같은 먼 날짜는 받음(서버도 받음)
     t = new Date(Date.UTC(y, mo - 1, d));
     if (t.getUTCFullYear() !== y || t.getUTCMonth() !== mo - 1 || t.getUTCDate() !== d) return { ok: false, why: DATE_FIELD_WHY, bad: "cal" };
     return { ok: true, v: s };
