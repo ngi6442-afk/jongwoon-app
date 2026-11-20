@@ -1660,3 +1660,10 @@
 - [x] (AI 시험 화면 대상) 시험 서버 PM 콘솔 급여 요율 줄(까닭 글에 지문 앞 8자) [ㄱ] → 저장값 `settings:pay` bg_sha = 올라온 판 지문 · 같은 이름으로 내용이 바뀐 판에서는 승격되지 않음(서버 409) · 꼴이 틀린 표를 올리면 '불러오지 못함' 줄 · 꼭 읽는 값이 빠진 옛 표는 [ㄱ]이 막힘 — ✓ AI 11/20
 - [x] (AI) `paycalc_check` 10건(182.5시간 연장수당 ≥ 법정 최소 · 2,000,999 → 국민연금 95,000 · 끝수 단위 · 결함 사본 74) · `servertest` '66 판1' 5건(결함 사본 24) · `uismoke` '66 판1' 3건(결함 사본 12) — ✓ AI 11/20
 - [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` · `paycalc_check` 통과 · v510 문서 검사를 이 판 이상으로 풀고 v511 문서·판 번호 정확 검사 — ✓ AI 11/20
+
+## v512 — C243: 사용 안내 전수 대조 반영 — MANUAL.html만(앱 화면·동작 무변)
+- [ ] (AI 운영 확인 — C243) 운영 MANUAL.html이 이 판 글로 열림 — 1절 넓은 모니터 문단에 '월말명세서'·'안전 › 체크'·칸 폭 끌기 문장, 7절 '계약 수행 권한이 있는 분이 끝나지 않은 계약을 펼치면'
+- [ ] (AI 운영 확인 — C243) 목차 링크 전부 제자리로 이동(앵커 바뀐 것 0) · 절 제목 그대로
+- [ ] (AI 운영 확인 — C243) 이 판에만 있는 글귀가 한 번씩 — 16절 '만기 다음 날부터' · 5절 '규칙 불명' · 19절 '직원 홈에서는' · 21절 '우선기기 1대에 갑니다' · 물어보기 절 주의는 '내게 온 지시는 홈과 내 업무 탭에서 확인하세요' 그대로
+- [x] (AI) `uismoke` 전 항목 통과(MANUAL 문장을 글자째 붙든 검사 포함) · MANUAL.html 태그 짝 오류 0 · 목차 링크 70 깨짐 0 · CR 0 · 이 판 구현 diff가 MANUAL.html 한 파일 — ✓ AI 11/20
+- [x] (AI) `uismoke` · `servertest` · `autorulestest` · `paycalc_check` 전부 통과 + node --check(함수·_lib·sw) + 앱 스크립트 전체 파싱 오류 0 · v511 문서 검사를 이 판 이상으로 풀고 v512 문서·판 번호 정확 검사 — 숫자는 커밋 메시지
