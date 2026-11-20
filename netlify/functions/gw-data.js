@@ -1981,6 +1981,8 @@ async function handlePushPrimary(event, d, R) {
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   return jr(200, { status: 'OK', primary: curPrimary(), request_id: R });
 }
+// C185 판3: 회원 레코드 하나로 '지금 재직 관리자인가'(명부 전체를 못 읽은 회차의 승인권자 판정용 · 못 읽음 = 아님)
+async function memberAdminNow(id) { try { const r = await blobGet(store(USERS), 'member:' + String(id)); return !!(r.ok && r.data && r.data.admin === true && r.data.del !== 1 && !tier.retired(r.data)); } catch (e) { return false; } }
 async function handlePushSend(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
@@ -2004,8 +2006,10 @@ async function handlePushSend(event, d, R) {
       if (nfP && nfP.events.task_review === 'issuer_approver' && /^task-rv-/.test(tagP)) {
         const atP = await assignRead(store(DATA));
         let hrKeep = false;   // C185 판2 재확인 1: 승인권자가 관리자가 아니고 그 지시가 입·퇴사 지시(hr:·acct:)면 관리자 전원 그대로(지시 문서를 못 읽으면 관리자 전원 쪽) · 승인권자가 관리자·빈칸이면 종전 글자째
-        if (atP.approver_id && tc.adminIds.indexOf(atP.approver_id) < 0) { try { const trP = await blobGet(store(DATA), colKey('tasks')); const tdP = (trP.ok && trP.data && Array.isArray(trP.data.items)) ? trP.data.items : null; const tP = tdP ? tdP.find(function (x) { return x && x.id === tagP.slice(8); }) : null; hrKeep = !tdP || !!(tP && /^(?:hr|acct):/.test(String(tP.auto_key || ''))); } catch (e) { hrKeep = true; } }
+        const apvAdmP = !!atP.approver_id && (tc.unavailable ? await memberAdminNow(atP.approver_id) : tc.adminIds.indexOf(atP.approver_id) >= 0);   // C185 판3: 명부를 못 읽은 회차 = 승인권자 회원 레코드로 관리자 판정(명부 일부로 '관리자 아님'이라 보지 않음)
+        if (atP.approver_id && !apvAdmP) { try { const trP = await blobGet(store(DATA), colKey('tasks')); const tdP = (trP.ok && trP.data && Array.isArray(trP.data.items)) ? trP.data.items : null; const tP = tdP ? tdP.find(function (x) { return x && x.id === tagP.slice(8); }) : null; hrKeep = !tdP || !!(tP && /^(?:hr|acct):/.test(String(tP.auto_key || ''))); } catch (e) { hrKeep = true; } }
         if (atP.approver_id && atP.approver_id !== c.member.id && !hrKeep) ids = [atP.approver_id];
+        if (hrKeep && !ids.length && tc.unavailable) return jr(503, { status: 'ERROR', error_code: 'MEMBERS_UNAVAILABLE', request_id: R });   // C185 판3: 입·퇴사 지시를 관리자에게 보내야 하는데 명부를 못 읽어 0명 = 조용히 0발 대신 실패로
       }
     }
     else ids = [to];
@@ -3221,6 +3225,9 @@ async function handleAutotaskRevert(event, d, R) {
   if (d.base !== undefined && Number(d.base) !== Number(a.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'AUTOTASK_STALE', request_id: R });
   const rules = autotaskDefaults(); Object.keys(a.prev.rules).forEach(function (k) { if (autotaskValid(k, a.prev.rules[k])) rules[k] = a.prev.rules[k]; });
   Object.keys(rules).forEach(function (rk) { if (rules[rk] === 'live' && !autotaskReady(rk)) rules[rk] = 'dry'; });   // C185 판2(ⓙ 8): 직전 판에 준비 안 된 규칙의 live가 있으면 그 규칙만 연습으로 낮춰 진행(종전 400 대신)   // C185 판1 — 준비 안 된 규칙을 되돌림으로 켜지 않음
+  // C185 판3(판2 검토에서 넘어옴): 되돌린 결과 live인 규칙 가운데 배정표 줄을 쓰는 규칙(입·퇴사)은 켜기와 같은 가드 — 쓰는 줄 담당이 하나라도 빈칸·재직자 아님·못 읽음이면 400 ASSIGN_NEEDED(스위치 그대로)
+  const liveUses = Object.keys(rules).filter(function (rk) { return rules[rk] === 'live' && ((AUTOTASK_SRV_RULES[rk] || {}).uses || []).length; });
+  if (liveUses.length) { const asR = await autotaskAssignState(st, liveUses); if (Object.keys(asR).some(function (pf) { return asR[pf] !== 'ok'; })) return jr(400, { status: 'REJECTED', error_code: 'ASSIGN_NEEDED', request_id: R }); }
   // C185 판1 켠 시각: 되돌린 결과 새로 live가 된 규칙 = 지금 시각 · 그대로 live인 규칙 = 지금 값 · 나머지 = 없음
   const now0 = Date.now(), since = {};
   Object.keys(rules).forEach(function (k) { if (rules[k] !== 'live') return; if (a.rules[k] !== 'live') since[k] = now0; else if (a.since && a.since[k]) since[k] = a.since[k]; });
@@ -5418,6 +5425,11 @@ async function backupRestorePlan(sn, key, cls, cur, data, preview) {
       });
       if (has(prev, 'leave_date')) { if (JSON.stringify(prev.leave_date) !== JSON.stringify(payload.leave_date)) kept.push('leave_date'); payload.leave_date = prev.leave_date; }
       else if (has(payload, 'leave_date') && tier.retired({ leave_date: payload.leave_date })) { kept.push('leave_date'); delete payload.leave_date; }   // 지난 퇴사일은 받지 않음
+      // C185 판3(검토 16): 퇴사 표식 leave_ev는 퇴사일과 같은 쪽 값 — 지금 퇴사일을 지키면 지금 표식(없으면 없게) · 백업 퇴사일을 받으면 백업 표식 · 지난 퇴사일을 버렸거나 퇴사일이 없으면 표식도 없음 · 재입사 표식 join_ev는 지금 값이 있으면 지금 값
+      const evKeep = function (f, v) { if (JSON.stringify(prev[f]) !== JSON.stringify(payload[f])) kept.push(f); if (v) payload[f] = prev[f]; else delete payload[f]; };
+      if (has(prev, 'leave_date')) evKeep('leave_ev', own(prev, 'leave_ev'));
+      else if (!has(payload, 'leave_date') && own(payload, 'leave_ev')) { kept.push('leave_ev'); delete payload.leave_ev; }
+      if (has(prev, 'join_ev')) evKeep('join_ev', true);
       if (prev.del === 1) { if (payload.del !== 1) delete payload.del; }   // 해제만 받음
       else { if (own(payload, 'del') && JSON.stringify(payload.del) !== JSON.stringify(prev.del)) kept.push('del'); if (own(prev, 'del')) payload.del = prev.del; else delete payload.del; }
       const idNow = has(prev, 'id') ? prev.id : key.slice('member:'.length);

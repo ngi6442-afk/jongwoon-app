@@ -241,4 +241,55 @@ function planHrJoin(input, ctx) {
 }
 RULES.hr_join.plan = planHrJoin;
 
-module.exports = { KEY_RE, isEvKey, isEvLike, ruleOfKey, subjOf, RULES, RULE_IDS, BASE_NEEDS, CAP, DRY_WIN, ready, needsOf, kstDay, ctxFor, emptySum, skipSum, notReadySum, MARK, MARK_WHY, markedKind, markTask, unmarkTask, run, botSum, TITLE_MAX, PLAN_TITLE_MAX, PLAN_DETAIL_MAX, HR_JOIN_ITEMS, hrJoinKey, planHrJoin };
+// ---- C185 판3 ② 퇴사(hr_leave) — 계획 함수(착수계획 ⓒ ② · 판3 행) ----
+//   사건 = 삭제·시험 계정·지입차주가 아닌 회원 ∧ 퇴사일이 달력 날짜 ∧ 퇴사 표식 leave_ev.at0 ≥ 켠 시각(표식 = gw-auth 회원 저장이 퇴사일 빈칸 → 날짜 때 찍음) ∧ 퇴사일 ≥ 켠 날(KST)
+//   표식이 없는 옛 퇴사자·켜기 전 표식 = 사건 아님(소급 없음) · 퇴사일이 켠 날보다 앞 = 사건 아님(요약 old) · 미래 퇴사일(사직 승인의 희망일)도 저장한 뒤 첫 실행에 사건
+//   지시 = 아래 항목 표 한 줄에 하나(인사 6 + 계정 1) · 키에 회원 id·퇴사일·번호 · 글에 이름 없음(대상은 관리자 화면의 [인사 카드]) · 끼워 넣는 값 = 퇴사일(MM/DD)뿐 · 공개 범위 = 담당만
+//   기한 = 인사 근거 승격일 때만(짝 근거 행이 모두 승격본에 있고 calc 참 · 사규 항목은 퇴사일 그대로) · 퇴사일을 고치면 새 키로 7항 + 옛 날짜 열린 지시에 '날짜 바뀜' 표시 · 지우면 표시만 · 같은 날짜를 다시 넣으면 표시가 떨어짐
+//   항목을 더하거나 빼는 일 = HR_LEAVE_ITEMS 한 줄 + servertest 'C185 판3' 표본
+const HR_LEAVE_ITEMS = [   // no(키 번호 — 바꾸지 말 것) · pre(키 접두어 = 배정표 줄) · t(제목 꼬리) · due(day0 = 퇴사일 · day14 = 퇴사일 + 14일 · '' = 기한 없음) · rows(짝 인사 근거 행 id — 빈 배열 = 사규 기준) · d(본문)
+  { no: 1, pre: 'hr:', t: '사직서 접수·계약 종료 확인', due: 'day0', rows: [], d: '사직서를 접수하거나 계약 종료를 확인합니다.' },
+  { no: 2, pre: 'hr:', t: '자료·장비·열쇠·차량 반환', due: 'day0', rows: [], d: '업무 자료·장비·열쇠·차량을 돌려받습니다.' },
+  { no: 3, pre: 'hr:', t: '개인 기기·계정 자료 삭제 확인', due: 'day0', rows: [], d: '개인 기기에 남은 회사 자료와 업무 계정 자료가 지워졌는지 확인합니다.' },
+  { no: 4, pre: 'acct:', t: '계정 회수 확인·대장 갱신', due: '', rows: [], d: '그룹웨어 계정·기기 회수를 확인하고 계정 관리대장을 고칩니다. 퇴사 다음 날 아침 자동 회수 기록이 생기면 승인 대기로 올라갑니다.' },
+  { no: 5, pre: 'hr:', t: '4대보험 상실 신고', due: 'day14', rows: ['law.nhi.10-2'], d: '건강보험은 퇴사일부터 14일 안, 고용보험·국민연금은 다음 달 15일까지 신고합니다(기한은 빠른 쪽). 신고한 날 [완료]를 눌러 주세요.' },
+  { no: 6, pre: 'hr:', t: '임금·연차수당 정산', due: 'day14', rows: ['law.lsa.36', 'law.rba.9-1'], d: '임금·연차수당 등 금품을 정산합니다. 처리한 날 [완료]를 눌러 주세요.' },
+  { no: 7, pre: 'hr:', t: '인사 기록 정리·보존', due: '', rows: [], d: '인사 기록을 정리해 보존합니다.' },
+];
+function hrLeaveKey(mid, ld, it) { return it.pre === 'acct:' ? 'acct:' + mid + ':leave:' + ld : 'hr:' + mid + ':leave:' + ld + ':' + it.no; }
+function planHrLeave(input, ctx) {
+  const ms = Array.isArray(input.members) ? input.members : [];
+  const hb = input.hrbg || null, bgOn = !!(hb && hb.on === true && hb.bg && Array.isArray(hb.bg.rows));
+  const rowOk = {};
+  if (bgOn) hb.bg.rows.forEach(function (r) { if (r && typeof r.id === 'string' && r.calc === true) rowOk[r.id] = 1; });
+  const out = { events: [], subjects: {}, old: 0, no_row: [], ref: { new: 0, no_date: 0, jiip: 0, test: 0, del: 0, rejoin_mark: 0, past12_leave: 0, bg_off: bgOn ? 0 : 1 } };
+  const noRow = {}, today = ctx.today, y1 = addDaysK(today, -365);
+  ms.forEach(function (m) {
+    if (!m || typeof m.id !== 'string' || !m.id) return;
+    const ld = String(m.leave_date || ''), ldOk = realDate(ld);
+    if (m.del !== 1) out.subjects[m.id] = ldOk ? HR_LEAVE_ITEMS.map(function (it) { return hrLeaveKey(m.id, ld, it); }) : [];
+    if (m.del !== 1 && !m.test_acct && m.emp_type !== '지입차주' && ldOk && ld >= y1 && ld <= today) out.ref.past12_leave++;   // 참고: 지난 12개월 퇴사(표식 없는 옛 퇴사자 포함 — 소급 없음)
+    if (m.del !== 1 && m.join_ev && Number(m.join_ev.at0) >= ctx.since) out.ref.rejoin_mark++;   // 재입사 표식(입사 규칙 쪽에서 셈)
+    if (!(m.leave_ev && Number(m.leave_ev.at0) >= ctx.since)) return;
+    out.ref.new++;
+    const skipK = m.del === 1 ? 'del' : (m.test_acct ? 'test' : (m.emp_type === '지입차주' ? 'jiip' : ''));   // 삭제·시험 계정·지입차주 = 사건 아님(수만)
+    if (skipK) { out.ref[skipK]++; return; }
+    if (!ldOk) { out.ref.no_date++; return; }
+    if (ld < ctx.since_day) { out.old++; return; }   // 퇴사일이 켠 날보다 앞(옛 퇴사자의 퇴사일을 비웠다 다시 넣음 등) — 소급 없음
+    const md = ld.slice(5).replace('-', '/'), n = HR_LEAVE_ITEMS.length;
+    out.events.push({ subj: m.id, tasks: HR_LEAVE_ITEMS.map(function (it) {
+      let due = '';
+      if (bgOn && it.due) {
+        const miss = it.rows.filter(function (r) { return !rowOk[r]; });
+        if (miss.length) miss.forEach(function (r) { noRow[r] = 1; });
+        else due = it.due === 'day14' ? addDaysK(ld, 14) : ld;
+      }
+      return { key: hrLeaveKey(m.id, ld, it), title: '퇴사(' + md + ') ' + it.no + '/' + n + ' ' + it.t, detail: (it.d + HR_JOIN_TAIL).trim(), due: due, priv: true, vals: [md] };
+    }) });
+  });
+  out.no_row = Object.keys(noRow);
+  return out;
+}
+RULES.hr_leave.plan = planHrLeave;
+
+module.exports = { KEY_RE, isEvKey, isEvLike, ruleOfKey, subjOf, RULES, RULE_IDS, BASE_NEEDS, CAP, DRY_WIN, ready, needsOf, kstDay, ctxFor, emptySum, skipSum, notReadySum, MARK, MARK_WHY, markedKind, markTask, unmarkTask, run, botSum, TITLE_MAX, PLAN_TITLE_MAX, PLAN_DETAIL_MAX, HR_JOIN_ITEMS, hrJoinKey, planHrJoin, HR_LEAVE_ITEMS, hrLeaveKey, planHrLeave };

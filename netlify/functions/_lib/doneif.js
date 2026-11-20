@@ -158,11 +158,22 @@ function signalFor(task, recs) {
 
 // C185 판2 계정 신호 — recs.__rows.devices = gw_users device:* 레코드 배열(크론이 매 시 첫 회차에만 읽음) · null = 못 읽음/안 읽음 = 신호 없음 · 퇴사(leave) 회수 신호는 판3
 function acctSignal(k, recs) {
+  if (k.kind === 'leave') return acctLeaveSignal(k, recs);   // C185 판3
   if (k.kind !== 'join') return { ok: false, why: 'manual' };
   const devs = recs && recs.__rows ? recs.__rows.devices : null;
   if (!Array.isArray(devs)) return { ok: false, why: 'no_rows' };
   const n = devs.filter(function (d) { return d && d.member_id === k.id && d.status === 'approved'; }).length;
   return n >= 1 ? { ok: true, why: 'acct.device ' + n } : { ok: false, why: 'acct.device 0' };
+}
+// C185 판3 계정 회수 신호 — recs.__rows.devstate = 회원 저장소의 자동 회수 기록 문서(퇴사 다음 날 07시 기기·구독 회수 · 크론이 열린 퇴사 계정 지시가 있을 때 읽음 · 못 읽음 = null = 신호 없음)
+//   신호 = 그 회원의 회수 표식 tag가 'leave:<지시 키의 퇴사일>' ∧ 못 돌린 기기(left)·못 지운 구독(subs_left) 없음 → 승인 대기 · 표식이 다른 퇴사일·없음·남은 것 있음 = 신호 없음
+function acctLeaveSignal(k, recs) {
+  const ds = recs && recs.__rows ? recs.__rows.devstate : null;
+  if (!ds || typeof ds !== 'object' || Array.isArray(ds)) return { ok: false, why: 'no_rows' };
+  const r = ds.rev && typeof ds.rev === 'object' ? ds.rev[k.id] : null;
+  if (!r || typeof r !== 'object' || r.tag !== 'leave:' + k.due) return { ok: false, why: 'acct.rev none' };
+  if ((Array.isArray(r.left) && r.left.length) || r.subs_left) return { ok: false, why: 'acct.rev left' };
+  return { ok: true, why: 'acct.rev ' + k.due };
 }
 // 전환 계획: 자격 있는 자동 지시 중 신호가 켜진 것
 function plan(tasks, recs) {

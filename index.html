@@ -34751,6 +34751,8 @@ function dutyStage(nx){
     if (Number(rf.no_hire)) p.push("입사일이 비어 아직 세지 않은 " + Number(rf.no_hire) + "명");
     if (Number(rf.bg_off)) p.push("인사 근거 승격 전이라 기한 없이");
     if (rf.past12 !== undefined) p.push("참고: 지난 12개월 입사 " + (Number(rf.past12) || 0) + "명(켠 뒤 일만 — 소급 없음)");
+    if (Number(rf.rejoin_mark)) p.push("재입사 표식이 찍힌 " + Number(rf.rejoin_mark) + "명(입사 쪽에서 셈)");   // C185 판3 퇴사 규칙 참고 수
+    if (rf.past12_leave !== undefined) p.push("참고: 지난 12개월 퇴사 " + (Number(rf.past12_leave) || 0) + "명(퇴사일을 새로 저장한 일만 셈 — 표식 없는 옛 퇴사자 소급 없음)");
     return p.join(" · ") + ".";
   }
   // '켤까요?' 줄 — 검토 G: [ㄱ]은 누르는 즉시 켬(예고는 사람이 먼저) · 만들 지시 0건인데 담당이 없어 못 만드는 것만 있으면 [ㄱ]을 닫고 배정표 담당부터

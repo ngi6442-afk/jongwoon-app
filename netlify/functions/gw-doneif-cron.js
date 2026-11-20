@@ -36,6 +36,12 @@ async function run(st, nowMs) {
         } catch (e) { devs = null; }
       }
       recs.__rows.devices = devs;
+      // C185 판3 계정 회수 신호: 열린 퇴사 계정 지시(acct:<회원>:leave:<퇴사일>)가 있으면 자동 회수 기록(gw_users devauto:state) 하나를 읽음 — 매 회차(한 번 읽기) · 못 읽음·깨진 꼴 = null(신호 없음)
+      if (tdoc.items.some(function (t) { if (!D.eligible(t)) return false; const pk = D.parseKey(t.auto_key); return !!pk && pk.dom === 'acct' && pk.kind === 'leave'; })) {
+        let ds = null;
+        try { const r = await blobGet(store(USERS), 'devauto:state'); ds = (r && r.ok && r.data && typeof r.data === 'object' && !Array.isArray(r.data)) ? r.data : null; } catch (e) { ds = null; }
+        recs.__rows.devstate = ds;
+      }
       continue;
     }
     if (col === 'proof') {   // P1 판19 증명서 신호: 열린 증명서 지시가 있을 때만 증빙 보관함 색인 하나를 읽는다(파일 본문 안 읽음). 읽기 실패·없음·깨진 꼴 = null(신호 없음)
@@ -82,7 +88,10 @@ async function run(st, nowMs) {
       const to = apv ? [apv] : ((tc && tc.adminIds) || []);
       // C185 판2 검토 9: 승인권자가 관리자가 아니면 입·퇴사 지시(hr:·acct: — 담당·관리자만 보는 지시)는 그 사람 알림에서 뺌(입사 날짜가 든 제목이 지시를 볼 수 없는 사람에게 가지 않게)
       const hrId = {}; tdoc.items.forEach(function (t) { if (t && /^(?:hr|acct):/.test(String(t.auto_key || ''))) hrId[t.id] = 1; });
-      const cands = (apv && (((tc && tc.adminIds) || []).indexOf(apv) < 0)) ? p.candidates.filter(function (x) { return !hrId[x.id]; }) : p.candidates;
+      // C185 판3: 명부를 못 읽은 회차(tierCtx unavailable)는 명부 일부로 '관리자 아님'이라 보지 않고 승인권자 회원 레코드로 판정(못 읽음 = 아님 → 입·퇴사는 관리자 쪽)
+      let apvAdm = !!apv && (((tc && tc.adminIds) || []).indexOf(apv) >= 0);
+      if (apv && tc && tc.unavailable) { try { const mr = await blobGet(store(USERS), 'member:' + apv); apvAdm = !!(mr.ok && mr.data && mr.data.admin === true && mr.data.del !== 1 && !(mr.data.leave_date && String(mr.data.leave_date) < today)); } catch (e) { apvAdm = false; } }
+      const cands = (apv && !apvAdm) ? p.candidates.filter(function (x) { return !hrId[x.id]; }) : p.candidates;
       if (to.length && cands.length) {
         const body = cands.slice(0, 3).map(function (c) { return c.title.slice(0, 28); }).join(' · ') + (cands.length > 3 ? ' 외 ' + (cands.length - 3) + '건' : '') + ' — 지시함 [오늘 승인 일괄]';
         await push.sendTo(to, { title: '승인 대기 ' + (cands === p.candidates ? last.moved : cands.length) + '건(앱 기준)', body: body.slice(0, 200), url: './', tag: 'task-appbase-' + today }, { ctx: tc, primaryOnly: true, by: '앱 기준' });
@@ -96,6 +105,7 @@ async function run(st, nowMs) {
         await push.sendTo(adm, { title: '승인 대기 ' + hrC.length + '건(앱 기준 · 입·퇴사)', body: bodyH.slice(0, 200), url: './', tag: 'task-appbase-hr-' + today }, { ctx: tc, primaryOnly: true, by: '앱 기준' });
         last.notified += adm.length;
       }
+      if (hrC.length && !adm.length) last.notify_fail = 'MEMBERS_UNAVAILABLE';   // C185 판3: 관리자에게 보낼 입·퇴사 승인 대기가 있는데 받을 관리자 0명 = 조용히 0발 대신 기록(it:doneif:last)
     } catch (e) {}
   }
   try { await blobSet(st, D.DONEIF_LAST, last); } catch (e) {}

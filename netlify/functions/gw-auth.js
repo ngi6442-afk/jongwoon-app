@@ -415,6 +415,14 @@ async function handleMemberUpsert(st, event, d, R) {
   if (d.annual_basis !== undefined) m.annual_basis = (d.annual_basis === 'fiscal' ? 'fiscal' : 'hire');
   if (d.loa_days !== undefined) m.loa_days = isNaN(Number(d.loa_days)) ? 0 : Number(d.loa_days);
   if (d.leave_date !== undefined) m.leave_date = String(d.leave_date || '');
+  // C185 판3(착수계획 ⓒ ② · ⓔ): 퇴사 표식 leave_ev = 퇴사일이 빈칸 → 날짜로 바뀐 저장(새 회원을 퇴사일과 함께 등록 포함)에 { at0: 지금 } · 날짜 → 다른 날짜 = 그대로 · 날짜 → 빈칸 = 지움
+  //   재입사 표식 join_ev = 퇴사 상태(tier.retired)였던 회원이 이 저장 뒤 퇴사 상태가 아니게 된 때 { at0: 지금 } · 앱이 보낸 같은 이름 칸은 쓰지 않음(아래 둘만 쓰는 곳) · 서버 자동 지시 실행기만 읽음
+  {
+    const ldB = String((before && before.leave_date) || ''), ldA = String(m.leave_date || ''), evNow = Date.now();
+    if (!ldB && ldA) m.leave_ev = { at0: evNow };
+    else if (ldB && !ldA) delete m.leave_ev;
+    if (before && tier.retired(before) && !tier.retired(m)) m.join_ev = { at0: evNow };
+  }
   if (d.annual_paid !== undefined) m.annual_paid = !!d.annual_paid;
   if (d.annual_base !== undefined) { m.annual_base = (d.annual_base === null || isNaN(Number(d.annual_base))) ? null : Number(d.annual_base); }
   if (d.annual_base_date !== undefined) m.annual_base_date = String(d.annual_base_date || '');

@@ -21324,5 +21324,57 @@ try {
     r522.ok && M522.every((v) => v === false), JSON.stringify({ r: r522.info, mut: M522 }));
 } catch (e) { console.log('  (v522 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ---- C185 판3 ② 퇴사 — 화면(실행): 켜기 거절 ASSIGN_NEEDED 알림 두 길(콘솔 [ㄱ] pmconAct · 카드 단추 evrCardSet — 판2 검토에서 넘어온 실행 시험) · 퇴사 요약 참고 수 글
+try {
+  const fnL3 = (name, src) => { src = src || html; const i = src.indexOf('function ' + name + '('); if (i < 0 || src.indexOf('function ' + name + '(', i + 1) >= 0) throw new Error('함수 없음·둘: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('함수 끝 없음: ' + name); };
+  const stL3 = (re, src) => { const m = (src || html).match(re); if (!m) throw new Error('문장 없음: ' + re); return m[0]; };
+  const ASSIGN_TXT = '배정표 담당을 먼저 정해 주세요 — 이 규칙이 쓰는 배정표 줄의 담당이 비었거나 재직자가 아닙니다.';
+  const boxA3 = (src) => new Function('RES', [
+    'var pmconBusy = false, evrCardBusy = false, pmconState = { canWrite: true, base: 555, byId: {} }, calls = [], toasts = [], renders = 0;',
+    'var PMCON_CHOICE_TXT = { ok: "적용" };',
+    'function confirm(){ return true; } function prompt(){ return ""; } function alert(m){ toasts.push("alert:" + m); } function apprToastShow(m){ toasts.push(m); } function renderPmcon(){ renders++; }',
+    'function gwCall(fn, b){ calls.push(b); return Promise.resolve(RES); }',
+    fnL3('pmconAct', src), fnL3('evrCardSet', src),
+    'return { act: pmconAct, set: evrCardSet, st: pmconState, calls: calls, toasts: toasts, renders: function(){ return renders; } };'].join('\n'));
+  const chkA3 = async (src) => {
+    const o = {}, tick = () => new Promise((r) => setTimeout(r, 0));
+    const ROW = { id: 'autotask:hr_leave:live', kind: 'autotask', grade: 'R1', q: '퇴사 체크리스트 지시 — 켤까요?', recTxt: '켬(실제 발행)', args: { rule: 'hr_leave', mode: 'live' }, setBase: 44, k: { revert: '연습으로' } };
+    const B = { meta_srv: { hr_leave: { label: '퇴사 체크리스트 지시', ready: true, uses: ['hr:', 'acct:'] } }, updated_at: 44 };
+    const a = boxA3(src)({ status: 400, body: { error_code: 'ASSIGN_NEEDED' } }); a.st.byId[ROW.id] = ROW; a.act('ok', ROW.id); await tick();
+    o.console = a.calls.length === 1 && a.calls[0].kind === 'autotask' && JSON.stringify(a.calls[0].args) === '{"rule":"hr_leave","mode":"live"}' && JSON.stringify(a.toasts) === JSON.stringify(['alert:' + ASSIGN_TXT]) && a.renders() === 1;
+    const c = boxA3(src)({ status: 400, body: { error_code: 'ASSIGN_NEEDED' } }); c.set(B, 'hr_leave', 'dry'); await tick();
+    o.card = c.calls.length === 1 && c.calls[0].row === 'autotask:hr_leave:dry' && JSON.stringify(c.toasts) === JSON.stringify(['alert:' + ASSIGN_TXT]) && c.renders() === 1;
+    const n = boxA3(src)({ status: 400, body: { error_code: 'RULE_NOT_READY' } }); n.st.byId[ROW.id] = ROW; n.act('ok', ROW.id); await tick();
+    const n2 = boxA3(src)({ status: 400, body: { error_code: 'RULE_NOT_READY' } }); n2.set(B, 'hr_leave', 'dry'); await tick();
+    o.others = n.toasts.join().indexOf('배정표') < 0 && /준비 중인 규칙/.test(n.toasts.join()) && n2.toasts.join().indexOf('배정표') < 0 && /준비 중인 규칙/.test(n2.toasts.join());
+    o.ok = Object.values(o).every((v) => v === true); return o;
+  };
+  const boxS3 = (src) => new Function([
+    'function memberName(id){ return id === "u1" ? "담당가" : ""; }',
+    [/var EVR_STOP = \{[^}]+\};/, /EVR_STOP\.TEXT_LONG = "[^"]+";/, /var EVR_SKIP = \{[^}]+\};/].map((re) => stL3(re, src)).join('\n'),
+    fnL3('evrSumTxt', src), 'return evrSumTxt;'].join('\n'))();
+  const chkS3 = (src) => {
+    const f = boxS3(src), base = { mode: 'dry', ready: true, win: 30, events: 1, found: 1, tasks: 7, who: [{ id: 'u1', n: 6 }, { id: 'u2', n: 1 }], no_who: 0, no_due: 0, old: 1, gone: 0, marked: 0, no_row: [], skip: '' };
+    const lv = f(Object.assign({}, base, { ref: { new: 2, no_date: 0, jiip: 0, test: 0, del: 0, rejoin_mark: 2, past12_leave: 3, bg_off: 0 } }));
+    const jn = f(Object.assign({}, base, { tasks: 8, ref: { new: 1, no_hire: 0, rejoin: 0, past12: 4, bg_off: 0 } }));
+    return /최근 30일 기준으로 켰다면 지시 7건\(사건 1\)/.test(lv) && lv.indexOf('재입사 표식이 찍힌 2명(입사 쪽에서 셈)') >= 0 && lv.indexOf('참고: 지난 12개월 퇴사 3명(퇴사일을 새로 저장한 일만 셈 — 표식 없는 옛 퇴사자 소급 없음)') >= 0
+      && lv.indexOf('지난 12개월 입사') < 0 && /켠 날보다 앞선 일이라 뺀 1건/.test(lv) && !/rejoin_mark|past12_leave|no_date|uLv|u2/.test(lv)
+      && jn.indexOf('참고: 지난 12개월 입사 4명') >= 0 && jn.indexOf('퇴사') < 0 && jn.indexOf('재입사 표식') < 0;
+  };
+  const A3 = await chkA3();
+  T('C185 판3 ① 켜기 거절 ASSIGN_NEEDED 화면 알림(실행 — 실제 pmconAct·evrCardSet · 가짜 gwCall): PM 콘솔 [ㄱ](퇴사 켬) 400 ASSIGN_NEEDED = "배정표 담당을 먼저 정해 주세요 — …" 알림 1·다시 그림 · 카드 단추도 같은 글 · RULE_NOT_READY는 종전 글(배정표 글 없음)', A3.ok, JSON.stringify(A3));
+  const S3 = chkS3();
+  T('C185 판3 ② 퇴사 요약 글(실행 — 실제 evrSumTxt): 재입사 표식 수 · 지난 12개월 퇴사(옛 퇴사자 소급 없음) · 켠 날보다 앞 · 내부 칸 이름·회원 id 0 · 입사 요약엔 퇴사 글 없음', S3);
+  const mutL3 = (from, to) => { if (html.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); return html.replace(from, () => to); };
+  const MA3 = [['        else if (res.body && res.body.error_code === "ASSIGN_NEEDED") alert(', '        else if (false) alert('],
+    ['      if (res.status !== 200 && res.body && res.body.error_code === "ASSIGN_NEEDED"){ alert(', '      if (false){ alert(']];
+  const kA3 = [];
+  for (const [a, b] of MA3) { let v; try { v = (await chkA3(mutL3(a, b))).ok; } catch (e) { v = 'err ' + e.message; } kA3.push(v); }
+  const MS3 = [['    if (Number(rf.rejoin_mark)) p.push(', '    if (false) p.push('], ['    if (rf.past12_leave !== undefined) p.push(', '    if (false) p.push(']];
+  const kS3 = MS3.map(([a, b]) => { try { return chkS3(mutL3(a, b)); } catch (e) { return 'err ' + e.message; } });
+  T('C185 판3 ①② 결함 사본 ' + (kA3.length + kS3.length) + '개(콘솔 거절 글 걷음 · 카드 거절 글 걷음 · 재입사 표식 수 글 걷음 · 지난 12개월 퇴사 글 걷음) = 모두 ✗', kA3.concat(kS3).every((v) => v === false), JSON.stringify({ kA3, kS3 }));
+} catch (e) { console.log('  (C185 판3 검사 생략 — ' + e.message + ')'); fails++; }
+
+
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
