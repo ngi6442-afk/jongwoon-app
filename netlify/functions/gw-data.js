@@ -5264,6 +5264,7 @@ function backupRestoreClass(sn, key) {
   if (key.indexOf('reclog:') === 0) return 'reclog';
   if (key.indexOf('clog:') === 0) return 'clog';   // v453 검토: 해시 체인 기록 전부(clog:contract* · 결재 학습 신호 clog:appr:YYYY-MM — 규약 clog:<domain>:<YYYY-MM>)
   if (key.indexOf('settings:') === 0) return 'settings';
+  if (key.indexOf('pay:') === 0) return 'pay';   // 66 판2 급여 문서(기준·달 대장·설정) — 재해 복원 모드에서만, 꼴 검사(payledger.docOk) 통과분만
   return '';
 }
 // clog 상한·시작 검사: clog:contract(앱이 상한에서 409로 멈춤 — 첫 줄 p '' 엄격) · clog:contract:YYYY-MM(같음) · 그 밖(clog:appr:* — DONEIF.clogAppend가 상한에서 앞을 잘라 첫 줄 p가 ''가 아닐 수 있음 → 시작 p 허용)
@@ -5434,6 +5435,10 @@ async function backupRestorePlan(sn, key, cls, cur, data, preview) {
     if (mg.err) return { status: 400, body: { status: 'REJECTED', error_code: mg.err } };
     payload = mg.doc; preview.merge = { added: mg.added, kept: mg.kept, rechained: mg.rechained, mode: mg.mode };
     note += ' · 체인 ' + mg.mode + ' · 백업 줄 ' + mg.added + ' · 지금 줄 ' + mg.kept + (mg.rechained ? ' · 다시 이음 ' + mg.rechained + '줄' : '') + ' · from ' + (mg.from || '-') + ' → to ' + (mg.to || '-');
+  } else if (cls === 'pay') {
+    const pk = PAYLEDGER.docOk(key, payload);   // 66 판2 — 급여 문서 꼴(모르는 pay: 키·틀린 꼴은 거절). 감사 note 에는 금액 없이 꼴 통과만
+    if (!pk.ok) return { status: 400, body: { status: 'REJECTED', error_code: 'BAD_PAY_DOC', field: String(pk.field || '').slice(0, 60) } };
+    payload = pk.doc; note += ' · 급여 문서 꼴 통과';
   } else if (cls === 'settings' && key === AUTOTASK_KEY) {
     const cl = backupAutotaskClamp(curData, payload);
     payload = cl.payload;
@@ -6357,6 +6362,7 @@ PMCON_KINDS.hrbg = { label: '인사 법령 근거 승격', grade: 'R2', fn: hand
 //   판14 와 다른 점: 근거 표를 '못 읽음'과 '없음'을 가른다(못 읽음 = BG_READ_FAILED — 없음으로 보지 않음) · 읽기는 관리자만(급여 자료 — 권한관리 표에 열이 없음).
 //   읽기 pay_bg_get = 로그인 → 기기 승인 → 관리자 · 쓰기 pay_bg_set = pmconGate 쓰기(PM) → 낙관락 → 직전 값(prev) → 감사 1줄(col pay) · PM 콘솔 줄 paybg(R2 · 무응답 = 미승격).
 const PAYBG = require('./_lib/paybg');
+const PAYLEDGER = require('./_lib/payledger');   // 66 판2 — 백업 복원의 급여 문서 꼴 검사만(급여 읽기·쓰기는 gw-pay)
 const PAY_BG_KEYS = { bg: 'bg:pay:law:v1', flag: 'settings:pay' };
 async function payBgReadFlag(st) {   // { ok, flag } — 없음 = 빈 스위치 · 읽기 실패 = ok false(그 위에 쓰지 않음)
   const r = await blobGet(st, PAY_BG_KEYS.flag);

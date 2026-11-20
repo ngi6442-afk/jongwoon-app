@@ -10,6 +10,7 @@ function floorTo(v, unit) { if (!(Number.isInteger(unit) && unit > 0)) throw bad
 function bad(what) { const e = new Error('PAY_BAD_INPUT: ' + what); e.code = 'PAY_BAD_INPUT'; e.field = what; return e; }
 function amt(v, what) { if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > Number.MAX_SAFE_INTEGER) throw bad(what); return Math.round(v) || 0; }   // || 0 = -0 을 0 으로
 function hrs(v, what) { if (v === undefined || v === null) return 0; if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) throw bad(what); return v; }   // 시간 수는 반올림하지 않는다(소수 시간 그대로)
+function colOf(x) { return x && typeof x.col === 'string' && /^[a-z]{2,8}$/.test(x.col) ? x.col : ''; }   // 66 판2 급여대장 칸 이름(base·allow·adj·bonus·meal·car) — 계산에는 안 쓰고 칸 나누기에만
 function opt(v, what) { return (v === undefined || v === null) ? null : amt(v, what); }   // 빈 칸 = null · 있으면 0 이상의 숫자
 
 // 근로소득 간이세액(소득세법 시행령 별표 2): taxable = 그 달 과세 급여(원 — 비과세·학자금 제외) · fam = 공제대상가족 수(본인 포함) · kids = 8세 이상 20세 이하 자녀 수 · pct = 80|100|120
@@ -61,9 +62,9 @@ function calcMonth(rates, tax, inp) {
   const lines = [], notes = [];
   const fixed = Array.isArray(inp.fixed) ? inp.fixed : [], extra = Array.isArray(inp.extra) ? inp.extra : [], ot = inp.ot || {};
   const base = amt(inp.base, 'base'), hours = hrs(inp.hours, 'hours');
-  lines.push({ n: '기본급', amt: base, taxfree: false });
+  lines.push({ n: '기본급', amt: base, taxfree: false, col: 'base' });
   let ord = base;
-  fixed.forEach(function (x, i) { const a = amt(x && x.amt, 'fixed[' + i + ']'); if (x.ord) ord += a; lines.push({ n: String(x.n || ''), amt: a, taxfree: !!x.taxfree }); });
+  fixed.forEach(function (x, i) { const a = amt(x && x.amt, 'fixed[' + i + ']'); if (x.ord) ord += a; lines.push({ n: String(x.n || ''), amt: a, taxfree: !!x.taxfree, col: colOf(x) }); });
   // 통상시급 = 통상임금 ÷ 월 소정근로시간, 원 미만 올림(가산임금이 '이상'이 되도록) — 명세서 계산식 글과 금액이 같은 시급을 쓴다
   const hourly = hours > 0 ? (Math.ceil(ord / hours - 1e-9) || 0) : 0;   // || 0 = 통상임금 0일 때 -0 이 글에 찍히지 않게
   if (!Number.isFinite(hourly)) throw bad('hours');   // 0에 아주 가까운 시간 수
@@ -75,10 +76,14 @@ function calcMonth(rates, tax, inp) {
     otHours += h;
     const a = Math.ceil(hourly * h * d[2] - 1e-6) || 0;
     if (!Number.isFinite(a) || a > Number.MAX_SAFE_INTEGER) throw bad('ot.' + d[0]);
-    lines.push({ n: d[1], amt: a, taxfree: false, hours: h, how: '통상시급 ' + hourly.toLocaleString('ko-KR') + '원 × ' + h + '시간 × ' + d[2] });
+    lines.push({ n: d[1], amt: a, taxfree: false, hours: h, how: '통상시급 ' + hourly.toLocaleString('ko-KR') + '원 × ' + h + '시간 × ' + d[2], col: 'adj' });
   });
   if (otHours > 0 && !(hours > 0)) notes.push('월 소정근로시간이 비어 시간 수당을 계산하지 못함');
-  extra.forEach(function (x, i) { lines.push({ n: String((x && x.n) || ''), amt: amt(x && x.amt, 'extra[' + i + ']'), taxfree: !!(x && x.taxfree) }); });
+  extra.forEach(function (x, i) { lines.push({ n: String((x && x.n) || ''), amt: amt(x && x.amt, 'extra[' + i + ']'), taxfree: !!(x && x.taxfree), col: colOf(x) }); });
+  // 66 판2 결근·조퇴 차감(시간) = 통상시급 × 시간(원 미만 올림)을 뺀다 · 직접 넣는 초과/차감 금액(정수, 음수 가능) — 둘 다 급여대장의 '초과/차감 수당' 칸
+  const mh = hrs(inp.minus_hours, 'minus_hours');
+  if (mh) { if (!(hours > 0)) throw bad('minus_hours'); const a = Math.ceil(hourly * mh - 1e-6) || 0; if (!Number.isFinite(a) || a > Number.MAX_SAFE_INTEGER) throw bad('minus_hours'); lines.push({ n: '결근·조퇴 차감', amt: -a, taxfree: false, hours: mh, how: '통상시급 ' + hourly.toLocaleString('ko-KR') + '원 × ' + mh + '시간', col: 'adj' }); }
+  if (inp.adj_amt !== undefined && inp.adj_amt !== null) { if (!Number.isInteger(inp.adj_amt) || Math.abs(inp.adj_amt) > Number.MAX_SAFE_INTEGER) throw bad('adj_amt'); if (inp.adj_amt) lines.push({ n: '초과/차감(직접 넣음)', amt: inp.adj_amt, taxfree: false, col: 'adj' }); }
   const gross = lines.reduce(function (s, x) { return s + x.amt; }, 0);
   const taxable = lines.filter(function (x) { return !x.taxfree; }).reduce(function (s, x) { return s + x.amt; }, 0);
   const skip = inp.skip || {}, fd = inp.fixed_ded || {}, deds = [];

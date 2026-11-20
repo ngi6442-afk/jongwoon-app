@@ -1613,6 +1613,7 @@
     <button class="tab-btn" data-tab="cli" id="tabCliBtn">거래처</button>
     <button class="tab-btn perm-hidden" data-tab="hr" id="tabHrBtn">인사·직원 <span class="tab-badge hide" id="hrTabBadge">0</span></button>
     <button class="tab-btn perm-hidden" data-tab="workers" id="tabWkBtn">인사·일용직</button>
+    <button class="tab-btn perm-hidden" data-tab="pay" id="tabPayBtn">급여</button>
     <button class="tab-btn perm-hidden" data-tab="progress" id="tabProgressBtn">진척도</button>
     <button class="tab-btn perm-hidden" data-tab="pmcon" id="tabPmconBtn">PM 콘솔 <span class="tab-badge hide" id="pmconTabBadge">0</span></button>
     <div class="nav-divider"></div>
@@ -2078,6 +2079,67 @@
 
   <!-- P1 판29 PM 콘솔(시안 11/13 18:14 PM ㄱ · 착수설명서 판29 · 업무별 설계 3-17) — 권한관리 카드 7종의 '정할 것'만 모은 목록. 관리자에게 보이고 [ㄱ]/[보류]/[기본값] 저장은 PM만(서버 pmcon_decide).
        값 바꾸기는 기존 카드와 같은 서버 길(기존 핸들러) — 콘솔은 그 위의 목록이고 설정 편집기를 새로 만들지 않는다. 누른 기록 = status:decide 한 곳. 점검 카드(판30·31)는 PMCON_CHECKS 한 곳에 줄을 더한다. -->
+  <section class="view" id="view-pay">
+    <style>
+      /* 66 판2 급여 탭 — 회계사무소 급여대장 꼴(한 사람 두 줄 · 묶음 머리 · 넣는 칸/계산 칸 구분). 관리자만(서버 gw-pay 가 강제) */
+      .views>#view-pay{max-width:none;}
+      #view-pay .pay-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+      #view-pay .pay-bar .vs-chip.on{background:var(--brand,#1A9A6B);border-color:var(--brand,#1A9A6B);color:#fff;font-weight:700}
+      #view-pay .pay-info{cursor:default}
+      #view-pay .pay-st{background:#FFF3D4;border-color:#FFF3D4;color:#8A6410;font-weight:700;cursor:default}
+      #view-pay .pay-st.done{background:#E8F5EF;border-color:#E8F5EF;color:#0F5132}
+      #view-pay .pay-law{font-size:12px;color:var(--sub);background:#EEF5F1;border-radius:8px;padding:6px 10px;margin-bottom:8px;line-height:1.5}
+      #view-pay .pay-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:#fff}
+      #view-pay table.pay-led{border-collapse:collapse;width:100%;min-width:1120px;font-size:12.5px;font-variant-numeric:tabular-nums}
+      #view-pay .pay-led th,#view-pay .pay-led td{padding:5px 7px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);text-align:right;white-space:nowrap;vertical-align:middle}
+      #view-pay .pay-led th{font-size:11.5px;color:var(--sub);font-weight:700;background:#FAFCFB;text-align:center}
+      #view-pay .pay-led th.g{background:#EFF4F1;color:var(--text)}
+      #view-pay .pay-led td.l{text-align:left}
+      #view-pay .pay-led tr.a td{border-bottom-style:dashed}
+      #view-pay .pay-led td.pay-in{background:#fff;box-shadow:inset 0 0 0 1px #CFE0D7;cursor:pointer}
+      #view-pay .pay-led td.pay-in:hover{background:#F2FAF6}
+      #view-pay .pay-led td.au{background:#F3F6F4;color:#33423D}
+      #view-pay .pay-led td.sum{background:#F3F6F4;font-weight:700}
+      #view-pay .pay-led td.none{background:#F3F6F4;color:var(--sub);text-align:center}
+      #view-pay .pay-led td small{display:block;font-size:10.5px;color:var(--sub);font-weight:400}
+      #view-pay .pay-led td.pay-miss{text-align:left;color:var(--sub);background:#FAFAF7;white-space:normal}
+      #view-pay .pay-led tr.tot td{background:#EFF4F1;font-weight:700}
+      #view-pay .pay-name{border:0;background:none;padding:0;font:inherit;font-weight:700;color:var(--text);cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+      #view-pay .pay-tag{display:inline-block;font-size:10.5px;font-weight:700;padding:0 6px;border-radius:999px;background:#FFF3D4;color:#8A6410;margin:1px 0;white-space:normal}
+      #view-pay .pay-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--sub);margin:8px 0}
+      #view-pay .pay-legend i{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin-right:4px;border:1px solid var(--line)}
+      #view-pay .pay-legend i.in{background:#fff;box-shadow:inset 0 0 0 1px #CFE0D7}
+      #view-pay .pay-legend i.au{background:#F3F6F4}
+      #view-pay .pay-btns{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
+      #view-pay .pay-btns .vs-chip.on{background:var(--brand,#1A9A6B);border-color:var(--brand,#1A9A6B);color:#fff;font-weight:700}
+      #view-pay .pay-hint{font-size:12px;color:var(--sub);line-height:1.55;margin:6px 0}
+      #view-pay .pay-loose{font-size:12.5px;margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+      .pay-modal{max-width:760px !important}
+      .pay-modal .pay-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:6px 0 10px}
+      .pay-modal .pay-f{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--sub);min-width:0}
+      .pay-modal .pay-f input,.pay-modal .pay-f select{padding:7px 9px;border-radius:8px;font-size:13.5px;margin:0}
+      .pay-modal .pay-f small{font-size:11px;color:var(--sub)}
+      .pay-modal .pay-cks{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;margin:4px 0 10px}
+      .pay-modal .pay-ck input{width:auto;padding:0;margin:0 2px 0 0}
+      .pay-modal .pay-sub{font-size:12.5px;font-weight:700;margin:8px 0 2px}
+      .pay-modal .pay-calc{background:#EEF5F1;border-radius:8px;padding:8px 10px;font-size:12.5px;line-height:1.6;font-variant-numeric:tabular-nums}
+      .pay-modal .pay-calc.off{background:#FFF3D4;color:#8A6410}
+      .pay-modal .pay-calc .net{color:#0F5132;font-size:15px}
+      .pay-modal .pay-how{color:var(--sub);font-size:11.5px}
+      .pay-modal table.pay-vers,.pay-modal table.pay-dr{border-collapse:collapse;width:100%;font-size:12.5px;margin:4px 0 8px;font-variant-numeric:tabular-nums}
+      .pay-modal .pay-vers th,.pay-modal .pay-vers td,.pay-modal .pay-dr th,.pay-modal .pay-dr td{border-bottom:1px solid var(--line);padding:4px 6px;text-align:left}
+      .pay-modal .pay-vers tr.on td{background:#E8F5EF;font-weight:700}
+      .pay-modal td.num{text-align:right}
+      .pay-modal .pay-dr input,.pay-modal .pay-dr select{padding:4px 6px;font-size:12.5px;border-radius:6px;margin:0;width:100%;min-width:60px}
+      .pay-modal .pay-dr tr.in td{background:#FFF8E6}
+      .pay-modal .pay-dr tr.tot td{font-weight:700;background:#EFF4F1}
+      .pay-modal .pay-hint{font-size:12px;color:var(--sub);margin:6px 0 0}
+      .pay-modal .pay-dlg-btns{display:flex;gap:8px;margin-top:12px}
+      .pay-modal .pay-dlg-btns button{flex:1 1 0}
+    </style>
+    <div class="dash-sec" style="margin-bottom:8px;"><h2>급여 <span class="cnt">관리자만</span></h2></div>
+    <div id="payHost"><div class="loading">불러오는 중…</div></div>
+  </section>
   <section class="view" id="view-pmcon">
     <style>
       .pc-row{display:flex;gap:12px;align-items:flex-start;padding:10px 4px;border-bottom:1px solid var(--line)}
@@ -6971,6 +7033,8 @@
     document.getElementById("view-progress").classList.toggle("active", name === "progress");
     if (name === "progress" && prevTab !== "progress") renderProgress();   // 재클릭은 no-op(iframe 재로드 방지) — 갱신은 새로고침 버튼
     document.getElementById("view-pmcon").classList.toggle("active", name === "pmcon");
+    document.getElementById("view-pay").classList.toggle("active", name === "pay");   // 66 판2 급여 — 관리자만(서버 gw-pay 도 강제)
+    if (name === "pay") payOpen();   // 66 판2 급여대장(관리자만)
     if (name === "pmcon") renderPmcon();   // P1 판29 PM 콘솔 — 관리자만(서버 pmcon_get도 강제)
 
     if (name === "cal"){ renderCalendar(); if (canSee("safety")) loadEdu(); }   // v430 교육·건강진단 다음 예정 = 안전 권한(종전엔 인허가·인사 탭을 거쳐야 읽혔다 — 교육을 안 보여 주는 화면의 읽기는 뺐다)
@@ -32447,6 +32511,9 @@ function dutyStage(nx){
     var pcBtn = document.getElementById("tabPmconBtn");
     if (pcBtn) pcBtn.classList.toggle("perm-hidden", !adminUser);   // P1 판29 PM 콘솔 — 관리자에게 보임(버튼 저장은 PM만 — 서버 pmcon_decide PM_ONLY)
     if (currentTab === "pmcon" && !adminUser) switchTab("dash");
+    var payBtn = document.getElementById("tabPayBtn");
+    if (payBtn) payBtn.classList.toggle("perm-hidden", !adminUser);   // 66 판2 급여 — 관리자만(서버 gw-pay ADMIN_ONLY)
+    if (currentTab === "pay" && !adminUser) switchTab("dash");
     if (currentTab === "workers"){ if (!canSee("wk")) switchTab("dash"); else { renderWorkers(); loadAsb(); } }   // v442: 볼 수 있으면 다시 그린다 — 로그인 창 '전환'은 새로고침 없이 이 함수만 돌아, 앞사람 권한(현장 보기)으로 그린 일용직 표의 참여 열·칩이 남는다(화관법 줄과 같은 꼴) · 검토: 현장 대장도 읽는다(현장 권한 없는 앞사람은 대장을 못 받았다 — loadAsb는 현장 권한이 없으면 바로 돌아가고, 받으면 renderWorkers를 다시 부름. 받기 전에는 참여 칸 '확인 중')
     if (currentTab === "stmt" && !canSee("veh")) switchTab("dash");   // 29 판② 차량 숨김이면 명세서도 홈으로(서버 NO_VEH_ACCESS — 검토 반영)
     if (currentTab === "stmt" && canSee("stmt")) renderStmt();   // 29 판② — 숨김이면 위 일반 강제 이동(탭 이름 = 키)이 홈으로. 볼 수 있으면 다시 그린다: 로그인 창 '전환'은 새로고침 없이 이 함수만 돌아, 보는 사람이 바뀌면 renderStmt(stmtViewer)가 앞사람이 연 상세·고치던 줄을 비운다
@@ -33857,6 +33924,295 @@ function dutyStage(nx){
       setBase: pf.updated_at || 0 }];
   }
   PMCON_KINDS.push({ kind: "paybg", label: "급여 법령 근거 승격", grade: "R2", get: "pay_bg_get", card: "", revert: "승격 해제(단추는 급여 화면이 들어오는 판에 — 그 전에는 이 표를 쓰는 화면이 없음)", rows: pmconRowsPayBg });
+  // ── 66 급여 판2(원장 C236 · PM 11/20 16:04 'ㄱ' — 시안 3판) 급여 탭: 급여대장(달·회사) = 회계사무소 대장 꼴 · 한 사람 기준 · 그 달 값 · 하수준설 수당 내역 · 단가·기간 설정 ──
+  //   서버 gw-pay(관리자만 · 계산은 서버만 — 화면은 받은 금액을 그리기만). 금액 칸 숫자·요율 숫자를 이 코드에 적지 않는다(설정·근거 표에서 옴).
+  var payS = { corp: "env", ym: "", data: null, busy: false, seq: 0 };
+  var PAY_CORP = { env: "종운환경", con: "종운건설" };
+  var PAY_WHY = { NO_BASE: "기준 없음", NO_BG: "요율 표 없음", NOT_PROMOTED: "요율 표 승격 전", SHA_CHANGED: "요율 표 내용 바뀜(다시 승격)", BAD_BG: "요율 표 꼴 틀림", FLAG_READ_FAILED: "승격 상태를 못 읽음", BG_READ_FAILED: "요율 표를 못 읽음", NO_RATE: "그 달 요율 없음", RATE_OVERLAP: "요율 행 겹침", BAD_RATE: "요율 값 틀림", NO_TAX_TABLE: "그 달 세액표 없음", NO_DREDGE_CONF: "하수준설 단가 설정 없음", BAD_INPUT: "넣은 값 틀림", CALC_FAILED: "계산 실패" };
+  var PAY_ERR = { PAY_STALE: "그사이 다른 사람이 고쳤습니다 — 다시 불러온 뒤 넣어 주세요", OVERWRITTEN: "저장 직후 다른 저장이 덮었습니다 — 다시 불러와 확인해 주세요", MONTH_CLOSED: "확정한 달은 고칠 수 없습니다(확정 풀기 뒤)", ROWS_NOT_READY: "계산이 안 된 사람이 있어 확정할 수 없습니다", LAW_OFF: "요율 표가 승격되지 않아 확정할 수 없습니다", VER_IN_USE: "이번 달 이전에 시작한 판은 지울 수 없습니다 — 같은 적용 달로 고쳐 주세요", KIND_MISMATCH: "저장 직전 판 상태가 바뀌었습니다 — 다시 열어 주세요", NO_CHANGE: "바뀐 값이 없습니다", ADMIN_ONLY: "관리자만 쓸 수 있습니다", WRITE_UNCONFIRMED: "저장했는지 확인하지 못했습니다 — 다시 불러와 확인해 주세요" };
+  function payWon(n){ return (n === null || n === undefined || n === "") ? "" : Number(n).toLocaleString("ko-KR"); }
+  function payYmNow(){ var d = new Date(Date.now() + 9 * 36e5); return d.getUTCFullYear() + "-" + String(d.getUTCMonth() + 1).padStart(2, "0"); }
+  function payYmAdd(ym, n){ var y = +ym.slice(0, 4), m = +ym.slice(5) - 1 + n; var yy = y + Math.floor(m / 12), mm = ((m % 12) + 12) % 12 + 1; return yy + "-" + String(mm).padStart(2, "0"); }
+  function payErr(res, what){ var b = (res && res.body) || {}; var code = b.error_code || (res ? res.status : "NET"); alert(what + " 실패 — " + (PAY_ERR[code] || code) + (b.field ? " (칸: " + b.field + ")" : "")); }
+  function payOpen(){ if (!isAdmin()) return; if (!payS.ym) payS.ym = payYmNow(); payLoad(); }
+  function payLoad(){
+    var host = document.getElementById("payHost"); if (!host) return;
+    var my = ++payS.seq;
+    host.innerHTML = '<div class="loading">불러오는 중…</div>';
+    gwCall("gw-pay", { action: "pay_month_get", corp: payS.corp, ym: payS.ym }).then(function(res){
+      if (my !== payS.seq) return;
+      if (res.status !== 200){ payS.data = null; host.innerHTML = '<div class="empty-li">급여대장을 불러오지 못했습니다 (' + esc(String((res.body && res.body.error_code) || res.status)) + ')</div>'; return; }
+      payS.data = res.body; payRender();
+    }, function(){ if (my === payS.seq) host.innerHTML = '<div class="empty-li">급여대장을 불러오지 못했습니다(네트워크)</div>'; });
+  }
+  function payRow(mid){ var d = payS.data; if (!d) return null; for (var i = 0; i < d.rows.length; i++) if (d.rows[i].mid === mid) return d.rows[i]; return null; }
+  function payLawTxt(l){
+    if (!l || !l.on) return '요율 표 <b>' + esc(PAY_WHY[l && l.why] || (l && l.why) || "-") + '</b> — 공제는 계산하지 않습니다(PM 콘솔에서 승격)';
+    if (!l.rates) return '요율 표 <b>' + esc(l.ver) + '</b> · 이 달은 ' + esc(PAY_WHY[l.off] || l.off || "") + (l.keys && l.keys.length ? "(" + esc(l.keys.join(",")) + ")" : "");
+    var p = function(x){ return String(+(x * 100).toFixed(4)) + "%"; }, r = l.rates;
+    return '요율 표 <b>' + esc(l.ver) + '</b> · 국민연금 ' + p(r.pension) + ' · 건강보험 ' + p(r.health) + ' · 장기요양 건강보험료의 ' + p(r.care_ratio) + ' · 고용보험 ' + p(r.emp) + ' · 소득세 간이세액표 · 지방소득세 ' + p(r.local) + ' · 공제는 ' + r.cut + '원 미만 버림';
+  }
+  function payRender(){
+    var host = document.getElementById("payHost"), d = payS.data; if (!host || !d) return;
+    var closed = d.state === "closed", h = '';
+    h += '<div class="pay-bar"><button type="button" class="vs-chip" data-pay-ym="-1">◀</button><b>' + esc(d.ym.slice(0, 4)) + '년 ' + (+d.ym.slice(5)) + '월</b><button type="button" class="vs-chip" data-pay-ym="1">▶</button>';
+    ["env", "con"].forEach(function(c){ h += '<button type="button" class="vs-chip' + (c === payS.corp ? ' on' : '') + '" data-pay-corp="' + c + '">' + PAY_CORP[c] + '</button>'; });
+    h += '<span class="vs-chip pay-info">지급일 ' + (d.pay_day ? (+d.ym.slice(5)) + '월 ' + d.pay_day + '일' : '설정 없음') + '</span><span class="vs-chip pay-info">근무 기간 ' + esc(d.period.from.slice(5).replace("-", "/")) + '~' + esc(d.period.to.slice(5).replace("-", "/")) + '</span>';
+    h += '<span class="vs-chip pay-st' + (closed ? ' done' : '') + '">' + (closed ? '확정' : '작성 중') + '</span></div>';
+    h += '<div class="pay-law">' + (closed && d.frozen_law ? '확정한 달 — 확정 때 요율 표 <b>' + esc(d.frozen_law.ver) + '</b>로 계산한 금액을 그대로 보입니다' : payLawTxt(d.law)) + '</div>';
+    var T = { base: 0, allow: 0, adj: 0, bonus: 0, meal: 0, car: 0, taxable: 0, gross: 0, pension: 0, health: 0, care: 0, emp: 0, income: 0, local: 0, ded: 0, net: 0 }, n = 0;
+    h += '<div class="pay-scroll"><table class="pay-led"><thead><tr><th class="g" colspan="2">인적사항</th><th class="g" colspan="7">지급내역</th><th class="g" colspan="8">공제내역 및 차인지급액</th><th class="g" rowspan="3">비고</th></tr>';
+    h += '<tr><th>사원번호</th><th>성명</th><th rowspan="2">기본급</th><th rowspan="2">수당</th><th rowspan="2">초과/차감<br>수당</th><th rowspan="2">상여금</th><th rowspan="2">식대</th><th rowspan="2">자가운전<br>보조금</th><th>4대보험<br>적용총액</th><th rowspan="2">국민연금</th><th rowspan="2">건강보험</th><th rowspan="2">장기요양<br>보험료</th><th rowspan="2">고용보험</th><th rowspan="2">소득세</th><th rowspan="2">지방<br>소득세</th><th rowspan="2">공제합계</th><th rowspan="2">차인지급액</th></tr><tr><th>입사일</th><th>직위</th><th>지급총액</th></tr></thead><tbody>';
+    d.rows.forEach(function(r){
+      var m = r.member || {}, c = r.calc, row = r.row || {}, mid = esc(r.mid), tags = [];
+      var nameCell = '<td class="l"><button type="button" class="pay-name" data-pay-base="' + mid + '">' + esc(m.name || "(지운 직원)") + '</button></td>';
+      var top = '<tr class="a"><td class="l">' + esc(m.emp_no || "") + '</td>' + nameCell;
+      var bot = '<tr class="b"><td class="l">' + esc(m.hire_date || "") + '</td><td class="l">' + esc(m.rank || "") + '</td>';
+      if (!c){
+        var why = r.state === "no_base" ? '기준 없음 — 이름을 눌러 기준을 넣어 주세요' : (r.state === "off" ? '계산 못 함: ' + esc(PAY_WHY[r.off && r.off.why] || (r.off && r.off.why) || "") + (r.off && r.off.keys && r.off.keys.length ? " (" + esc(r.off.keys.join(",")) + ")" : "") : (r.state === "bad" ? '저장된 기준 꼴이 틀림(관리자 확인)' : (r.state === "unread" ? '기준을 읽지 못함(새로고침)' : '확정 때 이 사람 값 없음')));
+        h += top + '<td class="pay-miss" colspan="16" rowspan="2">' + why + (r.state === "off" && !closed ? ' <button type="button" class="vs-chip" data-pay-row="' + mid + '">그 달 값</button>' : '') + '</td></tr>' + bot + '</tr>';
+        return;
+      }
+      n++;
+      var k = c.cols, e = c.ded, ed = closed ? '' : ' pay-in';
+      ["base", "allow", "adj", "bonus", "meal", "car"].forEach(function(x){ T[x] += k[x] || 0; });
+      T.taxable += c.taxable; T.gross += c.gross; T.ded += c.ded_total; T.net += c.net;
+      ["pension", "health", "care", "emp", "income", "local"].forEach(function(x){ T[x] += e[x] || 0; });
+      if (row.prorate) tags.push('일할 ' + row.prorate.days + '/' + row.prorate.of);
+      if (c.dredge) tags.push('하수준설 ' + c.dredge.days + '일');
+      if (r.suggest) tags.push('가입 제외 제안(' + [r.suggest.pension ? "국민연금" : "", r.suggest.emp ? "고용보험" : ""].filter(Boolean).join("·") + ')');
+      if (r.next_from) tags.push(r.next_from + ' 새 기준');
+      if (row.ded_fix) tags.push('공제 직접 값');
+      if (row.note) tags.push(row.note);
+      var cell = function(x, sub){ return '<td class="num' + ed + '" rowspan="2"' + (closed ? '' : ' data-pay-row="' + mid + '"') + '>' + payWon(k[x] || "") + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</td>'; };
+      var dredgeOn = r.ver && r.ver.dredge;
+      var allowCell = dredgeOn && !closed ? '<td class="num pay-in" rowspan="2" data-pay-dredge="' + mid + '">' + payWon(k.allow || "") + '<small>' + (c.dredge ? '하수준설 ' + payWon(c.dredge.total) : '하수준설 내역') + '</small></td>' : cell("allow", c.dredge ? '하수준설 ' + payWon(c.dredge.total) : "");
+      var adjSub = row.ot ? ["ext", "night", "hol", "hol8"].filter(function(x){ return row.ot[x]; }).map(function(x){ return ({ ext: "연장", night: "야간", hol: "휴일", hol8: "휴일 8h 초과" })[x] + " " + row.ot[x] + "h"; }).join(" ") : (row.minus_hours ? "차감 " + row.minus_hours + "h" : "");
+      var dd = function(x){ return e[x] === null || e[x] === undefined ? '<td class="none" rowspan="2">—</td>' : '<td class="num au" rowspan="2">' + payWon(e[x]) + '</td>'; };
+      h += top + cell("base", row.prorate ? "일할" : "") + allowCell + cell("adj", adjSub) + cell("bonus") + cell("meal") + cell("car") + '<td class="num au">' + payWon(c.taxable) + '</td>' + dd("pension") + dd("health") + dd("care") + dd("emp") + dd("income") + dd("local") + '<td class="num sum" rowspan="2">' + payWon(c.ded_total) + '</td><td class="num sum" rowspan="2">' + payWon(c.net) + '</td><td class="l" rowspan="2">' + tags.map(function(t){ return '<span class="pay-tag">' + esc(t) + '</span>'; }).join(" ") + '</td></tr>';
+      h += bot + '<td class="num sum">' + payWon(c.gross) + '</td></tr>';
+    });
+    if (!d.rows.length) h += '<tr><td colspan="18" class="empty-li">이 회사·달 급여대장에 들어갈 직원이 없습니다</td></tr>';
+    else h += '<tr class="tot"><td class="l" colspan="2">합계 ' + n + '명</td>' + ["base", "allow", "adj", "bonus", "meal", "car"].map(function(x){ return '<td class="num">' + payWon(T[x]) + '</td>'; }).join("") + '<td class="num">' + payWon(T.taxable) + '<small>지급 ' + payWon(T.gross) + '</small></td>' + ["pension", "health", "care", "emp", "income", "local", "ded", "net"].map(function(x){ return '<td class="num">' + payWon(T[x]) + '</td>'; }).join("") + '<td></td></tr>';
+    h += '</tbody></table></div>';
+    h += '<div class="pay-legend"><span><i class="in"></i>누르면 넣는 칸</span><span><i class="au"></i>앱이 계산하는 칸</span><span>— = 그 보험 대상 아님</span><span>합계 줄은 대장에 없던 것을 더했습니다</span></div>';
+    h += '<div class="pay-btns"><button type="button" class="vs-chip" id="payConfBtn">단가·기간 설정</button>' + (closed ? '<button type="button" class="vs-chip" id="payReopenBtn">확정 풀기</button>' : '<button type="button" class="vs-chip on" id="payCloseBtn">이 달 확정</button>') + '</div>';
+    h += '<p class="pay-hint">계산 순서는 회계사무소 대장과 같습니다. 4대보험적용총액 = 기본급 + 수당 + 초과/차감 수당 + 상여금(+ 비과세 한도를 넘는 식대·자가운전) · 지급총액 = 적용총액 + 비과세 식대·자가운전보조금 · 차인지급액 = 지급총액 − 공제합계. 이름을 누르면 그 사람 기준(매달 같은 값), 금액 칸을 누르면 이 달에만 쓰는 값을 넣습니다. 지입차주·일용직은 이 대장에 나오지 않습니다.</p>';
+    if (d.loose && d.loose.length && !closed) h += '<div class="pay-loose">회사 표시가 비어 어느 대장에도 안 들어간 직원: ' + d.loose.map(function(x){ return '<button type="button" class="vs-chip" data-pay-base="' + esc(x.mid) + '">' + esc(x.name) + (x.rank ? ' ' + esc(x.rank) : '') + ' — 이 대장에 기준 넣기</button>'; }).join(" ") + '</div>';
+    host.innerHTML = h;
+    Array.prototype.forEach.call(host.querySelectorAll("[data-pay-ym]"), function(b){ b.onclick = function(){ payS.ym = payYmAdd(payS.ym, +b.getAttribute("data-pay-ym")); payLoad(); }; });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-pay-corp]"), function(b){ b.onclick = function(){ payS.corp = b.getAttribute("data-pay-corp"); payLoad(); }; });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-pay-base]"), function(b){ b.onclick = function(){ payBaseDlg(b.getAttribute("data-pay-base")); }; });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-pay-row]"), function(b){ b.onclick = function(){ payRowDlg(b.getAttribute("data-pay-row")); }; });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-pay-dredge]"), function(b){ b.onclick = function(){ payDredgeDlg(b.getAttribute("data-pay-dredge")); }; });
+    var cb = document.getElementById("payConfBtn"); if (cb) cb.onclick = payConfDlg;
+    var cl = document.getElementById("payCloseBtn"); if (cl) cl.onclick = payClose;
+    var ro = document.getElementById("payReopenBtn"); if (ro) ro.onclick = payReopen;
+  }
+  // 창(하나를 돌려 씀)
+  function payDlg(title, body, onSave, saveTxt){
+    var bd = document.getElementById("payBackdrop");
+    if (!bd){
+      bd = document.createElement("div"); bd.className = "modal-backdrop"; bd.id = "payBackdrop";
+      bd.innerHTML = '<div class="modal pay-modal"><h3 id="payDlgTitle"></h3><div id="payDlgBody"></div><div class="pay-dlg-btns"><button class="primary" id="payDlgSave"></button><button class="secondary" id="payDlgClose">닫기</button></div></div>';
+      document.body.appendChild(bd);
+      document.getElementById("payDlgClose").onclick = function(){ bd.classList.remove("show"); };
+    }
+    document.getElementById("payDlgTitle").textContent = title;
+    document.getElementById("payDlgBody").innerHTML = body;
+    var sv = document.getElementById("payDlgSave");
+    sv.style.display = onSave ? "" : "none"; sv.textContent = saveTxt || "저장"; sv.disabled = false;
+    sv.onclick = onSave ? function(){ if (payS.busy) return; onSave(sv); } : null;
+    bd.classList.add("show");
+    return document.getElementById("payDlgBody");
+  }
+  function payDlgClose(){ var bd = document.getElementById("payBackdrop"); if (bd) bd.classList.remove("show"); }
+  function payNum(el, opt){   // 빈 칸 = null(opt) · 숫자 아니면 NaN
+    var v = String(el && el.value || "").replace(/[,\s]/g, ""); if (v === "") return opt ? null : 0;
+    return /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : NaN;
+  }
+  function payFld(id, label, val, ph, sub){ return '<label class="pay-f"><span>' + esc(label) + '</span><input id="' + id + '" inputmode="decimal" value="' + esc(val === null || val === undefined ? "" : String(val)) + '" placeholder="' + esc(ph || "") + '">' + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</label>'; }
+  function payCk(id, label, on){ return '<label class="pay-ck"><input type="checkbox" id="' + id + '"' + (on ? ' checked' : '') + '> ' + esc(label) + '</label>'; }
+  function payCalcTxt(c, off){
+    if (!c) return '<div class="pay-calc off">계산 못 함: ' + esc(PAY_WHY[off && off.why] || (off && off.why) || "") + (off && off.keys && off.keys.length ? " (" + esc(off.keys.join(",")) + ")" : "") + '</div>';
+    var k = c.cols, e = c.ded, ln = ["기본급 " + payWon(k.base), "수당 " + payWon(k.allow), "초과/차감 " + payWon(k.adj), "상여 " + payWon(k.bonus), "식대 " + payWon(k.meal), "자가운전 " + payWon(k.car)].join(" · ");
+    var dl = [["국민연금", e.pension], ["건강보험", e.health], ["장기요양", e.care], ["고용보험", e.emp], ["소득세", e.income], ["지방소득세", e.local]].filter(function(x){ return x[1] !== null && x[1] !== undefined; }).map(function(x){ return x[0] + " " + payWon(x[1]); }).join(" · ");
+    var hw = c.lines.filter(function(l){ return l.how; }).map(function(l){ return esc(l.n) + ": " + esc(l.how) + " = " + payWon(l.amt); }).join("<br>");
+    return '<div class="pay-calc">' + ln + '<br>적용총액 <b>' + payWon(c.taxable) + '</b> · 지급총액 <b>' + payWon(c.gross) + '</b><br>' + dl + ' · 공제합계 <b>' + payWon(c.ded_total) + '</b><br>차인지급액 <b class="net">' + payWon(c.net) + '원</b>' + (hw ? '<br><span class="pay-how">' + hw + '</span>' : '') + (c.notes && c.notes.length ? '<br><span class="pay-how">' + c.notes.map(function(x){ return esc(x); }).join("<br>") + '</span>' : '') + '</div>';
+  }
+  // ── 한 사람 기준(이름을 누르면) ──
+  function payBaseDlg(mid){
+    gwCall("gw-pay", { action: "pay_base_get", corp: payS.corp, mid: mid, ym: payS.ym }).then(function(res){
+      if (res.status !== 200){ payErr(res, "기준 읽기"); return; }
+      var b = res.body, vers = (b.doc && b.doc.vers) || [], rev = b.doc ? b.doc.rev : "", m = b.member;
+      var use = null; vers.forEach(function(v){ if (v.from <= payS.ym) use = v; });
+      var v = use || vers[vers.length - 1] || null;
+      var h = '<p>' + esc(PAY_CORP[payS.corp]) + ' · ' + esc(m.rank || "") + (m.hire_date ? ' · 입사 ' + esc(m.hire_date) : '') + '</p>';
+      if (vers.length){
+        h += '<table class="pay-vers"><thead><tr><th>적용 달</th><th>기본급</th><th>수당</th><th>식대</th><th>자가운전</th><th>가족</th><th></th></tr></thead><tbody>' + vers.map(function(x){ return '<tr' + (x === use ? ' class="on"' : '') + '><td>' + esc(x.from) + '~</td><td class="num">' + payWon(x.base) + '</td><td class="num">' + payWon(x.allow) + '</td><td class="num">' + payWon(x.meal) + '</td><td class="num">' + payWon(x.car) + '</td><td class="num">' + x.fam + '</td><td>' + (x.from > b.now_ym ? '<button type="button" class="vs-chip" data-pay-drop="' + esc(x.from) + '">지움</button>' : '') + '</td></tr>'; }).join("") + '</tbody></table>';
+      }
+      var sg = b.suggest || {};
+      h += '<div class="pay-grid">' + '<label class="pay-f"><span>적용 시작 달</span><input id="pbFrom" type="month" value="' + esc(v ? v.from : payS.ym) + '"><small id="pbKind"></small></label>' +
+        payFld("pbBase", "기본급", v ? v.base : "") + payFld("pbAllow", "고정 수당", v ? v.allow : 0, "", "매달 같은 수당(하수준설 수당은 따로)") + payFld("pbMeal", "식대", v ? v.meal : 0) + payFld("pbCar", "자가운전보조금", v ? v.car : 0) +
+        payFld("pbHours", "월 소정근로시간", v ? v.hours : "", "통상시급 = 통상임금 ÷ 이 시간") + payFld("pbFam", "간이세액 가족 수", v ? v.fam : 1, "", "본인 포함 · 대장은 전원 1명 칸") + payFld("pbKids", "8~20세 자녀 수", v ? v.kids : 0) +
+        '<label class="pay-f"><span>세액 비율</span><select id="pbPct">' + [80, 100, 120].map(function(p){ return '<option value="' + p + '"' + ((v ? v.pct : 100) === p ? ' selected' : '') + '>' + p + '%</option>'; }).join("") + '</select></label>' +
+        payFld("pbPb", "국민연금 기준소득월액", v ? v.pension_base : "", "비우면 그 달 적용총액") + payFld("pbHb", "건강보험 보수월액", v ? v.health_base : "", "비우면 그 달 적용총액") + '</div>';
+      h += '<div class="pay-cks">' + payCk("pbOrd", "고정 수당을 통상임금에 넣음(노무사 확인)", v && v.allow_ord) + payCk("pbSkP", "국민연금 대상 아님" + (sg.pension ? " — 나이로 제외 제안" : ""), v && v.skip.pension) + payCk("pbSkH", "건강보험 대상 아님", v && v.skip.health) + payCk("pbSkE", "고용보험 대상 아님" + (sg.emp ? " — 나이로 제외 제안" : ""), v && v.skip.emp) + payCk("pbDr", "하수준설 수당 대상", v && v.dredge) + '</div>';
+      h += '<div id="pbCalc"></div>';
+      var body = payDlg(m.name + " 기준", h, function(btn){
+        var ver = payBaseRead(); if (!ver) return;
+        var kind = vers.some(function(x){ return x.from === ver.from; }) ? "fix" : "new";
+        if (kind === "fix" && ver.from < payS.ym && !confirm(ver.from + " 판을 고치면 " + ver.from + "부터 확정하지 않은 달 금액이 모두 바뀝니다. 고칠까요?\n(인상·변경이면 적용 시작 달을 바꿔 새 판으로 넣어 주세요)")) return;
+        payS.busy = true; btn.disabled = true;
+        gwCall("gw-pay", { action: "pay_base_save", corp: payS.corp, mid: mid, ver: ver, rev: rev, kind: kind }).then(function(r2){
+          payS.busy = false; btn.disabled = false;
+          if (r2.status !== 200){ payErr(r2, "기준 저장"); return; }
+          gwToast(kind === "new" ? "새 판을 넣었습니다" : "판을 고쳤습니다"); payDlgClose(); payLoad();
+        }, function(){ payS.busy = false; btn.disabled = false; alert("기준 저장 실패(네트워크)"); });
+      });
+      var kindTxt = function(){ var f = (document.getElementById("pbFrom").value || ""); document.getElementById("pbKind").textContent = vers.some(function(x){ return x.from === f; }) ? "이 적용 달 판을 고침" : "새 판(이 달부터 적용)"; };
+      document.getElementById("pbFrom").onchange = kindTxt; kindTxt();
+      Array.prototype.forEach.call(body.querySelectorAll("[data-pay-drop]"), function(bt){ bt.onclick = function(){
+        var f = bt.getAttribute("data-pay-drop"); if (!confirm(f + " 판을 지울까요? (아직 오지 않은 달의 판)")) return;
+        gwCall("gw-pay", { action: "pay_base_drop", corp: payS.corp, mid: mid, from: f, rev: rev }).then(function(r3){ if (r3.status !== 200){ payErr(r3, "판 지우기"); return; } payDlgClose(); payLoad(); }, function(){ alert("판 지우기 실패(네트워크)"); });
+      }; });
+      var t = null, prev = function(){ clearTimeout(t); t = setTimeout(function(){ var ver = payBaseRead(true); if (!ver) return; gwCall("gw-pay", { action: "pay_row_preview", corp: payS.corp, ym: payS.ym, mid: mid, ver: ver, row: (payRow(mid) || {}).row || {} }).then(function(r4){ var el = document.getElementById("pbCalc"); if (el && r4.status === 200) el.innerHTML = '<div class="pay-sub">' + esc(payS.ym) + ' 이 판으로 계산하면</div>' + payCalcTxt(r4.body.calc, r4.body.off); }, function(){}); }, 400); };
+      Array.prototype.forEach.call(body.querySelectorAll("input,select"), function(el){ el.addEventListener("input", prev); el.addEventListener("change", prev); });
+      prev();
+    }, function(){ alert("기준 읽기 실패(네트워크)"); });
+  }
+  function payBaseRead(quiet){
+    var g = function(id){ return document.getElementById(id); };
+    var ver = { from: g("pbFrom").value, base: payNum(g("pbBase")), allow: payNum(g("pbAllow")), allow_ord: g("pbOrd").checked, meal: payNum(g("pbMeal")), car: payNum(g("pbCar")), hours: payNum(g("pbHours")), fam: payNum(g("pbFam")), kids: payNum(g("pbKids")), pct: +g("pbPct").value,
+      pension_base: payNum(g("pbPb"), true), health_base: payNum(g("pbHb"), true), skip: { pension: g("pbSkP").checked, health: g("pbSkH").checked, emp: g("pbSkE").checked }, dredge: g("pbDr").checked };
+    var badF = ["base", "allow", "meal", "car", "hours", "fam", "kids", "pension_base", "health_base"].filter(function(k){ return typeof ver[k] === "number" && isNaN(ver[k]); });
+    if (!/^\d{4}-\d{2}$/.test(ver.from)) badF.push("적용 시작 달");
+    if (!ver.base) badF.push("기본급");
+    if (!ver.hours) badF.push("월 소정근로시간");
+    if (badF.length){ if (!quiet) alert("숫자를 확인해 주세요: " + badF.join(", ")); return null; }
+    return ver;
+  }
+  // ── 그 달 값(금액 칸을 누르면) ──
+  function payRowDlg(mid){
+    var r = payRow(mid); if (!r) return;
+    var row = r.row || {}, v = r.ver || {}, m = r.member || {}, ot = row.ot || {}, df = row.ded_fix || {};
+    var h = '<p>' + esc(payS.ym) + ' 이 달에만 쓰는 값입니다. 빈 칸은 기준 값(' + (v.from ? esc(v.from) + ' 판' : '기준 없음') + ')을 씁니다.</p>';
+    h += '<div class="pay-grid">' + payFld("prBase", "기본급", row.base, payWon(v.base)) + payFld("prAllow", "고정 수당", row.allow, payWon(v.allow)) + payFld("prMeal", "식대", row.meal, payWon(v.meal)) + payFld("prCar", "자가운전보조금", row.car, payWon(v.car)) + payFld("prBonus", "상여금", row.bonus || "", "0") + '</div>';
+    h += '<div class="pay-sub">입사·퇴사 달 일할(그 달 값을 넣지 않은 칸에 월액 ÷ 날수 × 일한 날)</div><div class="pay-grid">' + payFld("prDays", "일한 날", row.prorate ? row.prorate.days : "") + payFld("prOf", "그 달 날수 기준", row.prorate ? row.prorate.of : "", "대장은 30") + '</div>';
+    h += '<div class="pay-sub">초과/차감 수당(통상시급 × 시간 × 가산율 — 하수준설 연장은 수당 칸의 내역에서)</div><div class="pay-grid">' + payFld("prExt", "연장 시간", ot.ext) + payFld("prNight", "야간 시간", ot.night) + payFld("prHol", "휴일 시간", ot.hol) + payFld("prHol8", "휴일 8시간 초과", ot.hol8) + payFld("prMinus", "결근·조퇴 차감 시간", row.minus_hours) + payFld("prAdj", "직접 넣는 금액(±)", row.adj_amt) + '</div>';
+    h += '<div class="pay-sub">공제를 계산 대신 이 값으로(회계사무소·공단 금액을 따르기로 한 칸만)</div><div class="pay-grid">' + payFld("prDP", "국민연금", df.pension) + payFld("prDH", "건강보험", df.health) + payFld("prDC", "장기요양", df.care) + payFld("prDE", "고용보험", df.emp) + '</div>';
+    h += '<label class="pay-f"><span>비고</span><input id="prNote" maxlength="60" value="' + esc(row.note || "") + '"></label><div id="prCalc"></div>';
+    var body = payDlg((m.name || "") + " — " + payS.ym + " 값", h, function(btn){ var x = payRowRead(row); if (!x) return; paySaveRow(mid, x, btn); });
+    var t = null, prev = function(){ clearTimeout(t); t = setTimeout(function(){ var x = payRowRead(row, true); if (!x) return; gwCall("gw-pay", { action: "pay_row_preview", corp: payS.corp, ym: payS.ym, mid: mid, row: x }).then(function(r4){ var el = document.getElementById("prCalc"); if (el && r4.status === 200) el.innerHTML = payCalcTxt(r4.body.calc, r4.body.off); else if (el && r4.body && r4.body.error_code) el.innerHTML = '<div class="pay-calc off">' + esc(r4.body.error_code) + (r4.body.field ? " (" + esc(r4.body.field) + ")" : "") + '</div>'; }, function(){}); }, 400); };
+    Array.prototype.forEach.call(body.querySelectorAll("input"), function(el){ el.addEventListener("input", prev); });
+    prev();
+  }
+  function payRowRead(row, quiet){   // row = 지금 저장된 값(하수준설 줄은 그대로 이어 둠)
+    var g = function(id){ return document.getElementById(id); }, x = {}, badF = [];
+    var put = function(k, id, lab){ var n = payNum(g(id), true); if (n === null) return; if (isNaN(n)) badF.push(lab); else x[k] = n; };
+    put("base", "prBase", "기본급"); put("allow", "prAllow", "고정 수당"); put("meal", "prMeal", "식대"); put("car", "prCar", "자가운전보조금"); put("bonus", "prBonus", "상여금");
+    var dy = payNum(g("prDays"), true), of = payNum(g("prOf"), true);
+    if (dy !== null || of !== null){ if (dy === null || of === null || isNaN(dy) || isNaN(of)) badF.push("일할(두 칸 다)"); else x.prorate = { days: dy, of: of }; }
+    var ot = {}; [["ext", "prExt"], ["night", "prNight"], ["hol", "prHol"], ["hol8", "prHol8"]].forEach(function(p){ var n = payNum(g(p[1]), true); if (n === null) return; if (isNaN(n)) badF.push("시간"); else if (n) ot[p[0]] = n; });
+    if (Object.keys(ot).length) x.ot = ot;
+    put("minus_hours", "prMinus", "차감 시간"); put("adj_amt", "prAdj", "직접 넣는 금액");
+    var df = {}; [["pension", "prDP"], ["health", "prDH"], ["care", "prDC"], ["emp", "prDE"]].forEach(function(p){ var n = payNum(g(p[1]), true); if (n === null) return; if (isNaN(n)) badF.push("공제 값"); else df[p[0]] = n; });
+    if (Object.keys(df).length) x.ded_fix = df;
+    var nt = String(g("prNote").value || "").trim(); if (nt) x.note = nt;
+    if (row && row.dredge) x.dredge = row.dredge;
+    if (badF.length){ if (!quiet) alert("숫자를 확인해 주세요: " + badF.join(", ")); return null; }
+    return x;
+  }
+  function paySaveRow(mid, x, btn){
+    var d = payS.data; if (!d) return;
+    payS.busy = true; if (btn) btn.disabled = true;
+    gwCall("gw-pay", { action: "pay_row_save", corp: payS.corp, ym: payS.ym, mid: mid, row: Object.keys(x).length ? x : null, rev: d.rev }).then(function(res){
+      payS.busy = false; if (btn) btn.disabled = false;
+      if (res.status !== 200){ payErr(res, "저장"); if (res.body && (res.body.error_code === "PAY_STALE" || res.body.error_code === "OVERWRITTEN")) payLoad(); return; }
+      gwToast("저장했습니다"); payDlgClose(); payLoad();
+    }, function(){ payS.busy = false; if (btn) btn.disabled = false; alert("저장 실패(네트워크)"); });
+  }
+  // ── 하수준설 수당 내역(수당 칸을 누르면) — 받은 수당내역 꼴: 일수·날짜·추가 수당·연장시간 ──
+  function payDredgeDlg(mid){
+    var r = payRow(mid); if (!r) return;
+    var d = payS.data, cf = d.conf && d.conf.dredge;
+    var lines = ((r.row && r.row.dredge) || []).map(function(l){ return { d: l.d, days: l.days, ot: l.ot, add: l.add, side: l.side }; });
+    var others = d.rows.filter(function(x){ return x.mid !== mid && x.row && x.row.dredge && x.row.dredge.length; });
+    var draw = function(calc){
+      var cl = calc && calc.dredge ? calc.dredge.lines : null, byD = {}; (cl || []).forEach(function(x){ byD[x.d] = x; });
+      var WD = "일월화수목금토";
+      var h = '<p>근무 기간 ' + esc(d.period.from) + ' ~ ' + esc(d.period.to) + (cf ? ' · 준설 ' + cf.free_days + '일까지 기본급 포함 · 넘는 날 하루 ' + payWon(cf.day) + '원(반일은 반) · 연장 1시간 ' + payWon(cf.ot_hour) + '원' : ' · <b>단가 설정이 없어 계산하지 않습니다(단가·기간 설정)</b>') + '</p>';
+      h += '<table class="pay-dr"><thead><tr><th>날짜</th><th>일수</th><th>연장시간</th><th>더한 금액</th><th>나눔</th><th>추가 수당</th><th></th></tr></thead><tbody>';
+      lines.forEach(function(l, i){
+        var c = byD[l.d], dw = WD[new Date(l.d + "T00:00:00Z").getUTCDay()];
+        h += '<tr' + (c && c.paid === 0 ? ' class="in"' : '') + '><td>' + esc(l.d.slice(5)) + ' (' + dw + ')</td><td><select data-dr-days="' + i + '"><option value="1"' + (l.days === 1 ? ' selected' : '') + '>1</option><option value="0.5"' + (l.days === 0.5 ? ' selected' : '') + '>0.5</option></select></td>' +
+          '<td><input data-dr-ot="' + i + '" inputmode="decimal" value="' + (l.ot || "") + '"></td><td><input data-dr-add="' + i + '" inputmode="decimal" value="' + (l.add || "") + '"></td>' +
+          '<td><select data-dr-side="' + i + '"><option value=""' + (!l.side ? ' selected' : '') + '>자동' + (c && !l.side ? '(' + (c.auto === "in" ? "포함" : (c.auto === "out" ? "지급" : "일부")) + ')' : '') + '</option><option value="in"' + (l.side === "in" ? ' selected' : '') + '>기본급 포함</option><option value="out"' + (l.side === "out" ? ' selected' : '') + '>추가 지급</option></select></td>' +
+          '<td class="num">' + (c ? payWon(c.amt) : "") + '</td><td><button type="button" class="vs-chip" data-dr-del="' + i + '">✕</button></td></tr>';
+      });
+      h += '<tr class="add"><td><input type="date" id="drNewD" min="' + esc(d.period.from) + '" max="' + esc(d.period.to) + '"></td><td><select id="drNewDays"><option value="1">1</option><option value="0.5">0.5</option></select></td><td><input id="drNewOt" inputmode="decimal" placeholder="0"></td><td></td><td></td><td></td><td><button type="button" class="vs-chip" id="drAdd">추가</button></td></tr>';
+      var s = calc && calc.dredge;
+      h += '<tr class="tot"><td>총 근무 일수</td><td class="num">' + (s ? s.days : "") + '</td><td class="num">' + (s ? s.ot : "") + '</td><td></td><td>총 수당</td><td class="num">' + (s ? payWon(s.total) : "") + '</td><td></td></tr></tbody></table>';
+      if (others.length) h += '<div class="pay-sub">같이 나간 사람 내역 가져오기: ' + others.map(function(x){ return '<button type="button" class="vs-chip" data-dr-copy="' + esc(x.mid) + '">' + esc((x.member && x.member.name) || x.mid) + '</button>'; }).join(" ") + ' <small>(지금 줄은 지우고 그 사람 줄로 바꿈 — 다른 날만 고치면 됩니다)</small></div>';
+      h += '<p class="pay-hint">추가 수당은 앱이 계산합니다. 단가로 풀리지 않는 금액은 \'더한 금액\'에, 기본급 포함/추가 지급 나눔이 자동과 다르면 \'나눔\'을 바꿔 주세요. 총 수당이 이 달 대장의 수당 칸으로 들어갑니다.</p>';
+      return h;
+    };
+    var calcNow = null;
+    var body = payDlg(((r.member && r.member.name) || "") + " — " + payS.ym + " 하수준설 수당 내역", draw(r.calc), function(btn){ var x = Object.assign({}, r.row || {}); if (lines.length) x.dredge = lines; else delete x.dredge; paySaveRow(mid, x, btn); });
+    var refresh = function(){
+      var x = Object.assign({}, r.row || {}); if (lines.length) x.dredge = lines; else delete x.dredge;
+      gwCall("gw-pay", { action: "pay_row_preview", corp: payS.corp, ym: payS.ym, mid: mid, row: x }).then(function(res){ calcNow = res.status === 200 ? res.body.calc : null; body.innerHTML = draw(calcNow); bind(); if (res.status !== 200) gwToast("줄을 확인해 주세요 — " + ((res.body && res.body.field) || (res.body && res.body.error_code) || res.status), true); }, function(){ body.innerHTML = draw(null); bind(); });
+    };
+    var bind = function(){
+      var q = function(sel, fn){ Array.prototype.forEach.call(body.querySelectorAll(sel), fn); };
+      q("[data-dr-days]", function(el){ el.onchange = function(){ lines[+el.getAttribute("data-dr-days")].days = +el.value; refresh(); }; });
+      q("[data-dr-side]", function(el){ el.onchange = function(){ lines[+el.getAttribute("data-dr-side")].side = el.value; refresh(); }; });
+      q("[data-dr-ot]", function(el){ el.onchange = function(){ var n = payNum(el, true); if (n === null) n = 0; if (isNaN(n)){ alert("연장시간은 숫자로"); return; } lines[+el.getAttribute("data-dr-ot")].ot = n; refresh(); }; });
+      q("[data-dr-add]", function(el){ el.onchange = function(){ var n = payNum(el, true); if (n === null) n = 0; if (isNaN(n)){ alert("더한 금액은 숫자로"); return; } lines[+el.getAttribute("data-dr-add")].add = n; refresh(); }; });
+      q("[data-dr-del]", function(el){ el.onclick = function(){ lines.splice(+el.getAttribute("data-dr-del"), 1); refresh(); }; });
+      q("[data-dr-copy]", function(el){ el.onclick = function(){ var o = payRow(el.getAttribute("data-dr-copy")); if (!o || !o.row || !o.row.dredge) return; if (lines.length && !confirm("지금 줄을 지우고 그 사람 줄로 바꿀까요?")) return; lines = o.row.dredge.map(function(l){ return { d: l.d, days: l.days, ot: l.ot, add: l.add, side: l.side }; }); refresh(); }; });
+      var ad = document.getElementById("drAdd"); if (ad) ad.onclick = function(){
+        var dt = document.getElementById("drNewD").value, n = payNum(document.getElementById("drNewOt"), true);
+        if (!dt){ alert("날짜를 골라 주세요"); return; }
+        if (dt < d.period.from || dt > d.period.to){ alert("근무 기간 안의 날짜만 넣을 수 있습니다"); return; }
+        if (lines.some(function(l){ return l.d === dt; })){ alert("이미 있는 날짜입니다"); return; }
+        if (n !== null && isNaN(n)){ alert("연장시간은 숫자로"); return; }
+        lines.push({ d: dt, days: +document.getElementById("drNewDays").value, ot: n || 0, add: 0, side: "" }); lines.sort(function(a, b){ return a.d < b.d ? -1 : 1; }); refresh();
+      };
+    };
+    bind();
+  }
+  // ── 단가·기간 설정 ──
+  function payConfDlg(){
+    gwCall("gw-pay", { action: "pay_conf_get" }).then(function(res){
+      if (res.status !== 200){ payErr(res, "설정 읽기"); return; }
+      var c = res.body.conf || {}, dr = c.dredge || {}, rev = c.rev || "";
+      var h = '<p>급여 기간·지급일과 하수준설 수당 단가입니다. 바꾸면 확정하지 않은 달 계산에 바로 쓰입니다(확정한 달은 그대로).</p><div class="pay-grid">' +
+        payFld("pcPeriod", "급여 기간 시작일", c.period_day || "", "1 = 그 달 1일~말일", "예: 15 = 전달 15일~이달 14일") + payFld("pcPay", "지급일", c.pay_day || "", "비우면 표시 안 함") + '</div><div class="pay-sub">하수준설 수당</div><div class="pay-grid">' +
+        payFld("pcDay", "10일 넘는 날 하루 금액", dr.day || "", "", "반일은 반") + payFld("pcOt", "연장 1시간 금액", dr.ot_hour === undefined ? "" : dr.ot_hour) + payFld("pcFree", "기본급에 포함하는 준설 일수", dr.free_days === undefined ? "" : dr.free_days) + '</div>';
+      payDlg("급여 단가·기간 설정", h, function(btn){
+        var g = function(id){ return payNum(document.getElementById(id), true); };
+        var pd = g("pcPeriod"), py = g("pcPay"), dy = g("pcDay"), ot = g("pcOt"), fr = g("pcFree");
+        var conf = { period_day: pd === null ? 1 : pd, pay_day: py, dredge: (dy === null && ot === null && fr === null) ? null : { day: dy, ot_hour: ot === null ? 0 : ot, free_days: fr === null ? 0 : fr } };
+        if ([pd, py, dy, ot, fr].some(function(x){ return typeof x === "number" && isNaN(x); })){ alert("숫자를 확인해 주세요"); return; }
+        payS.busy = true; btn.disabled = true;
+        gwCall("gw-pay", { action: "pay_conf_save", conf: conf, rev: rev }).then(function(r2){ payS.busy = false; btn.disabled = false; if (r2.status !== 200){ payErr(r2, "설정 저장"); return; } gwToast("설정을 저장했습니다"); payDlgClose(); payLoad(); }, function(){ payS.busy = false; btn.disabled = false; alert("설정 저장 실패(네트워크)"); });
+      });
+    }, function(){ alert("설정 읽기 실패(네트워크)"); });
+  }
+  function payClose(){
+    var d = payS.data; if (!d) return;
+    if (!confirm(PAY_CORP[payS.corp] + " " + d.ym + " 급여대장을 확정할까요?\n확정하면 지금 금액을 얼려 두고, 그 뒤에 기준·요율이 바뀌어도 이 달 금액은 그대로입니다(확정 풀기로 다시 열 수 있음).")) return;
+    gwCall("gw-pay", { action: "pay_month_close", corp: payS.corp, ym: d.ym, rev: d.rev }).then(function(res){
+      if (res.status !== 200){ if (res.body && res.body.mids){ var nm = res.body.mids.map(function(x){ var r = payRow(x); return (r && r.member && r.member.name) || x; }); alert("확정 못 함 — 계산이 안 된 사람: " + nm.join(", ")); } else payErr(res, "확정"); return; }
+      gwToast("확정했습니다"); payLoad();
+    }, function(){ alert("확정 실패(네트워크)"); });
+  }
+  function payReopen(){
+    var d = payS.data; if (!d) return;
+    if (!confirm(d.ym + " 확정을 풀까요? 얼려 둔 금액을 지우고 지금 기준·요율로 다시 계산합니다.")) return;
+    gwCall("gw-pay", { action: "pay_month_reopen", corp: payS.corp, ym: d.ym, rev: d.rev }).then(function(res){ if (res.status !== 200){ payErr(res, "확정 풀기"); return; } gwToast("확정을 풀었습니다"); payLoad(); }, function(){ alert("확정 풀기 실패(네트워크)"); });
+  }
   // @pay-end
   function pmconDueTxt(r){
     if (r.due) return "무응답 적용일 " + pmconMd(r.due) + " — " + (r.def === "rec" ? r.recTxt + " 적용" : "그대로");

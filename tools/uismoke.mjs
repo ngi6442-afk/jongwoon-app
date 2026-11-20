@@ -20958,6 +20958,54 @@ try {
   T('v518 문서·판 번호(정확 검사): FEATURES 기준 v518 (2026-11-20)·v518 절(운반일지 집계·새 노선) · TESTLIST v518 칸 5(화면·운영 확인 3 · 게이트 [x] 2) · MANUAL 겹침 알림 문장(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 3줄 한 번씩 · sw jw-shell-v518 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
     r518.ok && M518.every((v) => v === false), JSON.stringify({ r: r518.info, mut: M518 }));
 } catch (e) { console.log('  (v518 검사 생략 — ' + e.message + ')'); fails++; }
+// ── 66 급여 판2(원장 C236 · PM 11/20 16:04 'ㄱ' — 시안 3판: 회계사무소 급여대장 꼴 + 하수준설 수당 내역) 급여 탭 배선·글 함수. 서버 동작은 servertest '66 판2' · 여기는 화면 배선과 순수 글 함수.
+try {
+  const fnQ = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) return ''; let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } return ''; };
+  const gpQ = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-pay.js'), 'utf8');
+  const actsQ = ((gpQ.match(/\nconst ACTS = \{([\s\S]*?)\};/) || [0, ''])[1].match(/pay_[a-z_]+(?=:)/g) || []);
+  const segQ = (H) => { const a = H.indexOf('\n  // @pay-start\n'), b = H.indexOf('\n  // @pay-end\n'); return a > 0 && b > a ? H.slice(a, b) : ''; };
+  const chkQ = (H) => {
+    const I = {}, seg = segQ(H);
+    const used = (seg.match(/action: "(pay_[a-z_]+)"/g) || []).map((x) => x.slice(9, -1));
+    I.wire = H.indexOf('<button class="tab-btn perm-hidden" data-tab="workers" id="tabWkBtn">인사·일용직</button>\n    <button class="tab-btn perm-hidden" data-tab="pay" id="tabPayBtn">급여</button>') > 0
+      && H.indexOf('<section class="view" id="view-pay">') > 0 && H.indexOf('<div id="payHost">') > 0
+      && /document\.getElementById\("view-pay"\)\.classList\.toggle\("active", name === "pay"\);/.test(H) && /\n    if \(name === "pay"\) payOpen\(\);/.test(H)
+      && /if \(payBtn\) payBtn\.classList\.toggle\("perm-hidden", !adminUser\);[^\n]*\n    if \(currentTab === "pay" && !adminUser\) switchTab\("dash"\);/.test(H)
+      && /function payOpen\(\)\{ if \(!isAdmin\(\)\) return;/.test(seg);
+    I.acts = used.length >= 10 && used.every((a) => actsQ.indexOf(a) >= 0) && actsQ.every((a) => used.indexOf(a) >= 0) && seg.indexOf('gwCall("gw-data"') < 0;
+    // 금액·요율 숫자를 화면 코드에 적지 않음(다섯 자리 넘는 숫자 없음) · 직원 수정 창·회원 저장 호출 없음
+    I.nonum = !/[^\w.]\d{5,}(?![\w])/.test(seg.replace(/\/\/[^\n]*/g, '')) && !/gw-auth|meSave|member_upsert/.test(seg);
+    // 사람 이름·글은 esc 를 거쳐 그림(이름 칸·비고 꼬리표·기준 창 제목은 textContent)
+    I.esc = /esc\(m\.name \|\| "\(지운 직원\)"\)/.test(seg) && /'<span class="pay-tag">' \+ esc\(t\) \+ '<\/span>'/.test(seg) && /document\.getElementById\("payDlgTitle"\)\.textContent = title;/.test(seg) && !/innerHTML = [^;]*\btitle\b/.test(seg);
+    // 글 함수: 요율 줄(근거 표 값으로만) · 금액 쉼표 · 달 넘기기
+    const f = new Function('esc', 'PAY_WHY', fnQ(H, 'payWon') + '\n' + fnQ(H, 'payYmAdd') + '\n' + fnQ(H, 'payLawTxt') + '\nreturn { payWon: payWon, payYmAdd: payYmAdd, payLawTxt: payLawTxt };')((s) => String(s).replace(/</g, '&lt;'), { NOT_PROMOTED: '요율 표 승격 전' });
+    const lt = f.payLawTxt({ on: true, ver: 'v1-x', rates: { pension: 0.0475, health: 0.03595, care_ratio: 0.1314, emp: 0.009, local: 0.1, cut: 10 } });
+    I.text = lt.indexOf('국민연금 4.75% · 건강보험 3.595% · 장기요양 건강보험료의 13.14% · 고용보험 0.9%') > 0 && lt.indexOf('지방소득세 10% · 공제는 10원 미만 버림') > 0
+      && f.payLawTxt({ on: false, why: 'NOT_PROMOTED' }).indexOf('요율 표 승격 전') > 0 && f.payWon(1234567) === '1,234,567' && f.payWon(null) === '' && f.payYmAdd('2026-12', 1) === '2027-01' && f.payYmAdd('2026-01', -1) === '2025-12';
+    // 대장 칸 = 회계사무소 대장 머리 그대로(묶음 셋 · 두 줄 머리 · 18칸)
+    I.cols = seg.indexOf('<th class="g" colspan="2">인적사항</th><th class="g" colspan="7">지급내역</th><th class="g" colspan="8">공제내역 및 차인지급액</th><th class="g" rowspan="3">비고</th>') > 0
+      && seg.indexOf('<th>사원번호</th><th>성명</th><th rowspan="2">기본급</th><th rowspan="2">수당</th><th rowspan="2">초과/차감<br>수당</th><th rowspan="2">상여금</th><th rowspan="2">식대</th><th rowspan="2">자가운전<br>보조금</th><th>4대보험<br>적용총액</th>') > 0
+      && seg.indexOf('<tr><th>입사일</th><th>직위</th><th>지급총액</th></tr>') > 0;
+    // 확정한 달은 넣는 칸을 열지 않음 · 확정·풀기는 확인 창
+    I.closed = /\(closed \? '' : ' data-pay-row="' \+ mid \+ '"'\)/.test(seg) && /dredgeOn && !closed \?/.test(seg) && /function payClose\(\)\{[\s\S]{0,120}if \(!confirm\(/.test(seg) && /function payReopen\(\)\{[\s\S]{0,120}if \(!confirm\(/.test(seg);
+    return { ok: Object.values(I).every((v) => v === true), info: I };
+  };
+  const rQ = chkQ(html);
+  const muQ = (a, b) => { if (html.split(a).length !== 2) return 'no-site:' + a.slice(0, 40); return chkQ(html.replace(a, () => b)).ok; };
+  const MQ = [
+    muQ('    if (payBtn) payBtn.classList.toggle("perm-hidden", !adminUser);', '    if (payBtn) payBtn.classList.toggle("perm-hidden", false);'),
+    muQ('function payOpen(){ if (!isAdmin()) return;', 'function payOpen(){'),
+    muQ('esc(m.name || "(지운 직원)")', 'String(m.name || "(지운 직원)")'),
+    muQ('document.getElementById("payDlgTitle").textContent = title;', 'document.getElementById("payDlgTitle").innerHTML = title;'),
+    muQ('gwCall("gw-pay", { action: "pay_conf_get" })', 'gwCall("gw-pay", { action: "pay_conf_read" })'),
+    muQ('<th class="g" colspan="7">지급내역</th>', '<th class="g" colspan="6">지급내역</th>'),
+    muQ('(closed ? \'\' : \' data-pay-row="\' + mid + \'"\')', '(\' data-pay-row="\' + mid + \'"\')'),
+    muQ('return String(+(x * 100).toFixed(4)) + "%";', 'return String(+(x * 100).toFixed(1)) + "%";')
+  ];
+  T('66 판2 ① 급여 탭 배선·글 함수: 단추(인사·일용직 다음 · 관리자만 보임 · 아니면 홈으로) · 화면 구역·탭 바꾸기·payOpen 관리자 확인 · 서버 gw-pay 동작 10개와 화면 호출이 서로 같음 · 화면 코드에 금액·요율 숫자 없음 · 이름·꼬리표 esc · 창 제목 textContent · 요율 줄 글·금액 쉼표·달 넘기기 · 대장 머리 = 회계사무소 대장 꼴 · 확정 달은 넣는 칸 닫힘·확정/풀기 확인 창',
+    rQ.ok, JSON.stringify(rQ.info));
+  T('66 판2 ② 결함 사본 ' + MQ.length + '개(단추 늘 보임 · payOpen 관리자 확인 걷음 · 이름 esc 걷음 · 창 제목 innerHTML · 서버에 없는 동작 · 머리 칸 수 · 확정 달 칸 열림 · 요율 % 자리) = 모두 ✗', MQ.every((v) => v === false), JSON.stringify(MQ));
+} catch (e) { console.log('  (66 판2 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

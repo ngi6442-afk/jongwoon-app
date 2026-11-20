@@ -13813,10 +13813,12 @@ function J91a(x) { return JSON.stringify(x); }
     T('66 판1 ① pay_bg_get: 비로그인 401 · 직원·인사 수행 권한 직원 403 ADMIN_ONLY(급여는 관리자만) · 근거 없음 NO_BG · 확인 필요 행이 계산에 쓰이면 BAD_BG · 미승격 = 올라온 판 요약만(행·sum 없음) · 승격 = on·sum·행 40(세액표 본문은 안 실음) · can_write = PM만 · 스위치 못 읽음 FLAG_READ_FAILED · 근거 표 못 읽음 BG_READ_FAILED(없음으로 보지 않음) · sha 없는 스위치 NOT_PROMOTED · 내용만 바뀜 SHA_CHANGED', RA.ok, RA.info);
     T('66 판1 ② pay_bg_set: PM 아닌 관리자 403 PM_ONLY · 직원 403 · 비로그인 401 · 틀린 꼴 400 BAD_VALUE · 다른 판 409 BG_MISSING · 낡은 base 409 PAY_BG_STALE · 근거 표 못 읽음 503 PAY_BG_READ_FAILED · base 없음 400 NEED_BASE · 지문 다름·없음 409 BG_CHANGED · 해제에 지문 400 BAD_VALUE · 꼭 읽는 키가 빠진 표 409 BG_INCOMPLETE(전부 스위치 그대로·감사 0) · 승격 = bg_ver·bg_sha·prev·updated_by·다른 칸 보존·감사 1줄 · 같은 값 400 NO_CHANGE · 내용 바뀐 같은 판 다시 승격 · 스위치 못 읽음 503(덮지 않음) · 해제', RB.ok, JSON.stringify(RB.info));
     T('66 판1 ③ PM 콘솔 줄 paybg(R2): 등급 R1 400 BAD_GRADE · 줄 id와 값이 다르면 400 BAD_ROW · PM 아닌 관리자 403 · [기본값] = 그대로(미승격 — keep 표시) · [ㄱ] = pay_bg_set 길로 승격·누른 기록 · 지문 칸이 빠진 인자 400 BAD_ARGS · 지문이 다른 [ㄱ] 409 BG_CHANGED(스위치 그대로)', RC.ok, JSON.stringify(RC.info));
-    const othersP = fsP.readdirSync(FN).filter((f) => /\.js$/.test(f) && f !== 'gw-data.js').filter((f) => /bg:pay:law|settings:pay|pay_bg_/.test(fsP.readFileSync(join(FN, f), 'utf8')));
+    const othersP = fsP.readdirSync(FN).filter((f) => /\.js$/.test(f) && f !== 'gw-data.js' && f !== 'gw-pay.js').filter((f) => /bg:pay:law|settings:pay|pay_bg_/.test(fsP.readFileSync(join(FN, f), 'utf8')));
+    const payFnP = fsP.readFileSync(join(FN, 'gw-pay.js'), 'utf8');   // 66 판2: gw-pay 는 두 키를 읽기만(blobSet 0 · pay_bg_* 동작 없음) · 판정 = PAYBG.lawPick(gw-data payBgState 와 같은 답 — 판2 ⑧이 대조)
+    const payFnOk = !/blobSet\([^)]*(LAW_KEY|LAW_FLAG|bg:pay:law|settings:pay)/.test(payFnP) && !/pay_bg_/.test(payFnP) && /PAYBG\.lawPick\(/.test(payFnP);
     const libsP = fsP.readdirSync(join(FN, '_lib')).filter((f) => /\.js$/.test(f)).filter((f) => /^pay/.test(f) && /getStore|blobGet|blobSet|require\(/.test(fsP.readFileSync(join(FN, '_lib', f), 'utf8').replace(/\/\/[^\n]*/g, '')));
-    T('66 판1 ④ 급여 근거 키(bg:pay:law·settings:pay)·동작(pay_bg_*)을 아는 서버 파일 = gw-data.js 하나 · _lib/paybg·paycalc 는 저장소를 모름 · 스위치 쓰기 한 곳 · 콘솔 줄 서버 표 paybg R2',
-      othersP.length === 0 && libsP.length === 0 && (SRCP.match(/blobSet\(st, PAY_BG_KEYS\.flag,/g) || []).length === 1 && (SRCP.match(/PAY_BG_KEYS\.bg/g) || []).length === 1
+    T('66 판1 ④ 급여 근거 키(bg:pay:law·settings:pay)·동작(pay_bg_*)을 아는 서버 파일 = gw-data.js(쓰기) + gw-pay.js(읽기만 · lawPick) · _lib/pay* 는 저장소를 모름 · 스위치 쓰기 한 곳 · 콘솔 줄 서버 표 paybg R2',
+      othersP.length === 0 && payFnOk && libsP.length === 0 && (SRCP.match(/blobSet\(st, PAY_BG_KEYS\.flag,/g) || []).length === 1 && (SRCP.match(/PAY_BG_KEYS\.bg/g) || []).length === 1
       && /\nPMCON_KINDS\.paybg = \{ label: '급여 법령 근거 승격', grade: 'R2', fn: handlePayBgSet, args: \{ bg_ver: 's', bg_sha: 's' \}/.test(SRCP), JSON.stringify({ othersP, libsP }));
     const MUTP = {
       A: [["  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });\n  const s = await payBgState(store(DATA));", "  const s = await payBgState(store(DATA));"],
@@ -13851,6 +13853,302 @@ function J91a(x) { return JSON.stringify(x); }
     T('66 판1 ⑤ 결함 사본 ' + nP + '개(관리자 검사 걷음 · 못 읽은 표를 통과·없음으로 · 못 읽은 스위치 통과 · sha 없는 스위치 통과 · 내용 바뀜 못 봄 · 꼴 검사 걷음 · 세액표 본문 실음 · 쓰기 가능을 관리자 전원으로 · 쓰기 관문을 읽기로 · 못 읽은 표로 승격 · 판 대조 느슨 · 낙관락 걷음 · 못 읽은 스위치 덮기 · 다른 칸 지움 · sha 안 적음 · 감사 없음 · 같은 판 다시 승격 막힘 · 콘솔 등급 R1) = 모두 ✗', killP.length === 0, killP.join(' | '));
   } catch (e) { T('66 판1 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
   finally { resetP(); }
+}
+{ // ---- 66 급여 판2(원장 C236 · PM 11/20 16:04 'ㄱ' — 시안 3판: 회계사무소 급여대장 꼴 + 하수준설 수당 내역) gw-pay.js · _lib/payledger.js
+  //   급여대장(달·회사) · 그 달 값 · 미리 계산 · 확정/풀기 · 한 사람 기준(판) · 단가·기간 설정 · 백업 복원 'pay' 갈래 · 승격 판정 두 벌 대조(PAYBG.lawPick ↔ gw-data payBgState).
+  //   시험 자료는 전부 가짜(이름 '급여66…' · 금액 임의). 근거 표 = tools/pay_bg_fixture.json(얼린 사본). 결함 사본 = gw-pay.js(G) 또는 _lib/payledger.js(L) 한 곳을 바꿔 메모리에서 컴파일.
+  //   달은 늘 박아서 부른다(YM 2026-11 · 기간 시작일 15 → 2026-10-15 ~ 2026-11-14). 판 지우기의 '이번 달'은 시계를 갈아 끼운 한 묶음에서만 본다.
+  const fsQ = require('fs'), ModQ = require('module');
+  const FILEQ = join(FN, 'gw-pay.js'), LIBQ = join(FN, '_lib', 'payledger.js');
+  const SRCQ = fsQ.readFileSync(FILEQ, 'utf8').replace(/\r\n/g, '\n'), LSRCQ = fsQ.readFileSync(LIBQ, 'utf8').replace(/\r\n/g, '\n');
+  const gwpQ = require(FILEQ), PGQ = require(join(FN, '_lib/paybg.js')), PCQ = require(join(FN, '_lib/paycalc.js')), PLQ = require(LIBQ);
+  const compQ = (file, src) => { const m = new ModQ(file); m.filename = file; m.paths = ModQ._nodeModulePaths(dirname(file)); m._compile(src, file); return m.exports; };
+  const mutQ = (src, from, to) => { if (src.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return src.replace(from, () => to); };
+  const loadQ = (kind, from, to) => {
+    if (kind === 'G') return compQ(FILEQ, mutQ(SRCQ, from, to));
+    const rp = require.resolve(LIBQ), keep = require.cache[rp];
+    try { require.cache[rp] = { id: rp, filename: rp, loaded: true, exports: compQ(LIBQ, mutQ(LSRCQ, from, to)) }; return compQ(FILEQ, SRCQ); } finally { require.cache[rp] = keep; }
+  };
+  const callerQ = (mod) => async (body, tok) => {
+    const r = await mod.handler({ httpMethod: 'POST', headers: { authorization: tok ? 'Bearer ' + tok : '' }, body: JSON.stringify(body) });
+    let b = {}; try { b = JSON.parse((r && r.body) || '{}') || {}; } catch (e) { b = {}; }
+    return { code: r && r.statusCode, body: (b && typeof b === 'object') ? b : {} };
+  };
+  const snapQ = JSON.stringify({ u: mem.gw_users, d: mem.gw_data }), now0Q = Date.now;
+  const tryQ = (fn) => { try { return fn() === true; } catch (e) { return false; } };
+  const cloneQ = (x) => (x === undefined ? undefined : JSON.parse(JSON.stringify(x)));
+  const outQ = (P, I) => ({ ok: Object.keys(P).length > 0 && Object.keys(P).every((k) => P[k] === true), info: '✗ ' + Object.keys(P).filter((k) => P[k] !== true).join(',') + ' ' + JSON.stringify(I).slice(0, 900) });
+  const KBQ = 'bg:pay:law:v1', KFQ = 'settings:pay', YMQ = '2026-11', PERQ = { from: '2026-10-15', to: '2026-11-14' };
+  const FIXQ = fsQ.readFileSync(join(ROOT, 'tools', 'pay_bg_fixture.json'), 'utf8');
+  const BGQ = () => JSON.parse(FIXQ), VQ = BGQ().ver, SQ = BGQ().sha, FLGQ = () => ({ schema: 1, bg_ver: VQ, bg_sha: SQ, updated_at: 5 });
+  const REVQ = (n) => String(n).padStart(16, 'a').slice(-16).replace(/[^0-9a-f]/g, 'b');
+  const MSQ = {
+    uadmin: { id: 'uadmin', name: '관리자', admin: true, perms: {}, tier: 'pm' },
+    uw66q: { id: 'uw66q', name: '급여66직원', admin: false, perms: { hr: 'do' }, corp: 'env' },
+    ura66q: { id: 'ura66q', name: '급여66퇴사관리', admin: true, perms: {}, leave_date: '2020-01-01' },
+    qa: { id: 'qa', name: '급여66가', corp: 'env', emp_type: '정규직', rank: '반장', hire_date: '2022-01-17', emp_no: '12', birth: '1980-01-01' },
+    qb: { id: 'qb', name: '급여66나', corp: 'both', emp_type: '계약직', rank: '기사', hire_date: '2016-09-01', emp_no: '15', birth: '1962-05-05' },
+    qc: { id: 'qc', name: '급여66다', corp: 'con', emp_type: '정규직' },
+    qd: { id: 'qd', name: '급여66지입', corp: 'env', emp_type: '지입차주' },
+    qe: { id: 'qe', name: '급여66일용', corp: 'env', emp_type: '일용직' },
+    qf: { id: 'qf', name: '급여66시험', corp: 'env', test_acct: true },
+    qg: { id: 'qg', name: '급여66삭제', corp: 'env', del: 1 },
+    qh: { id: 'qh', name: '급여66지난퇴사', corp: 'env', leave_date: '2026-10-14' },
+    qi: { id: 'qi', name: '급여66기간퇴사', corp: 'env', leave_date: '2026-10-20' },
+    qj: { id: 'qj', name: '급여66늦은입사', corp: 'env', hire_date: '2026-11-15' },
+    qk: { id: 'qk', name: '급여66회사없음', corp: '' }
+  };
+  const tWQ = issueSession(MSQ.uw66q).token, tRQ = issueSession(MSQ.ura66q).token, tGQ = issueSession({ id: 'ughost66q', admin: true }).token;
+  const VERQ = (o) => Object.assign({ from: '2026-10', base: 2600000, allow: 100000, allow_ord: true, meal: 200000, car: 0, hours: 209, fam: 1, kids: 0, pct: 100, pension_base: null, health_base: null, skip: { pension: false, health: false, emp: false }, dredge: true }, o || {});
+  const BDQ = (vers, rev) => ({ schema: 1, rev: rev || REVQ('b1'), vers: vers, updated_at: 7, updated_by: 'uadmin' });
+  const CONFQ = () => ({ schema: 1, rev: REVQ('c1'), dredge: { day: 150000, ot_hour: 20000, free_days: 10 }, period_day: 15, pay_day: 15, updated_at: 3, updated_by: 'uadmin' });
+  const LINESQ = () => ['10-15', '10-16', '10-19', '10-20', '10-21', '10-22', '10-23', '10-26', '10-27', '10-28', '10-30', '11-03', '11-05', '11-10'].map((x) => ({ d: '2026-' + x, days: x === '11-05' ? 0.5 : 1, ot: x === '11-03' ? 2 : 0, add: 0, side: '' }));
+  const seedQ = (o) => {
+    o = o || {};
+    blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; blobsMock.hooks.beforeGet = null; blobsMock.hooks.beforeSet = null; blobsMock.hooks.failList = false;
+    mem.gw_users = { 'device:dev1': { status: 'approved' } };
+    Object.keys(MSQ).forEach((id) => { mem.gw_users['member:' + id] = Object.assign({ perms: {} }, cloneQ(MSQ[id])); });
+    mem.gw_data = {};
+    if (o.bg !== null) mem.gw_data[KBQ] = o.bg || BGQ();
+    if (o.flag !== null) mem.gw_data[KFQ] = o.flag || FLGQ();
+    if (o.conf !== null) mem.gw_data['pay:conf'] = o.conf || CONFQ();
+    mem.gw_data['pay:base:env:qa'] = BDQ([VERQ()]);
+    mem.gw_data['pay:base:env:qb'] = BDQ([VERQ({ base: 2800000, allow: 200000, car: 200000, dredge: false, skip: { pension: true, health: false, emp: false } })]);
+    Object.assign(mem.gw_data, o.docs || {});
+  };
+  // 직접 계산(같은 함수 · 다른 길): 요율 고르기 → 입력 만들기 → calcMonth → 대장 칸
+  const handQ = (ver, row, conf, bg) => { bg = bg || BGQ(); const rf = PGQ.ratesFor(bg, YMQ, YMQ); const bi = PLQ.buildInput(ver, row || {}, conf, PGQ.capsFor(bg, YMQ)); if (!bi.ok) return bi; const t = PLQ.toCols(PCQ.calcMonth(rf.rates, rf.tax, bi.inp)); return { ok: true, net: t.net, gross: t.gross, taxable: t.taxable, cols: t.cols, ded: t.ded, dredge: bi.dredge }; };
+  const rowOfQ = (b, mid) => (b.rows || []).filter((r) => r.mid === mid)[0] || null;
+  const audQ = () => auditMock.logs.filter((l) => l && l.col === 'pay');
+
+  const chkGateQ = async (c) => {   // (1) 관문 — 관리자만 · 회원 못 읽음 503 · 동작 이름 · 시험 계정·퇴사·없는 관리자
+    seedQ(); const P = {}, I = {};
+    const acts = ['pay_month_get', 'pay_row_save', 'pay_row_preview', 'pay_month_close', 'pay_month_reopen', 'pay_base_get', 'pay_base_save', 'pay_base_drop', 'pay_conf_get', 'pay_conf_save'];
+    const g = [];
+    for (const a of acts) g.push((await c({ action: a, corp: 'env', ym: YMQ }, null)).code + '/' + (await c({ action: a, corp: 'env', ym: YMQ }, tWQ)).body.error_code + '/' + (await c({ action: a, corp: 'env', ym: YMQ }, tRQ)).code + '/' + (await c({ action: a, corp: 'env', ym: YMQ }, tGQ)).code);
+    P.gate = g.every((x) => x === '401/ADMIN_ONLY/401/401'); I.gate = g.slice(0, 3);
+    blobsMock.hooks.failGet = (k) => k === 'member:uadmin';
+    const mr = await c({ action: 'pay_month_get', corp: 'env', ym: YMQ }, tokA); blobsMock.hooks.failGet = null;
+    P.memread = mr.code === 503 && mr.body.error_code === 'MEMBER_READ_FAILED'; I.memread = mr.code;
+    const un = await c({ action: 'pay_bg_get' }, tokA), bc = await c({ action: 'pay_month_get', corp: 'xx', ym: YMQ }, tokA), by = await c({ action: 'pay_month_get', corp: 'env', ym: '2019-12' }, tokA), bf = await c({ action: 'pay_month_get', corp: 'env', ym: '2099-01' }, tokA);
+    P.args = un.body.error_code === 'UNKNOWN_ACTION' && bc.body.error_code === 'BAD_CORP' && by.body.error_code === 'BAD_YM' && bf.body.error_code === 'BAD_YM';
+    I.args = [un.body.error_code, bc.body.error_code, by.body.error_code, bf.body.error_code];
+    return outQ(P, I);
+  };
+  const chkLedgerQ = async (c) => {   // (2) 대장 사람·계산 — 같은 함수 직접 호출과 같은 값 · 상태 가름
+    const P = {}, I = {};
+    seedQ({ docs: { 'pay:base:env:qc': BDQ([VERQ({ dredge: false })]), 'pay:month:env:2026-11': { schema: 1, rev: REVQ('m1'), corp: 'env', ym: YMQ, state: 'open', rows: { qa: { dredge: LINESQ(), bonus: 50000 } }, frozen: null, updated_at: 9, updated_by: 'uadmin' } } });
+    const r = await c({ action: 'pay_month_get', corp: 'env', ym: YMQ }, tokA), b = r.body, ids = (b.rows || []).map((x) => x.mid).sort().join();
+    P.people = r.code === 200 && ids === 'qa,qb,qc,qi,uw66q' && (b.loose || []).map((x) => x.mid).sort().join() === 'qk,uadmin';
+    I.people = [r.code, ids, (b.loose || []).map((x) => x.mid).join()];
+    const ra = rowOfQ(b, 'qa'), rb = rowOfQ(b, 'qb'), rc = rowOfQ(b, 'qc'), ri = rowOfQ(b, 'qi');
+    const ea = handQ(VERQ(), { dredge: LINESQ(), bonus: 50000 }, CONFQ()), eb = handQ(VERQ({ base: 2800000, allow: 200000, car: 200000, dredge: false, skip: { pension: true, health: false, emp: false } }), {}, CONFQ());
+    P.calc = tryQ(() => ra.state === 'ok' && ra.calc.net === ea.net && ra.calc.gross === ea.gross && ra.calc.cols.allow === 100000 + ea.dredge.total && ra.calc.dredge.total === ea.dredge.total && ra.calc.cols.bonus === 50000
+      && ea.dredge.paid_days === 3.5 && ea.dredge.total === 3.5 * 150000 + 2 * 20000 && rb.calc.net === eb.net && rb.calc.ded.pension === null && rc.state === 'ok' && ri.state === 'no_base' && b.period.from === PERQ.from && b.period.to === PERQ.to && b.pay_day === 15 && b.law.on === true && b.law.rates.pension > 0);
+    I.calc = [ra && ra.state, ra && ra.calc && ra.calc.net, ea.net, rb && rb.calc && rb.calc.net, eb.net, ri && ri.state, b.period];
+    // 건설 대장: both 인 사람(qb)·con(qc) · qb 는 건설 기준이 없어 no_base
+    const rcn = await c({ action: 'pay_month_get', corp: 'con', ym: YMQ }, tokA);
+    P.con = tryQ(() => rcn.body.rows.map((x) => x.mid).sort().join() === 'qb,qc' && rowOfQ(rcn.body, 'qb').state === 'no_base');
+    I.con = (rcn.body.rows || []).map((x) => x.mid + ':' + x.state).join();
+    // 요율 꺼짐 → off(이유) · 단가 설정 없음 + 준설 줄 → NO_DREDGE_CONF · 기준 꼴 틀림 → 그 사람만 bad · 명부 못 읽음 503
+    seedQ({ flag: null, docs: { 'pay:month:env:2026-11': { schema: 1, rev: REVQ('m1'), corp: 'env', ym: YMQ, state: 'open', rows: { qa: { dredge: LINESQ() } }, frozen: null, updated_at: 9 } } });
+    const r2 = await c({ action: 'pay_month_get', corp: 'env', ym: YMQ }, tokA);
+    seedQ({ conf: null, docs: { 'pay:base:env:qb': { schema: 1, rev: 'x', vers: [] }, 'pay:month:env:2026-11': { schema: 1, rev: REVQ('m1'), corp: 'env', ym: YMQ, state: 'open', rows: { qa: { dredge: [{ d: '2026-11-02', days: 1, ot: 0, add: 0, side: '' }] } }, frozen: null, updated_at: 9 } } });
+    const r3 = await c({ action: 'pay_month_get', corp: 'env', ym: YMQ }, tokA);
+    blobsMock.hooks.failGet = (k) => k === 'pay:base:env:qa'; const r5 = await c({ action: 'pay_month_get', corp: 'env', ym: YMQ }, tokA);
+    blobsMock.hooks.failGet = (k) => k === 'pay:month:env:2026-11'; const r6 = await c({ action: 'pay_month_get', corp: 'env', ym: YMQ }, tokA); blobsMock.hooks.failGet = null;
+    const lm = pushMock.loadMembers; pushMock.loadMembers = async () => { const a = []; a.unavailable = true; return a; };
+    const r4 = await c({ action: 'pay_month_get', corp: 'env', ym: YMQ }, tokA); pushMock.loadMembers = lm;
+    P.off = tryQ(() => r2.body.law.on === false && r2.body.law.why === 'NOT_PROMOTED' && rowOfQ(r2.body, 'qa').state === 'off' && rowOfQ(r2.body, 'qa').off.why === 'NOT_PROMOTED' && !('calc' in rowOfQ(r2.body, 'qa'))
+      && rowOfQ(r3.body, 'qa').off.why === 'NO_DREDGE_CONF' && rowOfQ(r3.body, 'qb').state === 'bad' && r3.body.period.from === '2026-11-01' && r4.code === 503 && rowOfQ(r5.body, 'qa').state === 'unread' && r6.code === 503 && r6.body.error_code === 'PAY_READ_FAILED');
+    I.off = [r2.body.law && r2.body.law.why, rowOfQ(r3.body, 'qa') && rowOfQ(r3.body, 'qa').off, rowOfQ(r3.body, 'qb') && rowOfQ(r3.body, 'qb').state, r4.code];
+    return outQ(P, I);
+  };
+  const chkRowQ = async (c) => {   // (3) 그 달 값 저장 — 꼴·기간·낙관락·덮임·확정 달·감사 글에 금액 없음
+    const P = {}, I = {};
+    seedQ(); const a0 = audQ().length;
+    const sv = (row, rev, mid) => c({ action: 'pay_row_save', corp: 'env', ym: YMQ, mid: mid || 'qa', row: row, rev: rev }, tokA);
+    const bads = [[{ dredge: [{ d: '2026-11-20', days: 1 }] }, 'dredge[0].d'], [{ dredge: [{ d: '2026-11-02', days: 0.3 }] }, 'dredge[0].days'], [{ note: '=HYPERLINK()' }, 'note'], [{ note: '<b>' }, 'note'], [{ base: -1 }, 'base'], [{ prorate: { days: 31, of: 30 } }, 'prorate'], [{ ot: { ext: 1.25 } }, 'ot.ext'], [{ ded_fix: { income: 1 } }, 'ded_fix'], [{ adj_amt: 1.5 }, 'adj_amt']];
+    const bm = [];
+    for (const [row, f] of bads) { const r = await sv(row, ''); if (!(r.code === 400 && r.body.error_code === 'BAD_ROW' && r.body.field === f)) bm.push(f + '→' + r.code + ':' + r.body.field); }
+    P.bad = bm.length === 0; I.bad = bm;
+    const nr = await sv({ bonus: 1 }, undefined), tg = await sv({ bonus: 1 }, '', 'qd');
+    P.need = nr.body.error_code === 'NEED_BASE' && tg.code === 404; I.need = [nr.body.error_code, tg.code];
+    const ok1 = await sv({ dredge: LINESQ(), bonus: 30000, note: '가짜 비고66' }, '');
+    const doc1 = mem.gw_data['pay:month:env:2026-11'];
+    const st = await sv({ bonus: 2 }, '');
+    P.save = ok1.code === 200 && tryQ(() => doc1.rev === ok1.body.rev && doc1.rows.qa.bonus === 30000 && doc1.rows.qa.dredge.length === 14 && st.code === 409 && st.body.error_code === 'PAY_STALE');
+    I.save = [ok1.code, ok1.body.error_code, st.code];
+    const au = audQ().slice(a0), auTxt = JSON.stringify(au);
+    P.audit = au.length === 1 && au[0].ev[0].op === '급여대장' && !/30000|30,000|150000|가짜 비고66/.test(auTxt); I.audit = auTxt.slice(0, 200);
+    // 쓰고 나서 다시 읽었을 때 남의 rev 면 409 OVERWRITTEN · 다시 읽기 실패 503 WRITE_UNCONFIRMED · 쓰기 실패 500
+    let n = 0; blobsMock.hooks.beforeGet = (k) => { if (k === 'pay:month:env:2026-11' && ++n === 3) mem.gw_data[k] = Object.assign({}, mem.gw_data[k], { rev: REVQ('zz') }); };
+    const ow = await sv({ bonus: 3 }, ok1.body.rev); blobsMock.hooks.beforeGet = null;
+    const rv = mem.gw_data['pay:month:env:2026-11'].rev; let n2 = 0;
+    blobsMock.hooks.failGet = (k) => k === 'pay:month:env:2026-11' && ++n2 === 3;
+    const un = await sv({ bonus: 4 }, rv); blobsMock.hooks.failGet = null;
+    const rv2 = mem.gw_data['pay:month:env:2026-11'].rev;
+    blobsMock.hooks.failSet = (k) => k === 'pay:month:env:2026-11'; const fs5 = await sv({ bonus: 5 }, rv2); blobsMock.hooks.failSet = null;
+    P.race = ow.code === 409 && ow.body.error_code === 'OVERWRITTEN' && un.code === 503 && un.body.error_code === 'WRITE_UNCONFIRMED' && fs5.code === 500;
+    I.race = [ow.code + ow.body.error_code, un.code + un.body.error_code, fs5.code];
+    // 지우기(row null) · 미리 계산은 쓰지 않음
+    const rv3 = mem.gw_data['pay:month:env:2026-11'].rev, before = JSON.stringify(mem.gw_data);
+    const pv = await c({ action: 'pay_row_preview', corp: 'env', ym: YMQ, mid: 'qa', row: { bonus: 70000 } }, tokA);
+    const pvv = await c({ action: 'pay_row_preview', corp: 'env', ym: YMQ, mid: 'qa', row: {}, ver: VERQ({ base: 3000000 }) }, tokA);
+    P.preview = JSON.stringify(mem.gw_data) === before && pv.code === 200 && pv.body.calc.net === handQ(VERQ(), { bonus: 70000 }, CONFQ()).net && pvv.body.calc.net === handQ(VERQ({ base: 3000000 }), {}, CONFQ()).net;
+    I.preview = [pv.code, pv.body.calc && pv.body.calc.net, pvv.code];
+    const del = await sv(null, rv3);
+    P.del = del.code === 200 && !('qa' in mem.gw_data['pay:month:env:2026-11'].rows); I.del = del.code;
+    return outQ(P, I);
+  };
+  const chkCloseQ = async (c) => {   // (4) 확정·풀기 — 준비 안 된 줄·요율 꺼짐 거절 · 얼린 값 그대로 · 확정 달 쓰기 거절
+    const P = {}, I = {};
+    seedQ();
+    const g0 = await c({ action: 'pay_month_get', corp: 'env', ym: YMQ }, tokA);
+    const cl0 = await c({ action: 'pay_month_close', corp: 'env', ym: YMQ, rev: '' }, tokA);   // qi 기준 없음
+    P.notready = cl0.code === 409 && cl0.body.error_code === 'ROWS_NOT_READY' && (cl0.body.mids || []).slice().sort().join() === 'qi,uw66q'; I.notready = [cl0.code, cl0.body.mids];
+    mem.gw_data['pay:base:env:qi'] = BDQ([VERQ({ dredge: false })]); mem.gw_data['pay:base:env:uw66q'] = BDQ([VERQ({ dredge: false })]);
+    const g1 = await c({ action: 'pay_month_get', corp: 'env', ym: YMQ }, tokA);
+    const cl = await c({ action: 'pay_month_close', corp: 'env', ym: YMQ, rev: '' }, tokA), doc = mem.gw_data['pay:month:env:2026-11'];
+    const netA = rowOfQ(g1.body, 'qa').calc.net;
+    mem.gw_data['pay:base:env:qa'] = BDQ([VERQ({ base: 9000000 })], REVQ('b9'));   // 확정 뒤 기준이 바뀌어도
+    mem.gw_data[KFQ] = { schema: 1, bg_ver: '', bg_sha: '' };   // 승격이 풀려도
+    const g2 = await c({ action: 'pay_month_get', corp: 'env', ym: YMQ }, tokA);
+    const ws = await c({ action: 'pay_row_save', corp: 'env', ym: YMQ, mid: 'qa', row: { bonus: 1 }, rev: doc.rev }, tokA);
+    P.close = cl.code === 200 && doc.state === 'closed' && tryQ(() => g2.body.state === 'closed' && rowOfQ(g2.body, 'qa').calc.net === netA && rowOfQ(g2.body, 'qa').frozen === true && g2.body.frozen_law.ver === VQ) && ws.code === 409 && ws.body.error_code === 'MONTH_CLOSED';
+    I.close = [cl.code, cl.body.error_code, g2.body.state, ws.body.error_code];
+    const ro0 = await c({ action: 'pay_month_reopen', corp: 'env', ym: YMQ, rev: 'x' }, tokA);
+    const ro = await c({ action: 'pay_month_reopen', corp: 'env', ym: YMQ, rev: doc.rev }, tokA), g3 = await c({ action: 'pay_month_get', corp: 'env', ym: YMQ }, tokA);
+    P.reopen = ro0.code === 409 && ro.code === 200 && mem.gw_data['pay:month:env:2026-11'].frozen === null && g3.body.state === 'open' && g3.body.law.on === false && rowOfQ(g3.body, 'qa').state === 'off';
+    I.reopen = [ro0.code, ro.code, g3.body.state];
+    const cl2 = await c({ action: 'pay_month_close', corp: 'env', ym: YMQ, rev: mem.gw_data['pay:month:env:2026-11'].rev }, tokA);
+    P.lawoff = cl2.code === 409 && cl2.body.error_code === 'LAW_OFF'; I.lawoff = cl2.body.error_code;
+    const au = JSON.stringify(audQ());
+    P.audit = !/9000000|9,000,000|2600000|2,600,000/.test(au) && audQ().some((l) => l.ev[0].op === '급여대장 확정') && audQ().some((l) => l.ev[0].op === '급여대장 확정 풀기'); I.audit = au.slice(0, 160);
+    return outQ(P, I);
+  };
+  const chkBaseQ = async (c) => {   // (5) 한 사람 기준 — 새 판·고침·의도 대조·달 범위·지우기(오지 않은 달만)·판 상한·낙관락
+    const P = {}, I = {};
+    seedQ();
+    const sv = (ver, rev, kind, mid) => c({ action: 'pay_base_save', corp: 'env', mid: mid || 'qa', ver: ver, rev: rev, kind: kind }, tokA);
+    const r0 = mem.gw_data['pay:base:env:qa'].rev;
+    const nw = await sv(VERQ({ from: '2026-12', base: 2700000 }), r0, 'new');
+    const r1 = mem.gw_data['pay:base:env:qa'].rev;
+    const km = await sv(VERQ({ from: '2026-12', base: 2750000 }), r1, 'new');
+    const fx = await sv(VERQ({ from: '2026-12', base: 2750000 }), r1, 'fix');
+    const vs = mem.gw_data['pay:base:env:qa'].vers;
+    const far = await sv(VERQ({ from: '2099-01' }), mem.gw_data['pay:base:env:qa'].rev), bv = await sv(VERQ({ base: 0 }), mem.gw_data['pay:base:env:qa'].rev), st = await sv(VERQ({ from: '2027-01' }), r0);
+    P.save = nw.code === 200 && nw.body.kind === 'new' && km.code === 409 && km.body.error_code === 'KIND_MISMATCH' && fx.body.kind === 'fix' && vs.length === 2 && vs[1].from === '2026-12' && vs[1].base === 2750000
+      && far.body.field === 'from' && bv.body.field === 'base' && st.body.error_code === 'PAY_STALE';
+    I.save = [nw.code, km.body.error_code, fx.body.kind, vs.length, far.body.field, bv.body.field, st.body.error_code];
+    const g = await c({ action: 'pay_month_get', corp: 'env', ym: YMQ }, tokA), g12 = await c({ action: 'pay_month_get', corp: 'env', ym: '2026-12' }, tokA);
+    P.pick = tryQ(() => rowOfQ(g.body, 'qa').ver.from === '2026-10' && rowOfQ(g.body, 'qa').next_from === '2026-12' && rowOfQ(g12.body, 'qa').ver.base === 2750000);
+    I.pick = [rowOfQ(g.body, 'qa') && rowOfQ(g.body, 'qa').ver && rowOfQ(g.body, 'qa').ver.from];
+    // 지우기: 이번 달(실행 시각 KST)보다 뒤 판만 — 시험 판은 실행 달 기준으로 만든다(날짜에 묶지 않음)
+    const nowYmQ = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 7), nextYmQ = PLQ.ymAdd(nowYmQ, 1);
+    mem.gw_data['pay:base:env:qa'] = BDQ([VERQ({ from: '2020-01' }), VERQ({ from: nowYmQ, base: 2650000 }), VERQ({ from: nextYmQ, base: 2700000 })], REVQ('d1'));
+    const dp = await c({ action: 'pay_base_drop', corp: 'env', mid: 'qa', from: nowYmQ, rev: REVQ('d1') }, tokA);
+    const df = await c({ action: 'pay_base_drop', corp: 'env', mid: 'qa', from: nextYmQ, rev: REVQ('d1') }, tokA);
+    P.drop = dp.code === 409 && dp.body.error_code === 'VER_IN_USE' && df.code === 200 && mem.gw_data['pay:base:env:qa'].vers.length === 2;
+    I.drop = [dp.code, dp.body.error_code, df.code];
+    // 판 상한: 자르지 않고 VERS_FULL
+    const many = []; for (let i = 0; i < PLQ.LIM.vers; i++) many.push(VERQ({ from: PLQ.ymAdd('2016-01', i) }));
+    mem.gw_data['pay:base:env:qa'] = BDQ(many);
+    const full = await sv(VERQ({ from: '2027-06' }), mem.gw_data['pay:base:env:qa'].rev, 'new');
+    P.full = full.code === 400 && full.body.error_code === 'VERS_FULL' && mem.gw_data['pay:base:env:qa'].vers.length === PLQ.LIM.vers; I.full = [full.code, full.body.error_code];
+    // 기준 읽기: 다른 사람 값 없음 · 나이 제안(62세 → 국민연금 제외 제안)
+    const gb = await c({ action: 'pay_base_get', corp: 'env', mid: 'qb', ym: YMQ }, tokA);
+    P.get = gb.code === 200 && gb.body.member.id === 'qb' && !('birth' in gb.body.member) && gb.body.suggest.pension === true && gb.body.doc.vers.length === 1; I.get = [gb.code, gb.body.suggest];
+    return outQ(P, I);
+  };
+  const chkConfQ = async (c) => {   // (6) 설정 — 꼴·낙관락·없음
+    const P = {}, I = {};
+    seedQ({ conf: null });
+    const g0 = await c({ action: 'pay_conf_get' }, tokA);
+    const bad = await c({ action: 'pay_conf_save', conf: { period_day: 29, pay_day: 15, dredge: null }, rev: '' }, tokA);
+    const ok = await c({ action: 'pay_conf_save', conf: { period_day: 15, pay_day: 15, dredge: { day: 150000, ot_hour: 20000, free_days: 10 } }, rev: '' }, tokA);
+    const st = await c({ action: 'pay_conf_save', conf: { period_day: 1, pay_day: null, dredge: null }, rev: '' }, tokA);
+    const g1 = await c({ action: 'pay_conf_get' }, tokA);
+    P.conf = g0.code === 200 && g0.body.conf === null && bad.body.field === 'period_day' && ok.code === 200 && st.body.error_code === 'PAY_STALE' && g1.body.conf.dredge.free_days === 10 && g1.body.conf.period_day === 15;
+    I.conf = [g0.code, bad.body.field, ok.code, st.body.error_code];
+    mem.gw_data['pay:conf'] = { schema: 1, rev: 'zz' };
+    const gb = await c({ action: 'pay_conf_get' }, tokA), mb = await c({ action: 'pay_month_get', corp: 'env', ym: YMQ }, tokA);
+    P.badconf = gb.code === 503 && gb.body.error_code === 'PAY_CONF_BAD' && mb.code === 503; I.badconf = [gb.code, mb.code];
+    return outQ(P, I);
+  };
+  const chkRestoreQ = async () => {   // (7) 백업 복원 'pay' 갈래 — 재해 복원 모드에서만 · 꼴 검사 통과분만
+    const P = {}, I = {};
+    seedQ();
+    const K = 'pay:month:env:2026-12', good = { schema: 1, rev: REVQ('r1'), corp: 'env', ym: '2026-12', state: 'open', rows: { qa: { bonus: 1 } }, frozen: null, updated_at: 1 };
+    const a = await call({ action: 'backup_put', secret: 'test-ingest-key', store: 'gw_data', key: K, data: good, confirm: true });
+    const b = await call({ action: 'backup_put', secret: 'test-ingest-key', store: 'gw_data', key: K, data: Object.assign({}, good, { ym: '2026-11' }), confirm: true, restore: true });
+    const b2 = await call({ action: 'backup_put', secret: 'test-ingest-key', store: 'gw_data', key: 'pay:base:env:qa', data: { schema: 1, rev: REVQ('r2'), vers: [VERQ({ base: 0 })], updated_at: 1 }, confirm: true, restore: true });
+    const b3 = await call({ action: 'backup_put', secret: 'test-ingest-key', store: 'gw_data', key: 'pay:what', data: { a: 1 }, confirm: true, restore: true });
+    const ok = await call({ action: 'backup_put', secret: 'test-ingest-key', store: 'gw_data', key: K, data: good, confirm: true, restore: true });
+    P.restore = a.code === 403 && a.body.error_code === 'RESTORE_MODE_ONLY' && b.code === 400 && b.body.error_code === 'BAD_PAY_DOC' && b2.body.error_code === 'BAD_PAY_DOC' && b3.body.error_code === 'BAD_PAY_DOC' && ok.code === 200 && mem.gw_data[K].rev === good.rev;
+    I.restore = [a.code + a.body.error_code, b.body.error_code, b2.body.error_code, b3.body.error_code, ok.code];
+    return outQ(P, I);
+  };
+  const chkLawQ = async (c) => {   // (8) 승격 판정 두 벌(gw-pay = PAYBG.lawPick · gw-data payBgState) 같은 입력 → 같은 답
+    const P = {}, I = {};
+    const badBg = BGQ(); badBg.rows.find((r) => r.id === 'pay.minwage').calc = true;
+    const chg = BGQ(); chg.sha = '1111222233334444';
+    const CASES = [[undefined, undefined, null], [BGQ(), { bg_ver: '', bg_sha: '' }, null], [BGQ(), { bg_ver: VQ }, null], [BGQ(), FLGQ(), KFQ], [BGQ(), [VQ, SQ], null], [BGQ(), 'on', null], [BGQ(), FLGQ(), KBQ], [badBg, FLGQ(), null], [chg, FLGQ(), null], [BGQ(), FLGQ(), null]];
+    const miss = [];
+    for (let i = 0; i < CASES.length; i++) {
+      const [bg, flag, failKey] = CASES[i];
+      seedQ({ bg: bg === undefined ? null : bg, flag: flag === undefined ? null : flag });
+      if (failKey) blobsMock.hooks.failGet = (k) => k === failKey;
+      const p = await c({ action: 'pay_month_get', corp: 'env', ym: YMQ }, tokA), d = await call({ action: 'pay_bg_get' }, tokA);
+      blobsMock.hooks.failGet = null;
+      const pa = p.body.law || {}, da = d.body || {};
+      if (!(pa.on === da.on && (pa.on || pa.why === da.why))) miss.push(i + ':' + pa.on + '/' + pa.why + '≠' + da.on + '/' + da.why);
+    }
+    P.same = miss.length === 0; I.same = miss;
+    return outQ(P, I);
+  };
+
+  try {
+    const c0 = callerQ(gwpQ);
+    const RG = await chkGateQ(c0), RL = await chkLedgerQ(c0), RR = await chkRowQ(c0), RC = await chkCloseQ(c0), RB = await chkBaseQ(c0), RF = await chkConfQ(c0), RS = await chkRestoreQ(), RW = await chkLawQ(c0);
+    T('66 판2 ① 관문(열 동작 전부): 비로그인·퇴사 관리자·없는 회원 401 · 인사 권한 직원 403 ADMIN_ONLY · 요청자 회원 못 읽음 503 MEMBER_READ_FAILED · 모르는 동작·회사·달 범위(2020-01 ~ 이번 달 + 12) 400', RG.ok, RG.info);
+    T('66 판2 ② 급여대장 사람·계산: 그 회사(both 는 두 회사)·기간 안 재직만(지입차주·일용직·시험·삭제·기간 앞 퇴사·기간 뒤 입사 제외) · 회사 없는 직원은 loose · 금액 = 같은 함수 직접 호출 · 하수준설(10일 포함·반일·연장) · 요율 꺼짐 off · 단가 없음 NO_DREDGE_CONF · 꼴 틀린 기준은 그 사람만 bad · 명부 못 읽음 503', RL.ok, RL.info);
+    T('66 판2 ③ 그 달 값 저장: 꼴 9가지 400 BAD_ROW(칸 이름 · 기간 밖 날짜·0.3일·수식 머리·꺾쇠) · NEED_BASE · 지입차주 404 · 낙관락 409 PAY_STALE · 쓰고 다시 읽어 남의 rev 409 OVERWRITTEN · 다시 읽기 실패 503 · 쓰기 실패 500 · 미리 계산은 안 씀 · 감사 글에 금액·비고 없음', RR.ok, RR.info);
+    T('66 판2 ④ 확정·풀기: 계산 안 된 사람 409 ROWS_NOT_READY(그 id) · 확정 뒤 기준·승격이 바뀌어도 얼린 금액 그대로 · 확정 달 쓰기 409 MONTH_CLOSED · 풀기 낙관락 · 풀면 다시 계산 · 요율 꺼짐 확정 409 LAW_OFF · 감사에 금액 없음', RC.ok, RC.info);
+    T('66 판2 ⑤ 한 사람 기준: 새 판·고침 · 화면 의도와 다르면 409 KIND_MISMATCH · 먼 달·기본급 0 거절 · 낙관락 · 그 달 판 고르기·다음 판 알림 · 지우기는 오지 않은 달 판만(지난 판 409 VER_IN_USE) · 판 상한 = 자르지 않고 VERS_FULL · 읽기에 생년월일 없음·나이 제외 제안', RB.ok, RB.info);
+    T('66 판2 ⑥ 단가·기간 설정: 없음 null · 꼴 400(칸 이름) · 낙관락 · 꼴 틀린 설정 = 503 PAY_CONF_BAD(대장도 503)', RF.ok, RF.info);
+    T('66 판2 ⑦ 백업 복원 pay: 갈래 — 봇 키만으로 403 RESTORE_MODE_ONLY · 재해 복원 모드에서도 꼴 틀림·키와 달이 다름·모르는 pay: 키 400 BAD_PAY_DOC · 맞는 문서만 씀', RS.ok, RS.info);
+    T('66 판2 ⑧ 승격 판정 두 벌(gw-pay PAYBG.lawPick ↔ gw-data payBgState) 10가지 입력에서 같은 답(없음·미승격·지문 없음·스위치 못 읽음·꼴 아님·표 못 읽음·꼴 틀림·지문 다름·켜짐)', RW.ok, RW.info);
+    // 결함 사본 — 한 곳씩 바꾸면 위 검사 가운데 하나가 깨져야 한다
+    const MUTQ = [
+      ['G', "  if (c.member.admin !== true) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });\n", '', 'G'],
+      ['G', "  if (!r.ok && r.code === 'NOT_FOUND') return { ok: true, data: null };", "  if (!r.ok) return { ok: true, data: null };", 'L'],
+      ['G', "  if (NOT_PAYEE.indexOf(String(m.emp_type || '')) >= 0) return false;\n  if (!(m.corp", "  if (!(m.corp", 'L'],
+      ['G', "  if (m.leave_date && String(m.leave_date) < period.from) return false;", '', 'L'],
+      ['G', "  if ((baseRev || '') !== curRev) return { res: 'stale' };", '', 'R'],
+      ['G', "  if (!back.doc || back.doc.rev !== doc.rev) return { res: 'overwritten' };", '', 'R'],
+      ['G', "  if (mo.doc && mo.doc.state === 'closed') return conflict('MONTH_CLOSED', R);", '', 'C'],
+      ['G', "    if (frozen) { o.calc = frozen.rows && frozen.rows[mid] ? frozen.rows[mid] : null; o.frozen = true; out.push(o); continue; }", '', 'C'],
+      ['G', "  if (notOk.length) return jr(409,", "  if (false) return jr(409,", 'C'],
+      ['G', "  if (!(d.from > ymNow())) return conflict('VER_IN_USE', R);", '', 'B'],
+      ['G', "  if (d.kind !== undefined && d.kind !== pv.kind) return conflict('KIND_MISMATCH', R);", '', 'B'],
+      ['G', "  if (!ymOk(cv.ver.from)) return bad('BAD_VER', R, { field: 'from' });", '', 'B'],
+      ['G', "const au = await audit(c, '급여대장', d.corp + ':' + d.ym + ':' + t.m.id, '그 달 값 · 바뀐 칸 [' + changed.join(',') + ']');", "const au = await audit(c, '급여대장', d.corp + ':' + d.ym + ':' + t.m.id, JSON.stringify(row));", 'R'],
+      ['L', "      if (period && (l.d < period.from || l.d > period.to)) return no(f + '.d');", '', 'R'],
+      ['L', "function textOk(s, max) { return typeof s === 'string' && s.length <= max && !/[\\u0000-\\u001f\\u007f<>]/.test(s) && !/^[=+\\-@]/.test(s); }", "function textOk(s, max) { return typeof s === 'string' && s.length <= max; }", 'R'],
+      ['L', "    else { const left = Math.max(0, conf.free_days - acc); const inFree = Math.min(l.days, left); paid = l.days - inFree; acc += l.days; }", "    else { paid = l.days; acc += l.days; }", 'L'],
+      ['L', "    if (vers.length >= LIM.vers) return { ok: false, code: 'VERS_FULL' };", '', 'B'],
+      ['L', "  if (!int(x.period_day, 28) || x.period_day < 1) return no('period_day');", '', 'F']
+    ];
+    const RUNQ = { G: chkGateQ, L: chkLedgerQ, R: chkRowQ, C: chkCloseQ, B: chkBaseQ, F: chkConfQ };
+    const killQ = []; let nQ = 0;
+    for (const [kind, from, to, which] of MUTQ) {
+      nQ++; let k; try { k = !(await RUNQ[which](callerQ(loadQ(kind, from, to)))).ok; } catch (e) { k = 'err ' + e.message; }
+      if (k !== true) killQ.push(kind + ':' + from.trim().slice(0, 60) + (k === false ? ' 안 깨짐' : ' ' + k));
+    }
+    T('66 판2 ⑨ 결함 사본 ' + nQ + '개(관리자 검사 걷음 · 못 읽음을 없음으로 · 지입차주·일용직 넣음 · 기간 앞 퇴사자 넣음 · 낙관락 걷음 · 덮임 못 봄 · 확정 달 쓰기 · 얼린 값 무시 · 준비 안 된 확정 · 지난 판 지움 · 의도 대조 걷음 · 먼 달 · 감사에 금액 · 기간 밖 날짜 · 글 칸 검사 걷음 · 10일 포함 무시 · 판 상한 걷음 · 기간 시작일 검사 걷음) = 모두 ✗', killQ.length === 0, killQ.join(' | '));
+  } catch (e) { T('66 판2 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+  finally { const s = JSON.parse(snapQ); mem.gw_users = s.u; mem.gw_data = s.d; Date.now = now0Q; blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; blobsMock.hooks.beforeGet = null; blobsMock.hooks.beforeSet = null; blobsMock.hooks.failList = false; }
 }
 
 { // ---- C225 판 A(원장 C225 — 서버가 저장소 읽기에 실패했을 때 빈 문서·기본값으로 보고 덮어쓰던 길 막기) ----
