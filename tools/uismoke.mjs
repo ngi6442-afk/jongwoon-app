@@ -21532,23 +21532,33 @@ try {
     o.sum = /최근 30일 기준으로 켰다면 지시 1건\(사건 1\)/.test(t1) && t1.indexOf('규모 건설기계 3대(전체 12대) · 오늘 31일 남은 건설기계 1대') > 0 && t1.indexOf('인사 근거') < 0
       && t2 === '차량 근거가 승격 전이라 쉬는 중입니다(그동안 30일 전 지시가 그대로 나갑니다) · 규모 건설기계 3대(전체 12대) · 오늘 31일 남은 건설기계 1대.'
       && t3.indexOf('승격된 차량 근거에 31일 전 기준 행이 없어 쉬는 중') === 0 && !/ceq|NOT_PROMOTED|NO_ROW|ref\./.test(t1 + t2 + t3);
+    // 검토 시험 2: 운영 꼴 = 규모 채운 차 0대(전체 52대) — '0대'가 숨지 않음 · 검토 권고 4: 요약 win 0 = '오늘 실행에 지시 n건'
+    const t0 = b.sum(SV({ win: 0, tasks: 0, found: 0, events: 0, who: [], ref: { ceq_total: 52, ceq: 0, ceq_d31: 0 } })), t02 = b.sum(SV({ skip: 'NOT_PROMOTED', tasks: 0, ref: { ceq_total: 52, ceq: 0, ceq_d31: 0 } }));
+    o.zero = t0.indexOf('오늘 실행에 지시 0건(사건 0)') === 0 && t0.indexOf('규모 건설기계 0대(전체 52대) · 오늘 31일 남은 건설기계 0대') > 0 && t0.indexOf('최근 30일') < 0 && t02.indexOf('규모 건설기계 0대(전체 52대)') > 0;
     const rows = b.rows(BV({ dry: { veh_ceq31: SV(), hr_join: SV({ ref: {} }) } }));
     const rv = rows.find((r) => r.id === 'autotask:veh_ceq31:live'), rh = rows.find((r) => r.id === 'autotask:hr_join:live');
-    o.live = !!rv && !rv.block && rv.why.indexOf('(켠 날부터 매일 그날 31일 남은 건설기계마다 — 관리자 접속 때 만드는 30일 전 지시는 그대로)') > 0 && rv.why.indexOf('켠 뒤에 생긴 일만') < 0 && rv.why.indexOf('[ㄱ]을 누르면 바로 켜지고') >= 0
+    o.live = !!rv && !rv.block && rv.why.indexOf('(켠 날부터 평일마다 그날 31일 남은 건설기계마다 — 31일째가 주말이면 30일 전 지시로 · 관리자 접속 때 만드는 30일 전 지시는 그대로)') > 0 && rv.why.indexOf('매일') < 0 && rv.why.indexOf('켠 뒤에 생긴 일만') < 0 && rv.why.indexOf('[ㄱ]을 누르면 바로 켜지고') >= 0
       && !!rh && rh.why.indexOf('(켠 뒤에 생긴 일만 — 지난 일 소급 없음)') > 0;
+    // 검토 권고 5: 미승격·행 없음 = 계획대로 쉬는 중 — 막힘 글·추천이 까닭별(다음 집계로 안 풀림) · 다른 건너뜀은 종전 글
+    const rowOf = (sk) => box4(src).rows(BV({ dry: { veh_ceq31: SV({ skip: sk, tasks: 0 }) } })).find((r) => r.id === 'autotask:veh_ceq31:live') || {};
+    const rNP = rowOf('NOT_PROMOTED'), rNR = rowOf('NO_ROW'), rER = rowOf('ERROR');
+    o.skipRow = rNP.block === '차량 근거 승격 뒤에 정해 주세요' && rNP.recTxt === '그대로(근거 승격 뒤)' && rNR.block === '차량 근거에 31일 전 기준 행이 들어간 뒤 정해 주세요' && rNR.recTxt === '그대로(근거 행 뒤)'
+      && rER.block === '이번 연습 집계를 하지 못했습니다 — 다음 집계 뒤에 정해 주세요' && rER.recTxt === '그대로(다음 집계 뒤)' && !/NOT_PROMOTED|NO_ROW/.test(JSON.stringify([rNP.block, rNP.recTxt, rNR.block, rNR.recTxt]));
     const b2 = box4(src); b2.rows(BV({ dry: { veh_ceq31: { mode: 'dry', ready: false } } })); const e = { innerHTML: '', querySelectorAll: () => [] }; b2.card(e);
     const tx = e.innerHTML.replace(/<[^>]+>/g, ' '); const iV = tx.indexOf('건설기계 정기검사 지시 31일 전');
     o.stale = iV >= 0 && tx.slice(iV).indexOf('아직 연습 집계가 없습니다(다음 평일 08:10 정기업무 봇 뒤에 보입니다).') > 0 && tx.slice(iV).indexOf('준비 중 — 계산') < 0;
     o.ok = Object.values(o).every((v) => v === true); return o;
   };
   const RV4 = chkV4();
-  T('C185 판4 ② 콘솔 글(실행 — 실제 evrSumTxt·evrLiveRow·evrCardRender): 연습 요약 = 지시 n건 + "규모 건설기계 n대(전체 n대) · 오늘 31일 남은 건설기계 n대"(인사 근거 글 없음) · 미승격·행 없음 = 쉬는 까닭 + 같은 참고 수(내부 이름 0) · 켜기 줄 = "(켠 날부터 매일 그날 31일 남은 건설기계마다 — 관리자 접속 때 만드는 30일 전 지시는 그대로)"(입사 줄은 종전 글) · 준비된 규칙의 낡은 요약 = "아직 연습 집계가 없습니다(…)"',
+  T('C185 판4 ② 콘솔 글(실행 — 실제 evrSumTxt·evrLiveRow·evrCardRender · 검토 반영: 0대(전체 52대) 글 · win 0 = 오늘 실행에 · 켜기 줄 평일마다 · 미승격·행 없음 막힘 글·추천 까닭별): 연습 요약 = 지시 n건 + "규모 건설기계 n대(전체 n대) · 오늘 31일 남은 건설기계 n대"(인사 근거 글 없음) · 미승격·행 없음 = 쉬는 까닭 + 같은 참고 수(내부 이름 0) · 켜기 줄 = "(켠 날부터 평일마다 그날 31일 남은 건설기계마다 — 31일째가 주말이면 30일 전 지시로 · 관리자 접속 때 만드는 30일 전 지시는 그대로)"(입사 줄은 종전 글) · 준비된 규칙의 낡은 요약 = "아직 연습 집계가 없습니다(…)"',
     RV4.ok, JSON.stringify(RV4));
   const mutV4 = (from, to) => { if (html.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); return html.replace(from, () => to); };
   const MV4 = [['    if (s.skip && ceqTxt) return', '    if (false) return'], ['    if (ceqTxt) p.push(ceqTxt);', ''], ['    if (EVR_LIVE_NOTE[k]) row.why = row.why.replace(', '    if (false) row.why = row.why.replace('],
-    ['NOT_PROMOTED: "차량 근거가 승격 전이라 쉬는 중입니다(그동안 30일 전 지시가 그대로 나갑니다)", ', '']];
+    ['NOT_PROMOTED: "차량 근거가 승격 전이라 쉬는 중입니다(그동안 30일 전 지시가 그대로 나갑니다)", ', ''],
+    ['var ceqTxt = (s.ref && s.ref.ceq_total !== undefined) ?', 'var ceqTxt = (s.ref && s.ref.ceq) ?'],   // 검토 h5: 0대가 숨음
+    ['    else if (!row.block && skipped && EVR_SKIP_BLOCK[s.skip]) row.block = EVR_SKIP_BLOCK[s.skip];', ''], ['(skipped ? (EVR_SKIP_REC[s.skip] || "그대로(다음 집계 뒤)")', '(skipped ? ("그대로(다음 집계 뒤)")']];
   const kV4 = MV4.map(([a, b]) => { try { return chkV4(mutV4(a, b)).ok; } catch (e) { return 'err ' + e.message; } });
-  T('C185 판4 ② 결함 사본 ' + kV4.length + '개(건너뛸 때 참고 수 걷음 · 연습 참고 수 걷음 · 켜기 줄 규칙별 글 걷음 · 미승격 글 걷음) = 모두 ✗', kV4.every((v) => v === false), JSON.stringify(kV4));
+  T('C185 판4 ② 결함 사본 ' + kV4.length + '개(건너뛸 때 참고 수 걷음 · 연습 참고 수 걷음 · 켜기 줄 규칙별 글 걷음 · 미승격 글 걷음 · 0대 숨김 · 까닭별 막힘 글 걷음 · 까닭별 추천 걷음) = 모두 ✗', kV4.every((v) => v === false), JSON.stringify(kV4));
 } catch (e) { console.log('  (C185 판4 검사 생략 — ' + e.message + ')'); fails++; }
 
 

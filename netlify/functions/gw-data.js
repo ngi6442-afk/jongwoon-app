@@ -1135,7 +1135,7 @@ async function handleAutotaskIngest(event, d, R) {
   let notified = 0;
   const notSeen = {};   // C185 판2(ⓙ 1): 일반·실행기 알림을 받은 사람(응답 notified = 사람 수 한 번씩)
   if (notifyItems.length) notified = await notifyAutoCreated(st, notifyItems, '정기봇', { seen: notSeen });
-  const blockTxt = blocked ? ' · 스위치 막음 ' + blocked + '(' + Object.keys(blockedBy).map(function (k) { return k + ' ' + blockedBy[k] + ' — ' + (k === 'unknown' ? '허용 꼴 밖' : sw.rules[k]); }).join(', ') + ')' : '';   // v453 규칙 이름·건수·스위치 값만(키·본문 없음)
+  const blockTxt = blocked ? ' · 스위치 막음 ' + blocked + '(' + Object.keys(blockedBy).map(function (k) { return k + ' ' + blockedBy[k] + ' — ' + (k === 'unknown' ? '허용 꼴 밖' : (k === 'veh_unread' ? '차량 문서 못 읽음' : sw.rules[k])); }).join(', ') + ')' : '';   // v453 규칙 이름·건수·스위치 값만(키·본문 없음)
   const licTxt = !lic ? '' : (lic.skip ? ' · 인허가 기한 건너뜀(' + lic.skip + ')' : ((lic.bundled || lic.made || lic.bumped || lic.moved || lic.next || lic.no_who || lic.reopened) ? ' · 인허가 기한 ' + (lic.bundled ? '묶음 ' + lic.bundled + ' · ' : '') + '새 ' + lic.made + ' · 단계 올림 ' + lic.bumped + (lic.moved ? ' · 담당 옮김 ' + lic.moved : '') + (lic.next ? ' · 다음 회차 ' + lic.next : '') + (lic.reopened ? ' · 다시 엶 ' + lic.reopened : '') + (lic.no_who ? ' · 담당 없음 ' + lic.no_who + '행' : '') : ''));   // P1 판20 수·행 수만
   if (made || fixed || assigned || (lic && lic.touched) || srvTouched) {
     doc.updated_by = '정기봇'; doc.updated_at = Date.now();

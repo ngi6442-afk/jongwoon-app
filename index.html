@@ -34781,13 +34781,15 @@ function dutyStage(nx){
     var miss = uses.filter(function(p){ return ast[p] !== "ok"; });
     var noWhoOnly = !(Number(s.tasks) > 0) && Number(s.no_who) > 0 && !s.skip;
     var needWho = miss.length > 0 || noWhoOnly, skipped = !!s.skip, blocked = needWho || skipped;
-    var EVR_LIVE_NOTE = { veh_ceq31: "(켠 날부터 매일 그날 31일 남은 건설기계마다 — 관리자 접속 때 만드는 30일 전 지시는 그대로)" };   // C185 판4(ⓙ 4): 켠 시각과 견주지 않는 규칙의 글
-    var row = { id: "autotask:" + k + ":live", q: nm + " — 켤까요?", recTxt: needWho ? "그대로(담당 먼저)" : (skipped ? "그대로(다음 집계 뒤)" : "켬(실제 발행)"), curTxt: "연습(발행 0)", args: { rule: k, mode: "live" }, def: "keep",
+    var EVR_SKIP_BLOCK = { NOT_PROMOTED: "차량 근거 승격 뒤에 정해 주세요", NO_ROW: "차량 근거에 31일 전 기준 행이 들어간 뒤 정해 주세요" }, EVR_SKIP_REC = { NOT_PROMOTED: "그대로(근거 승격 뒤)", NO_ROW: "그대로(근거 행 뒤)" };   // C185 판4 검토 권고 5: 계획대로 쉬는 까닭은 다음 집계로 풀리지 않음
+    var EVR_LIVE_NOTE = { veh_ceq31: "(켠 날부터 평일마다 그날 31일 남은 건설기계마다 — 31일째가 주말이면 30일 전 지시로 · 관리자 접속 때 만드는 30일 전 지시는 그대로)" };   // C185 판4(ⓙ 4): 켠 시각과 견주지 않는 규칙의 글
+    var row = { id: "autotask:" + k + ":live", q: nm + " — 켤까요?", recTxt: needWho ? "그대로(담당 먼저)" : (skipped ? (EVR_SKIP_REC[s.skip] || "그대로(다음 집계 뒤)") : "켬(실제 발행)"), curTxt: "연습(발행 0)", args: { rule: k, mode: "live" }, def: "keep",
       block: noWhoOnly ? "배정표 담당을 먼저 정해 주세요" : "",
       card: needWho ? "assignCard" : "pmconChk-evrules", nocount: needWho && miss.length > 0 && miss.every(function(p){ return ast[p] === "empty"; }),   // 검토 5: 막히지 않은 줄의 [카드 열기] = 이 화면 점검 카드
       why: blocked ? evrSumTxt(s) : evrSumTxt(s) + " [ㄱ]을 누르면 바로 켜지고 다음 평일 08:10 실행부터 지시가 생깁니다(켠 뒤에 생긴 일만 — 지난 일 소급 없음). 직원에게 새로 가는 알림이라 누르기 사흘 전에 예고해 주세요. 되돌리기: 이 화면 '범위 밖 자동 지시 규칙' 카드 [연습으로]·[끄기](이미 생긴 지시는 남음).", setBase: b.updated_at || 0 };
     if (EVR_LIVE_NOTE[k]) row.why = row.why.replace("(켠 뒤에 생긴 일만 — 지난 일 소급 없음)", EVR_LIVE_NOTE[k]);
     if (!row.block && needWho) row.block = "배정표 담당을 먼저 정해 주세요";   // 판2 검토 3: 배정표 줄 빈칸·퇴사자·못 읽음(위 block 줄 = 요약이 담당 없음뿐 — 판1 그대로)
+    else if (!row.block && skipped && EVR_SKIP_BLOCK[s.skip]) row.block = EVR_SKIP_BLOCK[s.skip];   // C185 판4 검토 권고 5
     else if (!row.block && skipped) row.block = "이번 연습 집계를 하지 못했습니다 — 다음 집계 뒤에 정해 주세요";
     return row;
   }

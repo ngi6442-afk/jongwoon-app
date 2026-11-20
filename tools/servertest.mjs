@@ -15891,7 +15891,7 @@ function J91a(x) { return JSON.stringify(x); }
     const r4 = E.run('veh_ceq31', { vehicles: vs, vehbg: ON }, ctx, t1, opt(), true);
     o.plan = r1.sum.tasks === 1 && t1.length === 1 && t1[0].auto_key === 'veh:a:insp:' + addV(31) && t1[0].title === '가짜a 정기검사 갱신' && t1[0].due === addV(31) && t1[0].who_id === 'uVH' && JSON.stringify(t1[0].scope) === '[]'
       && JSON.stringify(r1.sum.ref) === '{"ceq_total":7,"ceq":6,"ceq_d31":1}' && r2.sum.skip === 'NOT_PROMOTED' && r2.sum.tasks === 0 && r2.sum.ref.ceq === 6 && r3.sum.skip === 'NO_ROW' && JSON.stringify(r3.sum.no_row) === '["ref.ceq.window"]' && r4.sum.tasks === 0
-      && E.ready('veh_ceq31') === true && E.RULES.veh_ceq31.since === false;
+      && E.ready('veh_ceq31') === true && E.RULES.veh_ceq31.since === false && r1.sum.win === 0 && r2.sum.win === 0;   // 판4 검토 권고 4: 날짜 상태 규칙 = '최근 30일' 창 없음
     o.ok = ['ceq31', 'veh90', 'ruleOf', 'plan'].every((k) => o[k] === true); return o;
   };
   // ③ 실제 서버
@@ -15925,17 +15925,23 @@ function J91a(x) { return JSON.stringify(x); }
       // 미승격 = 0건·skip NOT_PROMOTED(참고 수는 남음) · 연습 요약 칸
       seedV({ rules: { veh_ceq31: 'live' }, promo: false }); const i4 = await c({ action: 'autotask_ingest', key: KEYV, items: [], only: 'srv' });
       seedV(); const d1 = await c({ action: 'autotask_dry_put', key: KEYV, day: TDV, run: 'p4', dry: {} }); const sd = ((mem.gw_data['it:autotask:dry'] || {}).rules || {}).veh_ceq31 || {};
-      o.skipDry = i4.body.srv.veh_ceq31.skip === 'NOT_PROMOTED' && tasksV().length === 0 && d1.code === 200 && sd.ready === true && sd.tasks === 1 && JSON.stringify(sd.ref) === '{"ceq_total":4,"ceq":3,"ceq_d31":1}' && JSON.stringify(sd).indexOf('가짜') < 0;
+      o.skipDry = i4.body.srv.veh_ceq31.skip === 'NOT_PROMOTED' && tasksV().length === 0 && d1.code === 200 && sd.ready === true && sd.tasks === 1 && sd.win === 0 && JSON.stringify(sd.ref) === '{"ceq_total":4,"ceq":3,"ceq_d31":1}' && JSON.stringify(sd).indexOf('가짜') < 0;
       I.sd = sd;
       // 차량 문서 못 읽음 = 31일 이상 정기검사 키 막힘(veh_unread) · 30일·보험 키는 종전 · 없음(NOT_FOUND) = 종전 판정
       seedV({ rules: { veh_insp90: 'live' } }); blobsMock.hooks.failGet = (k) => (k === 'col:vehicles' ? 'STORAGE_READ_FAILED' : null);
-      const i5 = await c({ action: 'autotask_ingest', key: KEYV, items: ITEMS }); blobsMock.hooks.failGet = null;
+      const au5 = auditMock.logs.length, i5 = await c({ action: 'autotask_ingest', key: KEYV, items: ITEMS }); blobsMock.hooks.failGet = null;
+      const aud5 = JSON.stringify(auditMock.logs.slice(au5));   // 판4 검토 권고 1: 감사 줄 = 사람 글('undefined' 없음)
+      o.audit = aud5.indexOf('veh_unread 3 — 차량 문서 못 읽음') >= 0 && aud5.indexOf('undefined') < 0;
+      seedV({ rules: { veh_insp90: 'live' } }); mem.gw_data['col:vehicles'] = { schema: 1, items: null, updated_at: 2 };   // 판4 검토 시험 1: 깨진 꼴(items가 배열 아님 — null은 '|| []'로 빈 대장이 될 수 있는 꼴) = 못 읽음과 같이 막음
+      const i7 = await c({ action: 'autotask_ingest', key: KEYV, items: ITEMS });
+      o.broken = i7.code === 200 && JSON.stringify(i7.body.blocked_rules) === '{"veh_unread":3}' && i7.body.made === 1;
+      I.broken = [i7.body.blocked_rules, i7.body.made];
       seedV({ rules: { veh_insp90: 'live' } }); delete mem.gw_data['col:vehicles'];
       const i6 = await c({ action: 'autotask_ingest', key: KEYV, items: ITEMS });
       o.unread = i5.code === 200 && JSON.stringify(i5.body.blocked_rules) === '{"veh_unread":3}' && i5.body.made === 1 && i6.code === 200 && i6.body.made === 4 && i6.body.blocked === 0;
       I.unread = [i5.body.blocked_rules, i5.body.made, i6.body.made];
     } catch (e) { o.err = String((e && e.stack) || e).slice(0, 300); blobsMock.hooks.failGet = null; }
-    o.ok = ['dryBlock', 'live', 'skipDry', 'unread'].every((k) => o[k] === true);
+    o.ok = ['dryBlock', 'live', 'skipDry', 'unread', 'audit', 'broken'].every((k) => o[k] === true);
     return { o, I };
   };
   try {
@@ -15945,19 +15951,33 @@ function J91a(x) { return JSON.stringify(x); }
     const MPV = [['    if (isCeq(v)) return;   // C185 판4', '    if (false) return;   // C185 판4'], ["    if (dayDiff(v.insp_due, today) !== CEQ31) return;", "    if (dayDiff(v.insp_due, today) < CEQ31) return;"], ["    if (GREY.indexOf(String(v.state || '')) >= 0) return;\n    if (!isDate(v.insp_due)) return;\n    if (dayDiff", "    if (!isDate(v.insp_due)) return;\n    if (dayDiff"],
       ["    if (have[key]) { overlap++; return; }\n    items.push({ id: v.id, no:", "    items.push({ id: v.id, no:"]];
     const kP = MPV.map(([a, b]) => { try { return chkPV(mutV(SRCV.ar, a, b)).ok; } catch (e) { return 'err ' + e.message; } });
-    const MPE = [["  if (!(vb && vb.on === true)) { out.skip = 'NOT_PROMOTED'; return out; }", ''], ["  if (!rows.some(function (r) { return r && r.id === CEQ_ROW; })) { out.no_row = [CEQ_ROW]; out.skip = 'NO_ROW'; return out; }", '']];
+    const MPE = [["  if (R && R.since === false) sum.win = 0;", ''], ["  if (!(vb && vb.on === true)) { out.skip = 'NOT_PROMOTED'; return out; }", ''], ["  if (!rows.some(function (r) { return r && r.id === CEQ_ROW; })) { out.no_row = [CEQ_ROW]; out.skip = 'NO_ROW'; return out; }", '']];
     MPE.forEach(([a, b]) => { try { kP.push(chkPV(null, mutV(SRCV.ev, a, b)).ok); } catch (e) { kP.push('err ' + e.message); } });
     const MPG = [["  if (dc !== null && dc >= AR.CEQ31) { if (veh === null) return 'veh_unread'; if (AR.isCeq(veh)) return dc === AR.CEQ31 ? 'veh_ceq31' : 'unknown'; }", ''],
       ["if (AR.isCeq(veh)) return dc === AR.CEQ31 ? 'veh_ceq31' : 'unknown'; }", "if (AR.isCeq(veh)) return 'veh_ceq31'; }"], ["{ if (veh === null) return 'veh_unread'; if (AR.isCeq", "{ if (AR.isCeq"]];
     MPG.forEach(([a, b]) => { try { kP.push(chkPV(null, null, mutV(SRCV.gw, a, b)).ok); } catch (e) { kP.push('err ' + e.message); } });
     T('C185 판4 ① 결함 사본 ' + kP.length + '개(90일에서 건설기계 안 뺌 · 31일 아닌 날도 · 회색 안 뺌 · 겹친 키 셈 · 미승격 거름 · 행 거름 · 서버 판정 갈래 걷음 · 32일 이상도 31일 규칙 · 못 읽음 걷음) = 모두 ✗', kP.every((v) => v === false), JSON.stringify(kP));
     const E0 = await chkEV(gwd);
-    T('C185 판4 ③ 실제 서버: 연습 = 봇이 보낸 31일 건설기계 키 막힘(veh_ceq31)·40일 건설기계 늘 막힘(unknown)·31일 대형 화물은 90일 규칙(연습 = 막힘)·30일은 종전 D-30 만듦 · 켬 = 실행기가 31일 건설기계 1건(담당 veh:·글 차번호)·봇이 같은 키를 보내도 중복 · 미승격 = 0건·NOT_PROMOTED · 연습 요약 = 준비됨·지시 1·참고 수(이름 0) · 차량 문서 못 읽음 = 31일 이상 정기검사 키 3건 막힘(veh_unread)·30일은 만듦 · 차량 문서 없음 = 종전 판정',
+    T('C185 판4 ③ 실제 서버(검토 반영: 깨진 차량 문서 = veh_unread · 감사 줄 "veh_unread n — 차량 문서 못 읽음" · 연습 요약 win 0): 연습 = 봇이 보낸 31일 건설기계 키 막힘(veh_ceq31)·40일 건설기계 늘 막힘(unknown)·31일 대형 화물은 90일 규칙(연습 = 막힘)·30일은 종전 D-30 만듦 · 켬 = 실행기가 31일 건설기계 1건(담당 veh:·글 차번호)·봇이 같은 키를 보내도 중복 · 미승격 = 0건·NOT_PROMOTED · 연습 요약 = 준비됨·지시 1·참고 수(이름 0) · 차량 문서 못 읽음 = 31일 이상 정기검사 키 3건 막힘(veh_unread)·30일은 만듦 · 차량 문서 없음 = 종전 판정',
       E0.o.ok, JSON.stringify(E0.o.ok ? E0.o : E0));
-    const MEV = [["  let vehById = {};\n  if (items.some(", "  let vehById = {};\n  if (false && items.some("], ["if (!rv0.ok && rv0.code !== 'NOT_FOUND') vehById = null; else if", "if (!rv0.ok) vehById = {}; else if"], ["    const rule = autotaskRuleOf(k, today, vehOfKey(k));", "    const rule = autotaskRuleOf(k, today);"]];
+    const MEV = [["  let vehById = {};\n  if (items.some(", "  let vehById = {};\n  if (false && items.some("], ["else if (rv0.ok && rv0.data && !Array.isArray(rv0.data.items)) vehById = null; else ", "else "],
+      ["(k === 'veh_unread' ? '차량 문서 못 읽음' : sw.rules[k])", "sw.rules[k]"], ["if (!rv0.ok && rv0.code !== 'NOT_FOUND') vehById = null; else if", "if (!rv0.ok) vehById = {}; else if"], ["    const rule = autotaskRuleOf(k, today, vehOfKey(k));", "    const rule = autotaskRuleOf(k, today);"]];
     const kE = [];
     for (const [a, b] of MEV) { let v; try { v = (await chkEV(gwV(mutV(SRCV.gw, a, b)))).o.ok; } catch (e) { v = 'err ' + e.message; } kE.push(v); }
-    T('C185 판4 ③ 결함 사본 ' + kE.length + '개(차량 문서 안 읽음 · 못 읽음을 없음으로 · 판정에 차 안 넘김) = 모두 ✗', kE.every((v) => v === false), JSON.stringify(kE));
+    T('C185 판4 ③ 결함 사본 ' + kE.length + '개(차량 문서 안 읽음 · 깨진 꼴 갈래 걷음 · 감사 글 걷음 · 못 읽음을 없음으로 · 판정에 차 안 넘김) = 모두 ✗', kE.every((v) => v === false), JSON.stringify(kE));
+    // 판4 검토 시험 3: 봇 collectors/autotask.py CEQ_SAMPLES·CEQ_SAMPLE_TODAY = 위 표본(글자째) — 한쪽만 고치면 갈라짐(봇 파일은 C185_BOT_AUTOTASK 또는 ../jongwoon-appdata · 봇 판4가 아직 없으면 생략 표시)
+    const botP = process.env.C185_BOT_AUTOTASK || join(ROOT, '..', 'jongwoon-appdata', 'collectors', 'autotask.py');
+    const botS = fsV.existsSync(botP) ? fsV.readFileSync(botP, 'utf8') : '';
+    const cmpBot = (bs, js, jt) => { const m = /\nCEQ_SAMPLES = \[([\s\S]*?)\]\n/.exec(bs), d = /\nCEQ_SAMPLE_TODAY = datetime\.date\((\d+), (\d+), (\d+)\)/.exec(bs); if (!m || !d) return null;
+      const py = [...m[1].matchAll(/\("([^"]*)", "([^"]*)", "([^"]*)"\)/g)].map((x) => [x[1], x[2], x[3]]), day = d[1] + '-' + String(d[2]).padStart(2, '0') + '-' + String(d[3]).padStart(2, '0');
+      return JSON.stringify(py) === JSON.stringify(js) && day === jt; };
+    const cb0 = cmpBot(botS, CEQ_SAMPLES, CEQ_SAMPLE_TODAY);
+    if (cb0 === null) console.log('  (C185 판4 봇 표본 대조 생략 — 봇 파일에 CEQ_SAMPLES 없음: 봇 판4 브랜치가 main에 들어가기 전)');
+    else {
+      const cbM = [cmpBot(botS, CEQ_SAMPLES.slice(1), CEQ_SAMPLE_TODAY), cmpBot(botS, CEQ_SAMPLES.map((r, i) => (i === 2 ? [r[0], r[1], 'veh_insp90'] : r)), CEQ_SAMPLE_TODAY), cmpBot(botS, CEQ_SAMPLES, '2026-11-14'), cmpBot(botS.replace('("veh:c1:insp:2026-12-14", "건설기계", "veh_ceq31")', '("veh:c1:insp:2026-12-14", "건설기계", "unknown")'), CEQ_SAMPLES, CEQ_SAMPLE_TODAY)];
+      T('C185 판4 봇·서버 표본 정적 대조(검토 시험 3): 봇 CEQ_SAMPLES ' + CEQ_SAMPLES.length + '줄·CEQ_SAMPLE_TODAY = servertest 표본 글자째 같음 · 결함 사본 4개(한 줄 빠짐 · 기대값 바뀜 · 날짜 바뀜 · 봇 쪽만 고침) 모두 ✗',
+        cb0 === true && cbM.every((v) => v === false), JSON.stringify({ cb0, cbM }));
+    }
   } catch (e) { T('C185 판4 검사 실행', false, String(e && e.stack || e).slice(0, 500)); }
   finally { require.cache[rpARV] = keepARV; require.cache[rpEVV] = keepEVV; const s = JSON.parse(snapV); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; }
 }

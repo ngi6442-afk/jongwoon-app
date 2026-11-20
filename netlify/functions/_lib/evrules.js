@@ -109,6 +109,7 @@ function assignFor(k, rules) {   // gw-data assignFor와 같은 판정(가장 �
 //   반환 { sum, made: [새 지시], changed: 바뀐 지시 수, txt: 감사 한 줄 조각(수만) }
 function run(id, input, ctx, tasks, opt, write) {
   const R = RULES[id], sum = emptySum(ctx.mode), out = { sum: sum, made: [], changed: 0, txt: '' };
+  if (R && R.since === false) sum.win = 0;   // C185 판4 검토 권고 4: 날짜 상태 규칙(오늘 그날인 것만 셈)은 연습이어도 '최근 30일' 창이 아님
   tasks = Array.isArray(tasks) ? tasks : [];
   opt = opt || {};
   if (!R || typeof R.plan !== 'function') { out.sum = notReadySum(ctx.mode); return out; }
