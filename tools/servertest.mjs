@@ -14420,7 +14420,9 @@ function J91a(x) { return JSON.stringify(x); }
     T('C225 판 A ② 운반일지 추가 노선 못 읽음 = 500·노선 그대로(정상 = 다음 줄 41) · 완료 판정 크론 변경 기록 못 읽음 = 그 회차 500 ok:false CLOG_STORAGE_READ_FAILED·기록 그대로(지시 전환은 그대로) · 흔적 note 끝에 원인 코드(정상 회차 note는 종전 글자째) · 블로그 학습 규칙 창고 못 읽음 = 짝 fail LESSONS_READ_FAILED·모델 호출 0·창고(끔 스위치 포함) 그대로',
       AB0.ok && CR0.ok && PL0.ok, J({ ab: AB0.o, cr: CR0.o, pl: PL0.o }));
     const k3 = [];
-    try { k3.push((await chkAB(comp225(P225.ab, mut225(S225.ab, "  if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { ok: false, code: r.code || 'STORAGE_READ_FAILED', request_id: R });   // C225", '  // ')))).ok); } catch (e) { k3.push('err ' + e.message); }
+    // v518(C279) 합침: 추가 노선 저장 직전 다시 읽기에도 같은 가드가 있어(동시 추가 막기) 결함 사본은 두 가드를 함께 지운다 — 하나만 지우면 다른 하나가 막아 통과해 버림
+    try { k3.push((await chkAB(comp225(P225.ab, mut225(mut225(S225.ab, "  if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { ok: false, code: r.code || 'STORAGE_READ_FAILED', request_id: R });   // C225", '  // '),
+      "  if (!r2.ok && r2.code !== 'NOT_FOUND') return jr(500, { ok: false, code: r2.code, request_id: R });", '')))).ok); } catch (e) { k3.push('err ' + e.message); }
     try { k3.push((await chkCR(comp225(P225.cr, mut225(S225.cr, "      if (!cr.ok && cr.code !== 'NOT_FOUND') clogFail = cr.code || 'STORAGE_READ_FAILED';\n      else {", '      {')))).ok); } catch (e) { k3.push('err ' + e.message); }
     try { k3.push((await chkCR(comp225(P225.cr, mut225(S225.cr, "  if (clogFail) return Object.assign({ ok: false, code: 'CLOG_' + clogFail }, last);", '')))).ok); } catch (e) { k3.push('err ' + e.message); }
     try { k3.push((await chkCR(comp225(P225.cr, mut225(S225.cr, "(r.code ? ' · ' + String(r.code).slice(0, 40) : '')", "''")))).ok); } catch (e) { k3.push('err ' + e.message); }

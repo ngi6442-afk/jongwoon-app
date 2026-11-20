@@ -644,7 +644,7 @@ async function handleRouteAdd(st, c, d, R) {
   //   숨김·학습을 못 읽으면 번호는 추가분만으로 정하고 겹침 확인은 건너뛴다.
   const reads = await Promise.all([blobGet(st, EXTRA_KEY), blobGet(st, HIDDEN_KEY), blobGet(st, LEARNED_KEY)]);
   const r = reads[0], hr = reads[1], lr = reads[2];
-  if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { ok: false, code: r.code || 'STORAGE_READ_FAILED', request_id: R });   // 없는 키: 실제 저장소 = ok·null, 시험 대역 = NOT_FOUND — 둘 다 '아직 없음'
+  if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { ok: false, code: r.code || 'STORAGE_READ_FAILED', request_id: R });   // C225 판 A: 추가 노선을 못 읽으면 빈 목록으로 보고 옛 줄 번호를 다시 차지하지 않음(없는 키는 실제 저장소 ok·null, 시험 대역 NOT_FOUND)
   const items = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : [];
   const refs =[].concat((hr.ok && hr.data && Array.isArray(hr.data.items)) ? hr.data.items : [], lr.ok ? learnedItems(lr.data) : []);
   const row = AB.nextExtraRow(side, items, refs);

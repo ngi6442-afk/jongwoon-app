@@ -20913,9 +20913,9 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ["`STORAGE_WRITE_BLOCKED`", "원장 C225"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v517 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 8 && gate.length === 2 && scr.length === 6 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 517 && ftv.length > 0 && mF.length === 0 && cb.length === 8 && gate.length === 2 && scr.length === 6 && !cb.some((l) => /\(PM/.test(l))
       && d.cl.indexOf('**C225 판A(v517') > 0
-      && /SHELL_CACHE = 'jw-shell-v517'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 517;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r517 = chk517(D517);
@@ -20927,6 +20927,37 @@ try {
   T('v517 문서·판 번호(정확 검사): FEATURES 기준 v517 (2026-11-20)·v517 절(C225 판A) · TESTLIST v517 칸 8(화면·운영 확인 6 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v517 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
     r517.ok && M517.every((v) => v === false), JSON.stringify({ r: r517.info, mut: M517 }));
 } catch (e) { console.log('  (v517 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v518(운반일지 집계·새 노선 — 원장 C244·C279): 실행 검사는 위 'C244' 블록·v351 블록의 'C279' 묶음·servertest 'C279' · 여기는 문서·판 번호 정확 검사 + 고정 글 3줄(빼면 ✗)
+try {
+  const rd518 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D518 = { ft: rd518('FEATURES.md'), tl: rd518('TESTLIST.md'), sw: rd518('sw.js'), man: rd518('MANUAL.html'), cl: rd518('CLAUDE.md'), ix: rd518('index.html') };
+  const FIX518 = ["byKey[k] = byKey[k] ? abSheetMerge(byKey[k], c) : c;", "if (max[side] < AB_EXTRA_ROW_MAX){ out[side] = max[side] + 1; return; }", "abNrDraft = { key: key, from: from, to: to, item: item, side: side };"];
+  const MANA518 = "(2026-11 v518) 새 줄의 하차지·품목 이름이 기존 줄과 겹쳐 ";
+  const chk518 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v518 (11/20)', '\n### '), tlv = cut(d.tl, '\n## v518 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`abSheetMerge`", "`abSummary`", "`routeAddImpact`", "`ROUTE_OVERLAP`", "`ROUTE_ADD_BUSY`", "`abNrDraft`", "원장 C244", "원장 C279"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = "(2026-11 v518) 새 줄의 하차지·품목 이름이 기존 줄과 겹쳐 ";
+    const ok = /기준: v518 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf(MAN) > 0
+      && d.cl.indexOf('**운반일지 집계·새 노선(v518') > 0
+      && FIX518.every((x) => d.ix.split(x).length === 2)
+      && /SHELL_CACHE = 'jw-shell-v518'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX518.map((x) => d.ix.split(x).length - 1) } };
+  };
+  const r518 = chk518(D518);
+  const mu518 = (k, f) => chk518(Object.assign({}, D518, { [k]: f(D518[k]) })).ok;
+  const M518 = [mu518('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v517 (')), mu518('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v517'")),
+    mu518('ft', (s) => s.split('`abSheetMerge`').join('abSheetMerge')),
+    mu518('man', (s) => s.replace(MANA518, '')), mu518('cl', (s) => s.replace('**운반일지 집계·새 노선(v518', '운반일지 집계·새 노선(')),
+    mu518('tl', (s) => s.replace('\n- [x] (AI) `servertest` \'C279 ①②③\'', '\n- (AI) `servertest` \'C279 ①②③\''))]
+    .concat(FIX518.map((x) => mu518('ix', (s) => s.replace(x, ''))));
+  T('v518 문서·판 번호(정확 검사): FEATURES 기준 v518 (2026-11-20)·v518 절(운반일지 집계·새 노선) · TESTLIST v518 칸 5(화면·운영 확인 3 · 게이트 [x] 2) · MANUAL 겹침 알림 문장(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 3줄 한 번씩 · sw jw-shell-v518 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
+    r518.ok && M518.every((v) => v === false), JSON.stringify({ r: r518.info, mut: M518 }));
+} catch (e) { console.log('  (v518 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
