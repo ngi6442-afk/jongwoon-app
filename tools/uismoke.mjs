@@ -20621,11 +20621,11 @@ try {
     const FT = ['B1', 'B13', 'C254', 'C247', '`bidShow`', '`bidLegSoon`', '`bidsDrawAfterLoad`', '52 → 43'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const sumFn = cutB(d.ix, '    var taskUndone = 0, hasOverdue = false;', '    var taskCell = ');
-    const ok = /기준: v513 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length >= 3 && gate.length >= 1 && op.length >= 1
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 513 && ftv.length > 0 && mF.length === 0 && cb.length >= 3 && gate.length >= 1 && op.length >= 1
       && blk.length > 0 && mC.length === 0 && d.ix.indexOf('<style>') < d.ix.indexOf('/* 폰 줄 눌림 수리 B1~B13') && d.ix.indexOf('/* 폰 줄 눌림 수리 B1~B13') < d.ix.indexOf('</head>')
       && /if \(t\.status !== "open" && t\.status !== "hold"\) return;/.test(sumFn) && !/if \(t\.status === "done"\) return;/.test(sumFn)
       && /<input type="number" id="bcLow" step="0\.5" style="flex:1"><span>~<\/span><input type="number" id="bcHigh" step="0\.5" style="flex:1">/.test(d.ix)
-      && d.cl.indexOf('**폰 줄 눌림 수리(v513') > 0 && /SHELL_CACHE = 'jw-shell-v513'/.test(d.sw);
+      && d.cl.indexOf('**폰 줄 눌림 수리(v513') > 0 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 513;
     return { ok, info: { mC, mF, cb: cb.length, gate: gate.length, op: op.length, blk: blk.length } };
   };
   const rB = chkB(DB);
@@ -20638,6 +20638,37 @@ try {
   T('v513 폰 줄 눌림 B1~B13 CSS(묶음 글자 11항목 · head 첫 <style> 끝 자리) · C247 ③ 업무 요약 = 진행·보류만 · ④ 계산기 사정률 칸 기본값 없음 · FEATURES·TESTLIST·CLAUDE.md·sw 판 번호 · 결함 사본 8건 다 잡힘',
     rB.ok && MB.every((v) => v === false), JSON.stringify({ r: rB.info, mut: MB }));
 } catch (e) { console.log('  (v513 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v514(운반일지 줄 번호 — PM 11/20 예비줄 건): 실행 검사는 위 v351 블록의 '2026-11-20' 묶음·servertest 절 39 · 여기는 문서·판 번호 정확 검사 + 고정 글 3줄(빼면 ✗)
+try {
+  const rd514 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D514 = { ft: rd514('FEATURES.md'), tl: rd514('TESTLIST.md'), sw: rd514('sw.js'), man: rd514('MANUAL.html'), cl: rd514('CLAUDE.md'), ix: rd514('index.html') };
+  const FIX514 = ["var AB_EXTRA_ROW_MIN = 40, AB_EXTRA_ROW_MAX = 999;", "var AB_XLSX_1P = 52, AB_XLSX_2P = 124, AB_XLSX_NEAR = 6;", "if (from.length > 60 || to.length > 60 || item.length > 40){"];
+  const MANA514 = "(2026-11 v514) 새 노선 폼에는 지금 보이는 노선 줄 수와 엑";
+  const chk514 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v514 (11/20)', '\n### '), tlv = cut(d.tl, '\n## v514 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`EXTRA_ROW_MAX`", "`_grow_rows`", "`AB_XLSX_1P`", "`ROWS_FULL`", "한도자리_전수표_1120.md"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = "(2026-11 v514) 새 노선 폼에는 지금 보이는 노선 줄 수와 엑";
+    const ok = /기준: v514 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf(MAN) > 0
+      && d.cl.indexOf('**운반일지 줄 번호(v514') > 0
+      && FIX514.every((x) => d.ix.split(x).length === 2)
+      && /SHELL_CACHE = 'jw-shell-v514'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX514.map((x) => d.ix.split(x).length - 1) } };
+  };
+  const r514 = chk514(D514);
+  const mu514 = (k, f) => chk514(Object.assign({}, D514, { [k]: f(D514[k]) })).ok;
+  const M514 = [mu514('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v513 (')), mu514('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v513'")),
+    mu514('ft', (s) => s.split('`EXTRA_ROW_MAX`').join('EXTRA_ROW_MAX')),
+    mu514('man', (s) => s.replace(MANA514, '')), mu514('cl', (s) => s.replace('**운반일지 줄 번호(v514', '운반일지 줄 번호(')),
+    mu514('tl', (s) => s.replace('\n- [x] (AI) `servertest` 절 39 운영 꼴·경계 · `uismoke` v351 블록 새 검사(실제 화면 함수) · 자료 저장소 수집 봇 selftest ⑤⑥⑦ · 끝에서 끝 두 종(실제 handler·실제 생성기) · Excel 쪽수 실측 · v513 문서 검사를 이 판 이상으로 풂 — ✓ AI 11/20', '\n- (AI) `servertest` 절 39 운영 꼴·경계 · `uismoke` v351 블록 새 검사(실제 화면 함수) · 자료 저장소 수집 봇 selftest ⑤⑥⑦ · 끝에서 끝 두 종(실제 handler·실제 생성기) · Excel 쪽수 실측 · v513 문서 검사를 이 판 이상으로 풂 — ✓ AI 11/20'))]
+    .concat(FIX514.map((x) => mu514('ix', (s) => s.replace(x, ''))));
+  T('v514 문서·판 번호(정확 검사): FEATURES 기준 v514 (2026-11-20)·v514 절(운반일지 줄 번호) · TESTLIST v514 칸 4(화면·운영 확인 2 · 게이트 [x] 2) · MANUAL 새 노선 폼 문장(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 3줄 한 번씩 · sw jw-shell-v514 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
+    r514.ok && M514.every((v) => v === false), JSON.stringify({ r: r514.info, mut: M514 }));
+} catch (e) { console.log('  (v514 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
