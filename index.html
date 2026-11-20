@@ -1891,6 +1891,7 @@
 
   <!-- 월말명세서(체크 29 판② — 권민지 월말 명세서 확인: 월 보드 = 공통 표 부품, 거래처 상세 = 줄 입력 표, 서버 gw-stmt) -->
   <section class="view" id="view-stmt">
+    <div id="stmtPhone" style="display:none;"></div>   <!-- 29 판⑪ 폰(859px 이하) = 안내 카드 한 장(PC에서 함) -->
     <div class="dash-sec" id="stmtMonBar" style="margin-bottom:8px;"><h2><span class="st-mon">월말명세서 <button type="button" class="vs-chip" id="stmtPrev" aria-label="이전 달">◀</button><b id="stmtYm"></b><button type="button" class="vs-chip" id="stmtNext" aria-label="다음 달">▶</button> <span class="cnt" id="stmtHead"></span></span></h2></div>
     <div class="st-stats" id="stmtStats"></div>
     <div id="stmtBoardMsg"></div>
@@ -9954,7 +9955,7 @@
     if (!canDo("stmt")) return;
     gwCall("gw-stmt", { action: "stmt_mail_status" }).then(function(res){
       var b = res.body || {};
-      if (res.status === 200 && b.status === "OK"){ STMT.mail = { set: !!b.set, last: b.last || null, senders: b.senders || 0 }; if (!STMT.ed && !STMT.cfg) stmtDropRender(); }
+      if (res.status === 200 && b.status === "OK"){ STMT.mail = { set: !!b.set, last: b.last || null, senders: b.senders || 0 }; if (stmtPhone()){ var ph = document.getElementById("stmtPhone"); if (ph && currentTab === "stmt") ph.innerHTML = stmtPhoneHtml(); } else if (!STMT.ed && !STMT.cfg) stmtDropRender(); }   // 29 판⑪ 폰 카드의 메일 줄
     }).catch(function(){});
   }
   function stmtMailRun(){
@@ -10671,7 +10672,7 @@
   function stmtViewer(){ var who = (typeof myId === "function") ? String(myId() || "") : ""; if (STMT.who === who) return; if (STMT.who !== null) stmtReset(); STMT.who = who; }
   // 탭 입구 — 월 보드(부품 갈래 함수) 또는 거래처 상세. 처음·사람이 바뀐 뒤엔 그 달을 읽는다(읽기 실패는 '다시 읽기'로만 — 저절로 되풀이하지 않음)
   function renderStmt(){
-    var board = document.getElementById("stmtBoard"), edHost = document.getElementById("stmtEditor"), cfHost = document.getElementById("stmtCfg"), ed, cf, ymEl = document.getElementById("stmtYm");
+    var board = document.getElementById("stmtBoard"), edHost = document.getElementById("stmtEditor"), cfHost = document.getElementById("stmtCfg"), ed, cf, ymEl = document.getElementById("stmtYm"), phone, ph;
     if (!board || !edHost) return;
     stmtViewer(); stmtBindOnce();
     if (!canSee("stmt")){ board.innerHTML = ""; edHost.innerHTML = ""; if (cfHost) cfHost.innerHTML = ""; return; }
@@ -10679,9 +10680,18 @@
     if (ymEl) ymEl.textContent = STMT.ym;
     if (STMT.cfg && !canDo("stmt")){ STMT.cfg = null; STMT.cseq++; }   // 거래처 목록 고치기는 수행만
     ed = STMT.ed; cf = !ed && STMT.cfg;
-    ["stmtMonBar", "stmtStats", "stmtBoardMsg", "stmtDrop", "stmtOutBar", "stmtBoard", "stmtCfgBar"].forEach(function(id){ var el = document.getElementById(id); if (el) el.style.display = (ed || cf) ? "none" : ""; });
-    edHost.style.display = ed ? "" : "none";
-    if (cfHost){ cfHost.style.display = cf ? "" : "none"; if (!cf) cfHost.innerHTML = ""; }
+    phone = stmtPhone(); ph = document.getElementById("stmtPhone");
+    ["stmtMonBar", "stmtStats", "stmtBoardMsg", "stmtDrop", "stmtOutBar", "stmtBoard", "stmtCfgBar"].forEach(function(id){ var el = document.getElementById(id); if (el) el.style.display = (ed || cf || phone) ? "none" : ""; });
+    edHost.style.display = ed && !phone ? "" : "none";
+    if (cfHost){ cfHost.style.display = cf && !phone ? "" : "none"; if (!cf) cfHost.innerHTML = ""; }
+    if (ph) ph.style.display = phone ? "" : "none";
+    if (phone){   // 29 판⑪(PM 11/20 14:51 '안내 카드로 ㄱ'): 폰에서는 안내 카드 한 장만 — 열어 둔 상세·거래처 목록 고치기는 그대로 두고(PC 폭으로 돌아가면 이어짐) 그리지 않음
+      if (!STMT.month && !STMT.loading && !STMT.err) stmtLoadMonth();
+      if (canDo("stmt") && (!STMT.mail || Date.now() - (STMT.mailAt || 0) > 60000)){ STMT.mailAt = Date.now(); stmtMailLoad(); }
+      if (ph) ph.innerHTML = stmtPhoneHtml();
+      return;
+    }
+    if (ph) ph.innerHTML = "";
     if (ed){ stmtEdRender(); return; }
     edHost.innerHTML = "";
     if (cf){ stmtCfgRender(); return; }
@@ -10690,6 +10700,28 @@
     if (STMT.month) vsSheetRender(stmtSheetDef());
     else { board.removeAttribute("data-vs-mode"); board.innerHTML = STMT.err ? "" : '<div class="loading">불러오는 중…</div>'; }
   }
+  // 29 판⑪ 폰(859px 이하 — 표들과 같은 경계 vsStage 1) 안내 카드: 'PC에서 합니다' + 그 달 상태 한 줄(실적 있는 거래처 기준) + 메일 받기 한 줄(수행 권한만 — 메일 상태를 읽을 수 있는 사람)
+  function stmtPhone(){ return vsStage() === 1; }
+  function stmtPhoneHtml(){
+    var mon = String(Number(STMT.ym.slice(5))) + "월분", rows, n = { wait: 0, red: 0, ready: 0, fin: 0 }, h, m = STMT.mail, l = m && m.last;
+    h = '<div class="card st-phone" style="padding:14px 16px;"><div style="font-size:17px;font-weight:700;">월말명세서는 PC에서 합니다</div>'
+      + '<div class="st-mute" style="margin-top:6px;">원본 넣기·명세 줄 고치기·확정은 PC 화면에서 해 주세요. 폰에서는 상태만 봅니다.</div>';
+    if (STMT.month){
+      rows = stmtBoardActed();
+      rows.forEach(function(r){ var k = stmtRowSt(r); if (k === "wait") n.wait++; else if (k === "red") n.red++; else if (k === "ready") n.ready++; else if (k === "done" || k === "sent") n.fin++; });
+      var nw = function(t){ return '<span style="white-space:nowrap;">' + t + '</span>'; };   // 한 셈이 두 줄로 갈리지 않게
+      h += '<div style="margin-top:12px;"><b>' + esc(mon) + '</b> · 거래처 ' + rows.length + '곳 — ' + nw('입력 대기 <b>' + n.wait + '</b>') + ' · '
+        + (n.red ? '<span class="st-no" style="white-space:nowrap;">붉은 칸 <b>' + n.red + '</b></span>' : nw('붉은 칸 0')) + ' · ' + nw('확정 전 <b>' + n.ready + '</b>') + ' · ' + nw('확정 <b>' + n.fin + '</b>/' + rows.length) + '</div>';
+    } else h += '<div class="st-mute" style="margin-top:12px;">' + esc(mon) + ' — ' + (STMT.err ? esc(STMT.err) : '불러오는 중…') + '</div>';
+    if (m && canDo("stmt")){
+      if (!m.set) h += '<div class="st-mute" style="margin-top:6px;">📧 메일 자동 받기 — 꺼짐</div>';
+      else if (!l) h += '<div class="st-mute" style="margin-top:6px;">📧 메일 자동 받기 — 아직 한 번도 안 돎</div>';
+      else if (!l.ok) h += '<div class="st-no" style="margin-top:6px;">📧 메일 받기 실패 ' + esc(stmtMailWhen(l.at)) + '</div>';
+      else h += '<div style="margin-top:6px;">📧 메일 자동 받기 — 마지막 ' + esc(stmtMailWhen(l.at)) + ' · 새 원본 ' + (Number(l.added) || 0) + '개</div>';
+    }
+    return h + '</div>';
+  }
+  try { var stmtMql = window.matchMedia("(max-width:859px)"), stmtOnBreak = function(){ if (typeof currentTab !== "undefined" && currentTab === "stmt") renderStmt(); }; if (stmtMql.addEventListener) stmtMql.addEventListener("change", stmtOnBreak); else if (stmtMql.addListener) stmtMql.addListener(stmtOnBreak); } catch(e){}   // 폰 ↔ PC 폭이 바뀌면 카드 ↔ 화면
   // 탭에 들어올 때(switchTab) — 보던 달을 바로 그리고 뒤에서 다시 읽는다(상세를 열어 둔 채면 그대로)
   function stmtEnter(){ if (!STMT.ed && !STMT.loading){ STMT.err = ""; STMT.errCode = ""; if (STMT.month) stmtLoadMonth(); } renderStmt(); }
   // @stmt-sheet-end

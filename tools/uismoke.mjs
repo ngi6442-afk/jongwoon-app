@@ -13167,7 +13167,7 @@ try {
       'function saveTasksCache(){} function renderTasks(){} function renderSummary(){} function scheduleTasksSave(){} var vehOpenId = null, vehDetTab = "ov"; function renderVehicles(){} function isAdmin(){ return false; } function loadTasks(){}',
       vsb6, src || ssb6,
       'stmtEdRender = function(){}; stmtEdRefresh = function(){}; stmtVehMatch = function(i){ __env.vm.push(i); }; stmtLoadMonth = function(){}; renderStmt = function(){ __env.rs++; };',
-      'return { STMT: STMT, load: stmtEdLoad, save: stmtEdSave, files: stmtDropFiles, html: stmtDropHtml, render: stmtDropRender, setVk: stmtDropSetVk, auto: stmtDropAuto, fill: stmtDropFill, chip: stmtDropChip, missing: stmtDropMissing, edInner: stmtDropEdInner, rows: stmtBoardRows, kick: stmtDropKick, dload: stmtDropLoad, err: stmtReadErr };'].join('\n'))(env);
+      'return { STMT: STMT, load: stmtEdLoad, save: stmtEdSave, files: stmtDropFiles, html: stmtDropHtml, render: stmtDropRender, setVk: stmtDropSetVk, auto: stmtDropAuto, fill: stmtDropFill, phoneHtml: stmtPhoneHtml, chip: stmtDropChip, missing: stmtDropMissing, edInner: stmtDropEdInner, rows: stmtBoardRows, kick: stmtDropKick, dload: stmtDropLoad, err: stmtReadErr };'].join('\n'))(env);
     api.STMT.ym = '2026-10';
     api.STMT.month = { status: 'OK', ym: '2026-10', cfg: CFG6, vendors: {} };
     api.STMT.drop = { ym: '2026-10', ok: true, list: (o.list || []).slice() };
@@ -13316,6 +13316,36 @@ try {
         if (good) c10.push(nm);
       }
       T('29 판⑩ ③-10 결함 사본 ' + MU10.length + '개(계산서 합치기·다른 회사 장 빼기·봇 판독 부르기·사람 줄 겹쳐 부름) = 모두 ✗', c10.length === 0, J6(c10));
+    }
+    // ③-11 29 판⑪(PM 11/20 14:51 '1. 안내 카드로 ㄱ'): 폰(859px 이하)에서는 월말명세서 = 안내 카드 한 장 — 'PC에서 합니다' + 그 달 상태 한 줄 + 메일 한 줄 · 단추 0
+    {
+      const runP = async (src, o) => {
+        const U = mk6({ list: [E6('p', { vk: 'v07' })] }, src);
+        U.api.STMT.month.vendors = { v07: { group: 'veh', status: 'doing', rows: 1, bad: 1, issues: [], ok: false, total: 500 } };   // v08 = 문서·첨부 없음(실적 없는 거래처 — 셈에서 빠짐)
+        U.api.STMT.mail = (o && o.mail !== undefined) ? o.mail : { set: true, last: { at: Date.parse('2026-11-20T07:01:00+09:00'), ok: true, added: 3 } };
+        return U.api.phoneHtml();
+      };
+      const okP = (h) => /월말명세서는 PC에서 합니다/.test(h) && /<b>10월분<\/b> · 거래처 1곳 — <span style="white-space:nowrap;">입력 대기 <b>0<\/b><\/span> · <span class="st-no" style="white-space:nowrap;">붉은 칸 <b>1<\/b><\/span> · <span style="white-space:nowrap;">확정 전 <b>0<\/b><\/span> · <span style="white-space:nowrap;">확정 <b>0<\/b>\/1<\/span>/.test(h) && /📧 메일 자동 받기 — 마지막 .* · 새 원본 3개/.test(h) && !/<button|data-st-/.test(h);
+      const p1 = await runP(), p2 = await runP(null, { mail: { set: true, last: { at: 1, ok: false, code: 'MAIL_LOGIN_FAILED' } } });
+      const rsF = fn6('renderStmt');
+      const wired = /phone = stmtPhone\(\); ph = document\.getElementById\("stmtPhone"\);/.test(rsF) && /el\.style\.display = \(ed \|\| cf \|\| phone\) \? "none" : "";/.test(rsF) && /edHost\.style\.display = ed && !phone \? "" : "none";/.test(rsF)
+        && rsF.indexOf('if (phone){') > 0 && rsF.indexOf('if (phone){') < rsF.indexOf('stmtRenderStats();') && /function stmtPhone\(\)\{ return vsStage\(\) === 1; \}/.test(ssb6)
+        && /<div id="stmtPhone" style="display:none;"><\/div>/.test(html) && html.indexOf('id="stmtPhone"') < html.indexOf('id="stmtMonBar"') && /if \(stmtPhone\(\)\)\{ var ph = document\.getElementById\("stmtPhone"\);/.test(ssb6);
+      T('29 판⑪ ③-11 폰 안내 카드: "월말명세서는 PC에서 합니다" · 10월분 · 거래처 1곳(실적 있는 곳 — 문서·첨부 없는 포항모터스 빠짐) — 입력 대기 0 · 붉은 칸 1(붉게) · 확정 전 0 · 확정 0/1 · 메일 마지막 시각·새 원본 3개 · 단추·누름 속성 0 · 메일 실패 = 붉은 실패 줄 · renderStmt: 폰이면 달 막대·상태·넣기·보드·상세·거래처 고치기 숨기고 카드만(그리기 전에 돌아감) · 카드 자리는 달 막대 위 · 메일 상태 받으면 카드 다시',
+        okP(p1) && /st-no.*메일 받기 실패/.test(p2) && wired, J6({ p1: p1.replace(/<[^>]+>/g, '|').slice(0, 300), wired }));
+      const MUP = [
+        ['붉은 칸 셈 걷음', 'else if (k === "red") n.red++; ', ''],
+        ['실적 없는 거래처까지 셈', 'rows = stmtBoardActed();', 'rows = stmtBoardAll();'],
+        ['메일 줄 걷음', "else h += '<div style=\"margin-top:6px;\">📧 메일 자동 받기 — 마지막 '", "else if (false) h += '<div style=\"margin-top:6px;\">📧 메일 자동 받기 — 마지막 '"],
+      ];
+      const cP = [];
+      for (const [nm, a, b] of MUP) {
+        if (ssb6.indexOf(a) < 0) { cP.push(nm + ':원문없음'); continue; }
+        let good = false;
+        try { good = okP(await runP(ssb6.split(a).join(b))); } catch (e) { good = false; }
+        if (good) cP.push(nm);
+      }
+      T('29 판⑪ ③-11 결함 사본 ' + MUP.length + '개(붉은 칸 셈·실적 없는 거래처까지 셈·메일 줄) = 모두 ✗', cP.length === 0, J6(cP));
     }
     T('29 판⑨ ③-9 결함 사본 ' + MU9.length + '개(덧붙이기·전부 채우기·같은 원본 두 번·명세 합계 더하기) = 모두 ✗', caught9.length === 0, J6(caught9));
   }
@@ -20652,11 +20682,11 @@ try {
     const FT = ["`EXTRA_ROW_MAX`", "`_grow_rows`", "`AB_XLSX_1P`", "`ROWS_FULL`", "한도자리_전수표_1120.md"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = "(2026-11 v514) 새 노선 폼에는 지금 보이는 노선 줄 수와 엑";
-    const ok = /기준: v514 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 514 && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
       && d.man.indexOf(MAN) > 0
       && d.cl.indexOf('**운반일지 줄 번호(v514') > 0
       && FIX514.every((x) => d.ix.split(x).length === 2)
-      && /SHELL_CACHE = 'jw-shell-v514'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 514;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX514.map((x) => d.ix.split(x).length - 1) } };
   };
   const r514 = chk514(D514);
@@ -20669,6 +20699,31 @@ try {
   T('v514 문서·판 번호(정확 검사): FEATURES 기준 v514 (2026-11-20)·v514 절(운반일지 줄 번호) · TESTLIST v514 칸 4(화면·운영 확인 2 · 게이트 [x] 2) · MANUAL 새 노선 폼 문장(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 3줄 한 번씩 · sw jw-shell-v514 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
     r514.ok && M514.every((v) => v === false), JSON.stringify({ r: r514.info, mut: M514 }));
 } catch (e) { console.log('  (v514 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v515(29 판⑪ — 폰에서 닫음): 실행 검사는 위 '29 판⑪ ③-11' · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '515 이상'으로 풀 것
+try {
+  const rdS = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DS = { ft: rdS('FEATURES.md'), tl: rdS('TESTLIST.md'), sw: rdS('sw.js'), man: rdS('MANUAL.html'), cl: rdS('CLAUDE.md') };
+  const chkS = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v515 (11/20)', '\n### '), tlv = cut(d.tl, '\n## v515 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[x\] \(AI 시험 화면 대상\)/.test(l)), op = cb.filter((l) => /^- \[ \] \(운영 확인\)/.test(l));
+    const FT = ['`vsStage`', '`stmtPhone`', '`stmtBoardActed`', '`stmtMailLoad`', '`stmtBoardCards`', '메뉴는 그대로'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = '<li><b>폰에서는 상태만</b> (2026-11 v515) — ';
+    const ok = /기준: v515 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 1 && op.length === 1
+      && d.man.indexOf(MAN) > 0 && !/stmtPhone|vsStage|renderStmt/.test(cut(d.man, MAN, '\n'))
+      && d.cl.indexOf('**월말명세서 판⑪(v515)**') > 0 && /SHELL_CACHE = 'jw-shell-v515'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, op: op.length } };
+  };
+  const rS = chkS(DS);
+  const muS = (k, f) => chkS(Object.assign({}, DS, { [k]: f(DS[k]) })).ok;
+  const MS = [muS('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v514 (')), muS('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v514'")), muS('ft', (s) => s.split('`stmtPhone`').join('stmtPhone')),
+    muS('man', (s) => s.replace('상태만</b> (2026-11 v515) ', '상태만</b> ')), muS('cl', (s) => s.replace('**월말명세서 판⑪(v515)**', '월말명세서 판⑪')),
+    muS('tl', (s) => s.replace("\n- [x] (AI) `uismoke` 29 판⑪", "\n- (AI) `uismoke` 29 판⑪"))];
+  T('v515 문서·판 번호(정확 검사): FEATURES 기준 v515 (2026-11-20)·v515 절(29 판⑪) · TESTLIST v515 칸 4(운영 확인 1 · 시험 화면 [x] 1 · 게이트 [x] 2) · MANUAL 폰 줄(내부 이름 0) · CLAUDE.md 한 줄 · sw jw-shell-v515 · 결함 사본(기준 줄·sw·FEATURES 글·MANUAL 판 표시·CLAUDE 줄·TESTLIST 칸) ✗',
+    rS.ok && MS.every((v) => v === false), JSON.stringify({ r: rS.info, mut: MS }));
+} catch (e) { console.log('  (v515 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
