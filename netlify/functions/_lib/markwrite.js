@@ -6,12 +6,14 @@
 //   그래서 처음 읽기가 실패한 회차만 이것으로 쓴다: 다시 읽어 성공(없음 포함)하면 그 값에 이번 표식을 합쳐 쓰고(다시 읽기가 층 1 표시를 푼다) ·
 //   깨진 표식이면 지킬 자료가 아니므로 이번 표식만으로 force로 다시 세움 · 그래도 못 읽으면 쓰지 않고 { ok:false }(부르는 쪽이 회차 실패로).
 //   build(cur) = 저장할 문서(cur = 다시 읽은 값, 없거나 깨졌으면 null). 처음 읽기가 성공한 회차는 종전대로 부르는 쪽이 바로 쓴다(정상 길 무변).
+//   마지막 재확인(원장 C225): opts.rebuild = 다시 읽기도 일시 실패면 이번 회차 것만으로 force로 다시 세움(옛 항목은 잃음 — 운영 판이 하던 결과와 같음 ·
+//   안 쓰면 다음 회차에 같은 알림이 한 번 더 나갔다). 부르는 쪽은 이번 회차에 실제로 나간 발송이 있을 때만 rebuild를 준다(안 나갔으면 표식을 아예 안 써 다음 회차가 살림).
 const { blobGet, blobSet } = require('./blobs');
 
-async function markAfterSend(st, key, build) {
+async function markAfterSend(st, key, build, opts) {
   const r = await blobGet(st, key);
   if (r.ok || r.code === 'NOT_FOUND') return blobSet(st, key, build(r.ok ? r.data : null));
-  if (r.code === 'STORAGE_PARSE_FAILED') return blobSet(st, key, build(null), { force: true });
+  if (r.code === 'STORAGE_PARSE_FAILED' || (opts && opts.rebuild === true)) return blobSet(st, key, build(null), { force: true });
   return { ok: false, code: r.code || 'STORAGE_READ_FAILED' };
 }
 

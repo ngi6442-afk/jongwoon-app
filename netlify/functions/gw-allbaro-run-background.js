@@ -474,7 +474,7 @@ exports.handler = async function (event, context) {
       // 미매칭은 7일 창을 매일 다시 훑으므로, 노선표를 고칠 때까지 같은 알림이 매일 온다.
       // 내용이 직전과 같으면 보내지 않는다 — 매일 오는 알림은 무시하게 되고, 그러면 새 미매칭도 놓친다.
       const sig = unmatchedDays.slice().sort().join('|');
-      let needUnmatched = unmatchedTotal > 0, sigReadFailed = false;
+      let needUnmatched = unmatchedTotal > 0, sigReadFailed = false, rsU = null;
       if (needUnmatched) {
         const prev = await blobGet(st, 'allbaro:lastnotify');
         if (prev.ok && prev.data && prev.data.sig === sig) needUnmatched = false;
@@ -485,11 +485,13 @@ exports.handler = async function (event, context) {
         const ids = tcF.adminIds;
         if (ids.length) {
           if (needFail) await push.sendTo(ids, { title: '올바로 수집 실패', body: failSummary(rec.log), url: './', tag: 'allbaro' }, { ctx: tcF });
-          if (needUnmatched) await push.sendTo(ids, { title: '운반일지 미매칭', body: (unmatchedDays.join(' · ') + ' — 노선표 확인 필요').slice(0, 280), url: './', tag: 'allbaro-unmatched' }, { ctx: tcF });
+          if (needUnmatched) rsU = await push.sendTo(ids, { title: '운반일지 미매칭', body: (unmatchedDays.join(' · ') + ' — 노선표 확인 필요').slice(0, 280), url: './', tag: 'allbaro-unmatched' }, { ctx: tcF });
         }
       }
       // C225 판 A 두 번째 검토: 서명을 못 읽은 회차는 발송 뒤 다시 읽어 씀(깨진 서명은 다시 세움) — 층 1에 막혀 서명이 안 남으면 다음 회차에 같은 미매칭 알림이 또 나감
-      if (unmatchedTotal > 0) { if (needUnmatched) { if (sigReadFailed) await MW.markAfterSend(st, 'allbaro:lastnotify', function () { return { sig: sig, ts: Date.now() }; }); else await blobSet(st, 'allbaro:lastnotify', { sig: sig, ts: Date.now() }); } }
+      //   마지막 재확인: 실제로 나간 미매칭 알림이 있으면 다시 읽기도 실패할 때 이번 서명으로 다시 세움(운영 판과 같은 결과) · 안 나갔으면 안 씀(다음 회차가 살림) ·
+      //   그래도 못 썼으면 작업 기록에 한 줄(종전엔 흔적 없음)
+      if (unmatchedTotal > 0) { if (needUnmatched) { if (sigReadFailed) { if (rsU && Number(rsU.sent) > 0) { const mwU = await MW.markAfterSend(st, 'allbaro:lastnotify', function () { return { sig: sig, ts: Date.now() }; }, { rebuild: true }); if (!(mwU && mwU.ok)) { rec.log = (rec.log || []).concat(['[알림] 미매칭 서명 못 씀 ' + String((mwU && mwU.code) || '') + ' — 다음 회차에 같은 알림이 다시 나갈 수 있음']).slice(-MAX_LOG_LINES); await blobSet(st, jobKey(job), rec); } } } else await blobSet(st, 'allbaro:lastnotify', { sig: sig, ts: Date.now() }); } }
       else await blobSet(st, 'allbaro:lastnotify', { sig: '', ts: Date.now() });   // 해소되면 서명 비움(다음 발생 시 다시 알림)
     } catch (e) {}
   } catch (e) {

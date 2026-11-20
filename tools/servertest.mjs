@@ -13780,7 +13780,7 @@ function J91a(x) { return JSON.stringify(x); }
   const fakeSDK = { setEnvironmentContext() {}, getStore(o) { const name = 'site:' + (typeof o === 'string' ? o : o.name);
     return { name, async get(k) { SDK.gets++; const q = SDK.q[name + '|' + k]; if (q && q.length) { const m = q.shift(); if (m === 'throw') throw new Error('fetch failed'); if (m === 'broken') return '{broken'; }
         const v = SDK.data[name + '|' + k]; return v === undefined ? null : v; },
-      async set(k, v) { SDK.data[name + '|' + k] = v; }, async delete(k) { if (SDK.delFail && SDK.delFail.has(name + '|' + k)) throw new Error('delete failed'); delete SDK.data[name + '|' + k]; },
+      async set(k, v) { if (SDK.setFail && SDK.setFail.has(name + '|' + k)) throw new Error('set failed'); SDK.data[name + '|' + k] = v; }, async delete(k) { if (SDK.delFail && SDK.delFail.has(name + '|' + k)) throw new Error('delete failed'); delete SDK.data[name + '|' + k]; },
       async list(o2) { const p = name + '|' + ((o2 && o2.prefix) || ''); return { blobs: Object.keys(SDK.data).filter((x) => x.indexOf(p) === 0).map((x) => ({ key: x.slice(name.length + 1) })) }; } }; } };
   const blWith = (src) => { const keep = require.cache[NBP225]; require.cache[NBP225] = { id: NBP225, filename: NBP225, loaded: true, exports: fakeSDK }; try { return comp225(P225.bl, src); } finally { if (keep) require.cache[NBP225] = keep; else delete require.cache[NBP225]; } };
   const withCache = (file, exp, fn) => { const rp = require.resolve(file), keep = require.cache[rp]; require.cache[rp] = { id: rp, filename: rp, loaded: true, exports: exp }; try { return fn(); } finally { if (keep) require.cache[rp] = keep; else delete require.cache[rp]; } };
@@ -13828,6 +13828,12 @@ function J91a(x) { return JSON.stringify(x); }
     await B.blobGet(st, 'doc:g'); const dg0 = await B.blobDelete(st, 'doc:g'); const dg = await B.blobDelete(st, 'doc:g', { force: true });
     const gone = !(K('doc:g') in SDK.data); const sg = await B.blobSet(st, 'doc:g', { v: 3 });
     o.l = sf1.ok && sf2.ok && SDK.data[K('doc:f')] === '{"v":2}' && dg0.code === 'STORAGE_WRITE_BLOCKED' && dg.ok && gone && sg.ok;
+    // ⓜ(마지막 재확인) force는 그 열쇠 표시만 지움 — A·B 둘 다 읽기 실패 → A force 쓰기 → B 보통 쓰기는 여전히 막힘 · force 쓰기가 예외면 표시 그대로(같은 열쇠 보통 쓰기도 막힘)
+    SDK.q[K('doc:ma')] = ['throw', 'throw']; SDK.q[K('doc:mb')] = ['throw', 'throw']; SDK.q[K('doc:mc')] = ['throw', 'throw'];
+    await B.blobGet(st, 'doc:ma'); await B.blobGet(st, 'doc:mb'); await B.blobGet(st, 'doc:mc');
+    const ma = await B.blobSet(st, 'doc:ma', { v: 1 }, { force: true }), mb = await B.blobSet(st, 'doc:mb', { v: 1 });
+    SDK.setFail = new Set([K('doc:mc')]); const mc1 = await B.blobSet(st, 'doc:mc', { v: 1 }, { force: true }); SDK.setFail = new Set(); const mc2 = await B.blobSet(st, 'doc:mc', { v: 2 });
+    o.m = ma.ok && mb.code === 'STORAGE_WRITE_BLOCKED' && mc1.code === 'STORAGE_WRITE_FAILED' && mc2.code === 'STORAGE_WRITE_BLOCKED' && !(K('doc:mc') in SDK.data);
     return { ok: Object.keys(o).every((k) => o[k] === true), o };
   };
 
@@ -13994,9 +14000,12 @@ function J91a(x) { return JSON.stringify(x); }
       mem.gw_data[ak] = { schema: 1, items: [{ h: 'k1', p: '', ts: 1, id: 'z', f: 'due' }] }; delete mem.gw_data['it:doneif:last']; };
     seedC(); const b0 = J(mem.gw_data[ak]);
     failOn([ak]); const r1 = await CR.handler({}); blobsMock.hooks.failGet = null; const j1 = JSON.parse(r1.body);
+    const note1 = String((mem.gw_data['it:cron:gw-doneif-cron:last'] || {}).note || '');
+    o.noteFail = / · CLOG_STORAGE_READ_FAILED$/.test(note1) && note1.indexOf('on true · scanned ') === 0;   // 두 번째 검토: 실패 회차 흔적 끝에 원인 코드
     o.clog = r1.statusCode === 500 && j1.ok === false && j1.code === 'CLOG_STORAGE_READ_FAILED' && j1.moved === 1 && J(mem.gw_data[ak]) === b0 && mem.gw_data['col:tasks'].items[0].status === 'review';
     seed225(); seedC(); const r2 = await CR.handler({}); const j2 = JSON.parse(r2.body);
     o.clogOk = r2.statusCode === 200 && j2.ok === true && !('code' in j2) && mem.gw_data[ak].items.length === 2;
+    o.noteOk = String((mem.gw_data['it:cron:gw-doneif-cron:last'] || {}).note) === 'on ' + !!j2.on + ' · scanned ' + (j2.scanned || 0) + ' · cand ' + ((j2.candidates || []).length) + ' · moved ' + (j2.moved || 0);   // 정상 회차 흔적은 종전 글자째
     pushMock.sendTo = pushSend225;
     return { ok: Object.keys(o).every((k) => o[k] === true), o };
   };
@@ -14102,7 +14111,7 @@ function J91a(x) { return JSON.stringify(x); }
     seedP(true); SDK.delFail.add(Fk('cdoc:cp1:S00:x:1')); const p3b = await pg(); SDK.delFail = new Set();
     o.purgeBodyDel = p3b.code === 500 && !purged();
     seedP(false); SDK.data[Fk('cdoc:cp1:S00:x:1')] = '{"name":"a.pd'; const auP = auditMock.logs.length; const pB = await pg();   // 깨진 본문 = force로 지움·표식·감사(좁은 재확인)
-    o.purgeBroken = pB.code === 200 && purged() && !SDK.data[Fk('cdoc:cp1:S00:x:1')] && !SDK.data[Fk('parse:att_p0')] && auditMock.logs.length >= auP;
+    o.purgeBroken = pB.code === 200 && purged() && !SDK.data[Fk('cdoc:cp1:S00:x:1')] && !SDK.data[Fk('parse:att_p0')] && auditMock.logs.length > auP;
     seedP(true); const p4 = await pg();
     o.purgeOk = p4.code === 200 && purged() && !SDK.data[Fk('cdoc:cp1:S00:x:1')] && !SDK.data[Fk('att_big1')] && !SDK.data[Fk('attp:att_big1:0')] && !SDK.data[Fk('parse:att_p0')];
     // 첨부 삭제: 본 레코드 읽기 2회 실패 = 500·아무것도 안 지움·감사 0 · 정상 = 200
@@ -14141,21 +14150,69 @@ function J91a(x) { return JSON.stringify(x); }
       seedT(); SDK.data[D('todo:sent:u225w')] = '{broken'; SDK.data[D('duty:sent')] = '{broken';
       await run(); await run(); await run();
       o.broken = nTag(/^todo-due-/) === 1 && nTag(/^ct-/) === 1;
-      // 계속 실패(다시 읽기도 실패) — 표식 못 씀 = 회차 실패(fails 2) · 저장값 그대로
-      seedT(); const t0 = SDK.data[D('todo:sent:u225w')]; SDK.q[D('todo:sent:u225w')] = ['throw', 'throw', 'throw', 'throw']; SDK.q[D('duty:sent')] = ['throw', 'throw', 'throw', 'throw'];
-      const a3 = await run();
-      o.persist = a3.fails === 2 && SDK.data[D('todo:sent:u225w')] === t0;
-      // 정상 — 종전과 같음(1번씩 · 표식에 오늘)
-      seedT(); const a4 = await run(); await run();
-      o.normal = a4.fails === 0 && nTag(/^todo-due-/) === 1 && nTag(/^ct-/) === 1 && JSON.parse(SDK.data[D('todo:sent:u225w')]).ids.tq1 === today;
+      // 회차 내내 실패(다시 읽기도 실패) + 실제로 나감 — 이번 것만으로 다시 세움(운영 판과 같은 결과 · 옛 항목 잃음) → 같은 날 다음 회차 0
+      seedT(); SDK.q[D('todo:sent:u225w')] = ['throw', 'throw', 'throw', 'throw']; SDK.q[D('duty:sent')] = ['throw', 'throw', 'throw', 'throw'];
+      const a3 = await run(); await run(); const m3 = JSON.parse(SDK.data[D('todo:sent:u225w')]).ids;
+      o.persist = a3.fails === 0 && nTag(/^todo-due-/) === 1 && nTag(/^ct-/) === 1 && m3.tq1 === today && !('old1' in m3);
+      // 회차 내내 실패 + 실제로 안 나감(키·구독 못 읽음 — sendTo sent 0) — 표식을 안 써 다음 회차가 살림
+      seedT(); const t0 = SDK.data[D('todo:sent:u225w')], d0 = SDK.data[D('duty:sent')]; SDK.q[D('todo:sent:u225w')] = ['throw', 'throw', 'throw', 'throw']; SDK.q[D('duty:sent')] = ['throw', 'throw', 'throw', 'throw'];
+      pushMock.sendTo = async (ids, p) => { sent.push('x' + String(p.tag || '')); return { sent: 0, removed: 0, skipped: 0, why: 'KEYS_READ_FAILED' }; };
+      await run(); const t1 = SDK.data[D('todo:sent:u225w')], d1 = SDK.data[D('duty:sent')];
+      pushMock.sendTo = async (ids, p) => { sent.push(String(p.tag || '')); return { sent: ids.length, removed: 0 }; };
+      await run();
+      o.notSent = t1 === t0 && d1 === d0 && nTag(/^todo-due-/) === 1 && nTag(/^ct-/) === 1 && nTag(/^xtodo-due-/) === 1;
+      // 다시 세우는 쓰기마저 예외 — 회차 fails(흔적 ok:false)
+      seedT(); SDK.q[D('todo:sent:u225w')] = ['throw', 'throw', 'throw', 'throw']; SDK.setFail = new Set([D('todo:sent:u225w')]);
+      const a5 = await run(); SDK.setFail = new Set(); o.writeFail = a5.fails === 1;
+      // 정상 — 종전과 같음(1번씩 · 표식에 오늘 · 90일 지난 표식은 정리)
+      seedT(); { const m = JSON.parse(SDK.data[D('todo:sent:u225w')]); m.ids.old91 = day225(-91); SDK.data[D('todo:sent:u225w')] = J(m); }
+      const a4 = await run(); await run(); const m4 = JSON.parse(SDK.data[D('todo:sent:u225w')]).ids;
+      o.normal = a4.fails === 0 && nTag(/^todo-due-/) === 1 && nTag(/^ct-/) === 1 && m4.tq1 === today && m4.old1 === day225(-5) && !('old91' in m4);
       // 문의 속도 제한(상한 6/10분): 깨진 창 → 8번 요청에 발송 6번(종전처럼 첫 요청이 다시 세움) · 일시 실패 첫 요청 뒤도 6번
       process.env.INQUIRY_PUSH_KEY = 'inq-c225-key';
       const inq = async () => clG(G)({ action: 'inquiry_notify', key: 'inq-c225-key', name: '문의', message: '시험' });
       seedT(); SDK.data[D('inquiry:rl')] = '{broken'; for (let i = 0; i < 8; i++) await inq();
       const iB = nTag(/^inquiry$/);
       seedT(); SDK.q[D('inquiry:rl')] = ['throw', 'throw']; for (let i = 0; i < 8; i++) await inq();
-      o.inquiry = iB === 6 && nTag(/^inquiry$/) === 6;
+      const iT = nTag(/^inquiry$/);
+      // 창 합치기: 창이 가득(6)인데 첫 읽기만 실패 → 보낸 뒤 다시 읽어 합쳐 7 → 다음 요청은 막힘
+      seedT(); SDK.data[D('inquiry:rl')] = J({ ts: [1, 2, 3, 4, 5, 6].map((i) => Date.now() - i * 1000) }); SDK.q[D('inquiry:rl')] = ['throw', 'throw'];
+      await inq(); const iM1 = nTag(/^inquiry$/), rlM = JSON.parse(SDK.data[D('inquiry:rl')]).ts.length; await inq(); const iM2 = nTag(/^inquiry$/);
+      // 10분 거르기: 저장된 창이 20분 전 것뿐이면 다시 세울 때 버림(이번 시각 1개만)
+      seedT(); SDK.data[D('inquiry:rl')] = J({ ts: [1, 2, 3].map((i) => Date.now() - 20 * 60000 - i * 1000) }); SDK.q[D('inquiry:rl')] = ['throw', 'throw'];
+      await inq(); const rlF = JSON.parse(SDK.data[D('inquiry:rl')]).ts.length;
+      o.inquiry = iB === 6 && iT === 6 && iM1 === 1 && rlM === 7 && iM2 === 1 && rlF === 1;
     } finally { pushMock.sendTo = pushSend225; if (savedIK === undefined) delete process.env.INQUIRY_PUSH_KEY; else process.env.INQUIRY_PUSH_KEY = savedIK; }
+    return { ok: Object.keys(o).every((k) => o[k] === true), o };
+  };
+  // ③-5 마지막 재확인(실 blobs.js 위 · 실 워커 handler · 바깥 수집 collectDays만 가짜): 운반일지 미매칭 알림 서명(allbaro:lastnotify)
+  const PWK = join(FN, 'gw-allbaro-run-background.js'), PAB = join(FN, '_lib', 'allbaro.js');
+  const chkWK = async (B, src) => {
+    const AB2 = require(PAB), keepCD = AB2.collectDays; let abDays = [], WK;
+    AB2.collectDays = async function () { return { ok: true, days: abDays, log: [] }; };
+    try { const MWx = withCache(P225.bl, B, () => comp225(PMW, src.mw)); WK = withCache(P225.bl, B, () => withCache(PMW, MWx, () => comp225(PWK, src.wk))); }
+    finally { AB2.collectDays = keepCD; }
+    const o = {}, D = (k) => 'site:gw_data|' + k, LN = D('allbaro:lastnotify'), tags = []; let sentZero = false, seq = 0;
+    const savedID = process.env.GW_ALLBARO_ID, savedPW = process.env.GW_ALLBARO_PW;
+    process.env.GW_ALLBARO_ID = 'c225fakeid'; process.env.GW_ALLBARO_PW = 'c225fakepw';
+    pushMock.sendTo = async (ids, p) => { tags.push((sentZero ? 'x' : '') + String(p.tag || '')); return sentZero ? { sent: 0, removed: 0, skipped: 0, why: 'KEYS_READ_FAILED' } : { sent: ids.length, removed: 0 }; };
+    const nU = (re) => tags.filter((t) => re.test(t)).length;
+    const tok = issueSession({ id: '__allbaro__', role: 'system' }).token;
+    const yday = day225(-1);
+    const seedW = () => { seed225(); SDK.data = {}; SDK.q = {}; SDK.delFail = new Set(); SDK.setFail = new Set(); tags.length = 0; sentZero = false;
+      abDays = [{ day: yday, total: 3, counts: [{ from: '가', to: '나', item: '다', n: 3 }], unmatched: [{ from: '가상차', to: '가하차', item: '가품목', n: 2 }] }]; };
+    const runW = async () => { seq++; await WK.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tok }, body: J({ job: 'ab_c225_' + seq, mode: 'collect', days: [yday] }) }, {}); return SDK.data[D('allbaro:job:ab_c225_' + seq)]; };
+    try {
+      seedW(); await runW(); await runW(); o.normal = nU(/^allbaro-unmatched$/) === 1 && /"sig"/.test(SDK.data[LN] || '');
+      // 첫 회차 내내 서명 읽기 실패(다시 읽기까지) + 실제로 나감 → 이번 서명으로 다시 세움 → 다음 회차 같은 미매칭 0(운영 판과 같음)
+      seedW(); SDK.q[LN] = Array(20).fill('throw'); await runW(); SDK.q[LN] = []; await runW(); o.outage = nU(/^allbaro-unmatched$/) === 1 && /"sig"/.test(SDK.data[LN] || '');
+      // 첫 회차 내내 실패 + 실제로 안 나감 → 서명 안 씀 → 다음 회차가 살림
+      seedW(); SDK.q[LN] = Array(20).fill('throw'); sentZero = true; await runW(); const noSig = !(LN in SDK.data); sentZero = false; SDK.q[LN] = []; await runW();
+      o.notSent = noSig && nU(/^xallbaro-unmatched$/) === 1 && nU(/^allbaro-unmatched$/) === 1;
+      // 다시 세우는 쓰기마저 예외 → 작업 기록에 한 줄
+      seedW(); SDK.q[LN] = Array(20).fill('throw'); SDK.setFail = new Set([LN]); const jr1 = await runW(); SDK.setFail = new Set();
+      o.writeFailLog = /\[알림\] 미매칭 서명 못 씀/.test(String(jr1 || ''));
+    } finally { pushMock.sendTo = pushSend225; if (savedID === undefined) delete process.env.GW_ALLBARO_ID; else process.env.GW_ALLBARO_ID = savedID; if (savedPW === undefined) delete process.env.GW_ALLBARO_PW; else process.env.GW_ALLBARO_PW = savedPW; }
     return { ok: Object.keys(o).every((k) => o[k] === true), o };
   };
   // ③-4 두 번째 검토(정적): 저장소를 쓰는 함수 진입점마다 setupBlobContext 호출이 정확히 1번이고 handler 안 첫 store() 보다 앞
@@ -14176,12 +14233,14 @@ function J91a(x) { return JSON.stringify(x); }
   try {
     const B0 = blWith(S225.bl);
     const L0 = await chkL1(B0);
-    T('C225 판 A ① 층 1(실 _lib/blobs.js · 가짜 SDK): 읽기 실패 → 쓰기·지우기 막힘(STORAGE_WRITE_BLOCKED · 저장값 그대로) · 한 실행에서 store() 다시 불러도 막힘 · 다른 열쇠·다른 저장소 무관 · force 지나감 · 다시 읽어 성공 → 풀림 · 없음 → 씀 · 깨진 JSON 막힘(읽기 1회 — 다시 읽지 않음) · 일시 실패 1회 = 다시 시도로 읽힘(읽기 2회) · 다음 실행(setupBlobContext)이면 표시 없음 · 이름 없는 저장소 객체는 객체 단위 · 실패 뒤 다시 읽어 없음 = 풀림 · force로 다시 세우거나 지우면 표시 지움(다음 보통 쓰기 지나감) · 보통 지우기는 막힘',
+    T('C225 판 A ① 층 1(실 _lib/blobs.js · 가짜 SDK): 읽기 실패 → 쓰기·지우기 막힘(STORAGE_WRITE_BLOCKED · 저장값 그대로) · 한 실행에서 store() 다시 불러도 막힘 · 다른 열쇠·다른 저장소 무관 · force 지나감 · 다시 읽어 성공 → 풀림 · 없음 → 씀 · 깨진 JSON 막힘(읽기 1회 — 다시 읽지 않음) · 일시 실패 1회 = 다시 시도로 읽힘(읽기 2회) · 다음 실행(setupBlobContext)이면 표시 없음 · 이름 없는 저장소 객체는 객체 단위 · 실패 뒤 다시 읽어 없음 = 풀림 · force로 다시 세우거나 지우면 표시 지움(다음 보통 쓰기 지나감) · 보통 지우기는 막힘 · force는 그 열쇠 표시만 지움(다른 열쇠 여전히 막힘) · force 쓰기 예외면 표시 그대로',
       L0.ok, J(L0.o));
     const MB = [["  readFails.clear();   // C225: 실행마다 비움", '  // 비우지 않음'],
       ["  if (!(opts && opts.force === true) && readFailed(st, key)) return { ok: false, code: 'STORAGE_WRITE_BLOCKED' };   // C225 층 1\n  try {\n    await st.set(", '  try {\n    await st.set('],
       ["  if (!(opts && opts.force === true) && readFailed(st, key)) return { ok: false, code: 'STORAGE_WRITE_BLOCKED' };   // C225 층 1 · force", '  // '],
       ['    if (opts && opts.force === true) clearReadFail(st, key);   // C225 두 번째 검토', '    // '],
+      ['    if (opts && opts.force === true) clearReadFail(st, key);   // C225 두 번째 검토', '    if (opts && opts.force === true) readFails.clear();   // '],
+      ["  if (!(opts && opts.force === true) && readFailed(st, key)) return { ok: false, code: 'STORAGE_WRITE_BLOCKED' };   // C225 층 1\n  try {\n    await st.set(", "  if (!(opts && opts.force === true) && readFailed(st, key)) return { ok: false, code: 'STORAGE_WRITE_BLOCKED' };\n  if (opts && opts.force === true) clearReadFail(st, key);\n  try {\n    await st.set("],
       ['    if (opts && opts.force === true) clearReadFail(st, key);   // C225: force로 지웠으면', '    // '],
       ["  if (!(opts && opts.force === true) && readFailed(st, key)) return { ok: false, code: 'STORAGE_WRITE_BLOCKED' };   // C225 층 1 · force", "  if (readFailed(st, key)) return { ok: false, code: 'STORAGE_WRITE_BLOCKED' };   // "],
       ["  if (!r.ok && r.code === 'STORAGE_READ_FAILED') {   // C225: 일시 실패면 짧게 쉬고 한 번만 다시", '  if (false) {'],
@@ -14192,7 +14251,7 @@ function J91a(x) { return JSON.stringify(x); }
       ["  if (st && typeof st.name === 'string' && st.name) return 'n:' + st.name;\n", '']];
     const kB = [];
     for (const [a, b] of MB) { let v; try { v = (await chkL1(blWith(mut225(S225.bl, a, b)))).ok; } catch (e) { v = 'err ' + e.message; } kB.push(v); }
-    T('C225 판 A ① 결함 사본 ' + kB.length + '개(실행마다 안 비움 · 쓰기 막음 걷음 · 지우기 막음 걷음 · 쓰기 force 뒤 표시 안 지움 · 지우기 force 뒤 표시 안 지움 · 지우기 force 무시 ·다시 시도 없음 · 깨진 JSON도 다시 읽음 · 다시 읽어도 안 풀림 · 없음으로 읽으면 안 풀림 · force 무시 · 저장소를 객체로만 구별) = 모두 ✗',
+    T('C225 판 A ① 결함 사본 ' + kB.length + '개(실행마다 안 비움 · 쓰기 막음 걷음 · 지우기 막음 걷음 · 쓰기 force 뒤 표시 안 지움 · 쓰기 force가 표시를 통째로 지움 · force 쓰기 예외 전에 표시 지움 ·지우기 force 뒤 표시 안 지움 · 지우기 force 무시 ·다시 시도 없음 · 깨진 JSON도 다시 읽음 · 다시 읽어도 안 풀림 · 없음으로 읽으면 안 풀림 · force 무시 · 저장소를 객체로만 구별) = 모두 ✗',
       kB.every((v) => v === false), J(kB));
 
     const G0 = await chkG(gwd);
@@ -14250,18 +14309,20 @@ function J91a(x) { return JSON.stringify(x); }
       ['if (!w0.ok) return jr(500, { status: \'ERROR\', error_code: w0.code, request_id: R });', 'if (false) return jr(500, { status: \'ERROR\', error_code: w0.code, request_id: R });']];
     const kA = [];
     for (const [a, b] of MA) { let v; try { v = (await chkAU(comp225(P225.au, mut225(S225.au, a, b)))).ok; } catch (e) { v = 'err ' + e.message; } kA.push(v); }
-    T('C225 판 A ② 결함 사본 ' + kA.length + '개(못 읽은 회원 세기 · 첫 계정 · 회원 저장 명부 · 이름 색인 · 개발자 판정 · 삭제 명부 · 아이디 색인 · 이름=아이디 색인 · 회원 저장 아이디 500 · 아이디 설정 500 · 남의 PIN 500 · 남의 아이디 500) = 모두 ✗',
+    T('C225 판 A ② 결함 사본 ' + kA.length + '개(못 읽은 회원 세기 · 첫 계정 · 회원 저장 명부 · 이름 색인 · 개발자 판정 · 삭제 명부 · 아이디 색인 · 이름=아이디 색인 · 회원 저장 아이디 500 · 아이디 설정 500 · 남의 PIN 500 · 남의 아이디 500 · 기기 삭제 쓰기 결과) = 모두 ✗',
       kA.every((v) => v === false), J(kA));
 
     const AB0 = await chkAB(comp225(P225.ab, S225.ab)), CR0 = await chkCR(comp225(P225.cr, S225.cr)), PL0 = await chkPL(comp225(P225.pl, S225.pl));
-    T('C225 판 A ② 운반일지 추가 노선 못 읽음 = 500·노선 그대로(정상 = 다음 줄 41) · 완료 판정 크론 변경 기록 못 읽음 = 그 회차 500 ok:false CLOG_STORAGE_READ_FAILED·기록 그대로(지시 전환은 그대로) · 블로그 학습 규칙 창고 못 읽음 = 짝 fail LESSONS_READ_FAILED·모델 호출 0·창고(끔 스위치 포함) 그대로',
+    T('C225 판 A ② 운반일지 추가 노선 못 읽음 = 500·노선 그대로(정상 = 다음 줄 41) · 완료 판정 크론 변경 기록 못 읽음 = 그 회차 500 ok:false CLOG_STORAGE_READ_FAILED·기록 그대로(지시 전환은 그대로) · 흔적 note 끝에 원인 코드(정상 회차 note는 종전 글자째) · 블로그 학습 규칙 창고 못 읽음 = 짝 fail LESSONS_READ_FAILED·모델 호출 0·창고(끔 스위치 포함) 그대로',
       AB0.ok && CR0.ok && PL0.ok, J({ ab: AB0.o, cr: CR0.o, pl: PL0.o }));
     const k3 = [];
     try { k3.push((await chkAB(comp225(P225.ab, mut225(S225.ab, "  if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { ok: false, code: r.code || 'STORAGE_READ_FAILED', request_id: R });   // C225", '  // ')))).ok); } catch (e) { k3.push('err ' + e.message); }
     try { k3.push((await chkCR(comp225(P225.cr, mut225(S225.cr, "      if (!cr.ok && cr.code !== 'NOT_FOUND') clogFail = cr.code || 'STORAGE_READ_FAILED';\n      else {", '      {')))).ok); } catch (e) { k3.push('err ' + e.message); }
     try { k3.push((await chkCR(comp225(P225.cr, mut225(S225.cr, "  if (clogFail) return Object.assign({ ok: false, code: 'CLOG_' + clogFail }, last);", '')))).ok); } catch (e) { k3.push('err ' + e.message); }
+    try { k3.push((await chkCR(comp225(P225.cr, mut225(S225.cr, "(r.code ? ' · ' + String(r.code).slice(0, 40) : '')", "''")))).ok); } catch (e) { k3.push('err ' + e.message); }
+    try { k3.push((await chkCR(comp225(P225.cr, mut225(S225.cr, "(r.code ? ' · ' + String(r.code).slice(0, 40) : '')", "(' · ' + r.code)")))).ok); } catch (e) { k3.push('err ' + e.message); }
     try { k3.push((await chkPL(comp225(P225.pl, mut225(S225.pl, "    if (!lr.ok && lr.code !== 'NOT_FOUND') { await finish('fail', 'LESSONS_READ_FAILED', lr.code); return; }", '')))).ok); } catch (e) { k3.push('err ' + e.message); }
-    T('C225 판 A ② 결함 사본 ' + k3.length + '개(노선 가드 · 크론 기록 가드 · 크론 실패 회차 · 학습 창고 가드) = 모두 ✗', k3.every((v) => v === false), J(k3));
+    T('C225 판 A ② 결함 사본 ' + k3.length + '개(노선 가드 · 크론 기록 가드 · 크론 실패 회차 · 흔적 원인 코드 없음 · 정상 흔적에도 코드 · 학습 창고 가드) = 모두 ✗', k3.every((v) => v === false), J(k3));
 
     const RB0 = await chkRB(B0, S225.gw);
     T('C225 판 A ③ 실 blobs.js 위 실 gw-data: 백업 복원·버전 되돌리기 = 깨진 지금 값은 교체(force) · 일시 실패(다시 시도까지 2회) = 500 STORAGE_WRITE_BLOCKED·그대로 · 중간 자리(경보 라벨 설정) 못 읽음 = 그대로(층 1) · 휴가 비관리자 500 PREV_READ_FAILED',
@@ -14299,15 +14360,36 @@ function J91a(x) { return JSON.stringify(x); }
     const MK0 = await chkMK(B0, SMK);
     T('C225 판 A ③-3 발송 표식(실 blobs.js 위 · 할 일 크론·무기계약직 레이더·문의 속도 제한): 표식 일시 실패 회차 = 보내고 다시 읽어 표식 남김 → 같은 날 다음 회차 0 · 옛 표식 보존 · 깨진 표식 = 첫 회차가 다시 세움(3회차까지 1번) · 계속 실패 = 회차 fails·저장값 그대로 · 정상 = 종전 · 문의 속도 제한 깨진 창·일시 실패 = 8번 중 6번(상한)',
       MK0.ok, J(MK0.o));
-    const MK = [['mw', "  if (r.code === 'STORAGE_PARSE_FAILED') return blobSet(st, key, build(null), { force: true });", "  if (r.code === 'STORAGE_PARSE_FAILED') return blobSet(st, key, build(null));"],
+    const MK = [['mw', "  if (r.code === 'STORAGE_PARSE_FAILED' || (opts && opts.rebuild === true)) return blobSet(st, key, build(null), { force: true });", "  if (r.code === 'STORAGE_PARSE_FAILED' || (opts && opts.rebuild === true)) return blobSet(st, key, build(null));"],
+      ['mw', "  if (r.code === 'STORAGE_PARSE_FAILED' || (opts && opts.rebuild === true)) return", "  if (r.code === 'STORAGE_PARSE_FAILED') return"],
       ['mw', "  if (r.ok || r.code === 'NOT_FOUND') return blobSet(st, key, build(r.ok ? r.data : null));", ''],
-      ['td', "const mw = await MW.markAfterSend(st, 'todo:sent:' + mid,", "const mw = await (async function (a, b, f) { return blobSet(a, b, f(null)); })(st, 'todo:sent:' + mid,"],
-      ['td', "const mw2 = await MW.markAfterSend(st, 'duty:sent',", "const mw2 = await (async function (a, b, f) { return blobSet(a, b, f(null)); })(st, 'duty:sent',"],
+      ['td', "? await MW.markAfterSend(st, 'todo:sent:' + mid,", "? await (async function (a, b, f) { return blobSet(a, b, f(null)); })(st, 'todo:sent:' + mid,"],
+      ['td', "? await MW.markAfterSend(st, 'duty:sent',", "? await (async function (a, b, f) { return blobSet(a, b, f(null)); })(st, 'duty:sent',"],
+      ['td', "? cur : { schema: 1, ids: {} }); }, { rebuild: true })", "? cur : { schema: 1, ids: {} }); })"],
+      ['td', "? cur : { schema: 1, keys: {} }); }, { rebuild: true })", "? cur : { schema: 1, keys: {} }); })"],
+      ['td', 'const mw = (rsT && Number(rsT.sent) > 0) ?', 'const mw = true ?'],
+      ['td', 'const mw2 = (rsC && Number(rsC.sent) > 0) ?', 'const mw2 = true ?'],
       ['td', '        if (!(mw && mw.ok)) fails++;', ''],
-      ['gw', "    else await MW.markAfterSend(store(DATA), 'inquiry:rl',", "    else await (async function (a, b, f) { return blobSet(a, b, f(null)); })(store(DATA), 'inquiry:rl',"]];
+      ['td', '        Object.keys(doc.ids).forEach(function (id) { if (String(doc.ids[id]) < cutoff) delete doc.ids[id]; });\n', ''],
+      ['gw', "    else await MW.markAfterSend(store(DATA), 'inquiry:rl',", "    else await (async function (a, b, f) { return blobSet(a, b, f(null)); })(store(DATA), 'inquiry:rl',"],
+      ['gw', 'const t1 = ((cur && Array.isArray(cur.ts)) ? cur.ts : [])', 'const t1 = ([])'],
+      ['gw', '.filter(function (t) { return now - t < INQUIRY_RL_WINDOW; }); t1.push(now);', '; t1.push(now);']];
     const kMK = [];
     for (const [w, a, b] of MK) { let v; try { const s = Object.assign({}, SMK); s[w] = mut225(SMK[w], a, b); v = (await chkMK(B0, s)).ok; } catch (e) { v = 'err ' + e.message; } kMK.push(v); }
-    T('C225 판 A ③-3 결함 사본 ' + kMK.length + '개(깨진 표식 force 없음 · 다시 읽어 합쳐 쓰기 없음 · 할 일 표식 그냥 쓰기(9075a26 꼴) · 레이더 표식 그냥 쓰기 · 회차 실패 안 셈 · 문의 창 그냥 쓰기) = 모두 ✗', kMK.every((v) => v === false), J(kMK));
+    T('C225 판 A ③-3 결함 사본 ' + kMK.length + '개(깨진 표식 force 없음 · 다시 세우기 없음 · 다시 읽어 합쳐 쓰기 없음 · 할 일 표식 그냥 쓰기(9075a26 꼴) · 레이더 표식 그냥 쓰기 · 할 일 다시 세우기 안 줌 · 레이더 다시 세우기 안 줌 · 할 일 발송 확인 없음 · 레이더 발송 확인 없음 · 회차 실패 안 셈 · 할 일 90일 정리 없음 · 문의 창 그냥 쓰기 · 문의 창 합치기 없음 · 문의 창 10분 거르기 없음) = 모두 ✗', kMK.every((v) => v === false), J(kMK));
+
+    const SWK = { mw: S2.mw, wk: fs225.readFileSync(PWK, 'utf8') };
+    const WK0 = await chkWK(B0, SWK);
+    T('C225 판 A ③-5 운반일지 미매칭 서명(실 blobs.js 위 실 워커): 정상 2회 = 1번 · 첫 회차 내내 서명 못 읽음 + 실제로 나감 = 이번 서명으로 다시 세움 → 다음 회차 0(운영 판과 같음) · 실제로 안 나감 = 서명 안 씀 → 다음 회차가 살림 · 다시 세우기마저 실패 = 작업 기록에 한 줄',
+      WK0.ok, J(WK0.o));
+    const MW5 = [['wk', "        if (!prev.ok && prev.code !== 'NOT_FOUND') sigReadFailed = true;   // C225 판 A 두 번째 검토", ''],
+      ['wk', "function () { return { sig: sig, ts: Date.now() }; }, { rebuild: true })", "function () { return { sig: '', ts: Date.now() }; }, { rebuild: true })"],
+      ['wk', '}, { rebuild: true }); if (!(mwU', '}); if (!(mwU'],
+      ['wk', 'if (rsU && Number(rsU.sent) > 0) {', 'if (true) {'],
+      ['wk', 'if (!(mwU && mwU.ok)) {', 'if (false) {']];
+    const kW5 = [];
+    for (const [w, a, b] of MW5) { let v; try { const s = Object.assign({}, SWK); s[w] = mut225(SWK[w], a, b); v = (await chkWK(B0, s)).ok; } catch (e) { v = 'err ' + e.message; } kW5.push(v); }
+    T('C225 판 A ③-5 결함 사본 ' + kW5.length + '개(서명 읽기 실패 표시 뺌 · 다시 세운 서명 빈 값 · 다시 세우기 안 줌 · 발송 확인 없음 · 작업 기록 한 줄 없음) = 모두 ✗', kW5.every((v) => v === false), J(kW5));
 
     const bad0 = chkSetup(GWF225);
     const mS = Object.assign({}, GWF225); mS['gw-todo-cron.js'] = mut225(mS['gw-todo-cron.js'], 'setupBlobContext(event); st = store(DATA);', 'st = store(DATA);');
