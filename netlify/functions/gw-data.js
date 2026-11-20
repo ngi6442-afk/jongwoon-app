@@ -6,6 +6,7 @@
 const crypto = require('crypto');
 const zlib = require('zlib');   // v378 큰 본문 gzip(응답·요청) — 10/8 실사고(col:bids 6.69MB > 동기 함수 한도 6MB)
 const { setupBlobContext, store, blobGet, blobSet, blobDelete, blobList } = require('./_lib/blobs');
+const MW = require('./_lib/markwrite');   // C225 판 A 두 번째 검토 — 창을 못 읽은 요청의 속도 제한 기록 쓰기(inquiry:rl)
 const { verifyToken, bearer } = require('./_lib/session');
 const { appendAudit, auditKey, diffItems, MAX_PER_MONTH: AUDIT_MAX_PER_MONTH } = require('./_lib/audit');
 const IMG = require('./_lib/imgsniff');   // C265 홍보 사진 형식(머리 바이트) 확인
@@ -1778,7 +1779,9 @@ async function handleInquiryNotify(event, d, R) {
     const ts = ((rl.ok && rl.data && Array.isArray(rl.data.ts)) ? rl.data.ts : []).filter(function (t) { return now - t < INQUIRY_RL_WINDOW; });
     if (ts.length >= INQUIRY_RL_MAX) return jr(200, { status: 'OK', sent: 0, note: 'rate-limited', window_count: ts.length, request_id: R });
     ts.push(now);
-    await blobSet(store(DATA), 'inquiry:rl', { ts: ts.slice(-50) });
+    if (rl.ok || rl.code === 'NOT_FOUND') await blobSet(store(DATA), 'inquiry:rl', { ts: ts.slice(-50) });
+    // C225 판 A 두 번째 검토: 창을 못 읽은 요청 — 다시 읽어 합쳐 씀(깨진 창은 이번 시각으로 다시 세움 — 종전처럼 스스로 고쳐짐) · 층 1에 막혀 속도 제한이 영영 열리지 않게
+    else await MW.markAfterSend(store(DATA), 'inquiry:rl', function (cur) { const t1 = ((cur && Array.isArray(cur.ts)) ? cur.ts : []).filter(function (t) { return now - t < INQUIRY_RL_WINDOW; }); t1.push(now); return { ts: t1.slice(-50) }; });
   } catch (e) {}
   const clean = function (v, n) { return String(v || '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n); };
   const name = clean(d.name, 40), contact = clean(d.contact, 60), service = clean(d.service, 30), region = clean(d.region, 40), msg = clean(d.message, 120), id = clean(d.id, 40);
@@ -4319,7 +4322,10 @@ async function handleCdocPurge(event, d, R) {
   // C225 판 A 검토: 본문 레코드 읽기는 큰 파일(조각·본 레코드)인지 알려면 꼭 필요 — 못 읽으면(읽기·파싱 실패) 아무것도 지우지 않고 500(다시 할 수 있게).
   //   본 레코드·본문을 못 지웠으면 '영구 삭제됨' 표식을 남기지 않고 500 — 파기 기록과 남은 파일이 어긋나지 않게(종전엔 결과를 안 봐 표식만 남고 다시 지울 길이 없었다)
   const pr0 = await blobGet(store(FILES), cdocKey(cid, it.i, it.dk, n));
-  if (!pr0.ok && pr0.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: pr0.code || 'STORAGE_READ_FAILED', request_id: R });
+  // C225 좁은 재확인: 본문 레코드가 깨진 JSON(STORAGE_PARSE_FAILED)이면 지킬 자료가 아니므로 그 본문 열쇠를 force로 지우고 표식·감사를 남김(운영 판처럼 파기됨 ·
+  //   큰 파일인지 알 수 없어 조각이 남을 수 있는 것은 운영 판과 같음) · 일시 읽기 실패는 500(다시 할 수 있음)
+  const pr0Broken = !pr0.ok && pr0.code === 'STORAGE_PARSE_FAILED';
+  if (!pr0.ok && pr0.code !== 'NOT_FOUND' && !pr0Broken) return jr(500, { status: 'ERROR', error_code: pr0.code || 'STORAGE_READ_FAILED', request_id: R });
   if (pr0.ok && pr0.data && pr0.data.att) {   // v423 큰 파일은 조각과 본 레코드까지
     const am = await blobGet(store(FILES), pr0.data.att);
     if (am.ok && am.data) await BF.attDeleteParts(store(FILES), pr0.data.att, am.data);
@@ -4327,7 +4333,7 @@ async function handleCdocPurge(event, d, R) {
     if (!aw.ok) return jr(500, { status: 'ERROR', error_code: aw.code, request_id: R });
   }
   if (it.att0) await blobDelete(store(FILES), 'parse:' + it.att0);   // v423 판독값도 함께(개인정보 항목의 값이 남지 않게)
-  const bw = await blobDelete(store(FILES), cdocKey(cid, it.i, it.dk, n));
+  const bw = await blobDelete(store(FILES), cdocKey(cid, it.i, it.dk, n), { force: pr0Broken });
   if (!bw.ok) return jr(500, { status: 'ERROR', error_code: bw.code, request_id: R });
   it.purged = Date.now(); it.purged_by = c.member.id; it.cur = 0;
   idx.updated_at = Date.now(); idx.updated_by = c.member.id;

@@ -9,6 +9,7 @@
 // 올바로는 조회 전용 — 여기서 등록·수정·삭제 요청을 보내지 않는다(_lib/allbaro.js도 조회만 제공).
 const crypto = require('crypto');
 const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
+const MW = require('./_lib/markwrite');   // C225 판 A 두 번째 검토 — 미매칭 알림 서명을 못 읽은 회차의 발송 뒤 서명 쓰기
 const { verifyToken, bearer } = require('./_lib/session');
 const { appendAudit } = require('./_lib/audit');
 const push = require('./_lib/push');
@@ -473,10 +474,11 @@ exports.handler = async function (event, context) {
       // 미매칭은 7일 창을 매일 다시 훑으므로, 노선표를 고칠 때까지 같은 알림이 매일 온다.
       // 내용이 직전과 같으면 보내지 않는다 — 매일 오는 알림은 무시하게 되고, 그러면 새 미매칭도 놓친다.
       const sig = unmatchedDays.slice().sort().join('|');
-      let needUnmatched = unmatchedTotal > 0;
+      let needUnmatched = unmatchedTotal > 0, sigReadFailed = false;
       if (needUnmatched) {
         const prev = await blobGet(st, 'allbaro:lastnotify');
         if (prev.ok && prev.data && prev.data.sig === sig) needUnmatched = false;
+        if (!prev.ok && prev.code !== 'NOT_FOUND') sigReadFailed = true;   // C225 판 A 두 번째 검토
       }
       if (needFail || needUnmatched) {
         const tcF = await push.tierCtx();   // 스캔 1회 — adminIds와 sendTo 활성 필터 공용
@@ -486,7 +488,8 @@ exports.handler = async function (event, context) {
           if (needUnmatched) await push.sendTo(ids, { title: '운반일지 미매칭', body: (unmatchedDays.join(' · ') + ' — 노선표 확인 필요').slice(0, 280), url: './', tag: 'allbaro-unmatched' }, { ctx: tcF });
         }
       }
-      if (unmatchedTotal > 0) { if (needUnmatched) await blobSet(st, 'allbaro:lastnotify', { sig: sig, ts: Date.now() }); }
+      // C225 판 A 두 번째 검토: 서명을 못 읽은 회차는 발송 뒤 다시 읽어 씀(깨진 서명은 다시 세움) — 층 1에 막혀 서명이 안 남으면 다음 회차에 같은 미매칭 알림이 또 나감
+      if (unmatchedTotal > 0) { if (needUnmatched) { if (sigReadFailed) await MW.markAfterSend(st, 'allbaro:lastnotify', function () { return { sig: sig, ts: Date.now() }; }); else await blobSet(st, 'allbaro:lastnotify', { sig: sig, ts: Date.now() }); } }
       else await blobSet(st, 'allbaro:lastnotify', { sig: '', ts: Date.now() });   // 해소되면 서명 비움(다음 발생 시 다시 알림)
     } catch (e) {}
   } catch (e) {

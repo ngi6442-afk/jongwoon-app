@@ -14,6 +14,8 @@ const { badBlobKey } = require('./blobkey');
 //   표시는 모듈 안 한 벌이고 실행(요청·크론 한 번)마다 setupBlobContext가 비운다 — 모든 함수 진입점이 실행 첫머리에 부른다(gw-cron-kick은 크론 handler에 넘기고,
 //   gw-hwakwan-cron은 저장소를 쓰지 않음). 넷리파이 함수 인스턴스는 한 번에 한 실행만 돌리므로 따뜻한 인스턴스의 앞 실행 표시가 뒤 실행을 막지 않는다.
 //   저장소 구별은 Store 객체의 name(실 SDK = 'site:<이름>' — store()를 몇 번 불러도 같은 이름)이고, 이름이 없는 객체(시험용)는 객체 하나를 한 저장소로 본다.
+//   한계(두 번째 검토): 표시는 '읽는 이'가 아니라 '열쇠' 단위 — 한 요청에서 같은 열쇠를 두 번 읽어(또는 Promise.all로 동시에) 나중 읽기가 성공하면
+//   앞 읽기 실패를 빈 문서로 뭉갠 쓰기도 지나간다. 그런 처리기는 자기 읽기 결과(r.ok)를 직접 보아야 한다(층 2).
 const readFails = new Map();   // 저장소 이름 → Set(열쇠)
 const anonStores = new WeakMap();
 let anonSeq = 0;
@@ -82,6 +84,7 @@ async function blobSet(st, key, val, opts) {
   if (!(opts && opts.force === true) && readFailed(st, key)) return { ok: false, code: 'STORAGE_WRITE_BLOCKED' };   // C225 층 1
   try {
     await st.set(key, JSON.stringify(val));
+    if (opts && opts.force === true) clearReadFail(st, key);   // C225 두 번째 검토: force로 다시 세웠으면 표시도 지움(같은 실행의 다음 보통 쓰기가 막히지 않게)
     return { ok: true };
   } catch (e) {
     return { ok: false, code: 'STORAGE_WRITE_FAILED', error_name: e && e.constructor && e.constructor.name };
@@ -90,9 +93,10 @@ async function blobSet(st, key, val, opts) {
 
 async function blobDelete(st, key, opts) {
   if (badBlobKey(key)) return { ok: false, code: 'STORAGE_BAD_KEY' };   // v453
-  if (!(opts && opts.force === true) && readFailed(st, key)) return { ok: false, code: 'STORAGE_WRITE_BLOCKED' };   // C225 층 1
+  if (!(opts && opts.force === true) && readFailed(st, key)) return { ok: false, code: 'STORAGE_WRITE_BLOCKED' };   // C225 층 1 · force = 깨진 계약 기록물 본문 영구 삭제(gw-data handleCdocPurge)만
   try {
     await st.delete(key);
+    if (opts && opts.force === true) clearReadFail(st, key);   // C225: force로 지웠으면 표시도 지움
     return { ok: true };
   } catch (e) {
     return { ok: false, code: 'STORAGE_DELETE_FAILED', error_name: e && e.constructor && e.constructor.name };

@@ -13818,6 +13818,16 @@ function J91a(x) { return JSON.stringify(x); }
     const an1 = { async get() { throw new Error('x'); }, async set() {}, async delete() {} }, an2 = { async get() { return null; }, async set() {}, async delete() {} };
     await B.blobGet(an1, 'k'); const s10 = await B.blobSet(an1, 'k', 1), s10b = await B.blobSet(an2, 'k', 1);
     o.j = s10.code === 'STORAGE_WRITE_BLOCKED' && s10b.ok === true;
+    // ⓚ(두 번째 검토) 읽기 실패 → 다시 읽으니 없음(null) → 풀림
+    SDK.q[K('doc:z')] = ['throw', 'throw']; const gz = await B.blobGet(st, 'doc:z'); const sz0 = await B.blobSet(st, 'doc:z', { v: 1 });
+    const gz2 = await B.blobGet(st, 'doc:z'); const sz1 = await B.blobSet(st, 'doc:z', { v: 2 });
+    o.k = !gz.ok && sz0.code === 'STORAGE_WRITE_BLOCKED' && gz2.ok && gz2.data === null && sz1.ok && SDK.data[K('doc:z')] === '{"v":2}';
+    // ⓛ(두 번째 검토) force로 다시 세우면 표시도 지움 → 같은 실행의 다음 보통 쓰기·지우기 지나감 · 지우기에는 force 길 없음
+    SDK.data[K('doc:f')] = '{broken'; SDK.data[K('doc:g')] = '{broken';
+    await B.blobGet(st, 'doc:f'); const sf1 = await B.blobSet(st, 'doc:f', { v: 1 }, { force: true }), sf2 = await B.blobSet(st, 'doc:f', { v: 2 });
+    await B.blobGet(st, 'doc:g'); const dg0 = await B.blobDelete(st, 'doc:g'); const dg = await B.blobDelete(st, 'doc:g', { force: true });
+    const gone = !(K('doc:g') in SDK.data); const sg = await B.blobSet(st, 'doc:g', { v: 3 });
+    o.l = sf1.ok && sf2.ok && SDK.data[K('doc:f')] === '{"v":2}' && dg0.code === 'STORAGE_WRITE_BLOCKED' && dg.ok && gone && sg.ok;
     return { ok: Object.keys(o).every((k) => o[k] === true), o };
   };
 
@@ -13953,6 +13963,13 @@ function J91a(x) { return JSON.stringify(x); }
     o.index = [nu1, nu2, nu3, nu5].every((x) => x.code === 500 && x.body.error_code === 'MEMBERS_READ_FAILED') && nU() === n0 && !mem.gw_users['uid:newc225'] && !mem.gw_users['name:c225새직원'] && !mem.gw_users['member:u225w'].uid;
     const nu4 = await c({ action: 'member_upsert', name: 'C225새직원', role: '직원', pin: '1234', uid: 'newc225' }, tokD225);
     o.indexOk = nu4.code === 200 && nU() === n0 + 1 && !!mem.gw_users['uid:newc225'];
+    // (두 번째 검토) 기기 삭제: 쓰기 실패 = 500 STORAGE_WRITE_FAILED·감사 '기기삭제' 0·문서 그대로 · 정상 = 200·문서 없음·감사 1
+    seedA(); mem.gw_users['device:dDel225'] = { id: 'dDel225', status: 'approved' }; const au1 = auditMock.logs.filter((l) => l.ev && l.ev[0] && l.ev[0].op === '기기삭제').length;
+    blobsMock.hooks.failSet = (k) => k === 'device:dDel225'; const dd1 = await c({ action: 'device_delete', device: 'dDel225' }, tokD225); blobsMock.hooks.failSet = null;
+    const au2 = auditMock.logs.filter((l) => l.ev && l.ev[0] && l.ev[0].op === '기기삭제').length, kept = !!mem.gw_users['device:dDel225'];
+    const dd2 = await c({ action: 'device_delete', device: 'dDel225' }, tokD225);
+    const au3 = auditMock.logs.filter((l) => l.ev && l.ev[0] && l.ev[0].op === '기기삭제').length;
+    o.devDelete = dd1.code === 500 && dd1.body.error_code === 'STORAGE_WRITE_FAILED' && au2 === au1 && kept && dd2.code === 200 && !mem.gw_users['device:dDel225'] && au3 === au1 + 1;
     return { ok: Object.keys(o).every((k) => o[k] === true), o };
   };
 
@@ -14075,7 +14092,7 @@ function J91a(x) { return JSON.stringify(x); }
     const purged = () => !!JSON.parse(SDK.data[D('recidx:cp1')]).items[0].purged;
     const pg = () => c({ action: 'cdoc_purge', cid: 'cp1', n: 1, confirm: true }, tokA);
     seedP(false); SDK.q[Fk('cdoc:cp1:S00:x:1')] = ['throw', 'throw']; const p1 = await pg();
-    const p1ok = p1.code === 500 && !purged() && !!SDK.data[Fk('cdoc:cp1:S00:x:1')] && !!SDK.data[Fk('parse:att_p0')];
+    const p1ok = p1.code === 500 && p1.body.error_code === 'STORAGE_READ_FAILED' && !purged() && !!SDK.data[Fk('cdoc:cp1:S00:x:1')] && !!SDK.data[Fk('parse:att_p0')];
     const p1b = await pg();
     o.purgeSmall = p1ok && p1b.code === 200 && purged() && !SDK.data[Fk('cdoc:cp1:S00:x:1')];
     seedP(true); SDK.q[Fk('cdoc:cp1:S00:x:1')] = ['throw', 'throw']; const p2 = await pg();
@@ -14084,33 +14101,98 @@ function J91a(x) { return JSON.stringify(x); }
     o.purgeBigDel = p3.code === 500 && !purged() && !!SDK.data[Fk('cdoc:cp1:S00:x:1')];
     seedP(true); SDK.delFail.add(Fk('cdoc:cp1:S00:x:1')); const p3b = await pg(); SDK.delFail = new Set();
     o.purgeBodyDel = p3b.code === 500 && !purged();
+    seedP(false); SDK.data[Fk('cdoc:cp1:S00:x:1')] = '{"name":"a.pd'; const auP = auditMock.logs.length; const pB = await pg();   // 깨진 본문 = force로 지움·표식·감사(좁은 재확인)
+    o.purgeBroken = pB.code === 200 && purged() && !SDK.data[Fk('cdoc:cp1:S00:x:1')] && !SDK.data[Fk('parse:att_p0')] && auditMock.logs.length >= auP;
     seedP(true); const p4 = await pg();
     o.purgeOk = p4.code === 200 && purged() && !SDK.data[Fk('cdoc:cp1:S00:x:1')] && !SDK.data[Fk('att_big1')] && !SDK.data[Fk('attp:att_big1:0')] && !SDK.data[Fk('parse:att_p0')];
     // 첨부 삭제: 본 레코드 읽기 2회 실패 = 500·아무것도 안 지움·감사 0 · 정상 = 200
     seedU(); SDK.data[Fk('att_x1')] = J({ name: 'a.pdf', kind: 'con', data: 'QQ==' }); SDK.data[Fk('parse:att_x1')] = J({ ts: 1 }); au0 = auditMock.logs.length;
     SDK.q[Fk('att_x1')] = ['throw', 'throw']; const ad1 = await c({ action: 'att_del', id: 'att_x1' }, tokA);
-    const adSame = ad1.code === 500 && !!SDK.data[Fk('att_x1')] && !!SDK.data[Fk('parse:att_x1')] && auditMock.logs.length === au0;
+    const adSame = ad1.code === 500 && ad1.body.error_code === 'STORAGE_READ_FAILED' && !!SDK.data[Fk('att_x1')] && !!SDK.data[Fk('parse:att_x1')] && auditMock.logs.length === au0;
     const ad2 = await c({ action: 'att_del', id: 'att_x1' }, tokA);
     o.attDel = adSame && ad2.code === 200 && !SDK.data[Fk('att_x1')] && !SDK.data[Fk('parse:att_x1')];
     return { ok: Object.keys(o).every((k) => o[k] === true), o };
   };
 
+  // ③-3 두 번째 검토(실 blobs.js 위): 발송 표식 — 표식을 못 읽은 회차에 보낸 뒤 다시 읽어 합쳐 씀 · 깨진 표식은 다시 세움 · 그래도 못 쓰면 회차 실패
+  //   할 일 크론(todo:sent:<회원> · 무기계약직 레이더 duty:sent) · 홈페이지 문의 속도 제한(inquiry:rl)
+  const PMW = join(FN, '_lib', 'markwrite.js'), PTD = join(FN, 'gw-todo-cron.js');
+  const S2 = { mw: fs225.readFileSync(PMW, 'utf8'), td: fs225.readFileSync(PTD, 'utf8') };
+  const UC225 = (() => { const d = new Date(Date.now() + 9 * 3600000 + 60 * 86400000); d.setUTCFullYear(d.getUTCFullYear() - 2); return { id: 'uct225', name: 'C225계약', admin: false, perms: {}, emp_type: '계약직', hire_date: d.toISOString().slice(0, 10), birth: '1990-03-03' }; })();
+  const chkMK = async (B, src) => {
+    const MWx = withCache(P225.bl, B, () => comp225(PMW, src.mw));
+    const TD = withCache(P225.bl, B, () => withCache(PMW, MWx, () => comp225(PTD, src.td)));
+    const G = withCache(P225.bl, B, () => withCache(PMW, MWx, () => comp225(P225.gw, src.gw)));
+    const o = {}, D = (k) => 'site:gw_data|' + k, U = (k) => 'site:gw_users|' + k, sent = [];
+    const today = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+    const savedIK = process.env.INQUIRY_PUSH_KEY;
+    pushMock.sendTo = async (ids, p) => { sent.push(String(p.tag || '')); return { sent: ids.length, removed: 0 }; };
+    const nTag = (re) => sent.filter((t) => re.test(t)).length;
+    const seedT = () => { seed225(); mem.gw_users['member:uct225'] = UC225; SDK.data = {}; SDK.q = {}; SDK.delFail = new Set(); sent.length = 0;
+      SDK.data[U('member:uadmin')] = J(ADMIN); SDK.data[D('priv:u225w:mytasks')] = J({ schema: 1, items: [{ id: 'tq1', title: '할 일', due: today }] });
+      SDK.data[D('todo:sent:u225w')] = J({ schema: 1, ids: { old1: day225(-5) } });   /* 90일 정리에 걸리지 않는 옛 표식 */ SDK.data[D('duty:sent')] = J({ schema: 1, keys: { 'ct:other': '2026-01-01' } }); };
+    const run = async () => JSON.parse((await TD.handler({})).body);
+    try {
+      // 일시 실패(다시 시도까지 2회) — 첫 회차는 보내고, 다시 읽어 표식을 남겨 같은 날 다음 회차는 안 보냄 · 옛 표식 보존
+      seedT(); SDK.q[D('todo:sent:u225w')] = ['throw', 'throw']; SDK.q[D('duty:sent')] = ['throw', 'throw'];
+      const a1 = await run(); await run();
+      o.transient = nTag(/^todo-due-/) === 1 && nTag(/^ct-/) === 1 && a1.fails === 0 && JSON.parse(SDK.data[D('todo:sent:u225w')]).ids.old1 === day225(-5) && !!JSON.parse(SDK.data[D('duty:sent')]).keys['ct:other'];
+      // 깨진 표식 — 첫 회차가 다시 세움 → 3회차까지 각 1번만
+      seedT(); SDK.data[D('todo:sent:u225w')] = '{broken'; SDK.data[D('duty:sent')] = '{broken';
+      await run(); await run(); await run();
+      o.broken = nTag(/^todo-due-/) === 1 && nTag(/^ct-/) === 1;
+      // 계속 실패(다시 읽기도 실패) — 표식 못 씀 = 회차 실패(fails 2) · 저장값 그대로
+      seedT(); const t0 = SDK.data[D('todo:sent:u225w')]; SDK.q[D('todo:sent:u225w')] = ['throw', 'throw', 'throw', 'throw']; SDK.q[D('duty:sent')] = ['throw', 'throw', 'throw', 'throw'];
+      const a3 = await run();
+      o.persist = a3.fails === 2 && SDK.data[D('todo:sent:u225w')] === t0;
+      // 정상 — 종전과 같음(1번씩 · 표식에 오늘)
+      seedT(); const a4 = await run(); await run();
+      o.normal = a4.fails === 0 && nTag(/^todo-due-/) === 1 && nTag(/^ct-/) === 1 && JSON.parse(SDK.data[D('todo:sent:u225w')]).ids.tq1 === today;
+      // 문의 속도 제한(상한 6/10분): 깨진 창 → 8번 요청에 발송 6번(종전처럼 첫 요청이 다시 세움) · 일시 실패 첫 요청 뒤도 6번
+      process.env.INQUIRY_PUSH_KEY = 'inq-c225-key';
+      const inq = async () => clG(G)({ action: 'inquiry_notify', key: 'inq-c225-key', name: '문의', message: '시험' });
+      seedT(); SDK.data[D('inquiry:rl')] = '{broken'; for (let i = 0; i < 8; i++) await inq();
+      const iB = nTag(/^inquiry$/);
+      seedT(); SDK.q[D('inquiry:rl')] = ['throw', 'throw']; for (let i = 0; i < 8; i++) await inq();
+      o.inquiry = iB === 6 && nTag(/^inquiry$/) === 6;
+    } finally { pushMock.sendTo = pushSend225; if (savedIK === undefined) delete process.env.INQUIRY_PUSH_KEY; else process.env.INQUIRY_PUSH_KEY = savedIK; }
+    return { ok: Object.keys(o).every((k) => o[k] === true), o };
+  };
+  // ③-4 두 번째 검토(정적): 저장소를 쓰는 함수 진입점마다 setupBlobContext 호출이 정확히 1번이고 handler 안 첫 store() 보다 앞
+  const chkSetup = (srcs) => {
+    const bad = [];
+    Object.keys(srcs).forEach((f) => {
+      const s = srcs[f], body = s.replace(/require\([^)]*\)/g, '');
+      if (!/\bstore\(|\bblob(Get|Set|Delete|List)\(/.test(body)) return;   // 저장소를 안 씀(gw-cron-kick·gw-hwakwan-cron)
+      const n = (s.match(/setupBlobContext\(/g) || []).length;
+      const h0 = s.indexOf('async function handler('), h = h0 >= 0 ? h0 : s.indexOf('exports.handler');
+      const su = s.indexOf('setupBlobContext(', h), fs0 = s.indexOf('store(', h);
+      if (n !== 1 || h < 0 || su < 0 || (fs0 >= 0 && fs0 < su)) bad.push(f + ':' + n);
+    });
+    return bad;
+  };
+  const GWF225 = {}; fs225.readdirSync(FN).filter((f) => /^gw-.*\.js$/.test(f)).forEach((f) => { GWF225[f] = fs225.readFileSync(join(FN, f), 'utf8'); });
+
   try {
     const B0 = blWith(S225.bl);
     const L0 = await chkL1(B0);
-    T('C225 판 A ① 층 1(실 _lib/blobs.js · 가짜 SDK): 읽기 실패 → 쓰기·지우기 막힘(STORAGE_WRITE_BLOCKED · 저장값 그대로) · 한 실행에서 store() 다시 불러도 막힘 · 다른 열쇠·다른 저장소 무관 · force 지나감 · 다시 읽어 성공 → 풀림 · 없음 → 씀 · 깨진 JSON 막힘(읽기 1회 — 다시 읽지 않음) · 일시 실패 1회 = 다시 시도로 읽힘(읽기 2회) · 다음 실행(setupBlobContext)이면 표시 없음 · 이름 없는 저장소 객체는 객체 단위',
+    T('C225 판 A ① 층 1(실 _lib/blobs.js · 가짜 SDK): 읽기 실패 → 쓰기·지우기 막힘(STORAGE_WRITE_BLOCKED · 저장값 그대로) · 한 실행에서 store() 다시 불러도 막힘 · 다른 열쇠·다른 저장소 무관 · force 지나감 · 다시 읽어 성공 → 풀림 · 없음 → 씀 · 깨진 JSON 막힘(읽기 1회 — 다시 읽지 않음) · 일시 실패 1회 = 다시 시도로 읽힘(읽기 2회) · 다음 실행(setupBlobContext)이면 표시 없음 · 이름 없는 저장소 객체는 객체 단위 · 실패 뒤 다시 읽어 없음 = 풀림 · force로 다시 세우거나 지우면 표시 지움(다음 보통 쓰기 지나감) · 보통 지우기는 막힘',
       L0.ok, J(L0.o));
     const MB = [["  readFails.clear();   // C225: 실행마다 비움", '  // 비우지 않음'],
       ["  if (!(opts && opts.force === true) && readFailed(st, key)) return { ok: false, code: 'STORAGE_WRITE_BLOCKED' };   // C225 층 1\n  try {\n    await st.set(", '  try {\n    await st.set('],
-      ["  if (!(opts && opts.force === true) && readFailed(st, key)) return { ok: false, code: 'STORAGE_WRITE_BLOCKED' };   // C225 층 1\n  try {\n    await st.delete(", '  try {\n    await st.delete('],
+      ["  if (!(opts && opts.force === true) && readFailed(st, key)) return { ok: false, code: 'STORAGE_WRITE_BLOCKED' };   // C225 층 1 · force", '  // '],
+      ['    if (opts && opts.force === true) clearReadFail(st, key);   // C225 두 번째 검토', '    // '],
+      ['    if (opts && opts.force === true) clearReadFail(st, key);   // C225: force로 지웠으면', '    // '],
+      ["  if (!(opts && opts.force === true) && readFailed(st, key)) return { ok: false, code: 'STORAGE_WRITE_BLOCKED' };   // C225 층 1 · force", "  if (readFailed(st, key)) return { ok: false, code: 'STORAGE_WRITE_BLOCKED' };   // "],
       ["  if (!r.ok && r.code === 'STORAGE_READ_FAILED') {   // C225: 일시 실패면 짧게 쉬고 한 번만 다시", '  if (false) {'],
       ["  if (!r.ok && r.code === 'STORAGE_READ_FAILED') {   // C225: 일시 실패면 짧게 쉬고 한 번만 다시", '  if (!r.ok) {'],
       ['  if (r.ok) clearReadFail(st, key); else markReadFail(st, key);', '  if (!r.ok) markReadFail(st, key);'],
+      ['  if (r.ok) clearReadFail(st, key); else markReadFail(st, key);', '  if (r.ok && r.data !== null) clearReadFail(st, key); else if (!r.ok) markReadFail(st, key);'],
       ["  if (!(opts && opts.force === true) && readFailed(st, key)) return { ok: false, code: 'STORAGE_WRITE_BLOCKED' };   // C225 층 1\n  try {\n    await st.set(", "  if (readFailed(st, key)) return { ok: false, code: 'STORAGE_WRITE_BLOCKED' };\n  try {\n    await st.set("],
       ["  if (st && typeof st.name === 'string' && st.name) return 'n:' + st.name;\n", '']];
     const kB = [];
     for (const [a, b] of MB) { let v; try { v = (await chkL1(blWith(mut225(S225.bl, a, b)))).ok; } catch (e) { v = 'err ' + e.message; } kB.push(v); }
-    T('C225 판 A ① 결함 사본 ' + kB.length + '개(실행마다 안 비움 · 쓰기 막음 걷음 · 지우기 막음 걷음 · 다시 시도 없음 · 깨진 JSON도 다시 읽음 · 다시 읽어도 안 풀림 · force 무시 · 저장소를 객체로만 구별) = 모두 ✗',
+    T('C225 판 A ① 결함 사본 ' + kB.length + '개(실행마다 안 비움 · 쓰기 막음 걷음 · 지우기 막음 걷음 · 쓰기 force 뒤 표시 안 지움 · 지우기 force 뒤 표시 안 지움 · 지우기 force 무시 ·다시 시도 없음 · 깨진 JSON도 다시 읽음 · 다시 읽어도 안 풀림 · 없음으로 읽으면 안 풀림 · force 무시 · 저장소를 객체로만 구별) = 모두 ✗',
       kB.every((v) => v === false), J(kB));
 
     const G0 = await chkG(gwd);
@@ -14151,7 +14233,7 @@ function J91a(x) { return JSON.stringify(x); }
     T('C225 판 A ② 결함 사본 ' + kP.length + '개(키 읽기 가드 · sendTo 키 실패 처리 · 알림함 읽기 가드 · 알림함 쓰기 결과) = 모두 ✗', kP.every((v) => v === false), J(kP));
 
     const AU0 = await chkAU(comp225(P225.au, S225.au));
-    T('C225 판 A ② 로그인 쪽(gw-auth): 못 읽은 회원이 있으면 판정 안 함 500 MEMBERS_READ_FAILED — 무인증 첫 계정·관리자 만들기·삭제(개발자 판정·마지막 PM 판정)·남의 아이디·남의 PIN·기기 승인 · 아이디·이름 색인 못 읽음(새 회원·아이디 설정) · 회원·색인 그대로 · 정상 = 종전(409 ALREADY_INITIALIZED · 403 DEV_ONLY · 200 새 회원)',
+    T('C225 판 A ② 로그인 쪽(gw-auth): 못 읽은 회원이 있으면 판정 안 함 500 MEMBERS_READ_FAILED — 무인증 첫 계정·관리자 만들기·삭제(개발자 판정·마지막 PM 판정)·남의 아이디·남의 PIN·기기 승인 · 아이디·이름 색인 못 읽음(새 회원·아이디 설정) · 회원·색인 그대로 · 정상 = 종전(409 ALREADY_INITIALIZED · 403 DEV_ONLY · 200 새 회원) · 기기 삭제 쓰기 실패 = 500 STORAGE_WRITE_FAILED·감사 0·문서 그대로(정상 200·감사 1)',
       AU0.ok, J(AU0.o));
     const MA = [["    else if (!r.ok && r.code !== 'NOT_FOUND') miss++;\n", ''],
       ['  if (existing.unavailable) return MEMBERS_FAIL(R);', ''],
@@ -14164,7 +14246,8 @@ function J91a(x) { return JSON.stringify(x); }
       ["    const dup = await uidTaken(st, nu, m.id);\n    if (dup) return dup === 'MEMBERS_READ_FAILED' ? MEMBERS_FAIL(R) : jr(409,", '    const dup = await uidTaken(st, nu, m.id);\n    if (dup) return jr(409,'],
       ["  const dup = await uidTaken(st, uid, targetId);\n  if (dup) return dup === 'MEMBERS_READ_FAILED' ? MEMBERS_FAIL(R) : jr(409,", '  const dup = await uidTaken(st, uid, targetId);\n  if (dup) return jr(409,'],
       ["  if (wantOther) { const da = await devAllowed(st, c.member); if (da === null) return MEMBERS_FAIL(R);", '  if (wantOther) { const da = await devAllowed(st, c.member);'],
-      ["  if (wantOtherUid) { const da = await devAllowed(st, c.member); if (da === null) return MEMBERS_FAIL(R);", '  if (wantOtherUid) { const da = await devAllowed(st, c.member);']];
+      ["  if (wantOtherUid) { const da = await devAllowed(st, c.member); if (da === null) return MEMBERS_FAIL(R);", '  if (wantOtherUid) { const da = await devAllowed(st, c.member);'],
+      ['if (!w0.ok) return jr(500, { status: \'ERROR\', error_code: w0.code, request_id: R });', 'if (false) return jr(500, { status: \'ERROR\', error_code: w0.code, request_id: R });']];
     const kA = [];
     for (const [a, b] of MA) { let v; try { v = (await chkAU(comp225(P225.au, mut225(S225.au, a, b)))).ok; } catch (e) { v = 'err ' + e.message; } kA.push(v); }
     T('C225 판 A ② 결함 사본 ' + kA.length + '개(못 읽은 회원 세기 · 첫 계정 · 회원 저장 명부 · 이름 색인 · 개발자 판정 · 삭제 명부 · 아이디 색인 · 이름=아이디 색인 · 회원 저장 아이디 500 · 아이디 설정 500 · 남의 PIN 500 · 남의 아이디 500) = 모두 ✗',
@@ -14192,9 +14275,9 @@ function J91a(x) { return JSON.stringify(x); }
     T('C225 판 A ③ 결함 사본 ' + kR225.length + '개(백업 복원 force 없음 · 되돌리기 force 없음 · 백업 복원 늘 force · 되돌리기 늘 force) = 모두 ✗', kR225.every((v) => v === false), J(kR225));
 
     const RB2 = await chkRB2(B0, S225.gw, S225.au);
-    T('C225 판 A ③-2 검토 반영(실 blobs.js 위): 깨진 기기 문서 = 직원 verify가 대기로 다시 세움·개발자 승인 = approved(감사 1) · 일시 실패 승인·해제 = 500 STORAGE_WRITE_BLOCKED·감사 0·문서 그대로·verify가 저장된 승인을 덮지 않음 · 회원 삭제 대상 못 읽음 = 500 · 기록물 영구 삭제: 본문 못 읽음 = 500·표식 없음·본문·판독값 남음 → 다시 하면 200 · 큰 파일 본문 못 읽음 = 500·조각·판독값 남음 · 본 레코드·본문 못 지움 = 500·표식 없음 · 정상 = 전부 지움 · 첨부 삭제 본 레코드 못 읽음 = 500·아무것도 안 지움·감사 0 → 다시 하면 200',
+    T('C225 판 A ③-2 검토 반영(실 blobs.js 위): 깨진 기기 문서 = 직원 verify가 대기로 다시 세움·개발자 승인 = approved(감사 1) · 일시 실패 승인·해제 = 500 STORAGE_WRITE_BLOCKED·감사 0·문서 그대로·verify가 저장된 승인을 덮지 않음 · 회원 삭제 대상 못 읽음 = 500 · 기록물 영구 삭제: 본문 못 읽음 = 500·표식 없음·본문·판독값 남음 → 다시 하면 200 · 큰 파일 본문 못 읽음 = 500·조각·판독값 남음 · 본 레코드·본문 못 지움 = 500·표식 없음 · 깨진 본문(파싱 실패) = force로 지우고 200·표식(좁은 재확인) · 정상 = 전부 지움 · 첨부 삭제 본 레코드 못 읽음 = 500·아무것도 안 지움·감사 0 → 다시 하면 200',
       RB2.ok, J(RB2.o));
-    const MD2 = [['gw', "  if (!pr0.ok && pr0.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: pr0.code || 'STORAGE_READ_FAILED', request_id: R });\n", ''],
+    const MD2 = [['gw', "  if (!pr0.ok && pr0.code !== 'NOT_FOUND' && !pr0Broken) return jr(500, { status: 'ERROR', error_code: pr0.code || 'STORAGE_READ_FAILED', request_id: R });\n", ''],
       ['gw', '    if (!aw.ok) return jr(500, { status: \'ERROR\', error_code: aw.code, request_id: R });\n', ''],
       ['gw', '  if (!bw.ok) return jr(500, { status: \'ERROR\', error_code: bw.code, request_id: R });\n', ''],
       ['gw', "  if (!am0.ok && am0.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: am0.code || 'STORAGE_READ_FAILED', request_id: R });\n", ''],
@@ -14203,10 +14286,34 @@ function J91a(x) { return JSON.stringify(x); }
       ['au', "  const w = await blobSet(st, deviceKey(id), dev, { force: !r.ok && r.code === 'STORAGE_PARSE_FAILED' });", '  const w = await blobSet(st, deviceKey(id), dev, { force: true });'],
       ['au', "  const w = await blobSet(st, deviceKey(dv.id), dev, { force: !dr.ok && dr.code === 'STORAGE_PARSE_FAILED' });", '  const w = await blobSet(st, deviceKey(dv.id), dev);'],
       ['au', "  const w = await blobSet(st, deviceKey(dv.id), dev, { force: !dr.ok && dr.code === 'STORAGE_PARSE_FAILED' });", '  const w = await blobSet(st, deviceKey(dv.id), dev, { force: true });'],
-      ['au', "  if (!r.ok && r.code !== 'NOT_FOUND') return MEMBERS_FAIL(R);   // C225 판 A 검토", '  // ']];
+      ['au', "  if (!r.ok && r.code !== 'NOT_FOUND') return MEMBERS_FAIL(R);   // C225 판 A 검토", '  // '],
+      ['gw', "error_code: pr0.code || 'STORAGE_READ_FAILED'", "error_code: 'X'"],
+      ['gw', 'cdocKey(cid, it.i, it.dk, n), { force: pr0Broken });', 'cdocKey(cid, it.i, it.dk, n));'],
+      ['gw', "&& !pr0Broken) return jr(500,", ') return jr(500,'],
+      ['gw', "error_code: am0.code || 'STORAGE_READ_FAILED'", "error_code: 'X'"]];
     const kD2 = [];
     for (const [w, a, b] of MD2) { let v; try { v = (await chkRB2(B0, w === 'gw' ? mut225(S225.gw, a, b) : S225.gw, w === 'au' ? mut225(S225.au, a, b) : S225.au)).ok; } catch (e) { v = 'err ' + e.message; } kD2.push(v); }
-    T('C225 판 A ③-2 결함 사본 ' + kD2.length + '개(영구 삭제 본문 읽기 가드 · 본 레코드 지우기 결과 · 본문 지우기 결과 · 첨부 삭제 읽기 가드 · 기기 승인 쓰기 결과 · 기기 승인 force 없음 · 기기 승인 늘 force · 기기 등록 force 없음 · 기기 등록 늘 force · 회원 삭제 읽기 가드) = 모두 ✗', kD2.every((v) => v === false), J(kD2));
+    T('C225 판 A ③-2 결함 사본 ' + kD2.length + '개(영구 삭제 본문 읽기 가드 · 본 레코드 지우기 결과 · 본문 지우기 결과 · 첨부 삭제 읽기 가드 · 기기 승인 쓰기 결과 · 기기 승인 force 없음 · 기기 승인 늘 force · 기기 등록 force 없음 · 기기 등록 늘 force · 회원 삭제 읽기 가드 · 영구 삭제·첨부 삭제 코드 이름 · 깨진 본문 force 없음 · 깨진 본문도 500) = 모두 ✗', kD2.every((v) => v === false), J(kD2));
+
+    const SMK = { mw: S2.mw, td: S2.td, gw: S225.gw };
+    const MK0 = await chkMK(B0, SMK);
+    T('C225 판 A ③-3 발송 표식(실 blobs.js 위 · 할 일 크론·무기계약직 레이더·문의 속도 제한): 표식 일시 실패 회차 = 보내고 다시 읽어 표식 남김 → 같은 날 다음 회차 0 · 옛 표식 보존 · 깨진 표식 = 첫 회차가 다시 세움(3회차까지 1번) · 계속 실패 = 회차 fails·저장값 그대로 · 정상 = 종전 · 문의 속도 제한 깨진 창·일시 실패 = 8번 중 6번(상한)',
+      MK0.ok, J(MK0.o));
+    const MK = [['mw', "  if (r.code === 'STORAGE_PARSE_FAILED') return blobSet(st, key, build(null), { force: true });", "  if (r.code === 'STORAGE_PARSE_FAILED') return blobSet(st, key, build(null));"],
+      ['mw', "  if (r.ok || r.code === 'NOT_FOUND') return blobSet(st, key, build(r.ok ? r.data : null));", ''],
+      ['td', "const mw = await MW.markAfterSend(st, 'todo:sent:' + mid,", "const mw = await (async function (a, b, f) { return blobSet(a, b, f(null)); })(st, 'todo:sent:' + mid,"],
+      ['td', "const mw2 = await MW.markAfterSend(st, 'duty:sent',", "const mw2 = await (async function (a, b, f) { return blobSet(a, b, f(null)); })(st, 'duty:sent',"],
+      ['td', '        if (!(mw && mw.ok)) fails++;', ''],
+      ['gw', "    else await MW.markAfterSend(store(DATA), 'inquiry:rl',", "    else await (async function (a, b, f) { return blobSet(a, b, f(null)); })(store(DATA), 'inquiry:rl',"]];
+    const kMK = [];
+    for (const [w, a, b] of MK) { let v; try { const s = Object.assign({}, SMK); s[w] = mut225(SMK[w], a, b); v = (await chkMK(B0, s)).ok; } catch (e) { v = 'err ' + e.message; } kMK.push(v); }
+    T('C225 판 A ③-3 결함 사본 ' + kMK.length + '개(깨진 표식 force 없음 · 다시 읽어 합쳐 쓰기 없음 · 할 일 표식 그냥 쓰기(9075a26 꼴) · 레이더 표식 그냥 쓰기 · 회차 실패 안 셈 · 문의 창 그냥 쓰기) = 모두 ✗', kMK.every((v) => v === false), J(kMK));
+
+    const bad0 = chkSetup(GWF225);
+    const mS = Object.assign({}, GWF225); mS['gw-todo-cron.js'] = mut225(mS['gw-todo-cron.js'], 'setupBlobContext(event); st = store(DATA);', 'st = store(DATA);');
+    const mS2 = Object.assign({}, GWF225); mS2['gw-auth.js'] = mut225(mS2['gw-auth.js'], '  setupBlobContext(event);\n', '  setupBlobContext(event);\n  setupBlobContext(event);\n');
+    T('C225 판 A ③-4 정적 검사: 저장소를 쓰는 gw-*.js 진입점마다 setupBlobContext 호출 정확히 1번·handler 안 첫 store() 보다 앞 · 결함 사본(호출 뺌·두 번) = 잡힘',
+      bad0.length === 0 && chkSetup(mS).length === 1 && chkSetup(mS2).length === 1, J({ bad0, m1: chkSetup(mS), m2: chkSetup(mS2), n: Object.keys(GWF225).length }));
   } catch (e) { T('C225 판 A 검사 실행', false, String(e && e.stack || e).slice(0, 600)); }
   finally { global.fetch = realFetch225; pushMock.sendTo = pushSend225; if (savedG2B225 === undefined) delete process.env.G2B_API_KEY; else process.env.G2B_API_KEY = savedG2B225; if (savedAK225 === undefined) delete process.env.GW_ANTHROPIC_KEY; else process.env.GW_ANTHROPIC_KEY = savedAK225;
     const s = JSON.parse(snap225); mem.gw_users = s.u; mem.gw_data = s.d; mem.gw_files = s.f; blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; }

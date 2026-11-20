@@ -109,6 +109,6 @@ exports.handler = async function (event) {
   try { setupBlobContext(event); st = store(DATA); } catch (e) { return { statusCode: 500, body: JSON.stringify({ ok: false, code: 'NO_BLOB_CONTEXT' }) }; }
   await stamp('gw-doneif-cron', { state: 'start' });
   const r = await run(st, Date.now());
-  await stamp('gw-doneif-cron', { state: 'end', ok: !!r.ok, note: 'on ' + !!r.on + ' · scanned ' + (r.scanned || 0) + ' · cand ' + ((r.candidates || []).length) + ' · moved ' + (r.moved || 0) });
+  await stamp('gw-doneif-cron', { state: 'end', ok: !!r.ok, note: 'on ' + !!r.on + ' · scanned ' + (r.scanned || 0) + ' · cand ' + ((r.candidates || []).length) + ' · moved ' + (r.moved || 0) + (r.code ? ' · ' + String(r.code).slice(0, 40) : '') });   // C225 두 번째 검토: 실패 회차는 원인 코드를 흔적 끝에
   return { statusCode: r.ok ? 200 : 500, body: JSON.stringify(r) };
 };
