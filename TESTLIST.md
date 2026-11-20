@@ -1607,3 +1607,10 @@
 - [x] (AI 시험 화면 대상) 시험 서버 PM 콘솔에 급여 요율 줄(R2 · 추천 승격 · 지금 미승격)이 뜨고 [ㄱ] 뒤 줄이 사라짐 · 저장값 `settings:pay` bg_ver·bg_sha = 올라온 판 — ✓ AI 11/20
 - [x] (AI) `paycalc_check` 10건(간이세액표 칸 되읽기 · 한 달 손계산 · 틀린 입력 던짐 · 결함 사본 37) · `servertest` '66 판1' 5건(결함 사본 19) · `uismoke` '66 판1' 3건(결함 사본 7) — ✓ AI 11/20
 - [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` · `paycalc_check` 통과 · v501 문서 검사를 이 판 이상으로 풀고 v502 문서·판 번호 정확 검사 — ✓ AI 11/20
+
+## v503 — 체크 29 판⑨: 월말명세서 메일 에이전트 청구서함·청구서 폴더 · 쿠팡 주문 메일 본문 읽기
+- [ ] (운영 확인) 11/21 07:00 이후 월말명세서 11월 목록 📧 줄이 성공이고, 11월 쿠팡 거래처 줄에 11/12~ 주문 원본(📎)이 들어와 있음 · 쿠팡 상세를 열면 주문 줄이 채워짐(저장은 권민지 몫)
+- [ ] (운영 확인) 12월 초 11월분 거래처 명세·국세청 계산서(청구서함·청구서 폴더 것)가 첨부 원본 목록에 들어옴 · 목록 밖 거래처 계산서는 ‘거래처 고르기’에 쌓이지 않음
+- [x] (AI 시험 화면 대상) 실물 쿠팡 주문 32통(4~11월 · 스크래치) = 거래처 v13 32/32 · 읽기 32/32 경고 0 · 65줄 줄 검사·검산 통과 · 남기는 원본에 받는 사람·연락처·주소·계좌 0 — ✓ AI 11/20
+- [x] (AI) `stmtmail_check` ⑨ 15건(읽기 실패 포함 · 결함 사본 10) · `uismoke` 29 판⑨ ③-9 2건(결함 사본 4) — ✓ AI 11/20
+- [x] (AI) `uismoke` · `servertest` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` · `paycalc_check` 통과 · v502 문서 검사를 이 판 이상으로 풀고 v503 문서·판 번호 정확 검사 — ✓ AI 11/20

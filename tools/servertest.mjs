@@ -7323,22 +7323,22 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     // ② 거래처 목록 — 시드 12곳 · 낡은 base 409 · 더하기 200 · 지우기 VENDOR_REMOVED · 묶음 바꾸기 GROUP_LOCKED · 같은 값 NO_CHANGE · 이름 바꾸면 감사 'a→b' · 설정 읽기 실패 = 500(시드로 그리지 않음)
     const c89 = await cs89({ action: 'stmt_cfg_get' }, tokA);
     const seed89 = c89.body.vendors || [];
-    const add89 = seed89.concat([{ vk: 'v13', name: '새주유소', group: 'veh', kind: 'fuel', basis: 'total', hint: ['새주유'] }]);
+    const add89 = seed89.concat([{ vk: 'v14', name: '새주유소', group: 'veh', kind: 'fuel', basis: 'total', hint: ['새주유'] }]);
     const stale89 = await cs89({ action: 'stmt_cfg_set', vendors: add89, base: 5 }, tokA);
     const set89 = await cs89({ action: 'stmt_cfg_set', vendors: add89, base: 0 }, tokA);
     const rm89 = await cs89({ action: 'stmt_cfg_set', vendors: seed89, base: set89.body.updated_at }, tokA);
     const grp89 = await cs89({ action: 'stmt_cfg_set', vendors: set89.body.vendors.map((v) => v.vk === 'v05' ? Object.assign({}, v, { group: 'tool' }) : v), base: set89.body.updated_at }, tokA);
     const nc89 = await cs89({ action: 'stmt_cfg_set', vendors: set89.body.vendors, base: set89.body.updated_at }, tokA);
-    const ren89 = await cs89({ action: 'stmt_cfg_set', vendors: set89.body.vendors.map((v) => v.vk === 'v13' ? Object.assign({}, v, { name: '새주유소2' }) : v), base: set89.body.updated_at }, tokA);
+    const ren89 = await cs89({ action: 'stmt_cfg_set', vendors: set89.body.vendors.map((v) => v.vk === 'v14' ? Object.assign({}, v, { name: '새주유소2' }) : v), base: set89.body.updated_at }, tokA);
     const renAud89 = auditMock.logs.slice(audit89).filter((x) => x.col === 'stmt' && x.ev[0].op === '명세서거래처').map((x) => x.ev[0].t);
     blobsMock.hooks.failGet = (k) => k === 'stmt:cfg';
     const cf89 = await cs89({ action: 'stmt_cfg_get' }, tokA);
     blobsMock.hooks.failGet = null;
-    T('89 ② 거래처 목록: 시드 12곳(veh 9·tool 3 · v05 basis total · v01·v10·v11 잔액형) · 낡은 base 409 · v13 더함 200(prev 없음) · 지우기 VENDOR_REMOVED · 묶음 바꾸기 GROUP_LOCKED · 같은 값 NO_CHANGE · 이름 바꾸기 200·감사 "v13 새주유소→새주유소2" · 읽기 실패 500',
-      c89.code === 200 && c89.body.seeded === true && c89.body.updated_at === 0 && seed89.length === 12 && seed89.filter((v) => v.group === 'veh').length === 9 && seed89.filter((v) => v.group === 'tool').length === 3
+    T('89 ② 거래처 목록: 시드 13곳(veh 9·tool 4 · v05 basis total · v01·v10·v11 잔액형) · 낡은 base 409 · v14 더함 200(prev 없음) · 지우기 VENDOR_REMOVED · 묶음 바꾸기 GROUP_LOCKED · 같은 값 NO_CHANGE · 이름 바꾸기 200·감사 "v14 새주유소→새주유소2" · 읽기 실패 500',
+      c89.code === 200 && c89.body.seeded === true && c89.body.updated_at === 0 && seed89.length === 13 && seed89.filter((v) => v.group === 'veh').length === 9 && seed89.filter((v) => v.group === 'tool').length === 4
       && seed89[4].vk === 'v05' && seed89[4].basis === 'total' && ['v01', 'v10', 'v11'].every((vk) => seed89.find((v) => v.vk === vk).carry === true)
-      && stale89.code === 409 && set89.code === 200 && set89.body.vendors.length === 13 && rm89.body.error_code === 'VENDOR_REMOVED' && grp89.body.error_code === 'GROUP_LOCKED'
-      && nc89.body.error_code === 'NO_CHANGE' && ren89.code === 200 && renAud89.some((t) => t.indexOf('v13 새주유소→새주유소2') >= 0) && cf89.code === 500,
+      && stale89.code === 409 && set89.code === 200 && set89.body.vendors.length === 14 && rm89.body.error_code === 'VENDOR_REMOVED' && grp89.body.error_code === 'GROUP_LOCKED'
+      && nc89.body.error_code === 'NO_CHANGE' && ren89.code === 200 && renAud89.some((t) => t.indexOf('v14 새주유소→새주유소2') >= 0) && cf89.code === 500,
       JSON.stringify([c89.code, seed89.length, stale89.code, set89.code, rm89.body.error_code, grp89.body.error_code, nc89.body.error_code, ren89.code, cf89.code]));
     // ③ 저장 정리 — 월 밖 날짜(at) · 비고 휴대폰 PII · 없는 거래처 · 키 꼴 · 월 꼴 · 낡은 base · 목록에 없는 차량 UNKNOWN_VEH · '__proto__' 차량 BAD_VEH · 숫자만 줄 id BAD_RID · 천 단위 아닌 쉼표 BAD_MONEY — 아무것도 안 씀
     const row89 = (o) => Object.assign({ date: '2026-10-01', veh: 'veh_a', vraw: '5288', item: '초저유황경유', kind: 'fuel', qty: '100', unit: '1650', amt: 165000, how: 'ocr' }, o);
@@ -7401,7 +7401,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     const mo89 = vh89.body.months || [];
     const oct89 = mo89.find((m) => m.ym === '2026-10'), nov89 = mo89.find((m) => m.ym === '2026-11');
     T('89 ⑥ 월 보드(v05 ok·done·거래처 13곳) · 차량별 이력 veh_a: 10월 = 대송 확정분만(주유 1건 165,000 + 요소수 1건 20,000 = 185,000) · 영남 10월 붉은 작성 중 = pending · 11월 = 영남 작성 중만 pending · 색인 지운 뒤 reindex = 10월 v05·v06만(11월 v06 안 섞임)',
-      m89.code === 200 && m89.body.vendors.v05.ok === true && m89.body.vendors.v05.status === 'done' && m89.body.cfg.length === 13 && o06.code === 200 && p06.code === 200
+      m89.code === 200 && m89.body.vendors.v05.ok === true && m89.body.vendors.v05.status === 'done' && m89.body.cfg.length === 14 && o06.code === 200 && p06.code === 200
       && vh89.code === 200 && oct89 && oct89.kinds.fuel[0] === 1 && oct89.kinds.fuel[1] === 165000 && oct89.kinds.urea[1] === 20000 && oct89.total === 185000 && oct89.vendors.join() === 'v05' && oct89.pending.join() === 'v06'
       && nov89 && nov89.total === 0 && nov89.pending.join() === 'v06' && ri89.code === 200 && Object.keys(ri89.body.vendors).sort().join() === 'v05,v06' && ri89.body.vendors.v05.rows === 3
       && mem.gw_data['stmtidx:2026-10'].vendors.v05.veh.veh_a.fuel[1] === 165000,

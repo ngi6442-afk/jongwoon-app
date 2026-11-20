@@ -88,7 +88,16 @@ async function readFile(buf, name, ctx) {
     return { ok: false, code: r.code || 'PDF_FAILED' };
   }
   if (kind === 'image') return { ok: true, ai: 'image' };
-  if (kind === 'html') return { ok: true, ai: 'html' };
+  if (kind === 'html') {
+    // 29 판⑨ 쿠팡 주문 메일 본문(메일 에이전트가 주문 표만 잘라 남긴 HTML · 사람이 넣은 본문 저장본도) — AI 없이 표 그대로
+    const C = require('./stmtcoupang');
+    if (C.isCoupangOrder(buf)) {
+      const r = C.readOrder(buf, '');
+      if (!r.ok) return { ok: false, code: r.code, why: r.why || '' };
+      return { ok: true, result: finish(r, ctx) };
+    }
+    return { ok: true, ai: 'html' };
+  }
   if (kind === 'xlsx') return { ok: false, code: 'UNKNOWN_LAYOUT', why: '아직 모르는 엑셀(xlsx) 양식입니다 — 거래처 원본을 PM께 보내 주시면 틀을 더합니다' };
   return { ok: false, code: 'UNSUPPORTED_TYPE', why: 'PDF·그림(JPG·PNG)·엑셀·계산서 HTML·XML만 읽습니다' };
 }

@@ -12180,7 +12180,7 @@ try {
     J({ errs: p3.errs, badf: p3.badf, docErr: p3.docErr, din, dinFeb }));
 
   // ④ 월 보드 — 정의 검사 통과 · 행 = 거래처 목록(켜진 곳 + 꺼졌어도 이 달 문서가 있는 곳) · 두 묶음(차량 → 사장님 · 용구 → 나주임) · 거래처 순서 = 목록 순서(v01~) · 칩 건수 · 칸 글 · 합계 줄 · [열기] = 읽기 칩(vs-chip)
-  const seed = SV.seedVendors();
+  const seed = SV.seedVendors().filter((v) => v.vk !== 'v13');   // 판⑨ 쿠팡(v13) 전 시드 12곳 표본
   const cfg = seed.concat([{ vk: 'v13', name: '꺼진곳', group: 'veh', kind: '', basis: 'supply', carry: false, active: false, hint: [] }, { vk: 'v14', name: '꺼진문서', group: 'tool', kind: 'tool', basis: 'supply', carry: false, active: false, hint: [] }]);
   const sumOf = (vk, doc) => { const v = cfg.find((x) => x.vk === vk); return SV.vendorSummary(Object.assign({ updated_at: 1793000000000, updated_by: 'u1' }, doc), SV.checkDoc(doc, v)); };
   const MON = { status: 'OK', ym: '2026-10', cfg: cfg, cfg_at: 0, idx_at: 1, vendors: {
@@ -12559,7 +12559,7 @@ try {
     tp1 === null && J(tp2) === J({ pos: '운전석 1축', act: 'used' }) && J(tp3) === J({ pos: '운전석 1축', act: '' }), J({ tp1, tp2, tp3 }));
 
   // ④ 거래처 목록 고치기
-  const seedT = SVt.seedVendors();
+  const seedT = SVt.seedVendors().filter((v) => v.vk !== 'v13');   // 판⑨ 쿠팡(v13) 전 시드 12곳 표본
   const CF = mk29t({ resp: { stmt_cfg_get: () => ({ status: 200, body: { status: 'OK', vendors: seedT, updated_at: 0, updated_by: '', seeded: true } }) } });
   CF.api.STMT.ym = '2026-10'; CF.api.STMT.month = { cfg: seedT, vendors: {} };
   CF.api.cfgOpen(); const cfLoading = !!CF.api.STMT.cfg && CF.api.STMT.cfg.loading === true;
@@ -13147,6 +13147,46 @@ try {
     && sv3 && J6((sv3.body.drop_ids || []).map((x) => x[0])) === J6(['p', 'n']) && J6(ap3) === J6(['n', 'o', 'p'])
     && /첨부 원본 4개/.test(inner3) && (inner3.match(/data-st-drop="open"/g) || []).length === 4 && (inner3.match(/data-st-drop="del"/g) || []).length === 4,
     J6({ gets3, fill3, drop_ids: sv3 && sv3.body.drop_ids, ap3 }));
+  // ③-9 29 판⑨(PM 11/20 '쿠팡까지 같이'): 쿠팡 주문 원본은 한 달에 여러 통 — 빈 명세면 그 달 주문 전부를 차례로(첫 통 채우고 나머지는 덧붙임 · 같은 날·품목·금액 줄은 한 번) · 명세 합계 칸은 안 채움 · 줄이 있는 상세에서 [채우기] = 바꿀지 묻지 않고 덧붙임
+  {
+    const V13 = { vk: 'v13', name: '쿠팡', group: 'tool', kind: 'tool', basis: 'total', carry: false, active: true, hint: ['쿠팡'] };
+    const R9a = { ok: true, src: 'coupang', basis: 'total', rows: [{ date: '2026-10-05', vraw: '', item: '가짜 생수', kind: 'tool', qty: 2, unit: 12000, amt: 24000, vat: null, note: '판매자 쿠팡(주)', how: 'file' }, { date: '2026-10-05', vraw: '', item: '할인금액', kind: 'tool', qty: 1, unit: -1000, amt: -1000, vat: null, note: '', how: 'file' }], sum: { total: 23000 }, warn: [] };
+    const R9b = { ok: true, src: 'coupang', basis: 'total', rows: [{ date: '2026-10-05', vraw: '', item: '가짜 생수', kind: 'tool', qty: 2, unit: 12000, amt: 24000, vat: null, note: '판매자 쿠팡(주)', how: 'file' }, { date: '2026-10-20', vraw: '', item: '가짜 장갑', kind: 'tool', qty: 1, unit: 9900, amt: 9900, vat: null, note: '판매자 가짜상사', how: 'file' }], sum: { total: 9900 }, warn: [] };
+    const run9 = async (src) => {
+      const L9 = [E6('b', { vk: 'v13', src: 'coupang', name: '쿠팡 주문 2026-10-20.html', kind: 'html', at: 20 }), E6('a', { vk: 'v13', src: 'coupang', name: '쿠팡 주문 2026-10-05.html', kind: 'html', at: 5 }), E6('z', { vk: 'v13', src: 'coupang', applied: 3, at: 1 })];
+      const U9 = mk6({ list: L9, resp: { stmt_drop_get: (b) => ({ status: 200, body: { status: 'OK', entry: L9.find((x) => x.id === b.id), result: b.id[0] === 'a' ? R9a : R9b } }) } }, src);
+      U9.api.STMT.ed = { ym: '2026-10', vk: 'v13', loading: true, err: '', msg: '', vendor: null, rows: [] };
+      U9.api.load({ vendor: V13, doc: null });
+      const ed9 = U9.api.STMT.ed;
+      U9.api.auto(ed9); await fl6();
+      for (let k = 0; k < 6; k++) { const t = U9.env.timers.splice(0); t.forEach((x) => x.f()); await fl6(); }
+      return { U9, ed9, gets: U9.env.log.filter((x) => x.body.action === 'stmt_drop_get').map((x) => x.body.id[0]) };
+    };
+    const a9 = await run9();
+    const rows9 = a9.ed9.rows.map((e) => [e.date, e.item, e.amt]);
+    T('29 판⑨ ③-9 쿠팡 자동 채우기: 그 달 주문 원본(a·b — 채운 z 뺌)을 주문 차례로 stmt_drop_get 2번 · 줄 = 첫 통 2줄 + 둘째 통의 새 줄 1줄(같은 날·품목·금액 줄은 한 번) · 줄 금액 기준 부가세 포함 · 명세 합계 칸 비움 · 바꿀지 묻지 않음 · dropIds [a·b]',
+      J6(a9.gets) === J6(['a', 'b']) && rows9.length === 3 && rows9.filter((r) => r[1] === '가짜 생수').length === 1 && rows9.some((r) => r[1] === '가짜 장갑') && rows9.some((r) => r[1] === '할인금액')
+      && a9.ed9.basis === 'total' && String(a9.ed9.stated == null ? '' : a9.ed9.stated) === '' && a9.U9.env.confirms.length === 0 && J6(a9.ed9.dropIds.map((x) => x[0]).sort()) === J6(['a', 'b']),
+      J6({ gets: a9.gets, rows9, basis: a9.ed9.basis, stated: a9.ed9.stated, confirms: a9.U9.env.confirms.length }));
+    const MU9 = [
+      ['덧붙이기 걷음(바꾸기로)', 'if (r.src === "coupang" && keep.length && rows.length) return stmtReadAppend(ed, r, name, keep);', ''],
+      ['쿠팡 전부 채우기 걷음', 'if (l.every(function(x){ return x.src === "coupang"; })){', 'if (false){'],
+      ['같은 줄 거름 걷음', 'if (have[sig(d, x.item, x.amt)]) return;', ''],
+      ['명세 합계 채움', 'if (r.sum && r.src !== "coupang" && r.sum.total != null', 'if (r.sum && r.sum.total != null'],
+    ];
+    const caught9 = [];
+    for (const [nm, a, b] of MU9) {
+      if (ssb6.indexOf(a) < 0) { caught9.push(nm + ':원문없음'); continue; }
+      let bad = false;
+      try {
+        const m9 = await run9(ssb6.split(a).join(b));
+        const r = m9.ed9.rows.map((e) => e.item);
+        bad = !(J6(m9.gets) === J6(['a', 'b']) && r.length === 3 && r.filter((x) => x === '가짜 생수').length === 1 && String(m9.ed9.stated == null ? '' : m9.ed9.stated) === '');
+      } catch (e) { bad = true; }
+      if (!bad) caught9.push(nm);
+    }
+    T('29 판⑨ ③-9 결함 사본 ' + MU9.length + '개(덧붙이기·전부 채우기·같은 줄 거름·명세 합계) = 모두 ✗', caught9.length === 0, J6(caught9));
+  }
   // ④ 안 채우는 경우 — 줄 있는 상세 · 확정 문서 · 계산서만 넣은 상세
   const U4 = mk6({ list: L3, resp: { stmt_drop_get: get3 } });
   U4.api.STMT.ed = { ym: '2026-10', vk: 'v07', loading: true, err: '', msg: '', vendor: null, rows: [] };
@@ -20046,9 +20086,9 @@ try {
     const FT = ['`bg:pay:law:v1`', '`settings:pay`', '`pay_bg_get`', '`pay_bg_set`', '`BG_READ_FAILED`', '`ratesFor', '`calcMonth`', '원장 C236', '부칙 4조①', '별표 2', '지급하는 달', '`PAY_BAD_INPUT`'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = '<li><b>급여 요율 표 승격</b> (2026-11 v502) — ';
-    const ok = /기준: v502 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 1 && pm.length === 1
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 502 && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 1 && pm.length === 1
       && d.man.indexOf(MAN) > 0 && !/pay_bg|paybg|settings:pay|bg:pay|ratesFor|calcMonth|pmcon|gwCall|BG_READ/.test(cut(d.man, MAN, '\n'))
-      && d.cl.indexOf('**66 급여 판1(v502') > 0 && /SHELL_CACHE = 'jw-shell-v502'/.test(d.sw);
+      && d.cl.indexOf('**66 급여 판1(v502') > 0 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 502;   // v503(29 판⑨)에서 '502 이상'으로 풂
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, pm: pm.length } };
   };
   const rN = chkN(DN);
@@ -20058,6 +20098,31 @@ try {
   T('v502 문서·판 번호(정확 검사): FEATURES 기준 v502 (2026-11-20)·v502 절(66 급여 판1) · TESTLIST v502 칸 4(PM 1 · 시험 화면 [x] 1 · 게이트 [x] 2) · MANUAL 한 줄(내부 이름 0) · CLAUDE.md 한 줄 · sw jw-shell-v502 · 결함 사본(기준 줄·sw·FEATURES 글·MANUAL 판 표시·CLAUDE 줄·TESTLIST 칸) ✗',
     rN.ok && MN.every((v) => v === false), JSON.stringify({ r: rN.info, mut: MN }));
 } catch (e) { console.log('  (v502 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v503(29 판⑨ — PM 11/20 09:35 "2"): 실행 검사는 위 '29 판⑨ ③-9'·tools/stmtmail_check.mjs ⑨ · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '503 이상'으로 풀 것
+try {
+  const rdP = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DP = { ft: rdP('FEATURES.md'), tl: rdP('TESTLIST.md'), sw: rdP('sw.js'), man: rdP('MANUAL.html'), cl: rdP('CLAUDE.md') };
+  const chkP = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v503 (11/20)', '\n### '), tlv = cut(d.tl, '\n## v503 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[x\] \(AI 시험 화면 대상\)/.test(l)), op = cb.filter((l) => /^- \[ \] \(운영 확인\)/.test(l));
+    const FT = ['청구서함', '`mailBoxes`', '`STMT_MAIL_BOXES`', '`_lib/stmtcoupang.js`', '`orderHtml`', '`readOrder`', '`BODY_START`', '**v13 쿠팡**', '`stmtReadAppend`', '`other`', '원장 C235', '주문한 달'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = '<li><b>쿠팡 주문 자동 정리</b> (2026-11 v503) — ';
+    const ok = /기준: v503 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 1 && op.length === 2
+      && d.man.indexOf(MAN) > 0 && !/stmtcoupang|orderHtml|readOrder|BODY_START|mailBoxes|gwCall|v13/.test(cut(d.man, MAN, '\n')) && d.man.indexOf('&lsquo;청구서함&rsquo;·&lsquo;청구서&rsquo;도 읽습니다') > 0
+      && d.cl.indexOf('**월말명세서 판⑨(v503)**') > 0 && /SHELL_CACHE = 'jw-shell-v503'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, op: op.length } };
+  };
+  const rP = chkP(DP);
+  const muP = (k, f) => chkP(Object.assign({}, DP, { [k]: f(DP[k]) })).ok;
+  const MP = [muP('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v502 (')), muP('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v502'")), muP('ft', (s) => s.split('`readOrder`').join('readOrder')),
+    muP('man', (s) => s.replace('정리</b> (2026-11 v503) ', '정리</b> ')), muP('man', (s) => s.replace('&lsquo;청구서함&rsquo;·&lsquo;청구서&rsquo;도 읽습니다', '')), muP('cl', (s) => s.replace('**월말명세서 판⑨(v503)**', '월말명세서 판⑨')),
+    muP('tl', (s) => s.replace("\n- [x] (AI) `stmtmail_check` ⑨", "\n- (AI) `stmtmail_check` ⑨"))];
+  T('v503 문서·판 번호(정확 검사): FEATURES 기준 v503 (2026-11-20)·v503 절(29 판⑨) · TESTLIST v503 칸 5(운영 확인 2 · 시험 화면 [x] 1 · 게이트 [x] 2) · MANUAL 쿠팡 줄(내부 이름 0)·메일 줄 폴더 문장 · CLAUDE.md 한 줄 · sw jw-shell-v503 · 결함 사본(기준 줄·sw·FEATURES 글·MANUAL 판 표시·폴더 문장·CLAUDE 줄·TESTLIST 칸) ✗',
+    rP.ok && MP.every((v) => v === false), JSON.stringify({ r: rP.info, mut: MP }));
+} catch (e) { console.log('  (v503 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
