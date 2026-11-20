@@ -2062,7 +2062,9 @@ async function handleVehDueSet(event, d, R) {
   // P1 판38(C166): 검사 칸이면 law 안 새 칸(이번 수검일·검사 신청일·연장 만료일) 꼴·미래·순서 검사 — 틀리면 쓰기 전에 400(차량·버전 링·감사 그대로)
   //   8차 지시: 승격본에 기간 칸 있는 행이 없으면(옛 판 — vehBg38S) 새 칸을 보지도 기록하지도 않음(운영 그대로)
   const bg38 = (field === 'insp_due' && d.law && typeof d.law === 'object') ? await vehBgState(st) : { on: false }, on38 = !!(bg38.on && vehBg38S(bg38.bg));
-  const lx = (field === 'insp_due' && on38) ? vehLawEx(d.law, cur, new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10), date) : { ok: true, ex: null };
+  //   8차-d: 자동차 요청에 실려 온 신청일은 버림(검사·기록 안 함 — 앱은 자동차 신청일을 보내지 않음 · 기록 품질)
+  const lawIn = (field === 'insp_due' && on38 && d.law && typeof d.law === 'object' && v.size !== '건설기계') ? Object.assign({}, d.law, { insp_apply: undefined }) : d.law;
+  const lx = (field === 'insp_due' && on38) ? vehLawEx(lawIn, cur, new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10), date) : { ok: true, ex: null };
   if (!lx.ok) return jr(400, { status: 'REJECTED', error_code: lx.code, field: lx.f, request_id: R });
   await verSnapshot('vehicles', rv.data, c.member.name, false);
   // 검토 S2: 스냅샷(블롭 읽기·쓰기 여러 번) 사이에 끝난 일반 차량 저장을 덮지 않게 쓰기 직전 다시 읽는다 — 문서가 바뀌었으면 새 문서의 그 줄에 적용(그 칸이 그 사이 바뀌었으면 409 · 줄이 없어졌으면 404).

@@ -12374,7 +12374,10 @@ function J91a(x) { return JSON.stringify(x); }
     out.extLife = out.extLifeInfo === '200/-//-/2026-11-15/2026-11-15 # 200/-//-/2027-01-31/2027-01-31 # {"insp_due":["2026-10-31","2026-11-05"],"insp_ext":["2026-11-15","2027-01-31"]} # 200/-//-/2026-11-15/2026-11-15 # 200/-//-/2026-11-15/2026-11-15 # 200/-//-/2026-11-15/2026-11-15 # 200/-//2026-09-01/2026-11-15/2026-11-15 # 200/2026-11-20/2026-11-10/-/2026-11-15/2026-11-15 # 200/2026-11-20/2026-11-10/-/undefined/ # 200/-/2026-11-10/-/2026-11-15/2026-11-15';
     seed38(); const r4 = await set38(c, tokW, 'k1', '2027-11-15', L38({ insp_done: KST38, insp_apply: KST38 }));
     const l4 = (W38().insp_log || [])[0] || {};
-    out.today = r4.code === 200 && l4.insp_done === KST38 && l4.insp_apply === KST38;
+    //   8차-d: 자동차 요청의 신청일은 버림(검사·기록 안 함 — 내일 날짜여도 거절 없음) · 건설기계는 그대로 기록
+    seed38(); W38().size = '건설기계'; const r4c = await set38(c, tokW, 'k1', '2027-11-15', L38({ insp_done: KST38, insp_apply: KST38 })); const l4c = (W38().insp_log || [])[0] || {};
+    seed38(); const r4t = await set38(c, tokW, 'k1', '2027-11-15', L38({ insp_done: '2026-11-10', insp_apply: TMR38 })); const l4t = (W38().insp_log || [])[0] || {};
+    out.today = r4.code === 200 && l4.insp_done === KST38 && !('insp_apply' in l4) && r4c.code === 200 && l4c.insp_apply === KST38 && r4t.code === 200 && !('insp_apply' in l4t);
     seed38(); const r5 = await set38(c, tokW, 'k2', '2027-12-20', L38({ insp_done: TMR38, insp_ext: '2020-01-01' }));
     out.ins = r5.code === 200 && !('insp_log' in W38()) && W38().insp_ext === '2026-11-15' && W38().ins_due === '2027-12-20';
     seed38({ off: true }); const r6 = await set38(c, tokW, 'k1', '2027-11-15', L38({ insp_done: '2026-11-10' }));
@@ -12398,7 +12401,9 @@ function J91a(x) { return JSON.stringify(x); }
       [L38({ insp_done: TMR38 }), 'INSP_FUTURE:insp_done'], [L38({ insp_done: '2026-11-10', insp_apply: TMR38 }), 'INSP_FUTURE:insp_apply'], [L38({ insp_done: '2026-11-10', insp_apply: '2026-11-11' }), 'INSP_ORDER:insp_apply'],
       [L38({ insp_done: '', insp_ext: '2026-10-31' }), 'INSP_EXT_EARLY:insp_ext'], [L38({ insp_done: '', insp_ext: '2026-10-30' }), 'INSP_EXT_EARLY:insp_ext'], [L38({ insp_done: '', insp_ext: '2026/12/01' }), 'BAD_INSP_DATE:insp_ext'],
       [L38({ insp_done: '2023-10-30' }), 'INSP_RANGE:insp_done'], [L38({ insp_done: '2026-11-10' }), 'INSP_AFTER_DUE:insp_done', '2026-11-05'], [L38({ insp_done: '', insp_apply: '2026-11-08' }), 'INSP_AFTER_DUE:insp_apply', '2026-11-05'], [L38({ insp_done: '', insp_apply: '2016-01-01' }), 'INSP_RANGE:insp_apply'], [L38({ insp_done: '', insp_ext: '2036-12-01' }), 'INSP_RANGE:insp_ext']];
-    for (const [law, ec, dt] of exp) { const r = await set38(c, tokW, 'k1', dt || '2027-11-15', law); const e = (r.body.error_code || '') + ':' + (r.body.field || ''); if (r.code !== 400 || e !== ec) got.push(ec + ' → ' + r.code + '/' + e); }
+    //   8차-d: 신청일 검사는 건설기계 차에서만(자동차 요청의 신청일은 버림)
+    for (const [law, ec, dt] of exp) { W38().size = /insp_apply/.test(ec) ? '건설기계' : '대형'; const r = await set38(c, tokW, 'k1', dt || '2027-11-15', law); const e = (r.body.error_code || '') + ':' + (r.body.field || ''); if (r.code !== 400 || e !== ec) got.push(ec + ' → ' + r.code + '/' + e); }
+    W38().size = '대형';
     const same = JSON.stringify(mem.gw_data['col:vehicles']) === v0 && !Object.keys(mem.gw_data).some((k) => k.indexOf('ver:vehicles:') === 0) && auditMock.logs.length === a0;
     // 권한: 배정표 차량 담당 = 그 지시의 그 차 검사 칸 + 새 칸 · 다른 차(배정표 밖 담당) = 403(새 칸이 틀려도 권한이 먼저) · 날짜가 이미 바뀐 칸 = 403
     seed38(); const pA = await set38(c, tA38, 'ka', '2027-11-15', L38({ insp_done: '2026-11-10' }));
@@ -12486,7 +12491,7 @@ function J91a(x) { return JSON.stringify(x); }
       ["const VEH_INSP_SPAN_M = 36, VEH_EXT_SPAN_M = 120;", "const VEH_INSP_SPAN_M = 36, VEH_EXT_SPAN_M = 24;"],
       // 8차-c: 감사 거짓 '연장 바뀜'(extWas를 판38 길에서만 잡던 꼴)
       ["  const extWas = Object.prototype.hasOwnProperty.call(wv, 'insp_ext') ?", "  const extWas = (lawLog && lx.ex && Object.prototype.hasOwnProperty.call(wv, 'insp_ext')) ?"],
-      ["const vals = [x.insp_done, k.cls === 'ceq' ? x.insp_apply : '']", "const vals = [x.insp_done, x.insp_apply]"],
+      ["const lawIn = (field === 'insp_due' && on38 && d.law && typeof d.law === 'object' && v.size !== '건설기계') ?", "const lawIn = false ?"],
     ];
     const kill = [];
     for (const [from, to] of MUT38) {
