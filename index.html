@@ -15751,6 +15751,7 @@
       if (!c.site && v.site) c.site = v.site;
       c.updated = todayStr(); scheduleContractSave();
       if (c.elems && (c.elems.asb || c.elems.demo || c.elems.permit) && (v.site || c.site) && !c.bldg_info) conBldgLookup(c.id, v.site || c.site, true);
+      if (filled.indexOf("착공일") >= 0 && typeof csSiteStartFill === "function") csSiteStartFill(c);   // 원장 C256: 착공일이 지금 채워졌으면 연결된 대장의 빈 시작일에(값이 있으면 그대로)
     }
     return { filled: filled, diff: diff };
   }
@@ -17017,16 +17018,42 @@
   function csNorm(s){ return String(s || "").toLowerCase().replace(/[\s()\-·,.㈜]/g, "").replace(/주식회사|유한회사/g, ""); }
   var csSiteLinkQueue = {};
   // 계약 시작·[대장 연결] 공통 입구 — 대장을 아직 못 받았으면 받아서(열람 권한 site — v429, 서버 col:asbestos와 같은 키) 연결 큐에, 받았으면 바로. 반환: 대장 행 | "wait" | "noperm" | "skip" | "none"
-  function csLinkSiteLater(c){
+  // 원장 C256: hand = 직접 생성 창에서 사람이 고쳐 넣은 시작일(그 창을 거친 부름만 넘긴다 — 그 밖의 부름은 비움). 대장을 받은 뒤 연결할 때도 쓰게 큐에 같이 둔다
+  function csLinkSiteLater(c, hand){
     if (!c || !csSiteKindOf(c) || !canDo("site")) return "skip";
     var loaded = (typeof asbLoaded === "undefined" || asbLoaded);
     if (!loaded || (c.site_id && !findAsb(c.site_id))){   // 못 받았거나, 가리키는 대장이 로컬에 없다(다른 기기 생성·갱신 전) → 다시 받아 보고 결정(F8)
       if (typeof canSee === "function" && !canSee("site")) return "noperm";
-      csSiteLinkQueue[c.id] = 1; if (typeof loadAsb === "function") loadAsb(); return "wait";
+      csSiteLinkQueue[c.id] = hand || csSiteLinkQueue[c.id] || 1; if (typeof loadAsb === "function") loadAsb(); return "wait";
     }
-    return csLinkSite(c, true) || "none";
+    return csLinkSite(c, true, hand) || "none";
   }
-  function csLinkSite(c, auto){
+  // 원장 C256 — 계약이 만드는 대장 줄의 날짜(한 곳). 시작 = 계약 정보의 착공일(d2, 달력에 있는 날짜일 때) · 없으면 hand(직접 생성 창에서 사람이 고친 시작일) · 그 밖은 빈칸(사람이 대장에서 넣음).
+  //   계약의 start는 쓰지 않는다 — 계약서 넣기 길에서는 등록한 날, 견적 승격 길에서는 견적일이고, 계약 줄만으로는 사람이 넣은 시작일인지 가를 수 없다(끝난 공사를 오늘 등록하면 끝 < 시작인 줄이 생기던 자리).
+  //   끝 = 준공일(d3)이 날짜이고 시작이 비었거나 시작 이후일 때만(끝 < 시작이 되는 값은 넣지 않는다)
+  function csSiteDay(v){ return (typeof v === "string" && (typeof vehRealDate === "function" ? vehRealDate(v) : isDate(v))) ? v : ""; }
+  function csSiteDates(c, hand){
+    var ci = (c && c.contract_info) || {}, st = csSiteDay(ci.d2) || csSiteDay(hand), en = csSiteDay(ci.d3);
+    return { start: st, end: (en && (!st || en >= st)) ? en : "" };
+  }
+  // 연결된 뒤에 착공일이 채워진 때(계약서를 진행 중 계약에 넣기·서류 생성 창·계약서 작성) — 대장 시작일이 비어 있을 때만 그 착공일로. 값이 있는 시작일·다른 계약의 줄·지운 줄은 건드리지 않고, 끝 < 시작이 되는 값도 넣지 않는다.
+  //   대장을 못 받은 기기는 받은 뒤에(csSiteHooksRetry) — noWait = 그때의 부름(다시 받으러 가지 않음)
+  var csSiteFillQueue = {};
+  function csSiteStartFill(c, noWait){
+    var d2 = c ? csSiteDay((c.contract_info || {}).d2) : "";
+    if (!c || !c.site_id || !d2 || typeof asb === "undefined" || !Array.isArray(asb) || !canDo("site")) return false;
+    var r = (typeof asbLoaded === "undefined" || asbLoaded) ? findAsb(c.site_id) : null;
+    if (!r){
+      if (!noWait && typeof canSee === "function" && canSee("site") && typeof loadAsb === "function"){ csSiteFillQueue[c.id] = 1; loadAsb(); }
+      return false;
+    }
+    if (r.del === 1 || r.con_id !== c.id || r.start) return false;
+    if (csSiteDay(r.end) && r.end < d2) return false;
+    r.start = d2; r.updated = todayStr(); scheduleAsbSave();
+    if (typeof renderSites === "function") renderSites();
+    return true;
+  }
+  function csLinkSite(c, auto, hand){
     if (!c || typeof asb === "undefined" || !Array.isArray(asb) || !canDo("site")) return null;
     if (typeof asbLoaded !== "undefined" && !asbLoaded) return null;   // 대장을 아직 못 받았으면 보류 — 있는 대장을 두고 새 대장을 만들지 않는다
     if (c.site_id){ var cur = findAsb(c.site_id); if (cur && cur.del !== 1) return null; }   // 삭제된 대장을 가리키면 다시 연결 허용
@@ -17040,7 +17067,8 @@
     });
     if (!hit){
       if (auto === "find") return null;
-      hit = { id: genId("asb"), created: todayStr(), kind: kind, title: csTitle(c) || c.site || c.label || "", client: c.client || "", site: c.site || "", start: c.start || "", end: ((c.contract_info||{}).d3) || "",
+      var dt = csSiteDates(c, hand);
+      hit = { id: genId("asb"), created: todayStr(), kind: kind, title: csTitle(c) || c.site || c.label || "", client: c.client || "", site: c.site || "", start: dt.start, end: dt.end,
         material: "", area: "", status: "plan", conc: "", waste_no: "", note: "계약 탭에서 자동 생성(" + todayStr() + ")", member_ids: [], worker_ids: [], updated: todayStr() };
       asb.push(hit);
     }
@@ -17074,7 +17102,7 @@
     var r = findAsb(c.site_id), amt = conAmtEff(c);
     if (!r) return false;   // 로컬에 없음(다른 기기 생성·갱신 전) — 표식 없이 보류, 다음 loadAsb 때 재시도(F8: 없음 ≠ 삭제)
     if (r.del === 1){ if (c.site_hook !== "none"){ c.site_hook = "none"; c.updated = todayStr(); scheduleContractSave(); } return false; }   // 대장이 삭제됨 — 할 일 없음(재연결하면 해제)
-    r.status = "done"; if (!r.end) r.end = todayStr();
+    r.status = "done"; if (!r.end && !(/^\d{4}-\d{2}-\d{2}$/.test(String(r.start || "")) && todayStr() < r.start)) r.end = todayStr();   // 원장 C256: 시작일(착공일)이 아직 앞날이면 끝을 넣지 않는다 — 끝 < 시작인 줄을 자동으로 만들지 않음
     var kd = { no: "", year: todayStr().slice(0, 4), biz: CON_SITE_BIZ[csSiteKindOf(c)] || "", amount: amt || 0, done_amount: amt || 0, contract_date: ((c.contract_info||{}).d1) || c.start || "", approve: "-", corp: CON_SITE_CORP[csSiteKindOf(c)] || "" };
     r.ks = (r.ks && typeof r.ks === "object") ? r.ks : {};
     Object.keys(kd).forEach(function(k){ if (r.ks[k] === undefined || r.ks[k] === null || r.ks[k] === "") r.ks[k] = kd[k]; });   // 초안은 빈 칸만 채운다 — 사람이 넣은 값은 지우지 않는다
@@ -17086,7 +17114,8 @@
   // 대장을 받은 직후(loadAsb 성공) — 보류된 연결·종결을 처리한다
   function csSiteHooksRetry(){
     if (typeof contracts === "undefined") return;
-    Object.keys(csSiteLinkQueue).forEach(function(id){ var c = findProc(id); delete csSiteLinkQueue[id]; if (c) csLinkSite(c, true); });
+    Object.keys(csSiteLinkQueue).forEach(function(id){ var c = findProc(id), h = csSiteLinkQueue[id]; delete csSiteLinkQueue[id]; if (c) csLinkSite(c, true, typeof h === "string" ? h : ""); });
+    Object.keys(csSiteFillQueue).forEach(function(id){ var c = findProc(id); delete csSiteFillQueue[id]; if (c) csSiteStartFill(c, true); });   // 원장 C256: 못 받은 사이 채워진 착공일
     (contracts || []).forEach(function(c){ if (c && c.del !== 1 && c.scen && c.status === "done" && c.site_id && !c.site_hook) csSiteDone(c); });
   }
   // @con-scen-end
@@ -17402,7 +17431,7 @@
       status:"active", who_id:opts.who||"", who:memberName(opts.who||""), created:today, updated:today };
     contracts.push(c);
     c.pipes.forEach(function(p){ materializeStage(c, p, c.start); });
-    if(opts.scen){ try { csLinkSiteLater(c); } catch(e){} }   // v384 현장 대장 자동 연결(새 시나리오 계약만, 현장 권한) — 대장을 못 받았으면 받은 뒤
+    if(opts.scen){ try { csLinkSiteLater(c, opts.handStart || ""); } catch(e){} }   // v384 현장 대장 자동 연결(새 시나리오 계약만, 현장 권한) — 대장을 못 받았으면 받은 뒤 · 원장 C256: 대장 시작일은 착공일(d2)·직접 생성 창에서 사람이 고친 시작일(handStart)만
     scheduleContractSave();
     renderTasks(); renderSummary(); renderDashboard(); renderContracts();
     return c;
@@ -18270,6 +18299,7 @@
     if(!confirm("이 계약을 삭제할까요? (이미 생성된 지시는 남습니다)")) return;
     c.del=1; c.updated=todayStr(); scheduleContractSave(); renderContracts();
   }
+  var conStartDef = "";   // 원장 C256: 직접 생성 창을 열 때 시작일 칸에 미리 넣은 값(오늘) — 저장 때 칸 값이 이것·등록일과 다르면 사람이 고친 시작일
   function openConStart(){
     if(!canDo("con")) return;
     lastBidForCon=null;
@@ -18280,7 +18310,7 @@
     document.getElementById("conSite").value="";
     var am0=document.getElementById("conAmount"); if(am0) am0.value="";   // v427 PM 11/9 "직접생성은 다 계약금액이 들어가야지"
     var at0=document.getElementById("conAmtTbd"); if(at0) at0.checked=false;
-    document.getElementById("conStart").value=todayStr();
+    conStartDef=todayStr(); document.getElementById("conStart").value=conStartDef;
     fillMemberSelect(document.getElementById("conWho"), "");
     var cb0=document.getElementById("conCombo"); if(cb0) cb0.checked=false;
     var qm0=document.getElementById("conQualMan"); if(qm0) qm0.checked=false;   // v402
@@ -18318,7 +18348,8 @@
         client:lb.org||"", site:"", guarantee:0, from:"낙찰 공고("+(lb.no||lb.id||"")+")", checked:todayStr() };
     }
     if(amt){ if(bcinfo) bcinfo.amount=amt; else bcinfo={ title:"", amount:amt, d1:"", d2:"", d3:"", client:"", site:"", guarantee:0, from:"직접 생성", checked:todayStr() }; }   // v427 창에 친 금액(낙찰 건은 낙찰 금액을 미리 채워 둠 — 고치면 고친 값)
-    var nc=startProcess(type, {client:client, site:site, start:start, who:who, docType:docType,
+    var handStart=(start!==conStartDef && start!==todayStr()) ? start : "";   // 원장 C256: 사람이 시작일 칸을 고친 때만 대장 시작일로(미리 넣어 둔 오늘 그대로면 등록일이라 넘기지 않음)
+    var nc=startProcess(type, {client:client, site:site, start:start, handStart:handStart, who:who, docType:docType,
       title:btitle, cinfo:bcinfo,
       stages:stages, elems:elems, scen:conScenTag({type:type, pub:pub, combo:combo, ver:1}, stages), bid_id:(lastBidForCon?lastBidForCon.id:"")});
     if(!nc){ alert("계약 생성 실패 — 유형 템플릿(" + type + ") 누락. 관리자에게 문의."); return; }
@@ -18559,6 +18590,7 @@
         if(!cc.client&&dd.owner) cc.client=dd.owner;
         if(!cc.site&&dd.site) cc.site=dd.site;
         scheduleContractSave(); afterSave(renderContracts);   // v336: 계약 목록 갱신이 실패해도 서류 미리보기·모달 닫기까지는 반드시 간다
+        if (typeof csSiteStartFill === "function") csSiteStartFill(cc);   // 원장 C256: 계약서 작성으로 착공일이 들어왔으면 연결된 대장의 빈 시작일에(값이 있으면 그대로)
         if(cc.elems&&(cc.elems.asb||cc.elems.demo||cc.elems.permit)&&dd.site&&!cc.bldg_info) conBldgLookup(cc.id, dd.site, true);   // 대장 자동
         setTimeout(function(){
           var pk=conPacketKinds(cc);
