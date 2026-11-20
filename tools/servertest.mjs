@@ -2326,6 +2326,31 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       const imp = abLib.routeAddImpact(docs, ten(-1), { side: 'R', row: 41, from: '한라티씨(주) 2공장', to: '거성산업', item: '분진' }, []);
       T('C279 ② routeAddImpact: 더 구체적인 상차지 줄을 만들면 그 이름의 묶음은 새 줄로 옮겨 감 = moved [R40 1묶음 4회] · loosened 없음 · 끝나면 노선표 원복',
         JSON.stringify(imp) === JSON.stringify({ checked: 1, loosened: [], moved: [{ side: 'R', row: 40, bundles: 1, trips: 4, days: 1 }] }) && abLib.routesVer() === v0, JSON.stringify(imp)); }
+    // 검토(11/20) 반영 — 동시 추가: 처음 읽은 뒤 다른 사람이 L50을 먼저 저장하면 쓰기 직전 다시 읽어 L51로 · 같은 이름이면 그 줄을 돌려줌 · 쓴 뒤 내 줄이 없으면 409 ROUTE_ADD_BUSY
+    {
+      mem.gw_data['allbaro:routes_extra'] = { schema: 1, items: ten(-1) }; abLib.setExtraRoutes(ten(-1)); delete mem.gw_data['allbaro:day:' + tdy];
+      const hookOn = (fn) => { let n = 0; blobsMock.hooks.beforeGet = async (k) => { if (k === 'allbaro:routes_extra') { n++; fn(n); } }; };
+      // 추가분 읽기 차례: 1 = 요청 시작 노선표(loadExtraRoutes) · 2 = 번호 정하기 · 3 = 쓰기 직전 다시 읽기 · 4 = 쓴 뒤 확인
+      hookOn((n) => { if (n === 3) mem.gw_data['allbaro:routes_extra'].items.push({ side: 'L', row: 50, from: '먼저온줄', to: '먼저하차', item: '', count_col: 5, bid: 'other', ts: 1 }); });
+      r = await ab({ action: 'ab_route_add', from: '나중온줄', to: '나중하차', item: '', side: 'L' }, tokO, 'dev1');
+      const ex1 = extra();
+      T('C279 동시 추가: 다른 사람이 사이에 L50을 저장 → 내 줄은 L51 · 둘 다 남음(12건) · 감사로그 노선추가 L51', r.code === 200 && r.body.row === 51 && ex1.length === 12 && ex1.some((x) => x.row === 50 && x.from === '먼저온줄') && ex1.some((x) => x.row === 51 && x.from === '나중온줄'), JSON.stringify(r.body).slice(0, 140));
+      mem.gw_data['allbaro:routes_extra'] = { schema: 1, items: ten(-1) }; abLib.setExtraRoutes(ten(-1));
+      hookOn((n) => { if (n === 3) mem.gw_data['allbaro:routes_extra'].items.push({ side: 'R', row: 50, from: '같은이름', to: '같은하차', item: '분진', count_col: 11, bid: 'other', ts: 1 }); });
+      r = await ab({ action: 'ab_route_add', from: '같은이름', to: '같은하차', item: '분진', side: 'L' }, tokO, 'dev1');
+      T('C279 동시 추가: 사이에 같은 상·하차지·품목 줄(R50)이 생기면 새로 만들지 않고 existed:true R50', r.code === 200 && r.body.existed === true && r.body.side === 'R' && r.body.row === 50 && extra().length === 11, JSON.stringify(r.body).slice(0, 140));
+      mem.gw_data['allbaro:routes_extra'] = { schema: 1, items: ten(-1) }; abLib.setExtraRoutes(ten(-1));
+      hookOn((n) => { if (n === 4) mem.gw_data['allbaro:routes_extra'] = { schema: 1, items: ten(-1).concat([{ side: 'L', row: 50, from: '덮어쓴줄', to: 'x', item: '', count_col: 5, bid: 'other', ts: 2 }]) }; });
+      r = await ab({ action: 'ab_route_add', from: '덮인줄', to: '덮인하차', item: '', side: 'L' }, tokO, 'dev1');
+      T('C279 동시 추가: 내가 쓴 뒤 다른 쓰기가 덮어 내 줄이 없으면 409 ROUTE_ADD_BUSY(화면은 지정하지 않음) · 노선표는 저장된 목록으로', r.code === 409 && r.body.code === 'ROUTE_ADD_BUSY' && abLib.routes().some((x) => x.from === '덮어쓴줄') && !abLib.routes().some((x) => x.from === '덮인줄'), JSON.stringify(r.body).slice(0, 140));
+      blobsMock.hooks.beforeGet = null;
+      mem.gw_data['allbaro:routes_extra'] = { schema: 1, items: ten(-1) }; abLib.setExtraRoutes(ten(-1));
+      mem.gw_data['allbaro:day:' + tdy] = Object.assign(dayDoc(), { counts: [{ from: '한라티씨(주) 2공장', to: '거성산업(주)', item: '분진(고상)', n: 4, n_pending: 0, qty_ton: 4, qty_unknown: 0, weak: false, route: { side: 'R', row: 40, count_col: 11, item: '분진' } }] });
+      r = await ab({ action: 'ab_route_add', from: '한라티씨(주) 2공장', to: '거성산업', item: '분진', side: 'R' }, tokO, 'dev1');
+      T('C279 옮겨 오는 묶음(구체 줄 우선)은 막지 않고 200 응답 moved에 [R40 1묶음 4회 1일] — 화면이 알림에 싣는다', r.code === 200 && r.body.existed === false && JSON.stringify(r.body.moved) === JSON.stringify([{ side: 'R', row: 40, bundles: 1, trips: 4, days: 1 }]), JSON.stringify(r.body).slice(0, 200));
+      delete mem.gw_data['allbaro:day:' + tdy];
+      mem.gw_data['allbaro:routes_extra'] = { schema: 1, items: ten(-1) }; abLib.setExtraRoutes(ten(-1));
+    }
     // ③ 읽기 실패
     blobsMock.hooks.failGet = (k) => k === 'allbaro:routes_extra';
     const exKeep = JSON.stringify(mem.gw_data['allbaro:routes_extra']);

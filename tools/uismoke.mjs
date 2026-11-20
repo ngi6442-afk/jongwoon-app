@@ -1308,7 +1308,7 @@ try {
           + 'function abErrText(res, head){ return head + " — " + ((res.body && res.body.code) || res.status); } function abLearnGo(k, v, nc){ LOG.learn.push([v, nc]); }'
           + 'function confirm(m){ LOG.confirms.push(String(m)); return ANS.length ? ANS.shift() : true; } function alert(m){ LOG.alerts.push(String(m)); }'
           + 'function gwCall(fn, body){ LOG.calls.push(JSON.parse(JSON.stringify(body))); var res = SCRIPT.shift() || { status: 500, body: {} }; return { then: function(f){ f(res); return { catch: function(){} }; } }; }'
-          + ['abRouteFind', 'abXlsxVisN', 'abXlsxPages', 'abXlsxLeft', 'abXlsxPageText', 'abXlsxGrowNote', 'abRoutesKnown', 'abFreeReserve', 'abOverlapText', 'abNewRouteFormHtml', 'abRouteAddGo', 'abVariantSplit'].map(cut).join('\n')
+          + ['abRouteFind', 'abXlsxVisN', 'abXlsxPages', 'abXlsxLeft', 'abXlsxPageText', 'abXlsxGrowNote', 'abRoutesKnown', 'abFreeReserve', 'abOverlapText', 'abMovedText', 'abNewRouteFormHtml', 'abRouteAddGo', 'abVariantSplit'].map(cut).join('\n')
           + 'return { form: abNewRouteFormHtml, go: abRouteAddGo, split: abVariantSplit };';
         const api = new Function('LIST', 'SRV', 'SCRIPT', 'ANS', 'LOG', code)(LIST, o.noSrv ? [] : LIST, script.slice(), (o.ans || []).slice(), log);
         const vals = Object.assign({ from: '새상차', to: '새하차', item: '분진', side: 'L' }, o.vals || {});
@@ -1334,7 +1334,10 @@ try {
         fd.api.go('k', fd.host); const done = fd.api.form({ key: 'k', from: '처음상차', to: '처음하차', item: '처음품목' });
         T('C279 흐름 ⑤: 겹침 안내에서 취소해 화면이 다시 그려져도 사람이 고쳐 넣은 이름·열(R)이 폼에 남는다(다른 조합의 폼에는 안 섞임) · 성공하면 비운다 · 날짜 이동·취소 단추·로그아웃에서도 비운다',
           /value="고친상차"/.test(again) && /value="고친하차"/.test(again) && /value="고친품목"/.test(again) && /<option value="R" selected>/.test(again) && !/처음상차/.test(again) && /value="처음상차"/.test(other)
-          && fd.log.calls.length === 2 && /value="처음상차"/.test(done) && (html.match(/abNrDraft = null;/g) || []).length >= 4, JSON.stringify([again.slice(0, 260), fd.log.calls.length])); }
+          && fd.log.calls.length === 2 && /value="처음상차"/.test(done)
+          // 검토(11/20): 개수만 세면 한 자리를 지워도 통과했다 — 비우는 자리를 함수마다 확인(로그아웃 clearSessionData · 날짜 이동 abOpenDay · 세션 교대 sessViewerSwap · 취소 단추)
+          && ['clearSessionData', 'abOpenDay', 'sessViewerSwap'].every((nm) => { const s = cut(nm); return /abNrDraft = null;/.test(s); })
+          && /addEventListener\("click", function\(\)\{ abLearnOpen = ""; abLearnNew = ""; abNrDraft = null; renderAbSheet\(\); \}\);/.test(html), JSON.stringify([again.slice(0, 260), fd.log.calls.length])); }
       let f5 = flow(base, [OK50], { noSrv: true }); const form5 = f5.api.form({ key: 'k', from: '새상차', to: '새하차', item: '분진' }); f5.api.go('k', f5.host);
       T('C279 흐름 ④(서버 노선표를 못 받은 순간): 폼·확인창에 줄 수·줄 번호를 적지 않는다("저장할 때 정해집니다") · 추가는 그대로 되고 지정은 서버가 준 번호 L|50',
         /노선표를 아직 불러오지 못했습니다 — 줄 수·줄 번호는 저장할 때 정해집니다\./.test(form5) && !/L40|R41|보이는 노선 \d+줄/.test(form5) && />왼쪽\(L\) 번호</.test(form5)
@@ -1344,7 +1347,14 @@ try {
       let f8 = flow(prod, [{ status: 403, body: { ok: false, code: 'FORBIDDEN' } }]); f8.api.split('L', 34, '에코프로비엠(CAM9)');
       T('C279 [별도 줄로 나누기]: 이름 61자는 보내기 전에 문장으로 알림(서버 호출 0) · 겹침 안내 확인 뒤 force로 한 번 더 · 실패 글은 코드만 띄우지 않고 abErrText를 거친다',
         f6.log.calls.length === 0 && f6.log.alerts.length === 1 && /이름이 60자를 넘어 별도 줄로 만들 수 없습니다\(지금 61자\)/.test(f6.log.alerts[0]) && f7.log.calls.length === 2 && f7.log.calls[1].force === true && f7.log.calls[1].from === '에코프로비엠(CAM9)' && /새 줄 L50/.test(f7.log.toasts.join('|'))
-        && f8.log.toasts.length === 1 && f8.log.toasts[0] === '줄 추가 실패 — FORBIDDEN' && !/줄 추가 실패: /.test(html), JSON.stringify([f6.log, f7.log.calls.length, f8.log.toasts]).slice(0, 400)); }
+        && f8.log.toasts.length === 1 && f8.log.toasts[0] === '줄 추가 실패 — FORBIDDEN' && !/줄 추가 실패: /.test(html), JSON.stringify([f6.log, f7.log.calls.length, f8.log.toasts]).slice(0, 400));
+      // 검토(11/20) 반영: [별도 줄로 나누기]도 401이면 로그인 창으로(onSessionInvalid) · 기존 줄에서 옮겨 온 인계서(moved)를 알림에 한 구절
+      { const f9 = flow(prod, [{ status: 401, body: {} }]); let inval = 0; f9.api.split('L', 34, '에코프로비엠(CAM9)');
+        const s0 = html.indexOf('function abVariantSplit('), sv = html.slice(s0, html.indexOf('function abRoutesKnown(', s0));
+        const fm = flow(prod, [{ status: 200, body: { ok: true, side: 'L', row: 50, existed: false, moved: [{ side: 'R', row: 40, bundles: 2, trips: 5, days: 2 }] } }]); fm.api.go('k', fm.host);
+        T('C279 검토 반영: [별도 줄로 나누기] 401 → onSessionInvalid(토스트 없음) · 새 줄 알림에 "기존 줄 R40에서 옮겨 온 인계서 5회(최근 14일 …)"',
+          /if \(res\.status === 401\)\{ onSessionInvalid\(\); return; \}/.test(sv) && f9.log.toasts.length === 0 && f9.log.calls.length === 1
+          && /^새 노선 L50 추가 · 기존 줄 R40에서 옮겨 온 인계서 5회\(최근 14일 — 더 지난 날짜도 열 때 옮겨짐\)$/.test(fm.log.toasts[0] || ''), JSON.stringify([f9.log.toasts, fm.log.toasts])); } }
   }
 } catch (e) { console.log('  (v351 검사 생략 — ' + e.message + ')'); fails++; }
 

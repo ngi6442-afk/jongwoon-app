@@ -653,7 +653,7 @@ async function handleRouteAdd(st, c, d, R) {
   // C279 겹침 미리 보기(2026-11-20 독립 검토): 이 줄이 생기면 지금 다른 줄에 들어가 있는 묶음이 '후보 2줄'이 되어 미배정으로 풀리는지 최근 STATUS_DAYS일 문서를
   //   저장 없이 재판정해 센다. 풀리는 묶음이 있으면 저장하지 않고 409 ROUTE_OVERLAP(좌표·수만) — 화면이 사람에게 보이고 force:true로 다시 보내면 만든다.
   //   학습·일자 문서를 못 읽으면 확인 없이 만든다(종전 동작 — 응답 overlap_checked:false).
-  let overlapChecked = false;
+  let overlapChecked = false, moved = [];
   if (lr.ok) {
     try {
       const wanted = []; for (let i = 0; i < STATUS_DAYS; i++) wanted.push(kstDate(-i));
@@ -662,21 +662,41 @@ async function handleRouteAdd(st, c, d, R) {
       for (let i = 0; i < wanted.length; i++) { if (dr[i] && dr[i].ok && dr[i].data) docs.push({ day: wanted[i], doc: dr[i].data }); }
       const imp = AB.routeAddImpact(docs, items, entry, learnedItems(lr.data));
       overlapChecked = true;
+      moved = imp.moved;   // 더 구체적인 이름이라 기존 줄에서 이 줄로 옮겨 오는 묶음(막지 않음 — 응답에 실어 화면이 알린다)
       if (imp.loosened.length && d.force !== true) {
         return jr(409, { ok: false, code: 'ROUTE_OVERLAP', side: side, row: row, days_checked: imp.checked, loosened: imp.loosened, request_id: R });
       }
     } catch (e) { AB.setExtraRoutes(items); overlapChecked = false; }
   }
-  items.push(entry);
-  const w = await blobSet(st, EXTRA_KEY, { schema: 1, items: items, updated_at: Date.now() });
+  // C279 검토(동시 추가): 처음 읽은 뒤 14일 문서를 읽고 재판정하는 사이 다른 사람이 줄을 더했을 수 있다 — 쓰기 직전에 다시 읽어
+  //   바뀌었으면 그 목록 위에서 같은 줄 여부·번호를 다시 정하고, 쓴 뒤 다시 읽어 내 줄이 그 번호에 있는지 확인한다(없으면 409 ROUTE_ADD_BUSY — 다시 누르면 됨).
+  const r2 = await blobGet(st, EXTRA_KEY);
+  if (!r2.ok && r2.code !== 'NOT_FOUND') return jr(500, { ok: false, code: r2.code, request_id: R });
+  const fresh = (r2.ok && r2.data && Array.isArray(r2.data.items)) ? r2.data.items : [];
+  let list = items;
+  if (JSON.stringify(fresh) !== JSON.stringify(items)) {
+    list = fresh;
+    AB.setExtraRoutes(list);
+    const dup2 = AB.routes().find(function (x) { return normName(x.from) === normName(from) && normName(x.to) === normName(to) && normItem(x.item) === normItem(item); });
+    if (dup2) return jr(200, { ok: true, side: dup2.side, row: dup2.row, existed: true, request_id: R });
+    entry.row = AB.nextExtraRow(side, list, refs);
+    if (!entry.row) return jr(409, { ok: false, code: 'ROWS_FULL', side: side, request_id: R });
+  }
+  const row2 = entry.row;
+  list.push(entry);
+  const w = await blobSet(st, EXTRA_KEY, { schema: 1, items: list, updated_at: Date.now() });
   if (!w.ok) return jr(500, { ok: false, code: w.code, request_id: R });
-  AB.setExtraRoutes(items);
+  const r3 = await blobGet(st, EXTRA_KEY);
+  const mine = (r3.ok && r3.data && Array.isArray(r3.data.items)) ? r3.data.items.some(function (x) { return x && x.side === side && Number(x.row) === row2 && x.bid === entry.bid && x.ts === entry.ts && x.from === from; }) : true;
+  if (r3.ok && r3.data && Array.isArray(r3.data.items)) list = r3.data.items;
+  AB.setExtraRoutes(list);
+  if (!mine) return jr(409, { ok: false, code: 'ROUTE_ADD_BUSY', request_id: R });
   try {
     await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'allbaro',
-      ev: [{ op: '노선추가', id: side + row, t: from + ' → ' + to + (item ? ' · ' + item : '') }] });
+      ev: [{ op: '노선추가', id: side + row2, t: from + ' → ' + to + (item ? ' · ' + item : '') }] });
   } catch (e) {}
   try { await requestXlsxRegen(st, 'route_add', c.member.name); } catch (e) {}   // v352
-  return jr(200, { ok: true, side: side, row: row, existed: false, routes_ver: AB.routesVer(), overlap_checked: overlapChecked, request_id: R });
+  return jr(200, { ok: true, side: side, row: row2, existed: false, routes_ver: AB.routesVer(), overlap_checked: overlapChecked, moved: moved, request_id: R });
 }
 
 // 수동 수집 — 관리자 또는 개발자만. 날짜는 정규식+달력 왕복 검증, 오늘−60일~오늘, 최대 14개.

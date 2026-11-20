@@ -4018,6 +4018,7 @@
     edu = []; eduLoaded = false; eduPending = false; eduBase = 0; eduSel = {}; wkEduSt = "";
     if (typeof imBaseDrop === "function"){ imBaseDrop("workers"); imBaseDrop("edu"); }   // P1 판24j: 비운 두 원장의 받은 사본도(앞사람 늦은 읽기·저장 200 거름)
     renderXgWorkers();   // 생성 창 투입 인력 목록 자리에 남은 앞사람 명부 이름을 지움(창이 닫혀 있어도 자리에 글이 남음)
+    abLearnOpen = ""; abLearnNew = ""; abNrDraft = null;   // C279 검토: 앞사람이 운반일지 새 노선 폼에 넣은 값·열어 둔 폼을 다음 사람에게 넘기지 않는다
     if (canSee("wk")) loadWorkers();
     if (canSee("safety")) loadEdu();
     return true;
@@ -30948,6 +30949,7 @@ function dutyStage(nx){
     BAD_ROUTE: "양식 노선표에 없는 줄입니다 — 앱을 새로고침해 최신 노선표로 다시 지정하세요(계속 나오면 관리자에게 알려주세요).",
     BAD_ROUTE_ID: "노선 식별자가 올바르지 않습니다 — 앱을 새로고침한 뒤 다시 시도하세요.",
     ROWS_FULL: "이 열의 줄 번호를 다 썼습니다 — 다른 열(왼쪽/오른쪽)을 골라 추가하세요. 계속 나오면 관리자에게 알려주세요.",
+    ROUTE_ADD_BUSY: "같은 때 다른 사람이 노선을 추가해 저장이 겹쳤습니다 — 앱을 새로고침한 뒤 다시 추가해 주세요.",
     ROUTE_OVERLAP: "이 이름으로 줄을 만들면 다른 줄에 들어가 있는 인계서가 미배정으로 풀립니다 — 이름을 그 줄과 겹치지 않게 고치거나, 앱을 새로고침한 뒤 다시 시도하면 자세한 안내가 나옵니다.",
     BAD_INPUT: "상차지·하차지와 왼쪽/오른쪽 열을 모두 입력하세요.",
     BAD_PRESET_ID: "단골 노선 식별자가 올바르지 않습니다 — 앱을 새로고침한 뒤 다시 시도하세요.",
@@ -31446,6 +31448,12 @@ function dutyStage(nx){
     return "이 이름으로 줄을 만들면, 지금 아래 줄에 들어가 있는 인계서가 '어느 줄인지 모호'가 되어 미배정으로 풀립니다.\n(최근 " + abInt(b && b.days_checked) + "일치를 다시 판정해 본 수 — 더 지난 날짜도 열 때 같이 풀립니다)\n\n" + lines.join("\n") +
       "\n\n새 줄의 하차지·품목 이름이 그 줄과 서로 겹치기 때문입니다.\n[취소] → 이름을 그 줄과 겹치지 않게 고쳐 다시 추가하거나, 새 줄 없이 기존 줄로 [노선 지정]\n[확인] → 그대로 만들고, 풀린 인계서는 미배정 목록에서 다시 지정";
   }
+  // C279 검토: 새 줄이 더 구체적인 이름이라 기존 줄의 인계서가 새 줄로 옮겨 오면(구체 줄 우선 — 의도한 동작) 서버가 최근 14일 수를 moved로 준다 — 알림에 한 구절
+  function abMovedText(b){
+    var M = Array.isArray(b && b.moved) ? b.moved : [], n = 0, i;
+    for (i = 0; i < M.length; i++) n += abInt(M[i] && M[i].trips);
+    return n ? (" · 기존 줄 " + M.map(function(x){ return String(x.side || "") + abInt(x.row); }).join("·") + "에서 옮겨 온 인계서 " + n + "회(최근 14일 — 더 지난 날짜도 열 때 옮겨짐)") : "";
+  }
   function abVariantSplit(side, row, name){
     if (abLearnBusy || !abCanLearn() || !name) return;
     var rt = null, rs = abRouteList(); for (var i = 0; i < rs.length; i++){ if (rs[i].s === side && rs[i].r === row){ rt = rs[i]; break; } }
@@ -31460,9 +31468,10 @@ function dutyStage(nx){
       if (force) body.force = true;
       gwCall("gw-allbaro", body).then(function(res){
         abLearnBusy = false;
+        if (res.status === 401){ onSessionInvalid(); return; }   // C279 검토: 새 노선 폼과 같게 — 로그인 창으로
         if (res.status === 409 && res.body && res.body.code === "ROUTE_OVERLAP" && !force){ if (confirm(abOverlapText(res.body))) send(true); return; }
         if (!(res.status === 200 && res.body && res.body.side && res.body.row)){ gwToast(abErrText(res, "줄 추가 실패"), true, 3500); return; }
-        gwToast(res.body.existed ? ("이미 있는 줄 → " + res.body.side + res.body.row) : ("새 줄 " + res.body.side + res.body.row + " '" + name + "' 추가 — 이 날 일지를 다시 판정합니다"), false, 2400);
+        gwToast(res.body.existed ? ("이미 있는 줄 → " + res.body.side + res.body.row) : ("새 줄 " + res.body.side + res.body.row + " '" + name + "' 추가 — 이 날 일지를 다시 판정합니다" + abMovedText(res.body)), false, 3200);
         loadAbStatus(); if (abDay.day) abOpenDay(abDay.day);
       }).catch(function(){ abLearnBusy = false; gwToast("줄 추가 실패(네트워크)", true, 2500); });
     })(false);
@@ -31549,7 +31558,7 @@ function dutyStage(nx){
             if (abStatus && Array.isArray(abStatus.routes)) abStatus.routes.push(nr);
             if (abDay.data && Array.isArray(abDay.data.routes)) abDay.data.routes.push(nr);
           }
-          apprToastShow(res.body.existed ? ("이미 있는 노선 → " + sd + rw + "로 지정") : ("새 노선 " + sd + rw + " 추가"));
+          apprToastShow(res.body.existed ? ("이미 있는 노선 → " + sd + rw + "로 지정") : ("새 노선 " + sd + rw + " 추가" + abMovedText(res.body)));
           abLearnNew = ""; abNrDraft = null;
           abLearnGo(key, sd + "|" + rw, true);   // 확인창은 위에서 한 번 — 바로 지정·재정렬
           return;
