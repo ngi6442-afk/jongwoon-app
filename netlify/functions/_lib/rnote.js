@@ -28,16 +28,17 @@ const NAME_SKIP = { '개인': 1, '기타': 1, '미정': 1, '없음': 1, '본사'
 const CORP_RE = /\(주\)|\(유\)|\(사\)|\(재\)|㈜|주식회사|유한회사|합자회사|사단법인|재단법인/g;
 const ZW_RE = /[​-‍⁠﻿]/g;
 const H = 3600000;
-// 금액 꼴 — appdata rnote.py AMOUNT_RES와 같은 꼴(원 뒤 원장·원본·원문·원칙·원인·원천 같은 낱말은 금액 아님)
+// 금액 꼴 — appdata rnote.py AMOUNT_RES와 같은 꼴·같은 플래그(수집기는 전부 re.I — 원장 C177 ⓐ로 여기도 전부 i, 영문 글자가 없는 꼴은 뜻이 같음)
+//   (원 뒤 원장·원본·원문·원칙·원인·원천 같은 낱말은 금액 아님)
 const AMOUNT_RES = [
-  /\d[\d,]*(?:\.\d+)?\s*(?:억|천만|백만|만|천)?\s*원(?![장본문칙인천점래격자형리단])/,
-  /\d[\d,]*(?:\.\d+)?\s*억/,
-  /\d[\d,]*\s*만\s*원/,
-  /\d[\d,]*(?:\.\d+)?\s*[천백십]\s*만/,
-  /₩\s*\d/,
+  /\d[\d,]*(?:\.\d+)?\s*(?:억|천만|백만|만|천)?\s*원(?![장본문칙인천점래격자형리단])/i,
+  /\d[\d,]*(?:\.\d+)?\s*억/i,
+  /\d[\d,]*\s*만\s*원/i,
+  /\d[\d,]*(?:\.\d+)?\s*[천백십]\s*만/i,
+  /₩\s*\d/i,
   /\d[\d,]*\s*KRW/i,
   /KRW\s*\d/i,
-  /[일이삼사오육칠팔구십백천]+\s*(?:억|만)\s*원/,
+  /[일이삼사오육칠팔구십백천]+\s*(?:억|만)\s*원/i,
 ];
 // 키·토큰 꼴 — appdata rnote.py KEY_RES와 같은 꼴(값이 아니라 꼴만 본다)
 const KEY_RES = [
@@ -53,9 +54,14 @@ const NAME_COLS = [['col:workers', 'name'], ['col:vehicles', 'driver']];
 const CLIENT_COLS = [['col:clients', 'name'], ['col:contracts', 'client'], ['col:asbestos', 'client'], ['col:quotes', 'recv']];
 // 거르기 표 내용 지문(원장 C174 ⑤ — 판 번호만 맞추면 한쪽 표만 고친 것을 못 잡음): 두 저장소가 같은 차례로 표 내용을 JSON 배열로 늘어놓고 sha256 앞 16자.
 //   수집기 rnote.py rules_fp()와 같은 배열이어야 한다 — 받기 때 수집기 지문과 다르면 400 RNOTE_RULES_FP(원천: 표 내용 자체를 견줌). 번호 꼴(PII)은 앱 learn.js piiScan과 수집기 PII_RES가 일부러 다른 구현이라 뺀다.
+//   원장 C177 ⓐ: 꼴마다 [글, 대소문자 무시 'i' 또는 ''] — 꼴 글은 같아도 한쪽만 i면 영문 꼴이 한쪽에서만 걸린다.
+//   'g'는 파이썬에 없는 개념이라 지문 밖 — 대신 플래그 규칙을 servertest가 따로 지킨다: 지우기(.replace)에 쓰는 CORP_RE·ZW_RE = g 필수(없으면 첫 글자만 지움),
+//   검사(.test)에 쓰는 AMOUNT_RES·KEY_RES·MAIL_RE = g·y 금지(lastIndex가 남아 다음 요청에서 놓침), 모든 꼴 m·s·u 금지(수집기와 뜻이 갈림).
+//   (파이썬 re.A·JS의 \d·\s 차이는 지문 밖 — 수집기 \d는 유니코드 숫자까지 넓어 더 가리는 쪽이고, \s는 KEY_RES 끝 꼴에서 수집기가 좁아 서버가 더 거절하는 쪽이라 새지 않음)
+function rxFp(r) { return [r.source, r.flags.indexOf('i') >= 0 ? 'i' : '']; }
 function rulesFp() {
-  const arr = [['v', 1], ['name_min', NAME_MIN], ['core_min', CORE_MIN], ['name_skip', Object.keys(NAME_SKIP).sort()], ['corp', CORP_RE.source], ['zw', ZW_RE.source], ['join', NAME_JOIN],
-    ['name_cols', NAME_COLS], ['client_cols', CLIENT_COLS], ['amount', AMOUNT_RES.map(function (r) { return r.source; })], ['key', KEY_RES.map(function (r) { return r.source; })], ['mail', MAIL_RE.source]];
+  const arr = [['v', 2], ['name_min', NAME_MIN], ['core_min', CORE_MIN], ['name_skip', Object.keys(NAME_SKIP).sort()], ['corp', rxFp(CORP_RE)], ['zw', rxFp(ZW_RE)], ['join', NAME_JOIN],
+    ['name_cols', NAME_COLS], ['client_cols', CLIENT_COLS], ['amount', AMOUNT_RES.map(rxFp)], ['key', KEY_RES.map(rxFp)], ['mail', rxFp(MAIL_RE)]];
   return require('crypto').createHash('sha256').update(JSON.stringify(arr), 'utf8').digest('hex').slice(0, 16);
 }
 const RULES_FP = rulesFp();
@@ -182,7 +188,8 @@ async function stampWarn(note, nowMs) {
 }
 async function put(d, nowMs) {
   const now = nowMs || Date.now();
-  if (d.ping === true) { const s = await dueState(now); await stampOk(s.ok, s.note); return { code: 200, body: { status: 'OK', ping: true, due: s.due, due_ok: s.ok } }; }
+  // 원장 C177 ⓖ: 판정 글(note — 값·이름 없음)도 돌려준다 — 봇 로그가 due_ok만 보고 '있음'이라 적어 '첫 회 전'을 '문서 있음'으로 읽히게 했다
+  if (d.ping === true) { const s = await dueState(now); await stampOk(s.ok, s.note); return { code: 200, body: { status: 'OK', ping: true, due: s.due, due_ok: s.ok, note: String(s.note || '').slice(0, 120) } }; }
   const period = String(d.period || '');
   if (!ymOk(period) || period >= kstYm(now)) return { code: 400, body: { status: 'REJECTED', error_code: 'BAD_PERIOD' } };   // 지난달까지만
   if (d.fail !== undefined) {   // 봇이 거르기·재료에서 멈춤 — 사유 코드만(글은 받지 않음)
@@ -278,4 +285,4 @@ async function save(d, member, nowMs) {
   return { code: 200, body: { status: 'OK', period: period, doc: view(doc), audit: au } };
 }
 
-module.exports = { PREFIX, FIRST, STAMP_FN, RULES_VER, RULES_FP, rulesFp, TEXT_MAX, META_MAX, LIST_MONTHS, AMOUNT_RES, KEY_RES, MAIL_RE, NAME_COLS, CLIENT_COLS, kstYm, prevYm, addYm, ymOk, normText, skipName, cleanNames, nameRe, leakKinds, memberNames, peopleNames, clientNames, recentDocs, staleDraft, dueState, put, get, save, view };
+module.exports = { PREFIX, FIRST, STAMP_FN, RULES_VER, RULES_FP, rulesFp, TEXT_MAX, META_MAX, LIST_MONTHS, AMOUNT_RES, KEY_RES, MAIL_RE, CORP_RE, ZW_RE, NAME_COLS, CLIENT_COLS, kstYm, prevYm, addYm, ymOk, normText, skipName, cleanNames, nameRe, leakKinds, memberNames, peopleNames, clientNames, recentDocs, staleDraft, dueState, put, get, save, view };

@@ -1632,3 +1632,8 @@
 - [x] (AI) 거르기 전수 표 어긋남 0/36(09_조사_문서\10_블로그완성도_자료_20261110\거르기_전수표_20261120.md) — ✓ AI 11/20
 - [ ] (운영 확인) 배포 뒤 다음 품질 학습 회차(크론 ⑥)가 종전처럼 돎(운영에는 아직 열쇠 없음 — 문서 off:false 그대로 읽음) · 관리자 카드 품질 학습 켜짐 표시 그대로
 - [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `paycalc_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` 통과 · v505 문서 검사를 이 판 이상으로 풀고 v506 문서·판 번호 정확 검사 — ✓ AI 11/20
+
+## v507 — 연구노트 미룬 것(원장 C177 — 지문 플래그·ping 판정 글·7일 경계 시험, 화면·운영 데이터 변경 없음)
+- [ ] (운영 확인) 12/1~3 첫 자동 초안 때 받기 거절(표 내용 다름) 없이 저장 · 다음 만드는 날 아닌 날 로그가 '판정 괜찮음 · …' 꼴 — 원장 C173과 같이 확인
+- [x] (AI) `servertest` 'C174 ⑤'(플래그만 바꿔도 지문 바뀜 · g 무관 · 기대 지문 52120baf5e4bcef0) · 'P1 판21' ping 응답 판정 글 = 흔적 글 · 결함 사본 2개 더함 — ✓ AI 11/20
+- [x] (AI) `uismoke` 'C174 ③④' 7일 경계(1분 모자람 보임·1분 지남 숨김) + 결함 사본 2개 · v506 문서 검사를 이 판 이상으로 풀고 v507 문서·판 번호 정확 검사 · 게이트 18종 + node --check · appdata `rnote.py --selftest` — 숫자는 커밋 메시지

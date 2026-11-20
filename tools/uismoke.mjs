@@ -15683,6 +15683,8 @@ try {
     ['if (!doc && unread.length){', 'if (false){'],
     ['if (un.length) li.push(', 'if (false) li.push('],
     ['return ts > 0 && Date.now() - ts < 7 * 86400000; }', 'return ts > 0; }'],
+    ['return ts > 0 && Date.now() - ts < 7 * 86400000; }', 'return ts > 0 && Date.now() - ts < 7.5 * 86400000; }'],   // C177 ⓒ 경계
+    ['return ts > 0 && Date.now() - ts < 7 * 86400000; }', 'return ts > 0 && Date.now() - ts < 6.9 * 86400000; }'],
     ['.filter(function(x){ return x && x.status !== "confirmed" && x.period !== doc.period; })', '.filter(function(x){ return x && x.period !== doc.period; })'],
   ];
   const EVIL21 = DOC21({ text: '<img src=x onerror=1> & "q"', meta: Object.assign({}, META21, { missing: [{ label: '문서<b>저장소</b>', why: 'x' }] }) });
@@ -15691,13 +15693,17 @@ try {
   // C174 ④ 확정본만 남은 카드 = 확정 뒤 7일까지(8일 지난 것은 숨김·묶음 제목도) · ③ 못 읽은 달(서버 unread) = 초안 카드에 한 줄 · 보일 문서가 없으면 빨간 한 줄 카드
   const OLDC21 = DOC21({ status: 'confirmed', confirmed: { ts: Date.now() - 8 * 86400000, by: 'u21pm', name: '가짜요원', edited: false } });
   const URES21 = (d) => ({ rnote_get: { status: 200, body: { status: 'OK', period: d ? '2026-10' : '', doc: d, latest: null, months: [], unread: ['2026-09'], can_write: true } } });
+  // 원장 C177 ⓒ: 7일 경계 — 7일에서 1분 모자람 = 보임 · 7일하고 1분 지남 = 숨김(1일·8일만 보던 것)
+  const EDGEC21 = (ms) => DOC21({ status: 'confirmed', confirmed: { ts: Date.now() - ms, by: 'u21pm', name: '가짜요원', edited: false } });
   const c174ok = async (H) => {
     const old = await run21({ res: RES21(null, true, { latest: OLDC21 }) }, H), un = await run21({ res: URES21(null) }, H), du = await run21({ res: URES21(DOC21()) }, H);
-    return old.card.style.display === 'none' && old.wrap.style.display === 'none' && un.card.style.display === '' && un.wrap.style.display === '' && un.vis().indexOf('읽지 못한 달: 9월 — 잠시 뒤 다시 열어 주세요') >= 0
+    const e6 = await run21({ res: RES21(null, true, { latest: EDGEC21(7 * 86400000 - 60000) }) }, H), e7 = await run21({ res: RES21(null, true, { latest: EDGEC21(7 * 86400000 + 60000) }) }, H);
+    return e6.card.style.display === '' && e6.vis().indexOf('연구노트 10월 확정본') >= 0 && e7.card.style.display === 'none' && e7.wrap.style.display === 'none'
+      && old.card.style.display === 'none' && old.wrap.style.display === 'none' && un.card.style.display === '' && un.wrap.style.display === '' && un.vis().indexOf('읽지 못한 달: 9월 — 잠시 뒤 다시 열어 주세요') >= 0
       && du.vis().indexOf('연구노트 10월 초안 — 확인해 주세요') >= 0 && du.vis().indexOf('읽지 못한 달: 9월 — 잠시 뒤 다시 열어 주세요') >= 0 && bt(du) === 'ack,edit,view';
   };
   const c1740 = await c174ok(html);
-  T('C174 ③④ 카드(실행): 초안 없이 확정본만 = 확정 뒤 7일까지만 보임(8일 지난 확정본 = 카드·묶음 제목 숨김, 하루 지난 것은 보임) · 서버가 못 읽은 달 = 초안 카드에 "읽지 못한 달: 9월 — 잠시 뒤 다시 열어 주세요" 한 줄(단추 그대로) · 보일 문서 없이 못 읽은 달만 = 그 한 줄 카드(숨기지 않음)', c1740, '');
+  T('C174 ③④ 카드(실행): 초안 없이 확정본만 = 확정 뒤 7일까지만 보임(8일 지난 확정본 = 카드·묶음 제목 숨김, 하루 지난 것은 보임 · C177 ⓒ 7일에서 1분 모자람 = 보임, 7일하고 1분 = 숨김) · 서버가 못 읽은 달 = 초안 카드에 "읽지 못한 달: 9월 — 잠시 뒤 다시 열어 주세요" 한 줄(단추 그대로) · 보일 문서 없이 못 읽은 달만 = 그 한 줄 카드(숨기지 않음)', c1740, '');
   const evil0 = await evilOk(html), dlg0 = await dlGuard(html);
   const kill21 = [];
   for (const [from, to] of MUT21) {
@@ -20288,8 +20294,8 @@ try {
     const FT = ['`promoai:qlearn_off`', '`QOFF_KEY`', '`offOf`', '`kick`', '`injectOf`', '`cardOf`', '`cleanRule`', '거르기_전수표_20261120.md', '0/36'];
     const GATE = ['uismoke', 'servertest', 'consheet_check', 'proctpl_check', 'settletest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check', 'paycalc_check', 'stmtread_a_check', 'stmtread_b_check', 'stmtread_c_check', 'stmtread_d_check', 'stmtmail_check'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0), last = gate[gate.length - 1] || '';
-    const ok = /기준: v506 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
-      && GATE.every((g) => last.indexOf('`' + g + '`') > 0) && /SHELL_CACHE = 'jw-shell-v506'/.test(d.sw);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 506 /* v507: 기준 줄·sw = 이 판 이상 */ && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => last.indexOf('`' + g + '`') > 0) && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 506;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
   };
   const rQ = chkQ(DQ);
@@ -20299,6 +20305,29 @@ try {
   T('v506 문서·판 번호(정확 검사): FEATURES 기준 v506 (2026-11-20)·v506 절(따로 열쇠 promoai:qlearn_off·QOFF_KEY·offOf·kick·injectOf·cardOf · 전수 표 cleanRule 0/36) · TESTLIST v506 칸 4(운영 확인 1 · AI [x] 3(게이트 줄 2) · 게이트 18종) · sw jw-shell-v506 · 결함 사본 ' + MQ.length + '개 = 모두 ✗',
     rQ.ok && MQ.every((v) => v === false), JSON.stringify({ r: rQ.info, mut: MQ }));
 } catch (e) { console.log('  (v506 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v507(65 연구노트 미룬 것 — 원장 C177): 실행 검사는 위 'C174'·'P1 판21' 블록·servertest·appdata selftest · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '507 이상'으로 풀 것
+try {
+  const rd507 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D507 = { ft: rd507('FEATURES.md'), tl: rd507('TESTLIST.md'), sw: rd507('sw.js'), cl: rd507('CLAUDE.md') };
+  const chk507 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v507 (11/20)', '\n### '), tlv = cut(d.tl, '\n## v507 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), op = cb.filter((l) => /^- \[ \] \(운영 확인\)/.test(l));
+    const FT = ['원장 C177', '`RULES_FP`', '`rxFp`', '**52120baf5e4bcef0**', '`note`', '`ping_line`', '**앱을 먼저 올리고**', '화면·운영 데이터 변경 없음'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v507 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**연구노트 미룬 것(v507') > 0 && /SHELL_CACHE = 'jw-shell-v507'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
+  };
+  const r507 = chk507(D507);
+  const mu507 = (k, f) => chk507(Object.assign({}, D507, { [k]: f(D507[k]) })).ok;
+  const M507 = [mu507('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v506 (')), mu507('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v506'")),
+    mu507('ft', (s) => s.split('`rxFp`').join('rxFp')), mu507('cl', (s) => s.replace('**연구노트 미룬 것(v507', '연구노트 미룬 것(')),
+    mu507('tl', (s) => s.replace("\n- [ ] (운영 확인) 12/1~3", "\n- (운영 확인) 12/1~3"))];
+  T('v507 문서·판 번호(정확 검사): FEATURES 기준 v507 (2026-11-20)·v507 절(C177 ⓐⓖⓒ) · TESTLIST v507 칸 3(운영 확인 1 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v507 · 결함 사본 ' + M507.length + '개 = 모두 ✗',
+    r507.ok && M507.every((v) => v === false), JSON.stringify({ r: r507.info, mut: M507 }));
+} catch (e) { console.log('  (v507 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

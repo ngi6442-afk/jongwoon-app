@@ -10569,9 +10569,15 @@ function J91a(x) { return JSON.stringify(x); }
     // 원장 C174 ⑤: 거르기 표 내용 지문 — 다르거나 없으면 400 RNOTE_RULES_FP(흔적 '표 내용 다름') · 지문 = 16자 16진 · 표 내용(보통 낱말 하나)이 바뀌면 지문도 바뀜
     const a10 = await put({ period: PREV21, text: CLEAN21, rules_fp: '0000000000000000' }), a10s = st(), a11 = await put({ period: PREV21, text: CLEAN21, rules_fp: undefined });
     const fpX = comp21(P21, S21.replace("const NAME_SKIP = { '개인': 1,", () => "const NAME_SKIP = { '가짜낱말': 1, '개인': 1,")).RULES_FP;
+    // 원장 C177 ⓐ: 꼴 글은 같고 대소문자 플래그만 다른 표도 지문이 바뀜(금액 KRW 꼴의 i를 뗌) · g는 지문 밖(파이썬에 없음) — 대신 플래그 규칙(flagOk)으로 지킴(검토 11/20 ①)
+    const fpI = comp21(P21, S21.replace('/\\d[\\d,]*\\s*KRW/i,', () => '/\\d[\\d,]*\\s*KRW/,')).RULES_FP;
+    const flagOk = (M) => [M.CORP_RE, M.ZW_RE].every((r) => r && r.global) && [...M.AMOUNT_RES, ...M.KEY_RES, M.MAIL_RE].every((r) => !r.global && !r.sticky)
+      && [...M.AMOUNT_RES, ...M.KEY_RES, M.MAIL_RE, M.CORP_RE, M.ZW_RE].every((r) => !/[msu]/.test(r.flags));
+    const zw2 = M => M.normText('가​짜​요원') === '가짜요원';   // 폭 없는 문자 둘 다 지움(g 필수 — 하나만 지우던 결함을 잡음)
     P.A2 = a10.code === 400 && a10.body.error_code === 'RNOTE_RULES_FP' && a10s && a10s.ok === false && /표 내용 다름/.test(a10s.note || '') && a11.code === 400 && a11.body.error_code === 'RNOTE_RULES_FP' && !doc()
       && /^[0-9a-f]{16}$/.test(RM.RULES_FP) && RM.RULES_FP === RM.rulesFp() && fpX !== RN21.RULES_FP
-      && RN21.RULES_FP === 'f9f87d93874f763f';   // 기대 지문 — appdata rnote.py selftest와 같은 값(표를 고치면 두 시험의 이 값을 같이 고친다 · 덧대기: 한쪽만 고치면 커밋 전에 드러남)
+      && fpI !== RN21.RULES_FP && flagOk(RM) && zw2(RM)
+      && RM.RULES_FP === '52120baf5e4bcef0';   // 기대 지문(C177: RN21 → RM — 결함 사본 모듈의 지문도 이 값이어야 함) — appdata rnote.py selftest와 같은 값(표를 고치면 두 시험의 이 값을 같이 고친다 · 덧대기: 한쪽만 고치면 커밋 전에 드러남)
     I.A = [a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11].map((x) => x.code + '/' + x.body.error_code);
     // ② 서버 재검사(검토 11/15 ②⑥⑦ — 느슨한 꼴·핵심 이름·NFC·폭 없는 문자·금액·메일)
     const LEAKS = [['회원 실명', '- 가짜요원 확인\n', 'name'], ['띄어 쓴 3자 일용직 이름', '- 가짜 꾼 요청\n', 'name'], ['가운뎃점 섞은 이름', '- 가짜·꾼 요청\n', 'name'], ['풀어 쓴 한글(NFD)', '- ' + '가짜요원'.normalize('NFD') + '\n', 'name'],
@@ -10616,6 +10622,7 @@ function J91a(x) { return JSON.stringify(x); }
     const ds3 = await RM.dueState(JAN03), ds4 = await RM.dueState(JAN04);
     const back = JSON.parse(g0d); delete mem.gw_data['rnote:2036-11']; delete mem.gw_data['rnote:2037-01']; Object.keys(back).forEach((k) => { if (!(k in mem.gw_data)) mem.gw_data[k] = back[k]; });
     P.E = f1.code === 200 && f1s.ok === false && /LEAK_NAME/.test(f1s.note) && f2.code === 400 && f2.body.error_code === 'BAD_FAIL' && f3.code === 400 && pg.code === 200 && pg.body.due === PREV21 && pg.body.due_ok === true && pgs.ok === true && pgs.fn === 'rnote'
+      && typeof pg.body.note === 'string' && pg.body.note.length > 0 && pg.body.note === pgs.note   // 원장 C177 ⓖ: ping 응답에 흔적과 같은 판정 글
       && ds1.ok === false && /확정 안 된 초안 2036-11/.test(ds1.note) && ds2.ok === true && ds3.ok === true && ds4.ok === false;
     I.E = { f1: f1.code, f1s, f2: f2.code, f3: f3.code, pg: pg.body, ds: [ds1, ds2, ds3, ds4] };
     // 원장 C174 ②: 1~3일(봇이 묻기·저장)에도 오래 미확정 초안 경고가 흔적에 남음 · ③ 한 달만 못 읽으면 흔적 ok false('읽지 못한 달') — 2037-02-02 KST, 2036-11 초안이 확정 안 된 채
@@ -10691,6 +10698,10 @@ function J91a(x) { return JSON.stringify(x); }
       ['R', "const CLIENT_COLS = [['col:clients', 'name'], ['col:contracts', 'client'], ['col:asbestos', 'client'], ['col:quotes', 'recv']];", "const CLIENT_COLS = [['col:clients', 'name']];"],
       ['R', "  return new RegExp(cs.join(cs.length >= 3 ? NAME_JOIN : ''), 'i');", "  return new RegExp(cs.join(''), 'i');"],
       ['R', "  if (String(d.rules_fp || '') !== RULES_FP) {", "  if (false) {"],
+      ['R', "function rxFp(r) { return [r.source, r.flags.indexOf('i') >= 0 ? 'i' : '']; }", "function rxFp(r) { return [r.source, '']; }"],
+      ['R', "const ZW_RE = /[​-‍⁠﻿]/g;", "const ZW_RE = /[​-‍⁠﻿]/;"],   // 검토 11/20 ①: g 떼면 첫 글자만 지움
+      ['R', "const MAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)+/;", "const MAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)+/g;"],   // .test에 g = lastIndex 남음
+      ['R', "due_ok: s.ok, note: String(s.note || '').slice(0, 120) } }; }", "due_ok: s.ok } }; }"],
       ['R', "  await stampOk(!w.bad, note + w.note);", "  await stampOk(true, note);"],
       ['R', "    if (!r.ok) { unread.push(p); continue; }", "    if (!r.ok) return null;"],
       ['R', "  const note = (old.length ? ' · 확정 안 된 초안 ' + old.join('·') : '') + (rs.unread.length ? ' · 읽지 못한 달 ' + rs.unread.join('·') : '');\n  return { bad: !!(old.length || rs.unread.length), note: note };", "  const note = (old.length ? ' · 확정 안 된 초안 ' + old.join('·') : '');\n  return { bad: !!old.length, note: note };"],
@@ -10699,7 +10710,7 @@ function J91a(x) { return JSON.stringify(x); }
       ['R', "function normText(s) { return String(s == null ? '' : s).normalize('NFC').replace(ZW_RE, ''); }", "function normText(s) { return String(s == null ? '' : s).normalize('NFC'); }"],
       ['R', "    if (client) { const core = t.replace(CORP_RE, '').replace(/\\s+/g, ''); if (core.length >= CORE_MIN && core !== t) add(core); }", ""],
       ['R', "  return !!NAME_SKIP[c] || !!NAME_SKIP[c.replace(/[\\d._-]+$/, '')] || !!NAME_SKIP[c.toLowerCase()];", "  return !!NAME_SKIP[c] || !!NAME_SKIP[c.toLowerCase()];"],
-      ['R', "  /\\d[\\d,]*(?:\\.\\d+)?\\s*[천백십]\\s*만/,\n", ""],
+      ['R', "  /\\d[\\d,]*(?:\\.\\d+)?\\s*[천백십]\\s*만/i,\n", ""],
       ['R', "  /KRW\\s*\\d/i,\n", ""],
       ['R', "  if (!LN.piiScan(s).ok || MAIL_RE.test(s)) kinds.push('pii');", "  if (!LN.piiScan(s).ok) kinds.push('pii');"],
       ['R', "  if (AMOUNT_RES.some(function (re) { return re.test(s); })) kinds.push('amount');", ""],
@@ -10737,7 +10748,7 @@ function J91a(x) { return JSON.stringify(x); }
     }
     const place21 = MUT21.filter(([k, from]) => (k === 'R' ? S21 : SG21).split(from).length !== 2).map(([k, from]) => k + ':' + from.trim().slice(0, 40) + ' 자리');
     kill21.push(...place21);
-    T('C174 ⑤ 거르기 표 내용 지문: 다르거나 없으면 400 RNOTE_RULES_FP(흔적 \'표 내용 다름\')·저장 0 · 지문 16자 16진 = 표 내용에서 계산 · 보통 낱말 하나만 더해도 지문이 바뀜', R21.P.A2, JSON.stringify(R21.I.A));
+    T('C174 ⑤ 거르기 표 내용 지문: 다르거나 없으면 400 RNOTE_RULES_FP(흔적 \'표 내용 다름\')·저장 0 · 지문 16자 16진 = 표 내용에서 계산 · 보통 낱말 하나만 더해도 지문이 바뀜 · C177 ⓐ 대소문자 플래그만 바꿔도 지문이 바뀜 · 플래그 규칙(지우기 꼴 g 필수·검사 꼴 g·y 금지·m·s·u 금지)·폭 없는 문자 둘 다 지움', R21.P.A2, JSON.stringify(R21.I.A));
     T('C174 ② 1~3일 묻기·이미 있음·저장 흔적에도 오래 미확정 초안 경고(ok false·\'확정 안 된 초안 2026-11\') · 확정하면 ok · ③ 한 달 못 읽음 = 흔적 ok false(\'읽지 못한 달\')', R21.P.E2, JSON.stringify(R21.I.E2));
     T('C174 ③ 읽기: 한 달 문서만 못 읽음 = 200 · 그 달만 unread · 다음 초안·최근 확정본·목록은 그대로 · 평소 unread 빈 목록 · 목록 자체 실패 = 503', R21.P.F2, JSON.stringify(R21.I.F2));
     T('P1 판21 ⑨ 결함 사본 ' + MUT21.length + '개(재검사 끔·명부 못 읽음 통과·회원 0명 통과·일용직/계약 상대 표 뺌·느슨한 꼴·NFC·폭 없는 문자·핵심 이름·보통 낱말 뒤 숫자·천만·KRW 앞·메일·금액 검사 뺌·meta 안 봄·규칙 판 안 봄·probe 걷음·확정 덮기·초안 덮기·확정 두 번·base 안 봄·봇 원본 덮기·원본 내림·이번 달 받음·크기 안 봄·감사 없음·초안 순서·최근 확정본 없음·오래된 초안 판정 끔·can_write 늘 참 · gw-data 읽기 관문 걷음·확정 PM 관문을 관리자로·봇 키 안 봄 · C174: 표 내용 지문 안 봄·1~3일 흔적 경고 꼬리 걷음·한 달 실패 = 전체 실패·못 읽은 달 경고 걷음·unread 안 내림) = 모두 ✗', kill21.length === 0, kill21.join(' | '));
