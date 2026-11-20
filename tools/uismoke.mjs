@@ -21042,8 +21042,8 @@ try {
     const FT = ['`gw-pay`', '`_lib/payledger.js`', '`pay:base:<회사>:<회원>`', '`pay:month:<회사>:<달>`', '`pay:conf`', '`KIND_MISMATCH`', '`ROWS_NOT_READY`', '`OVERWRITTEN`', '`BAD_PAY_DOC`', '`lawPick`', '`minus_hours`', '`CALC_CHANGED`', '`ord_month`', '43줄'];
     const GATE = ['uismoke', 'servertest', 'consheet_check', 'proctpl_check', 'settletest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check', 'paycalc_check', 'stmtread_a_check', 'stmtread_b_check', 'stmtread_c_check', 'stmtread_d_check', 'stmtmail_check'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0), last = gate[gate.length - 1] || '';
-    const ok = /기준: v519 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && pm.length === 1 && op.length === 1
-      && GATE.every((g) => last.indexOf('`' + g + '`') > 0) && /SHELL_CACHE = 'jw-shell-v519'/.test(d.sw) && d.man.indexOf('<li><b>급여 탭</b> (2026-11 v519) — 관리자만 보입니다.') > 0 && d.cl.indexOf('- **66 급여 판2(v519 — 급여 탭') > 0;
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 519 && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && pm.length === 1 && op.length === 1
+      && GATE.every((g) => last.indexOf('`' + g + '`') > 0) && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 519 && d.man.indexOf('<li><b>급여 탭</b> (2026-11 v519) — 관리자만 보입니다.') > 0 && d.cl.indexOf('- **66 급여 판2(v519 — 급여 탭') > 0;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, pm: pm.length, op: op.length } };
   };
   const rR = chkR(DR);
@@ -21053,6 +21053,31 @@ try {
   T('v519 문서·판 번호(정확 검사): FEATURES 기준 v519 (2026-11-20)·v519 절(gw-pay·payledger·키 셋·KIND_MISMATCH·ROWS_NOT_READY·OVERWRITTEN·BAD_PAY_DOC·lawPick·minus_hours·43줄) · TESTLIST v519 칸 4(PM 1 · 운영 확인 1 · AI [x] 2 · 게이트 18) · sw v519 · MANUAL 급여 탭 한 줄 · CLAUDE.md 판2 줄 · 결함 사본 ' + MR.length + '개 = 모두 ✗',
     rR.ok && MR.every((v) => v === false), JSON.stringify({ r: rR.info, mut: MR }));
 } catch (e) { console.log('  (v519 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v520(C240 판A-1 — 가르는 칸 글자만 · 원장 C240): 실행 검사는 servertest 'C240 판 A-1' 블록 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd520 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D520 = { ft: rd520('FEATURES.md'), tl: rd520('TESTLIST.md'), sw: rd520('sw.js'), man: rd520('MANUAL.html'), cl: rd520('CLAUDE.md') };
+  const chk520 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v520 (11/20)', '\n### '), tlv = cut(d.tl, '\n## v520 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`BAD_FIELD`", "원장 C240"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v520 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 7 && gate.length === 2 && scr.length === 5 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C240 판A-1(v520') > 0
+      && /SHELL_CACHE = 'jw-shell-v520'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r520 = chk520(D520);
+  const mu520 = (k, f) => chk520(Object.assign({}, D520, { [k]: f(D520[k]) })).ok;
+  const M520 = [mu520('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v519 (')), mu520('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v519'")),
+    mu520('ft', (s) => s.split('`BAD_FIELD`').join('BAD_FIELD')),
+    mu520('cl', (s) => s.replace('**C240 판A-1(v520', 'C240 판A-1(')),
+    mu520('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v519 9e66df7 위로 옮긴 0b88eb7) uismoke ✓ 921 · servertest 1450(운영 1442 + C240 판 A-1 8) · 14종 0 · node --check 104 · 인라인 파싱 오류 0 · paycalc_check 10 · autorulestest 8 · CR 0 — ✓ AI 11/20', '\n- (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v519 9e66df7 위로 옮긴 0b88eb7) uismoke ✓ 921 · servertest 1450(운영 1442 + C240 판 A-1 8) · 14종 0 · node --check 104 · 인라인 파싱 오류 0 · paycalc_check 10 · autorulestest 8 · CR 0 — ✓ AI 11/20'))];
+  T('v520 문서·판 번호(정확 검사): FEATURES 기준 v520 (2026-11-20)·v520 절(C240 판A-1) · TESTLIST v520 칸 7(화면·운영 확인 5 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v520 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
+    r520.ok && M520.every((v) => v === false), JSON.stringify({ r: r520.info, mut: M520 }));
+} catch (e) { console.log('  (v520 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

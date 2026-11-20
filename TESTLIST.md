@@ -1712,3 +1712,12 @@
 - [ ] (운영 확인) 급여 탭: 직원 한 명 기준을 넣으면 그 달 대장 줄에 금액이 나오고, 금액 칸을 눌러 상여·연장 시간을 넣으면 미리 계산이 바뀌며 저장 뒤 대장에 그대로 · 하수준설 대상의 수당 칸 → 날짜 줄 추가 → 총 수당이 수당 칸으로
 - [x] (AI) `servertest` 66 판2 ①~⑨(관문 · 대장 사람·계산 = 같은 함수 직접 호출 · 그 달 값 꼴·낙관락·덮임 · 확정·풀기 · 기준 판 · 설정 · 백업 복원 · 승격 판정 대조 · 결함 사본 21) · `uismoke` 66 판2 ①②(결함 사본 8) · 받은 수당내역 43줄 재현 — ✓ AI 11/20
 - [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `paycalc_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` 통과 · v518 문서 검사를 이 판 이상으로 풀고 v519 문서·판 번호 정확 검사 — ✓ AI 11/20
+
+## v520 — C240 판 A-1 — 가르는 칸 글자만 · 증빙 읽기 권한 · 남의 PIN · 당번 크론(서버만)
+- [ ] (AI 시험 화면 대상 — C240 판A-1) 직원·관리자 계정으로 홈·지시·차량·기성·문서함·체크·휴가 탭을 한 바퀴 — 종전과 같음(400 없음 — 개발자 도구 네트워크 탭)
+- [ ] (AI 시험 화면 대상 — C240 판A-1) 계약 보기 직원: 계약 서류 창 적격심사 패킷 생성 뒤 '증빙 함께 내려받기' 제안 뜸 · 관리자 양식 관리의 증빙 목록·삭제 됨
+- [ ] (AI 시험 화면 대상 — C240 판A-1) 경리 관리자 인사 카드: 직원 PIN 칸에 값 넣고 저장 → "계정·권한 변경은 개발자만 가능합니다." · PIN 빈칸 저장 됨 · 새 직원 등록(PIN 포함) 됨
+- [ ] (AI 운영 확인 — C240 판A-1) 운영 앱 직원·관리자 계정 한 바퀴 · 오류 기록(err_list) 새 항목 없음 · 다음 날 아침 수집기·백업·운반일지 봇 정상(Actions 기록)
+- [ ] (AI 운영 확인 — C240 판A-1) `/.netlify/functions/gw-duty-cron` 주소 호출 = 404 · 08:00 gw-todo-cron 계약직 알림 그대로
+- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v519 9e66df7 위로 옮긴 0b88eb7) uismoke ✓ 921 · servertest 1450(운영 1442 + C240 판 A-1 8) · 14종 0 · node --check 104 · 인라인 파싱 오류 0 · paycalc_check 10 · autorulestest 8 · CR 0 — ✓ AI 11/20
+- [x] (AI) `servertest` C240 판 A-1 블록 8칸 · 꼴 표 392건 모두 400·저장소 그대로 · 재현 28건 막힘(중립 사본 28건 뚫림) · 글자 정상 요청 56건 중립 사본과 글자째 같음 · 결함 사본 72개 모두 잡힘 · 좁은 독립 확인 한 벌: 우회 5길 운영 v517에서 재현 → 이 판 400 · 앱 gwCall 249자리·수집기 = 글자 아닌 값 0 · 빈 값·null 통과 — ✓ AI 11/20
