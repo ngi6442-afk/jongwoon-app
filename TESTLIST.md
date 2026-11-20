@@ -1614,3 +1614,9 @@
 - [x] (AI 시험 화면 대상) 실물 쿠팡 주문 32통(4~11월 · 스크래치) = 거래처 v13 32/32 · 읽기 32/32 경고 0 · 65줄 줄 검사·검산 통과 · 남기는 원본에 받는 사람·연락처·주소·계좌 0 — ✓ AI 11/20
 - [x] (AI) `stmtmail_check` ⑨ 15건(읽기 실패 포함 · 결함 사본 10) · `uismoke` 29 판⑨ ③-9 2건(결함 사본 4) — ✓ AI 11/20
 - [x] (AI) `uismoke` · `servertest` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` · `paycalc_check` 통과 · v502 문서 검사를 이 판 이상으로 풀고 v503 문서·판 번호 정확 검사 — ✓ AI 11/20
+
+## v504 — C147 ②: 거래처 PC 표 '관련 문서' = 제목만 맞춤 · 안내 글
+- [ ] (운영 확인) PC 거래처 탭 줄을 펴 [관련 문서]의 첫 줄 안내가 '문서함 제목에 상호가 들어간 문서 — …'이고 건수가 그 상호가 제목에 든 문서 수와 같음
+- [x] (AI 시험 화면 대상) 시험 서버(v504 + 11/20 백업 사본) PC 1366: 관련 문서 안내 글 '제목에' · 폰 380 옛 [상세 ›] 창 무변 — ✓ AI 11/20
+- [x] (AI) `uismoke` v464 C081 ①(c1 = 2건)·v441 ㉑ 안내 글·v504 문서·판 번호 정확 검사 · v503 문서 검사를 이 판 이상으로 풂 — ✓ AI 11/20
+- [x] (AI) `servertest` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` · `paycalc_check` 통과 — ✓ AI 11/20

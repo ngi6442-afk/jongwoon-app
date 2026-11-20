@@ -7301,7 +7301,7 @@ try {
   openRow41(X21, 'c5'); press41(X21, 'data-cli-tab', 'doc'); const h21b = X21.host._h;
   const tip21 = (h) => (/data-cli-tab="doc" title="([^"]*)"/.exec(h) || ['', ''])[1];
   const s21 = [tip21(h21a), /<div class="vs-empty">관련 문서 없음 — 상호가 짧아\(2자 이하\) 관련 문서를 찾지 않습니다 — 문서함에서 직접 찾아보세요<\/div>/.test(h21b), tip21(h21b),
-    /<div class="vs-dsub" style="margin:0 0 4px;">문서함 제목·분류에 상호가 들어간 문서 — &#39;\(주\)&#39;·&#39;㈜&#39;·&#39;주식회사&#39;·띄어쓰기는 무시합니다<\/div><table class="vs-hist">.*JW-04-01-001/.test(h21a)];   // v464 C081 ①: c1 = 열쇠 '가나건설' 1건(표 첫 줄 안내) · c5 사아 = 2자라 찾지 않음(빈 안내)
+    /<div class="vs-dsub" style="margin:0 0 4px;">문서함 제목에 상호가 들어간 문서 — &#39;\(주\)&#39;·&#39;㈜&#39;·&#39;주식회사&#39;·띄어쓰기는 무시합니다<\/div><table class="vs-hist">.*JW-04-01-001/.test(h21a)];   // v464 C081 ①: c1 = 열쇠 '가나건설' 1건(표 첫 줄 안내) · c5 사아 = 2자라 찾지 않음(빈 안내)
   const P21 = mk41({ width: 375 }), HP21 = (id) => P21.env.host(id); P21.api.render(); P21.api.detail('c4'); const b21a = HP21('cliDetailBody')._h; P21.api.detail('c3'); const b21b = HP21('cliDetailBody')._h; P21.api.detail('c5'); const b21c = HP21('cliDetailBody')._h;
   const Q21 = mk41({ width: 375, user: U41.D }); Q21.api.render(); Q21.api.detail('c5'); const b21d = Q21.env.host('cliDetailBody')._h;   // c5 사아 = 계약 k5·관련 문서 2건이 메모리에 있는 거래처
   s21.push(b21a.indexOf('9001011234567') < 0 && /13자리\(숨김\)/.test(b21a), /<div class="crm-info">개인\(사업자 없음\)<\/div>/.test(b21b), /계약 <span>1건<\/span>/.test(b21c) && /관련 문서 <span>2건<\/span>/.test(b21c), /crm-h">계약 /.test(b21d) || /관련 문서/.test(b21d));
@@ -7311,14 +7311,14 @@ try {
   s21.push([hy21('c1'), hy21('c3'), hy21('c4'), hy21('c5')].join('|'), H21.api.sText(cl41(H21, 'c3')).indexOf('개인(사업자 없음)') > 0 && H21.api.sText(cl41(H21, 'c3')).indexOf('개인고객 ' + hy21('c3') + ' ') === 0);
   const tsb21 = blkOf41('// @task-sheet-start', '// @task-sheet-end'), rsb21 = blkOf41('// @rec-sheet-start', '// @rec-sheet-end');
   s21.push(!/\bcount\s*:/.test(tsb21) && !/\bcount\s*:/.test(rsb21) && /\bcount: function\(r\)\{ return !r\.out; \},/.test(csb41), X1.api.check(Object.assign({}, d1, { count: 1 })).indexOf('count') >= 0 && X1.api.check(d1).indexOf('count') < 0);
-  T('v441 ㉑ 검토 — 관련 문서 찾는 법·옛 상세 창·탭 이동·검색 글·건수: 관련 문서 탭 title·첫 줄 안내(v464 C081 ①: c1 "제목·분류에 상호 … 무시" · c5 2자 "찾지 않습니다" 빈 안내) · 옛 [상세 ›] = 13자리 원문 0("13자리(숨김)")·개인 "개인(사업자 없음)"·관리자 c5 계약 1·관련 문서 2·계약 숨김 직원D = 계약·관련 문서 절 0 · 탭에 다시 옴: 폰 = 그대로·PC = 표·처음 = 옛 목록 · hay c1 원문·c3 개인 빈 글·c4 13자리 빈 글·c5 원문 · 표 검색 글 뒤쪽 "개인(사업자 없음)" · count는 거래처 정의만(정의 검사)',
-    JSON.stringify(s21) === JSON.stringify(["문서함 제목·분류에 상호가 들어간 문서 — &#39;(주)&#39;·&#39;㈜&#39;·&#39;주식회사&#39;·띄어쓰기는 무시합니다", true,
+  T('v441 ㉑ 검토 — 관련 문서 찾는 법·옛 상세 창·탭 이동·검색 글·건수: 관련 문서 탭 title·첫 줄 안내(v464 C081 ①: c1 "제목에 상호 … 무시" — v504 C147 ② · c5 2자 "찾지 않습니다" 빈 안내) · 옛 [상세 ›] = 13자리 원문 0("13자리(숨김)")·개인 "개인(사업자 없음)"·관리자 c5 계약 1·관련 문서 2·계약 숨김 직원D = 계약·관련 문서 절 0 · 탭에 다시 옴: 폰 = 그대로·PC = 표·처음 = 옛 목록 · hay c1 원문·c3 개인 빈 글·c4 13자리 빈 글·c5 원문 · 표 검색 글 뒤쪽 "개인(사업자 없음)" · count는 거래처 정의만(정의 검사)',
+    JSON.stringify(s21) === JSON.stringify(["문서함 제목에 상호가 들어간 문서 — &#39;(주)&#39;·&#39;㈜&#39;·&#39;주식회사&#39;·띄어쓰기는 무시합니다", true,
       "상호가 짧아(2자 이하) 관련 문서를 찾지 않습니다 — 문서함에서 직접 찾아보세요", true,
       true, true, true, false, 'kept', 'sheet', 'legacy', '123-45-67890|||2223344444', true, true, true]) && noMiss41(m21),
     JSON.stringify({ s21, miss: miss41.slice(m21) }));
 
-  // v464(11/13 — C081 ① R1, 11/11 예고): PC 표 펼침 '관련 문서' = 상호 열쇠(cliNameKey) 3자 이상이 제목 열쇠 또는 분류 열쇠 안에 있는 문서(지운 문서 빼고)
-  //   c1 (주)가나건설(열쇠 '가나건설') = '가나 건설(주) 견적'·'주식회사 가나건설 계약'·분류 '가나건설' 3건 · 제목 '가나' 0 · 제목 끝+분류 앞 경계('…가나' + '건설…')로는 안 잡힘 · 지운 문서 0
+  // v464(11/13 — C081 ① R1, 11/11 예고): PC 표 펼침 '관련 문서' = 상호 열쇠(cliNameKey) 3자 이상이 제목 열쇠 안에 있는 문서(지운 문서 빼고 · v504 C147 ②부터 분류 열쇠는 안 봄 — 아래 경계 줄은 되살림 막음 확인용)
+  //   c1 (주)가나건설(열쇠 '가나건설') = '가나 건설(주) 견적'·'주식회사 가나건설 계약' 2건 · 제목 '가나' 0 · 글자 분류 칸(category) '가나건설'은 v504(C147 ②)부터 안 봄 · 제목 끝+분류 앞 경계('…가나' + '건설…')로는 안 잡힘 · 지운 문서 0
   //   c5 사아(2자) = 0 · 탭 title = 짧은 상호 안내 · 폰 옛 [상세 ›] 창(cliRelatedDocs)은 종전 글자째 그대로('사아' 부분 일치 3건)
   const m51 = miss41.length;
   const DOCS51 = [{ id: 'e1', title: '가나 건설(주) 견적', no: 'JW-1' }, { id: 'e2', title: '주식회사 가나건설 계약', no: 'JW-2' }, { id: 'e3', title: '협약', category: '가나건설', no: 'JW-3' },
@@ -7329,7 +7329,7 @@ try {
   const P51 = mk41({ width: 375, docs: DOCS51.map((d) => Object.assign({}, d)) }); P51.api.render(); P51.api.detail('c5'); const b51 = P51.env.host('cliDetailBody')._h;
   const s51 = [tabs41(h51a), [...h51a.matchAll(/<tr><td>(JW-\d)<\/td>/g)].map((m) => m[1]).join(','), tabs41(h51b), (/data-cli-tab="doc" title="([^"]*)"/.exec(h51b) || ['', ''])[1], (/관련 문서 <span>(\d+)건/.exec(b51) || ['', ''])[1]];
   T('v464 C081 ① 관련 문서 = 상호 열쇠 3자 이상(PC 표 펼침): ' + JSON.stringify(s51),
-    JSON.stringify(s51) === JSON.stringify(['개요|미수 (3)|계약 (2)|관련 문서 (3)*', 'JW-1,JW-2,JW-3', '개요*|미수 (1)|계약 (1)|관련 문서 (0)', '상호가 짧아(2자 이하) 관련 문서를 찾지 않습니다 — 문서함에서 직접 찾아보세요', '3']) && noMiss41(m51),
+    JSON.stringify(s51) === JSON.stringify(['개요|미수 (3)|계약 (2)|관련 문서 (2)*', 'JW-1,JW-2', '개요*|미수 (1)|계약 (1)|관련 문서 (0)', '상호가 짧아(2자 이하) 관련 문서를 찾지 않습니다 — 문서함에서 직접 찾아보세요', '3']) && noMiss41(m51),
     JSON.stringify({ s51, miss: miss41.slice(m51) }));
 
   // ㉒ 검토 반영 문서: FEATURES v441 '검토 반영(11/11' 줄(못 읽은 대장·409 병합·13자리 판정·번호가 다르면 다른 회사·count·관련 문서 안내·탭 이동·운영 사본 다시 잼)과 실제와 달랐던 옛 서술 0
@@ -20110,9 +20110,9 @@ try {
     const FT = ['청구서함', '`mailBoxes`', '`STMT_MAIL_BOXES`', '`_lib/stmtcoupang.js`', '`orderHtml`', '`readOrder`', '`BODY_START`', '**v13 쿠팡**', '`stmtReadAppend`', '`other`', '원장 C235', '주문한 달'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = '<li><b>쿠팡 주문 자동 정리</b> (2026-11 v503) — ';
-    const ok = /기준: v503 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 1 && op.length === 2
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 503 && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 1 && op.length === 2
       && d.man.indexOf(MAN) > 0 && !/stmtcoupang|orderHtml|readOrder|BODY_START|mailBoxes|gwCall|v13/.test(cut(d.man, MAN, '\n')) && d.man.indexOf('&lsquo;청구서함&rsquo;·&lsquo;청구서&rsquo;도 읽습니다') > 0
-      && d.cl.indexOf('**월말명세서 판⑨(v503)**') > 0 && /SHELL_CACHE = 'jw-shell-v503'/.test(d.sw);
+      && d.cl.indexOf('**월말명세서 판⑨(v503)**') > 0 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 503;   // v504(C147 ②)에서 '503 이상'으로 풂
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, op: op.length } };
   };
   const rP = chkP(DP);
@@ -20123,6 +20123,34 @@ try {
   T('v503 문서·판 번호(정확 검사): FEATURES 기준 v503 (2026-11-20)·v503 절(29 판⑨) · TESTLIST v503 칸 5(운영 확인 2 · 시험 화면 [x] 1 · 게이트 [x] 2) · MANUAL 쿠팡 줄(내부 이름 0)·메일 줄 폴더 문장 · CLAUDE.md 한 줄 · sw jw-shell-v503 · 결함 사본(기준 줄·sw·FEATURES 글·MANUAL 판 표시·폴더 문장·CLAUDE 줄·TESTLIST 칸) ✗',
     rP.ok && MP.every((v) => v === false), JSON.stringify({ r: rP.info, mut: MP }));
 } catch (e) { console.log('  (v503 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v504(C147 ② — 45-1 작은 판): 실행 검사는 위 'v464 C081 ①'(c1 = 2건)·'v441 ㉑'(안내 글) · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '504 이상'으로 풀 것
+try {
+  const rdQ = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DQ = { ft: rdQ('FEATURES.md'), tl: rdQ('TESTLIST.md'), sw: rdQ('sw.js'), man: rdQ('MANUAL.html'), cl: rdQ('CLAUDE.md'), ix: rdQ('index.html') };
+  const chkQ = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v504 (11/20)', '\n### '), tlv = cut(d.tl, '\n## v504 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[x\] \(AI 시험 화면 대상\)/.test(l)), op = cb.filter((l) => /^- \[ \] \(운영 확인\)/.test(l));
+    const FT = ['`category`', '`cliSheetDocs`', '`cliSheetDocNote`', '`cliRelatedDocs`', '`collectors/onbid.py`', '155cc25', '원장 C147'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const docs = cut(d.ix, '  function cliSheetDocs(r){', '\n  }');
+    const ok = /기준: v504 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 1 && op.length === 1
+      && d.man.indexOf('관련 문서는 제목에 상호가 들어간 문서함 문서입니다') > 0 && d.man.indexOf('제목이나 분류에 상호가') < 0
+      && docs.length > 0 && docs.indexOf('category') < 0 && d.ix.indexOf('"문서함 제목에 상호가 들어간 문서 — ') > 0 && d.ix.indexOf('문서함 제목·분류에 상호') < 0
+      && d.cl.indexOf('**거래처 관련 문서 제목만(v504') > 0 && /SHELL_CACHE = 'jw-shell-v504'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, op: op.length, docs: docs.length } };
+  };
+  const rQ = chkQ(DQ);
+  const muQ = (k, f) => chkQ(Object.assign({}, DQ, { [k]: f(DQ[k]) })).ok;
+  const MQ = [muQ('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v503 (')), muQ('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v503'")), muQ('ft', (s) => s.split('`cliSheetDocNote`').join('cliSheetDocNote')),
+    muQ('man', (s) => s.replace('관련 문서는 제목에 상호가', '관련 문서는 제목이나 분류에 상호가')),
+    muQ('ix', (s) => s.replace('return d && d.del !== 1 && cliNameKey(d.title).indexOf(k) >= 0;', 'return d && d.del !== 1 && (cliNameKey(d.title).indexOf(k) >= 0 || cliNameKey(d.category).indexOf(k) >= 0);')),
+    muQ('ix', (s) => s.replace('"문서함 제목에 상호가 들어간 문서 — ', '"문서함 제목·분류에 상호가 들어간 문서 — ')), muQ('cl', (s) => s.replace('**거래처 관련 문서 제목만(v504', '거래처 관련 문서 제목만(v504')),
+    muQ('tl', (s) => s.replace("\n- [x] (AI) `servertest` · `stmtread_a_check`", "\n- (AI) `servertest` · `stmtread_a_check`"))];
+  T('v504 문서·판 번호(정확 검사): FEATURES 기준 v504 (2026-11-20)·v504 절(C147 ②) · TESTLIST v504 칸 4(운영 확인 1 · 시험 화면 [x] 1 · 게이트 [x] 2) · MANUAL 관련 문서 \'제목에\' · index cliSheetDocs 분류 칸 0·안내 글 \'제목에\' · CLAUDE.md 한 줄 · sw jw-shell-v504 · 결함 사본(기준 줄·sw·FEATURES 글·MANUAL 옛 글·분류 조건 되살림·옛 안내 글·CLAUDE 줄·TESTLIST 칸) 8건 다 잡힘',
+    rQ.ok && MQ.every((v) => v === false), JSON.stringify({ r: rQ.info, mut: MQ }));
+} catch (e) { console.log('  (v504 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

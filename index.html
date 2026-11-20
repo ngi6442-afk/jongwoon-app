@@ -27479,17 +27479,18 @@
     if (!r.out && canSee("doc")) a.push({ k: "doc", h: "관련 문서 (" + cliSheetDocs(r).length + ")", tip: cliSheetDocNote(r) });   // v464(C081 ①): 셈 = 상호 열쇠 3자 이상(cliSheetDocs) — 폰 옛 [상세 ›] 창은 cliRelatedDocs 그대로
     return a;
   }
-  // 관련 문서(PC 표 펼침 — v464 C081 ①): 상호 열쇠(cliNameKey — '(주)'·'㈜'·'주식회사'·띄어쓰기·영문 대소문자 무시)가 문서 제목 열쇠 또는 분류 열쇠 안에 들어 있는 문서함 문서(지운 문서 빼고).
-  //   열쇠가 3자 미만(1·2자 상호)이면 찾지 않는다(종전 글자째 부분 일치는 1자 상호가 이름이 들어간 다른 문서를 2·3건 잡았다). 제목·분류는 따로 맞춤(둘을 이어 붙인 경계에서 생기는 엉뚱한 일치 없게).
+  // 관련 문서(PC 표 펼침 — v464 C081 ①): 상호 열쇠(cliNameKey — '(주)'·'㈜'·'주식회사'·띄어쓰기·영문 대소문자 무시)가 문서 제목 열쇠 안에 들어 있는 문서함 문서(지운 문서 빼고).
+  //   v504(C147 ②): 분류 열쇠 맞춤은 뺐다 — 문서 기록에 글자 분류 칸(category)이 없고(운영 11/20 문서함 93건 모두 번호 분류 cat) 분류 이름에는 상호가 들어가지 않아 늘 0건이었다(안내 글도 '제목에'로).
+  //   열쇠가 3자 미만(1·2자 상호)이면 찾지 않는다(종전 글자째 부분 일치는 1자 상호가 이름이 들어간 다른 문서를 2·3건 잡았다). 제목 열쇠만 본다.
   //   폰 옛 [상세 ›] 창(openCliDetail)은 cliRelatedDocs 그대로(옛 목록 글자째 유지)
   var CLI_DOC_MINKEY = 3;
   function cliSheetDocs(r){
     var k = cliNameKey(r && r.name);
     if (k.length < CLI_DOC_MINKEY || typeof documents === "undefined" || !documents) return [];
-    return documents.filter(function(d){ return d && d.del !== 1 && (cliNameKey(d.title).indexOf(k) >= 0 || cliNameKey(d.category).indexOf(k) >= 0); });
+    return documents.filter(function(d){ return d && d.del !== 1 && cliNameKey(d.title).indexOf(k) >= 0; });
   }
   // 관련 문서 찾는 법 안내(탭 title·탭 안 첫 줄·빈 안내 — v464 C081 ①)
-  function cliSheetDocNote(r){ return cliNameKey(r && r.name).length < CLI_DOC_MINKEY ? "상호가 짧아(2자 이하) 관련 문서를 찾지 않습니다 — 문서함에서 직접 찾아보세요" : "문서함 제목·분류에 상호가 들어간 문서 — '(주)'·'㈜'·'주식회사'·띄어쓰기는 무시합니다"; }
+  function cliSheetDocNote(r){ return cliNameKey(r && r.name).length < CLI_DOC_MINKEY ? "상호가 짧아(2자 이하) 관련 문서를 찾지 않습니다 — 문서함에서 직접 찾아보세요" : "문서함 제목에 상호가 들어간 문서 — '(주)'·'㈜'·'주식회사'·띄어쓰기는 무시합니다"; }
   // 고른 하위 탭 — 다른 줄을 펼치면 첫 탭(개요)으로 · 권한이 바뀌어 없는 탭이면 첫 탭(메모리만)
   function cliSheetTabOf(r, tabs){
     var id = String(r.id), ok = function(k){ return tabs.some(function(t){ return t.k === k; }); };
