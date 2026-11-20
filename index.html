@@ -31290,6 +31290,11 @@ function dutyStage(nx){
   // v366(PM 9/18 재발방지): 잠정 = 배출자 확정등록이 없는 인계서 — 예약만 있고 실행 전(예약 밀림)일 수 있다. 검은 숫자가 실행 운행으로 읽히던 것(9/11·9/17)을 막는다.
   var AB_PEND_HINT = "배출자 확정등록이 아직 없는 인계서 — 예약만 있고 실행 전(예약 밀림)일 수 있습니다. 올바로 실적에 없으면 예약이 밀린 것이고, 실행되면 재수집에서 그 날짜로 자동 이동합니다. 이 날 회수에는 세어져 있습니다. 인계번호로 올바로에서 확인:";
   function abPendList(c){
+    if (c && c._parts){   // C244: 표에서 합친 줄 — 원 묶음(상·하차지·품목)마다 모으되 같은 조합은 한 번만
+      var got = {}, acc = [];
+      c._parts.forEach(function(p){ var pk = String(p.from || "") + "|" + String(p.to || "") + "|" + String(p.item || ""); if (got[pk]) return; got[pk] = 1; acc = acc.concat(abPendList(p)); });
+      return acc;
+    }
     var d = abDay.data || {}, L = Array.isArray(d.pending) ? d.pending : [], out = [], i, p;
     for (i = 0; i < L.length; i++){ p = L[i]; if (!p) continue;
       if (c && (String(p.from || "") !== String(c.from || "") || String(p.to || "") !== String(c.to || "") || String(p.item || "") !== String(c.item || ""))) continue;
@@ -31363,21 +31368,23 @@ function dutyStage(nx){
     var d = abDay.data || {};
     var counts = Array.isArray(d.counts) ? d.counts : [];
     var raw = Array.isArray(d.unmatched) ? d.unmatched : [];
-    var out = [], seen = {}, reason = {}, i, k;
+    // C244: 같은 상·하차지·품목 묶음이 둘 이상(차량 종류로 갈린 묶음)이면 건너뛰지 않고 회수를 더한다 — 목록 합 = 합계줄 '미배정 n회'.
+    //   지정 키는 학습과 같은 from|to|item 그대로. unmatched[]는 counts에 없는 조합만 보태고, 그 안의 같은 조합끼리도 더한다.
+    var out = [], at = {}, src = {}, reason = {}, i, k;
     for (i = 0; i < raw.length; i++){ if (raw[i]) reason[abUnmKey(raw[i])] = raw[i].reason || raw[i].code || ""; }
     for (i = 0; i < counts.length; i++){
       var c = counts[i];
       if (!c || c.route) continue;
       k = abUnmKey(c);
-      if (seen[k]) continue;
-      seen[k] = 1;
+      if (at[k] !== undefined){ out[at[k]].n += abInt(c.n); continue; }
+      at[k] = out.length; src[k] = "c";
       out.push({ from: c.from || "", to: c.to || "", item: c.item || "", n: abInt(c.n), reason: reason[k] || "", key: k });
     }
     for (i = 0; i < raw.length; i++){
       var u = raw[i]; if (!u) continue;
       k = abUnmKey(u);
-      if (seen[k]) continue;
-      seen[k] = 1;
+      if (at[k] !== undefined){ if (src[k] === "u") out[at[k]].n += abInt(u.n); continue; }
+      at[k] = out.length; src[k] = "u";
       out.push({ from: u.from || "", to: u.to || "", item: u.item || "", n: abInt(u.n), reason: u.reason || u.code || "", key: k });
     }
     return out;
@@ -31707,7 +31714,7 @@ function dutyStage(nx){
   //   '숨김 해제 필요' 배지로 다시 드러낸다(데이터 손실 방지) ③ 관리자에겐 빈 줄마다 작은 [숨김] 버튼. 반환 {html, hiddenN(숨긴 줄 중 실제로 뺀 수), emptyN(토글로 뺀 수)}.
   function abSheetTableHtml(rl, rows){
     var byKey = {}, extra = { L: [], R: [] }, i, c, k, admin = abCanLearn(), emptyN = 0, hiddenN = 0;   // v386: 숨김·해제 = 관리자 + 운영부
-    for (i = 0; i < rows.length; i++){ c = rows[i]; if (!c || !c.route) continue; k = String(c.route.side || "") + "|" + c.route.row; byKey[k] = c; }
+    for (i = 0; i < rows.length; i++){ c = rows[i]; if (!c || !c.route) continue; k = String(c.route.side || "") + "|" + c.route.row; byKey[k] = byKey[k] ? abSheetMerge(byKey[k], c) : c; }   // C244: 같은 줄 묶음은 더한다(덮어쓰면 마지막 묶음만 보였다)
     function hideBtn(key){ return (admin && key) ? ' <button type="button" class="ab-hide-btn" data-ab-hide="' + esc(key) + '" title="이 줄을 운반내역 표에서 숨김(관리자·운영부) — 노선표·집계는 그대로">숨김</button>' : ""; }
     function cellN(c, hideKey){
       if (!c) return '<td class="n">' + hideBtn(hideKey) + '</td>';
@@ -31758,6 +31765,17 @@ function dutyStage(nx){
     for (i = 0; i < rows.length; i++){ c = rows[i]; if (!c || !c.route) continue; k = String(c.route.side || "") + "|" + c.route.row;
       if (!rl.some(function(r){ return r.s + "|" + r.r === k; })){ var sd = (c.route.side === "R") ? "R" : "L"; extra[sd].push(c); } }
     return { html: '<div class="ab-sheet">' + table(halves[0], "L") + table(halves[1], "R") + "</div>", hiddenN: hiddenN, emptyN: emptyN };
+  }
+  // C244(계산 검산 11/20): 같은 양식 줄(side|row)로 가는 묶음이 둘 이상이면(올바로 원문 표기·품목이 달라 서버가 따로 묶음) 회수·잠정·단위미상을 더한다
+  //   — 엑셀 generate.py가 줄 좌표별로 더하는 것(cnt[k] += n)과 같게. 원 묶음은 _parts로 남겨 잠정 인계번호(abPendList)를 묶음마다 모은다.
+  function abSheetMerge(a, b){
+    var parts = (a._parts || [a]).concat([b]), vs = [], seen = {};
+    parts.forEach(function(p){ (Array.isArray(p.variants) ? p.variants : []).forEach(function(v){ var nm = String((v && v.name) || v || ""); if (nm && !seen[nm]){ seen[nm] = 1; vs.push(v); } }); });
+    var m = { route: a.route, from: a.from, to: a.to, item: a.item, _parts: parts,
+      n: abInt(a.n) + abInt(b.n), n_pending: abInt(a.n_pending) + abInt(b.n_pending), qty_unknown: abInt(a.qty_unknown) + abInt(b.qty_unknown),
+      qty_ton: abNum(a.qty_ton) + abNum(b.qty_ton), weak: !!(a.weak || b.weak) };
+    if (vs.length) m.variants = vs;
+    return m;
   }
   // 배출자 정렬 키(엑셀 generate.py _sort_key와 같은 규칙): 공백·법인격 표기 제거 → [한글 0/그 외 1, 문자열]
   function abSortKey(name){

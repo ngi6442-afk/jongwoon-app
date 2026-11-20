@@ -20699,6 +20699,97 @@ try {
   T('v514 문서·판 번호(정확 검사): FEATURES 기준 v514 (2026-11-20)·v514 절(운반일지 줄 번호) · TESTLIST v514 칸 4(화면·운영 확인 2 · 게이트 [x] 2) · MANUAL 새 노선 폼 문장(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 3줄 한 번씩 · sw jw-shell-v514 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
     r514.ok && M514.every((v) => v === false), JSON.stringify({ r: r514.info, mut: M514 }));
 } catch (e) { console.log('  (v514 검사 생략 — ' + e.message + ')'); fails++; }
+// ── C244(계산 검산 11/20 — 운반일지·수량 집계): 실제 함수를 떼어 실행(index.html abSheetTableHtml·abSheetMerge·abPendList·abUnmatchedList·abTotals + 워커 abSummary)
+//   ① 같은 양식 줄로 가는 묶음 둘 이상 = 회수·잠정·단위미상을 더함(엑셀 generate.py cnt[k] += n과 같게) ② 미매칭 목록은 같은 상·하차지·품목 묶음(차량 분리분)을 더함 = 합계줄 '미배정 n회'
+//   ③ 자동 상신 본문 '합계 n회·톤' = 배정분만(화면 abTotals와 같은 규칙) · '오늘'은 인자(todayStr 대역) · 무작위 2만 건 불변식 · 결함 사본 11개
+try {
+  const vm244 = createRequire(import.meta.url)('vm');
+  const W244 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-allbaro-run-background.js'), 'utf8');
+  const fn244 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음 ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('끝 없음 ' + name); };
+  const vl244 = (src, nm) => { const m = src.match(new RegExp('\\n\\s*var ' + nm + ' = [^\\n]*;')); if (!m) throw new Error('var 없음 ' + nm); return m[0]; };
+  const AFN244 = ['esc', 'abInt', 'abNum', 'abTonTxt', 'abRowEmpty', 'abPendList', 'abPendAge', 'abPendInfo', 'abTotals', 'abTotalsText', 'abUnmKey', 'abUnmatchedList', 'abAutoRows', 'abVariantHtml', 'abSheetMerge', 'abSheetTableHtml', 'abSortKey'];
+  const load244 = (H, W, today) => {
+    let code = vl244(H, 'AB_PEND_STALE_DAYS') + vl244(H, 'AB_PEND_HINT') + '\n';
+    AFN244.forEach((n) => { code += fn244(H, n) + '\n'; });
+    code += fn244(W, 'unmatchedCount') + '\n' + fn244(W, 'abSummary') + '\n';
+    const ctx = { abDay: { data: null, loading: false }, abManual: { items: [] }, abHideEmpty: false, abCanLearn: () => false, todayStr: () => today };
+    vm244.createContext(ctx); vm244.runInContext(code, ctx); return ctx;
+  };
+  const RL244 = [{ s: 'L', r: 5, f: '가상상사', t: '가상처리', i: '분진' }, { s: 'L', r: 6, f: '나라공업', t: '가상처리', i: '슬러지' }, { s: 'R', r: 5, f: '다온산업', t: '가상매립', i: '광재' }];
+  const RT244 = { 'L|5': { side: 'L', row: 5, count_col: 5, item: '분진' }, 'L|6': { side: 'L', row: 6, count_col: 5, item: '슬러지' }, 'R|5': { side: 'R', row: 5, count_col: 11, item: '광재' } };
+  const cells244 = (h) => { const out = {}; const re = /<tr[^>]*><td>([^<]*)<\/td><td>([^<]*)<\/td><td>([^<]*)([\s\S]*?)<\/td><td class="n">([\s\S]*?)<\/td><\/tr>/g; let m;
+    while ((m = re.exec(h))) { const v = m[5].replace(/<button[\s\S]*?<\/button>/g, ''); const num = (v.match(/^(?:<span class="ab-n-pend"[^>]*>)?(\d+)(\?)?/) || []);
+      out[m[1]] = { n: num[1] ? Number(num[1]) : 0, q: !!num[2], sub: (v.match(/<span class="sub[^"]*">([^<]*)<\/span>/) || [])[1] || '', item: m[4], raw: v }; } return out; };
+  const B244 = (from, item, n, rt, x) => Object.assign({ from: from, to: '가상처리', item: item, n: n, qty_ton: n, qty_unknown: 0, n_pending: 0, route: rt ? RT244[rt] : null, weak: false }, x || {});
+  const doc244 = (counts, pending) => ({ counts: counts, pending: pending || [], qty_unknown: counts.reduce((s, c) => s + (c.qty_unknown || 0), 0), total: counts.reduce((s, c) => s + c.n, 0),
+    total_qty_ton: counts.reduce((s, c) => s + c.qty_ton, 0), unmatched: counts.filter((c) => !c.route).map((c) => Object.assign({ from: c.from, to: c.to, item: c.item, n: c.n, reason: c.reason || 'NO_ROUTE' }, c.vehicle_type ? { vehicle_type: c.vehicle_type } : {})) });
+  const run244 = (X, d) => { X.abDay.data = d; const t = X.abTotals(); const u = X.abUnmatchedList(); return { c: cells244(X.abSheetTableHtml(RL244, X.abAutoRows()).html), t: t, txt: X.abTotalsText(), u: u, us: u.reduce((s, v) => s + v.n, 0), w: X.abSummary(d) }; };
+  const head244 = (s) => (String(s).match(/^합계 \d+회 · (?:[\d.]+톤|톤 미집계)(?: · 미배정 \d+회)?/) || [''])[0];
+  const chk244 = (H, W) => {
+    const X = load244(H, W, '2026-11-20'), bad = [];
+    const eq = (nm, a, b) => { if (JSON.stringify(a) !== JSON.stringify(b)) bad.push(nm + ' ' + JSON.stringify(a) + '≠' + JSON.stringify(b)); };
+    // A 표기만 다른 두 묶음 1+1(검토자 최소 입력) — 표 L5 2 = 합계 2 · 표기 변형 칩은 합친 줄에 남음
+    let r = run244(X, doc244([B244('가상상사', '분진', 1, 'L|5'), B244('(주)가상상사', '분진', 1, 'L|5', { variants: ['(주)가상상사'] })]));
+    eq('A 칸', r.c['가상상사'].n, 2); eq('A 합계', r.txt, '합계 2회 · 2톤'); eq('A 칩', r.c['가상상사'].item.indexOf('표기 변형 (주)가상상사') > 0, true);
+    // B 3+1 — 정렬 순서와 무관하게 4
+    r = run244(X, doc244([B244('가상상사', '분진', 3, 'L|5'), B244('(주)가상상사', '분진', 1, 'L|5')])); eq('B 칸', r.c['가상상사'].n, 4);
+    // C 확정 2 + 잠정·단위미상 1 = 검은 3(전부 잠정 아님) + 잠정 1·단위미상 작은 글씨
+    r = run244(X, doc244([B244('가상상사', '분진', 2, 'L|5'), B244('가상상사', '분진(고상)', 1, 'L|5', { qty_ton: 0, qty_unknown: 1, n_pending: 1, weak: true })], [{ manf: 'M1', from: '가상상사', to: '가상처리', item: '분진(고상)', state: '운반중', date: '20261117' }]));
+    eq('C 칸', [r.c['가상상사'].n, r.c['가상상사'].q, /^잠정 1\(예약 미실행 가능 · 미확정 · 3일\+ 1\) · 품목확인 · 단위미상$/.test(r.c['가상상사'].sub)], [3, false, true]);
+    // D 두 묶음 다 잠정 = 붉은 '2?' · 인계번호 둘 다 안내 · 앞 묶음의 단위미상·품목확인도 남음
+    r = run244(X, doc244([B244('가상상사', '분진', 1, 'L|5', { n_pending: 1, qty_unknown: 1, weak: true }), B244('나가상상사', '분진', 1, 'L|5', { n_pending: 1 })],
+      [{ manf: 'M1', from: '가상상사', to: '가상처리', item: '분진', date: '20261119' }, { manf: 'M2', from: '나가상상사', to: '가상처리', item: '분진', date: '20261119' }]));
+    eq('D 칸', [r.c['가상상사'].n, r.c['가상상사'].q, r.c['가상상사'].sub, r.c['가상상사'].raw.indexOf('인계번호 M1') > 0 && r.c['가상상사'].raw.indexOf('인계번호 M2') > 0], [2, true, '잠정 2(예약 미실행 가능 · 미확정) · 품목확인 · 단위미상', true]);
+    // E 다른 줄은 그대로
+    r = run244(X, doc244([B244('가상상사', '분진', 1, 'L|5'), B244('나라공업', '슬러지', 2, 'L|6')])); eq('E 칸', [r.c['가상상사'].n, r.c['나라공업'].n, r.c['다온산업'].n], [1, 2, 0]);
+    // F 미매칭 차량 분리 2묶음(n=2 차량 미상 · n=1 카고) = 목록 1종 3회 = 합계줄 미배정 3회 · 지정 키 from|to|item
+    r = run244(X, doc244([B244('가상제강', '분진', 2, null, { reason: 'AMBIGUOUS' }), B244('가상제강', '분진', 1, null, { reason: 'AMBIGUOUS', vehicle_type: '카고' })]));
+    eq('F 목록', [r.u.length, r.us, r.t.unmN, r.u[0].key, r.u[0].reason], [1, 3, 3, '가상제강|가상처리|분진', 'AMBIGUOUS']);
+    // G counts에 없는 unmatched[]끼리 같은 조합 = 더함 · H counts와 같은 조합의 unmatched[] = 두 번 안 셈
+    X.abDay.data = { counts: [], unmatched: [{ from: '가', to: '나', item: '다', n: 1 }, { from: '가', to: '나', item: '다', n: 2 }] }; eq('G 목록', X.abUnmatchedList().map((u) => u.n), [3]);
+    X.abDay.data = { counts: [B244('가', '다', 2, null)], unmatched: [{ from: '가', to: '가상처리', item: '다', n: 2 }] }; eq('H 목록', X.abUnmatchedList().map((u) => u.n), [2]);
+    // I 배정 2(2톤) + 미매칭 1(1톤) — 결재 본문 = 화면 / J 미매칭만 / K counts 없는 옛 문서 = 종전 total / L 배정 톤 0 = '0톤'
+    r = run244(X, doc244([B244('가상상사', '분진', 2, 'L|5'), B244('없는곳', '분진', 1, null)])); eq('I 본문', [r.w, head244(r.txt)], ['합계 2회 · 2톤 · 미배정 1회', '합계 2회 · 2톤 · 미배정 1회']);
+    r = run244(X, doc244([B244('없는곳', '분진', 1, null)])); eq('J 본문', [r.w, head244(r.txt)], ['합계 0회 · 톤 미집계 · 미배정 1회', '합계 0회 · 톤 미집계 · 미배정 1회']);
+    eq('K 옛 문서', X.abSummary({ total: 3, total_qty_ton: 1.5 }), '합계 3회 · 1.5톤');
+    r = run244(X, doc244([B244('가상상사', '분진', 1, 'L|5', { qty_ton: 0, qty_unknown: 1 })])); eq('L 톤 0', [r.w, head244(r.txt)], ['합계 1회 · 0톤 · 단위미상 1건', '합계 1회 · 0톤']);
+    // 무작위 2만 건(씨앗 고정): 표 칸 = 그 줄 묶음 n 합 · 표 칸 합 = 자동분 · 목록 합 = 미배정 · 결재 본문 머리 = 화면 머리
+    let seed = 2441120; const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; }; const pk = (a) => a[Math.floor(rnd() * a.length)];
+    let rb = 0; const ex = [];
+    for (let k = 0; k < 20000; k++) {
+      const cs = [], L = 1 + Math.floor(rnd() * 6);
+      for (let j = 0; j < L; j++) { const n = 1 + Math.floor(rnd() * 4), np = Math.floor(rnd() * (n + 1)) * (rnd() < 0.4 ? 1 : 0), un = rnd() < 0.2 ? 1 : 0;
+        const c = B244(pk(['가상상사', '(주)가상상사', '나라공업', '가상제강']), pk(['분진', '분진(고상)', '슬러지']), n, pk(['L|5', 'L|5', 'L|6', 'R|5', null]), { qty_ton: Math.round(rnd() * 30000) / 1000, qty_unknown: un, n_pending: np });
+        if (rnd() < 0.3) c.vehicle_type = pk(['카고', '덤프']); cs.push(c); }
+      const d = doc244(cs); const q = run244(X, d), e = [];
+      ['L|5', 'L|6', 'R|5'].forEach((rk, ri) => { const want = cs.filter((c) => c.route && c.route.side + '|' + c.route.row === rk).reduce((s, c) => s + c.n, 0); const got = (q.c[RL244[ri].f] || {}).n || 0; if (got !== want) e.push(rk + ' ' + got + '≠' + want); });
+      const sumC = Object.keys(q.c).reduce((s, x) => s + q.c[x].n, 0); if (sumC !== q.t.autoN) e.push('칸합 ' + sumC + '≠' + q.t.autoN);
+      if (q.us !== q.t.unmN) e.push('목록 ' + q.us + '≠' + q.t.unmN);
+      if (head244(q.w) !== head244(q.txt)) e.push('본문 ' + head244(q.w) + '≠' + head244(q.txt));
+      if (e.length) { rb++; if (ex.length < 2) ex.push(e.join('/')); }
+    }
+    if (rb) bad.push('무작위 ' + rb + ' ' + ex.join(' | '));
+    return { ok: bad.length === 0, info: bad.slice(0, 6) };
+  };
+  const r244 = chk244(html, W244);
+  T('C244 ① 운반내역 표·미매칭 목록·자동 상신 본문(실행 — 실제 abSheetTableHtml·abSheetMerge·abPendList·abUnmatchedList·abTotals·워커 abSummary): 같은 줄 묶음 1+1 = 2·3+1 = 4(엑셀과 같게)·확정 2+잠정 1 = 검은 3·둘 다 잠정 = 붉은 2?·인계번호 둘 다·표기 변형 칩 유지 · 미매칭 차량 분리 2+1 = 1종 3회 = 합계줄 미배정 3회 · 결재 본문 = 화면(배정 2·미배정 1 → 합계 2회 · 미배정만 → 합계 0회 · 옛 문서 = 종전) · 무작위 2만 건 불변식(칸 = 줄 묶음 합·칸 합 = 자동분·목록 합 = 미배정·본문 머리 = 화면 머리)', r244.ok, JSON.stringify(r244.info));
+  const MU244 = [
+    ['H', 'byKey[k] = byKey[k] ? abSheetMerge(byKey[k], c) : c;', 'byKey[k] = c;', '덮어쓰기(고치기 전)'],
+    ['H', 'n: abInt(a.n) + abInt(b.n)', 'n: abInt(b.n)', '회수 안 더함'],
+    ['H', 'n_pending: abInt(a.n_pending) + abInt(b.n_pending)', 'n_pending: abInt(b.n_pending)', '잠정 안 더함'],
+    ['H', 'qty_unknown: abInt(a.qty_unknown) + abInt(b.qty_unknown)', 'qty_unknown: abInt(b.qty_unknown)', '단위미상 안 더함'],
+    ['H', 'weak: !!(a.weak || b.weak)', 'weak: !!b.weak', '품목확인 앞 묶음 버림'],
+    ['H', '    if (vs.length) m.variants = vs;\n', '', '표기 변형 버림'],
+    ['H', 'if (c && c._parts){', 'if (false){', '잠정 인계번호 한 묶음만'],
+    ['H', 'if (at[k] !== undefined){ out[at[k]].n += abInt(c.n); continue; }', 'if (at[k] !== undefined){ continue; }', '미매칭 둘째 묶음 버림(고치기 전)'],
+    ['H', 'if (at[k] !== undefined){ if (src[k] === "u") out[at[k]].n += abInt(u.n); continue; }', 'if (at[k] !== undefined){ out[at[k]].n += abInt(u.n); continue; }', 'unmatched[] 두 번 셈'],
+    ['H', 'if (at[k] !== undefined){ if (src[k] === "u") out[at[k]].n += abInt(u.n); continue; }', 'if (at[k] !== undefined){ continue; }', 'unmatched[]끼리 안 더함'],
+    ['W', '      if (!c || !c.route) continue;\n      const v = Math.round(Number(c.n));', '      if (!c) continue;\n      const v = Math.round(Number(c.n));', '본문에 미배정 포함(고치기 전)'],
+    ['W', 'ton += c.qty_ton; tonSeen = true;', 'ton += c.qty_ton;', '본문 톤 미집계로'],
+  ];
+  const kill244 = MU244.map(([w, a, b, nm]) => { const S = w === 'H' ? html : W244; if (S.split(a).length !== 2) return 'err 자리 ' + nm; const M = S.replace(a, () => b); try { return !(w === 'H' ? chk244(M, W244) : chk244(html, M)).ok; } catch (e) { return true; } });
+  T('C244 ② 결함 사본 ' + MU244.length + '개(' + MU244.map((x) => x[3]).join('·') + ') = 모두 ✗', kill244.every((v) => v === true), JSON.stringify(kill244.map((v, i) => v === true ? '' : MU244[i][3] + ':' + v).filter(Boolean)));
+} catch (e) { console.log('  (C244 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ── v515(29 판⑪ — 폰에서 닫음): 실행 검사는 위 '29 판⑪ ③-11' · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '515 이상'으로 풀 것
 try {

@@ -215,12 +215,26 @@ const APPR_KEY = 'col:approvals';   // gw-data colKey('approvals')와 동일 키
 
 // 일자 blob(schema 2)에서 상신 본문 요약 — 클라 abTotalsText와 같은 결. 수기 보충분(abManual)은
 // 서버가 모르므로 자동 수집분만 싣는다(명세: 서버에서 만들 수 있는 만큼만).
+// C244(계산 검산 11/20): '합계 n회·톤'은 양식 줄에 배정된 묶음만 더한다(미배정은 아래 '미배정 n회'로 따로) — 앱 abTotals와 같은 규칙.
+//   종전엔 d.total·d.total_qty_ton(미배정 포함)을 써서 미배정이 있는 날 화면·수동 상신과 숫자가 달랐다. counts가 없는 옛 문서만 종전 값.
 function abSummary(d) {
-  const total = Number(d.total) || 0;
-  let s = '합계 ' + total + '회';
-  const qty = Number(d.total_qty_ton);
-  if (Number.isFinite(qty) && qty > 0) s += ' · ' + (Math.round(qty * 1000) / 1000) + '톤';
-  else s += ' · 톤 미집계';
+  let s;
+  if (Array.isArray(d.counts)) {
+    let n = 0, ton = 0, tonSeen = false;
+    for (const c of d.counts) {
+      if (!c || !c.route) continue;
+      const v = Math.round(Number(c.n));
+      if (Number.isFinite(v) && v > 0) n += v;
+      if (typeof c.qty_ton === 'number' && Number.isFinite(c.qty_ton)) { ton += c.qty_ton; tonSeen = true; }
+    }
+    s = '합계 ' + n + '회' + (tonSeen ? ' · ' + (Math.round(ton * 1000) / 1000) + '톤' : ' · 톤 미집계');
+  } else {
+    const total = Number(d.total) || 0;
+    s = '합계 ' + total + '회';
+    const qty = Number(d.total_qty_ton);
+    if (Number.isFinite(qty) && qty > 0) s += ' · ' + (Math.round(qty * 1000) / 1000) + '톤';
+    else s += ' · 톤 미집계';
+  }
   const un = unmatchedCount(d.unmatched);
   if (un > 0) s += ' · 미배정 ' + un + '회';
   const unk = Number(d.qty_unknown);
@@ -292,6 +306,7 @@ async function regenAfterCollect(st, rec, mode, saved, log) {
   } catch (e) { return null; }
 }
 exports.regenAfterCollect = regenAfterCollect;
+exports.abSummary = abSummary;   // C244 검사용(자동 상신 본문 합계 = 화면 규칙)
 exports.opsPmIds = opsPmIds; exports.notifyPendingAndVariants = notifyPendingAndVariants; exports.PEND_KEY = PEND_KEY; exports.VAR_KEY = VAR_KEY;   // v366 검사용
 exports.handler = async function (event, context) {
   let st = null, job = '', rec = null;

@@ -3145,6 +3145,14 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   await wk.regenAfterCollect(stW, recC, 'collect', [{ day: kd(0) }], []); await wk.regenAfterCollect(stW, recD, 'inspect', [{ day: kd(0) }], []); await wk.regenAfterCollect(stW, { status: 'done' }, 'collect', [], []);
   T('⑥ 워커 regenAfterCollect: 성공·저장 9일 → dispatch 1회 days_back 10 · rec.regen.state requested · 로그 "[엑셀] 재생성 요청 접수" / 2분 안 두 번째 → 보류(state skipped, 로그 "보류") / 실패·inspect·저장 0건 → 요청 없음',
     calls.length === n0 + 1 && calls[calls.length - 1].body.inputs.days_back === '10' && recA.regen.state === 'requested' && /\[엑셀\] 재생성 요청 접수 · 소급 9일/.test(logA.join()) && recB.regen.state === 'skipped' && /보류/.test(logB.join()) && !recC.regen && !recD.regen, JSON.stringify([calls.length - n0, recA.regen, recB.regen, logA, logB]));
+  // C244(계산 검산 11/20): 자동 상신 본문 '합계 n회·톤' = 양식 줄에 배정된 묶음만(미배정은 '미배정 n회'로 따로 — 화면 abTotals와 같은 규칙) · counts 없는 옛 문서만 종전 total
+  const cs244 = [{ from: '가', to: '나', item: '다', n: 2, qty_ton: 2.25, route: { side: 'L', row: 5 } }, { from: '라', to: '나', item: '다', n: 1, qty_ton: 1, route: null }];
+  const s244 = [wk.abSummary({ total: 3, total_qty_ton: 3.25, counts: cs244, unmatched: [{ from: '라', to: '나', item: '다', n: 1 }], pending: [], qty_unknown: 0 }),
+    wk.abSummary({ total: 1, total_qty_ton: 1, counts: [cs244[1]], unmatched: [{ from: '라', to: '나', item: '다', n: 1 }] }),
+    wk.abSummary({ total: 2, total_qty_ton: 2.25, counts: [cs244[0]], qty_unknown: 1, pending: [{ manf: 'x' }] }),
+    wk.abSummary({ total: 3, total_qty_ton: 1.5 })];
+  T('C244 워커 abSummary(실행): 배정 2(2.25톤)+미배정 1 → "합계 2회 · 2.25톤 · 미배정 1회"(종전 3회·3.25톤) · 미배정만 → "합계 0회 · 톤 미집계 · 미배정 1회" · 배정만 = 종전 그대로 · counts 없는 옛 문서 = total',
+    JSON.stringify(s244) === JSON.stringify(['합계 2회 · 2.25톤 · 미배정 1회', '합계 0회 · 톤 미집계 · 미배정 1회', '합계 2회 · 2.25톤 · 단위미상 1건 · 잠정 1회', '합계 3회 · 1.5톤']), JSON.stringify(s244));
   const wsrc = require('fs').readFileSync(join(FN, 'gw-allbaro-run-background.js'), 'utf8');
   T('⑥ 워커 호출 위치: rec.status 판정 직후 · 잡 블롭 저장 전 await regenAfterCollect(st, rec, mode, saved, log)', /rec\.status = \(r && r\.ok && !writeFail\) \? 'done' : 'fail';[\s\S]{0,300}await regenAfterCollect\(st, rec, mode, saved, log\);[\s\S]{0,800}await blobSet\(st, jobKey\(job\), rec\);/.test(wsrc), '');
   const asrc = require('fs').readFileSync(join(FN, 'gw-allbaro.js'), 'utf8');
