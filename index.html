@@ -33015,6 +33015,15 @@ function dutyStage(nx){
   }
 
   // ---- 인사 탭(대표·관리자 전용): 부서별 직원 명부 ----
+  // C185 판3 좁은 재확인: [인사 카드](taskHrCardOpen)가 맡긴 열 카드 id — 명부 읽기 응답(성공·실패 응답·통신 실패)에서 한 번 쓰고 비움. 맡긴 것이 없으면 종전처럼 그리기만
+  var hrPendOpen = null;
+  function hrOpenPending(){
+    var po = hrPendOpen; hrPendOpen = null;
+    if (po == null){ drawHrRoster(); return; }
+    if (hrOpenId != null) hrCollapse();   // 다시 그리기(innerHTML)가 열린 편집 폼을 지우지 않게 먼저 홀더로
+    drawHrRoster(po);   // 대상이 퇴사자·시험 계정이면 그 묶음을 이 화면에서만 펼쳐 엶(저장 뒤 다시 여는 길과 같음)
+    var el = document.querySelector('[data-hr-toggle="' + String(po).replace(/["\\]/g, "") + '"]'); if (el && el.scrollIntoView) el.scrollIntoView({ block: "start" });
+  }
   function renderHrRoster(){
     var host = document.getElementById("hrRoster");
     if (!host || !isAdmin()) return;
@@ -33022,8 +33031,8 @@ function dutyStage(nx){
     host.innerHTML = '<div class="loading">불러오는 중…</div>';
     gwCall("gw-auth", { action: "member_list" }).then(function(res){
       if (res.status === 200 && res.body && Array.isArray(res.body.members)) members = res.body.members;
-      drawHrRoster();
-    });
+      hrOpenPending();   // C185 판3 좁은 재확인: 맡긴 카드가 있으면 그 카드를 열며 그림 · 없으면 종전 drawHrRoster()
+    }).catch(function(){ if (hrPendOpen != null) hrOpenPending(); });   // 통신 실패 = 맡긴 카드만 지금 명부로 엶(맡긴 것이 없으면 종전 그대로)
   }
   // 퇴사자 그룹 펼침은 기기별로 기억(운반일지 빈 줄 토글 AB_HIDE_EMPTY_KEY와 같은 방식). 기본 접힘.
   var HR_RET_OPEN_KEY = "jw_hr_ret_open";
@@ -33202,6 +33211,7 @@ function dutyStage(nx){
     })).then(function(){
       try{ saveUsersCache(); }catch(e){}
       if (btn){ btn.disabled=false; btn.textContent="인사업무 시작 ▶"; }
+      if (hrOpenId != null) hrCollapse();   // C185 판3 좁은 재확인(전수): 카드를 연 채 시작해도 다시 그리기가 편집 폼을 지우지 않게
       drawHrRoster(); render();
       alert("인사업무를 시작했습니다. 오늘부터 잔여 연차가 계산됩니다.");
     });
@@ -33231,9 +33241,9 @@ function dutyStage(nx){
   // C185 판2: 지시 펼침 [인사 카드] — 인사 탭으로 가서 그 직원 카드를 펼침(카드가 그려진 뒤 · 없는 회원이면 탭만)
   function taskHrCardOpen(mid){
     if (!isAdmin()) return;   // 인사 탭 = 관리자 전용(applyPerms)
+    // C185 판3 좁은 재확인(원천): 열 카드를 맡겨 두고 인사 탭의 명부 읽기가 끝난 뒤 그 자리(hrOpenPending)에서 엶 — 시간(300ms)에 기대면 늦게 온 명부 응답의 다시 그리기가 편집 폼을 지웠음
+    hrPendOpen = String(mid);
     switchTab("hr");
-    // C185 판3 검토 반영 1: 저장 뒤 다시 여는 길과 같게(대상이 퇴사자·시험 계정이면 그 묶음을 이 화면에서만 펼침 · 기억값 그대로) — 열린 편집 폼이 다시 그리기에 지워지지 않게 먼저 접음
-    setTimeout(function(){ hrCollapse(); drawHrRoster(mid); var el = document.querySelector('[data-hr-toggle="' + String(mid).replace(/["\\]/g, "") + '"]'); if (el && el.scrollIntoView) el.scrollIntoView({ block: "start" }); }, 300);
   }
   function hrToggle(id){
     if (hrOpenId === id){ hrCollapse(); return; }
@@ -34797,7 +34807,7 @@ function dutyStage(nx){
       if (m.ready !== true) st = "준비 중" + (cur === "off" ? "(꺼짐)" : "");
       else st = cur === "live" ? "켜짐" + (evrMd(since[k]) ? " · 켠 날 " + evrMd(since[k]) : "") : (cur === "off" ? "꺼짐" : "연습");
       if (m.ready === true && cur !== "off") line = '<br><span style="color:var(--sub);">' + esc(s && s.mode && s.mode !== cur ? (cur === "live" ? "켠 뒤 첫 집계 전(다음 평일 08:10 정기업무 봇 뒤에 채워짐)." : "바꾼 뒤 첫 집계 전(다음 평일 08:10 정기업무 봇 뒤에 채워짐).") : evrSumTxt(s)) + '</span>';   // 검토 G: 켠 직후엔 연습 때 글 대신
-      if (m.ready === true && cur !== "off" && s && s.ready === false) line = '<br><span style="color:var(--sub);">아직 연습 집계가 없습니다(다음 평일 08:10 정기업무 봇 뒤에 보입니다).</span>';   // C185 판3 검토 반영 5: 규칙이 준비된 뒤 첫 집계 전 — 남아 있는 옛 요약(준비 중)을 그대로 보이지 않음
+      if (m.ready === true && cur !== "off" && s && s.ready === false) line = '<br><span style="color:var(--sub);">' + (cur === "live" ? "켠 뒤 첫 집계 전(다음 평일 08:10 정기업무 봇 뒤에 보입니다)." : "아직 연습 집계가 없습니다(다음 평일 08:10 정기업무 봇 뒤에 보입니다).") + '</span>';   // C185 판3 검토 반영 5: 규칙이 준비된 뒤 첫 집계 전 — 남아 있는 옛 요약(준비 중)을 그대로 보이지 않음
       if (m.ready === true && cur === "live" && !s) line = '<br><span style="color:var(--sub);">켠 뒤 첫 집계 전(다음 평일 08:10 정기업무 봇 뒤에 채워짐).</span>';   // C185 판2(ⓙ 6): 켜졌는데 연습 요약 문서가 없음 = '아직 연습 집계가 없습니다' 대신
       if (cur === "live") act = cw ? '<br><button type="button" class="mini-btn" data-evr-set="' + esc(k) + ':dry">연습으로</button> <button type="button" class="mini-btn" data-evr-set="' + esc(k) + ':off">끄기</button>' : ' <span class="pc-who">바꾸실 분: PM</span>';
       return '<li><b>' + esc(m.label || "자동 지시 규칙") + '</b> — ' + esc(st) + line + act + '</li>';
