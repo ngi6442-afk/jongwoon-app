@@ -12,6 +12,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const html = readFileSync(join(ROOT, 'index.html'), 'utf8');
 const gwd = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8') + '\n' + readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'docscope.js'), 'utf8');   // v424 문서함 판정은 _lib/docscope.js로 옮김
 const auth = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-auth.js'), 'utf8');
+// C280(11/20): 앱 날짜 칸 도우미(index.html @date-field 구간 원문)를 전역에 둔다 — 저장 함수 원문을 떼어 new Function으로 돌리는 옛 시험 틀들이 dateFieldRead를 찾게(틀마다 고치지 않음)
+{ const a = html.indexOf('// @date-field-start'), b = html.indexOf('// @date-field-end'); if (a >= 0 && b > a) (0, eval)(html.slice(a, b)); }
 
 let fails = 0;
 const T = (name, ok, note) => { console.log((ok ? '  ✓ ' : '  ✗ ') + name + (ok ? '' : ' — ' + note)); if (!ok) fails++; };
@@ -21079,5 +21081,167 @@ try {
     r520.ok && M520.every((v) => v === false), JSON.stringify({ r: r520.info, mut: M520 }));
 } catch (e) { console.log('  (v520 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ── C280(날짜 칸 읽기 도우미 — 「원천」): 덜 채운 날·없는 날(값 빈 글자 + validity.badInput)·연도 6자리를 '비움'으로 읽어 기존 날짜를 지우던 저장 자리 전부가 dateFieldRead로 읽는지 실행 검사
+//   자리마다 실제 함수 원문을 떼어 가짜 DOM(값 빈 글자 + badInput)으로 돌림 → 저장 요청 0 · 안내 1 · 창 그대로 · 결함 사본(그 함수 안의 dateFieldRead( 를 옛 `.value` 읽기로 되돌림)은 저장까지 가서 잡힘
+try {
+  const fnC = (name) => { const i = html.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < html.length; j++) { const ch = html[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html.slice(i, j + 1); } } throw new Error('중괄호 짝: ' + name); };
+  const helper = (() => { const a = html.indexOf('// @date-field-start'), b = html.indexOf('// @date-field-end'); if (a < 0 || b < a) throw new Error('@date-field 구간 없음'); return html.slice(a, b); })();
+  const run = (fns, call, cfg, defect) => {
+    const calls = [], alerts = [];
+    const mkCL = () => { const s = new Set(); return { add: (c) => s.add(c), remove: (c) => s.delete(c), contains: (c) => s.has(c), toggle: (c, f) => { const on = f === undefined ? !s.has(c) : !!f; if (on) s.add(c); else s.delete(c); return on; } }; };
+    const mkEl = (id, o) => Object.assign({ id, value: '', defaultValue: '', checked: false, type: 'text', validity: { badInput: false }, style: {}, textContent: '', files: null, disabled: false, parentNode: null, tagName: 'INPUT',
+      classList: mkCL(), focus() {}, getAttribute(k) { return (this.attrs && Object.prototype.hasOwnProperty.call(this.attrs, k)) ? this.attrs[k] : null; }, querySelector() { return null; }, querySelectorAll() { return []; }, addEventListener(t, f) { (this.L = this.L || {})[t] = f; } }, o || {});
+    const E = {}; Object.keys(cfg.els || {}).forEach((id) => { E[id] = mkEl(id, cfg.els[id]); });
+    const document = { getElementById: (id) => E[id] || (E[id] = mkEl(id)), querySelector: (s) => (cfg.qs ? cfg.qs(s, E, mkEl) : null), querySelectorAll: (s) => (cfg.qsa ? cfg.qsa(s, E, mkEl) : []) };
+    const rec = (k) => (...a) => { calls.push(k); return undefined; };
+    const thenable = { then() { return thenable; }, catch() { return thenable; } };
+    const store = Object.assign({ document, alert: (m) => { alerts.push(String(m)); }, confirm: () => true, todayStr: () => '2026-11-20', setTimeout: () => 0,
+      __oldRead: (el) => ({ ok: true, v: el ? String(el.value || '') : '' }), gwCall: (...a) => { calls.push('gwCall'); return thenable; }, gwToast: (m) => { calls.push('gwToast'); alerts.push(String(m)); } }, cfg.stubs ? cfg.stubs(E, mkEl, calls) : {});
+    const P = new Proxy(store, { has: (t, k) => typeof k === 'string' && (k in t || !(k in globalThis)), get: (t, k) => (k === Symbol.unscopables ? undefined : (k in t ? t[k] : rec(k))), set: (t, k, v) => { t[k] = v; return true; } });
+    let src = fns.map((n) => { const s = fnC(n); return defect && defect.indexOf(n) >= 0 ? s.split('dateFieldRead(').join('__oldRead(') : s; }).join('\n');
+    let out, err = '';
+    try { const api = new Function('P', 'with (P) {\n' + helper + '\n' + src + '\nreturn { ' + fns.map((n) => n + ': ' + n).join(', ') + ' };\n}')(P); out = call(api, E, store); } catch (e) { err = String(e && e.message || e); }
+    return { calls, alerts, E, out, err, store };
+  };
+  const BAD = { type: 'date', value: '', validity: { badInput: true } }, Y6 = { type: 'date', value: '202612-02-01', validity: { badInput: false } };
+  const D = (v) => ({ type: 'date', value: v, defaultValue: v, validity: { badInput: false } });
+  // ① 도우미 단위
+  const H = run(['dateFieldRead'], (a) => [
+    a.dateFieldRead({ value: '', validity: { badInput: true } }), a.dateFieldRead({ value: '2026-02-31', validity: { badInput: false } }), a.dateFieldRead({ value: '202612-02-01', validity: { badInput: false } }),
+    a.dateFieldRead({ value: '', validity: { badInput: false } }), a.dateFieldRead({ value: '2026-11-20', validity: { badInput: false } }), a.dateFieldRead({ value: '1899-12-31' }), a.dateFieldRead({ value: '2100-01-01' }),
+    a.dateFieldRead(null), a.dateFieldRead({ value: '2028-02-29' }), a.dateFieldRead({ value: '2027-02-29' }), a.dateFieldRead({ value: '2026-1-5' })], {});
+  const hr = H.out || [];
+  const hOk = !H.err && hr[0].ok === false && hr[0].bad === 'input' && hr[0].why === '날짜를 끝까지, 달력에 있는 날로 넣어 주세요' && hr[1].ok === false && hr[1].bad === 'cal' && hr[2].ok === false && hr[2].bad === 'year'
+    && hr[3].ok === true && hr[3].v === '' && hr[4].ok === true && hr[4].v === '2026-11-20' && hr[5].bad === 'year' && hr[6].bad === 'year' && hr[7].ok === true && hr[7].v === ''
+    && hr[8].ok === true && hr[9].bad === 'cal' && hr[10].bad === 'form';
+  T('C280 ① 날짜 칸 도우미 dateFieldRead(실행): badInput(값 빈 글자) = 틀린 입력 "날짜를 끝까지, 달력에 있는 날로 넣어 주세요" · 2026-02-31 = 달력 · 202612-02-01(숫자 8자 이어 치기) = 연도 · 1899·2100 = 연도 · 진짜 빈칸 = 빈 값(지움) · 정상·윤일 2028-02-29 = 그대로 · 2027-02-29 = 달력 · 2026-1-5 = 꼴 · 요소 없음 = 빈 값',
+    hOk, H.err || JSON.stringify(hr));
+  // ② 자리마다(값 빈 글자 + badInput) — 저장 0 · 안내 · 창 그대로 / 결함 사본 = 저장됨
+  const SAVE = /^(schedule\w*Save|save\w*Cache|gwCall|saveMyTasks|saveDocuments|setMyTodoDue|startProcess|cbxStart|cbxContractInto|vehDueFinish|scheduleContractSave)$/;
+  const CLOSE = /^close\w*$|^vehDueClose$|Close$/;
+  const task = { id: 't1', title: 'x', due: '2026-12-15', who_id: '', status: 'open' };
+  const S = [];
+  const add = (name, fns, callName, cfg, judge) => S.push({ name, fns, callName, cfg, judge });
+  const callOf = (n, args) => (a, E, st) => a[n].apply(null, typeof args === 'function' ? args(E, st) : (args || []));
+  // 지시 수정
+  add('지시 수정 기한(saveTaskModal)', ['saveTaskModal'], callOf('saveTaskModal'), { els: { teTitle: { value: 'x' }, teDue: BAD }, stubs: () => ({ canDo: () => true, editingTaskId: 't1', findTask: () => task, getCheckedMembers: () => [], memberName: () => '' }) }, () => task.due === '2026-12-15');
+  add('지시 수정 기한 연도 6자리(saveTaskModal)', ['saveTaskModal'], callOf('saveTaskModal'), { els: { teTitle: { value: 'x' }, teDue: Y6 }, stubs: () => ({ canDo: () => true, editingTaskId: 't1', findTask: () => task, getCheckedMembers: () => [], memberName: () => '' }) }, () => task.due === '2026-12-15');
+  // 인허가
+  const lic = { id: 'l1', expiry: '2027-03-31', edu_due: '2027-01-31' };
+  const licStub = () => ({ editingLicId: 'l1', findLic: () => lic, getCheckedMembers: () => [], licenses: [] });
+  add('인허가 만료일(saveLicFromModal)', ['saveLicFromModal'], callOf('saveLicFromModal'), { els: { licName: { value: 'x' }, licExpiry: BAD, licEdu: D('2027-01-31') }, stubs: licStub }, () => lic.expiry === '2027-03-31');
+  add('인허가 교육 예정일(saveLicFromModal)', ['saveLicFromModal'], callOf('saveLicFromModal'), { els: { licName: { value: 'x' }, licExpiry: D('2027-03-31'), licEdu: BAD }, stubs: licStub }, () => lic.edu_due === '2027-01-31');
+  // 문서함
+  const doc = { id: 'd1', title: 'x', revised: '2026-05-01', cat: '05-01' };
+  add('문서 개정일(saveDocModal)', ['saveDocModal'], callOf('saveDocModal'), { els: { docTitle: { value: 'x' }, docRevised: BAD, docScope: { value: '' } }, stubs: () => ({ canDo: () => true, editingDocId: 'd1', findDoc: () => doc, isAdmin: () => true, curMember: () => ({ id: 'm1', name: 'n' }), docCatSelectGet: () => '05-01', docMajorOf: () => '05', docStatusOf: () => '등재', documents: [] }) }, () => doc.revised === '2026-05-01');
+  // 현장(석면 작업)
+  const asb = { id: 'a1', title: 'x', start: '2026-12-31', end: '2027-01-31', kind: 'asbestos' };
+  const asbStub = () => ({ asbSaveBusy: false, asbLoaded: true, asbEditId: 'a1', findAsb: () => asb, asbKindOf: () => 'asbestos', siteKind: () => 'asbestos', getCheckedMembers: () => [], asbGetCheckedWorkers: () => [], asb: [] });
+  add('현장 착공일(saveAsb)', ['saveAsb'], callOf('saveAsb'), { els: { asbTitle: { value: 'x' }, asbStart: BAD, asbEnd: D('2027-01-31') }, stubs: asbStub }, () => asb.start === '2026-12-31');
+  add('현장 종료일(saveAsb)', ['saveAsb'], callOf('saveAsb'), { els: { asbTitle: { value: 'x' }, asbStart: D('2026-12-31'), asbEnd: BAD }, stubs: asbStub }, () => asb.end === '2027-01-31');
+  // 의무 기준일
+  const duty = { no: 3, base_date: '2026-03-01', confirm: '조건부' };
+  add('의무 기준일(saveDutyFromModal — 확정 체크 아님)', ['saveDutyFromModal'], callOf('saveDutyFromModal'), { els: { dutyPreAns: { value: 'a' }, dutyBaseDate: BAD, dutyConfirmChk: { checked: false } }, stubs: () => ({ editingDutyNo: 3, findDuty: () => duty, editingDutyRk: false }) }, () => duty.base_date === '2026-03-01');
+  // 교육 이력
+  const eduStub = (ra) => () => ({ canDo: () => true, eduLoaded: true, eduBulkIds: null, isDate: (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v), eduHoursIn: () => '', eduIsRa: () => ra, eduOrgIn: () => '', eduRaTypeOk: () => true, eduNextAuto: '', edu: [], findEdu: () => null, eduEditId: null, genId: () => 'e1', eduNextFor: () => '', eduRenext: () => 0 });
+  add('교육 다음 예정(saveEdu)', ['saveEdu', 'eduRaIn'], callOf('saveEdu'), { els: { eduPerson: { value: 'member:m1' }, eduDate: D('2026-11-01'), eduKind: { value: 'regular' }, eduNext: BAD, eduNote: { value: '' } }, stubs: eduStub(false) }, () => true);
+  add('교육 평가일(saveEdu — 위험성평가 회차)', ['saveEdu', 'eduRaIn'], callOf('saveEdu'), { els: { eduPerson: { value: 'member:m1' }, eduDate: D('2026-11-01'), eduKind: { value: 'ra_join' }, eduNext: D(''), eduRaOn: BAD, eduRaType: { value: 'regular' }, eduRaUnit: { value: '' }, eduNote: { value: '' } }, stubs: eduStub(true) }, () => true);
+  // 견적
+  add('견적일(qtSaveRec·qtCollect)', ['qtSaveRec', 'qtCollect'], callOf('qtSaveRec'), { els: { qtNo: { value: 'Q-1' }, qtDate: BAD, qtTitle: { value: 'x' } }, stubs: () => ({ liveQuotes: () => [{ id: 'q1', no: 'Q-1', date: '2026-10-01' }], qtEditId: 'q1', quotes: [], renderQuotes: () => {} }) }, (r) => r.out === null);
+  // 안전 설정
+  add('안전 인정 만료일(sfSetRead → sfSetSave)', ['sfSetSave', 'sfSetRead', 'sfSetDateOk'], callOf('sfSetSave'), { els: { sfSetStage: { value: 'certified' }, sfSetExpires: BAD, sfSetChecks: { value: '' } }, stubs: () => ({ isAdmin: () => true, sfSetSaving: false, SF_SET_STAGES: ['none', 'applied', 'review', 'certified'], isDate: (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v), fmtDate: (d) => d.toISOString().slice(0, 10), sfSetBase: 1 }) }, () => true);
+  // 법인 등기
+  const crEls = (k) => { const o = { corpRegGate: { checked: true } }; ['reg_on', 'biz_fix_on', 'g2b_on'].forEach((f) => { o['corpRegIn_' + f] = f === k ? BAD : D('2026-10-01'); }); return o; };
+  const crStub = () => ({ isAdmin: () => true, corpRegSaving: false, corpRegBase: 1, CORP_REG_F: [['reg_on', '등기 접수일'], ['biz_fix_on', '사업자등록 정정일'], ['g2b_on', '나라장터 변경등록 완료일']], bidCorpGateBlocks: () => false });
+  add('법인 등기 접수일(corpRegSave)', ['corpRegSave', 'corpRegDateWhy'], callOf('corpRegSave'), { els: crEls('reg_on'), stubs: crStub }, () => true);
+  add('법인 등기 변경등록 완료일(corpRegSave)', ['corpRegSave', 'corpRegDateWhy'], callOf('corpRegSave'), { els: crEls('g2b_on'), stubs: crStub }, () => true);
+  // 직원 수정
+  const meEls = (k) => { const o = { meName: { value: '가' }, mePin: { value: '' }, meRole: { value: 'staff' }, meUid: { value: '' }, meErr: {}, meAnnual: { value: '' }, meAnnualBase: { value: '' }, meSeq: { value: '' }, meLoa: { value: '' }, meLoaChild: { value: '' } };
+    ['meBirth', 'meHire', 'meLeave'].forEach((f) => { o[f] = f === k ? BAD : D(f === 'meLeave' ? '' : '2021-08-31'); }); return o; };
+  const meStub = () => ({ editingMemberId: 'm1', ROLE_PRESET: {}, eduPersonFrom: '', cleanIdent: (s) => String(s || ''), isDev: () => false, isAdmin: () => false, EDU_QUAL: [], findMember: () => ({ id: 'm1' }), hrStarted: () => false });
+  ['meBirth', 'meHire', 'meLeave'].forEach((k) => add('직원 ' + ({ meBirth: '생년월일', meHire: '입사일', meLeave: '퇴사일' })[k] + '(saveMemberEdit)', ['saveMemberEdit'], callOf('saveMemberEdit'), { els: meEls(k), stubs: meStub }, (r) => /— 날짜를 끝까지/.test(r.E.meErr.textContent) && r.E.meErr.classList.contains('show')));
+  // 차량 수정
+  const veh = { id: 'v1', no: '12가3456', insp_due: '2027-03-31', ins_due: '2027-02-28', reg_date: '2015-05-05' };
+  const VIDS = ['vehNo', 'vehKind', 'vehInsp', 'vehIns', 'vehState', 'vehInsurer', 'vehNote', 'vehAcq', 'vehNodoc', 'vehType', 'vehOwn', 'vehPermit', 'vehDriver', 'vehCo', 'vehBiz', 'vehSize', 'vehRegDate', 'vehCeqKind', 'vehCeqYear'];
+  const vehEls = (k) => { const o = { vehNo: { value: '12가3456' }, vehInsp: D('2027-03-31'), vehIns: D('2027-02-28'), vehRegDate: D('2015-05-05') }; o[k] = BAD; return o; };
+  const vehStub = () => { const snap = {}; VIDS.forEach((id) => { snap[id] = ''; }); snap.vehNo = '12가3456'; snap.vehInsp = '2027-03-31'; snap.vehIns = '2027-02-28'; snap.vehRegDate = '2015-05-05';
+    return { canDo: () => true, vehicles: [veh], editingVehId: 'v1', findVeh: () => veh, VEH_MODAL_IDS: VIDS, vehModalSnap: snap, isAdmin: () => false, isDate: (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v), vehLawLogPush: () => {}, vehLawLogEntry: () => null }; };
+  const vehF = ['saveVehFromModal', 'vehModalVal', 'vehModalChanged', 'vehModalDateWhy', 'vehRealDate', 'vehModalAttrSave', 'vehSetOpt'];
+  add('차량 검사 만기(saveVehFromModal)', vehF, callOf('saveVehFromModal'), { els: vehEls('vehInsp'), stubs: vehStub }, () => veh.insp_due === '2027-03-31');
+  add('차량 보험 만기(saveVehFromModal)', vehF, callOf('saveVehFromModal'), { els: vehEls('vehIns'), stubs: vehStub }, () => veh.ins_due === '2027-02-28');
+  add('차량 최초등록일(saveVehFromModal)', vehF, callOf('saveVehFromModal'), { els: vehEls('vehRegDate'), stubs: vehStub }, () => veh.reg_date === '2015-05-05');
+  // 계약 단계 칸
+  const csStage = { name: '착공', vals: { st_date: '2026-12-01' } };
+  add('계약 단계 날짜 칸(csSaveFields)', ['csSaveFields'], (a, E, st) => a.csSaveFields(st.__c, { stages: [csStage], key: 'k' }, 0, st.__panel), { stubs: (E, mkEl) => {
+    const lab = { textContent: '착공(착수)일' }; const el = mkEl('f1', { type: 'date', value: '', defaultValue: '2026-12-01', validity: { badInput: true }, parentNode: lab, attrs: { 'data-cs-fld': 'st_date' } });
+    return { __c: { id: 'c1', pipes: [] }, __panel: { querySelectorAll: () => [el] }, conDueOn: () => false }; } }, (r) => r.out === false && csStage.vals.st_date === '2026-12-01');
+  add('계약 작업현황 날짜(csWlAdd)', ['csWlAdd'], (a, E, st) => a.csWlAdd(st.__c, st.__row), { stubs: (E, mkEl) => {
+    const de = mkEl('w1', { type: 'date', value: '', validity: { badInput: true }, attrs: { 'data-cs-wl': 'date' } }), ke = mkEl('w2', { type: 'number', value: '5', attrs: { 'data-cs-wl': 'kg' } });
+    return { __c: { id: 'c1', work_log: [] }, __row: { querySelector: () => de, querySelectorAll: () => [de, ke] }, genId: () => 'w9' }; } }, (r) => r.store.__c.work_log.length === 0);
+  // 내 할 일
+  add('내 할 일 기한 칸 change(bindTodoDueInputs → setMyTodoDue)', ['bindTodoDueInputs', 'setMyTodoDue'], (a, E, st) => { a.bindTodoDueInputs(st.__host); st.__inp.L.change({ stopPropagation() {} }); }, { stubs: (E, mkEl) => {
+    const inp = mkEl('td', { type: 'date', value: '', validity: { badInput: true }, attrs: { 'data-todo-due': 'td1' } }); return { __inp: inp, __host: { querySelectorAll: () => [inp] }, myTodos: [{ id: 'td1', due: '2026-12-15' }], isDate: (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) }; } }, (r) => r.store.myTodos[0].due === '2026-12-15');
+  add('내 할 일 더하기 기한(addMyTodo)', ['addMyTodo'], callOf('addMyTodo'), { els: { myTodoInput: { value: 'x' }, myTodoDue: BAD }, stubs: () => ({ myTodoUnread: () => false, myTodos: [], isDate: (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) }) }, (r) => r.store.myTodos.length === 0 && r.E.myTodoInput.value === 'x');
+  // 명세서 계산서 작성일
+  add('명세서 계산서 작성일(stmtInvIn)', ['stmtInvIn', 'stmtAllEmpty'], (a, E, st) => a.stmtInvIn({ date: '', supply: '1000', vat: '100', total: '1100' }, st.__el), { stubs: (E, mkEl) => ({ __el: mkEl('iv', BAD), stmtMoney: (s) => Number(s), isDate: (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) }) }, (r) => r.out === undefined, (r) => r.out !== undefined && r.out !== null);
+  // 지시 더하기
+  add('지시 더하기 기한(addTask)', ['addTask'], callOf('addTask'), { els: { taskTitle: { value: 'x' }, taskWho: { value: '' }, taskDue: BAD }, stubs: () => ({ canDo: () => true, tasks: [], getCheckedMembers: () => [], genId: () => 't9', memberName: () => '' }) }, (r) => r.store.tasks.length === 0 && r.E.taskTitle.value === 'x');
+  // 기성
+  add('기성 더하기 청구일(addReceivable)', ['addReceivable'], callOf('addReceivable'), { els: { recClient: { value: 'x' }, recDesc: { value: '' }, recAmount: { value: '1' }, recBilled: BAD, recCo: { value: '' } }, stubs: () => ({ canDo: () => true, receivables: [], genId: () => 'r9' }) }, (r) => r.store.receivables.length === 0);
+  const recR = { id: 'r1', client: 'x', billed: '2026-10-31' };
+  add('기성 수정 청구일 연도 6자리(saveRecModal)', ['saveRecModal'], callOf('saveRecModal'), { els: { reClient: { value: 'x' }, reCo: { value: '' }, reDesc: { value: '' }, reAmount: { value: '1' }, reBilled: Y6, reAssignee: { value: '' } }, stubs: () => ({ canDo: () => true, editingRecId: 'r1', findRec: () => recR, getCheckedMembers: () => [], findRecTask: () => null }) }, () => recR.billed === '2026-10-31');
+  // 입찰 수동 등록
+  add('입찰 수동 등록 마감일(saveBidAdd)', ['saveBidAdd'], callOf('saveBidAdd'), { els: { baTitle: { value: 'x' }, baOrg: { value: '' }, baDue: BAD, baUrl: { value: '' } }, stubs: () => ({ bidsLoaded: true, bids: [], genId: () => 'b9' }) }, (r) => r.store.bids.length === 0);
+  // 휴직·휴가
+  add('휴직 종료 예정일(saveLoa)', ['saveLoa'], callOf('saveLoa'), { els: { loaKind: { value: 'personal' }, loaStart: D('2026-12-01'), loaEnd: BAD, loaReason: { value: '' } }, stubs: () => ({ getMemberId: () => 'm1', LOA_KIND: { personal: '개인' }, isDate: (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v), leaves: [], genId: () => 'lv9', myName: () => '' }) }, (r) => r.store.leaves.length === 0);
+  add('휴가 종료일(saveLeaveApply)', ['saveLeaveApply'], callOf('saveLeaveApply'), { els: { lvType: { value: 'annual' }, lvStart: D('2026-12-01'), lvEnd: BAD, lvReason: { value: '사유' } }, stubs: () => ({ getMemberId: () => 'm1', isPartialLeave: () => false, isDate: (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v), leaves: [], genId: () => 'lv9', myName: () => '', leaveDays: () => 1 }) }, (r) => r.store.leaves.length === 0);
+  // 계약 시작
+  add('계약 시작일(saveConStart)', ['saveConStart'], callOf('saveConStart'), { els: { conType: { value: 'dredge' }, conClient: { value: 'x' }, conSite: { value: '' }, conStart: BAD, conWho: { value: '' }, conDoc: { value: 'private' }, conAmount: { value: '100' } }, stubs: () => ({ canDo: () => true, conModalCombo: () => false, conModalElems: () => ({}), conScenStages: () => [], conScenTag: () => '', lastBidForCon: null }) }, () => true);
+  // 차량 이력
+  const vh = { id: 'v1', history: [] };
+  add('차량 이력 날짜(addVehHistory)', ['addVehHistory'], callOf('addVehHistory'), { els: { vhContent: { value: 'x' }, vhDate: BAD, vhCost: { value: '' }, vhKind: { value: '' }, vhVendor: { value: '' } }, stubs: () => ({ canDo: () => true, histVehId: 'v1', findVeh: () => vh, genId: () => 'h9' }) }, () => vh.history.length === 0);
+  // 차량 만기 지시 완료 창
+  add('차량 만기 지시 새 만기일(vehDueOk)', ['vehDueOk', 'vehDueWhy'], callOf('vehDueOk'), { els: { vehDueDate: BAD }, stubs: () => ({ vehDueTask: { id: 't1', cur: '2027-01-31', vid: 'v1', f: 'insp_due' }, vehDueBusy: false, findTask: () => ({ status: 'open' }), isDate: (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) }) }, (r) => r.calls.indexOf('vehDueErr') >= 0);
+  // 넣기 박스 카드
+  add('넣기 박스 카드 계약일(cbxAct 시작)', ['cbxAct', 'cbxDateWhy'], (a, E, st) => a.cbxAct(st.__it, 'start'), { qsa: (s, E, mkEl) => (s.indexOf('[data-cbx-f^="7|"]') === 0 ? [mkEl('c1', { type: 'date', value: '', validity: { badInput: true }, attrs: { 'data-cbx-f': '7|d1' } })] : []), stubs: () => ({ __it: { id: 7, form: { d1: '2026-10-01' } }, findProc: () => null }) }, () => true);
+  // 서류출력(계약서 작성 = 계약 정보에 저장)
+  add('서류출력 계약서 착공일(generateDocs)', ['generateDocs'], callOf('generateDocs'), { els: { dgDocType: { value: 'demo' }, dgDate: D('2026-11-01'), dgStartDate: BAD, dgEndDate: D('') },
+    stubs: () => ({ dgDemoData: () => ({ simple: false, work: 'x', owner: '', site: '', amount: '1', date: '2026-11-01', startDate: '', endDate: '' }), dgConId: 'c1', findProc: () => ({ id: 'c1', elems: {} }), docDemoContract: () => '<p></p>' }) }, () => true);
+  // 서류 생성 창 → 계약 정보 빈 칸 채우기(연도 6자리)
+  let xgV = null;
+  add('서류 생성 창 계약일 연도 6자리(xgSaveBack)', ['xgSaveBack'], (a, E, st) => a.xgSaveBack({ id: 'c1' }), { els: { xgKind: { value: 'work_start' }, xgD1: Y6, xgTitle: { value: '' }, xgSite: { value: '' }, xgClient: { value: '' }, xgD2: { value: '' }, xgD3: { value: '' }, xgAmount: { value: '' } },
+    stubs: (E, mkEl, calls) => ({ cbxFillBlanks: (c, v) => { xgV = v; if (v.d1) calls.push('scheduleContractSave'); return { filled: [] }; }, xgCtx: { id: 'c1' }, xgSnap: {} }) }, () => xgV && !('d1' in xgV));
+  const bad = [], defOk = [];
+  const FIX = [[task, { due: '2026-12-15' }], [lic, { expiry: '2027-03-31', edu_due: '2027-01-31' }], [doc, { revised: '2026-05-01' }], [asb, { start: '2026-12-31', end: '2027-01-31' }], [duty, { base_date: '2026-03-01' }],
+    [veh, { insp_due: '2027-03-31', ins_due: '2027-02-28', reg_date: '2015-05-05' }], [csStage, { vals: { st_date: '2026-12-01' } }], [recR, { billed: '2026-10-31' }], [vh, { history: [] }]];
+  const reset = () => { FIX.forEach((f) => Object.assign(f[0], JSON.parse(JSON.stringify(f[1])))); xgV = null; };   // 결함 사본이 바꾼 고정 자료를 다음 사례 전에 되돌림
+  S.forEach((s) => {
+    reset();
+    const r = run(s.fns, s.callName, s.cfg, null);
+    const saved = r.calls.filter((c) => SAVE.test(c)), closed = r.calls.filter((c) => CLOSE.test(c));
+    const notice = r.alerts.length > 0 || r.calls.indexOf('vehDueErr') >= 0 || /날짜를 끝까지|연도는 네 자리/.test(String((r.out && r.out.err) || '')) || (r.E.meErr && /날짜를 끝까지/.test(r.E.meErr.textContent || ''));
+    const isUnit = s.name.indexOf('stmtInvIn') >= 0 || s.name.indexOf('xgSaveBack') >= 0;   // 단위(명세서 — 저장 막음은 errs) · 서류 생성 창(서류는 이미 만든 뒤 — 빈 칸 채우기만 건너뜀)
+    if (r.err || saved.length || closed.length || !(notice || isUnit) || !s.judge(r)) bad.push(s.name + ' ' + JSON.stringify({ err: r.err, saved, closed, alerts: r.alerts.slice(0, 2) }));
+    // 결함 사본 — 이 자리 함수 안의 dateFieldRead( 를 옛 읽기로
+    const own = s.fns.filter((n) => fnC(n).indexOf('dateFieldRead(') >= 0);
+    reset();
+    const d = run(s.fns, s.callName, s.cfg, own);
+    const dsaved = d.calls.filter((c) => SAVE.test(c)).length > 0 || (isUnit && d.out !== undefined);
+    defOk.push(dsaved && !d.err ? 1 : (s.name + ' 결함 사본 저장 안 됨 ' + JSON.stringify({ err: d.err, calls: d.calls.slice(0, 8), alerts: d.alerts.slice(0, 2) })));
+  });
+  const defBad = defOk.filter((x) => x !== 1);
+  T('C280 ② 저장 자리 ' + S.length + '곳(실행 — 실제 함수 원문 · 가짜 날짜 칸 값 빈 글자 + badInput, 연도 6자리 3곳): 지시 수정·인허가 2칸·문서 개정일·현장 2칸·의무 기준일·교육 다음 예정·평가일·견적일·안전 인정 만료일·법인 등기 2칸·직원 3칸·차량 3칸·계약 단계 칸·작업현황·내 할 일 2곳·명세서 계산서 작성일·지시 더하기·기성 2곳·입찰 수동 등록·휴직·휴가·계약 시작·차량 이력·차량 만기 완료 창·넣기 박스·서류출력(계약서 작성)·서류 생성 창 = 저장 요청 0 · 안내 1 · 창 그대로 · 기존 날짜 그대로',
+    bad.length === 0, bad.join(' | '));
+  T('C280 ③ 결함 사본 ' + S.length + '개(자리마다 그 함수 안의 dateFieldRead( 를 옛 `.value` 읽기로 되돌림) = 모두 저장까지 감(위 검사가 잡음)', defBad.length === 0, defBad.join(' | '));
+  // ④ 손대지 않은 자리 — 남은 `.value` 날짜 읽기가 표의 '저장 안 함·이미 막힘' 목록 밖으로 늘지 않음
+  const dateIds = [...html.matchAll(/<input type="date" id="([A-Za-z]\w*)"/g)].map((m) => m[1]);
+  const rawRead = dateIds.filter((id) => new RegExp('getElementById\\("' + id + '"\\)\\.value(?!\\s*=[^=])').test(html) || new RegExp('[$g]\\("' + id + '"\\)\\.value(?!\\s*=[^=])').test(html));
+  const KEEP = ['xgD1', 'xgD2', 'xgD3', 'xqDate',   // 서류 생성 창(값은 만든 서류에만 — 저장 안 함 · 계약 정보 빈 칸 채우기 xgSaveBack은 도우미)
+    'qtDate', 'asbStart', 'asbEnd', 'vehInsp', 'vehIns',   // 번호 제안·안내 글·[+1년] 단추(저장 안 함 — 저장은 도우미)
+    'famDate', 'eduDate', 'lvStart', 'rsDate', 'loaStart', 'lmDoneAt', 'lmFixTo', 'lmBaseDate', 'drNewD',   // 이미 막힘(isDate·lmDateWhy·빈 값 거절 — 안내 있음)
+    'lvEnd', 'loaEnd', 'vehDueDate', 'dgDate', 'dgStartDate', 'dgEndDate'];   // 도우미 검사 뒤·앞에서 읽음(틀리면 도우미가 먼저 막음 — 서류출력은 generateDocs 들머리)
+  const extra = rawRead.filter((id) => KEEP.indexOf(id) < 0);
+  T('C280 ④ 남은 날짜 칸 `.value` 직접 읽기 = 전수 표의 저장 안 함·이미 막힘·검사 앞 읽기 자리뿐(새 저장 자리가 옛 꼴로 생기면 잡힘 — 표 밖 ' + extra.length + ')', extra.length === 0, '표 밖: ' + extra.join(', '));
+} catch (e) { console.log('  (C280 검사 생략 — ' + e.message + ')'); fails++; }
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

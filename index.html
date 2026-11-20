@@ -4593,11 +4593,13 @@
     var t = findTask(editingTaskId); if (!t){ closeTaskModal(); return; }
     var title = document.getElementById("teTitle").value.trim();
     if (!title) return;
+    var dueR = dateFieldRead(document.getElementById("teDue"));   // C280: 틀린 날짜는 저장하지 않고 창 그대로(종전엔 '비움'으로 읽혀 기한이 지워짐)
+    if (!dueR.ok){ alert("기한 — " + dueR.why); return; }
     t.title = title;
     var whoId = document.getElementById("teWho").value;
     if (t.who_id !== whoId) t.who_by = "edit";   // v413 관리자 재지정 표식(서버 [내 것 아님] 보호 통과)
     t.who_id = whoId; t.who = memberName(whoId);
-    t.due = document.getElementById("teDue").value || "";
+    t.due = dueR.v;
     t.detail = document.getElementById("teDetail").value.trim();
     t.scope = getCheckedMembers("teScope");
     t.updated = todayStr();
@@ -5810,6 +5812,8 @@
     var dueEl = document.getElementById("taskDue");
     var title = titleEl.value.trim();
     if (!title) return;
+    var dueR = dateFieldRead(dueEl);   // C280: 틀린 기한은 더하지 않고 안내(입력 글은 칸에 남김 — 종전엔 기한 없이 더해짐)
+    if (!dueR.ok){ alert("기한 — " + dueR.why); return; }
     var today = todayStr();
     var whoId = whoEl.value;
     var scope = getCheckedMembers("taskScopePanel");
@@ -5826,7 +5830,7 @@
       from: getUser(),
       from_id: myId(),
       by: getUser(),
-      due: dueEl.value || "",
+      due: dueR.v,
       status: "open",
       done_at: null,
       done_by: null,
@@ -6057,6 +6061,8 @@
     var q = vehDueTask, s, t, why;
     if (!q || vehDueBusy) return;
     s = String(document.getElementById("vehDueDate").value || "").trim();
+    var sdr = dateFieldRead(document.getElementById("vehDueDate"));   // C280: 덜 채운 날·없는 날(값 빈 글자 + badInput)은 '비움 = 날짜 그대로 완료'가 아니라 틀린 입력 — 창 그대로. 값이 있는 칸은 아래 vehDueWhy 판정·안내 글 그대로
+    if (!sdr.ok && sdr.bad === "input"){ vehDueErr("새 만기일 — " + sdr.why); return; }
     t = findTask(q.id);
     if (!t || t.del === 1 || t.status === "done" || t.status === "review"){ vehDueClose(); return; }
     if (!s || s === q.cur){ vehDueClose(); vehDueFinish(q.id); return; }   // 비움·같은 날 = 날짜 그대로 완료(서버 쓰기 없음)
@@ -9407,8 +9413,9 @@
   }
   // 문서 칸(계산서·명세 합계·잔액·차량 소계) 글 → 서버 꼴. 모두 빈칸 = null · 잘못 = undefined(저장 막음)
   function stmtAllEmpty(o, ks){ return ks.every(function(k){ return String((o || {})[k] == null ? "" : o[k]).trim() === ""; }); }
-  function stmtInvIn(o){
+  function stmtInvIn(o, del){   // del = 화면의 작성일 칸(편집 중일 때만) — C280: 덜 채운 날·없는 날(값 빈 글자 + badInput)·연도 6자리는 '빈칸'이 아니라 잘못(저장 막음)
     var s, v, t, d;
+    if (del && !dateFieldRead(del).ok) return undefined;
     if (stmtAllEmpty(o, ["date", "supply", "vat", "total"])) return null;
     s = stmtMoney(o.supply, false); v = stmtMoney(o.vat, false); t = stmtMoney(o.total, false); d = String(o.date || "").trim();
     if (s === undefined || v === undefined || t === undefined || (d && !(isDate(d) && !isNaN(new Date(d + "T00:00:00").getTime())))) return undefined;
@@ -9444,8 +9451,9 @@
     });
     // 서버 cleanRows와 같은 꼴로 한 번 더(줄들의 품목·비고·번호 글·타이어 위치를 한 JSON으로) — 칸마다 본 것과 다르게 칸 사이에서만 걸리면 문서 오류로
     if (!out.errs.length && stmtPii(JSON.stringify(out.rows.map(function(x){ return [x.item, x.note, x.vraw, x.tire ? x.tire.pos : ""]; })))){ out.docErr.pii = 1; out.errs.push("전화·계좌·주민번호 꼴 글(품목·비고·차량 칸)"); }
-    inv = stmtInvIn(ed.inv); carry = stmtCarryIn(ed.carry); stated = stmtMoney(ed.stated, true); vsub = stmtVsubIn(ed.vsub, out.vsubBad);
-    if (inv === undefined){ out.docErr.inv = 1; out.errs.push("계산서 칸(세 칸 모두 숫자 — 비우려면 네 칸 다)"); inv = null; }
+    var invEl = stmtEdW(ed) ? document.querySelector('#stmtEditor [data-d="inv.date"]') : null, invDr = dateFieldRead(invEl);   // C280 작성일 칸은 도우미로(읽기 판은 칸 없음)
+    inv = stmtInvIn(ed.inv, invEl); carry = stmtCarryIn(ed.carry); stated = stmtMoney(ed.stated, true); vsub = stmtVsubIn(ed.vsub, out.vsubBad);
+    if (inv === undefined){ out.docErr.inv = 1; out.errs.push(invDr.ok ? "계산서 칸(세 칸 모두 숫자 — 비우려면 네 칸 다)" : "계산서 작성일 — " + invDr.why); inv = null; }
     if (carry === undefined){ out.docErr.carry = 1; out.errs.push("잔액 칸(네 칸 모두 숫자 — 비우려면 네 칸 다)"); carry = null; }
     if (stated === undefined){ out.docErr.stated = 1; out.errs.push("명세 합계"); stated = null; }
     if (Object.keys(out.vsubBad).length) out.errs.push("차량 소계 칸");
@@ -11268,7 +11276,11 @@
   function vehModalVal(id){ var el = document.getElementById(id); return el ? String(el.value == null ? "" : el.value) : ""; }
   function vehModalChanged(isNew){ return function(id){ return isNew || vehModalVal(id) !== vehModalSnap[id]; }; }
   function vehModalDateWhy(ch){   // 바꾼 날짜 칸이 달력에 없으면 안내 글(저장 안 함)
-    var bad = [["vehInsp", "검사 만기"], ["vehIns", "보험 만기"], ["vehRegDate", "최초등록일"]].filter(function(p){ var s = vehModalVal(p[0]).trim(); return ch(p[0]) && s && !vehRealDate(s); });
+    var D = [["vehInsp", "검사 만기"], ["vehIns", "보험 만기"], ["vehRegDate", "최초등록일"]];
+    // C280: 덜 채운 날·없는 날(값 빈 글자 + badInput)은 '지움'이 아니라 틀린 입력 — 도우미로 먼저 거름(종전엔 빈 글자라 통과해 만기·등록일이 지워짐). 값이 있는 칸은 종전 판정·안내 글 그대로
+    var inb = D.filter(function(p){ var r = dateFieldRead(document.getElementById(p[0])); return ch(p[0]) && !r.ok && r.bad === "input"; });
+    if (inb.length) return inb.map(function(p){ return p[1]; }).join("·") + " — " + DATE_FIELD_WHY;
+    var bad = D.filter(function(p){ var s = vehModalVal(p[0]).trim(); return ch(p[0]) && s && !vehRealDate(s); });
     return bad.length ? "달력에 없는 날짜입니다: " + bad.map(function(p){ return p[1]; }).join("·") : "";
   }
   function vehModalForm(){   // 창의 지금 값으로 만든 임시 줄(계산·안내용 — 저장 아님)
@@ -11335,9 +11347,11 @@
     var v = findVeh(histVehId); if (!v) return;
     var content = document.getElementById("vhContent").value.trim();
     if (!content){ document.getElementById("vhContent").focus(); return; }
+    var vhR = dateFieldRead(document.getElementById("vhDate"));   // C280: 틀린 날짜는 오늘로 바꾸지 않고 더하지 않음
+    if (!vhR.ok){ alert("이력 날짜 — " + vhR.why); return; }
     if (!v.history) v.history = [];
     var cost = parseInt(String(document.getElementById("vhCost").value).replace(/[^0-9]/g,""), 10);
-    v.history.push({ id: genId("h"), date: document.getElementById("vhDate").value || todayStr(), kind: document.getElementById("vhKind").value, content: content, cost: isNaN(cost)?0:cost, vendor: document.getElementById("vhVendor").value.trim(), created: todayStr() });
+    v.history.push({ id: genId("h"), date: vhR.v || todayStr(), kind: document.getElementById("vhKind").value, content: content, cost: isNaN(cost)?0:cost, vendor: document.getElementById("vhVendor").value.trim(), created: todayStr() });
     v.updated = todayStr();
     document.getElementById("vhContent").value = ""; document.getElementById("vhCost").value = ""; document.getElementById("vhVendor").value = "";
     renderVehHistory(v); renderVehicles();
@@ -11467,8 +11481,8 @@
     if (ch("vehNo")) v.no = no;
     if (ch("vehKind")) v.kind = document.getElementById("vehKind").value.trim();
     vehModalAttrSave(v, ch);   // P1 판26 속성 칸(바꾼 칸만 · 빈 칸은 키 안 만듦·지운 칸은 키째)
-    if (ch("vehInsp")) v.insp_due = document.getElementById("vehInsp").value || null;
-    if (ch("vehIns")) v.ins_due = document.getElementById("vehIns").value || null;
+    if (ch("vehInsp")) v.insp_due = dateFieldRead(document.getElementById("vehInsp")).v || null;   // C280: 위 vehModalDateWhy가 틀린 입력을 이미 막음 — 읽기도 도우미로
+    if (ch("vehIns")) v.ins_due = dateFieldRead(document.getElementById("vehIns")).v || null;
     if (ch("vehState")) v.state = document.getElementById("vehState").value;
     if (ch("vehInsurer")) v.insurer = document.getElementById("vehInsurer").value.trim();
     if (ch("vehNote")) v.note = document.getElementById("vehNote").value.trim();
@@ -12314,6 +12328,8 @@
     if (!lock && d && docMajorOf(d) === "01" && newCat.slice(0, 2) !== "01"){ alert("01 법인 문서는 다른 분류로 옮길 수 없습니다 — 01의 중분류를 골라주세요."); return; }   // 하드차단 유지(리뷰 확정)
     var scopeMode = document.getElementById("docScope").value, scopeIds = [];
     if (!lock && scopeMode === "ids"){ scopeIds = getCheckedMembers("docScopeMembers"); if (!scopeIds.length){ alert("직원 지정 공개는 최소 1명을 체크해주세요."); return; } }
+    var revR = dateFieldRead(document.getElementById("docRevised"));   // C280: 틀린 날짜는 저장하지 않고 창 그대로(push 전에 — 위 검증과 같은 자리)
+    if (!revR.ok){ alert("개정일 — " + revR.why); return; }
     if (!d){ d = {id: genId("doc"), created: today}; documents.push(d); }
     d.title = title;
     if (!lock){
@@ -12321,7 +12337,7 @@
       d.cat = newCat;   // 2층 분류 "AA-BB"(대분류-중분류) 또는 "99"(v317). 구 category 텍스트는 표시용으로만 남긴다
     }
     d.version = document.getElementById("docVer").value.trim();
-    d.revised = document.getElementById("docRevised").value || "";
+    d.revised = revR.v;
     var url = document.getElementById("docUrl").value.trim();
     if (url && !/^https?:\/\//i.test(url)) url = "https://" + url;
     d.url = url;
@@ -12759,9 +12775,7 @@
       if (ch("xgSite")) v.site = ch("xgSite");
       if (ch("xgClient") && !Object.prototype.hasOwnProperty.call(owner, kind)) v.client = ch("xgClient");
       if (dates){
-        if (ch("xgD1")) v.d1 = ch("xgD1");
-        if (ch("xgD2")) v.d2 = ch("xgD2");
-        if (ch("xgD3")) v.d3 = ch("xgD3");
+        ["xgD1", "xgD2", "xgD3"].forEach(function(id){ if (ch(id) && dateFieldRead(document.getElementById(id)).ok) v["d" + id.slice(3)] = ch(id); });   // C280: 틀린 날짜(연도 6자리 등)는 계약 정보 빈 칸에 채우지 않음(덜 채운 날은 값 빈 글자라 종전에도 안 씀)
         var amt = Number(ch("xgAmount").replace(/[^0-9]/g, "")) || 0;
         if (amt) v.amount = amt;
       }
@@ -16179,8 +16193,15 @@
     cbxBind(host);
     if (key){ var el = host.querySelector('[data-cbx-f="' + key + '"]'); if (el){ el.focus(); if (caret !== null && el.setSelectionRange){ try { el.setSelectionRange(caret, caret); } catch(e){} } } }
   }
+  // C280: 카드의 날짜 칸(계약일·착공·준공 — 고치기 펼침일 때만 화면에 있음) 가운데 틀린 입력 → "칸 이름 — 까닭" | ""
+  function cbxDateWhy(it){
+    var L = { d1: "계약일", d2: "착공일", d3: "준공일" }, out = "";
+    Array.prototype.forEach.call(document.querySelectorAll('[data-cbx-f^="' + it.id + '|"]'), function(el){ var k = String(el.getAttribute("data-cbx-f") || "").split("|")[1], r; if (out || el.type !== "date") return; r = dateFieldRead(el); if (!r.ok) out = (L[k] || "날짜") + " — " + r.why; });
+    return out;
+  }
   function cbxAct(it, act){
-    var c = it.cid ? findProc(it.cid) : null;
+    var c = it.cid ? findProc(it.cid) : null, dw;
+    if ((act === "start" || act === "startnew" || act === "into") && (dw = cbxDateWhy(it))){ alert(dw); return; }   // C280: 틀린 날짜로 계약을 만들거나 채우지 않음(카드 그대로)
     if (act === "drop" || act === "close"){ cbxDiscard(it); cbxRemove(it); }
     else if (act === "edit"){ it.edit = !it.edit; cbxRedraw(it.scope); }
     else if (act === "start") cbxStart(it);
@@ -16237,6 +16258,7 @@
         if (!it.form) return;
         if (k === "pub") it.form.pub = el.value === "1";
         else if (k === "combo") it.form.combo = !!el.checked;
+        else if (el.type === "date"){ var dr = dateFieldRead(el); if (dr.ok) it.form[k] = dr.v; }   // C280: 틀린 입력(덜 채운 날·없는 날·연도 6자리)은 카드 값에 쓰지 않음(판독 값·마지막 맞는 값 그대로) — [시작]·[넣기] 때 cbxDateWhy가 안내
         else it.form[k] = el.value;
         if (k === "type" || k === "pub" || k === "combo") cbxRedraw(it.scope);   // 단계 미리보기 갱신
       };
@@ -18058,6 +18080,10 @@
   }
   function csSaveFields(c, p, i, panel){
     var s = p.stages[i]; if (!s || !panel) return;
+    // C280: 날짜 칸은 도우미로 먼저 — 틀린 입력(덜 채운 날·없는 날·연도 6자리)이면 아무 칸도 쓰지 않고 안내(false — [완료]는 이어 가지 않음). 종전엔 값 빈 글자를 '비움'으로 받아 그 칸을 지움
+    var dBad = null;
+    Array.prototype.forEach.call(panel.querySelectorAll("[data-cs-fld]"), function(el){ if (dBad || el.type !== "date") return; var r = dateFieldRead(el); if (!r.ok && (r.bad === "input" || el.value !== el.defaultValue)) dBad = { el: el, why: r.why }; });   // 손대지 않은 칸(그린 값 그대로)은 종전처럼 건너뜀
+    if (dBad){ var dbl = dBad.el.parentNode ? String(dBad.el.parentNode.textContent || "").trim() : ""; alert((dbl || "날짜 칸") + " — " + dBad.why); try { dBad.el.focus(); } catch (e) {} return false; }
     s.vals = s.vals || {};
     // 판24i(가-3 · D6): 지시를 서버에서 한 번도 받지 못한 화면(오프라인 캐시로 부팅)은 이 자동 기한 쓰기를 건너뜀 — 기준 사본이 없어 병합이 통째 고르기로 떨어지면 같은 날 다른 기기가 결재로 닫은 지시를
     //   이 기한 쓰기가 다시 열었다(C208). 지시를 받은 화면은 칸 단위 병합이 기한 칸만 이 화면 값으로 하고 끝남은 남김 · 건너뛴 기한은 지시를 받은 뒤 다음 [입력 저장]이 채움
@@ -18068,6 +18094,8 @@
   }
   function csWlAdd(c, row){
     var r = { id: genId("w") }, any = false;
+    var wd = row.querySelector('[data-cs-wl="date"]'), wdr = dateFieldRead(wd);   // C280: 틀린 날짜는 줄을 더하지 않고 안내(종전엔 값 빈 글자라 오늘 날짜로 들어감)
+    if (!wdr.ok){ alert("작업현황 날짜 — " + wdr.why); try { wd.focus(); } catch (e) {} return; }
     Array.prototype.forEach.call(row.querySelectorAll("[data-cs-wl]"), function(el){ var k = el.getAttribute("data-cs-wl"), v = el.value; if (v === "") return; any = true; r[k] = (el.type === "number") ? Number(v) : v; });
     if (!any) return;
     if (!r.date) r.date = todayStr();
@@ -18277,7 +18305,7 @@
       var csAct = function(attr, fn){ Array.prototype.forEach.call(root.querySelectorAll("[" + attr + "]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var p = el.getAttribute(attr).split("|"), c = findProc(p[0]); if (!c) return; var pipe = csPipeOf(c, p[1]), i = Number(p[2]); if (!pipe || isNaN(i)) return; fn(c, pipe, i, el); }); }); };
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-gen]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var p = el.getAttribute("data-cs-gen").split("|"); if (p[1] === "html_contract") openDocFromContract(p[0]); else openXlsxGen(p[0], csGenKind(findProc(p[0]) || {}, p[1])); }); });   // v383 패킷 [생성]
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-site]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var c = findProc(el.getAttribute("data-cs-site")); if (!c) return; var r = csLinkSiteLater(c); alert(typeof r === "object" ? ("현장 대장에 연결했습니다: " + (r.title || "")) : (r === "wait" ? "현장 대장을 불러오는 중입니다 — 받는 대로 연결합니다(잠시 뒤 연결 탭 확인)." : (r === "noperm" ? "현장 대장 열람 권한(현장)이 없어 연결할 수 없습니다." :"연결할 수 없습니다(현장 권한 또는 종류)."))); renderContracts(); }); });   // v384
-      csAct("data-cs-done", function(c, p, i){ var s0 = p.stages[i], fp = (s0 && s0.aw === "amt") ? root.querySelector('[data-cs-fpanel="' + p.key + '|' + i + '"]') : null; if (fp) csSaveFields(c, p, i, fp); csDoneStage(c, p, i); });   // v402 R15: 변경계약은 입력 칸 값을 먼저 저장한 뒤 판정
+      csAct("data-cs-done", function(c, p, i){ var s0 = p.stages[i], fp = (s0 && s0.aw === "amt") ? root.querySelector('[data-cs-fpanel="' + p.key + '|' + i + '"]') : null; if (fp && csSaveFields(c, p, i, fp) === false) return; csDoneStage(c, p, i); });   // C280: 날짜 칸이 틀리면 저장도 완료도 하지 않음(안내는 csSaveFields)   // v402 R15: 변경계약은 입력 칸 값을 먼저 저장한 뒤 판정
       csAct("data-cs-skip", function(c, p, i){ csSkipStage(c, p, i); });
       csAct("data-cs-unskip", function(c, p, i){ csUnskipStage(c, p, i); });
       csAct("data-cs-jump", function(c, p, i){ csJumpStage(c, p, i); });
@@ -18360,10 +18388,12 @@
     var type=document.getElementById("conType").value;
     var client=document.getElementById("conClient").value.trim();
     var site=document.getElementById("conSite").value.trim();
-    var start=document.getElementById("conStart").value||todayStr();
+    var csR=dateFieldRead(document.getElementById("conStart"));   // C280: 틀린 시작일은 오늘로 바꾸지 않고 창 그대로
+    var start=csR.v||todayStr();
     var who=document.getElementById("conWho").value.trim();
     var docType=document.getElementById("conDoc").value;
     if(!client && !site){ alert("거래처 또는 현장을 입력하세요."); return; }
+    if(!csR.ok){ alert("시작일 — "+csR.why); return; }
     var amtEl=document.getElementById("conAmount"), amt=Number(String((amtEl&&amtEl.value)||"").replace(/[^0-9]/g,""))||0, amtTbd=!!((document.getElementById("conAmtTbd")||{}).checked);   // v427 종류 무관 계약금액 — 비우려면 '금액 미정' 체크
     if(!amt && !amtTbd){ alert("계약금액(원)을 입력하세요.\n견적 전이라 아직 금액이 없으면 '금액 미정'에 체크하세요(계약서가 들어오면 판독 값이 들어갑니다)."); if(amtEl) amtEl.focus(); return; }
     var combo=conModalCombo() && (type==="asbestos"||type==="demolition"), pub=(docType==="public");
@@ -18604,6 +18634,9 @@
   function generateDocs(){
     var type = document.getElementById("dgDocType").value;
     var html = "";
+    // C280: 날짜 세 칸은 도우미로 먼저 — 틀린 입력이면 서류를 만들지 않고 창 그대로(종전엔 계약(작성)일은 오늘로, 착공·준공일은 '비움'으로 읽혀 계약서 작성 때 계약 정보 날짜가 지워짐)
+    var dgBad = [["dgDate", "계약(작성)일"], ["dgStartDate", "착공일"], ["dgEndDate", "준공일"]].map(function(p){ var r = dateFieldRead(document.getElementById(p[0])); return r.ok ? "" : p[1] + " — " + r.why; }).filter(Boolean)[0];
+    if (dgBad){ alert(dgBad); return; }
     if(type === "quote_env" || type === "quote_con"){
       var q = { client:document.getElementById("dgQClient").value.trim(), service:document.getElementById("dgQService").value.trim(), date:document.getElementById("dgDate").value||todayStr() };
       html = docQuote(type === "quote_con" ? "con" : "env", q);
@@ -19084,6 +19117,7 @@
     var start=document.getElementById("loaStart").value;
     var end=document.getElementById("loaEnd").value;
     if(!LOA_KIND[kind]){ alert("휴직 종류를 고르세요."); return; }
+    var loaER=dateFieldRead(document.getElementById("loaEnd")); if(!loaER.ok){ alert("종료 예정일 — "+loaER.why); return; }   // C280: 틀린 종료 예정일은 '미정(비움)'으로 받지 않고 창 그대로
     // P1 판39 재검토: 육아휴직은 종료 예정일 필수 — 계약직 2년 날짜가 예정 종료일에서 멈춤(비우면 복직 처리 전까지 끝없이 늦어짐)
     if(kind==="child" && !isDate(end)){ alert(LOA_CHILD_END_MSG); return; }
     if(!isDate(start)){ alert("휴직 시작 예정일을 선택하세요."); return; }
@@ -19110,6 +19144,7 @@
     var start=document.getElementById("lvStart").value;
     var end=document.getElementById("lvEnd").value||start;
     if(!isDate(start)){ alert("시작일을 선택하세요."); return; }
+    var lvER=dateFieldRead(document.getElementById("lvEnd")); if(!isPartialLeave(type) && !lvER.ok){ alert("종료일 — "+lvER.why); return; }   // C280: 틀린 종료일은 시작일로 바꾸지 않고 창 그대로(반차·반반차는 종료일 칸을 쓰지 않음)
     if(!document.getElementById("lvReason").value.trim()){ alert("사유를 입력하세요."); return; }
     if(isPartialLeave(type)) end=start;
     var days=leaveDays(type,start,end);
@@ -20277,6 +20312,9 @@
     if (!asbLoaded){ alert(ASB_UNREAD_MSG); loadAsb(); return; }
     var title=document.getElementById("asbTitle").value.trim();
     if(!title){ alert("공사명을 입력하세요."); return; }
+    var stR=dateFieldRead(document.getElementById("asbStart")), enR=dateFieldRead(document.getElementById("asbEnd"));   // C280: 틀린 날짜는 저장하지 않고 창 그대로
+    if(!stR.ok){ alert("작업 시작일 — "+stR.why); return; }
+    if(!enR.ok){ alert("작업 종료일 — "+enR.why); return; }
     var r=asbEditId?findAsb(asbEditId):null, isNew=!r, kind=asbKindOf();
     // v445 검토: 석면 기록을 철거·준설로 바꿀 때는 확인(취소 = 저장 안 함·창 그대로) — 저장 뒤 다시 열어 지우면 30년 문구 없는 확인만 나오는 두 단계 길을 여기서 막는다
     if(!isNew && siteKind(r)==="asbestos" && kind!=="asbestos" && !confirm(ASB_KIND_OUT_MSG.replace("{종류}", SITE_KIND[kind]))) return;
@@ -20287,8 +20325,8 @@
     r.title=title;
     r.client=document.getElementById("asbClient").value.trim();
     r.site=document.getElementById("asbSite").value.trim();
-    r.start=document.getElementById("asbStart").value||"";
-    r.end=document.getElementById("asbEnd").value||"";
+    r.start=stR.v;
+    r.end=enR.v;
     r.material=document.getElementById("asbMaterial").value.trim();
     r.area=document.getElementById("asbArea").value.trim();
     r.status=document.getElementById("asbStatus").value||"plan";
@@ -20910,11 +20948,14 @@
   // 창 → 보낼 값 { v } | { err } — 서버 값 검사와 같은 규칙(서버가 다시 본다)
   function sfSetRead(){
     var g = function(id){ return String(document.getElementById(id).value || "").trim(); }, i, m;
+    // C280: 날짜 네 칸은 도우미로 읽음 — 덜 채운 날·없는 날(값 빈 글자 + badInput)은 '비움'이 아니라 틀린 입력(종전엔 저장된 날짜가 지워짐). 값이 있는 칸의 판정·안내 글은 종전 sfSetDateOk 그대로
+    var dl = { applied_on: ["sfSetApplied", "접수일"], review_on: ["sfSetReview", "심사일"], decided_on: ["sfSetDecided", "인정일(결정일)"], expires_on: ["sfSetExpires", "만료일"] }, dr = {};
+    Object.keys(dl).forEach(function(x){ dr[x] = dateFieldRead(document.getElementById(dl[x][0])); });
     var k = { stage: g("sfSetStage"), apply_no: g("sfSetApplyNo"), applied_on: g("sfSetApplied"), review_on: g("sfSetReview"), decided_on: g("sfSetDecided"), expires_on: g("sfSetExpires"), rate_year: g("sfSetRateYear"), checks: [] };
     if (SF_SET_STAGES.indexOf(k.stage) < 0) return { err: "인정 단계를 고르세요." };
     if (k.apply_no.length > 40) return { err: "접수번호는 40자까지입니다." };
     var ds = ["applied_on", "review_on", "decided_on", "expires_on"];
-    for (i = 0; i < ds.length; i++){ if (k[ds[i]] && !sfSetDateOk(k[ds[i]])) return { err: "날짜는 달력에서 고르거나 YYYY-MM-DD로 넣어 주세요." }; }
+    for (i = 0; i < ds.length; i++){ if (!dr[ds[i]].ok && dr[ds[i]].bad === "input") return { err: dl[ds[i]][1] + " — " + dr[ds[i]].why }; if (k[ds[i]] && !sfSetDateOk(k[ds[i]])) return { err: "날짜는 달력에서 고르거나 YYYY-MM-DD로 넣어 주세요." }; }
     if (k.rate_year && !(/^\d{4}$/.test(k.rate_year) && Number(k.rate_year) >= 2000 && Number(k.rate_year) <= 2100)) return { err: "요율 반영 연도는 네 자리(예: 2027)로 넣거나 비워 두세요." };
     var lines = String(document.getElementById("sfSetChecks").value || "").split(/\r?\n/).map(function(s){ return s.trim(); }).filter(Boolean);
     if (lines.length > 10) return { err: "사후점검 이력은 10건까지입니다." };
@@ -21241,7 +21282,7 @@
   function eduHoursIn(){ var raw = String(document.getElementById("eduHours").value || "").trim(); if (!raw) return ""; var n = Number(raw.replace(/시간|h/gi, "").trim()); if (isFinite(n) && n > 0) return n; if (eduHoursOrig !== undefined && eduHoursOrig !== null && typeof eduHoursOrig !== "number" && raw === String(eduHoursOrig).trim()) return eduHoursOrig; return null; }
   function eduRaIn(kind, date){
     if (!eduIsRa(kind)) return null;
-    var on = document.getElementById("eduRaOn").value, t = document.getElementById("eduRaType").value;
+    var on = dateFieldRead(document.getElementById("eduRaOn")).v || "", t = document.getElementById("eduRaType").value;
     return { on: isDate(on) ? on : date, type: eduRaTypeOk(t) ? t : "", unit: String(document.getElementById("eduRaUnit").value || "").trim().slice(0, 60) };   // v447 검토 2: 구분은 고른 것만(빈 글 = 회차 아님)
   }
   // v447 검토 2: 정기교육·관리감독자 다음 예정 다시 셈 — 같은 사람·같은 종류 줄의 자동 다음 예정(그 줄 날짜의 두 후보: 그 반기(해) 말일 · 다음 반기(해) 말일)을
@@ -21270,7 +21311,10 @@
     if(!isDate(date)){ alert("이수·실시일을 입력하세요."); return; }
     var hours=eduHoursIn();
     if(hours===null){ alert("시간은 숫자로 넣어 주세요(예: 16 · 1.5) — 모르면 비워 두세요."); return; }
-    var kind=document.getElementById("eduKind").value, next=document.getElementById("eduNext").value||"", note=document.getElementById("eduNote").value.trim(), ra=eduRaIn(kind, date);
+    var nxR=dateFieldRead(document.getElementById("eduNext"));   // C280: 틀린 날짜는 저장하지 않고 창 그대로(종전엔 다음 예정이 '비움'으로 지워지고 평가일은 위 날짜로 바뀜)
+    if(!nxR.ok){ alert("다음 예정일 — "+nxR.why); return; }
+    if(eduIsRa(document.getElementById("eduKind").value)){ var raR=dateFieldRead(document.getElementById("eduRaOn")); if(!raR.ok){ alert("평가일 — "+raR.why); return; } }
+    var kind=document.getElementById("eduKind").value, next=nxR.v, note=document.getElementById("eduNote").value.trim(), ra=eduRaIn(kind, date);
     var org=eduOrgIn(kind);   // v451 검진 두 종류만 "jw"|"other"(그 밖·모름 = "")
     var autoNx = !!next && next===eduNextAuto && /^(regular|super|gen_med)$/.test(kind);   // v447 검토: 자동 다음 예정 그대로면 사람마다 다시(eduNextFor) — 손으로 고친 값은 그대로
     if(eduBulkIds){   // v447 여럿에게 넣기 — 저장 때 한 번 더 고른다(창을 연 사이 퇴사·지움·권한이 바뀐 사람은 넣지 않음)
@@ -22312,7 +22356,7 @@
   }
   function qtCollect(){
     var g=function(k){ return document.getElementById(k).value; };
-    return { no:g("qtNo").trim(), date:g("qtDate"), co:g("qtCo"), recv:g("qtRecv").trim(), title:g("qtTitle").trim(),
+    return { no:g("qtNo").trim(), date:(dateFieldRead(document.getElementById("qtDate")).v||""), co:g("qtCo"), recv:g("qtRecv").trim(), title:g("qtTitle").trim(),
       item:g("qtItem").trim(), sang:g("qtSang").trim(), gubun:g("qtGubun").trim(), unit:g("qtUnit").trim(),
       qty:g("qtQty").trim(), price:(g("qtPrice")||"").replace(/[^0-9]/g,""), vat:g("qtVat"), note:g("qtNote").trim() };
   }
@@ -22320,6 +22364,7 @@
     var f=qtCollect();
     if(!f.no){ alert("견적번호를 입력하세요."); return null; }
     if(!f.title){ alert("용역명(공사명)을 입력하세요."); return null; }
+    var qdR=dateFieldRead(document.getElementById("qtDate")); if(!qdR.ok){ alert("견적일 — "+qdR.why); return null; }   // C280: 틀린 날짜는 저장하지 않고 창 그대로
     var dup=liveQuotes().filter(function(x){ return x.no===f.no && x.id!==qtEditId; });
     if(dup.length && !confirm("견적번호 "+f.no+" 가 이미 있습니다. 그대로 저장할까요?")) return null;
     var rec;
@@ -26592,7 +26637,7 @@
     if (corpRegSaving) return;
     var today = todayStr(), body = { action: "corp_reg_set", base: corpRegBase }, bad = "";
     CORP_REG_F.forEach(function(f){
-      var el = document.getElementById("corpRegIn_" + f[0]), s = el ? String(el.value || "").trim() : "", why = corpRegDateWhy(s, today);
+      var el = document.getElementById("corpRegIn_" + f[0]), s = el ? String(el.value || "").trim() : "", dr = dateFieldRead(el), why = (!dr.ok && dr.bad === "input") ? dr.why : corpRegDateWhy(s, today);   // C280: 덜 채운 날·없는 날(값 빈 글자 + badInput)은 '지움'이 아니라 틀린 입력 — 값이 있는 칸 판정·안내 글은 corpRegDateWhy 그대로
       if (why && !bad) bad = f[1] + " — " + why;
       body[f[0]] = s;
     });
@@ -27035,8 +27080,9 @@
   function saveBidAdd(){
     var t=document.getElementById("baTitle").value.trim(); if(!t){ alert("공고명을 입력하세요."); return; }
     if(!bidsLoaded){ alert(BID_UNREAD_MSG); if(!bidsLoading) loadBids(); return; }   // v443: 못 읽은 공고 목록에 더하지 않는다(위 bidsLoaded) — 다시 읽고 창은 그대로(읽히면 다시 [저장]) · 읽는 중이면 또 읽지 않음(bidsLoading — v443 검토)
+    var baDR=dateFieldRead(document.getElementById("baDue")); if(!baDR.ok){ alert("마감일 — "+baDR.why); return; }   // C280: 틀린 마감일은 더하지 않고 창 그대로(종전엔 마감 없이 더해짐)
     var nb={ id:genId("bid"), source:"수동", kind:"입찰", title:t, org:document.getElementById("baOrg").value.trim(),
-      region:"", due:document.getElementById("baDue").value||"", budget:0, url:document.getElementById("baUrl").value.trim(),
+      region:"", due:baDR.v, budget:0, url:document.getElementById("baUrl").value.trim(),
       matched:[], status:"new", created:todayStr(), updated:todayStr() };
     bids.push(nb);
     scheduleBidsSave();
@@ -28108,7 +28154,7 @@
     Array.prototype.forEach.call(host.querySelectorAll("[data-todo-due]"), function(inp){
       inp.addEventListener("click", function(e){ e.stopPropagation(); });
       // change=저장만(재렌더로 피커·포커스가 날아가지 않게), blur=재렌더(배지·정렬 반영) — v310
-      inp.addEventListener("change", function(e){ e.stopPropagation(); setMyTodoDue(inp.getAttribute("data-todo-due"), inp.value, true); });
+      inp.addEventListener("change", function(e){ e.stopPropagation(); var r = dateFieldRead(inp); if (!r.ok){ gwToast("기한 — " + r.why + " (저장하지 않았습니다)", true); return; } setMyTodoDue(inp.getAttribute("data-todo-due"), r.v, true); });   // C280: 틀린 입력(칸 한 자리만 지움·없는 날)은 저장 요청 없이 안내만 — 종전엔 '비움'으로 읽혀 기한이 바로 지워짐(칸을 떠나면 blur 다시 그리기가 저장된 기한을 다시 보임)
       inp.addEventListener("blur", function(){ renderMyTodos(); });
     });
   }
@@ -28136,7 +28182,9 @@
     var el = document.getElementById("myTodoInput"), dueEl = document.getElementById("myTodoDue");
     var title = el.value.trim(); if (!title) return;
     if (myTodoUnread()) return;   // P1 판24h: 목록을 못 읽은 채 더하면 서버의 내 할 일이 새 1건으로 바뀜(입력 글은 칸에 남김)
-    var due = (dueEl && isDate(dueEl.value)) ? dueEl.value : "";
+    var dueR = dateFieldRead(dueEl);   // C280: 틀린 기한은 더하지 않고 안내(입력 글은 칸에 남김 — 종전엔 기한 없이 더해짐)
+    if (!dueR.ok){ alert("기한 — " + dueR.why); return; }
+    var due = dueR.v;
     myTodos.push({ id: genId("td"), title: title, done: false, due: due, created: todayStr() });
     el.value = ""; if (dueEl) dueEl.value = "";
     renderMyTodos(); saveMyTasks();
@@ -28639,12 +28687,14 @@
     var billedEl = document.getElementById("recBilled");
     var client = clientEl.value.trim();
     if (!client) return;
+    var billR = dateFieldRead(billedEl);   // C280: 틀린 청구일은 더하지 않고 안내(종전엔 값 빈 글자라 오늘 날짜로 들어감)
+    if (!billR.ok){ alert("청구일 — " + billR.why); return; }
     var today = todayStr();
     var amt = parseInt(String(amtEl.value).replace(/[^0-9]/g, ""), 10);
     var nr = {
       id: genId("r"), client: client, site: "", desc: descEl.value.trim(),
       co: document.getElementById("recCo").value || "",
-      amount: isNaN(amt) ? 0 : amt, billed: billedEl.value || today,
+      amount: isNaN(amt) ? 0 : amt, billed: billR.v || today,
       invoice: false, paid: null, due_hint: "", note: "",
       assignee: "", scope: [], task_id: null, mismatch: false,
       created: today, updated: today
@@ -28732,13 +28782,15 @@
     var r = findRec(editingRecId); if (!r){ closeRecModal(); return; }
     var client = document.getElementById("reClient").value.trim();
     if (!client) return;
+    var reBR = dateFieldRead(document.getElementById("reBilled"));   // C280: 틀린 청구일은 저장하지 않고 창 그대로(종전엔 말없이 옛 값 · 연도 6자리는 그대로 저장)
+    if (!reBR.ok){ alert("청구일 — " + reBR.why); return; }
     r.client = client;
     r.co = document.getElementById("reCo").value || "";
     r.desc = document.getElementById("reDesc").value.trim();
     var amtRaw = String(document.getElementById("reAmount").value), amt = parseInt(amtRaw.replace(/[^0-9]/g, ""), 10);
     if (!isNaN(amt) && /^\s*-/.test(amtRaw)) amt = -amt;   // v440 검토: 앞의 '-'는 남긴다(수정세금계산서 음수 금액이 담당만 고쳐 저장해도 양수로 뒤집히지 않게)
     r.amount = isNaN(amt) ? 0 : amt;
-    r.billed = document.getElementById("reBilled").value || r.billed;
+    r.billed = reBR.v || r.billed;
     r.assignee = document.getElementById("reAssignee").value;
     r.scope = getCheckedMembers("reScope");
     if (r.recheck && recEditSheet === r.id) r.recheck = 0;   // v440 PC 표 펼침 [수정] 저장 = 입금 뒤 바뀐 금액(금액 바뀜)도 확인한 것으로(명세 — [금액 확인함]과 같은 0, 병합에서 되살아나지 않게 값으로) · 검토: 폰 목록·홈 줄 [수정]은 '금액 바뀜'을 보여 주지 않으므로 지우지 않음
@@ -29348,6 +29400,25 @@
   function liveLic(){ return licenses.filter(function(l){ return l && l.del !== 1; }); }
   function findLic(id){ for (var i=0;i<licenses.length;i++){ if (licenses[i].id === id) return licenses[i]; } return null; }
   function isDate(v){ return typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v); }
+  // @date-field-start — C280(11/20 「원천」): 날짜 칸(type="date") 읽기 도우미 한 곳. 요소 → { ok:true, v } | { ok:false, why, bad }.
+  //   브라우저는 덜 채운 날짜·달력에 없는 날(2026-02-31)을 value 빈 글자 + validity.badInput 참으로 준다 — 종전 `.value || ""`는 이것을 '비움'으로 읽어 기존 날짜를 안내 없이 지웠다.
+  //   숫자 8자를 구분 없이 이어 치면 연 칸이 6자리를 받아 '202612-02-01' 같은 값이 생긴다 — 꼴(YYYY-MM-DD)·연도 1900~2099·달력 왕복으로 거른다.
+  //   진짜 빈칸(badInput 거짓 · 값 빈 글자)만 빈 값(지움) 그대로. bad: "input"(덜 채움·없는 날 — 값 빈 글자) · "form"(꼴) · "year"(연도 범위) · "cal"(달력)
+  var DATE_FIELD_WHY = "날짜를 끝까지, 달력에 있는 날로 넣어 주세요";
+  function dateFieldRead(el){
+    var s, m, y, mo, d, t;
+    if (!el) return { ok: true, v: "" };
+    s = String(el.value == null ? "" : el.value).trim();
+    if (!s) return (el.validity && el.validity.badInput) ? { ok: false, why: DATE_FIELD_WHY, bad: "input" } : { ok: true, v: "" };
+    m = /^(\d+)-(\d{2})-(\d{2})$/.exec(s);
+    if (!m) return { ok: false, why: DATE_FIELD_WHY, bad: "form" };
+    y = Number(m[1]); mo = Number(m[2]); d = Number(m[3]);
+    if (m[1].length !== 4 || y < 1900 || y > 2099) return { ok: false, why: "연도는 네 자리(1900~2099)로 넣어 주세요", bad: "year" };
+    t = new Date(Date.UTC(y, mo - 1, d));
+    if (t.getUTCFullYear() !== y || t.getUTCMonth() !== mo - 1 || t.getUTCDate() !== d) return { ok: false, why: DATE_FIELD_WHY, bad: "cal" };
+    return { ok: true, v: s };
+  }
+  // @date-field-end
 
   function licNearest(l){
     var ds = [];
@@ -29551,14 +29622,17 @@
     var name = document.getElementById("licName").value.trim();
     if (!name) return;
     var noExp = document.getElementById("licNoExpiry").checked;
-    var expVal = document.getElementById("licExpiry").value;
+    var expR = dateFieldRead(document.getElementById("licExpiry")), eduR = dateFieldRead(document.getElementById("licEdu"));   // C280: 틀린 날짜는 저장하지 않고 창 그대로('만료 없음' 체크면 만료일 칸은 보지 않음)
+    if (!noExp && !expR.ok){ alert("만료일 — " + expR.why); return; }
+    if (!eduR.ok){ alert("보수교육·점검 다음 예정일 — " + eduR.why); return; }
+    var expVal = noExp ? "" : expR.v;
     var today = todayStr();
     var fields = {
       name: name,
       org: document.getElementById("licOrg").value.trim(),
       license_no: document.getElementById("licNo").value.trim(),
       expiry: noExp ? "해당없음" : (expVal || null),
-      edu_due: document.getElementById("licEdu").value || null,
+      edu_due: eduR.v || null,
       edu_cycle: document.getElementById("licCycle").value.trim(),
       note: document.getElementById("licNote").value.trim(),
       scope: getCheckedMembers("licScope"),
@@ -30085,7 +30159,9 @@ function dutyStage(nx){
     if (editingDutyNo == null) return;
     var d = findDuty(editingDutyNo); if (!d){ closeDutyModal(); return; }
     var ans = document.getElementById("dutyPreAns").value.trim();
-    var bd = document.getElementById("dutyBaseDate").value;
+    var bdR = dateFieldRead(document.getElementById("dutyBaseDate"));   // C280: 틀린 날짜는 저장하지 않고 창 그대로(종전엔 '비움'으로 읽혀 기준일이 지워짐 — '확정' 체크가 아닐 때)
+    if (!bdR.ok){ alert("기준일 — " + bdR.why); return; }
+    var bd = bdR.v;
     var toConfirm = document.getElementById("dutyConfirmChk").checked;
     var rkSeed = !!(editingDutyRk && d.confirm === "확정" && !d.confirmed_by);   // P1 판7 등재표 확정 행의 근거 재확인 저장 — 답·기준일 없이도(주기·기준일 칸은 그대로 · 조건부 행은 확정 전환을 안 하면 원래 답 필수가 아님)
     // 답·기준일 없는 확정 금지 — 전환뿐 아니라 확정 유지 저장에서도(답만 지우고 저장하면 근거 없는 확정이 남는다)
@@ -34908,6 +34984,10 @@ function dutyStage(nx){
     if (uidRaw && !/^[a-z0-9._-]{4,20}$/.test(uidRaw)){
       errEl.textContent = "아이디는 영문소문자·숫자·. _ - 로 4~20자입니다."; errEl.classList.add("show"); return;
     }
+    // C280: 날짜 세 칸은 도우미로 — 틀린 날짜는 보내지 않고 창 그대로(종전엔 '비움'으로 읽혀 생년월일·입사일·퇴사일이 지워짐)
+    var meBd = dateFieldRead(document.getElementById("meBirth")), meHd = dateFieldRead(document.getElementById("meHire")), meLd = dateFieldRead(document.getElementById("meLeave"));
+    var meDw = !meBd.ok ? "생년월일 — " + meBd.why : (!meHd.ok ? "입사일 — " + meHd.why : (!meLd.ok ? "퇴사일 — " + meLd.why : ""));
+    if (meDw){ errEl.textContent = meDw; errEl.classList.add("show"); return; }
     // 시스템 필드(admin·dev·uid)는 개발자만 전송 — 개발자가 아닌 관리자도 인사 정보는 계속 고칠 수 있어야 한다.
     // (서버가 이 필드들이 오면 개발자 권한을 요구하므로, 안 보내면 인사 수정이 정상 통과)
     var payload = { action: "member_upsert", name: name, role: role,
@@ -34915,13 +34995,13 @@ function dutyStage(nx){
       annual_days: annualRaw === "" ? null : Number(annualRaw),
       annual_base: baseRaw === "" ? null : Number(baseRaw),
       seq: seqRaw === "" ? null : Number(seqRaw),
-      birth: document.getElementById("meBirth").value || "",
-      hire_date: document.getElementById("meHire").value || "",
+      birth: meBd.v,
+      hire_date: meHd.v,
       emp_type: document.getElementById("meEmp").value,
       annual_basis: document.getElementById("meBasis").value,
       loa_days: loaRaw === "" ? 0 : Number(loaRaw),
       loa_days_child: loaChildRaw === "" ? 0 : Number(loaChildRaw),
-      leave_date: document.getElementById("meLeave").value || "",
+      leave_date: meLd.v,
       annual_paid: document.getElementById("mePaidAnnual").checked,
       office: document.getElementById("meOffice").checked, supervisor: document.getElementById("meSupervisor").checked,
       quals: EDU_QUAL.filter(function(q){ var el = document.getElementById("meQ_" + q.q); return !!(el && el.checked); }).map(function(q){ return q.q; }),   // v460(서버는 허용 키만 저장 — 하나도 없으면 칸째 지움)   // v447 회원 칸(서버는 켜짐만 저장 — 꺼짐은 칸째 지움)

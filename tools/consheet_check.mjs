@@ -5,7 +5,9 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const html = readFileSync(join(ROOT, 'index.html'), 'utf8');
-const cut = (a, b) => { const i = html.indexOf(a), j = html.indexOf(b); if (i < 0 || j < 0) throw new Error('segment ' + a); return html.slice(i, j); };
+// C280(11/20): 앱 날짜 칸 도우미(@date-field 구간 원문)를 전역에 — 떼어 돌리는 저장 함수(xgSaveBack 등)가 dateFieldRead를 찾게
+{ const a = html.indexOf('// @date-field-start'), b = html.indexOf('// @date-field-end'); if (a >= 0 && b > a) (0, eval)(html.slice(a, b)); }
+const cut =(a, b) => { const i = html.indexOf(a), j = html.indexOf(b); if (i < 0 || j < 0) throw new Error('segment ' + a); return html.slice(i, j); };
 const scen = cut('// @con-scen-start', '// @con-scen-end');
 const sheet = cut('// @con-sheet-start', '  function renderContracts(){');
 const fnOf = (name) => { const i = html.indexOf('  function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < html.length; j++) { const ch = html[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html.slice(i, j + 1); } } throw new Error(name); };
