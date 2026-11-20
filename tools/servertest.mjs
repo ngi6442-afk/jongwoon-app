@@ -13937,9 +13937,9 @@ function J91a(x) { return JSON.stringify(x); }
   };
   const chkLedgerQ = async (c) => {   // (2) 대장 사람·계산 — 같은 함수 직접 호출과 같은 값 · 상태 가름
     const P = {}, I = {};
-    seedQ({ docs: { 'pay:base:env:qc': BDQ([VERQ({ dredge: false })]), 'pay:month:env:2026-11': { schema: 1, rev: REVQ('m1'), corp: 'env', ym: YMQ, state: 'open', rows: { qa: { dredge: LINESQ(), bonus: 50000 } }, frozen: null, updated_at: 9, updated_by: 'uadmin' } } });
+    seedQ({ docs: { 'pay:base:env:qc': BDQ([VERQ({ dredge: false })]), 'pay:base:env:qh': BDQ([VERQ({ dredge: false })]), 'pay:base:env:qj': BDQ([VERQ({ dredge: false })]), 'pay:base:env:qk': BDQ([VERQ({ from: '2026-12', dredge: false })]), 'pay:month:env:2026-11': { schema: 1, rev: REVQ('m1'), corp: 'env', ym: YMQ, state: 'open', rows: { qa: { dredge: LINESQ(), bonus: 50000 } }, frozen: null, updated_at: 9, updated_by: 'uadmin' } } });
     const r = await c({ action: 'pay_month_get', corp: 'env', ym: YMQ }, tokA), b = r.body, ids = (b.rows || []).map((x) => x.mid).sort().join();
-    P.people = r.code === 200 && ids === 'qa,qb,qc,qi,uw66q' && (b.loose || []).map((x) => x.mid).sort().join() === 'qk,uadmin';
+    P.people = r.code === 200 && ids === 'qa,qb,qc,qi,uw66q' && (b.loose || []).map((x) => x.mid).sort().join() === 'qk,uadmin';   // qh(기간 앞 퇴사)·qj(기간 뒤 입사)는 기준이 있어도 없음 · qk(12월 판만)는 대장에 없고 loose
     I.people = [r.code, ids, (b.loose || []).map((x) => x.mid).join()];
     const ra = rowOfQ(b, 'qa'), rb = rowOfQ(b, 'qb'), rc = rowOfQ(b, 'qc'), ri = rowOfQ(b, 'qi');
     const ea = handQ(VERQ(), { dredge: LINESQ(), bonus: 50000 }, CONFQ()), eb = handQ(VERQ({ base: 2800000, allow: 200000, car: 200000, dredge: false, skip: { pension: true, health: false, emp: false } }), {}, CONFQ());
@@ -13962,6 +13962,31 @@ function J91a(x) { return JSON.stringify(x); }
     P.off = tryQ(() => r2.body.law.on === false && r2.body.law.why === 'NOT_PROMOTED' && rowOfQ(r2.body, 'qa').state === 'off' && rowOfQ(r2.body, 'qa').off.why === 'NOT_PROMOTED' && !('calc' in rowOfQ(r2.body, 'qa'))
       && rowOfQ(r3.body, 'qa').off.why === 'NO_DREDGE_CONF' && rowOfQ(r3.body, 'qb').state === 'bad' && r3.body.period.from === '2026-11-01' && r4.code === 503 && rowOfQ(r5.body, 'qa').state === 'unread' && r6.code === 503 && r6.body.error_code === 'PAY_READ_FAILED');
     I.off = [r2.body.law && r2.body.law.why, rowOfQ(r3.body, 'qa') && rowOfQ(r3.body, 'qa').off, rowOfQ(r3.body, 'qb') && rowOfQ(r3.body, 'qb').state, r4.code];
+    return outQ(P, I);
+  };
+  const chkFixedQ = async (c) => {   // (2-1) 숫자로 박은 정답 — 같은 함수로 다시 세지 않는다
+    const P = {}, I = {};
+    seedQ();
+    const pv = (row, ver) => c(Object.assign({ action: 'pay_row_preview', corp: 'env', ym: YMQ, mid: 'qa', row: row }, ver ? { ver: ver } : {}), tokA);
+    const L13 = ['10-15', '10-16', '10-19', '10-20', '10-21', '10-22', '10-23', '10-26', '10-27', '10-28', '10-30', '11-03', '11-05', '11-10'].map((x) => ({ d: '2026-' + x, days: x === '11-05' ? 0.5 : 1, ot: x === '10-21' ? 1 : (x === '10-26' ? 0.5 : (x === '11-03' ? 2 : 0)) }));
+    const a = (await pv({ dredge: L13 }, VERQ({ allow: 0, meal: 200000 }))).body.calc || {};
+    P.mock = tryQ(() => a.cols.allow === 595000 && a.taxable === 3195000 && a.gross === 3395000 && a.ded.pension === 151760 && a.ded.health === 114860 && a.ded.care === 15090 && a.ded.emp === 28750 && a.ded.income === 89750 && a.ded.local === 8970 && a.ded_total === 409180 && a.net === 2985820 && a.dredge.paid_days === 3.5 && a.dredge.in_days === 10);
+    I.mock = [a.cols && a.cols.allow, a.taxable, a.net, a.ded];
+    // 일할 달에도 통상시급은 기준 월액: 기본급 2,090,000 · 209시간 · 일할 10/30 · 연장 10시간 → 기본급 696,667 · 연장 10,000 × 10 × 1.5 = 150,000
+    const b = (await pv({ prorate: { days: 10, of: 30 }, ot: { ext: 10 } }, VERQ({ base: 2090000, allow: 0, allow_ord: false, meal: 0, dredge: false }))).body.calc || {};
+    const b2 = (await pv({ base: 1000000, ot: { ext: 10 } }, VERQ({ base: 2090000, allow: 0, allow_ord: false, meal: 0, dredge: false }))).body.calc || {};
+    P.ord = tryQ(() => b.cols.base === 696667 && b.cols.adj === 150000 && b.hourly === 10000 && b2.cols.base === 1000000 && b2.cols.adj === 150000);
+    I.ord = [b.cols && b.cols.base, b.cols && b.cols.adj, b.hourly, b2.cols && b2.cols.adj];
+    // 차감 8시간 + 직접 −1,000: 시급 = 올림(2,600,000 ÷ 209) = 12,441 → 초과/차감 칸 −100,528 · 식대 250,000(한도 200,000) → 적용총액에 50,000
+    const d = (await pv({ minus_hours: 8, adj_amt: -1000, meal: 250000 }, VERQ({ allow: 0, dredge: false }))).body.calc || {};
+    P.adj = tryQ(() => d.hourly === 12441 && d.cols.adj === -100528 && d.cols.meal === 250000 && d.taxable === 2600000 - 100528 + 50000 && d.gross === 2600000 - 100528 + 250000);
+    I.adj = [d.hourly, d.cols && d.cols.adj, d.taxable, d.gross];
+    // 나눔 바꾸기: 첫날을 '추가 지급'으로 → 150,000 · 그날은 포함 일수에 안 셈 / 11일째를 '포함'으로 → 0
+    const L11 = Array.from({ length: 11 }, (_, i) => ({ d: '2026-11-' + String(i + 1).padStart(2, '0'), days: 1 }));
+    const e1 = (await pv({ dredge: L11.map((l, i) => i === 0 ? Object.assign({}, l, { side: 'out' }) : l) })).body.calc || {}, e2 = (await pv({ dredge: L11.map((l, i) => i === 10 ? Object.assign({}, l, { side: 'in' }) : l) })).body.calc || {};
+    const e3 = (await pv({ dredge: L11.slice(0, 9).concat([{ d: '2026-11-10', days: 0.5 }, { d: '2026-11-11', days: 1 }]) })).body.calc || {};   // 9.5일 다음 하루 = 반은 포함·반은 지급
+    P.side = tryQ(() => e1.dredge.total === 150000 && e1.dredge.lines[0].amt === 150000 && e1.dredge.in_days === 10 && e2.dredge.total === 0 && e2.dredge.in_days === 10 && e3.dredge.total === 75000 && e3.dredge.paid_days === 0.5 && e3.dredge.in_days === 10);
+    I.side = [e1.dredge && e1.dredge.total, e2.dredge && e2.dredge.total, e3.dredge && e3.dredge.total, e3.dredge && e3.dredge.paid_days];
     return outQ(P, I);
   };
   const chkRowQ = async (c) => {   // (3) 그 달 값 저장 — 꼴·기간·낙관락·덮임·확정 달·감사 글에 금액 없음
@@ -14005,23 +14030,29 @@ function J91a(x) { return JSON.stringify(x); }
     const P = {}, I = {};
     seedQ();
     const g0 = await c({ action: 'pay_month_get', corp: 'env', ym: YMQ }, tokA);
-    const cl0 = await c({ action: 'pay_month_close', corp: 'env', ym: YMQ, rev: '' }, tokA);   // qi 기준 없음
+    const cl0 = await c({ action: 'pay_month_close', corp: 'env', ym: YMQ, rev: '', sig: g0.body.calc_sig }, tokA);   // qi·uw66q 기준 없음
     P.notready = cl0.code === 409 && cl0.body.error_code === 'ROWS_NOT_READY' && (cl0.body.mids || []).slice().sort().join() === 'qi,uw66q'; I.notready = [cl0.code, cl0.body.mids];
-    mem.gw_data['pay:base:env:qi'] = BDQ([VERQ({ dredge: false })]); mem.gw_data['pay:base:env:uw66q'] = BDQ([VERQ({ dredge: false })]);
-    const g1 = await c({ action: 'pay_month_get', corp: 'env', ym: YMQ }, tokA);
-    const cl = await c({ action: 'pay_month_close', corp: 'env', ym: YMQ, rev: '' }, tokA), doc = mem.gw_data['pay:month:env:2026-11'];
+    mem.gw_data['pay:base:env:qi'] = BDQ([VERQ({ dredge: false })]);
+    const off = await c({ action: 'pay_row_save', corp: 'env', ym: YMQ, mid: 'uw66q', row: { off: true }, rev: '' }, tokA);   // 이 달 이 대장에서 뺌(기준 없어도 확정 가능)
+    const g1 = await c({ action: 'pay_month_get', corp: 'env', ym: YMQ }, tokA), rv1 = mem.gw_data['pay:month:env:2026-11'].rev;
+    const keepA = mem.gw_data['pay:base:env:qa']; mem.gw_data['pay:base:env:qa'] = BDQ([VERQ({ base: 2700000 })], REVQ('bx'));
+    const clx = await c({ action: 'pay_month_close', corp: 'env', ym: YMQ, rev: rv1, sig: g1.body.calc_sig }, tokA);   // 화면을 연 뒤 기준이 바뀜
+    mem.gw_data['pay:base:env:qa'] = keepA;
+    P.sig = off.code === 200 && rowOfQ(g1.body, 'uw66q').state === 'excluded' && clx.code === 409 && clx.body.error_code === 'CALC_CHANGED' && mem.gw_data['pay:month:env:2026-11'].state === 'open';
+    I.sig = [off.code, rowOfQ(g1.body, 'uw66q') && rowOfQ(g1.body, 'uw66q').state, clx.code, clx.body.error_code];
+    const cl = await c({ action: 'pay_month_close', corp: 'env', ym: YMQ, rev: rv1, sig: g1.body.calc_sig }, tokA), doc = mem.gw_data['pay:month:env:2026-11'];
     const netA = rowOfQ(g1.body, 'qa').calc.net;
     mem.gw_data['pay:base:env:qa'] = BDQ([VERQ({ base: 9000000 })], REVQ('b9'));   // 확정 뒤 기준이 바뀌어도
     mem.gw_data[KFQ] = { schema: 1, bg_ver: '', bg_sha: '' };   // 승격이 풀려도
     const g2 = await c({ action: 'pay_month_get', corp: 'env', ym: YMQ }, tokA);
     const ws = await c({ action: 'pay_row_save', corp: 'env', ym: YMQ, mid: 'qa', row: { bonus: 1 }, rev: doc.rev }, tokA);
-    P.close = cl.code === 200 && doc.state === 'closed' && tryQ(() => g2.body.state === 'closed' && rowOfQ(g2.body, 'qa').calc.net === netA && rowOfQ(g2.body, 'qa').frozen === true && g2.body.frozen_law.ver === VQ) && ws.code === 409 && ws.body.error_code === 'MONTH_CLOSED';
+    P.close = cl.code === 200 && doc.state === 'closed' && !('uw66q' in doc.frozen.rows) && PLQ.frozenOk(doc.frozen).ok && tryQ(() => g2.body.state === 'closed' && rowOfQ(g2.body, 'qa').calc.net === netA && rowOfQ(g2.body, 'qa').frozen === true && g2.body.frozen_law.ver === VQ) && ws.code === 409 && ws.body.error_code === 'MONTH_CLOSED';
     I.close = [cl.code, cl.body.error_code, g2.body.state, ws.body.error_code];
     const ro0 = await c({ action: 'pay_month_reopen', corp: 'env', ym: YMQ, rev: 'x' }, tokA);
     const ro = await c({ action: 'pay_month_reopen', corp: 'env', ym: YMQ, rev: doc.rev }, tokA), g3 = await c({ action: 'pay_month_get', corp: 'env', ym: YMQ }, tokA);
     P.reopen = ro0.code === 409 && ro.code === 200 && mem.gw_data['pay:month:env:2026-11'].frozen === null && g3.body.state === 'open' && g3.body.law.on === false && rowOfQ(g3.body, 'qa').state === 'off';
     I.reopen = [ro0.code, ro.code, g3.body.state];
-    const cl2 = await c({ action: 'pay_month_close', corp: 'env', ym: YMQ, rev: mem.gw_data['pay:month:env:2026-11'].rev }, tokA);
+    const cl2 = await c({ action: 'pay_month_close', corp: 'env', ym: YMQ, rev: mem.gw_data['pay:month:env:2026-11'].rev, sig: g3.body.calc_sig }, tokA);
     P.lawoff = cl2.code === 409 && cl2.body.error_code === 'LAW_OFF'; I.lawoff = cl2.body.error_code;
     const au = JSON.stringify(audQ());
     P.audit = !/9000000|9,000,000|2600000|2,600,000/.test(au) && audQ().some((l) => l.ev[0].op === '급여대장 확정') && audQ().some((l) => l.ev[0].op === '급여대장 확정 풀기'); I.audit = au.slice(0, 160);
@@ -14084,8 +14115,9 @@ function J91a(x) { return JSON.stringify(x); }
     const b = await call({ action: 'backup_put', secret: 'test-ingest-key', store: 'gw_data', key: K, data: Object.assign({}, good, { ym: '2026-11' }), confirm: true, restore: true });
     const b2 = await call({ action: 'backup_put', secret: 'test-ingest-key', store: 'gw_data', key: 'pay:base:env:qa', data: { schema: 1, rev: REVQ('r2'), vers: [VERQ({ base: 0 })], updated_at: 1 }, confirm: true, restore: true });
     const b3 = await call({ action: 'backup_put', secret: 'test-ingest-key', store: 'gw_data', key: 'pay:what', data: { a: 1 }, confirm: true, restore: true });
+    const b4 = await call({ action: 'backup_put', secret: 'test-ingest-key', store: 'gw_data', key: K, data: Object.assign({}, good, { state: 'closed', frozen: { at: 1, law_ver: 'v', period: { from: '2026-11-15', to: '2026-12-14' }, rows: { qa: { net: 1 } } } }), confirm: true, restore: true });
     const ok = await call({ action: 'backup_put', secret: 'test-ingest-key', store: 'gw_data', key: K, data: good, confirm: true, restore: true });
-    P.restore = a.code === 403 && a.body.error_code === 'RESTORE_MODE_ONLY' && b.code === 400 && b.body.error_code === 'BAD_PAY_DOC' && b2.body.error_code === 'BAD_PAY_DOC' && b3.body.error_code === 'BAD_PAY_DOC' && ok.code === 200 && mem.gw_data[K].rev === good.rev;
+    P.restore = a.code === 403 && a.body.error_code === 'RESTORE_MODE_ONLY' && b.code === 400 && b.body.error_code === 'BAD_PAY_DOC' && b2.body.error_code === 'BAD_PAY_DOC' && b3.body.error_code === 'BAD_PAY_DOC' && b4.body.error_code === 'BAD_PAY_DOC' && ok.code === 200 && mem.gw_data[K].rev === good.rev;
     I.restore = [a.code + a.body.error_code, b.body.error_code, b2.body.error_code, b3.body.error_code, ok.code];
     return outQ(P, I);
   };
@@ -14110,11 +14142,12 @@ function J91a(x) { return JSON.stringify(x); }
 
   try {
     const c0 = callerQ(gwpQ);
-    const RG = await chkGateQ(c0), RL = await chkLedgerQ(c0), RR = await chkRowQ(c0), RC = await chkCloseQ(c0), RB = await chkBaseQ(c0), RF = await chkConfQ(c0), RS = await chkRestoreQ(), RW = await chkLawQ(c0);
+    const RG = await chkGateQ(c0), RL = await chkLedgerQ(c0), RX = await chkFixedQ(c0), RR = await chkRowQ(c0), RC = await chkCloseQ(c0), RB = await chkBaseQ(c0), RF = await chkConfQ(c0), RS = await chkRestoreQ(), RW = await chkLawQ(c0);
     T('66 판2 ① 관문(열 동작 전부): 비로그인·퇴사 관리자·없는 회원 401 · 인사 권한 직원 403 ADMIN_ONLY · 요청자 회원 못 읽음 503 MEMBER_READ_FAILED · 모르는 동작·회사·달 범위(2020-01 ~ 이번 달 + 12) 400', RG.ok, RG.info);
     T('66 판2 ② 급여대장 사람·계산: 그 회사(both 는 두 회사)·기간 안 재직만(지입차주·일용직·시험·삭제·기간 앞 퇴사·기간 뒤 입사 제외) · 회사 없는 직원은 loose · 금액 = 같은 함수 직접 호출 · 하수준설(10일 포함·반일·연장) · 요율 꺼짐 off · 단가 없음 NO_DREDGE_CONF · 꼴 틀린 기준은 그 사람만 bad · 명부 못 읽음 503', RL.ok, RL.info);
+    T('66 판2 ②-1 숫자로 박은 정답(같은 함수로 다시 세지 않음): 시안 가짜 직원 공제 6·차인 2,985,820 · 일할·그 달 기본급이어도 통상시급 = 기준 월액(연장 150,000) · 차감 8시간 + 직접 −1,000 = −100,528 · 식대 한도 초과분 과세 · 준설 나눔 바꾸기·9.5일째 하루', RX.ok, RX.info);
     T('66 판2 ③ 그 달 값 저장: 꼴 9가지 400 BAD_ROW(칸 이름 · 기간 밖 날짜·0.3일·수식 머리·꺾쇠) · NEED_BASE · 지입차주 404 · 낙관락 409 PAY_STALE · 쓰고 다시 읽어 남의 rev 409 OVERWRITTEN · 다시 읽기 실패 503 · 쓰기 실패 500 · 미리 계산은 안 씀 · 감사 글에 금액·비고 없음', RR.ok, RR.info);
-    T('66 판2 ④ 확정·풀기: 계산 안 된 사람 409 ROWS_NOT_READY(그 id) · 확정 뒤 기준·승격이 바뀌어도 얼린 금액 그대로 · 확정 달 쓰기 409 MONTH_CLOSED · 풀기 낙관락 · 풀면 다시 계산 · 요율 꺼짐 확정 409 LAW_OFF · 감사에 금액 없음', RC.ok, RC.info);
+    T('66 판2 ④ 확정·풀기: 계산 안 된 사람 409 ROWS_NOT_READY(그 id) · 이 달 이 대장에서 뺀 사람은 확정에서 빠짐 · 화면을 연 뒤 기준이 바뀌면 409 CALC_CHANGED(계산 지문) · 얼린 행 꼴 · 확정 뒤 기준·승격이 바뀌어도 얼린 금액 그대로 · 확정 달 쓰기 409 MONTH_CLOSED · 풀기 낙관락 · 풀면 다시 계산 · 요율 꺼짐 확정 409 LAW_OFF · 감사에 금액 없음', RC.ok, RC.info);
     T('66 판2 ⑤ 한 사람 기준: 새 판·고침 · 화면 의도와 다르면 409 KIND_MISMATCH · 먼 달·기본급 0 거절 · 낙관락 · 그 달 판 고르기·다음 판 알림 · 지우기는 오지 않은 달 판만(지난 판 409 VER_IN_USE) · 판 상한 = 자르지 않고 VERS_FULL · 읽기에 생년월일 없음·나이 제외 제안', RB.ok, RB.info);
     T('66 판2 ⑥ 단가·기간 설정: 없음 null · 꼴 400(칸 이름) · 낙관락 · 꼴 틀린 설정 = 503 PAY_CONF_BAD(대장도 503)', RF.ok, RF.info);
     T('66 판2 ⑦ 백업 복원 pay: 갈래 — 봇 키만으로 403 RESTORE_MODE_ONLY · 재해 복원 모드에서도 꼴 틀림·키와 달이 다름·모르는 pay: 키 400 BAD_PAY_DOC · 맞는 문서만 씀', RS.ok, RS.info);
@@ -14123,13 +14156,16 @@ function J91a(x) { return JSON.stringify(x); }
     const MUTQ = [
       ['G', "  if (c.member.admin !== true) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });\n", '', 'G'],
       ['G', "  if (!r.ok && r.code === 'NOT_FOUND') return { ok: true, data: null };", "  if (!r.ok) return { ok: true, data: null };", 'L'],
-      ['G', "  if (NOT_PAYEE.indexOf(String(m.emp_type || '')) >= 0) return false;\n  if (!(m.corp", "  if (!(m.corp", 'L'],
+      ['G', "  if (NOT_PAYEE.indexOf(String(m.emp_type || '')) >= 0) return false;\n  if (m.hire_date", "  if (m.hire_date", 'L'],
       ['G', "  if (m.leave_date && String(m.leave_date) < period.from) return false;", '', 'L'],
       ['G', "  if ((baseRev || '') !== curRev) return { res: 'stale' };", '', 'R'],
       ['G', "  if (!back.doc || back.doc.rev !== doc.rev) return { res: 'overwritten' };", '', 'R'],
       ['G', "  if (mo.doc && mo.doc.state === 'closed') return conflict('MONTH_CLOSED', R);", '', 'C'],
       ['G', "    if (frozen) { o.calc = frozen.rows && frozen.rows[mid] ? frozen.rows[mid] : null; o.frozen = true; out.push(o); continue; }", '', 'C'],
       ['G', "  if (notOk.length) return jr(409,", "  if (false) return jr(409,", 'C'],
+      ['G', "  if (d.sig !== b.calc_sig) return conflict('CALC_CHANGED', R);", '', 'C'],
+      ['L', "  const inp = { base: base, hours: ver.hours, fixed: fixed, ot: row.ot || {}, fam: ver.fam, kids: ver.kids, pct: ver.pct, skip: ver.skip, fixed_ded: row.ded_fix || {}, ord_month: ordMonth };", "  const inp = { base: base, hours: ver.hours, fixed: fixed, ot: row.ot || {}, fam: ver.fam, kids: ver.kids, pct: ver.pct, skip: ver.skip, fixed_ded: row.ded_fix || {} };", 'X'],
+      ['G', "if (PL.MID.test(mid) && workedIn(byId[mid], period)) ids.add(mid); });", "if (PL.MID.test(mid) && byId[mid]) ids.add(mid); });", 'L'],
       ['G', "  if (!(d.from > ymNow())) return conflict('VER_IN_USE', R);", '', 'B'],
       ['G', "  if (d.kind !== undefined && d.kind !== pv.kind) return conflict('KIND_MISMATCH', R);", '', 'B'],
       ['G', "  if (!ymOk(cv.ver.from)) return bad('BAD_VER', R, { field: 'from' });", '', 'B'],
@@ -14140,13 +14176,13 @@ function J91a(x) { return JSON.stringify(x); }
       ['L', "    if (vers.length >= LIM.vers) return { ok: false, code: 'VERS_FULL' };", '', 'B'],
       ['L', "  if (!int(x.period_day, 28) || x.period_day < 1) return no('period_day');", '', 'F']
     ];
-    const RUNQ = { G: chkGateQ, L: chkLedgerQ, R: chkRowQ, C: chkCloseQ, B: chkBaseQ, F: chkConfQ };
+    const RUNQ = { X: chkFixedQ, G: chkGateQ, L: chkLedgerQ, R: chkRowQ, C: chkCloseQ, B: chkBaseQ, F: chkConfQ };
     const killQ = []; let nQ = 0;
     for (const [kind, from, to, which] of MUTQ) {
       nQ++; let k; try { k = !(await RUNQ[which](callerQ(loadQ(kind, from, to)))).ok; } catch (e) { k = 'err ' + e.message; }
       if (k !== true) killQ.push(kind + ':' + from.trim().slice(0, 60) + (k === false ? ' 안 깨짐' : ' ' + k));
     }
-    T('66 판2 ⑨ 결함 사본 ' + nQ + '개(관리자 검사 걷음 · 못 읽음을 없음으로 · 지입차주·일용직 넣음 · 기간 앞 퇴사자 넣음 · 낙관락 걷음 · 덮임 못 봄 · 확정 달 쓰기 · 얼린 값 무시 · 준비 안 된 확정 · 지난 판 지움 · 의도 대조 걷음 · 먼 달 · 감사에 금액 · 기간 밖 날짜 · 글 칸 검사 걷음 · 10일 포함 무시 · 판 상한 걷음 · 기간 시작일 검사 걷음) = 모두 ✗', killQ.length === 0, killQ.join(' | '));
+    T('66 판2 ⑨ 결함 사본 ' + nQ + '개(관리자 검사 걷음 · 못 읽음을 없음으로 · 지입차주·일용직 넣음 · 기간 앞 퇴사자 넣음 · 낙관락 걷음 · 덮임 못 봄 · 확정 달 쓰기 · 얼린 값 무시 · 준비 안 된 확정 · 계산 지문 걷음 · 일할 시급 · 기준만 있는 퇴사자 넣음 · 지난 판 지움 · 의도 대조 걷음 · 먼 달 · 감사에 금액 · 기간 밖 날짜 · 글 칸 검사 걷음 · 10일 포함 무시 · 판 상한 걷음 · 기간 시작일 검사 걷음) = 모두 ✗', killQ.length === 0, killQ.join(' | '));
   } catch (e) { T('66 판2 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
   finally { const s = JSON.parse(snapQ); mem.gw_users = s.u; mem.gw_data = s.d; Date.now = now0Q; blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; blobsMock.hooks.beforeGet = null; blobsMock.hooks.beforeSet = null; blobsMock.hooks.failList = false; }
 }

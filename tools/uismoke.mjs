@@ -20990,7 +20990,26 @@ try {
     I.closed = /\(closed \? '' : ' data-pay-row="' \+ mid \+ '"'\)/.test(seg) && /dredgeOn && !closed \?/.test(seg) && /function payClose\(\)\{[\s\S]{0,120}if \(!confirm\(/.test(seg) && /function payReopen\(\)\{[\s\S]{0,120}if \(!confirm\(/.test(seg);
     return { ok: Object.values(I).every((v) => v === true), info: I };
   };
-  const rQ = chkQ(html);
+  // 그리기 실제 실행(가짜 자료) — payRender 를 문서 흉내 위에서 돌려 칸·합계·확정 달 닫힘·빼낸 줄·이름 이스케이프를 본다
+  const runQ = (H) => {
+    const seg = segQ(H), v = (n) => { const m = new RegExp('\\n  var ' + n + ' = [^\\n]*').exec(seg); return m ? m[0] : ''; };
+    const host = { innerHTML: '', querySelectorAll: () => [] };
+    const doc = { getElementById: (id) => (id === 'payHost' ? host : null) };
+    const escF = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const f = new Function('document', 'esc', v('payS') + v('PAY_CORP') + v('PAY_WHY') + '\n' + fnQ(H, 'payWon') + fnQ(H, 'payLawTxt') + fnQ(H, 'payRender') + '\nreturn function(d){ payS.data = d; payS.corp = d.corp; payRender(); return document.getElementById("payHost").innerHTML; };')(doc, escF);
+    const C = (o) => Object.assign({ cols: { base: 2600000, allow: 595000, adj: 0, bonus: 0, meal: 200000, car: 0 }, taxable: 3195000, gross: 3395000, ded: { pension: 151760, health: 114860, care: 15090, emp: 28750, income: 89750, local: 8970 }, ded_total: 409180, net: 2985820, lines: [], notes: [], dredge: { days: 13.5, total: 595000 } }, o || {});
+    const M = (id, nm) => ({ id: id, name: nm, rank: '반장', emp_no: '12', hire_date: '2022-01-17' });
+    const D = (state) => ({ corp: 'env', ym: '2026-11', period: { from: '2026-10-15', to: '2026-11-14' }, pay_day: 15, state: state, rev: '', calc_sig: 'x', frozen_law: state === 'closed' ? { ver: 'v1' } : null, law: { on: true, ver: 'v1', rates: { pension: 0.0475, health: 0.03595, care_ratio: 0.1314, emp: 0.009, local: 0.1, cut: 10 } }, loose: [{ mid: 'k', name: '<b>회사없음</b>' }],
+      rows: [{ mid: 'a', member: M('a', '<img src=x>가'), state: 'ok', calc: C(), ver: { from: '2026-10', dredge: true }, row: { dredge: [] } }, { mid: 'b', member: M('b', '나'), state: 'ok', calc: C({ ded: { pension: null, health: 1, care: 1, emp: null, income: 1, local: 1 }, net: 100 }), ver: { from: '2026-10' } },
+        { mid: 'c', member: M('c', '다'), state: 'excluded', row: { off: true } }, { mid: 'e', member: M('e', '라'), state: 'no_base' }] });
+    const o = f(D('open')), cz = f(D('closed'));
+    return { open: o, closed: cz,
+      ok: o.indexOf('2,985,820') > 0 && o.indexOf('합계 2명') > 0 && o.indexOf('&lt;img src=x&gt;가') > 0 && o.indexOf('<img src=x>') < 0 && o.indexOf('&lt;b&gt;회사없음') > 0 && (o.match(/<td class="none" rowspan="2">—<\/td>/g) || []).length === 2
+        && o.indexOf('이 달 이 대장에서 뺌') > 0 && o.indexOf('data-pay-out="e"') > 0 && o.indexOf('data-pay-dredge="a"') > 0 && o.indexOf('data-pay-row="b"') > 0 && o.indexOf('id="payCloseBtn"') > 0 && o.indexOf('2,985,920') > 0
+        && cz.indexOf('data-pay-row=') < 0 && cz.indexOf('data-pay-dredge=') < 0 && cz.indexOf('data-pay-out=') < 0 && cz.indexOf('id="payReopenBtn"') > 0 && cz.indexOf('id="payCloseBtn"') < 0 && cz.indexOf('회사 표시가 비어') < 0 };
+  };
+  const rQ = chkQ(html), gQ = (() => { try { return runQ(html); } catch (e) { return { ok: false, err: String(e.message) }; } })();
+  const muG = (a, b) => { if (html.split(a).length !== 2) return 'no-site:' + a.slice(0, 40); try { return runQ(html.replace(a, () => b)).ok; } catch (e) { return false; } };
   const muQ = (a, b) => { if (html.split(a).length !== 2) return 'no-site:' + a.slice(0, 40); return chkQ(html.replace(a, () => b)).ok; };
   const MQ = [
     muQ('    if (payBtn) payBtn.classList.toggle("perm-hidden", !adminUser);', '    if (payBtn) payBtn.classList.toggle("perm-hidden", false);'),
@@ -21004,6 +21023,11 @@ try {
   ];
   T('66 판2 ① 급여 탭 배선·글 함수: 단추(인사·일용직 다음 · 관리자만 보임 · 아니면 홈으로) · 화면 구역·탭 바꾸기·payOpen 관리자 확인 · 서버 gw-pay 동작 10개와 화면 호출이 서로 같음 · 화면 코드에 금액·요율 숫자 없음 · 이름·꼬리표 esc · 창 제목 textContent · 요율 줄 글·금액 쉼표·달 넘기기 · 대장 머리 = 회계사무소 대장 꼴 · 확정 달은 넣는 칸 닫힘·확정/풀기 확인 창',
     rQ.ok, JSON.stringify(rQ.info));
+  const MG = [muG('T.taxable += c.taxable; T.gross += c.gross; T.ded += c.ded_total; T.net += c.net;', 'T.taxable += c.taxable; T.gross += c.gross; T.ded += c.ded_total;'),
+    muG("var cell = function(x, sub){ return '<td class=\"num' + ed + '\" rowspan=\"2\"' + (closed ? '' :", "var cell = function(x, sub){ return '<td class=\"num' + ed + '\" rowspan=\"2\"' + (false ? '' :"),
+    muG('var why = r.state === "excluded" ?', 'var why = r.state === "excluded_" ?')];
+  T('66 판2 ③ 그리기 실제 실행(가짜 자료 · 문서 흉내): 차인 2,985,820 · 합계 2명(빼낸·기준 없는 줄 제외) · 차인 합계 · 가입 제외 — 2칸 · 이름·회사 없는 직원 이스케이프 · 빼기·하수준설·그 달 값 단추 · 확정 달은 넣는 단추 없음·풀기 단추 · 결함 사본 ' + MG.length + '개(합계 줄 · 확정 달 칸 열림 · 빼낸 줄) = 모두 ✗',
+    gQ.ok && MG.every((x) => x === false), JSON.stringify({ err: gQ.err, mut: MG, o: String(gQ.open || '').slice(0, 300) }));
   T('66 판2 ② 결함 사본 ' + MQ.length + '개(단추 늘 보임 · payOpen 관리자 확인 걷음 · 이름 esc 걷음 · 창 제목 innerHTML · 서버에 없는 동작 · 머리 칸 수 · 확정 달 칸 열림 · 요율 % 자리) = 모두 ✗', MQ.every((v) => v === false), JSON.stringify(MQ));
 } catch (e) { console.log('  (66 판2 검사 생략 — ' + e.message + ')'); fails++; }
 

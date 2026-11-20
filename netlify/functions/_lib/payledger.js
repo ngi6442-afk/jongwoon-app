@@ -183,6 +183,7 @@ function cleanRowIn(x, period) {
     if (lines.length) row.dredge = lines;
   }
   if (x.note !== undefined && x.note !== null && x.note !== '') { if (!textOk(x.note, LIM.note)) return no('note'); row.note = x.note; }
+  if (x.off !== undefined && x.off !== null && x.off !== false) { if (x.off !== true) return no('off'); row.off = true; }   // 이 달 이 대장에서 뺌(두 회사 재적·급여 없는 달)
   return { ok: true, row: row };
 }
 function cleanMonthDoc(d, key) {
@@ -200,9 +201,25 @@ function cleanMonthDoc(d, key) {
     rows[mid] = c.row;
   }
   if (d.state === 'closed' && !isObj(d.frozen)) return { ok: false, field: 'frozen' };
-  if (d.frozen !== null && d.frozen !== undefined && !isObj(d.frozen)) return { ok: false, field: 'frozen' };
+  if (d.frozen !== null && d.frozen !== undefined) { const fz = frozenOk(d.frozen); if (!fz.ok) return fz; }
   if (!int(d.updated_at, Number.MAX_SAFE_INTEGER)) return { ok: false, field: 'updated_at' };
   return { ok: true, doc: Object.assign({}, d, { rows: rows, frozen: d.frozen || null }) };
+}
+// 얼린 계산(확정 때) 꼴 — 화면이 그대로 그리는 칸만 본다(복원으로 들어온 틀린 꼴이 대장 화면을 멈추지 않게)
+function frozenOk(f) {
+  const num = function (v) { return typeof v === 'number' && Number.isFinite(v); };
+  const numN = function (v) { return v === null || num(v); };
+  if (!isObj(f) || !isObj(f.rows) || Object.keys(f.rows).length > LIM.rows) return { ok: false, field: 'frozen' };
+  if (typeof f.law_ver !== 'string' || !int(f.at, Number.MAX_SAFE_INTEGER)) return { ok: false, field: 'frozen' };
+  if (!isObj(f.period) || !realDay(f.period.from) || !realDay(f.period.to)) return { ok: false, field: 'frozen.period' };
+  for (const mid of Object.keys(f.rows)) {
+    const r = f.rows[mid], bad = { ok: false, field: 'frozen.rows.' + mid };
+    if (!MID.test(mid) || !isObj(r) || !isObj(r.cols) || !isObj(r.ded)) return bad;
+    if (!COLS.every(function (c) { return num(r.cols[c]); }) || !['pension', 'health', 'care', 'emp', 'income', 'local'].every(function (k) { return numN(r.ded[k]); })) return bad;
+    if (!['taxable', 'gross', 'ded_total', 'net'].every(function (k) { return num(r[k]); }) || !Array.isArray(r.lines) || !Array.isArray(r.notes)) return bad;
+    for (const k of ['name', 'rank', 'hire_date', 'emp_no']) if (!textOk(String(r[k] || ''), 60)) return bad;
+  }
+  return { ok: true };
 }
 function monthKey(corp, ym) { return 'pay:month:' + corp + ':' + ym; }
 function baseKey(corp, mid) { return 'pay:base:' + corp + ':' + mid; }
@@ -263,7 +280,9 @@ function buildInput(ver, row, conf, capsRes) {
     if (v > free) { fixed.push({ n: n + '(한도 초과분)', amt: v - free, taxfree: false, ord: false, col: k }); notes.push(n + ': 비과세 한도를 넘는 금액은 과세'); }
   };
   tf('meal', '식대', meal); tf('car', '자가운전보조금', car);
-  const inp = { base: base, hours: ver.hours, fixed: fixed, ot: row.ot || {}, fam: ver.fam, kids: ver.kids, pct: ver.pct, skip: ver.skip, fixed_ded: row.ded_fix || {} };
+  const ordMonth = ver.base + (ver.allow_ord ? ver.allow : 0);   // 통상시급은 기준 월액으로(일할·그 달 값으로 줄어든 달에도 시급이 낮아지지 않게)
+  if ((row.ot || row.minus_hours) && (pr || own(row, 'base') || (ver.allow_ord && own(row, 'allow')))) notes.push('통상시급은 기준 월액(기본급' + (ver.allow_ord ? ' + 통상임금에 넣은 수당' : '') + ') ÷ 월 소정근로시간으로 계산');
+  const inp = { base: base, hours: ver.hours, fixed: fixed, ot: row.ot || {}, fam: ver.fam, kids: ver.kids, pct: ver.pct, skip: ver.skip, fixed_ded: row.ded_fix || {}, ord_month: ordMonth };
   if (row.minus_hours) inp.minus_hours = row.minus_hours;
   if (row.adj_amt) inp.adj_amt = row.adj_amt;
   if (ver.pension_base) inp.pension_base = ver.pension_base;
@@ -279,4 +298,4 @@ function toCols(m) {
 }
 module.exports = { YM: YM, REV: REV, MID: MID, CORPS: CORPS, LIM: LIM, COLS: COLS, CONF_KEY: CONF_KEY, monthKey: monthKey, baseKey: baseKey, ymAdd: ymAdd, periodOf: periodOf, realDay: realDay, textOk: textOk,
   cleanVer: cleanVer, cleanBaseDoc: cleanBaseDoc, putVer: putVer, dropVer: dropVer, verFor: verFor, cleanConfIn: cleanConfIn, cleanConfDoc: cleanConfDoc, cleanRowIn: cleanRowIn, cleanMonthDoc: cleanMonthDoc, docOk: docOk,
-  dredgeCalc: dredgeCalc, buildInput: buildInput, toCols: toCols };
+  dredgeCalc: dredgeCalc, buildInput: buildInput, toCols: toCols, frozenOk: frozenOk };

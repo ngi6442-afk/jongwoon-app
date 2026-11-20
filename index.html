@@ -33928,8 +33928,8 @@ function dutyStage(nx){
   //   서버 gw-pay(관리자만 · 계산은 서버만 — 화면은 받은 금액을 그리기만). 금액 칸 숫자·요율 숫자를 이 코드에 적지 않는다(설정·근거 표에서 옴).
   var payS = { corp: "env", ym: "", data: null, busy: false, seq: 0 };
   var PAY_CORP = { env: "종운환경", con: "종운건설" };
-  var PAY_WHY = { NO_BASE: "기준 없음", NO_BG: "요율 표 없음", NOT_PROMOTED: "요율 표 승격 전", SHA_CHANGED: "요율 표 내용 바뀜(다시 승격)", BAD_BG: "요율 표 꼴 틀림", FLAG_READ_FAILED: "승격 상태를 못 읽음", BG_READ_FAILED: "요율 표를 못 읽음", NO_RATE: "그 달 요율 없음", RATE_OVERLAP: "요율 행 겹침", BAD_RATE: "요율 값 틀림", NO_TAX_TABLE: "그 달 세액표 없음", NO_DREDGE_CONF: "하수준설 단가 설정 없음", BAD_INPUT: "넣은 값 틀림", CALC_FAILED: "계산 실패" };
-  var PAY_ERR = { PAY_STALE: "그사이 다른 사람이 고쳤습니다 — 다시 불러온 뒤 넣어 주세요", OVERWRITTEN: "저장 직후 다른 저장이 덮었습니다 — 다시 불러와 확인해 주세요", MONTH_CLOSED: "확정한 달은 고칠 수 없습니다(확정 풀기 뒤)", ROWS_NOT_READY: "계산이 안 된 사람이 있어 확정할 수 없습니다", LAW_OFF: "요율 표가 승격되지 않아 확정할 수 없습니다", VER_IN_USE: "이번 달 이전에 시작한 판은 지울 수 없습니다 — 같은 적용 달로 고쳐 주세요", KIND_MISMATCH: "저장 직전 판 상태가 바뀌었습니다 — 다시 열어 주세요", NO_CHANGE: "바뀐 값이 없습니다", ADMIN_ONLY: "관리자만 쓸 수 있습니다", WRITE_UNCONFIRMED: "저장했는지 확인하지 못했습니다 — 다시 불러와 확인해 주세요" };
+  var PAY_WHY = { PERIOD_MISMATCH: "급여 기간 밖 준설 날짜가 있음(하수준설 내역에서 지워 주세요)", NO_BASE: "기준 없음", NO_BG: "요율 표 없음", NOT_PROMOTED: "요율 표 승격 전", SHA_CHANGED: "요율 표 내용 바뀜(다시 승격)", BAD_BG: "요율 표 꼴 틀림", FLAG_READ_FAILED: "승격 상태를 못 읽음", BG_READ_FAILED: "요율 표를 못 읽음", NO_RATE: "그 달 요율 없음", RATE_OVERLAP: "요율 행 겹침", BAD_RATE: "요율 값 틀림", NO_TAX_TABLE: "그 달 세액표 없음", NO_DREDGE_CONF: "하수준설 단가 설정 없음", BAD_INPUT: "넣은 값 틀림", CALC_FAILED: "계산 실패" };
+  var PAY_ERR = { PAY_STALE: "그사이 다른 사람이 고쳤습니다 — 다시 불러온 뒤 넣어 주세요", OVERWRITTEN: "저장 직후 다른 저장이 덮었습니다 — 다시 불러와 확인해 주세요", MONTH_CLOSED: "확정한 달은 고칠 수 없습니다(확정 풀기 뒤)", ROWS_NOT_READY: "계산이 안 된 사람이 있어 확정할 수 없습니다", LAW_OFF: "요율 표가 승격되지 않아 확정할 수 없습니다", VER_IN_USE: "이번 달 이전에 시작한 판은 지울 수 없습니다 — 같은 적용 달로 고쳐 주세요", KIND_MISMATCH: "저장 직전 판 상태가 바뀌었습니다 — 다시 열어 주세요", NO_CHANGE: "바뀐 값이 없습니다", CALC_CHANGED: "화면을 연 뒤 기준·설정·요율이 바뀌었습니다 — 다시 불러온 금액을 보고 확정해 주세요", NO_ROWS: "확정할 사람이 없습니다", ADMIN_ONLY: "관리자만 쓸 수 있습니다", WRITE_UNCONFIRMED: "저장했는지 확인하지 못했습니다 — 다시 불러와 확인해 주세요" };
   function payWon(n){ return (n === null || n === undefined || n === "") ? "" : Number(n).toLocaleString("ko-KR"); }
   function payYmNow(){ var d = new Date(Date.now() + 9 * 36e5); return d.getUTCFullYear() + "-" + String(d.getUTCMonth() + 1).padStart(2, "0"); }
   function payYmAdd(ym, n){ var y = +ym.slice(0, 4), m = +ym.slice(5) - 1 + n; var yy = y + Math.floor(m / 12), mm = ((m % 12) + 12) % 12 + 1; return yy + "-" + String(mm).padStart(2, "0"); }
@@ -33969,8 +33969,8 @@ function dutyStage(nx){
       var top = '<tr class="a"><td class="l">' + esc(m.emp_no || "") + '</td>' + nameCell;
       var bot = '<tr class="b"><td class="l">' + esc(m.hire_date || "") + '</td><td class="l">' + esc(m.rank || "") + '</td>';
       if (!c){
-        var why = r.state === "no_base" ? '기준 없음 — 이름을 눌러 기준을 넣어 주세요' : (r.state === "off" ? '계산 못 함: ' + esc(PAY_WHY[r.off && r.off.why] || (r.off && r.off.why) || "") + (r.off && r.off.keys && r.off.keys.length ? " (" + esc(r.off.keys.join(",")) + ")" : "") : (r.state === "bad" ? '저장된 기준 꼴이 틀림(관리자 확인)' : (r.state === "unread" ? '기준을 읽지 못함(새로고침)' : '확정 때 이 사람 값 없음')));
-        h += top + '<td class="pay-miss" colspan="16" rowspan="2">' + why + (r.state === "off" && !closed ? ' <button type="button" class="vs-chip" data-pay-row="' + mid + '">그 달 값</button>' : '') + '</td></tr>' + bot + '</tr>';
+        var why = r.state === "excluded" ? '이 달 이 대장에서 뺌' + (closed ? '' : ' <button type="button" class="vs-chip" data-pay-row="' + mid + '">다시 넣기</button>') : r.state === "no_base" ? '기준 없음 — 이름을 눌러 기준을 넣어 주세요' + (closed ? '' : ' 또는 <button type="button" class="vs-chip" data-pay-out="' + mid + '">이 달 이 대장에서 빼기</button>') : (r.state === "off" ? '계산 못 함: ' + esc(PAY_WHY[r.off && r.off.why] || (r.off && r.off.why) || "") + (r.off && r.off.keys && r.off.keys.length ? " (" + esc(r.off.keys.join(",")) + ")" : "") : (r.state === "bad" ? '저장된 기준 꼴이 틀림(관리자 확인)' : (r.state === "unread" ? '기준을 읽지 못함(새로고침)' : '확정 때 이 사람 값 없음')));
+        h += top + '<td class="pay-miss" colspan="16" rowspan="2">' + why + (r.state === "off" && !closed ? (r.off && r.off.why === "PERIOD_MISMATCH" ? ' <button type="button" class="vs-chip" data-pay-dredge="' + mid + '">하수준설 내역</button>' : ' <button type="button" class="vs-chip" data-pay-row="' + mid + '">그 달 값</button>') : '') + '</td></tr>' + bot + '</tr>';
         return;
       }
       n++;
@@ -34005,12 +34005,15 @@ function dutyStage(nx){
     Array.prototype.forEach.call(host.querySelectorAll("[data-pay-base]"), function(b){ b.onclick = function(){ payBaseDlg(b.getAttribute("data-pay-base")); }; });
     Array.prototype.forEach.call(host.querySelectorAll("[data-pay-row]"), function(b){ b.onclick = function(){ payRowDlg(b.getAttribute("data-pay-row")); }; });
     Array.prototype.forEach.call(host.querySelectorAll("[data-pay-dredge]"), function(b){ b.onclick = function(){ payDredgeDlg(b.getAttribute("data-pay-dredge")); }; });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-pay-out]"), function(b){ b.onclick = function(){ var m = b.getAttribute("data-pay-out"), r = payRow(m); if (!confirm(((r && r.member && r.member.name) || "") + " — " + payS.ym + " " + PAY_CORP[payS.corp] + " 대장에서 뺄까요? (두 회사 재적·이 달 급여 없음)")) return; paySaveRow(m, Object.assign({}, (r && r.row) || {}, { off: true }), null); }; });
     var cb = document.getElementById("payConfBtn"); if (cb) cb.onclick = payConfDlg;
     var cl = document.getElementById("payCloseBtn"); if (cl) cl.onclick = payClose;
     var ro = document.getElementById("payReopenBtn"); if (ro) ro.onclick = payReopen;
   }
   // 창(하나를 돌려 씀)
+  var payDlgSeq = 0;
   function payDlg(title, body, onSave, saveTxt){
+    payDlgSeq++;
     var bd = document.getElementById("payBackdrop");
     if (!bd){
       bd = document.createElement("div"); bd.className = "modal-backdrop"; bd.id = "payBackdrop";
@@ -34076,7 +34079,7 @@ function dutyStage(nx){
         var f = bt.getAttribute("data-pay-drop"); if (!confirm(f + " 판을 지울까요? (아직 오지 않은 달의 판)")) return;
         gwCall("gw-pay", { action: "pay_base_drop", corp: payS.corp, mid: mid, from: f, rev: rev }).then(function(r3){ if (r3.status !== 200){ payErr(r3, "판 지우기"); return; } payDlgClose(); payLoad(); }, function(){ alert("판 지우기 실패(네트워크)"); });
       }; });
-      var t = null, prev = function(){ clearTimeout(t); t = setTimeout(function(){ var ver = payBaseRead(true); if (!ver) return; gwCall("gw-pay", { action: "pay_row_preview", corp: payS.corp, ym: payS.ym, mid: mid, ver: ver, row: (payRow(mid) || {}).row || {} }).then(function(r4){ var el = document.getElementById("pbCalc"); if (el && r4.status === 200) el.innerHTML = '<div class="pay-sub">' + esc(payS.ym) + ' 이 판으로 계산하면</div>' + payCalcTxt(r4.body.calc, r4.body.off); }, function(){}); }, 400); };
+      var myDlg = payDlgSeq, pq = 0, t = null, prev = function(){ clearTimeout(t); t = setTimeout(function(){ var ver = payBaseRead(true); if (!ver) return; var my = ++pq; gwCall("gw-pay", { action: "pay_row_preview", corp: payS.corp, ym: payS.ym, mid: mid, ver: ver, row: (payRow(mid) || {}).row || {} }).then(function(r4){ if (myDlg !== payDlgSeq || my !== pq) return; var el = document.getElementById("pbCalc"); if (el && r4.status === 200) el.innerHTML = '<div class="pay-sub">' + esc(payS.ym) + ' 이 판으로 계산하면</div>' + payCalcTxt(r4.body.calc, r4.body.off); }, function(){}); }, 400); };
       Array.prototype.forEach.call(body.querySelectorAll("input,select"), function(el){ el.addEventListener("input", prev); el.addEventListener("change", prev); });
       prev();
     }, function(){ alert("기준 읽기 실패(네트워크)"); });
@@ -34101,10 +34104,10 @@ function dutyStage(nx){
     h += '<div class="pay-sub">입사·퇴사 달 일할(그 달 값을 넣지 않은 칸에 월액 ÷ 날수 × 일한 날)</div><div class="pay-grid">' + payFld("prDays", "일한 날", row.prorate ? row.prorate.days : "") + payFld("prOf", "그 달 날수 기준", row.prorate ? row.prorate.of : "", "대장은 30") + '</div>';
     h += '<div class="pay-sub">초과/차감 수당(통상시급 × 시간 × 가산율 — 하수준설 연장은 수당 칸의 내역에서)</div><div class="pay-grid">' + payFld("prExt", "연장 시간", ot.ext) + payFld("prNight", "야간 시간", ot.night) + payFld("prHol", "휴일 시간", ot.hol) + payFld("prHol8", "휴일 8시간 초과", ot.hol8) + payFld("prMinus", "결근·조퇴 차감 시간", row.minus_hours) + payFld("prAdj", "직접 넣는 금액(±)", row.adj_amt) + '</div>';
     h += '<div class="pay-sub">공제를 계산 대신 이 값으로(회계사무소·공단 금액을 따르기로 한 칸만)</div><div class="pay-grid">' + payFld("prDP", "국민연금", df.pension) + payFld("prDH", "건강보험", df.health) + payFld("prDC", "장기요양", df.care) + payFld("prDE", "고용보험", df.emp) + '</div>';
-    h += '<label class="pay-f"><span>비고</span><input id="prNote" maxlength="60" value="' + esc(row.note || "") + '"></label><div id="prCalc"></div>';
+    h += '<label class="pay-f"><span>비고</span><input id="prNote" maxlength="60" value="' + esc(row.note || "") + '"></label><div class="pay-cks">' + payCk("prOff", "이 달 이 대장에서 뺌(두 회사 재적·이 달 급여 없음)", row.off) + '</div><div id="prCalc"></div>';
     var body = payDlg((m.name || "") + " — " + payS.ym + " 값", h, function(btn){ var x = payRowRead(row); if (!x) return; paySaveRow(mid, x, btn); });
-    var t = null, prev = function(){ clearTimeout(t); t = setTimeout(function(){ var x = payRowRead(row, true); if (!x) return; gwCall("gw-pay", { action: "pay_row_preview", corp: payS.corp, ym: payS.ym, mid: mid, row: x }).then(function(r4){ var el = document.getElementById("prCalc"); if (el && r4.status === 200) el.innerHTML = payCalcTxt(r4.body.calc, r4.body.off); else if (el && r4.body && r4.body.error_code) el.innerHTML = '<div class="pay-calc off">' + esc(r4.body.error_code) + (r4.body.field ? " (" + esc(r4.body.field) + ")" : "") + '</div>'; }, function(){}); }, 400); };
-    Array.prototype.forEach.call(body.querySelectorAll("input"), function(el){ el.addEventListener("input", prev); });
+    var myDlg = payDlgSeq, pq = 0, t = null, prev = function(){ clearTimeout(t); t = setTimeout(function(){ var x = payRowRead(row, true); if (!x) return; var my = ++pq; gwCall("gw-pay", { action: "pay_row_preview", corp: payS.corp, ym: payS.ym, mid: mid, row: x }).then(function(r4){ if (myDlg !== payDlgSeq || my !== pq) return; var el = document.getElementById("prCalc"); if (el && r4.status === 200) el.innerHTML = payCalcTxt(r4.body.calc, r4.body.off); else if (el && r4.body && r4.body.error_code) el.innerHTML = '<div class="pay-calc off">' + esc(r4.body.error_code) + (r4.body.field ? " (" + esc(r4.body.field) + ")" : "") + '</div>'; }, function(){}); }, 400); };
+    Array.prototype.forEach.call(body.querySelectorAll("input"), function(el){ el.addEventListener("input", prev); el.addEventListener("change", prev); });
     prev();
   }
   function payRowRead(row, quiet){   // row = 지금 저장된 값(하수준설 줄은 그대로 이어 둠)
@@ -34120,6 +34123,7 @@ function dutyStage(nx){
     if (Object.keys(df).length) x.ded_fix = df;
     var nt = String(g("prNote").value || "").trim(); if (nt) x.note = nt;
     if (row && row.dredge) x.dredge = row.dredge;
+    if (g("prOff") && g("prOff").checked) x.off = true;
     if (badF.length){ if (!quiet) alert("숫자를 확인해 주세요: " + badF.join(", ")); return null; }
     return x;
   }
@@ -34157,18 +34161,23 @@ function dutyStage(nx){
       h += '<p class="pay-hint">추가 수당은 앱이 계산합니다. 단가로 풀리지 않는 금액은 \'더한 금액\'에, 기본급 포함/추가 지급 나눔이 자동과 다르면 \'나눔\'을 바꿔 주세요. 총 수당이 이 달 대장의 수당 칸으로 들어갑니다.</p>';
       return h;
     };
-    var calcNow = null;
+    var calcNow = null, myDlg, rq = 0;
     var body = payDlg(((r.member && r.member.name) || "") + " — " + payS.ym + " 하수준설 수당 내역", draw(r.calc), function(btn){ var x = Object.assign({}, r.row || {}); if (lines.length) x.dredge = lines; else delete x.dredge; paySaveRow(mid, x, btn); });
+    myDlg = payDlgSeq;
+    var keepNew = function(){ var o = {}; ["drNewD", "drNewDays", "drNewOt"].forEach(function(id){ var el = document.getElementById(id); if (el) o[id] = el.value; }); return o; };
+    var putNew = function(o){ Object.keys(o).forEach(function(id){ var el = document.getElementById(id); if (el) el.value = o[id]; }); };
     var refresh = function(){
       var x = Object.assign({}, r.row || {}); if (lines.length) x.dredge = lines; else delete x.dredge;
-      gwCall("gw-pay", { action: "pay_row_preview", corp: payS.corp, ym: payS.ym, mid: mid, row: x }).then(function(res){ calcNow = res.status === 200 ? res.body.calc : null; body.innerHTML = draw(calcNow); bind(); if (res.status !== 200) gwToast("줄을 확인해 주세요 — " + ((res.body && res.body.field) || (res.body && res.body.error_code) || res.status), true); }, function(){ body.innerHTML = draw(null); bind(); });
+      var my = ++rq;
+      gwCall("gw-pay", { action: "pay_row_preview", corp: payS.corp, ym: payS.ym, mid: mid, row: x }).then(function(res){ if (myDlg !== payDlgSeq || my !== rq) return; var kn = keepNew(); calcNow = res.status === 200 ? res.body.calc : null; body.innerHTML = draw(calcNow); bind(); putNew(kn); if (res.status !== 200) gwToast("줄을 확인해 주세요 — " + ((res.body && res.body.field) || (res.body && res.body.error_code) || res.status), true); }, function(){ if (myDlg !== payDlgSeq || my !== rq) return; var kn = keepNew(); body.innerHTML = draw(null); bind(); putNew(kn); });
     };
     var bind = function(){
       var q = function(sel, fn){ Array.prototype.forEach.call(body.querySelectorAll(sel), fn); };
       q("[data-dr-days]", function(el){ el.onchange = function(){ lines[+el.getAttribute("data-dr-days")].days = +el.value; refresh(); }; });
       q("[data-dr-side]", function(el){ el.onchange = function(){ lines[+el.getAttribute("data-dr-side")].side = el.value; refresh(); }; });
-      q("[data-dr-ot]", function(el){ el.onchange = function(){ var n = payNum(el, true); if (n === null) n = 0; if (isNaN(n)){ alert("연장시간은 숫자로"); return; } lines[+el.getAttribute("data-dr-ot")].ot = n; refresh(); }; });
-      q("[data-dr-add]", function(el){ el.onchange = function(){ var n = payNum(el, true); if (n === null) n = 0; if (isNaN(n)){ alert("더한 금액은 숫자로"); return; } lines[+el.getAttribute("data-dr-add")].add = n; refresh(); }; });
+      var numIn = function(el, k, lab){ var put = function(){ var n = payNum(el, true); if (n === null) n = 0; if (isNaN(n)) return false; lines[+el.getAttribute("data-dr-" + k)][k] = n; return true; }; el.oninput = put; el.onchange = function(){ if (!put()){ alert(lab + "은 숫자로"); return; } refresh(); }; };
+      q("[data-dr-ot]", function(el){ numIn(el, "ot", "연장시간"); });
+      q("[data-dr-add]", function(el){ numIn(el, "add", "더한 금액"); });
       q("[data-dr-del]", function(el){ el.onclick = function(){ lines.splice(+el.getAttribute("data-dr-del"), 1); refresh(); }; });
       q("[data-dr-copy]", function(el){ el.onclick = function(){ var o = payRow(el.getAttribute("data-dr-copy")); if (!o || !o.row || !o.row.dredge) return; if (lines.length && !confirm("지금 줄을 지우고 그 사람 줄로 바꿀까요?")) return; lines = o.row.dredge.map(function(l){ return { d: l.d, days: l.days, ot: l.ot, add: l.add, side: l.side }; }); refresh(); }; });
       var ad = document.getElementById("drAdd"); if (ad) ad.onclick = function(){
@@ -34203,8 +34212,8 @@ function dutyStage(nx){
   function payClose(){
     var d = payS.data; if (!d) return;
     if (!confirm(PAY_CORP[payS.corp] + " " + d.ym + " 급여대장을 확정할까요?\n확정하면 지금 금액을 얼려 두고, 그 뒤에 기준·요율이 바뀌어도 이 달 금액은 그대로입니다(확정 풀기로 다시 열 수 있음).")) return;
-    gwCall("gw-pay", { action: "pay_month_close", corp: payS.corp, ym: d.ym, rev: d.rev }).then(function(res){
-      if (res.status !== 200){ if (res.body && res.body.mids){ var nm = res.body.mids.map(function(x){ var r = payRow(x); return (r && r.member && r.member.name) || x; }); alert("확정 못 함 — 계산이 안 된 사람: " + nm.join(", ")); } else payErr(res, "확정"); return; }
+    gwCall("gw-pay", { action: "pay_month_close", corp: payS.corp, ym: d.ym, rev: d.rev, sig: d.calc_sig }).then(function(res){
+      if (res.status !== 200){ if (res.body && res.body.mids){ var nm = res.body.mids.map(function(x){ var r = payRow(x); return (r && r.member && r.member.name) || x; }); alert("확정 못 함 — 계산이 안 된 사람: " + nm.join(", ")); } else { payErr(res, "확정"); if (res.body && res.body.error_code === "CALC_CHANGED") payLoad(); } return; }
       gwToast("확정했습니다"); payLoad();
     }, function(){ alert("확정 실패(네트워크)"); });
   }

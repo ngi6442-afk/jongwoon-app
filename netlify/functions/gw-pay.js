@@ -102,14 +102,14 @@ function suggestOf(bg, m, ym) {
 }
 function memberOut(m) { return { id: m.id, name: String(m.name || ''), rank: String(m.rank || ''), dept: String(m.dept || ''), corp: String(m.corp || ''), emp_type: String(m.emp_type || ''), hire_date: String(m.hire_date || ''), leave_date: String(m.leave_date || ''), emp_no: String(m.emp_no || '') }; }
 // 그 달 급여대장 사람: 삭제·시험 계정·지입차주·일용직 아님 · 그 회사(both 는 두 회사) · 기간 안에 재직(입사일 ≤ 기간 끝 · 퇴사일 없음 또는 ≥ 기간 시작)
-function payeeIn(m, corp, period) {
+function workedIn(m, period) {   // 회사와 상관없이: 삭제·시험·지입차주·일용직 아님 · 기간 안 재직
   if (!m || !m.id || m.del === 1 || m.test_acct) return false;
   if (NOT_PAYEE.indexOf(String(m.emp_type || '')) >= 0) return false;
-  if (!(m.corp === corp || m.corp === 'both')) return false;
   if (m.hire_date && PL.realDay(m.hire_date) && m.hire_date > period.to) return false;
   if (m.leave_date && String(m.leave_date) < period.from) return false;
   return true;
 }
+function payeeIn(m, corp, period) { return workedIn(m, period) && (m.corp === corp || m.corp === 'both'); }
 async function readConf(st) {
   const r = await getOpt(st, PL.CONF_KEY);
   if (!r.ok) return { ok: false };
@@ -178,7 +178,7 @@ async function handleMonthGet(st, c, d, R) {
   const doc = mo.doc, frozen = doc && doc.state === 'closed' ? doc.frozen : null;
   const ids = new Set();
   ms.forEach(function (m) { if (payeeIn(m, corp, period)) ids.add(m.id); });
-  lst.keys.forEach(function (k) { const pre = 'pay:base:' + corp + ':'; if (String(k).indexOf(pre) !== 0) return; const mid = k.slice(pre.length); if (PL.MID.test(mid) && byId[mid] && byId[mid].del !== 1) ids.add(mid); });   // 기준이 있는 사람(회사 표식이 달라도 대장에 남김)
+  lst.keys.forEach(function (k) { const pre = 'pay:base:' + corp + ':'; if (String(k).indexOf(pre) !== 0) return; const mid = k.slice(pre.length); if (PL.MID.test(mid) && workedIn(byId[mid], period)) ids.add(mid); });   // 그 회사 기준이 있는 사람(회사 표식이 달라도 · 기간 안 재직일 때만)
   if (doc) Object.keys(doc.rows).forEach(function (mid) { ids.add(mid); });
   if (frozen && frozen.rows) Object.keys(frozen.rows).forEach(function (mid) { ids.add(mid); });
   const ls = await lawState(st);
@@ -193,7 +193,10 @@ async function handleMonthGet(st, c, d, R) {
     o.ver = ver; o.base_rev = br.doc ? br.doc.rev : '';
     o.next_from = br.doc ? (br.doc.vers.filter(function (v) { return v.from > ym; }).map(function (v) { return v.from; })[0] || '') : '';
     if (m) { const sg = suggestOf(ls.on ? ls.bg : null, m, ym); if (ver && ((sg.pension && !ver.skip.pension) || (sg.emp && !ver.skip.emp))) o.suggest = sg; }
+    if (!ver && !(m && payeeIn(m, corp, period)) && !o.row) continue;   // 기준만 있고 그 달 판이 없는 사람(다음 달 입사 등)은 대장에 넣지 않음
+    if (o.row && o.row.off) { o.state = 'excluded'; out.push(o); continue; }   // 이 달 이 대장에서 뺌
     if (!ver) { o.state = 'no_base'; out.push(o); continue; }
+    if (o.row && o.row.dredge && o.row.dredge.some(function (l) { return l.d < period.from || l.d > period.to; })) { o.state = 'off'; o.off = { why: 'PERIOD_MISMATCH', keys: ['dredge'] }; out.push(o); continue; }   // 설정한 급여 기간 밖 준설 줄(기간 설정이 바뀜)
     const k = calcRow(ls, ym, ver, o.row, conf);
     if (k.ok) { o.state = 'ok'; o.calc = k.calc; } else { o.state = 'off'; o.off = { why: k.why, keys: k.keys || [] }; }
     out.push(o);
@@ -205,9 +208,13 @@ async function handleMonthGet(st, c, d, R) {
     const kb = (mb.emp_no && Number.isFinite(nb) ? String(nb).padStart(8, '0') : 'z') + String(mb.hire_date || '9999') + String(mb.name || b.mid);
     return ka < kb ? -1 : (ka > kb ? 1 : 0);
   });
+  const shown = new Set(out.map(function (o) { return o.mid; }));
   // 회사 표식이 비어 있어 어느 대장에도 안 들어간 재직 직원(사람이 '이 대장에 넣기'로 고름 — 이름만)
-  const loose = ms.filter(function (m) { return m && m.id && m.del !== 1 && !m.test_acct && !m.corp && NOT_PAYEE.indexOf(String(m.emp_type || '')) < 0 && (!m.leave_date || String(m.leave_date) >= period.from) && !ids.has(m.id); }).map(function (m) { return { mid: m.id, name: String(m.name || ''), rank: String(m.rank || '') }; });
-  return jr(200, { status: 'OK', corp: corp, ym: ym, period: period, pay_day: conf ? conf.pay_day : null, conf: conf ? { dredge: conf.dredge, period_day: conf.period_day, pay_day: conf.pay_day, rev: conf.rev } : null,
+  const loose = ms.filter(function (m) { return m && m.id && m.del !== 1 && !m.test_acct && !m.corp && NOT_PAYEE.indexOf(String(m.emp_type || '')) < 0 && (!m.leave_date || String(m.leave_date) >= period.from) && !shown.has(m.id); }).map(function (m) { return { mid: m.id, name: String(m.name || ''), rank: String(m.rank || '') }; });
+  // 화면이 본 계산의 지문 — 확정 요청이 같은 지문을 보내야 확정(보는 사이 기준·설정·승격이 바뀌면 다시 보게)
+  const sig = crypto.createHash('sha256').update(JSON.stringify(out.map(function (o) { return [o.mid, o.state, o.calc ? [o.calc.gross, o.calc.ded_total, o.calc.net, o.calc.law_sha || ''] : null]; }))).digest('hex').slice(0, 16);
+  const fp = frozen && frozen.period ? frozen.period : period, fpd = frozen ? (frozen.pay_day === undefined ? null : frozen.pay_day) : (conf ? conf.pay_day : null);   // 확정한 달 머리 = 확정 때 기간·지급일
+  return jr(200, { status: 'OK', corp: corp, ym: ym, period: fp, pay_day: fpd, calc_sig: sig, conf: conf ? { dredge: conf.dredge, period_day: conf.period_day, pay_day: conf.pay_day, rev: conf.rev } : null,
     state: doc ? doc.state : 'open', rev: doc ? doc.rev : '', closed_at: doc && doc.closed_at || 0, closed_by: doc && doc.closed_by || '', frozen_law: frozen ? { ver: frozen.law_ver || '', at: frozen.at || 0 } : null,
     law: lawOut(ls, ym), rows: out, loose: loose, request_id: R });
 }
@@ -266,11 +273,12 @@ async function handleClose(st, c, d, R) {
   if (b.state === 'closed') return conflict('MONTH_CLOSED', R);
   if (b.rev !== d.rev) return conflict('PAY_STALE', R);
   if (!b.law.on) return conflict('LAW_OFF', R);
-  const notOk = b.rows.filter(function (r) { return r.state !== 'ok'; });
+  if (d.sig !== b.calc_sig) return conflict('CALC_CHANGED', R);   // 화면을 연 뒤 기준·설정·승격이 바뀜 — 다시 불러와 보고 확정
+  const notOk = b.rows.filter(function (r) { return r.state !== 'ok' && r.state !== 'excluded'; });
   if (notOk.length) return jr(409, { status: 'CONFLICT', error_code: 'ROWS_NOT_READY', mids: notOk.map(function (r) { return r.mid; }), request_id: R });
-  if (!b.rows.length) return conflict('NO_ROWS', R);
+  if (!b.rows.some(function (r) { return r.state === 'ok'; })) return conflict('NO_ROWS', R);
   const rows = {};
-  b.rows.forEach(function (r) { rows[r.mid] = Object.assign({}, r.calc, { name: r.member ? r.member.name : '', rank: r.member ? r.member.rank : '', hire_date: r.member ? r.member.hire_date : '', emp_no: r.member ? r.member.emp_no : '', from: r.ver ? r.ver.from : '' }); });
+  b.rows.filter(function (r) { return r.state === 'ok'; }).forEach(function (r) { rows[r.mid] = Object.assign({}, r.calc, { name: r.member ? r.member.name : '', rank: r.member ? r.member.rank : '', hire_date: r.member ? r.member.hire_date : '', emp_no: r.member ? r.member.emp_no : '', from: r.ver ? r.ver.from : '' }); });
   const rd = function () { return readMonth(st, d.corp, d.ym); };
   const mo = await rd();
   if (!mo.ok) return unread(mo.bad ? 'PAY_DOC_BAD' : 'PAY_READ_FAILED', R);
@@ -279,7 +287,7 @@ async function handleClose(st, c, d, R) {
     frozen: { at: now, by: c.member.id, law_ver: b.law.ver, period: b.period, pay_day: b.pay_day, conf: b.conf ? { dredge: b.conf.dredge, period_day: b.conf.period_day, pay_day: b.conf.pay_day } : null, rows: rows } };
   const w = await writeChecked(st, PL.monthKey(d.corp, d.ym), rd, d.rev, doc);
   if (w.res !== 'ok') return writeErr(w, R);
-  const au = await audit(c, '급여대장 확정', d.corp + ':' + d.ym, b.rows.length + '명 · 요율 표 ' + b.law.ver);
+  const au = await audit(c, '급여대장 확정', d.corp + ':' + d.ym, Object.keys(rows).length + '명 · 요율 표 ' + b.law.ver);
   return jr(200, { status: 'OK', rev: doc.rev, audit: au, request_id: R });
 }
 // 확정 풀기 — 얼린 값은 지우고 다시 계산하는 상태로(감사 남김)
@@ -380,12 +388,10 @@ async function handler(event) {
   if (event.httpMethod !== 'POST') return jr(405, { status: 'REJECTED', error_code: 'METHOD_NOT_ALLOWED', request_id: R });
   setupBlobContext(event);
   let d;
-  try {
-    const h = event.headers || {};
-    // 앱 gwCall 은 1MB 넘는 본문만 gzip 으로 보낸다 — 급여 요청은 그보다 작아야 정상이라 풀되 크기를 묶는다
-    if (String(h['x-gw-enc'] || h['X-GW-Enc'] || '').toLowerCase() === 'gzip') d = JSON.parse(require('zlib').gunzipSync(Buffer.from(event.body || '', event.isBase64Encoded ? 'base64' : 'binary'), { maxOutputLength: 2 * 1024 * 1024 }).toString('utf8'));
-    else d = JSON.parse(event.isBase64Encoded ? Buffer.from(event.body || '', 'base64').toString('utf8') : (event.body || '{}'));
-  } catch (e) { return bad('INVALID_JSON', R); }
+  const hh = event.headers || {};
+  // 앱 gwCall 은 1MB 넘는 본문만 gzip 으로 보낸다 — 급여 요청은 그보다 훨씬 작아 압축 본문은 받지 않는다(압축 풀기 자리를 늘리지 않음)
+  if (String(hh['x-gw-enc'] || hh['X-GW-Enc'] || '').toLowerCase() === 'gzip') return bad('BODY_TOO_BIG', R);
+  try { d = JSON.parse(event.isBase64Encoded ? Buffer.from(event.body || '', 'base64').toString('utf8') : (event.body || '{}')); } catch (e) { return bad('INVALID_JSON', R); }
   if (!d || typeof d !== 'object' || Array.isArray(d)) return bad('INVALID_JSON', R);
   const act = typeof d.action === 'string' ? d.action : '';
   if (!Object.prototype.hasOwnProperty.call(ACTS, act)) return bad('UNKNOWN_ACTION', R);

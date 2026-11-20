@@ -66,7 +66,9 @@ function calcMonth(rates, tax, inp) {
   let ord = base;
   fixed.forEach(function (x, i) { const a = amt(x && x.amt, 'fixed[' + i + ']'); if (x.ord) ord += a; lines.push({ n: String(x.n || ''), amt: a, taxfree: !!x.taxfree, col: colOf(x) }); });
   // 통상시급 = 통상임금 ÷ 월 소정근로시간, 원 미만 올림(가산임금이 '이상'이 되도록) — 명세서 계산식 글과 금액이 같은 시급을 쓴다
-  const hourly = hours > 0 ? (Math.ceil(ord / hours - 1e-9) || 0) : 0;   // || 0 = 통상임금 0일 때 -0 이 글에 찍히지 않게
+  // 66 판2: 일할·그 달 기본급으로 줄어든 달에도 통상시급은 기준 월액으로(ord_month — 부르는 쪽이 줌) · 없으면 그 달 통상임금
+  const ordBase = (inp.ord_month === undefined || inp.ord_month === null) ? ord : amt(inp.ord_month, 'ord_month');
+  const hourly = hours > 0 ? (Math.ceil(ordBase / hours - 1e-9) || 0) : 0;   // || 0 = 통상임금 0일 때 -0 이 글에 찍히지 않게
   if (!Number.isFinite(hourly)) throw bad('hours');   // 0에 아주 가까운 시간 수
   const OT = [['ext', '연장근로수당', 1 + rates.ot.ext], ['night', '야간근로 가산', rates.ot.night], ['hol', '휴일근로수당', 1 + rates.ot.hol], ['hol8', '휴일근로수당(8시간 초과)', 1 + rates.ot.hol8]];
   let otHours = 0;
