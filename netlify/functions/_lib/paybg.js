@@ -5,13 +5,17 @@
 'use strict';
 const VER = /^[A-Za-z0-9_.-]{2,40}$/;
 const YM = /^\d{4}-(0[1-9]|1[0-2])$/;
+const KEY = /^[a-z0-9_]{2,20}\.[a-z0-9_]{2,20}$/;
+const ROWS_MAX = 500;
+const SHA = /^[0-9a-f]{8,60}$/;   // 내용 지문 — PM 콘솔 인자 칸 길이(60) 안
 // 계산이 꼭 읽는 키(자료 저장소 pay_bg.py NEED 와 같은 목록)
-const NEED = ['pension.ee', 'pension.base_min', 'pension.base_max', 'health.rate', 'health.ee_share', 'health.prem_max', 'health.prem_min', 'care.rate', 'emp.ui_rate', 'emp.ee_share', 'tax.local', 'ot.ext', 'ot.night', 'ot.hol', 'ot.hol8'];
+const NEED = ['pension.ee', 'pension.base_unit', 'pension.base_min', 'pension.base_max', 'health.rate', 'health.ee_share', 'health.prem_max', 'health.prem_min', 'care.rate', 'emp.ui_rate', 'emp.ee_share', 'tax.local', 'cut.pension', 'cut.health', 'cut.care', 'cut.local', 'cut.income', 'ot.ext', 'ot.night', 'ot.hol', 'ot.hol8'];
+const OPT = ['cut.emp'];   // 없어도 되는 키(확인 필요로 남은 값) — 있으면 한 행만
 const nat = function (x) { return Number.isInteger(x) && x >= 0; };
 const pos = function (x) { return typeof x === 'number' && Number.isFinite(x) && x > 0; };
 
 function rowOk(r) {
-  return !!(r && typeof r.id === 'string' && typeof r.key === 'string' && (r.grade === '실측' || r.grade === '확인 필요') && typeof r.calc === 'boolean' && !(r.grade === '확인 필요' && r.calc !== false)
+  return !!(r && typeof r.id === 'string' && typeof r.key === 'string' && KEY.test(r.key) && (r.grade === '실측' || r.grade === '확인 필요') && typeof r.calc === 'boolean' && !(r.grade === '확인 필요' && r.calc !== false)
     && Number.isInteger(r.n) && Number.isInteger(r.d) && r.d > 0 && r.n >= 0 && typeof r.from === 'string' && YM.test(r.from) && (r.to === '' || (typeof r.to === 'string' && YM.test(r.to) && r.to >= r.from)));
 }
 function taxOk(t, m) {
@@ -29,15 +33,17 @@ function taxOk(t, m) {
   return true;
 }
 function bgOk(x) {
-  if (!(x && typeof x === 'object' && x.schema === 1 && x.domain === 'pay' && typeof x.ver === 'string' && VER.test(x.ver) && Array.isArray(x.rows) && x.rows.length && typeof x.sha === 'string' && x.sha.length >= 8)) return false;
+  if (!(x && typeof x === 'object' && x.schema === 1 && x.domain === 'pay' && typeof x.ver === 'string' && VER.test(x.ver) && Array.isArray(x.rows) && x.rows.length && x.rows.length <= ROWS_MAX && typeof x.sha === 'string' && SHA.test(x.sha))) return false;
   const ids = {};
   for (const r of x.rows) { if (!rowOk(r) || ids[r.id]) return false; ids[r.id] = 1; }
   return taxOk(x.simptax, x.simptax_meta);
 }
+// 꼭 읽는 키 가운데 계산에 쓰는 행이 하나도 없는 키 — 이 목록이 비지 않은 표는 승격해도 어느 달도 계산하지 못한다(옛 꼴 표)
+function missing(bg) { const have = Object.create(null); bg.rows.forEach(function (r) { if (r.calc === true) have[r.key] = 1; }); return NEED.filter(function (k) { return !have[k]; }); }
 function bgSum(bg) {   // 서버가 행에서 다시 셈(판 머리의 n_* 를 믿지 않음)
   let ck = '';
   bg.rows.forEach(function (r) { const c = typeof r.checked === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.checked) ? r.checked : ''; if (c > ck) ck = c; });
-  return { ver: bg.ver, sha: bg.sha, checked: ck, n: bg.rows.length, n_pending: bg.rows.filter(function (r) { return r.grade === '확인 필요'; }).length, n_calc_false: bg.rows.filter(function (r) { return r.calc === false; }).length, tax_from: bg.simptax_meta.from, tax_rows: bg.simptax.rows.length };
+  return { ver: bg.ver, sha: bg.sha, checked: ck, n: bg.rows.length, n_pending: bg.rows.filter(function (r) { return r.grade === '확인 필요'; }).length, n_calc_false: bg.rows.filter(function (r) { return r.calc === false; }).length, tax_from: bg.simptax_meta.from, tax_rows: bg.simptax.rows.length, missing: missing(bg) };
 }
 // 요율 한 벌: ym = 급여 귀속 달(보험료·가산율) · payYm = 지급하는 달(간이세액표 — 안 주면 귀속 달과 같은 달로 봄).
 //   꼭 읽는 키 가운데 그 달을 덮는 행이 없거나 둘 이상이면 계산하지 않는다({ ok:false, why, keys }).
@@ -45,19 +51,24 @@ function ratesFor(bg, ym, payYm) {
   if (!YM.test(String(ym || ''))) return { ok: false, why: 'BAD_YM', keys: [] };
   const pym = (payYm === undefined || payYm === null || payYm === '') ? ym : payYm;
   if (!YM.test(String(pym)) || pym < ym) return { ok: false, why: 'BAD_PAY_YM', keys: [] };   // 지급 달이 귀속 달보다 앞설 수 없음
-  const hit = {}, miss = [], dup = [];
+  const hit = Object.create(null), miss = [], dup = [];
   bg.rows.forEach(function (r) { if (r.calc === true && r.from <= ym && (r.to === '' || ym <= r.to)) (hit[r.key] = hit[r.key] || []).push(r); });
   NEED.forEach(function (k) { const h = hit[k] || []; if (!h.length) miss.push(k); else if (h.length > 1) dup.push(k); });
+  OPT.forEach(function (k) { if ((hit[k] || []).length > 1) dup.push(k); });
   if (miss.length) return { ok: false, why: 'NO_RATE', keys: miss };
   if (dup.length) return { ok: false, why: 'RATE_OVERLAP', keys: dup };
+  const zero = NEED.filter(function (k) { return !(hit[k][0].n > 0); });   // 꼭 읽는 값이 0 이면 계산하지 않음(값 범위 전체는 수집기 게이트 몫)
+  if (zero.length) return { ok: false, why: 'BAD_RATE', keys: zero };
   const m = bg.simptax_meta;
   if (!(m.from <= pym && (!m.to || pym <= m.to))) return { ok: false, why: 'NO_TAX_TABLE', keys: ['simptax'] };
   const v = function (k) { const r = hit[k][0]; return r.n / r.d; };
-  const used = {}; NEED.forEach(function (k) { used[k] = hit[k][0].id; });
-  return { ok: true, ym: ym, pay_ym: pym, ver: bg.ver, sha: bg.sha, used: used, tax: bg.simptax,
-    rates: { pension: { ee: v('pension.ee'), min: v('pension.base_min'), max: v('pension.base_max') },
+  const opt1 = function (k) { const h = hit[k]; return h && h.length === 1 ? h[0].n / h[0].d : null; };   // 없어도 되는 키 — 없으면 null(겹치면 위에서 RATE_OVERLAP)
+  const used = {}; NEED.forEach(function (k) { used[k] = hit[k][0].id; }); OPT.forEach(function (k) { if (hit[k]) used[k] = hit[k][0].id; });
+  return { ok: true, ym: ym, pay_ym: pym, ver: bg.ver, sha: bg.sha, used: used, tax: Object.assign({}, bg.simptax, { cut: v('cut.income') }),
+    rates: { pension: { ee: v('pension.ee'), unit: v('pension.base_unit'), min: v('pension.base_min'), max: v('pension.base_max') },
       health: { rate: v('health.rate'), share: v('health.ee_share'), prem_max: v('health.prem_max'), prem_min: v('health.prem_min') },
       care: { rate: v('care.rate') }, emp: { ee: v('emp.ui_rate') * v('emp.ee_share') }, local: v('tax.local'),
+      cut: { pension: v('cut.pension'), health: v('cut.health'), care: v('cut.care'), local: v('cut.local'), emp: opt1('cut.emp') },
       ot: { ext: v('ot.ext'), night: v('ot.night'), hol: v('ot.hol'), hol8: v('ot.hol8') } } };
 }
-module.exports = { VER: VER, NEED: NEED, bgOk: bgOk, bgSum: bgSum, ratesFor: ratesFor };
+module.exports = { VER: VER, NEED: NEED, ROWS_MAX: ROWS_MAX, missing: missing, bgOk: bgOk, bgSum: bgSum, ratesFor: ratesFor };

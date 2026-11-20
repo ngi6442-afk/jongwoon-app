@@ -1655,3 +1655,8 @@
 - [ ] (운영 확인) 배포 다음 크론 ⑤(00:00) 뒤 품질 카드 사진AI 초안 X2가 긴 문장 43~80% 줄에서 0점 · 그다음 크론 ⑥ 품질 학습 회차에서 목표에 X2(긴 문장)·로그 "넘친 항목 옛 규칙 뺌" · 규칙 "상당수는 예순 자를 넘는" 없음
 - [ ] (운영 확인) 다음 사진AI 초안의 긴 문장 비율이 11/18(43~80%)보다 내려감 · 블로그 학습 짝 표 완료 짝 "· 규칙 n"
 - [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `paycalc_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` 통과 · v509 문서 검사를 이 판 이상으로 풀고 v510 문서·판 번호 정확 검사 — ✓ AI 11/20
+
+## v511 — 66 급여 판1 보완: 소수 시간 반올림·국민연금 천원 미만 버림 고침 · 끝수 단위를 근거 표에서 · 승격 때 내용 지문 대조(직원 화면 없음)
+- [x] (AI 시험 화면 대상) 시험 서버 PM 콘솔 급여 요율 줄(까닭 글에 지문 앞 8자) [ㄱ] → 저장값 `settings:pay` bg_sha = 올라온 판 지문 · 같은 이름으로 내용이 바뀐 판에서는 승격되지 않음(서버 409) · 꼴이 틀린 표를 올리면 '불러오지 못함' 줄 · 꼭 읽는 값이 빠진 옛 표는 [ㄱ]이 막힘 — ✓ AI 11/20
+- [x] (AI) `paycalc_check` 10건(182.5시간 연장수당 ≥ 법정 최소 · 2,000,999 → 국민연금 95,000 · 끝수 단위 · 결함 사본 74) · `servertest` '66 판1' 5건(결함 사본 24) · `uismoke` '66 판1' 3건(결함 사본 12) — ✓ AI 11/20
+- [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` · `paycalc_check` 통과 · v510 문서 검사를 이 판 이상으로 풀고 v511 문서·판 번호 정확 검사 — ✓ AI 11/20

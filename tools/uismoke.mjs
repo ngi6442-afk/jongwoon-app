@@ -20198,24 +20198,35 @@ try {
     const r5 = rowsF({ flag_ok: true, bg_ok: true, flag: { bg_ver: 'v1-20261120', bg_sha: 'ffff000011112222', updated_at: 3 }, avail: AV }), r6 = rowsF({ flag_ok: true, bg_ok: true, flag: { bg_ver: 'v1-20261120', updated_at: 3 }, avail: AV });
     const r7 = rowsF({ flag_ok: false, bg_ok: true, flag: { bg_ver: '', bg_sha: '', updated_at: 0 }, avail: AV }), r8 = rowsF({ flag_ok: true, bg_ok: true, flag: { bg_ver: 'v1-20261101', bg_sha: SHA, updated_at: 9 }, avail: AV });
     I.rows = r1.length === 1 && r1[0].id === 'paybg:v1-20261120' && r1[0].q === '급여 요율 표를 승격할까요? (확인 필요 2건)' && r1[0].recTxt === '승격' && r1[0].curTxt === '미승격' && r1[0].def === 'keep' && r1[0].block === ''
-      && JSON.stringify(r1[0].args) === '{"bg_ver":"v1-20261120"}' && r1[0].setBase === 0 && /32행\(4대보험 요율·상하한·가산율\) \+ 근로소득 간이세액표 646구간\(2026-03 지급분부터\) · 확인일 2026-11-20\./.test(r1[0].why)
+      && JSON.stringify(r1[0].args) === '{"bg_ver":"v1-20261120","bg_sha":"abcdef0123456789"}' && r1[0].setBase === 0 && /32행\(4대보험 요율·상하한·가산율\) \+ 근로소득 간이세액표 646구간\(2026-03 지급분부터\) · 확인일 2026-11-20 · 지문 abcdef01\./.test(r1[0].why)
       && /확인 필요 2건은 계산에 쓰지 않습니다\. 승격해야 급여 계산이 이 표를 씁니다\(새 판이 올라온 뒤 승격 전에는 계산이 멈춥니다\)\. 지금 미승격\./.test(r1[0].why);
     I.none = r2.length === 0 && r3.length === 0 && r4.length === 0;
+    const thrP = (b) => { try { rowsF(b); return ''; } catch (e) { return String(e.message); } };
+    I.bad = thrP({ flag_ok: true, bg_ok: true, flag: {}, avail: null, why: 'BAD_BG' }) === 'PAYBG_BAD_BG' && thrP({ flag_ok: true, bg_ok: false, flag: {}, avail: null, why: 'BG_READ_FAILED' }) === 'PAYBG_BG_READ_FAILED'
+      && thrP({ flag_ok: true, bg_ok: false, flag: {}, avail: null }) === 'PAYBG_UNREAD' && thrP({ flag_ok: false, bg_ok: true, flag: {}, avail: null, why: 'FLAG_READ_FAILED' }) === 'PAYBG_FLAG_READ_FAILED'
+      && thrP({ flag_ok: true, bg_ok: true, flag: {}, avail: null, why: 'NO_BG' }) === '' && rowsF({ flag_ok: true, bg_ok: true, flag: {}, avail: null, why: 'NO_BG' }).length === 0;
+    const rm = rowsF({ flag_ok: true, bg_ok: true, flag: { bg_ver: '', bg_sha: '', updated_at: 0 }, avail: Object.assign({}, AV, { missing: ['cut.health', 'cut.care'] }) });
+    I.miss = rm.length === 1 && /꼭 읽는 값 2개가 없어 승격할 수 없습니다/.test(rm[0].block) && rowsF({ flag_ok: true, bg_ok: true, flag: { bg_ver: '', bg_sha: '', updated_at: 0 }, avail: Object.assign({}, AV, { missing: [] }) })[0].block === '';
     I.sha = r5.length === 1 && r5[0].curTxt === '승격본 v1-20261120(내용 바뀜)' && r6.length === 1 && r6[0].setBase === 3 && r8.length === 1 && r8[0].curTxt === '승격본 v1-20261101' && r8[0].setBase === 9;
     I.unread = r7.length === 1 && r7[0].curTxt === '상태를 읽지 못함' && /읽지 못해 지금은 승격할 수 없습니다/.test(r7[0].block) && /지금 상태를 읽지 못함\./.test(r7[0].why);
     return { ok: Object.values(I).every((v) => v === true), info: I };
   };
   const wP = wireP(html), cP = chkP(html);
   T('66 판1 ① 배선: 앱 구간 @pay-start~end(인사 근거 구간 뒤 · 줄 표 본문은 그대로 두고 PMCON_KINDS.push 한 줄 paybg·R2·pay_bg_get·카드 없음 · 구간 안에 직원 수정 창·회원 저장 호출 없음) · 서버 pay_bg_get·pay_bg_set 디스패치 · 서버 PMCON_KINDS.paybg 같은 이름·R2·handlePayBgSet', wP, '');
-  T('66 판1 ② PM 콘솔 줄: 올라온 판 ≠ 승격본일 때만 "급여 요율 표를 승격할까요? (확인 필요 n건)" R2 · 추천 승격 · 무응답이면 그대로 · args{bg_ver}·setBase = 스위치 updated_at · 까닭 글(행 수·세액표 구간·귀속 달·확인일) · 승격본과 같은 판·지문이면 줄 없음 · 판 이름 꼴 틀리면 줄 없음 · 내용만 바뀜 = "(내용 바뀜)" · sha 없는 스위치 = 줄 · 못 읽음 = 막음 글', cP.ok, JSON.stringify(cP.info));
+  T('66 판1 ② PM 콘솔 줄: 올라온 판 ≠ 승격본일 때만 "급여 요율 표를 승격할까요? (확인 필요 n건)" R2 · 추천 승격 · 무응답이면 그대로 · args{bg_ver·bg_sha}·setBase = 스위치 updated_at · 까닭 글(행 수·세액표 구간·지급 달·확인일·지문 앞 8자) · 승격본과 같은 판·지문이면 줄 없음 · 판 이름 꼴 틀리면 줄 없음 · 내용만 바뀜 = "(내용 바뀜)" · sha 없는 스위치 = 줄 · 못 읽음 = 막음 글 · 올라온 표 꼴 틀림·못 읽음(스위치 못 읽고 표 요약도 없음 포함) = 던짐(콘솔이 불러오지 못함 줄로) · 표 없음 = 줄 없음 · 꼭 읽는 값이 빠진 표 = [ㄱ] 막음 글', cP.ok, JSON.stringify(cP.info));
   const MUTP = [
     ['    if (!pa || !pa.ver || !/^[A-Za-z0-9_.-]{2,40}$/.test(String(pa.ver)) || payLawPromoted(pf, pa)) return [];', '    if (!pa || !pa.ver) return [];'],
     ['function payLawPromoted(pf, pa){ return !!(pf && pa && pf.bg_ver && pf.bg_sha && pf.bg_ver === pa.ver && pf.bg_sha === pa.sha); }', 'function payLawPromoted(pf, pa){ return !!(pf && pa && pf.bg_ver && pf.bg_ver === pa.ver); }'],
     ['    var pf = b.flag || {}, pa = b.avail || null, unread = b.flag_ok === false || b.bg_ok === false;', '    var pf = b.flag || {}, pa = b.avail || null, unread = false;'],
-    ['    return [{ id: "paybg:" + pa.ver, q: "급여 요율 표를 승격할까요? (확인 필요 " + pn + "건)", recTxt: "승격", curTxt: pcur,\n      def: "keep", args: { bg_ver: String(pa.ver) },', '    return [{ id: "paybg:" + pa.ver, q: "급여 요율 표를 승격할까요? (확인 필요 " + pn + "건)", recTxt: "승격", curTxt: pcur,\n      def: "rec", args: { bg_ver: String(pa.ver) },'],
+    ['    return [{ id: "paybg:" + pa.ver, q: "급여 요율 표를 승격할까요? (확인 필요 " + pn + "건)", recTxt: "승격", curTxt: pcur,\n      def: "keep", args: { bg_ver: String(pa.ver), bg_sha: String(pa.sha || "") },', '    return [{ id: "paybg:" + pa.ver, q: "급여 요율 표를 승격할까요? (확인 필요 " + pn + "건)", recTxt: "승격", curTxt: pcur,\n      def: "rec", args: { bg_ver: String(pa.ver), bg_sha: String(pa.sha || "") },'],
+    ['args: { bg_ver: String(pa.ver), bg_sha: String(pa.sha || "") }, block: unread', 'args: { bg_ver: String(pa.ver) }, block: unread'],
     ['      setBase: pf.updated_at || 0 }];\n  }\n  PMCON_KINDS.push({ kind: "paybg"', '      setBase: 0 }];\n  }\n  PMCON_KINDS.push({ kind: "paybg"'],
     ['  PMCON_KINDS.push({ kind: "paybg", label: "급여 법령 근거 승격", grade: "R2",', '  PMCON_KINDS.push({ kind: "paybg", label: "급여 법령 근거 승격", grade: "R1",'],
     ['    var pn = Number(pa.n_pending) || 0;\n    var pcur = unread ? "상태를 읽지 못함" : (pf.bg_ver ? "승격본 " + pf.bg_ver + (pf.bg_ver === pa.ver ? "(내용 바뀜)" : "") : "미승격");\n    return [{ id: "paybg:"', '    var pn = Number(pa.n_pending) || 0;\n    var pcur = unread ? "미승격" : (pf.bg_ver ? "승격본 " + pf.bg_ver : "미승격");\n    return [{ id: "paybg:"'],
+    ['    if (!pa && (b.bg_ok === false || b.flag_ok === false || b.why === "BAD_BG" || b.why === "BG_READ_FAILED")) throw new Error("PAYBG_" + (b.why || "UNREAD"));', ''],
+    [' || b.flag_ok === false || b.why === "BAD_BG"', ' || b.why === "BAD_BG"'],
+    [' + " · 지문 " + String(pa.sha || "").slice(0, 8) + ". 확인 필요 "', ' + ". 확인 필요 "'],
+    [' : (pa.missing && pa.missing.length ? "이 판에는 지금 앱이 계산에 꼭 읽는 값 " + pa.missing.length + "개가 없어 승격할 수 없습니다 — 새 표가 올라온 뒤 다시 보세요" : ""),', ' : "",'],
   ];
   const killP = [];
   for (const [from, to] of MUTP) {
@@ -20224,7 +20235,7 @@ try {
     let broken; try { broken = !(wireP(Hx) && chkP(Hx).ok); } catch (e) { broken = true; }
     if (!broken) killP.push(from.trim().slice(0, 60) + ' 안 깨짐');
   }
-  T('66 판1 ③ 결함 사본 ' + MUTP.length + '개(같은 판이어도 줄 · 지문 비교 걷음 · 못 읽음을 안 봄 · 무응답 기본 승격 · 낙관락 값 0 · 등급 R1 · 못 읽음을 미승격으로·내용 바뀜 표시 걷음) = 모두 ✗', killP.length === 0, killP.join(' | '));
+  T('66 판1 ③ 결함 사본 ' + MUTP.length + '개(같은 판이어도 줄 · 지문 비교 걷음 · 못 읽음을 안 봄 · 무응답 기본 승격 · 낙관락 값 0 · 등급 R1 · 못 읽음을 미승격으로·내용 바뀜 표시 걷음 · 지문 칸 안 보냄 · 꼴 틀림을 정할 것 없음으로 · 스위치 못 읽음을 정할 것 없음으로 · 지문 글 걷음 · 빠진 키 막음 글 걷음) = 모두 ✗', killP.length === 0, killP.join(' | '));
 } catch (e) { console.log('  (66 판1 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ── v502(66 급여 판1 — PM 11/20 09:14 "ㄱ"): 실행 검사는 위 '66 판1' 블록·tools/paycalc_check.mjs·servertest '66 판1' · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '502 이상'으로 풀 것
@@ -20311,8 +20322,8 @@ try {
     const FT = ['`triR`', '`q2-20261120`', '`overOf`', '`mergeQL`', '`over_dropped`', '`empty_kept`', '`ql2-20261120`', '`rules_n`', '기본 지시를 따릅니다'];
     const GATE = ['uismoke', 'servertest', 'consheet_check', 'proctpl_check', 'settletest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check', 'paycalc_check', 'stmtread_a_check', 'stmtread_b_check', 'stmtread_c_check', 'stmtread_d_check', 'stmtmail_check'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0), last = gate[gate.length - 1] || '';
-    const ok = /기준: v510 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && op.length === 2 && !cb.some((l) => /\(PM/.test(l))
-      && GATE.every((g) => last.indexOf('`' + g + '`') > 0) && /SHELL_CACHE = 'jw-shell-v510'/.test(d.sw);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 510 && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && op.length === 2 && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => last.indexOf('`' + g + '`') > 0) && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 510;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
   };
   const rQ = chkQ(DQ);
@@ -20450,6 +20461,29 @@ try {
   T('v508 폰 기성 줄 CSS·문서·판 번호(정확 검사): index 640 이하 .rec-item 묶음 8줄(본문 한 줄 전체·::after 줄 나눔·칩 order 3·버튼 아랫줄·청구 등록 줄바꿈·금액 칸 120) · FEATURES 기준 v508·v508 절 · TESTLIST v508 칸 4 · CLAUDE.md 한 줄 · sw jw-shell-v508 · 결함 사본 8건 다 잡힘',
     rR.ok && MR.every((v) => v === false), JSON.stringify({ r: rR.info, mut: MR }));
 } catch (e) { console.log('  (v508 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v511(66 급여 판1 보완 — 계산 검산 확정 2 · 끝수 단위 · 승격 길 방어): 실행 검사는 '66 판1' 블록·tools/paycalc_check.mjs·servertest '66 판1' · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '511 이상'으로 풀 것
+try {
+  const rdB = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DB = { ft: rdB('FEATURES.md'), tl: rdB('TESTLIST.md'), sw: rdB('sw.js'), cl: rdB('CLAUDE.md') };
+  const chkB = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v511 (11/20)', '\n### '), tlv = cut(d.tl, '\n## v511 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[x\] \(AI 시험 화면 대상\)/.test(l));
+    const FT = ['`pension.base_unit`', '`cut.emp`', '`cut.income`', '`BG_INCOMPLETE`', '`PAY_BAD_RATES`', '`BG_CHANGED`', '`NEED_BASE`', '`BAD_RATE`', '`bg_sha`', '시행령 5조①', '56조①', '117조', '원장 C236'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v511 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && scr.length === 1 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('내용 지문(`bg_sha`)을 같이 보낸다(v511)') > 0 && /SHELL_CACHE = 'jw-shell-v511'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const rB = chkB(DB);
+  const muB = (k, f) => chkB(Object.assign({}, DB, { [k]: f(DB[k]) })).ok;
+  const cutB = (s) => { const a0 = s.indexOf('\n## v511 '); const b0 = a0 < 0 ? -1 : s.indexOf('\n## ', a0 + 5); return [a0, b0 < 0 ? s.length : b0]; };   // 이 판 절 안에서만 고침(뒤 판 절이 같은 글을 적어도)
+  const MB = [muB('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v510 (')), muB('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v510'")), muB('ft', (s) => s.split('`BG_CHANGED`').join('BG_CHANGED')),
+    muB('cl', (s) => s.replace('같이 보낸다(v511)', '같이 보낸다')), muB('tl', (s) => { const r = cutB(s), k = s.indexOf('\n- [x] (AI) `paycalc_check` 10건(', r[0]); return k < 0 || k > r[1] ? s : s.slice(0, k) + '\n- (AI) `paycalc_check` 10건(' + s.slice(k + 32); })];
+  T('v511 문서·판 번호(정확 검사): FEATURES 기준 v511 (2026-11-20)·v511 절(66 급여 판1 보완) · TESTLIST v511 칸 3(시험 화면 [x] 1 · 게이트 [x] 2) · CLAUDE.md 글 · sw jw-shell-v511 · 결함 사본(기준 줄·sw·FEATURES 글·CLAUDE 글·TESTLIST 칸) ✗',
+    rB.ok && MB.every((v) => v === false), JSON.stringify({ r: rB.info, mut: MB }));
+} catch (e) { console.log('  (v511 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
