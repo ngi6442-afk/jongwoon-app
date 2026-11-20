@@ -7063,7 +7063,8 @@ try {
   // ⑪ 폰 legacy(375): 옛 본문 renderClientsLegacy = v440 renderClients 본문 글자째(sha256) · cliRelatedDocs 무변(같은 계산) · 실행 = 옛 접는 줄 6·표 글 0·옛 검색칸 보임·제목 '6곳'(옛 본문)·[+ 거래처 추가] 보임 · 옛 [상세 ›] = 같은 이름 맞추기
   //   (c1 '미수 3건 · 8,500,000원') · 1366(경계 한 번) = 표·옛 검색칸 숨김·제목 '6곳' → 다시 375 = 옛 목록·검색칸 되살림 · 폰에서 찾아가기(fromGs) = false
   // v469(11/14 화면 시험): 옛 본문의 사업자번호 줄만 바뀜 — 13자리(주민·법인등록번호 꼴) 원문 대신 '13자리(숨김)'·개인 거래처 표시(PC 표·[상세 ›]와 같은 규칙). 종전 해시 912da23c8460…
-  const LEG_SHA41 = '5b6db56cbbac6606c56d388adf8eeb0416614681295ef228c4a32d656eda847d', DOC_SHA41 = '95b7bd75fc3d30294f4174f3d2968d1bbe45718c9998f03ec3143fa0b9dc5c25';
+  // v508(C147 ①④): 옛 본문 검색 줄 — 거래처 수행이 아니면 사업자번호 칸 대신 cliBizHay(숨긴 13자리 빈 글) · 주석 'v467' → 'v469'. 종전 해시 5b6db56cbbac…
+  const LEG_SHA41 = 'c726e97b5a9221d63c1a2cfd4b6ec59d7c36a626678fa821429bef3bf51d0a88', DOC_SHA41 = '95b7bd75fc3d30294f4174f3d2968d1bbe45718c9998f03ec3143fa0b9dc5c25';
   const X11 = mk41({ width: 375 }), E11 = X11.env, H11 = (id) => E11.host(id); const r11 = X11.api.render();
   const s11a = [r11 === undefined, (X11.host._h.match(/class="item asb-item"/g) || []).length, X11.host._h.indexOf('data-vs-') < 0, H11('cliSearch').style.display, H11('cliHead').textContent, H11('cliAddBtn').style.display, X11.host.getAttribute('data-vs-mode')];
   const dt11 = X11.host.querySelector('[data-cli-detail="c1"]'); if (dt11) dt11.fire('click', { target: dt11 }); s11a.push((/<div class="crm-h">미수 <span>([^<]*)<\/span>/.exec(H11('cliDetailBody')._h) || ['', ''])[1]);
@@ -7081,6 +7082,13 @@ try {
     const css69 = /\.view\.readonly \.link-btn\[data-cli-detail\]\{display:block !important;\}/.test(html), ed69 = /\.view\.readonly [^{]*\[data-cli-edit\][^{]*\{display:(?!none)/.test(html);
     const s69 = [h69.indexOf('9001011234567') < 0, h69.indexOf('<span class="rec-st wait">13자리(숨김)</span>') > 0, h69.indexOf('개인(사업자 없음)') > 0, h69.indexOf('123-45-67890') > 0, css69, !ed69];
     T('v469 폰 거래처 펼침 사업자번호: 13자리 원문 0 · 13자리(숨김) · 개인 표시 · 10자리 그대로 · 보기 권한 [상세 ›] 되살림·[수정] 숨김 그대로', s69.every(Boolean), JSON.stringify(s69));
+  }
+  // v508(C147 ①): 폰 옛 목록 검색 — 거래처 수행이 아닌 계정(직원C 보기·직원E 보기)은 숨긴 13자리 번호(c4 9001011234567)를 숫자로 찾아도 0줄(맞는지 알 수 없음) ·
+  //   거래처 수행(관리자A·직원B·직원D — 수정 창에서 원문을 봄)은 그대로 1줄 · 10자리 번호('123-45' 줄표 꼴·'2223344444')는 모두 그대로 찾음 · 상호 글자도 그대로
+  {
+    const q05 = (u, t) => { const X = mk41({ width: 375, user: u }); X.api.setTerm(t); X.api.render(); return (X.host._h.match(/class="item asb-item"/g) || []).length; };
+    const s05 = ['A', 'B', 'C', 'D', 'E'].map((k) => [q05(U41[k], '9001011234567'), q05(U41[k], '900101'), q05(U41[k], '123-45'), q05(U41[k], '2223344444'), q05(U41[k], '마바')].join(','));
+    T('v508 C147 ① 폰 옛 거래처 검색: 수행 아닌 계정(C·E)은 숨긴 13자리 숫자로 0줄 · 수행(A·B·D)은 1줄 · 10자리·상호는 모두 그대로', JSON.stringify(s05) === JSON.stringify(['1,1,1,1,1', '1,1,1,1,1', '0,0,1,1,1', '1,1,1,1,1', '0,0,1,1,1']), JSON.stringify(s05));
   }
 
   // ⑫ 전역 검색 → 표: 검색칸 글 앞머리 = 전역 검색 hay(상호 · 사업자번호 보이는 글 · 상세 · 현장) · 기억(처리업소 칩·상호 거르기 '다라') 위에서 '가나'·c1 누름 = 칩·거르기 풀고 검색어 '가나'·c1 펼침·기기 기억 그대로 ·
@@ -20316,8 +20324,8 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), op = cb.filter((l) => /^- \[ \] \(운영 확인\)/.test(l));
     const FT = ['원장 C177', '`RULES_FP`', '`rxFp`', '**52120baf5e4bcef0**', '`note`', '`ping_line`', '**앱을 먼저 올리고**', '화면·운영 데이터 변경 없음'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v507 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
-      && d.cl.indexOf('**연구노트 미룬 것(v507') > 0 && /SHELL_CACHE = 'jw-shell-v507'/.test(d.sw);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 507 && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**연구노트 미룬 것(v507') > 0 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 507   /* v508(폰 기성 줄)에서 '507 이상'으로 풂 */;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
   };
   const r507 = chk507(D507);
@@ -20328,6 +20336,35 @@ try {
   T('v507 문서·판 번호(정확 검사): FEATURES 기준 v507 (2026-11-20)·v507 절(C177 ⓐⓖⓒ) · TESTLIST v507 칸 3(운영 확인 1 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v507 · 결함 사본 ' + M507.length + '개 = 모두 ✗',
     r507.ok && M507.every((v) => v === false), JSON.stringify({ r: r507.info, mut: M507 }));
 } catch (e) { console.log('  (v507 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v508(45-1 훑기 — 폰 기성 줄): 배치 계산은 시험 서버에서 봄(uismoke는 배치를 못 셈) · 여기는 CSS 묶음 글자·문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '508 이상'으로 풀 것
+try {
+  const rdR = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DR = { ft: rdR('FEATURES.md'), tl: rdR('TESTLIST.md'), sw: rdR('sw.js'), cl: rdR('CLAUDE.md'), ix: rdR('index.html') };
+  const chkR = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v508 (11/20)', '\n### '), tlv = cut(d.tl, '\n## v508 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[x\] \(AI 시험 화면 대상\)/.test(l)), op = cb.filter((l) => /^- \[ \] \(운영 확인\)/.test(l));
+    const FT = ['`.rec-main`', '`.rec-client`', '`.rec-actions`', '`::after`', '`renderReceivablesLegacy`', '`#recAddCard .add-row`'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const css = cut(d.ix, '  @media (max-width:640px){\n    .rec-item{flex-wrap:wrap;row-gap:6px;}', '\n  }');
+    const NEED = ['.rec-item .rec-main{flex:1 1 0;min-width:calc(100% - 40px);flex-wrap:wrap;', '.rec-item .rec-main>.rec-client{flex:1 1 0;min-width:40%;}', '.rec-item .rec-main>.rec-amt2{order:1;}',
+      '.rec-item .rec-main::after{content:"";order:2;flex-basis:100%;height:0;}', '.rec-item .rec-main>.dup-chip,.rec-item .rec-main>.rec-age{order:3;}', '.rec-item .rec-actions{margin-left:auto;}',
+      '#recAddCard .add-row{flex-wrap:wrap;}', '#recAddCard #recAmount{flex:1 1 120px;}'];
+    const mC = NEED.filter((x) => css.indexOf(x) < 0);
+    const ok = /기준: v508 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 1 && op.length === 1
+      && css.length > 0 && mC.length === 0 && d.cl.indexOf('**폰 기성 줄(v508)**') > 0 && /SHELL_CACHE = 'jw-shell-v508'/.test(d.sw);
+    return { ok, info: { mF, mC, cb: cb.length, gate: gate.length, scr: scr.length, op: op.length, css: css.length } };
+  };
+  const rR = chkR(DR);
+  const muR = (k, f) => chkR(Object.assign({}, DR, { [k]: f(DR[k]) })).ok;
+  const MR = [muR('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v507 (')), muR('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v507'")), muR('ft', (s) => s.split('`::after`').join('::after')),
+    muR('ix', (s) => s.replace('.rec-item .rec-main::after{content:"";order:2;flex-basis:100%;height:0;}', '')), muR('ix', (s) => s.replace('#recAddCard .add-row{flex-wrap:wrap;}', '')),
+    muR('ix', (s) => s.replace('.rec-item .rec-actions{margin-left:auto;}', '')), muR('cl', (s) => s.replace('**폰 기성 줄(v508)**', '폰 기성 줄(v508)')),
+    muR('tl', (s) => s.replace("\n- [x] (AI) `servertest` · `consheet_check`", "\n- (AI) `servertest` · `consheet_check`"))];
+  T('v508 폰 기성 줄 CSS·문서·판 번호(정확 검사): index 640 이하 .rec-item 묶음 8줄(본문 한 줄 전체·::after 줄 나눔·칩 order 3·버튼 아랫줄·청구 등록 줄바꿈·금액 칸 120) · FEATURES 기준 v508·v508 절 · TESTLIST v508 칸 4 · CLAUDE.md 한 줄 · sw jw-shell-v508 · 결함 사본 8건 다 잡힘',
+    rR.ok && MR.every((v) => v === false), JSON.stringify({ r: rR.info, mut: MR }));
+} catch (e) { console.log('  (v508 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

@@ -894,6 +894,21 @@
   .rec-item.checked .rec-client{color:#6C7A75;text-decoration:line-through;text-decoration-color:#B9C4BF;}
   .rec-item.checked .rec-amt2{color:#9AA8A2;}
   .rec-item .rec-actions{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+  /* v508 폰 기성 줄(45-1 훑기 11/20 — 7/29부터): 640 이하에서 .rec-main이 버튼 묶음(줄지 않음)과 한 줄을 나눠 써 칩·금액은 안 줄고
+     거래처 글만 폭 0으로 눌리고 금액이 버튼에 가렸다(관리자 버튼 3개 줄 14/14 · 기성 수행 직원도 380). 본문을 한 줄 전체로 —
+     윗줄 거래처(말줄임)·금액, ::after 줄 나눔, 칩 줄, 버튼 묶음은 아랫줄 오른쪽. 청구 등록 줄도 줄바꿈(금액 칸이 22px로 눌리고 [청구 등록]이 화면 밖).
+     CSS만 — 폰 옛 본문 renderReceivablesLegacy 해시 무변(uismoke v508가 이 묶음을 글자로 봄) */
+  @media (max-width:640px){
+    .rec-item{flex-wrap:wrap;row-gap:6px;}
+    .rec-item .rec-main{flex:1 1 0;min-width:calc(100% - 40px);flex-wrap:wrap;row-gap:4px;column-gap:8px;}
+    .rec-item .rec-main>.rec-client{flex:1 1 0;min-width:40%;}
+    .rec-item .rec-main>.rec-amt2{order:1;}
+    .rec-item .rec-main::after{content:"";order:2;flex-basis:100%;height:0;}
+    .rec-item .rec-main>.dup-chip,.rec-item .rec-main>.rec-age{order:3;}
+    .rec-item .rec-actions{margin-left:auto;}
+    #recAddCard .add-row{flex-wrap:wrap;}
+    #recAddCard #recAmount{flex:1 1 120px;}
+  }
   .dup-chip{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:#FBE7E3;color:#B0332A;font-weight:800;flex-shrink:0;}
   .rec-age{font-size:11px;font-weight:700;border-radius:6px;padding:1px 6px;white-space:nowrap;flex-shrink:0;}
   .rec-age.age0{background:rgba(128,128,128,.14);color:var(--sub);}
@@ -992,7 +1007,7 @@
   .view.readonly .link-btn{display:none !important;}
   .view.readonly .mini-btn[data-doc-att-open]{display:inline-block !important;}   /* v369: 문서함 첨부 [열기]는 열람(보기) 권한의 통로 — 서버 doc_att_get이 docVisible로 판정하므로 화면에서 지우지 않는다(PM 9/22 "직원들이 뽑을 수가 없다") */
   .view.readonly .mini-btn[data-go-tab]{display:inline-block !important;}   /* v428: 옮긴 화면으로 가는 길 안내 버튼은 아무것도 바꾸지 않으므로 보기 권한 화면에서도 남긴다 — 갈 곳을 못 보는 사람에게는 applySafetyPerms가 감싼 쪽을 숨긴다(이 !important는 버튼 자신의 인라인 display를 이기므로 버튼이 아니라 감싸개로: 인허가 석면 안내는 버튼 감싸개 asbMovedGo만 — 글 줄은 510ed20처럼 남김, 인사 두 화면 교육 안내는 줄째) */
-  .view.readonly .link-btn[data-cli-detail]{display:block !important;}   /* v467(11/14 화면 시험): 폰 거래처 [상세 ›]는 읽기 창(openCliDetail — 미수·계약·문서는 canSee로 거르고 [거래처 정보 수정]은 canDo("cli")일 때만) — 보기 권한 직원에게 이 줄이 숨겨 상세를 못 열었다 */
+  .view.readonly .link-btn[data-cli-detail]{display:block !important;}   /* v469(11/14 화면 시험): 폰 거래처 [상세 ›]는 읽기 창(openCliDetail — 미수·계약·문서는 canSee로 거르고 [거래처 정보 수정]은 canDo("cli")일 때만) — 보기 권한 직원에게 이 줄이 숨겨 상세를 못 열었다 */
   .view.readonly #hwRefreshBtn{display:inline-block !important;}   /* v434: 화관법 보기 권한(권민지·정재욱)도 제품 자동 현황을 다시 읽는다 — ↻ 새로고침은 hw_status 읽기뿐(서버도 보기 허용). ▶ 지금 실행(hwRunNowBtn)은 예외에 넣지 않는다(관리자·개발자만) */
   /* v428 안전 탭 칸(.sf-pane) — 보기 권한 readonly는 바깥 view-safety가 아니라 칸에만 건다(MODULE_VIEW.site=sfPaneSite·v430 safety=sfPaneEdu). 바깥에 걸면 칸 칩·다른 칸 버튼까지 숨는다 */
   .sf-pane.readonly .add-row,
@@ -27212,7 +27227,7 @@
   function cliDigits(s){ return String(s == null ? "" : s).replace(/[^0-9]/g, ""); }
   // 사업자번호 칸의 13자리(주민·법인등록번호 꼴) — 전각 숫자는 반각으로 바꾸고 띄어쓰기·줄표(- ‐ ‑ ‒ – — ― − － ㅡ)를 뺀 뒤 숫자가 13자리 이상 이어지면 참(v441 검토: '숫자가 모두 13개'만 보던 것은
   //   사업자번호와 함께 적거나·한 자리 더 치거나·전각으로 적은 주민번호가 빠졌다). 입력은 막고(saveCliModal) 옛 값은 PC 표·펼침·검색 글·전역 검색 줄·옛 [상세 ›] 창에 원문을 그리지 않는다(수정 창 칸에만 — 지우라고).
-  //   가린 번호('900101-1******')·10자리는 그대로 통과 · 사업자번호 둘을 띄어쓰기만으로 이으면 13자리 넘게 이어져 막힘(안내 글이 쉼표로 나누라고 함) · 예외(해시 고정·서버 — 원문 그대로): 폰 옛 목록 renderClientsLegacy · 물어보기 _lib/ask.js
+  //   가린 번호('900101-1******')·10자리는 그대로 통과 · 사업자번호 둘을 띄어쓰기만으로 이으면 13자리 넘게 이어져 막힘(안내 글이 쉼표로 나누라고 함) · 닫은 예외: 폰 옛 목록 펼침(v469)·물어보기 _lib/ask.js(v456)·폰 옛 목록 검색(C147 ① — 수행이 아니면 cliBizHay)
   function cliBiz13(s){ var t = String(s == null ? "" : s).replace(/[０-９]/g, function(ch){ return String.fromCharCode(ch.charCodeAt(0) - 0xFEE0); }).replace(/[​-‍⁠]/g, "");
     if (t.split(/[,\/]/).some(function(p){ return /\d{13}/.test(p.replace(/[\s\-‐-―−－ㅡ._·・∙•]/g, "")); })) return true;
     return /(^|\D)\d{6}[\s\-‐-―−－ㅡ.\/_·・∙•]*\d{7}(?!\d)/.test(t); }   // v456 2차 검토: 쉼표·빗금 조각마다 13자리 + 6·7자리 꼴은 구분자(빗금 포함)를 건너 따로(서버 _lib/clibiz.js와 같은 규칙 — 빗금으로 나눈 사업자번호 둘은 통과)
@@ -27350,7 +27365,7 @@
     var list = clients.filter(function(c){
       if (!c || c.del === 1) return false;
       if (!cliSearchTerm) return true;
-      return ((c.name||"") + " " + (c.biz_no||"") + " " + (c.contact||"")).toLowerCase().indexOf(cliSearchTerm) >= 0;
+      return ((c.name||"") + " " + (admin ? (c.biz_no||"") : cliBizHay(c)) + " " + (c.contact||"")).toLowerCase().indexOf(cliSearchTerm) >= 0;   // C147 ①(11/20): 거래처 수행이 아니면(수정 창을 못 여는 계정) 숨긴 13자리 번호 칸을 맞추지 않음 — 숫자로 찾아 숨긴 번호와 맞는지 알 수 있던 것(cliBizHay = 전역 검색·PC 표와 같은 글)
     });
     list.sort(function(a,b){ return (a.name||"") < (b.name||"") ? -1 : ((a.name||"") > (b.name||"") ? 1 : 0); });
     var head = document.getElementById("cliHead"); if (head) head.textContent = list.length ? (list.length + "곳") : "";
@@ -27376,7 +27391,7 @@
         + '</button>'
         + '<div class="asb-bd" id="cliBd-' + esc(c.id) + '" style="display:none;">'
         +   '<div class="jw-sheet-wrap"><table class="jw-sheet">'
-        +   sheetRow("사업자번호", cliBizKind(c) === "id13" ? cliBizHtml(c) + ' <span class="vs-dsub">' + esc(cliBizTitle(c)) + '</span>' : (c.indiv ? esc(cliBizTxt(c)) : (c.biz_no ? '<span class="num">' + esc(c.biz_no) + '</span>' : "—")))   // v467(11/14 화면 시험): 폰 펼침 표가 13자리(주민·법인등록번호 꼴) 원문을 그렸다 — PC 표·[상세 ›]처럼 '13자리(숨김)'만(원문은 수정 창에만) · 개인 거래처 표시
+        +   sheetRow("사업자번호", cliBizKind(c) === "id13" ? cliBizHtml(c) + ' <span class="vs-dsub">' + esc(cliBizTitle(c)) + '</span>' : (c.indiv ? esc(cliBizTxt(c)) : (c.biz_no ? '<span class="num">' + esc(c.biz_no) + '</span>' : "—")))   // v469(11/14 화면 시험): 폰 펼침 표가 13자리(주민·법인등록번호 꼴) 원문을 그렸다 — PC 표·[상세 ›]처럼 '13자리(숨김)'만(원문은 수정 창에만) · 개인 거래처 표시
         +   sheetRow("담당자", esc(c.contact || "—"))
         +   sheetRow("연락처", c.phone ? '<span class="num">' + esc(c.phone) + '</span>' : "—")
         +   (seeRec ? sheetRow("미수", unSum ? '<b class="num">' + esc(unSum) + '</b>' : "없음", unSum ? "warn" : "") : "")
