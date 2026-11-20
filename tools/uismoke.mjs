@@ -20711,9 +20711,9 @@ try {
     const FT = ['`vsStage`', '`stmtPhone`', '`stmtBoardActed`', '`stmtMailLoad`', '`stmtBoardCards`', '메뉴는 그대로'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = '<li><b>폰에서는 상태만</b> (2026-11 v515) — ';
-    const ok = /기준: v515 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 1 && op.length === 1
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 515 && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 1 && op.length === 1
       && d.man.indexOf(MAN) > 0 && !/stmtPhone|vsStage|renderStmt/.test(cut(d.man, MAN, '\n'))
-      && d.cl.indexOf('**월말명세서 판⑪(v515)**') > 0 && /SHELL_CACHE = 'jw-shell-v515'/.test(d.sw);
+      && d.cl.indexOf('**월말명세서 판⑪(v515)**') > 0 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 515;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, op: op.length } };
   };
   const rS = chkS(DS);
@@ -20724,6 +20724,34 @@ try {
   T('v515 문서·판 번호(정확 검사): FEATURES 기준 v515 (2026-11-20)·v515 절(29 판⑪) · TESTLIST v515 칸 4(운영 확인 1 · 시험 화면 [x] 1 · 게이트 [x] 2) · MANUAL 폰 줄(내부 이름 0) · CLAUDE.md 한 줄 · sw jw-shell-v515 · 결함 사본(기준 줄·sw·FEATURES 글·MANUAL 판 표시·CLAUDE 줄·TESTLIST 칸) ✗',
     rS.ok && MS.every((v) => v === false), JSON.stringify({ r: rS.info, mut: MS }));
 } catch (e) { console.log('  (v515 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v516(C265 사진 형식 확인 · C257 버린 사진 지우기): 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '504 이상'으로 풀 것
+try {
+  const rdQ = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DQ = { ft: rdQ('FEATURES.md'), tl: rdQ('TESTLIST.md'), sw: rdQ('sw.js') };
+  const chkQ = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v516 (11/20)', '\n### '), tlv = cut(d.tl, '\n## v516 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), op = cb.filter((l) => /^- \[ \] \(운영 확인\)/.test(l));
+    const FT = ['`_lib/imgsniff.js`', '`X-Content-Type-Options: nosniff`', '`promoUploadDiscard`', '`promoUploadReset`', '`promoOrphanDelCheck`', '`bid`', '441장', '63건'];
+    const GATE = ['uismoke', 'servertest', 'consheet_check', 'proctpl_check', 'settletest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check', 'paycalc_check', 'stmtread_a_check', 'stmtread_b_check', 'stmtread_c_check', 'stmtread_d_check', 'stmtmail_check'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0), last = gate[gate.length - 1] || '';
+    const ok = /기준: v516 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => last.indexOf('`' + g + '`') > 0) && /SHELL_CACHE = 'jw-shell-v516'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
+  };
+  const rQ = chkQ(DQ);
+  const muQ = (k, f) => chkQ(Object.assign({}, DQ, { [k]: f(DQ[k]) })).ok;
+  const MQ = [muQ('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v515 (')), muQ('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v515'")),
+    muQ('ft', (s) => s.split('`promoOrphanDelCheck`').join('promoOrphanDelCheck')), muQ('tl', (s) => s.split('\n## v516 ').join('\n## vX '))];
+  const ixC = readFileSync(join(ROOT, 'index.html'), 'utf8');
+  T('v516 C257 앱 배선: [+ 현장 기록]은 저장 안 된 사진(올리는 중 포함)이 있으면 창을 이어 씀(promoUploadReset 안 부름) · [취소]는 사진이 있고 올리는 중이 아니면 "버릴까요?" 확인 → promoUploadDiscard가 att_del · 저장 뒤 promoUploadReset',
+    /if\(promoUpload\.busy \|\| promoUpload\.photos\.length\)\{[\s\S]{0,300}?classList\.add\("show"\);\s*return;\s*\}\s*promoUploadReset\(\);/.test(ixC)
+    && /if\(n && !promoUpload\.busy && confirm\("올린 사진 "\+n\+"장을 버릴까요\?/.test(ixC) && /promoUploadDiscard\(\)\.then\(/.test(ixC) && /gwCall\("gw-data",\{action:"att_del",id:id\}\)/.test(ixC)
+    && /schedulePromoSave\(\); renderPromo\(\);\n    promoUploadReset\(\);/.test(ixC));
+  T('v516 문서·판 번호(정확 검사): FEATURES 기준 v516 (2026-11-20)·v516 절(imgsniff·nosniff·promoUploadDiscard·promoUploadReset·promoOrphanDelCheck·bid) · TESTLIST v516 칸 3(운영 확인 1 · AI [x] 2 · 게이트 18종) · sw jw-shell-v516 · 결함 사본 ' + MQ.length + '개 = 모두 ✗',
+    rQ.ok && MQ.every((v) => v === false), JSON.stringify({ r: rQ.info, mut: MQ }));
+} catch (e) { console.log('  (v516 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

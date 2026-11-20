@@ -1684,3 +1684,8 @@
 - [x] (AI 시험 화면 대상) 시험 서버 375px = 카드만(숨긴 자리 7곳 · 단추 0) · 1280px = 월 보드 · 다시 375px = 카드 — ✓ AI 11/20
 - [x] (AI) `uismoke` 29 판⑪ ③-11 2건(결함 사본 3) — ✓ AI 11/20
 - [x] (AI) `uismoke` · `servertest` · `stmtmail_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `paycalc_check` 통과 · 앞 판 문서 검사를 이 판 이상으로 풀고 v515 문서·판 번호 정확 검사 — ✓ AI 11/20
+
+## v516 — 홍보 사진 형식 확인(C265) · 저장 안 하고 버린 사진 지우기(C257)
+- [x] (AI) `servertest` C265(위장 올리기 400·공개 주소 415·nosniff) · C257(남의 사진·보기 권한·붙은 사진 거절 · 본인 고아 지움 · 옛 첨부 이름 판정 · 읽기 실패 503) · `uismoke` 앱 배선 — ✓ AI 11/20
+- [ ] (운영 확인) 홍보 탭 [+ 현장 기록] → 사진 → [취소] → "버릴까요?" [확인] 뒤 그 사진이 서버에서 지워짐(감사 기록 "첨부삭제") · [취소]에서 창만 닫으면 다음 [+ 현장 기록]에 사진이 이어 보임
+- [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `paycalc_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` 통과 · v515 문서 검사를 이 판 이상으로 풀고 v516 문서·판 번호 정확 검사 — ✓ AI 11/20
