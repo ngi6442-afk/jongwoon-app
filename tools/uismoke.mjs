@@ -2089,7 +2089,7 @@ try {
   T('v415 입찰 알림: bid_result each|award · bid_fail admins|assignee · bidNotifyIds(담당+PM) · bids_results award 분기(primaryOnly) · bot_notify watch-입찰 담당 추가 · todo-cron bids-lost 요약 · NOTIFY_EVENT_ORDER 7 · sw ≥ 415',
     gwd15.indexOf("bid_result: {") > 0 && gwd15.indexOf("bid_fail: {") > 0 && /async function bidNotifyIds\(/.test(gwd15) && gwd15.indexOf("nfB.events.bid_result === 'award'") > 0 && gwd15.indexOf("tag: 'bids-award'") > 0 && gwd15.indexOf("/^watch-입찰/.test(tag)") > 0
     && td15.indexOf("events.bid_result === 'award'") > 0 && td15.indexOf("tag: 'bids-lost-' + today") > 0
-    && ord15 === 'task_auto_create,task_review,due_digest,leave_request,leave_result,bid_result,bid_fail'
+    && ord15.indexOf('task_auto_create,task_review,due_digest,leave_request,leave_result,bid_result,bid_fail') === 0   // C253: 뒤에 push_miss가 붙음(앞 7종 순서는 그대로 — 앱↔서버 키 일치는 v396 검사)
     && Number((swv15.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 415);
 } catch (e) { console.log('  (v415 검사 생략 — ' + e.message + ')'); fails++; }
 

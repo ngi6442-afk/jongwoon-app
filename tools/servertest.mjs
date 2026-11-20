@@ -4364,7 +4364,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   mem.gw_data['settings:assign'] = { schema: 1, rules: { 'bid:': { who_id: 'uwork' } }, approver_id: '', prev: null, updated_at: 5, updated_by: 'uadmin' };
   const seed64 = () => { mem.gw_data['col:bids'] = { schema: 1, items: [{ id: 'b64a', title: '포항 준설 공사', status: '응찰' }, { id: 'b64b', title: '경주 철거 공사', status: '응찰' }], updated_at: 1 }; };
   seed64();
-  let r64 = await call({ action: 'notify_get' }, tokA); const e0 = r64.code === 200 && Object.keys(r64.body.meta).length === 7 && r64.body.events.bid_result === 'each' && r64.body.events.bid_fail === 'admins' && r64.body.meta.bid_result.rec === 'award';
+  let r64 = await call({ action: 'notify_get' }, tokA); const e0 = r64.code === 200 && Object.keys(r64.body.meta).length === 8 /* C253: push_miss 더함 */ && r64.body.events.bid_result === 'each' && r64.body.events.bid_fail === 'admins' && r64.body.meta.bid_result.rec === 'award';
   const RES = { action: 'bids_results', key: 'test-ingest-key', results: [{ id: 'b64a', status: '낙찰', result: { state: '낙찰', winner: '종운환경', amt: 100, rate: '87.5', bidders: 3 } }, { id: 'b64b', status: '유찰', result: { state: '유찰' } }] };
   r64 = await call(RES, null); const e1 = r64.code === 200 && sent64.length === 1 && /개찰결과 2건/.test(sent64[0].p.title) && sent64[0].ids.indexOf('uadmin') >= 0 && !sent64[0].o.primaryOnly;
   await call({ action: 'notify_set', event: 'bid_result', value: 'award' }, tokA); seed64();
@@ -17014,6 +17014,166 @@ function J91a(x) { return JSON.stringify(x); }
   const src90 = fs90.readFileSync(join(FN, 'gw-data.js'), 'utf8');
   T('T090 ② 계측기 함수 파일 2개 없음 · _lib/ask.js 내보내기에 METER_Q·saveRow 없음 · gw-data가 meter:cost 키를 읽지 않음',
     gone90 && !('METER_Q' in A90) && !('saveRow' in A90) && src90.indexOf("'meter:cost'") < 0);
+}
+
+{ // ---- C253(11/20 전수 조사 확정 — 「덧대기」) 받을 기기 없는 알림 가시화: ① 알림함 줄의 기기 수 ② 월 점검 구독 항목 ③ 개발자 하루 1번(설정 push_miss — 기본 끔) ----
+  // 실 _lib/push.js(sendTo·noteMiss) + 가짜 web-push(호출 기록 · 만료 410 · 오류) · 실 _lib/mchk.js judge · 실 gw-data handler(notify_get/set · push_log). 끝에 결함 사본(고친 줄 하나씩 되돌림)이 같은 검사에 걸리는지.
+  const svU53 = mem.gw_users, svD53 = mem.gw_data, svNow53 = Date.now;
+  const Mod53 = require('module'), fs53 = require('fs');
+  const FP53 = join(FN, '_lib', 'push.js'), FM53 = join(FN, '_lib', 'mchk.js');
+  const SP53 = fs53.readFileSync(FP53, 'utf8'), SM53 = fs53.readFileSync(FM53, 'utf8');
+  const rpW53 = require.resolve('web-push'), svW53 = require.cache[rpW53];
+  const wp53 = { calls: [], gone: {}, err: {}, generateVAPIDKeys() { return { publicKey: 'P', privateKey: 'Q' }; }, setVapidDetails() {},
+    async sendNotification(sub, body, opt) { const e0 = String(sub && sub.endpoint || ''); if (wp53.gone[e0]) { const e = new Error('gone'); e.statusCode = 410; throw e; } if (wp53.err[e0]) { const e = new Error('net'); e.statusCode = 500; throw e; } const p = JSON.parse(body); wp53.calls.push({ ep: e0.replace('https://push.invalid/', ''), title: p.title, tag: p.tag, opt: opt }); return { statusCode: 201 }; } };
+  const load53 = (file, src) => { const m = new Mod53(file); m.filename = file; m.paths = Mod53._nodeModulePaths(dirname(file)); m._compile(src, file); return m.exports; };
+  const mut53 = (src, from, to) => { if (src.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return src.replace(from, () => to); };
+  const ep53 = (x) => ({ endpoint: 'https://push.invalid/' + x });
+  const chk53 = async (PU, MC) => {
+    const o = {};
+    let t = Date.UTC(2026, 10, 20, 1, 0, 0); Date.now = () => t;   // 2026-11-20 10:00 KST
+    // 가대표 0대 · 가운영(개발자·PM) 1대 · 가관리 2대(a2 우선기기) · 가직원 2대(e2 만료 410) · 나직원 0대 · 다퇴사(퇴사)
+    const seed = (nf) => {
+      wp53.calls = []; wp53.gone = { 'https://push.invalid/e2': 1 }; wp53.err = {};
+      mem.gw_users = { 'member:cB': { id: 'cB', name: '가대표', admin: true, tier: 'boss', perms: {} }, 'member:cP': { id: 'cP', name: '가운영', admin: true, dev: true, tier: 'pm', perms: {} }, 'member:cA': { id: 'cA', name: '가관리', admin: true, tier: 'admin', perms: {} },
+        'member:cE': { id: 'cE', name: '가직원', admin: false, perms: {} }, 'member:cF': { id: 'cF', name: '나직원', admin: false, perms: {} }, 'member:cR': { id: 'cR', name: '다퇴사', admin: false, perms: {}, leave_date: '2026-10-31' } };
+      mem.gw_data = { 'push:keys': { publicKey: 'P', privateKey: 'Q' }, 'push:log': { schema: 1, items: [] },
+        'push:subs': { schema: 1, members: { cP: [{ sub: ep53('p1') }], cA: [{ sub: ep53('a1') }, { sub: ep53('a2'), primary: 1 }], cE: [{ sub: ep53('e1') }, { sub: ep53('e2') }] } } };
+      if (nf) mem.gw_data['settings:notify'] = { schema: 1, events: { push_miss: nf }, updated_at: 1, updated_by: 'x' };
+    };
+    const lines = () => mem.gw_data['push:log'].items, last = () => lines().slice(-1)[0] || {};
+    const alerts = (from) => wp53.calls.slice(from || 0).filter((x) => /^받을 기기 없음 — 미도달 \d+건$/.test(x.title));
+    const P = { title: 't', body: 'b', url: './', tag: 'g' };
+    // ① 알림함 줄의 수 — 설정 문서 없음(= 끔)
+    seed();
+    const r1 = await PU.sendTo(['cB'], P); const l1 = last();
+    o.one0 = r1.sent === 0 && l1.devices === 0 && l1.no_device === 1 && wp53.calls.length === 0;
+    const r2 = await PU.sendTo(['cB', 'cA', 'cE'], P); const l2 = last();
+    o.mix = r2.sent === 3 && r2.removed === 1 && l2.devices === 4 && l2.no_device === 1 && l2.to.join() === 'cB,cA,cE';
+    await PU.sendTo(['cB', 'cA', 'cE'], P); const l3 = last();
+    o.afterExpire = l3.devices === 3 && l3.no_device === 1;
+    await PU.sendTo(['cA'], P, { primaryOnly: true }); const l4 = last();
+    o.primary = l4.devices === 1 && l4.no_device === undefined && wp53.calls.slice(-1)[0].ep === 'a2';
+    await PU.sendTo(['cE'], P, { logOnly: true }); const l5 = last();
+    o.logOnly = l5.log_only === true && l5.devices === undefined && l5.no_device === undefined;
+    await PU.sendTo([], P); const l6 = last();
+    o.empty = l6.devices === undefined && l6.no_device === undefined && l6.log_only === undefined && l6.subs_unavailable === undefined;
+    blobsMock.hooks.failGet = (k) => k === 'push:subs'; const r7 = await PU.sendTo(['cF'], P); blobsMock.hooks.failGet = null; const l7 = last();
+    o.subsBad = r7.sent === 0 && l7.subs_unavailable === true && l7.devices === undefined && l7.no_device === undefined;
+    // ③ 끔 — 설정 문서 없음 · 값 off: 표식·알림 줄·추가 발송 없음(줄 수 = 보낸 수 그대로)
+    o.off = !('push:miss' in mem.gw_data) && lines().length === 7 && alerts().length === 0 && wp53.calls.length === 7;
+    seed('off'); await PU.sendTo(['cB'], P); await PU.sendTo(['cF'], P, { primaryOnly: true });
+    o.off2 = !('push:miss' in mem.gw_data) && lines().length === 2 && wp53.calls.length === 0;
+    // ③ 켬 — 그날 첫 미도달에 개발자 1발 · 같은 날은 수만 쌓음 · 다음 날 쌓인 수를 실어 1발
+    seed('dev_daily');
+    await PU.sendTo(['cB'], P, { by: '자동' });
+    const m1 = mem.gw_data['push:miss'] || {}, al1 = lines()[1] || {};
+    o.on1 = alerts().length === 1 && wp53.calls.length === 1 && wp53.calls[0].ep === 'p1' && wp53.calls[0].title === '받을 기기 없음 — 미도달 1건' && lines().length === 2
+      && al1.by === '알림 점검' && al1.tag === 'push-miss-2026-11-20' && (al1.to || []).join() === 'cP' && /^가대표 — /.test(al1.body) && al1.devices === 1 && m1.day === '2026-11-20' && m1.n === 0 && (m1.last || {}).n === 1;
+    t += 60000; await PU.sendTo(['cF'], P); await PU.sendTo(['cB'], P);
+    const m2 = mem.gw_data['push:miss'] || {};
+    o.sameDay = wp53.calls.length === 1 && lines().length === 4 && m2.n === 2 && (m2.who || {}).cF === 1 && (m2.who || {}).cB === 1 && m2.day === '2026-11-20';
+    // 세지 않는 것 — 여러 사람(둘 다 0대) · 기기 있는 한 사람 · 알림함만 · 푸시 서비스 오류(구독은 남음) · 구독 문서 못 읽음
+    await PU.sendTo(['cB', 'cF'], P); await PU.sendTo(['cA'], P); await PU.sendTo(['cF'], P, { logOnly: true });
+    wp53.err['https://push.invalid/p1'] = 1; await PU.sendTo(['cP'], P); wp53.err = {};
+    blobsMock.hooks.failGet = (k) => k === 'push:subs'; await PU.sendTo(['cF'], P); blobsMock.hooks.failGet = null;
+    o.notMiss = (mem.gw_data['push:miss'] || {}).n === 2 && alerts().length === 1;
+    t += 86400000; const w0 = wp53.calls.length; await PU.sendTo(['cB'], P);
+    const m3 = mem.gw_data['push:miss'] || {};
+    o.nextDay = alerts(w0).length === 1 && alerts(w0)[0].title === '받을 기기 없음 — 미도달 3건' && m3.day === '2026-11-21' && m3.n === 0 && (m3.last || {}).people === 2 && /나직원/.test(last().body) && /가대표/.test(last().body);
+    // 구독이 만료(410)로 다 걷힌 한 사람 = 미도달 · timeoutMs를 받은 발송이면 알림도 같은 상한
+    t += 86400000; mem.gw_data['push:subs'].members.cF = [{ sub: ep53('f1') }]; wp53.gone['https://push.invalid/f1'] = 1;
+    const w1 = wp53.calls.length; const r8 = await PU.sendTo(['cF'], P, { timeoutMs: 3000 });
+    o.expired = r8.removed === 1 && alerts(w1).length === 1 && alerts(w1)[0].title === '받을 기기 없음 — 미도달 1건' && (alerts(w1)[0].opt || {}).timeout === 3000 && !mem.gw_data['push:subs'].members.cF;
+    // 표식을 못 쓰면 보내지 않는다
+    t += 86400000; blobsMock.hooks.failSet = (k) => k === 'push:miss'; const w2 = wp53.calls.length; await PU.sendTo(['cF'], P); blobsMock.hooks.failSet = null;
+    o.markFail = wp53.calls.length === w2 && (mem.gw_data['push:miss'] || {}).day === '2026-11-22';
+    // 개발자 본인이 기기 0 — 알림이 0발이어도 되풀이하지 않는다(알림 줄 1개 · 쌓인 수 0)
+    seed('dev_daily'); delete mem.gw_data['push:subs'].members.cP;
+    await PU.sendTo(['cF'], P);
+    o.noLoop = wp53.calls.length === 0 && lines().length === 2 && (mem.gw_data['push:miss'] || {}).n === 0 && lines()[1].no_device === 1;
+    // 개발자 없음 → 관리자 전원(우선기기 1발씩)
+    seed('dev_daily'); mem.gw_users['member:cP'].dev = false; await PU.sendTo(['cF'], P);
+    o.fallback = ((lines()[1] || {}).to || []).slice().sort().join() === 'cA,cB,cP' && wp53.calls.map((x) => x.ep).sort().join() === 'a2,p1';
+    // ② 월 점검 구독 항목(순수 judge) — 12/1 09:00 KST · 앞 30일 알림함의 받는 사람 × 지금 구독
+    const NOWc = Date.UTC(2026, 11, 1, 0, 0, 0), Dc = 86400000; t = NOWc;
+    const MB = Object.keys(mem.gw_users).map((k) => mem.gw_users[k]);
+    const LG = [];
+    for (let i = 0; i < 17; i++) LG.push({ ts: NOWc - (i + 1) * Dc, title: '결재 요청', tag: 'appr-' + i, to: ['cB'] });
+    for (let i = 0; i < 5; i++) LG.push({ ts: NOWc - (i + 2) * Dc, title: '잠정', tag: 'p', to: ['cE', 'cF', 'cP'] });
+    LG.push({ ts: NOWc - 3 * Dc, title: '결재 진행', tag: 'x', to: ['cF'], log_only: true }, { ts: NOWc - 40 * Dc, title: '옛', tag: 'o', to: ['cF'] }, { ts: NOWc - 4 * Dc, title: '퇴사자 앞', tag: 'r', to: ['cR'] },
+      { ts: NOWc - 5 * Dc, title: '겹침', tag: 'd', to: ['cF', 'cF'] }, { ts: NOWc + Dc, title: '뒤', tag: 'f', to: ['cF'] }, { ts: NOWc - Dc, title: '꼴', tag: 's', to: 'cF' }, null);
+    const BMc = (ed) => { const m = { audit: { ok: true, items: [], missing: 0 }, members: MB.slice(), devices: [], locks: [], mlocks: [], subs: { cP: [{}], cA: [{}, {}], cE: [{}] }, usage: {}, filesStamp: 'none', alertDoc: 'none', alertSince: 'none', backupDoc: 'none', backupSince: 'none', pushLog: LG.slice() }; if (ed) ed(m); return m; };
+    const Jc = (ed) => MC.judge('2026-11', NOWc, BMc(ed)).find((x) => x.id === 'subs') || { n: {}, lines: [] };
+    const j1 = Jc(), j2 = Jc((m) => { m.subs.cB = [{}]; m.subs.cF = [{}]; }), j3 = Jc((m) => { m.pushLog = null; }), j4 = Jc((m) => { m.members = null; });
+    const j5 = Jc((m) => { ['x1', 'x2', 'x3'].forEach((id, i) => { m.members.push({ id: id, name: '라직원' + i, admin: false, perms: {} }); m.pushLog.push({ ts: NOWc - Dc, title: 'n', tag: 'n', to: [id] }); }); });
+    o.mchkBad = j1.st === 'bad' && j1.n.nodev === 2 && j1.n.nodev_msgs === 23 && j1.lines.length === 1 && /알림 기기 없는 사람 2명 · 이들 앞 알림 23건 — 가대표, 나직원$/.test(j1.lines[0]) && j1.n.over === 0 && j1.n.gone === 0;
+    o.mchkOk = j2.st === 'ok' && j2.n.nodev === 0 && j2.n.nodev_msgs === 0 && /^알림 받는 회원 5명 · 기기 6대$/.test(j2.lines[0]);
+    o.mchkUnk = j3.st === 'unknown' && j3.n.nodev === null && /알림함을 읽지 못해/.test(j3.lines[0]) && j4.st === 'unknown' && /회원 명부를 읽지 못해/.test(j4.lines[0]);
+    o.mchkNames = j5.st === 'bad' && j5.n.nodev === 5 && (j5.lines[0].split(' — ')[1] || '').split(', ').length === 3;
+    o.mchkRule = /알림 기기 1대 이상/.test(j1.rule) && /C253/.test(j1.basis);
+    return o;
+  };
+  const all53 = (o, ks) => ks.every((k) => o[k] === true);
+  const K1 = ['one0', 'mix', 'afterExpire', 'primary', 'logOnly', 'empty', 'subsBad'], K3off = ['off', 'off2'], K3on = ['on1', 'sameDay', 'notMiss', 'nextDay', 'expired', 'markFail', 'noLoop', 'fallback'], K2 = ['mchkBad', 'mchkOk', 'mchkUnk', 'mchkNames', 'mchkRule'];
+  try {
+    require.cache[rpW53] = { id: rpW53, filename: rpW53, loaded: true, exports: wp53 };
+    const o53 = await chk53(load53(FP53, SP53), load53(FM53, SM53));
+    T('C253 ① 알림함 줄에 보낼 기기 수(devices)·기기 없는 받는 사람 수(no_device): 0대 한 사람 = 0·1(발송 0) · 0대+2대+2대(하나 만료) = 4·1(도착 3·걷힘 1) → 다음 줄 3·1 · 우선기기 지정 primaryOnly = 1 · 알림함만 = log_only(수 없음) · 받는 사람 0명 = 새 칸 없음 · 구독 문서 못 읽음 = subs_unavailable(기기 없음으로 안 읽힘)',
+      all53(o53, K1), JSON.stringify(K1.filter((k) => o53[k] !== true)));
+    T('C253 ③ 끔(설정 문서 없음 · push_miss off): 표식(push:miss)·알림 줄·추가 발송 없음 — 줄 수·발송 수 = 보낸 그대로', all53(o53, K3off), JSON.stringify(K3off.filter((k) => o53[k] !== true)));
+    T('C253 ③ 켬(push_miss dev_daily): 한 사람 앞 알림이 기기 0대로 끝나면 그날 첫 번에 개발자 우선기기 1발 "받을 기기 없음 — 미도달 n건"(알림함 1줄 · by 알림 점검 · 꼬리표 push-miss-날짜 · 본문에 이름) · 같은 날은 수만 쌓음 · 다음 날 쌓인 수를 실어 1발 · 만료로 다 걷힌 한 사람도 셈 · 여러 사람·기기 있음·알림함만·푸시 오류·구독 못 읽음은 안 셈 · 표식 못 쓰면 안 보냄 · 개발자 0대여도 되풀이 없음 · 개발자 없으면 관리자 전원',
+      all53(o53, K3on), JSON.stringify(K3on.filter((k) => o53[k] !== true)));
+    T('C253 ② 월 점검 구독 항목: 앞 30일 알림함에서 받는 사람으로 찍힌 재직 회원 중 지금 알림 기기 0대 = 어긋남(사람 수·이들 앞 알림 수 · 이름 3명까지) — 알림함만 줄·30일 밖·점검 시각 뒤·퇴사자·기기 있는 사람·꼴 다른 줄은 안 셈 · 둘 다 켜면 맞음 · 알림함·명부 못 읽으면 확인 못 함 · 규칙·근거 글',
+      all53(o53, K2), JSON.stringify(K2.filter((k) => o53[k] !== true)));
+    // 결함 사본 — 고친 줄 하나를 되돌린 사본은 위 검사 가운데 하나 이상이 깨져야 한다
+    const MUT53 = [
+      ['P', "    else if (live) { ent.devices = devices; if (noDevice) ent.no_device = noDevice; }\n", ''],
+      ['P', "    if (live && subsBad) ent.subs_unavailable = true;\n    else if (live) {", "    if (live) {"],
+      ['P', "    if (opts && opts.logOnly === true) ent.log_only = true;\n", ''],
+      ['P', "  if (primaryOnly && list.some(function (x) { return x && x.primary; })) return list.filter(function (x) { return x && x.primary; }).length;\n", ''],
+      ['P', "  if (ids.length === 1 && sent === 0 && !subsBad", "  if (ids.length >= 1 && sent === 0 && !subsBad"],
+      ['P', "sent === 0 && !subsBad && !(opts && opts.missNote === false)", "sent === 0 && !(opts && opts.missNote === false)"],
+      ['P', "&& !((doc.members[ids[0]] || []).length)) {", "&& true) {"],
+      ['P', "nr.data.events.push_miss === MISS_ON)) return false;", "true)) return false;"],
+      ['P', "  if (cur.day === today) { await keep(); return false; }\n", ''],
+      ['P', "  if (!w || !w.ok) return false;\n  const nameOf", "  const nameOf"],
+      ['P', "const o = { ctx: ctx, primaryOnly: true, by: MISS_BY, missNote: false };", "const o = { ctx: ctx, primaryOnly: true, by: MISS_BY };"],
+      ['P', "  const to = devs.length ? devs : (ctx.adminIds || []).slice();\n  if (!to.length)", "  const to = devs;\n  if (!to.length)"],
+      ['M', "!isObj(x) || x.log_only === true || !Array.isArray(x.to)", "!isObj(x) || !Array.isArray(x.to)"],
+      ['M', "|| num(x.ts) < since || num(x.ts) > nowMs) return;", "|| num(x.ts) > nowMs) return;"],
+      ['M', "|| seen[id] || gone(id) || cnt(id) > 0) return;", "|| seen[id] || cnt(id) > 0) return;"],
+      ['M', "|| seen[id] || gone(id) || cnt(id) > 0) return;", "|| seen[id] || gone(id)) return;"],
+      ['M', "(goneS && goneS.length) || (noDev && noDev.people)) ? 'bad' : ((goneS && noDev) ? 'ok' : 'unknown')", "(goneS && goneS.length)) ? 'bad' : ((goneS && noDev) ? 'ok' : 'unknown')"],
+      ['M', "? 'bad' : ((goneS && noDev) ? 'ok' : 'unknown');", "? 'bad' : (goneS ? 'ok' : 'unknown');"]];
+    const alive53 = [];
+    for (const [w, from, to] of MUT53) {
+      let k; try { const om = await chk53(load53(FP53, w === 'P' ? mut53(SP53, from, to) : SP53), load53(FM53, w === 'M' ? mut53(SM53, from, to) : SM53)); k = !all53(om, K1.concat(K3off, K3on, K2)); } catch (e) { k = 'err ' + String(e && e.message || e).slice(0, 80); }
+      if (k !== true) alive53.push(w + ':' + from.trim().slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k));
+    }
+    T('C253 결함 사본 ' + MUT53.length + '개(수 칸 빼기 · 못 읽음을 기기 없음으로 · 알림함만 표시 빼기 · 우선기기 무시 · 여러 사람도 셈 · 못 읽음도 셈 · 구독 남아도 셈 · 끈 상태에서도 보냄 · 같은 날 거듭 보냄 · 표식 실패에도 보냄 · 자기 알림 되풀이 · 관리자 폴백 빼기 · 월 점검 4곳)가 모두 위 검사에 걸림', alive53.length === 0, alive53.join(' | '));
+  } catch (e) { T('C253 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+  finally { Date.now = svNow53; blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; if (svW53) require.cache[rpW53] = svW53; else delete require.cache[rpW53]; mem.gw_users = svU53; mem.gw_data = svD53; }
+  // 설정 열쇠·알림함 읽기 — 실 gw-data handler(관리자 uadmin)
+  {
+    const svN53 = mem.gw_data['settings:notify'], svL53 = mem.gw_data['push:log'];
+    try {
+      delete mem.gw_data['settings:notify'];
+      const g0 = await call({ action: 'notify_get' }, tokA);
+      const s1 = await call({ action: 'notify_set', event: 'push_miss', value: 'dev_daily' }, tokA);
+      const s2 = await call({ action: 'notify_set', event: 'push_miss', value: 'on' }, tokA);
+      const s3 = await call({ action: 'notify_set', event: 'push_miss', value: 'off', base: s1.body.updated_at }, tokA);
+      const mt = (g0.body.meta || {}).push_miss || {};
+      T('C253 ③ 설정 열쇠 push_miss(알림 설정 꼴 그대로): 기본 off · 추천값 없음(★·PM 콘솔 추천 줄 없음) · 선택지 off|dev_daily · notify_set으로 켜고 끔(다른 값 400 BAD_EVENT) · 다른 칸 기본값 그대로',
+        g0.code === 200 && g0.body.events.push_miss === 'off' && mt.def === 'off' && mt.rec === '' && Object.keys(mt.options || {}).join() === 'off,dev_daily' && s1.code === 200 && s1.body.events.push_miss === 'dev_daily' && s1.body.events.bid_result === 'each'
+        && s2.code === 400 && s2.body.error_code === 'BAD_EVENT' && s3.code === 200 && s3.body.events.push_miss === 'off', JSON.stringify([g0.code, mt, s1.code, s2.code, s3.code]));
+      mem.gw_data['push:log'] = { schema: 1, items: [{ ts: 5, title: 'n1', body: 'b', url: './', tag: 'g', to: ['uwork'], devices: 0, no_device: 1 }, { ts: 6, title: 'n2', body: 'b', url: './', tag: 'g', to: ['uadmin'], log_only: true }, { ts: 7, title: 'n3', body: 'b', url: './', tag: 'g', to: ['uwork', 'uadmin'], subs_unavailable: true }] };
+      const pa = await call({ action: 'push_log' }, tokA), pw = await call({ action: 'push_log' }, tokW);
+      const ks53 = (r) => [...new Set((r.body.items || []).flatMap((x) => Object.keys(x)))].sort().join();
+      T('C253 ① 알림함 읽기(push_log)는 새 칸이 든 줄도 종전 꼴 — 내보내는 칸 ts·title·body·tag뿐 · 관리자 3줄 · 직원은 자기 앞 2줄(최신 먼저)',
+        pa.code === 200 && (pa.body.items || []).length === 3 && ks53(pa) === 'body,tag,title,ts' && pw.code === 200 && (pw.body.items || []).map((x) => x.title).join() === 'n3,n1' && ks53(pw) === 'body,tag,title,ts', JSON.stringify([pa.code, ks53(pa), pw.code]));
+    } catch (e) { T('C253 설정·알림함 읽기 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+    finally { if (svN53 === undefined) delete mem.gw_data['settings:notify']; else mem.gw_data['settings:notify'] = svN53; if (svL53 === undefined) delete mem.gw_data['push:log']; else mem.gw_data['push:log'] = svL53; }
+  }
 }
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

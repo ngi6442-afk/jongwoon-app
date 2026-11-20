@@ -22,6 +22,7 @@ const PERM_CLOSED = { quote: 1, promo: 1, hr: 1, lic: 1, site: 1, safety: 1, hw:
 const H = 3600000, D = 24 * H;
 const DEVICE_PENDING_DAYS = 7;      // 판22 '대기 7일'(착수설명서 58행 — 새 기기 승인 대기 7일 넘으면 다시 알림)
 const SUBS_PER_MEMBER = 5;          // 그룹웨어 운영권한관리규정(JW-11-01-003) 제14조① '회원당 5대 이내' · gw-data handlePushSub slice(-5)
+const SUBS_NODEV_DAYS = 30;         // 원장 C253 — 점검 시각 앞 30일 알림함에서 받는 사람으로 찍힌 재직 회원의 알림 기기 0대를 본다(직책 추측 없이 실제 발송 기록으로)
 const FILES_BACKUP_H = 96;          // appdata data/cron_map.json 'JW 첨부백업' alert_after_h 96(주말·연휴 넘겨 PC가 꺼진 경우까지 잡는 선)
 // 월 사용 상한 — 코드에 적힌 값 그대로(한쪽만 고치지 말 것 — servertest 'P1 판31'이 원본 상수와 대조)
 const USAGE_CAPS = [
@@ -38,7 +39,7 @@ const ITEMS = [   // 순서 = 착수설명서 판31 줄(로그인·잠금·퇴�
   { id: 'retired', label: '퇴사자 접속', rule: '퇴사일 다음 날 뒤 로그인 0건', basis: '그룹웨어 운영권한관리규정 제8조(퇴사일 다음 날부터 로그인 차단) · _lib/tier.js retired' },
   { id: 'perm', label: '권한 변경', rule: '모듈 권한·관리자·개발자 표시 변경은 개발자만 · 등급 변경은 대표·PM만', basis: '그룹웨어 운영권한관리규정 제9조③·제10조① · gw-auth DEV_ONLY·TIER_PM_OR_BOSS_ONLY' },
   { id: 'device', label: '대기 기기', rule: '승인 대기 ' + DEVICE_PENDING_DAYS + '일 넘은 기기 0 · 퇴사·삭제 회원의 승인된 기기 0', basis: '착수설명서 판22(대기 7일·퇴사 다음 날 대기로) · 그룹웨어 운영권한관리규정 제12조③' },
-  { id: 'subs', label: '구독', rule: '회원당 알림 기기 ' + SUBS_PER_MEMBER + '대 이내 · 퇴사·삭제 회원 구독 0', basis: '그룹웨어 운영권한관리규정 제14조① · 착수설명서 판22(퇴사 다음 날 구독 회수) · gw-data push_sub' },
+  { id: 'subs', label: '구독', rule: '회원당 알림 기기 ' + SUBS_PER_MEMBER + '대 이내 · 퇴사·삭제 회원 구독 0 · 최근 ' + SUBS_NODEV_DAYS + '일 알림을 받은 재직 회원은 알림 기기 1대 이상', basis: '그룹웨어 운영권한관리규정 제14조① · 착수설명서 판22(퇴사 다음 날 구독 회수) · gw-data push_sub · 원장 C253(받을 기기 없는 알림 — 11/20 전수 조사 확정)' },
   { id: 'usage', label: '사용량', rule: '월 사용 상한에 닿은 기능 0', basis: '코드의 월 상한(물어보기·블로그 AI·사진 가리기·아침 브리핑·계약 학습)' },
   { id: 'backup', label: '백업 연속일', rule: '매일 백업이 빠진 날 0 · 부분 백업(실패 키 있음) 0 · 첨부 백업 마지막 흔적 ' + FILES_BACKUP_H + '시간 안', basis: '그룹웨어 운영권한관리규정 제17조①(매일 05시 30분 전체 백업) · appdata .github/workflows/backup.yml cron "30 20 * * *"(KST 05:30 매일)·cron_map backup.yml · 첨부 = cron_map JW 첨부백업 96시간' },
   { id: 'alerts', label: '경보 수', rule: '기준 없음 — 숫자만 기록', basis: '자동화운영규정(JW-11-01-004) 제14조②(이상일 때만 알림)는 허용 건수를 두지 않음' },
@@ -213,13 +214,28 @@ function judge(period, nowMs, m) {
     const cnt = function (id) { return Array.isArray(m.subs[id]) ? m.subs[id].length : 0; };
     const over = ids.filter(function (id) { return cnt(id) > SUBS_PER_MEMBER; });
     const goneS = m.members ? ids.filter(function (id) { return cnt(id) > 0 && gone(id); }) : null;
+    // 원장 C253 ② 받아야 할 사람인데 구독 0 — 점검 시각 앞 SUBS_NODEV_DAYS일 알림함에서 받는 사람(to)으로 찍힌 재직 회원 가운데 지금 알림 기기 0대(직책을 추측하지 않고 실제 발송 기록으로).
+    //   '알림함만' 줄(log_only — 기기로 보내지 않는 통지)은 세지 않는다. 건수 = 그 사람들이 받는 사람으로 찍힌 줄 수(연인원 — 줄에는 사람별 도착이 없어 '그 사람 앞 알림' 수다).
+    //   명부나 알림함을 못 읽으면 대조 못 함(noDev null). 이름은 퇴사자 접속 줄과 같은 꼴(3명까지)
+    let noDev = null;
+    if (m.members && Array.isArray(m.pushLog)) {
+      const since = nowMs - SUBS_NODEV_DAYS * D, hit = {};
+      m.pushLog.forEach(function (x) {
+        if (!isObj(x) || x.log_only === true || !Array.isArray(x.to) || num(x.ts) < since || num(x.ts) > nowMs) return;
+        const seen = {};
+        x.to.forEach(function (id) { if (typeof id !== 'string' || !id || seen[id] || gone(id) || cnt(id) > 0) return; seen[id] = 1; hit[id] = (hit[id] || 0) + 1; });
+      });
+      const who = Object.keys(hit);
+      noDev = { people: who.length, msgs: who.reduce(function (s, id) { return s + hit[id]; }, 0), names: who.map(function (id) { return String(byId[id].name || ''); }).filter(Boolean) };
+    }
     const lines = [];
     if (over.length) lines.push('알림 기기 ' + SUBS_PER_MEMBER + '대 넘은 회원 ' + over.length + '명');
     if (goneS && goneS.length) lines.push('퇴사·삭제 회원 구독 ' + goneS.length + '명');
-    const st = (over.length || (goneS && goneS.length)) ? 'bad' : (goneS ? 'ok' : 'unknown');
-    if (st === 'unknown') lines.push('회원 명부를 읽지 못해 퇴사자 구독을 대조하지 못했습니다');
+    if (noDev && noDev.people) lines.push('최근 ' + SUBS_NODEV_DAYS + '일 알림을 받은 재직 회원 중 알림 기기 없는 사람 ' + noDev.people + '명 · 이들 앞 알림 ' + noDev.msgs + '건' + (noDev.names.length ? ' — ' + noDev.names.slice(0, 3).join(', ') : ''));
+    const st = (over.length || (goneS && goneS.length) || (noDev && noDev.people)) ? 'bad' : ((goneS && noDev) ? 'ok' : 'unknown');
+    if (st === 'unknown') lines.push(!goneS ? '회원 명부를 읽지 못해 퇴사자 구독을 대조하지 못했습니다' : '알림함을 읽지 못해 받는 사람의 알림 기기를 대조하지 못했습니다');
     if (st === 'ok') lines.push('알림 받는 회원 ' + ids.length + '명 · 기기 ' + ids.reduce(function (s, id) { return s + cnt(id); }, 0) + '대');
-    out.push(item('subs', st, lines, { members: ids.length, over: over.length, gone: goneS ? goneS.length : null }));
+    out.push(item('subs', st, lines, { members: ids.length, over: over.length, gone: goneS ? goneS.length : null, nodev: noDev ? noDev.people : null, nodev_msgs: noDev ? noDev.msgs : null }));
   }
   });
   // 7 사용량 — 그달 사용이 월 상한에 닿았는가

@@ -2880,6 +2880,9 @@ const NOTIFY_EVENTS = {
   // v415 C3-2 입찰 2종(설계 3-1 안착 ③: 개찰 전건 관리자 푸시 → 낙찰·수집 실패만 즉시, 나머지 아침 요약). 기본=현행, 추천=★(R1 D-3 → 11/4 적용 예약). 게이트 잠금 위반 알림은 C6(변경등록 게이트) 뒤.
   bid_result: { label: '개찰 결과 알림', options: { each: '개찰 결과마다 관리자 전원(현행)', award: '낙찰만 즉시(입찰 담당+PM 우선기기) · 유찰은 아침 요약' }, def: 'each', rec: 'award' },
   bid_fail: { label: '입찰 수집 실패 경보 수신', options: { admins: '관리자 전원(현행)', assignee: '입찰 담당 + 관리자' }, def: 'admins', rec: 'assignee' },
+  // 원장 C253 ③(11/20) 받을 기기 없는 알림 가시화 — 한 사람에게만 가는 알림이 받을 기기 0대로 끝나면 개발자(없으면 관리자)에게 하루 1번. 발송·표식은 _lib/push.js noteMiss가 이 칸을 **읽기만** 해서 한다.
+  //   새 알림이라 기본 = 끔(끈 상태 = 종전 발송 그대로) · 추천값 없음(rec '' — ★·PM 콘솔 추천 줄 없음 · 켜는 것은 PM 결정). 켜면 이 카드의 다른 칸처럼 settings:notify 시각이 새로 찍힌다(관리자 병행 7일 — notifyParallelOn 알려진 한계)
+  push_miss: { label: '받을 기기 없음(미도달) 알림', options: { off: '없음(현행)', dev_daily: '개발자에게 하루 1번' }, def: 'off', rec: '' },
 };
 function notifyDefaults() { const o = {}; Object.keys(NOTIFY_EVENTS).forEach(function (k) { o[k] = NOTIFY_EVENTS[k].def; }); return o; }
 function notifyValid(k, v) { return Object.prototype.hasOwnProperty.call(NOTIFY_EVENTS, k) && Object.prototype.hasOwnProperty.call(NOTIFY_EVENTS[k].options, String(v)); }
