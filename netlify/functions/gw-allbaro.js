@@ -78,7 +78,7 @@ function round3(n) { return Math.round(n * 1000) / 1000; }
 
 // 노선표 인덱스 — 학습 지정이 실재하는 줄을 가리키는지 검증한다(계약 B-2 BAD_ROUTE).
 // 프로토타입 오염 없는 사전(Object.create(null))으로 'constructor' 같은 키 우회를 원천 차단.
-const EXTRA_KEY = 'allbaro:routes_extra';   // v351: 사람이 앱에서 더한 노선(양식 예비 행 40~49)
+const EXTRA_KEY = 'allbaro:routes_extra';   // v351: 사람이 앱에서 더한 노선(식별자 행 40~999 — 2026-11-20, 종전 40~49)
 // v352(PM 9/11 #33) 엑셀 재생성 요청 → v385에서 _lib/xlsx_regen.js로 옮김(수집 워커도 같이 부른다). 기본 소급 9일(수집 창과 같음).
 const { requestXlsxRegen, requestState, routeAtOf, daysAgoKst, backFor, REGEN_KEY, REGEN_MAX_DAYS, REGEN_STALE_MS, REGEN_GIVEUP_RETRY_MS } = require('./_lib/xlsx_regen');
 // v351: 추가 노선까지 보이도록 매번 현재 표에서 찾는다(인덱스 스냅샷이면 새 줄을 BAD_ROUTE로 거절한다).
@@ -628,7 +628,7 @@ async function loadExtraRoutes(st) {
     return items;
   } catch (e) { AB.setExtraRoutes([]); return []; }
 }
-// 새 노선 추가 — 관리자·운영부(canLearn과 같은 문). 예비 행(40~49)에서 다음 빈 줄을 잡는다.
+// 새 노선 추가 — 관리자·운영부(canLearn과 같은 문). 고른 열(L/R)에서 다음 빈 식별자 행(40~999)을 잡는다 — 식별자일 뿐 엑셀 자리가 아니다(2026-11-20).
 //   같은 상·하차지·품목이 이미 있으면 그 줄을 돌려주고 새로 만들지 않는다.
 async function handleRouteAdd(st, c, d, R) {
   if (!canLearn(c.member)) return jr(403, { ok: false, code: 'FORBIDDEN', request_id: R });
@@ -642,7 +642,7 @@ async function handleRouteAdd(st, c, d, R) {
   const r = await blobGet(st, EXTRA_KEY);
   const items = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : [];
   const row = AB.nextExtraRow(side, items);
-  if (!row) return jr(409, { ok: false, code: 'ROWS_FULL', side: side, request_id: R });   // 예비 행 소진 — 양식 원본을 늘려야 한다
+  if (!row) return jr(409, { ok: false, code: 'ROWS_FULL', side: side, request_id: R });   // 그 열의 식별자 960개(40~999)를 다 쓴 경우뿐 — 다른 열을 고르면 된다(2026-11-20, 종전: 예비 행 10줄 소진)
   const entry = { side: side, row: row, from: from, to: to, item: item, count_col: side === 'L' ? 5 : 11, by: c.member.name, bid: c.member.id, ts: Date.now() };
   items.push(entry);
   const w = await blobSet(st, EXTRA_KEY, { schema: 1, items: items, updated_at: Date.now() });

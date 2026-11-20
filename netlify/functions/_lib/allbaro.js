@@ -34,7 +34,8 @@ const ONE_PAGE_ROWS = '500';
 // ---------- 노선사전(노선사전.json routes 66개 임베드) ----------
 // 회수 기입: L측=E열(count_col 5), R측=K열(count_col 11).
 // v351(2026-09-11): 기본표(BASE_ROUTES)와 사람이 앱에서 더한 추가분(blob allbaro:routes_extra)을 합쳐 ROUTES가 된다.
-//   추가분은 양식 원본의 예비 행(L40~L49·R40~R49, 2026-09-11 삽입)에 들어간다. 요청마다 setExtraRoutes()로 합친다.
+//   추가분의 (side,row)는 식별자 L40~L999·R40~R999(2026-11-20 — 종전 40~49는 양식 예비 행 수에 묶여 20칸이 차면 막혔다).
+//   요청마다 setExtraRoutes()로 합친다.
 const BASE_ROUTES = [
   // 2026-08-24 배출자 가나다순 전면 재정렬(PM 지시) + 신설 3행 — 양식 원본도 같은 날 재배열.
   // 영문 배출자(SMC·TCC·YK)는 한글 뒤 알파벳순. 이전 행번호·이력 주석은 git 이력 참조.
@@ -110,8 +111,14 @@ const BASE_ROUTES = [
   { side: "R", row: 39, from: "(주)포스코퓨처엠", to: "대화산업", item: "폐석회", count_col: 11 },   // v326(PM 9/8): 9/7 폐석회 별도 줄 — 양식 R39 빈 줄(SUM K5:K39 범위 안), 가나다 재정렬 없이 말미 추가
   { side: "R", row: 40, from: "한라티씨", to: "거성산업", item: "분진", count_col: 11 },   // v351(PM 9/11): 9/10 미매칭 실측 — 양식 예비 행 R40(2026-09-11 삽입)
 ];
-// 추가 노선이 들어갈 수 있는 행 — 양식 원본 예비 행. 넘치면 원본을 다시 늘려야 한다(generate.py 주석 참조).
-const EXTRA_ROW_MIN = 40, EXTRA_ROW_MAX = 49;
+// 추가 노선의 식별자 행 범위. (side,row)는 노선 식별자일 뿐 엑셀의 물리 행이 아니다 — 2026-09-13부터 엑셀 자리는 생성기(appdata
+// collectors/logsheet/generate.py)가 생성 때마다 가나다순으로 정하고, 보이는 노선이 양식 자리(90줄)를 넘으면 생성기가 행을 늘린다.
+// 그래서 범위를 양식 행 수(종전 40~49)에 묶지 않는다. 같은 값: generate.py RESERVE_MIN/MAX · logsheet_daily.py EXTRA_ROW_MIN/MAX ·
+// index.html AB_EXTRA_ROW_MIN/MAX. 상한 999 = countRowKey의 세 자리 정렬 키와 같은 폭(넘기려면 그 자리도 같이).
+// 숨긴 줄·지난 기록·학습 지정이 식별자를 가리킨다. nextExtraRow는 그 열의 빈 번호 중 가장 낮은 것을 주는데, 노선을 지우는 액션이 없어
+// 쓴 번호가 비지 않는다(숨긴 줄도 번호를 차지). 추가분 blob에서 항목이 빠지면 그 번호를 새 줄이 물려받아 옛 지정·기록이 새 줄에 실리므로
+// blob을 손으로 지우지 말 것(2026-11-20 독립 검토 — 종전 범위에서도 같은 동작).
+const EXTRA_ROW_MIN = 40, EXTRA_ROW_MAX = 999;
 let ROUTES = BASE_ROUTES.slice();
 
 // ---------- 별칭사전(별칭사전.json 11개 임베드, _설명 키 제외) ----------
@@ -1179,7 +1186,7 @@ function setExtraRoutes(list) {
   ROUTES_VER = routesVerOf(ROUTES);
   return extra.length;
 }
-// 추가 노선이 들어갈 다음 빈 행(예비 행 안에서). 없으면 0.
+// 추가 노선의 다음 빈 식별자 행(그 열에서 EXTRA_ROW_MIN~MAX 중 가장 낮은 빈 번호). 없으면 0(한 열 960줄을 다 쓴 경우뿐).
 function nextExtraRow(side, extraList) {
   const used = Object.create(null);
   BASE_ROUTES.forEach((r) => { if (r.side === side) used[r.row] = true; });

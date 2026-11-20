@@ -30786,8 +30786,29 @@ function dutyStage(nx){
     {s:"R",r:37,f:"TCC스틸",t:"포항그린",i:"폐수오니"},
     {s:"R",r:38,f:"YK스틸",t:"스틸싸이클㈜",i:"EAFD"},
     {s:"R",r:39,f:"(주)포스코퓨처엠",t:"대화산업",i:"폐석회"},
-    {s:"R",r:40,f:"한라티씨",t:"거성산업",i:"분진"}   // v351(PM 9/11): 양식 예비 행 R40. 이후 새 노선은 앱 [＋ 새 노선으로 추가]가 예비 행(40~49)에 넣는다 — 코드 수정 없음
+    {s:"R",r:40,f:"한라티씨",t:"거성산업",i:"분진"}   // v351(PM 9/11): 양식 예비 행 R40. 이후 새 노선은 앱 [＋ 새 노선으로 추가]가 줄 번호 40~999에 넣는다 — 코드 수정 없음
   ];
+  // 2026-11-20(PM "예비줄 건부터 먼저"): 추가 노선의 줄 번호(식별자 행) 범위 — 서버 _lib/allbaro.js EXTRA_ROW_MIN/MAX와 같은 값(uismoke 대조).
+  //   (열,번호)는 노선 식별자일 뿐 엑셀의 물리 행이 아니다(자리는 가나다순 자동, 모자라면 엑셀 생성기가 행을 늘린다) — 종전 40~49는
+  //   양식 예비 행 수에 묶여 좌우 20칸이 차면 새 노선 추가가 막혔다. 숨긴 줄·지난 기록·학습 지정이 번호를 가리키는데, 노선을 지우는 기능이 없어
+  //   쓴 번호가 비지 않는다(숨긴 줄도 번호를 차지). 추가분 blob에서 항목이 빠지면 그 번호를 새 줄이 물려받으니 blob을 손으로 지우지 말 것.
+  var AB_EXTRA_ROW_MIN = 40, AB_EXTRA_ROW_MAX = 999;
+  // 엑셀 인쇄 쪽수 경계(보이는 노선 줄 수) — appdata generate.py PAGE_PT 주석의 2026-11-20 Excel 실측(A4·배율 77%·지금 줄 높이):
+  //   52줄까지 한 장 · 124줄까지 두 장. 생성기의 줄 높이·배율을 바꾸면 같이 다시 잰다. 경계까지 AB_XLSX_NEAR줄 안이면 표 아래에 미리 알린다.
+  var AB_XLSX_1P = 52, AB_XLSX_2P = 124, AB_XLSX_NEAR = 6;
+  function abXlsxVisN(){ return abRouteList().filter(function(r){ return !r.h; }).length; }
+  function abXlsxPages(n){ return n <= AB_XLSX_1P ? 1 : (n <= AB_XLSX_2P ? 2 : 3); }
+  function abXlsxLeft(n){ return n <= AB_XLSX_1P ? AB_XLSX_1P - n : (n <= AB_XLSX_2P ? AB_XLSX_2P - n : -1); }   // 쪽이 늘어나기까지 더 넣을 수 있는 줄 수(3쪽부터는 -1)
+  function abXlsxPageText(n){
+    var p = abXlsxPages(n);
+    return "보이는 노선 " + n + "줄 · 엑셀 인쇄 " + (p >= 3 ? "3쪽 이상" : p + "쪽") + " (한 장은 " + AB_XLSX_1P + "줄, 두 장은 " + AB_XLSX_2P + "줄까지 — 안 쓰는 줄을 숨기면 줄어듭니다. 숨긴 줄도 회수가 들어온 날은 그날 엑셀에 실립니다)";
+  }
+  function abXlsxNearHtml(){
+    if (!abCanLearn()) return "";
+    var n = abXlsxVisN(), left = abXlsxLeft(n), p = abXlsxPages(n);
+    if (left < 0 || left > AB_XLSX_NEAR) return "";
+    return '<div class="ab-hidden-line">보이는 노선 ' + n + '줄 — ' + (left ? left + "줄 더 늘면 그다음 줄부터" : "한 줄만 더 늘어도") + ' 엑셀 인쇄가 ' + (p + 1) + '쪽이 됩니다(지금 ' + p + '쪽). 안 쓰는 줄을 숨기면 줄어듭니다.</div>';
+  }
   function abRouteList(){
     var d = abDay.data || {}, s = abStatus || {};
     var src = (d && Array.isArray(d.routes)) ? d.routes : ((s && Array.isArray(s.routes)) ? s.routes : null);
@@ -30870,7 +30891,7 @@ function dutyStage(nx){
     WORKER_THREW: "수집 작업이 비정상 종료됐습니다.",
     BAD_ROUTE: "양식 노선표에 없는 줄입니다 — 앱을 새로고침해 최신 노선표로 다시 지정하세요(계속 나오면 관리자에게 알려주세요).",
     BAD_ROUTE_ID: "노선 식별자가 올바르지 않습니다 — 앱을 새로고침한 뒤 다시 시도하세요.",
-    ROWS_FULL: "양식 예비 줄(40~49행)이 다 찼습니다 — 양식 원본에 줄을 늘려야 합니다. 관리자에게 알려주세요.",
+    ROWS_FULL: "이 열의 줄 번호를 다 썼습니다 — 다른 열(왼쪽/오른쪽)을 골라 추가하세요. 계속 나오면 관리자에게 알려주세요.",
     BAD_INPUT: "상차지·하차지와 왼쪽/오른쪽 열을 모두 입력하세요.",
     BAD_PRESET_ID: "단골 노선 식별자가 올바르지 않습니다 — 앱을 새로고침한 뒤 다시 시도하세요.",
     DUP_PRESET_ID: "단골 노선 식별자가 중복됩니다 — 앱을 새로고침한 뒤 다시 시도하세요.",
@@ -31333,14 +31354,14 @@ function dutyStage(nx){
       if (r.s === "L") L += o; else R += o;
     }
     return '<option value="">— 양식 줄 선택 —</option>' +
-      '<option value="__new__">＋ 새 노선으로 추가…</option>' +   // v351(PM 9/11): 맨 위 — 양식 예비 행(40~49)에 새 줄을 만들고 바로 지정
+      '<option value="__new__">＋ 새 노선으로 추가…</option>' +   // v351(PM 9/11): 맨 위 — 노선표에 새 줄(줄 번호 40~999)을 만들고 바로 지정
       (L ? '<optgroup label="왼쪽(L열)">' + L + '</optgroup>' : '') +
       (R ? '<optgroup label="오른쪽(R열)">' + R + '</optgroup>' : '') +
       (H ? '<optgroup label="숨긴 줄(표에서 뺌 — 배정은 가능)">' + H + '</optgroup>' : '');
   }
-  // v351: 새 노선 폼 — 어느 열(L/R)이 먼저 비는지(예비 행 40~49 중 가장 낮은 빈 줄)로 기본 열을 고른다. 둘 다 찼으면 "".
+  // v351: 새 노선 폼 — 어느 열(L/R)의 줄 번호가 먼저 비는지(AB_EXTRA_ROW_MIN~MAX 중 가장 낮은 빈 번호)로 기본 열을 고른다. 둘 다 찼으면 "".
   // v366(PM 9/18 "에코프로비엠과 (CAM)은 두 개로 나눠달라, 앞으로도" 재발방지): 서버가 counts[].variants에 올바로 원문 이름을 남기면
-  //   줄에 '표기 변형' 칩을 달고, 운영부·관리자는 [별도 줄로 나누기]로 그 이름의 줄을 예비 행에 바로 만든다(ab_route_add) → 이 날 일지는 다시 열 때 재판정(v327).
+  //   줄에 '표기 변형' 칩을 달고, 운영부·관리자는 [별도 줄로 나누기]로 그 이름의 줄을 새 줄 번호에 바로 만든다(ab_route_add) → 이 날 일지는 다시 열 때 재판정(v327).
   function abVariantHtml(c, r){
     if (!c || !Array.isArray(c.variants) || !c.variants.length) return "";
     var names = c.variants.map(function(v){ return String((v && v.name) || v || ""); }).filter(Boolean);
@@ -31353,9 +31374,9 @@ function dutyStage(nx){
     if (abLearnBusy || !abCanLearn() || !name) return;
     var rt = null, rs = abRouteList(); for (var i = 0; i < rs.length; i++){ if (rs[i].s === side && rs[i].r === row){ rt = rs[i]; break; } }
     if (!rt) return;
-    if (!confirm("'" + name + "'을(를) 줄 " + side + row + " '" + rt.f + "'에서 떼어 예비 행에 별도 줄로 만듭니다.\n하차지 '" + rt.t + "' · 품목 '" + rt.i + "' 그대로. 만든 뒤 이 날 일지는 다시 열 때 재판정되고 엑셀은 다음 재생성에 반영됩니다.\n\n진행할까요?")) return;
+    if (!confirm("'" + name + "'을(를) 줄 " + side + row + " '" + rt.f + "'에서 떼어 별도 줄로 만듭니다.\n하차지 '" + rt.t + "' · 품목 '" + rt.i + "' 그대로. 만든 뒤 이 날 일지는 다시 열 때 재판정되고 엑셀은 다음 재생성에 반영됩니다." + abXlsxGrowNote() + "\n\n진행할까요?")) return;
     var fr = abFreeReserve(), sd = fr[side] ? side : (fr.L ? "L" : (fr.R ? "R" : ""));
-    if (!sd){ gwToast("예비 행(40~49)이 다 찼습니다 — 양식 원본을 늘려야 합니다", true, 2500); return; }
+    if (!sd){ gwToast("줄 번호를 다 썼습니다 — 관리자에게 알려주세요", true, 2500); return; }
     abLearnBusy = true;
     gwCall("gw-allbaro", { action: "ab_route_add", from: name, to: rt.t, item: rt.i, side: sd }).then(function(res){
       abLearnBusy = false;
@@ -31366,20 +31387,25 @@ function dutyStage(nx){
   }
   function abFreeReserve(){
     var rs = abRouteList(), used = { L: {}, R: {} }, i, side, row, out = { L: 0, R: 0 };
-    for (i = 0; i < rs.length; i++){ if (rs[i].r >= 40 && rs[i].r <= 49) used[rs[i].s][rs[i].r] = true; }
-    for (side in out){ for (row = 40; row <= 49; row++){ if (!used[side][row]){ out[side] = row; break; } } }
+    for (i = 0; i < rs.length; i++){ if (used[rs[i].s] && rs[i].r >= AB_EXTRA_ROW_MIN && rs[i].r <= AB_EXTRA_ROW_MAX) used[rs[i].s][rs[i].r] = true; }
+    for (side in out){ for (row = AB_EXTRA_ROW_MIN; row <= AB_EXTRA_ROW_MAX; row++){ if (!used[side][row]){ out[side] = row; break; } } }
     return out;
+  }
+  // 줄을 하나 더하면 엑셀 인쇄 쪽이 늘어나는 때만 확인창에 한 줄 붙인다(그 밖엔 빈 글).
+  function abXlsxGrowNote(){
+    var n = abXlsxVisN();
+    return (abXlsxPages(n + 1) > abXlsxPages(n)) ? ("\n\n※ 이 줄을 더하면 보이는 노선이 " + (n + 1) + "줄이 되어 엑셀 인쇄가 " + abXlsxPages(n + 1) + "쪽으로 늘어납니다 — 안 쓰는 줄을 숨기면 줄어듭니다.") : "";
   }
   function abNewRouteFormHtml(u){
     var free = abFreeReserve(), def = (!free.L || (free.R && free.R < free.L)) ? "R" : "L";
     return '<div class="ab-nr" data-ab-nr="' + esc(u.key) + '">' +
-      '<div class="ab-nr-hd">새 노선 — 양식 예비 줄(40~49행)에 추가하고 이 조합을 바로 지정합니다</div>' +
+      '<div class="ab-nr-hd">새 노선 — 노선표에 새 줄로 추가하고 이 조합을 바로 지정합니다. 엑셀·화면 자리는 배출자 가나다순으로 자동이고, 줄 번호는 식별용입니다.<br>' + esc(abXlsxPageText(abXlsxVisN())) + '</div>' +
       '<input class="ab-in" data-ab-nr-from="1" maxlength="60" placeholder="상차지" value="' + esc(u.from || "") + '">' +
       '<input class="ab-in" data-ab-nr-to="1" maxlength="60" placeholder="하차지" value="' + esc(u.to || "") + '">' +
       '<input class="ab-in" data-ab-nr-item="1" maxlength="40" placeholder="품목" value="' + esc(u.item || "") + '">' +
       '<select class="ab-in" data-ab-nr-side="1">' +
-        '<option value="L"' + (def === "L" ? " selected" : "") + '>왼쪽(L열)' + (free.L ? " — L" + free.L : " — 빈 줄 없음") + '</option>' +
-        '<option value="R"' + (def === "R" ? " selected" : "") + '>오른쪽(R열)' + (free.R ? " — R" + free.R : " — 빈 줄 없음") + '</option>' +
+        '<option value="L"' + (def === "L" ? " selected" : "") + '>왼쪽(L) 번호' + (free.L ? " — L" + free.L : " — 빈 번호 없음") + '</option>' +
+        '<option value="R"' + (def === "R" ? " selected" : "") + '>오른쪽(R) 번호' + (free.R ? " — R" + free.R : " — 빈 번호 없음") + '</option>' +
       '</select>' +
       '</div>';
   }
@@ -31393,10 +31419,16 @@ function dutyStage(nx){
     var from = v("[data-ab-nr-from]"), to = v("[data-ab-nr-to]"), item = v("[data-ab-nr-item]"), side = v("[data-ab-nr-side]");
     if (!from || !to){ alert("상차지와 하차지를 입력하세요."); return; }
     if (side !== "L" && side !== "R"){ alert("왼쪽/오른쪽 열을 고르세요."); return; }
+    // 노선 이름은 엑셀 칸에 그대로 찍힌다 — 서버 한도(상·하차지 60자·품목 40자, lib cleanExtraRoute)를 보내기 전에 정확한 글로 알린다.
+    //   올바로 품목 원문(법정 분류명)은 40자를 넘는 것이 있어 폼에 채워진 그대로면 걸린다(종전: 서버 400 뒤 '품목은 400자' 안내가 떠 틀렸다).
+    if (from.length > 60 || to.length > 60 || item.length > 40){
+      alert("노선 이름이 깁니다 — 상차지·하차지는 각 60자, 품목은 40자까지 넣을 수 있습니다.\n엑셀 칸에 그대로 찍히는 이름이라 양식에 쓰는 짧은 이름으로 줄여 주세요.\n(상차지·하차지를 줄일 때는 올바로 이름의 일부를 그대로 남겨 주세요 — 전혀 다른 약칭이면 엑셀에서 미매칭으로 빠집니다.)\n\n지금: 상차지 " + from.length + "자 · 하차지 " + to.length + "자 · 품목 " + item.length + "자");
+      return;
+    }
     var free = abFreeReserve();
     if (!free[side]){ alert(AB_CODE_TEXT.ROWS_FULL); return; }
     if (!confirm("새 노선을 추가하고 이 조합을 그 줄로 지정할까요?\n\n" + from + " → " + to + (item ? " · " + item : "") +
-        "\n→ " + side + free[side] + " (양식 예비 줄)\n\n같은 상·하차지·품목이 이미 있으면 새로 만들지 않고 그 줄로 지정합니다.")) return;
+        "\n→ 줄 번호 " + side + free[side] + " (엑셀 자리는 가나다순 자동)\n\n같은 상·하차지·품목이 이미 있으면 새로 만들지 않고 그 줄로 지정합니다." + abXlsxGrowNote())) return;
     abLearnBusy = true;
     renderAbSheet();
     gwCall("gw-allbaro", { action: "ab_route_add", from: from, to: to, item: item, side: side }).then(function(res){
@@ -31712,6 +31744,7 @@ function dutyStage(nx){
         h += sh.html;
         if (sh.emptyN) h += '<div class="ab-hidden-line">빈 줄 ' + sh.emptyN + '개 생략(빈 줄 숨기기 켜짐)</div>';
         h += abHiddenListHtml();   // 숨긴 노선 n개 · [보기]/[복구](v323)
+        h += abXlsxNearHtml();     // 엑셀 인쇄 쪽이 늘어나는 경계에 다가오면 미리 알림(관리자·운영부, 2026-11-20)
       } else {
         rows.forEach(function(c){
           var rt = c.route || {};

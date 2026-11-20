@@ -1239,8 +1239,9 @@ try {
   const wk = readFileSync(join(ROOT, 'netlify/functions/gw-allbaro-run-background.js'), 'utf8');
   const appR = [...html.matchAll(/\{s:"([LR])",r:(\d+),f:"([^"]*)",t:"([^"]*)",i:"([^"]*)"\}/g)].map((m) => m.slice(1).join('|'));
   const svrR = [...lib.slice(lib.indexOf('const BASE_ROUTES'), lib.indexOf('const EXTRA_ROW_MIN')).matchAll(/\{ side: "([LR])", row: (\d+), from: "([^"]*)", to: "([^"]*)", item: "([^"]*)"/g)].map((m) => m.slice(1).join('|'));
-  T('노선표 기본표 앱 AB_ROUTES ↔ 서버 BASE_ROUTES 71줄 완전 일치 · R40 한라티씨→거성산업 분진 · 예비 행 40~49',
-    appR.length === 71 && appR.length === svrR.length && appR.every((x, i) => x === svrR[i]) && appR.indexOf('R|40|한라티씨|거성산업|분진') >= 0 && /const EXTRA_ROW_MIN = 40, EXTRA_ROW_MAX = 49;/.test(lib),
+  T('노선표 기본표 앱 AB_ROUTES ↔ 서버 BASE_ROUTES 71줄 완전 일치 · R40 한라티씨→거성산업 분진 · 추가 노선 줄 번호 40~999(서버·앱 같은 값, 2026-11-20)',
+    appR.length === 71 && appR.length === svrR.length && appR.every((x, i) => x === svrR[i]) && appR.indexOf('R|40|한라티씨|거성산업|분진') >= 0 && /const EXTRA_ROW_MIN = 40, EXTRA_ROW_MAX = 999;/.test(lib)
+    && /var AB_EXTRA_ROW_MIN = 40, AB_EXTRA_ROW_MAX = 999;/.test(html) && !/row = 40; row <= 49|r >= 40 && rs\[i\]\.r <= 49/.test(html),
     '앱 ' + appR.length + ' / 서버 ' + svrR.length + (appR.length === svrR.length ? ' 첫 불일치 ' + (appR.findIndex((x, i) => x !== svrR[i])) : ''));
   T('서버: 요청 시작에 추가분 합침(loadExtraRoutes) · ab_route_add 분기 · findRoute가 현재 표를 본다 · ROUTE_LIST/ROUTE_INDEX 스냅샷 없음 · hidden export에 routes_extra · 워커도 합친 뒤 매칭',
     /await loadExtraRoutes\(store\(DATA\)\);/.test(ab) && /case 'ab_route_add': return await handleRouteAdd\(st, c, d, R\);/.test(ab) && /function findRoute\(side, row\) \{\s*const list = AB\.routes\(\);/.test(ab)
@@ -1251,7 +1252,51 @@ try {
   T('앱 새 노선 폼·저장: abNewRouteFormHtml(상차지·하차지·품목 프리필, L/R 기본 = 먼저 비는 열) · abRouteAddGo → ab_route_add → 성공 시 abLearnGo(noConfirm) 바로 지정 · 취소·날짜 이동·로그아웃에 abLearnNew 초기화 · ROWS_FULL 문구',
     ['abFreeReserve', 'abNewRouteFormHtml', 'abRouteAddGo'].every((f) => new RegExp('function ' + f + '\\(').test(html)) && /action: "ab_route_add", from: from, to: to, item: item, side: side/.test(html)
     && /abLearnGo\(key, sd \+ "\|" \+ rw, true\);/.test(html) && /function abLearnGo\(key, val, noConfirm\)/.test(html) && /if \(!noConfirm && !confirm\("이 조합을 아래 줄로 지정할까요\?/.test(html)
-    && (html.match(/abLearnNew = "";/g) || []).length >= 4 && /ROWS_FULL: "양식 예비 줄\(40~49행\)이 다 찼습니다/.test(html) && /if \(abLearnNew === key\) abRouteAddGo\(key, host\);/.test(html), '');
+    && (html.match(/abLearnNew = "";/g) || []).length >= 4 && /ROWS_FULL: "이 열의 줄 번호를 다 썼습니다/.test(html) && !/양식 예비 줄\(40~49행\)|예비 행\(40~49\)이 다 찼습니다/.test(html) && /if \(abLearnNew === key\) abRouteAddGo\(key, host\);/.test(html), '');
+  // 2026-11-20(PM "운반일지 양식 예비줄 건부터 먼저"): 줄 번호는 식별자 — abFreeReserve가 40~999에서 빈 번호를 찾고, 엑셀 인쇄 쪽수 경계(52·124줄)를 폼·확인창·표 아래에서 알린다.
+  //   실제 함수로 돌린다: 운영 꼴(예비 20칸 모두 참 · 숨김 9줄 · 보이는 노선 81줄)에서 다음 번호 L50·R50, 쪽수 2쪽, 경계 6줄 안에서만 미리 알림.
+  {
+    const cut = (name) => { const i = html.indexOf('function ' + name + '('); if (i < 0) throw new Error(name + ' 없음'); let dpt = 0, j = html.indexOf('{', i); for (let k = j; k < html.length; k++) { if (html[k] === '{') dpt++; else if (html[k] === '}') { dpt--; if (!dpt) return html.slice(i, k + 1); } } throw new Error(name + ' 끝 없음'); };
+    const consts = html.match(/var AB_EXTRA_ROW_MIN = 40, AB_EXTRA_ROW_MAX = 999;/)[0] + html.match(/var AB_XLSX_1P = \d+, AB_XLSX_2P = \d+, AB_XLSX_NEAR = \d+;/)[0];
+    const mk = new Function('LIST', 'CAN', 'var esc = function(s){ return String(s); }; function abRouteList(){ return LIST; } function abCanLearn(){ return CAN; }' + consts
+      + ['abXlsxVisN', 'abXlsxPages', 'abXlsxLeft', 'abXlsxPageText', 'abXlsxNearHtml', 'abXlsxGrowNote', 'abFreeReserve'].map(cut).join('\n')
+      + 'return { vis: abXlsxVisN, pages: abXlsxPages, left: abXlsxLeft, text: abXlsxPageText, near: abXlsxNearHtml, grow: abXlsxGrowNote, free: abFreeReserve };');
+    const base = [...html.matchAll(/\{s:"([LR])",r:(\d+),f:"([^"]*)",t:"([^"]*)",i:"([^"]*)"\}/g)].map((m) => ({ s: m[1], r: Number(m[2]), f: m[3], t: m[4], i: m[5], h: false }));
+    const prod = base.map((x) => Object.assign({}, x));
+    for (let n = 40; n <= 49; n++) prod.push({ s: 'L', r: n, f: '추가', t: 'x', i: '', h: n === 46 || n === 47 });
+    for (let n = 41; n <= 49; n++) prod.push({ s: 'R', r: n, f: '추가', t: 'x', i: '', h: n === 45 || n === 46 });
+    ['L|13', 'L|27', 'L|28', 'L|33', 'R|24'].forEach((k) => { const p = k.split('|'); prod.find((x) => x.s === p[0] && x.r === Number(p[1])).h = true; });
+    const P = mk(prod, true);
+    const fr = P.free();
+    const mkN = (n, can) => mk(Array.from({ length: n }, (_, i) => ({ s: 'L', r: 5 + i, f: 'a', t: 'b', i: '', h: false })), can);
+    T('운영 꼴(노선 90줄 · 예비 20칸 모두 참 · 숨김 9줄): 다음 줄 번호 L50·R50(막히지 않는다) · 보이는 노선 81줄 = 엑셀 2쪽 · 경계(124줄)까지 43줄이라 미리 알림 없음 · 확인창 덧글 없음',
+      prod.length === 90 && fr.L === 50 && fr.R === 50 && P.vis() === 81 && P.pages(81) === 2 && P.left(81) === 43 && P.near() === '' && P.grow() === ''
+      && /보이는 노선 81줄 · 엑셀 인쇄 2쪽 \(한 장은 52줄, 두 장은 124줄까지/.test(P.text(81)), JSON.stringify([prod.length, fr, P.vis(), P.near(), P.grow()]));
+    T('쪽수 경계: 52줄 1쪽·53줄 2쪽·124줄 2쪽·125줄 3쪽 · 남은 줄 6 안에서만 표 아래 미리 알림(관리자·운영부만) · 쪽이 늘어나는 한 줄에만 확인창 덧글',
+      [1, 52, 53, 124, 125, 400].map((n) => P.pages(n)).join() === '1,1,2,2,3,3' && [46, 52, 53, 118, 124, 125].map((n) => P.left(n)).join() === '6,0,71,6,0,-1'
+      && mkN(45, true).near() === '' && /보이는 노선 46줄 — 6줄 더 늘면 그다음 줄부터 엑셀 인쇄가 2쪽이 됩니다\(지금 1쪽\)/.test(mkN(46, true).near()) && /보이는 노선 124줄 — 한 줄만 더 늘어도 엑셀 인쇄가 3쪽이 됩니다\(지금 2쪽\)/.test(mkN(124, true).near())
+      && mkN(125, true).near() === '' && mkN(124, false).near() === ''
+      && mkN(51, true).grow() === '' && /보이는 노선이 53줄이 되어 엑셀 인쇄가 2쪽으로 늘어납니다/.test(mkN(52, true).grow()) && /보이는 노선이 125줄이 되어 엑셀 인쇄가 3쪽으로 늘어납니다/.test(mkN(124, true).grow()) && mkN(125, true).grow() === '',
+      JSON.stringify([mkN(46, true).near(), mkN(124, true).near(), mkN(52, true).grow()]).slice(0, 300));
+    const fullL = base.concat(Array.from({ length: 960 }, (_, i) => ({ s: 'L', r: 40 + i, f: 'a', t: 'b', i: '', h: false })));
+    T('abFreeReserve 경계: 빈 표 L40·R41(R40은 기본표) · 왼쪽 40~999 소진이면 L 0(빈 번호 없음)·R 41 · 범위 밖 번호(1000)·모르는 열은 무시',
+      (() => { const a = mk(base, true).free(), b = mk(fullL, true).free(), c = mk(base.concat([{ s: 'L', r: 1000, f: 'a', t: 'b', i: '', h: false }, { s: 'X', r: 40, f: 'a', t: 'b', i: '', h: false }]), true).free(); return a.L === 40 && a.R === 41 && b.L === 0 && b.R === 41 && c.L === 40 && c.R === 41; })(), '');
+    T('화면 글: 새 노선 폼·확인창·나누기에 "예비 줄/예비 행" 말이 없다(줄 번호·가나다순 자동) · 표 아래 미리 알림이 숨긴 노선 줄 다음에 걸려 있다',
+      /새 노선 — 노선표에 새 줄로 추가하고 이 조합을 바로 지정합니다\. 엑셀·화면 자리는 배출자 가나다순으로 자동이고, 줄 번호는 식별용입니다\./.test(html) && /"\\n→ 줄 번호 " \+ side \+ free\[side\] \+ " \(엑셀 자리는 가나다순 자동\)/.test(html)
+      && />왼쪽\(L\) 번호' \+ \(free\.L \? " — L" \+ free\.L : " — 빈 번호 없음"\)/.test(html) && /에서 떼어 별도 줄로 만듭니다\./.test(html) && !/예비 행에 별도 줄|\(양식 예비 줄\)|빈 줄 없음"/.test(html)
+      && /h \+= abHiddenListHtml\(\);[^\n]*\n\s*h \+= abXlsxNearHtml\(\);/.test(html), '');
+    { const g0 = html.indexOf('function abRouteAddGo('), g1 = html.indexOf('function abLearnGo(', g0), go = html.slice(g0, g1);
+      T('새 노선 길이 한도(상·하차지 60·품목 40 — 서버 cleanExtraRoute와 같은 값)를 보내기 전에 정확한 글로 알린다(확인창·서버 호출보다 앞)',
+        /if \(from\.length > 60 \|\| to\.length > 60 \|\| item\.length > 40\)\{/.test(go) && /상차지·하차지는 각 60자, 품목은 40자까지/.test(go)
+        && go.indexOf('item.length > 40') < go.indexOf('confirm(') && go.indexOf('item.length > 40') < go.indexOf('gwCall(')
+        && /from\.length > 60 \|\| to\.length > 60 \|\| item\.length > 40\) return null;/.test(lib), '');
+      // 독립 검토(11/20)가 낸 구멍: 함수 값만 보고 붙인 자리는 안 봤다 — 폼 머리글의 쪽수 줄 · 확인창 덧글 두 곳 · abRouteAddGo에 번호 상한을 직접 적어 다시 막는 꼴
+      const f0 = html.indexOf('function abNewRouteFormHtml('), fm = html.slice(f0, html.indexOf('function abRouteAddGo(', f0));
+      const v0 = html.indexOf('function abVariantSplit('), vs = html.slice(v0, html.indexOf('function abFreeReserve(', v0));
+      T('배선: 폼 머리글에 쪽수 줄(abXlsxPageText) · 새 노선·[별도 줄로 나누기] 확인창에 쪽 늘어남 덧글(abXlsxGrowNote) · abRouteAddGo·abVariantSplit이 줄 번호 상한을 직접 적어 막지 않는다(빈 번호 없음 = abFreeReserve 0 뿐)',
+        /esc\(abXlsxPageText\(abXlsxVisN\(\)\)\)/.test(fm) && /그 줄로 지정합니다\." \+ abXlsxGrowNote\(\)\)\) return;/.test(go) && /반영됩니다\." \+ abXlsxGrowNote\(\) \+ "\\n\\n진행할까요\?"\)\) return;/.test(vs)
+        && /if \(!free\[side\]\)\{ alert\(AB_CODE_TEXT\.ROWS_FULL\); return; \}/.test(go) && !/free\[side\] *[<>]=? *\d|free\.[LR] *[<>]=? *\d|[<>]=? *49\b/.test(go + vs + fm), ''); }
+  }
 } catch (e) { console.log('  (v351 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v352(PM 9/11 #33): 숨김·노선 변경 뒤 엑셀 재생성 요청(dispatch) + 내려받기 stale 경고 ----
