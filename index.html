@@ -1214,7 +1214,7 @@
     .layout{gap:16px;}
     .tabbar{width:168px;}
     .views>.view{max-width:808px;}
-    #view-tasks,#view-rec,#view-cli,#view-workers,#view-bid,#view-con,#view-veh,#view-safety,#view-perm,#view-stmt{max-width:none;}   /* v439 지시(#view-tasks) · v440 기성(#view-rec) · v441 거래처(#view-cli) · v442 일용직(#view-workers) · v443 입찰(#view-bid — 부동산 칸은 v444까지 옛 카드) · v445 안전(#view-safety — 현장 칸 표, 56 판)을 더함 · 29 판② 월말명세서(#view-stmt — 처음부터 표) */
+    #view-tasks,#view-rec,#view-cli,#view-workers,#view-bid,#view-con,#view-veh,#view-safety,#view-perm,#view-stmt,#view-pay{max-width:none;}   /* v439 지시(#view-tasks) · v440 기성(#view-rec) · v441 거래처(#view-cli) · v442 일용직(#view-workers) · v443 입찰(#view-bid — 부동산 칸은 v444까지 옛 카드) · v445 안전(#view-safety — 현장 칸 표, 56 판)을 더함 · 29 판② 월말명세서(#view-stmt — 처음부터 표) */
     #sfPaneNow,#view-perm>:not(#permRoster){max-width:808px;}   /* v445: 안전 탭은 현장 칸(표)만 넓고 현황은 808 · v447 체크 칸(#sfPaneEdu — 사람별 표)도 넓힘(칸 머리 두 줄·옛 대상 칩 줄은 아래 808) */
     #eduLead,#eduScopeLine{max-width:808px;}
     #recAddCard,#recImportCard,#recAbCard,#recAgingSummary{max-width:808px;}   /* v440 기성: 표만 넓고, 머리 버튼으로 펼치는 카드 셋(청구 등록·홈택스 불러오기·운반 실적)·거래처별 미수 집계는 지금 읽기 폭 808 그대로 */
@@ -2082,7 +2082,6 @@
   <section class="view" id="view-pay">
     <style>
       /* 66 판2 급여 탭 — 회계사무소 급여대장 꼴(한 사람 두 줄 · 묶음 머리 · 넣는 칸/계산 칸 구분). 관리자만(서버 gw-pay 가 강제) */
-      .views>#view-pay{max-width:none;}
       #view-pay .pay-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
       #view-pay .pay-bar .vs-chip.on{background:var(--brand,#1A9A6B);border-color:var(--brand,#1A9A6B);color:#fff;font-weight:700}
       #view-pay .pay-info{cursor:default}
@@ -2456,6 +2455,10 @@
     <button class="primary" id="cliDetailEdit" style="display:none;">거래처 정보 수정</button>
     <button class="secondary" id="cliDetailClose">닫기</button>
   </div>
+</div>
+
+<div class="modal-backdrop" id="payBackdrop">
+  <div class="modal pay-modal"><h3 id="payDlgTitle"></h3><div id="payDlgBody"></div><div class="pay-dlg-btns"><button class="primary" id="payDlgSave"></button><button class="secondary" id="payDlgClose">닫기</button></div></div>
 </div>
 
 <div class="modal-backdrop" id="bidAddBackdrop">
@@ -3581,7 +3584,7 @@
     <h3>도움말</h3>
     <p style="text-align:left;line-height:1.7;">
       · <b>홈</b>: 직원은 오늘 내 것(내게 온 지시·내 상신·주기 체크·내 할 일), 관리자는 만기·미수·결재를 한눈에, 대표는 결재함<br>
-      · <b>관리</b>: 지시 / 기성·수금 / 월말명세서 / 거래처 / 인사·직원 / 인사·일용직 / 진척도 / PM 콘솔<br>
+      · <b>관리</b>: 지시 / 기성·수금 / 월말명세서 / 거래처 / 인사·직원 / 인사·일용직 / 급여 / 진척도 / PM 콘솔<br>
       · <b>수주</b>: 입찰 / 계약 / 견적서 / 홍보<br>
       · <b>업무</b>: 캘린더 / 차량 / 화관법 / 운반일지 / 안전 / 인허가 / 문서함<br>
       · <b>개인</b>: 물어보기 / 내 업무(내게 온 지시·내 할 일·주기 체크) / 휴가<br>
@@ -34014,13 +34017,8 @@ function dutyStage(nx){
   var payDlgSeq = 0;
   function payDlg(title, body, onSave, saveTxt){
     payDlgSeq++;
-    var bd = document.getElementById("payBackdrop");
-    if (!bd){
-      bd = document.createElement("div"); bd.className = "modal-backdrop"; bd.id = "payBackdrop";
-      bd.innerHTML = '<div class="modal pay-modal"><h3 id="payDlgTitle"></h3><div id="payDlgBody"></div><div class="pay-dlg-btns"><button class="primary" id="payDlgSave"></button><button class="secondary" id="payDlgClose">닫기</button></div></div>';
-      document.body.appendChild(bd);
-      document.getElementById("payDlgClose").onclick = function(){ bd.classList.remove("show"); };
-    }
+    var bd = document.getElementById("payBackdrop");   // 창 틀은 본문 HTML(payBackdrop)에 있음
+    document.getElementById("payDlgClose").onclick = function(){ bd.classList.remove("show"); };
     document.getElementById("payDlgTitle").textContent = title;
     document.getElementById("payDlgBody").innerHTML = body;
     var sv = document.getElementById("payDlgSave");

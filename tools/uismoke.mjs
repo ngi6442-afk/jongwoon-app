@@ -2208,10 +2208,10 @@ try {
   // ② 사이드바 순서·칸 수
   const nav28 = html.slice(html.indexOf('<nav class="tabbar" id="tabbar">'), html.indexOf('</nav>'));
   const tabs28 = [...nav28.matchAll(/data-tab="([\w-]+)"/g)].map((m) => m[1]);
-  const WANT28 = 'dash,tasks,rec,stmt,cli,hr,workers,progress,pmcon,bid,con,quote,promo,cal,veh,hwakwan,allbaro,safety,lic,doc,ask,check,leave';   // 29 판②: 관리 › 기성·수금 다음 월말명세서(stmt)
+  const WANT28 = 'dash,tasks,rec,stmt,cli,hr,workers,pay,progress,pmcon,bid,con,quote,promo,cal,veh,hwakwan,allbaro,safety,lic,doc,ask,check,leave';   // 29 판②: 관리 › 기성·수금 다음 월말명세서(stmt)
   const ia28 = tabs28.indexOf('allbaro');
   T('v428 사이드바 21칸(관리자 22 → 21, 부동산 빠짐 — 29 판②에 관리 › 기성·수금 다음 월말명세서를 더해 22칸 · P1 판29 진척도 아래 PM 콘솔을 더해 23칸) 순서 그대로 · 업무 묶음 운반일지 → 안전 → 인허가(옛 현장 자리) · 안전 버튼 tabSafetyBtn = 처음엔 숨김(perm-hidden)·글자 "안전"',
-    tabs28.join(',') === WANT28 && tabs28.length === 23 && ia28 > 0 && tabs28[ia28 + 1] === 'safety' && tabs28[ia28 + 2] === 'lic'
+    tabs28.join(',') === WANT28 && tabs28.length === 24 &&   /* 66 급여 판2: 관리 › 인사·일용직 다음 급여(관리자만) — 24칸 */ ia28 > 0 && tabs28[ia28 + 1] === 'safety' && tabs28[ia28 + 2] === 'lic'
     && /<button class="tab-btn perm-hidden" data-tab="safety" id="tabSafetyBtn">안전<\/button>/.test(nav28), tabs28.join(','));
 
   // ③ 칸 구조 — 현장 id 5개가 view-safety의 현장 칸 안 · 교육 칸 · 입찰 칸
@@ -2448,7 +2448,7 @@ try {
   const OLDMAN28 = ['온비드 물건은 부동산 탭에 따로 모입니다', '현장 탭에 <b>미이수</b>', '인사·직원 탭(직원 대상)과 인사·일용직 탭(일용직 대상) 아래에 있습니다', '<h2 id="s12">12. 부동산', '<h2 id="s28">28. 현장', '홍보 / 부동산', '운반일지 / 현장 /', '>부동산 (온비드)</a>', '>현장 — 석면·철거·준설 대장</a>'];
   const oldMan28 = OLDMAN28.filter((s) => man28.indexOf(s) >= 0);
   T('v428 도움말·MANUAL 1절 4묶음 = 사이드바 라벨 그대로(관리 8(29 판② 월말명세서·P1 판29 PM 콘솔 더함 — 지시/기성·수금/월말명세서/…) · 수주 4 · 업무 7 · 개인 3 — 수주 입찰/계약/견적서/홍보 · 업무 …/운반일지/안전/인허가/문서함 · 개인 물어보기/내 업무/휴가) · 탭 안 칸 안내(입찰 = 공고/부동산, 안전 = 현장/교육·검진) · MANUAL 12·28·21-9절 새 자리 · 옛 위치 문장 0 · sw ≥ 428',
-    G4_28.map((g) => (grp28[g] || []).length).join(',') === '8,4,7,3' && grp28['관리'].slice(0, 3).join('/') === '지시/기성·수금/월말명세서' && grp28['수주'].join('/') === '입찰/계약/견적서/홍보' && grp28['업무'].join('/') === '캘린더/차량/화관법/운반일지/안전/인허가/문서함' && grp28['개인'].join('/') === '물어보기/내 업무/휴가'
+    G4_28.map((g) => (grp28[g] || []).length).join(',') === '9,4,7,3'   /* 66 급여 판2: 관리 9(급여) */ && grp28['관리'].slice(0, 3).join('/') === '지시/기성·수금/월말명세서' && grp28['수주'].join('/') === '입찰/계약/견적서/홍보' && grp28['업무'].join('/') === '캘린더/차량/화관법/운반일지/안전/인허가/문서함' && grp28['개인'].join('/') === '물어보기/내 업무/휴가'
     && helpBad28.length === 0 && manBad28.length === 0 && help28.indexOf('<b>입찰</b> = 공고 / 부동산, <b>안전</b> = 현황 / 현장 / 체크') > 0 && man1_28.indexOf('<b>입찰</b> = 공고 / 부동산, <b>안전</b> = 현황 / 현장 / 체크') > 0   // v432 안전 칸에 현황(맨 앞) · v447 칸 이름 교육·검진 → 체크
     && help28.indexOf('홍보 / 부동산') < 0 && help28.indexOf('운반일지 / 현장 /') < 0 && oldMan28.length === 0
     && man28.indexOf('<h2 id="s12">12. 입찰 › 부동산 (온비드)') > 0 && man28.indexOf('<h2 id="s28">28. 안전 › 현장 — 석면·철거·준설 대장') > 0 && man28.indexOf('<h3>21-9. 교육·건강진단 이력 (안전 › 체크)</h3>') > 0
@@ -4055,7 +4055,7 @@ try {
     fld: { id: 'k5', perms: { tasks: 'hide', veh: 'view', rec: 'hide', lic: 'hide', site: 'hide', check: 'do', con: 'hide', cli: 'hide', doc: 'view', wk: 'hide', quote: 'hide', promo: 'hide' } },   // 현장 8명(값 없음 = 기본 숨김)
     dmy: { id: 'k6', perms: { tasks: 'do', veh: 'do', rec: 'view', lic: 'view', site: 'do', check: 'do', con: 'hide', cli: 'view', doc: 'view', wk: 'do', quote: 'hide', promo: 'hide' } },   // 더미(값 없음)
   };
-  const WANT34 = { admin: [23, 23], kja: [15, 15], kmj: [14, 14], kmjS: [15, 15], jjw: [14, 14], kht: [12, 11], fld: [9, 8], dmy: [15, 14] };   // [4-1 흉내(v433), v434] — 29 판②: 관리자는 월말명세서·PM 콘솔(P1 판29 — 관리자만)까지 23(두 판 모두 — 흉내는 hw만 걷음), 그 밖 사람은 stmt 값이 없어 기본 숨김(칸 수 그대로)
+  const WANT34 = { admin: [24, 24],   /* 66 급여 판2: 관리자에 급여 탭 */ kja: [15, 15], kmj: [14, 14], kmjS: [15, 15], jjw: [14, 14], kht: [12, 11], fld: [9, 8], dmy: [15, 14] };   // [4-1 흉내(v433), v434] — 29 판②: 관리자는 월말명세서·PM 콘솔(P1 판29 — 관리자만)까지 23(두 판 모두 — 흉내는 hw만 걷음), 그 밖 사람은 stmt 값이 없어 기본 숨김(칸 수 그대로)
   const R34 = {}; Object.keys(P34).forEach((k) => { R34[k] = { a: runNav34(P34[k], REG41_34, AP41_34), b: runNav34(P34[k], REG42_34, AP42_34) }; });
   const diff34 = (r) => r.a.vis.filter((id) => r.b.vis.indexOf(id) < 0).concat(r.b.vis.filter((id) => r.a.vis.indexOf(id) < 0).map((id) => '+' + id));
   const okN34 = Object.keys(WANT34).every((k) => R34[k].a.vis.length === WANT34[k][0] && R34[k].b.vis.length === WANT34[k][1]);
@@ -4063,7 +4063,7 @@ try {
   const hwVis34 = Object.keys(P34).filter((k) => R34[k].b.vis.indexOf('tabHwakwanBtn') >= 0).join(',');
   const stVis34 = Object.keys(P34).filter((k) => R34[k].b.vis.indexOf('tabStmtBtn') >= 0).join(',');   // 29 판② 월말명세서 — 명부 저장값에 stmt가 없어(배포 직후 전원) 관리자만
   T('v434 ⓑ 사람별 사이드바 칸 수(실제 nav 23칸(29 판② 월말명세서·P1 판29 PM 콘솔 더함)·permOf·applyPerms·applySafetyPerms 실행 — 11/9 명부 권한 + 11/10 hw 저장값): 관리자 23 · 김정아(수행) 15 · 권민지(보기) 14(안전 부여 뒤 15) · 정재욱(보기) 14 · 김호태(숨김) 12 → 11 · 현장 8명형(값 없음) 9 → 8 · 더미(값 없음) 15 → 14 — 4-1 흉내(두 표에 hw 없음·전용 줄 없음)와 비교해 바뀐 칸은 화관법 하나뿐(안전 탭 등 그대로) · 화관법이 보이는 사람 = 관리자·김정아·권민지·정재욱 · 월말명세서가 보이는 사람 = 관리자만(stmt 값 없음 = 기본 숨김) · 4-1 흉내에서도 getElementById(undefined) 0(applyPerms "MODULE_TAB 없는 키 건너뜀" 안전장치가 남아 있음) · 흉내가 실제로 전용 줄·두 표 hw를 지웠는지 · 홈에서 돌린 applyPerms는 홈 이동·화관법 다시 그림 0',
-    navEls34.filter((e) => e.cls.indexOf('tab-btn') >= 0).length === 23 && AP41_34 !== AP42_34 && REG41_34[1] !== REG42_34[1] && REG41_34[2] !== REG42_34[2]
+    navEls34.filter((e) => e.cls.indexOf('tab-btn') >= 0).length === 24 &&   /* 66 급여 판2 */ AP41_34 !== AP42_34 && REG41_34[1] !== REG42_34[1] && REG41_34[2] !== REG42_34[2]
     && okN34 && okD34 && hwVis34 === 'admin,kja,kmj,kmjS,jjw' && stVis34 === 'admin' && Object.keys(R34).every((k) => R34[k].b.log.length === 0 && R34[k].a.undef === 0 && R34[k].b.undef === 0),
     Object.keys(P34).map((k) => k + ' ' + R34[k].a.vis.length + '→' + R34[k].b.vis.length + (diff34(R34[k]).length ? '(' + diff34(R34[k]).join('·') + ')' : '')).join(' · '));
 
@@ -5045,9 +5045,9 @@ try {
   const viewW38 = (win, id) => { const b = body38(win), own = decl38(win, '#view-' + id, 'max-width'), base = decl38(win, '.views>.view', 'max-width'), mx = own != null ? own : base; return (!mx || mx === 'none') ? b : Math.min(b, parseFloat(mx)); };
   //   명세 width_plan.table(창 → 본문, 스크롤바 17 포함): 1024 791 · 1100 867 · 1280 1011 · 1366 1097 · 1440 1171 · 1536 1267 · 1600 1331 · 1920·2560 1428
   const WT38 = { 1024: 791, 1100: 867, 1280: 1011, 1366: 1097, 1440: 1171, 1536: 1267, 1600: 1331, 1920: 1428, 2560: 1428 };
-  const WIDE38 = ['tasks', 'rec', 'cli', 'workers', 'bid', 'con', 'veh', 'safety', 'perm', 'stmt'];   // 명세 reading_width 9개 중 v438은 계약·차량·권한관리 · v439에 지시(#view-tasks) · v440에 기성(#view-rec) · v441에 거래처(#view-cli) · v442에 일용직(#view-workers) · v443에 입찰(#view-bid — 표로 바꾼 판) · v445에 안전(#view-safety — 56 판, 현장 칸 표) — 9개 다 · 29 판② 월말명세서(#view-stmt — 처음부터 표, 명세 9개 밖)
+  const WIDE38 = ['tasks', 'rec', 'cli', 'workers', 'bid', 'con', 'veh', 'safety', 'perm', 'stmt', 'pay'];   /* 66 급여 판2: 급여대장(18칸 표) 넓힘 */   // 명세 reading_width 9개 중 v438은 계약·차량·권한관리 · v439에 지시(#view-tasks) · v440에 기성(#view-rec) · v441에 거래처(#view-cli) · v442에 일용직(#view-workers) · v443에 입찰(#view-bid — 표로 바꾼 판) · v445에 안전(#view-safety — 56 판, 현장 칸 표) — 9개 다 · 29 판② 월말명세서(#view-stmt — 처음부터 표, 명세 9개 밖)
   const views38 = [...html.matchAll(/<(?:section|div) class="view(?: active)?" id="view-([a-z]+)">/g)].map((m) => m[1]);
-  const SECS38 = ['tasks', 'veh', 'hwakwan', 'allbaro', 'rec', 'stmt', 'cal', 'lic', 'bid', 'con', 'cli', 'doc', 'hr', 'progress', 'pmcon', 'ask', 'safety', 'quote', 'promo', 'workers', 'perm', 'fam', 'leave'];   // 29 판②: 기성 화면 뒤 월말명세서 section
+  const SECS38 = ['tasks', 'veh', 'hwakwan', 'allbaro', 'rec', 'stmt', 'cal', 'lic', 'bid', 'con', 'cli', 'doc', 'hr', 'progress', 'pay', 'pmcon', 'ask', 'safety', 'quote', 'promo', 'workers', 'perm', 'fam', 'leave'];   // 29 판②: 기성 화면 뒤 월말명세서 section
   const secs38 = [...html.matchAll(/<section class="view" id="view-([a-z]+)">/g)].map((m) => m[1]);
   const wBad38 = Object.keys(WT38).filter((w) => Math.abs(body38(+w) - WT38[w]) > 2);
   const vBad38 = [1366, 1920].map((w) => views38.filter((id) => viewW38(w, id) !== (WIDE38.indexOf(id) >= 0 ? body38(w) : 808)).join('/')).join('|') + '|' + views38.filter((id) => viewW38(1024, id) !== body38(1024)).join('/');
@@ -5055,7 +5055,7 @@ try {
     && decl38(1366, '#sfPaneNow', 'max-width') === '808px' && decl38(1920, '#sfPaneEdu', 'max-width') == null && decl38(1920, '#eduLead', 'max-width') === '808px' && decl38(1920, '#eduScopeLine', 'max-width') === '808px' && decl38(1920, '#sfPaneSite', 'max-width') == null;   // v447: 체크 칸(#sfPaneEdu)도 사람별 표라 넓힘 — 칸 머리 두 줄만 808   // v445: 안전 탭은 현장 칸(표)만 넓고 현황·교육·검진(옛 목록 — v446 사람별 표 판에서)은 808
   const phone38 = decl38(859, '#app', 'max-width') === '560px' && padLR38(decl38(859, '#app', 'padding')).join() === '16,16' && decl38(859, '.views>.view', 'max-width') == null && decl38(375, '.tabbar', 'width') == null && decl38(859, '.layout', 'gap') == null;
   T('v438 ① 화면 폭(head <style>을 읽어 계산 — 창 폭 − 스크롤바 17): 본문 = 명세 width_plan.table(±2px) 1024 791 · 1100 867 · 1280 1011 · 1366 1097 · 1440 1171 · 1536 1267 · 1600 1331 · 1920·2560 1428 · 넓히는 화면 id 10개(지시·기성·거래처·일용직·입찰·계약·차량·안전·권한관리·월말명세서 — v439에 지시·v440에 기성·v441에 거래처·v442에 일용직·v443에 입찰·v445에 안전·29 판②에 월말명세서를 더함)만 1366·1920에서 본문 폭, 그 밖 화면은 808 · 1024 창은 모두 본문 폭(791 < 808) · 권한관리는 권한 표(#permRoster)만 넓고 그 밖 카드·안전 현황(#sfPaneNow)·교육·검진(#sfPaneEdu — v446 전까지 옛 목록) 808(현장 칸 #sfPaneSite는 본문 폭) · 859px 이하 틀 그대로(#app 최대 560·여백 16, 간격·사이드바 폭·읽기 폭 규칙 없음) · section 태그 22개(29 판② 월말명세서 더함) class="view" 그대로(class 더하지 않음)',
-    wBad38.length === 0 && vBad38 === '||' && views38.length === 25 && perm38 && phone38 && JSON.stringify(secs38) === JSON.stringify(SECS38) && !/<section class="view [^"]*" id=/.test(html),   // 29 판②: 화면 25(월말명세서·PM 콘솔 더함)·넓히는 화면 10
+    wBad38.length === 0 && vBad38 === '||' && views38.length === 26 &&   /* 66 급여 판2 view-pay */ perm38 && phone38 && JSON.stringify(secs38) === JSON.stringify(SECS38) && !/<section class="view [^"]*" id=/.test(html),   // 29 판②: 화면 25(월말명세서·PM 콘솔 더함)·넓히는 화면 10
     JSON.stringify({ body: Object.keys(WT38).map((w) => w + ':' + body38(+w)), viewBad: vBad38, views: views38.length, perm38, phone38, secs: secs38.length }));
 
   // ② 이후 — 부품 하네스
