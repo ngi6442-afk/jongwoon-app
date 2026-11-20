@@ -252,7 +252,7 @@ try {
   T('v378 gwCall gzip: GW_GZ_MIN 1MB · CompressionStream("gzip") · octet-stream+X-GW-Enc · 미지원·실패 시 평문 폴백',
     /var GW_GZ_MIN = 1024 \* 1024;/.test(idx) && /new CompressionStream\("gzip"\)/.test(idx) && /h\["X-GW-Enc"\] = "gzip";/.test(idx) && /if \(!buf\) return gwSend\(fn, txt, gwHeaders\("application\/json"\)\);/.test(idx) && /typeof CompressionStream !== "function"/.test(idx), '');
   T('v378 입찰 불러오기 실패 가시화: loadBids catch→bidsLoadErr+renderBids · 붉은 배너(수집·재수집 누르지 마십시오)+[다시 불러오기] · 빈 상태 문구 분리 · 머리줄에 자동 수집 시각',
-    /var bidsLoadErr = null;/.test(idx) && /catch\(function\(e\)\{ bidsLoadErr=\{ msg:String\(\(e&&e\.message\)\|\|e\|\|"오류"\), ts:Date\.now\(\) \}; renderBids\(\); \}\);/.test(idx) && /id="bidReloadBtn"/.test(idx) && /수집·재수집을 누르지 마십시오/.test(idx) && /bidsLoadErr\?'불러오기 실패 — 위 안내의 \[다시 불러오기\]'/.test(idx) && /var hts=\(bidsHealth&&bidsHealth\.ts\)/.test(idx) && /bidsLoadErr=null; renderBids\(\); renderDashboard\(\);/.test(idx), '');
+    /var bidsLoadErr = null;/.test(idx) && /catch\(function\(e\)\{ bidsLoadErr=\{ msg:String\(\(e&&e\.message\)\|\|e\|\|"오류"\), ts:Date\.now\(\) \}; renderBids\(\); \}\);/.test(idx) && /id="bidReloadBtn"/.test(idx) && /수집·재수집을 누르지 마십시오/.test(idx) && /bidsLoadErr\?'불러오기 실패 — 위 안내의 \[다시 불러오기\]'/.test(idx) && /var hts=\(bidsHealth&&bidsHealth\.ts\)/.test(idx) && /bidsLoadErr=null; bidsDrawAfterLoad\(\); renderDashboard\(\);/.test(idx)   /* C254 ③: 읽기 뒤 그리기는 bidsDrawAfterLoad(폰에서 숨은 칸이면 배지만) */, '');
   // ---- v371: 번호판 전용 경로(차량 검출기 COCO-SSD → 조각 확대 → Claude 좌표 → 자기검증) — 동봉·배선·출처 규칙(PM 9/23 "차번호 덜/안 가려짐" → "ㄱ") ----
   try {
     const fs371 = readFileSync;
@@ -8019,11 +8019,11 @@ try {
     B043({ id: 'b14', title: '하 지난 유찰', org: '하가시', status: '유찰', due: '2026-11-02', url: 'https://g2b.example/b14', ext: { mmis: '1', decide: '적격심사' } })];   // 마감 지난 유찰(전체 밖)의 불일치 — 방법 불일치 칩은 전체 범위라 안 듦
   const AWARDS43 = { orgs: { '시험시청': { n: 5, med: 87.9, q1: 86.1, q3: 89.2 } }, lwlt: { '용역·2억미만': { n: 4, mode: '88' } } };
   const REAL43 = ['esc', 'isDate', 'vehDday', 'ddayInfo', 'fmtAmount', 'mTime', 'mergeDel', 'bidSt', 'bidHasDeepLink', 'bidNoOf', 'findBid', 'liveBids', 'bidExpired', 'bidNewCount', 'loadBids', 'scheduleBidsSave', 'mergeBidsLocal', 'doSaveBids',
-    'methodKindOf', 'bidMethodEff', 'bidDecideState', 'bidLwltState', 'bidFloorRange', 'bcBand', 'lwltRefMode', 'orgStatChip', 'undoBidStatus', 'setBidStatus', 'conAmtFromBid', 'renderBidsLegacy', 'bidToContract', 'openBidAdd', 'saveBidAdd'];
+    'methodKindOf', 'bidMethodEff', 'bidDecideState', 'bidLwltState', 'bidFloorRange', 'bcBand', 'lwltRefMode', 'orgStatChip', 'undoBidStatus', 'setBidStatus', 'conAmtFromBid', 'renderBidsLegacy', 'bidLegSoon', 'bidsDrawAfterLoad', 'bidLegNewNote', 'bidToContract', 'openBidAdd', 'saveBidAdd'];
   const VARS43 = ['  var bids = [];', '  var bidsSha = null, bidsSaveTimer', '  var bidExpanded = {};', '  var bidsHealth = null;', '  var bidsAwards = null;', '  var BID_STATUSES = ', '  var BID_NEXT = ', '  var BID_NO_DEEPLINK = ',
-    '  var bidsLoadErr = null;', '  var bidsLoaded = false, bidsSaveHeld = false;', '  var bidsLoading = ', '  var BID_UNREAD_MSG = ', '  var DECIDE_TO_METHOD=', '  var BID_PREV=', '  var BID_LABEL='].map((h) => line43(html, h));
+    '  var BID_LEG_PAGE = 150, bidShow', '  var BID_LEG_FAR_MSG = ', '  var bidsLoadErr = null;', '  var bidsLoaded = false, bidsSaveHeld = false;', '  var bidsLoading = ', '  var BID_UNREAD_MSG = ', '  var DECIDE_TO_METHOD=', '  var BID_PREV=', '  var BID_LABEL='].map((h) => line43(html, h));
   const PRE43 = [
-    'var BIDS_API = "https://api.github.com/repos/x/appdata/contents/data/bids.json", contracts = ENV.contracts || [], lastBidForCon = null, autoGenReady = {}, currentTab = ENV.tab || "bid";',
+    'var BIDS_API = "https://api.github.com/repos/x/appdata/contents/data/bids.json", contracts = ENV.contracts || [], lastBidForCon = null, autoGenReady = {}, currentTab = ENV.tab || "bid", bidLayer = ENV.layer || "list";',
     'function todayStr(){ return "2026-11-11"; }',
     'function genId(p){ ENV.gid++; return p + "N" + ENV.gid; }',
     'function curMember(){ return ENV.user; } function myId(){ return ENV.user ? ENV.user.id : ""; }',
@@ -8050,6 +8050,7 @@ try {
     + ' setFilter: function(f){ bidStatusFilter = f; }, setExp: function(o){ bidExpanded = o; }, term: function(){ return bidSearchTerm; }, setTerm: function(t){ bidSearchTerm = t; }, info: bidInfo, act: bidSheetAct, pairs: bidSheetPairs, cur: function(){ return bidSheetCur; },'
     + ' load: loadBids, save: doSaveBids, sched: scheduleBidsSave, timer: function(){ return bidsSaveTimer; }, setStatus: setBidStatus, undo: undoBidStatus, addOpen: openBidAdd, addSave: saveBidAdd, fromGs: bidSheetFromGs, homeRow: bidSheetHomeRow, showNew: bidSheetShowNew,'
     + ' unread: BID_UNREAD_MSG, head: bidSheetHead, banner: bidSheetBanner, sText: bidSheetSearchText, tab: function(){ return currentTab; }, KIND: BID_KIND_TXT,'
+    + ' show: function(){ return bidShow; }, setShow: function(n){ bidShow = n; }, drawAfterLoad: bidsDrawAfterLoad, newNote: bidLegNewNote, legFar: BID_LEG_FAR_MSG, setTab: function(t){ currentTab = t; }, setLayer: function(l){ bidLayer = l; },'
     + ' loading: function(){ return bidsLoading; }, farMsg: BID_NEW_FAR_MSG, allTip: BID_ALL_T, listRule: bidListRule, corp: corpRegApply };']).join('\n');
   // 작은 DOM — 선택자는 태그·#id·.class·[속성]·[속성="값"]을 붙여 쓴 것까지(v442와 같은 꼴)
   const match43 = (el, sel) => {
@@ -8117,7 +8118,7 @@ try {
       return host;
     };
     env.host = (id) => doc.byId[id];
-    ['bidList', 'bidHead', 'bidFilterBar', 'bidBanner', 'bidGuideCard', 'bidGuideSheet', 'bidSearch', 'bidTabBadge', 'view-bid', 'bidAddBackdrop', 'baTitle', 'baOrg', 'baDue', 'baUrl',
+    ['bidList', 'bidMoreBtn', 'bidHead', 'bidFilterBar', 'bidBanner', 'bidGuideCard', 'bidGuideSheet', 'bidSearch', 'bidTabBadge', 'view-bid', 'bidAddBackdrop', 'baTitle', 'baOrg', 'baDue', 'baUrl',
       'conClient', 'conSite', 'conType', 'conCombo', 'conAmount', 'conStartBackdrop'].forEach((id) => env.mkHost(id));
     env.host('bidList').innerHTML = '<div class="loading">불러오는 중…</div>';
     env.host('bidBanner').style.display = 'none'; env.host('bidGuideSheet').style.display = 'none';
@@ -8371,7 +8372,8 @@ try {
   // ⑨ 폰 legacy(859px 이하 — PM 11/10 '폰은 지금 디자인 그대로'): 옛 본문 renderBidsLegacy = v442 renderBids 본문 글자째(sha256) · 그대로 두는 함수 8개(setBidStatus·undoBidStatus·bidToContract·runBidQualGen·runAwardAutoCon·setBidLayer·renderBidStats·openBidCalc) 무변(해시) ·
   //   375 실행 = 옛 카드 8장(data-bid-exp)·표 글 0·옛 상태 칩 줄 보임(전체 10 — 옛 셈 그대로)·배너 자리 숨김·안내 '노란 카드' 글·검색칸 안내 글 옛것·자리 legacy → 1366(경계 넘김) = 표·옛 칩 줄 숨김·'지역 확인' 안내 글·검색칸 안내 '공고번호·매칭어' →
   //   검색칸에 글이 있는 채 다시 375 = 옛 검색어(bidSearchTerm)를 칸 글로 맞춰 그 카드만(b1) · 표 글 0
-  const LEG_SHA43 = '2a2b480c568054054f85190ea783adbc82af5da6c8cbe55d15286a2eea07eabe';
+  // C254(화면 속도 전수 11/20): 옛 본문 세 곳 — 상태 칩 누름에 bidShow 되돌림 · 카드 list.slice(0, bidShow) · 끝에 [더보기](#bidMoreBtn) 켜고 끔. 종전 해시 2a2b480c5680…
+  const LEG_SHA43 = '73c488198e86e2fc38adcd67e7a9d347e12d2b207c79ec41df3e458f812effb8';
   const KEEP43 = { setBidStatus: '436448555876bd4e',   // v464: [낙찰] 창 제목 한 줄 더함(화면 시험에서 찾은 결함 — v464 검사)
     undoBidStatus: 'a0592bc2abc9338c', bidToContract: '7f77a881c76b9641', runBidQualGen: '8b8ee537a4b76f77', runAwardAutoCon: '3c350982dd62e7c8', setBidLayer: '2866e6652936072a', renderBidStats: '285dfecb73473e6c', openBidCalc: '325b37a902ebd518' };
   const keepBad9 = Object.keys(KEEP43).filter((n) => sha43(body43(n)).slice(0, 16) !== KEEP43[n]);
@@ -8383,6 +8385,45 @@ try {
     keepBad9.length === 0 && sha43(body43('renderBidsLegacy')) === LEG_SHA43 && FB43 !== ''
     && JSON.stringify(p9) === JSON.stringify([8, true, FB43, true, 'none', '', 'none', '공고 검색(공고명·기관)', 'legacy', 'b6,b3,b1,b5,b2,b8,b4,b12', true, 'none', 'none', '', '공고 검색(공고명·기관·공고번호·매칭어)', '가 석면', 'b1', true, FB43, '']),
     JSON.stringify({ keepBad9, leg: sha43(body43('renderBidsLegacy')).slice(0, 12), FB43, p9 }));
+  // C254(화면 속도 전수 11/20 — 폰 옛 목록이 카드를 상한 없이 그려 느림): ① 150건씩 + [더보기 (보이는 수 / 전체)] · 상태 칩을 누르면 150으로 · 표 갈래는 단추 숨김
+  //   ③ 읽기 뒤(bidsDrawAfterLoad): 폰에서 공고 칸이 안 보이면(다른 탭 · 부동산 칸) 그리지 않고 탭 배지만 · 보이면 그림 · PC 폭은 늘 그림 · 새 수동 등록이 목록에 안 보이면 알림(폰만)
+  //   ② 검색 150ms 묶기(bidLegSoon): 연달아 세 번 = 150ms 뒤 한 번만 그림 · 고정 글 = 입력 배선 두 줄·[더보기] 배선·HTML 단추 한 번·loadBids 성공 줄 · 결함 사본 5개
+  {
+    const MANY = () => { const a = []; for (let i = 0; i < 320; i++) a.push(B043({ id: 'm' + i, title: '가짜 공고 ' + i, org: '가짜시', due: '2026-12-' + String(1 + (i % 28)).padStart(2, '0') })); return a; };
+    const cards = (X) => (X.host._h.match(/data-bid-exp=/g) || []).length;
+    const run = (src) => {
+      const o = [];
+      const XA = mk43({ width: 375, bids: MANY(), src }); XA.api.render(); const mb = XA.env.host('bidMoreBtn');
+      o.push(cards(XA), mb.style.display, mb.textContent);
+      XA.api.setShow(300); XA.api.render(); o.push(cards(XA), mb.textContent);
+      XA.api.setShow(450); XA.api.render(); o.push(cards(XA), mb.style.display);
+      const chip = XA.env.host('bidFilterBar').querySelector('[data-bid-filter="new"]'); chip.fire('click'); o.push(XA.api.show(), cards(XA), mb.style.display);   // 칩 누름 = 150으로
+      XA.env.width = 1366; XA.env.breakAll(); o.push(mb.style.display, XA.host._h.indexOf('data-bid-exp') < 0);   // 표 갈래 = 단추 숨김
+      // ③ 읽기 뒤 그리기
+      const d = (w, tab, layer) => { const X = mk43({ width: w, bids: MANY(), src }); X.api.render(); X.api.setTab(tab); X.api.setLayer(layer); const n0 = X.host._n; X.env.host('bidTabBadge').textContent = '?'; X.api.drawAfterLoad(); return (X.host._n - n0) + ':' + X.env.host('bidTabBadge').textContent; };
+      o.push(d(375, 'dash', 'list'), d(375, 'bid', 'onbid'), d(375, 'bid', 'list'), d(1366, 'dash', 'list'));
+      // 새 수동 등록 알림(폰만 · 그려진 카드면 조용히)
+      const XN = mk43({ width: 375, bids: MANY(), src }); XN.api.render(); XN.api.newNote('m0'); XN.api.newNote('없는id');
+      const XP = mk43({ width: 1366, bids: MANY(), src }); XP.api.render(); XP.api.newNote('없는id');
+      o.push(XN.env.log.filter((l) => l.indexOf('toast:') === 0).join('|') === 'toast:' + XN.api.legFar, XP.env.log.filter((l) => l.indexOf('toast:') === 0).length);
+      return o;
+    };
+    const WANT = [150, '', '더보기 (150 / 320건)', 300, '더보기 (300 / 320건)', 320, 'none', 150, 150, '', 'none', true, '0:320', '0:320', '1:320', '1:320', true, 0];
+    const r54 = run();
+    // ② 묶기 — bidLegSoon을 실제 함수로(가짜 시계)
+    const soon = (() => { const L = []; let tm = []; const f = new Function('setTimeout', 'clearTimeout', 'renderBids', 'bidSheetCur', 'var bidLegT = null; ' + fn43(html, 'bidLegSoon') + ' return bidLegSoon;')((fn, ms) => { tm.push({ fn, ms, off: false }); return tm.length; }, (id) => { if (tm[id - 1]) tm[id - 1].off = true; }, () => L.push('draw'), 'legacy'); f(); f(); f(); const live = tm.filter((t) => !t.off); live.forEach((t) => t.fn()); return [tm.length, live.length, live[0] && live[0].ms, L.length]; })();
+    const st54 = /<div class="card" id="bidList"><div class="loading">불러오는 중…<\/div><\/div>\s*\n\s*<button class="link-btn" id="bidMoreBtn" style="display:none;">더보기<\/button>\s*\n\s*<button class="link-btn" id="bidAddBtn">/.test(html) && (html.match(/id="bidMoreBtn"/g) || []).length === 1
+      && /document\.getElementById\("bidMoreBtn"\)\.addEventListener\("click", function\(\)\{ bidShow\+=BID_LEG_PAGE; renderBids\(\); \}\);/.test(html)
+      && /bidsLoaded=true; bidsLoadErr=null; bidsDrawAfterLoad\(\); renderDashboard\(\); runBidQualGen\(\);/.test(fn43(html, 'loadBids'))
+      && /bidSheetShowNew\(nb\.id\); bidLegNewNote\(nb\.id\);/.test(html) && /function obLegSoon\(\)\{ if \(obLegT\) clearTimeout\(obLegT\); obLegT = setTimeout\(function\(\)\{ obLegT = null; if \(obSheetCur !== "sheet"\) renderOnbid\(\); \}, 150\); \}/.test(html);
+    const MU54 = [['상한 걷음', 'list.slice(0, bidShow).map(function(b){', 'list.map(function(b){'], ['칩 되돌림 걷음', 'bidShow=BID_LEG_PAGE; renderBids(); }); });', 'renderBids(); }); });'],
+      ['숨은 칸도 그림', 'if (vsStage() === 1 && (currentTab !== "bid" || bidLayer !== "list")){ bidSheetBadge(); return; } renderBids();', 'renderBids();'],
+      ['배지 안 맞춤', '(currentTab !== "bid" || bidLayer !== "list")){ bidSheetBadge(); return; }', '(currentTab !== "bid" || bidLayer !== "list")){ return; }'],
+      ['표 갈래 단추 그대로', 'if (sheet && g("bidMoreBtn")) g("bidMoreBtn").style.display = "none";', '']];
+    const bad54 = MU54.filter(([nm, a, b]) => { if (SRC43.split(a).length !== 2) return true; let same = true; try { same = JSON.stringify(run(SRC43.replace(a, b))) === JSON.stringify(WANT); } catch (e) { same = false; } return same; }).map((m) => m[0]);
+    T('C254 폰 옛 공고 목록 150건씩: 320건 = 카드 150·[더보기 (150 / 320건)] → 300 → 320(단추 숨김) · 상태 칩 누름 = 150으로 · 표 갈래 = 단추 숨김 · 읽기 뒤: 폰 다른 탭·부동산 칸 = 안 그림(배지만) / 공고 칸·PC = 그림 · 새 수동 등록 안 보이면 알림(폰만 1번) · 검색 묶기 3번 = 150ms 뒤 1번 · 고정 글 · 결함 사본 5개 다 잡힘',
+      JSON.stringify(r54) === JSON.stringify(WANT) && JSON.stringify(soon) === JSON.stringify([3, 1, 150, 1]) && st54 && bad54.length === 0, JSON.stringify({ r54, soon, st54, bad54 }));
+  }
 
   // ⑩ 검색칸 = 탭의 #bidSearch(부품 옵션 search.el — 명세 '검색칸 그대로'): 표 위에 검색칸을 새로 그리지 않음 · 그 칸에 부품 배선 한 번(입력·조합 시작·끝) · 글을 치면 150ms 뒤 거름(149ms엔 그대로) · 검색 글 = 공고명·기관 + 공고번호('R26BK0000003' → b3 · 낙찰방법 꼬리 번호 b4)·매칭어('청소대행' → b6) ·
   //   한글 조합 중 입력은 기다렸다가 조합이 끝난 뒤 150ms · [필터 초기화] = 검색칸 글도 지움 · 보는 사람이 바뀌면(로그인 창 '전환') 검색칸 글 지움 · 그 칸에 커서가 있으면 다른 일로 다시 그려도 칸 글을 건드리지 않음 ·
@@ -8433,7 +8474,7 @@ try {
   X12.api.addSave(); s12.push(X12.api.bids().length, X12.env.host('bidAddBackdrop').classList.contains('show'));
   const X12n = mk43({ bids: [], loaded: true, fetchQ: [{ status: 404 }] }); X12n.api.load(); await flush43(); await flush43(); s12.push(X12n.api.loaded());   // 읽었던 기기도 404면 못 읽음으로
   const X12f = mk43({ bids: [], loaded: false, fetchQ: [{ err: '네트워크' }] }); X12f.api.load(); await flush43(); await flush43(); s12.push(X12f.api.loaded(), X12f.env.host('bidHead').textContent, X12f.env.host('bidBanner').innerHTML.indexOf('서버에서 공고를 불러오지 못했습니다') > 0);
-  const st12 = /\n\s*bidsLoaded = false; bidsSaveHeld = false;/.test(fn43(html, 'clearSessionData')) && (html.match(/bidsLoaded=true/g) || []).length === 1 && /bidsLoaded=true; bidsLoadErr=null; renderBids\(\); renderDashboard\(\);/.test(fn43(html, 'loadBids'))
+  const st12 = /\n\s*bidsLoaded = false; bidsSaveHeld = false;/.test(fn43(html, 'clearSessionData')) && (html.match(/bidsLoaded=true/g) || []).length === 1 && /bidsLoaded=true; bidsLoadErr=null; bidsDrawAfterLoad\(\); renderDashboard\(\);/.test(fn43(html, 'loadBids'))
     && /var token=getToken\(\); if\(!token\) return;\s*\n\s*if\(!bidsLoaded\)\{ bidsSaveHeld=true; return; \}/.test(fn43(html, 'doSaveBids'))
     && fn43(html, 'saveBidAdd').indexOf('if(!bidsLoaded){ alert(BID_UNREAD_MSG); if(!bidsLoading) loadBids(); return; }') > 0 && fn43(html, 'saveBidAdd').indexOf('if(!bidsLoaded)') < fn43(html, 'saveBidAdd').indexOf('bids.push(');   // v443 검토: 읽는 중이면 또 읽지 않음(㉒가 실행으로)
   T('v443 ⑫ 못 읽은 공고(실행 — 실제 loadBids·doSaveBids·saveBidAdd): 표 "공고를 불러오는 중입니다" · [+ 수동 등록] [저장] = 안내 1·목록 0·요청 = 다시 읽기(GET)뿐·창 열린 채 · 저장 예약이 와도 PUT 0(미뤄 둠) → 읽기 200 = 읽음·서버 b1,b2,b3·미룬 저장을 다시 잡음 → PUT 1 · 그 뒤 [저장] = 4건째·창 닫힘 · 404 = 못 읽음 · 읽기 실패 = 못 읽음·머리 "불러오기 실패"·배너 · 정적: clearSessionData가 끔 · 읽음으로 켜는 곳 1(loadBids 200) · doSaveBids 첫 줄 막음 · saveBidAdd는 목록에 넣기 전에 막음',
@@ -8473,7 +8514,7 @@ try {
     && (html.match(/function renderBids\(/g) || []).length === 1 && bsb43.indexOf('function renderBids(') > 0 && bsb43.indexOf('function renderBidsLegacy(') < 0
     && /<input type="search" id="bidSearch" placeholder="공고 검색\(공고명·기관\)" autocomplete="off"[^>]*>\s*<div id="bidBanner" style="display:none;"><\/div>[^\n]*\n\s*<div class="card" id="bidList"><div class="loading">불러오는 중…<\/div><\/div>/.test(html)
     && /<span id="bidGuideCard">칩의 <b>지역<\/b>=실제 참가제한 내용\. <span style="background:#FFF3CD;border-radius:4px;padding:0 5px;">노란 카드<\/span>=[^<]*<\/span><span id="bidGuideSheet" style="display:none;"><b>지역<\/b> 칸/.test(html)
-    && /document\.getElementById\("bidSearch"\)\.addEventListener\("input", function\(\)\{ bidSearchTerm=this\.value\.toLowerCase\(\)\.trim\(\); if\(bidSheetCur!=="sheet"\) renderBids\(\); \}\);/.test(html)
+    && /document\.getElementById\("bidSearch"\)\.addEventListener\("input", function\(\)\{ bidSearchTerm=this\.value\.toLowerCase\(\)\.trim\(\); bidShow=BID_LEG_PAGE; if\(bidSheetCur!=="sheet"\) bidLegSoon\(\); \}\);/.test(html)   /* C254 ②: 폰 옛 목록은 150ms 묶어 그림 */
     && /if \(def\.search && !def\.search\.el\) h \+= '<input type="search" class="vs-q"'/.test(blk43) && /if \(def\.search && def\.search\.el\) vsSheetExtQ\(def, inst\);/.test(fn43(blk43, 'vsSheetRender'))
     && /if \(!el\.__vsExtQ\)\{/.test(fn43(blk43, 'vsSheetExtQ')) && /if \(!inst\.q && el\.value\) inst\.q = String\(el\.value\);/.test(fn43(blk43, 'vsSheetExtQ')) && /if \(document\.activeElement !== el && !inst\.timers\[tk\] && el\.value !== \(inst\.q \|\| ""\)\) el\.value = inst\.q \|\| "";/.test(fn43(blk43, 'vsSheetExtQ'))
     && /if \(inst\.mode !== "sheet"\)\{ inst\.q = String\(v == null \? "" : v\); return; \} vsSheetSetQ\(def, v\);/.test(fn43(blk43, 'vsSheetExtQueue'));
@@ -8661,10 +8702,10 @@ try {
   const B044 = (o) => Object.assign({ source: '나라장터', kind: '용역', title: '', org: '', region: '', due: '', budget: 0, url: '', matched: [], method: '적격심사제', rgn_ref: false, status: 'new', created: '2026-11-01', updated: '2026-11-01', no: '', posted: '2026-11-01', ext: {} }, o);
   const BIDS44 = () => [B044({ id: 'b1', title: '가 석면 해체', org: '가나시', due: '2026-11-12', url: 'https://g2b.example/b1' }), B044({ id: 'b2', title: '나 슬러지 운반', org: '나다시', due: '2026-11-20', status: '검토', url: 'https://g2b.example/b2' }), B044({ id: 'b3', title: '다 포항 준설', org: '다라군', due: '2026-11-15', url: 'https://g2b.example/b3' })];   // b3 제목의 '포항' — 부동산 검색어가 공고 표에 새면 b3만 남는다
   const REAL44 = ['esc', 'isDate', 'vehDday', 'ddayInfo', 'fmtAmount', 'mTime', 'mergeDel', 'bidSt', 'bidHasDeepLink', 'bidNoOf', 'findBid', 'liveBids', 'bidExpired', 'bidNewCount', 'loadBids', 'scheduleBidsSave', 'mergeBidsLocal', 'doSaveBids',
-    'methodKindOf', 'bidMethodEff', 'bidDecideState', 'bidLwltState', 'bidFloorRange', 'bcBand', 'lwltRefMode', 'orgStatChip', 'undoBidStatus', 'setBidStatus', 'conAmtFromBid', 'renderBidsLegacy', 'bidToContract', 'openBidAdd', 'saveBidAdd',
+    'methodKindOf', 'bidMethodEff', 'bidDecideState', 'bidLwltState', 'bidFloorRange', 'bcBand', 'lwltRefMode', 'orgStatChip', 'undoBidStatus', 'setBidStatus', 'conAmtFromBid', 'renderBidsLegacy', 'bidLegSoon', 'bidsDrawAfterLoad', 'bidLegNewNote', 'bidToContract', 'openBidAdd', 'saveBidAdd',
     'findOb', 'liveObs', 'obExpired', 'loadOnbid', 'scheduleOnbidSave', 'doSaveOnbid', 'setObStatus', 'renderOnbidLegacy', 'setBidLayer'];
   const VARS44 = ['  var bids = [];', '  var bidsSha = null, bidsSaveTimer', '  var bidExpanded = {};', '  var bidsHealth = null;', '  var bidsAwards = null;', '  var BID_STATUSES = ', '  var BID_NEXT = ', '  var BID_NO_DEEPLINK = ',
-    '  var bidsLoadErr = null;', '  var bidsLoaded = false, bidsSaveHeld = false;', '  var bidsLoading = ', '  var BID_UNREAD_MSG = ', '  var DECIDE_TO_METHOD=', '  var BID_PREV=', '  var BID_LABEL=',
+    '  var BID_LEG_PAGE = 150, bidShow', '  var BID_LEG_FAR_MSG = ', '  var bidsLoadErr = null;', '  var bidsLoaded = false, bidsSaveHeld = false;', '  var bidsLoading = ', '  var BID_UNREAD_MSG = ', '  var DECIDE_TO_METHOD=', '  var BID_PREV=', '  var BID_LABEL=',
     '  var onbids = [];', '  var onbidSha = null, onbidSaveTimer', '  var bidLayer = '].map((h) => line44(html, h));
   const PRE44 = [
     'var BIDS_API = "https://api.github.com/repos/x/appdata/contents/data/bids.json", ONBID_API = "https://api.github.com/repos/x/appdata/contents/data/onbid.json", contracts = [], lastBidForCon = null, autoGenReady = {}, currentTab = "bid";',
@@ -9052,7 +9093,7 @@ try {
     && (osb44.match(/\bvsSheetRender\(/g) || []).length === 1 && (osb44.match(/\bvsSheetRenderKeep\(|\bvsSheetSeek\(|\bvsSheetReveal\(/g) || []).length === 0 && !/localStorage/.test(osb44)
     && (html.match(/function renderOnbid\(/g) || []).length === 1 && osb44.indexOf('function renderOnbid(') > 0 && osb44.indexOf('function renderOnbidLegacy(') < 0 && (html.match(/function renderOnbidLegacy\(/g) || []).length === 1
     && /if \(!b \|\| b\.del === 1 \|\| !isAdmin\(\)\) return;/.test(fn44(osb44, 'obSheetAct')) && /setObStatus\(id, v\)/.test(fn44(osb44, 'obSheetAct')) && /if \(isAdmin\(\)\) OB_ST_BTNS\.forEach\(/.test(fn44(osb44, 'obSheetDetail')) && !/canDo\("bid"\)/.test(osb44.replace(/\/\/[^\n]*/g, ''))
-    && /document\.getElementById\("obSearch"\)\.addEventListener\("input", function\(\)\{ obSearchTerm=this\.value\.toLowerCase\(\)\.trim\(\); obShow=150; if\(obSheetCur!=="sheet"\) renderOnbid\(\); \}\);/.test(html)
+    && /document\.getElementById\("obSearch"\)\.addEventListener\("input", function\(\)\{ obSearchTerm=this\.value\.toLowerCase\(\)\.trim\(\); obShow=150; if\(obSheetCur!=="sheet"\) obLegSoon\(\); \}\);/.test(html)   /* C254 ②: 폰 옛 목록은 150ms 묶어 그림 */
     && /document\.getElementById\("obMoreBtn"\)\.addEventListener\("click", function\(\)\{ obShow\+=150; renderOnbid\(\); \}\);/.test(html)
     && /<div class="dash-sec" style="margin-bottom:8px;"><h2>부동산 \(온비드 공매\) <span class="cnt" id="obHead"><\/span><\/h2><\/div>\s*\n\s*<div style="font-size:12px;color:var\(--sub\);margin:-4px 0 8px;">전국 · 매각 · 감정가 5억~50억 · 토지\/공장·산업\/상가·업무\. 마감 임박순, 150건씩 표시\.<\/div>\s*\n\s*<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="obFilterBar"><\/div>\s*\n\s*<input type="search" id="obSearch"[^>]*>\s*\n\s*<div class="card" id="obList"><div class="loading">불러오는 중…<\/div><\/div>\s*\n\s*<button class="link-btn" id="obMoreBtn" style="display:none;">더보기<\/button>/.test(html);
   const hostL14 = [X1, X2, X3, X4, X4w, X4n, X5, X5b, X6, X7, X7n, X7r, X8, X8n, X8s, X9, X10, X10p, X11, X11b, X11u, X11e, X11p, X12, X12b, X12c, X13].some((X) => X.env.log.some((l) => /^host-listener:obList:/.test(l)));
@@ -20495,9 +20536,9 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ["`09_조사_문서/사용안내_대조_자료_20261120/법노무_문장_17_1120.md`", "원장 C243"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v512 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 512 && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
       && d.cl.indexOf('**C243(v512') > 0
-      && /SHELL_CACHE = 'jw-shell-v512'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 512   /* v513(폰 줄 눌림 수리)에서 '512 이상'으로 풂 */;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r512 = chk512(D512);
@@ -20509,6 +20550,49 @@ try {
   T('v512 문서·판 번호(정확 검사): FEATURES 기준 v512 (2026-11-20)·v512 절(C243) · TESTLIST v512 칸 5(화면·운영 확인 3 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v512 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
     r512.ok && M512.every((v) => v === false), JSON.stringify({ r: r512.info, mut: M512 }));
 } catch (e) { console.log('  (v512 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v513(45-1 폰 줄 눌림 B1~B13 + C254 + C247 ③④): 배치는 시험 서버 실측(uismoke는 배치를 못 셈) · 여기는 CSS 묶음 글자·C247 실행·문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '513 이상'으로 풀 것
+try {
+  const rdB = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DB = { ft: rdB('FEATURES.md'), tl: rdB('TESTLIST.md'), sw: rdB('sw.js'), cl: rdB('CLAUDE.md'), ix: rdB('index.html') };
+  const cutB = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+  const NEEDB = [
+    ['B1', '@media (max-width:639px){', 'header.topbar>.brand{flex-shrink:0;}', 'header.topbar>.topbar-right{min-width:0;}', 'header.topbar>.topbar-right>.user-chip{flex:0 1000 auto;min-width:44px;}', 'header.topbar>.topbar-right>.gear-btn{min-width:28px;}'],
+    ['B2', '#view-tasks>.card.scope-host>.add-row:nth-child(2){flex-wrap:wrap;}', '#view-tasks>.card.scope-host>.add-row:nth-child(2)>#taskWho{flex:1 1 calc(100% - 150px);}'],
+    ['B3', '.vs.cs td .cs-bar{width:46px;margin-right:-46px;vertical-align:-11px;}', '.vs.cs col.cs-c-stage{width:24% !important;}'],
+    ['B4', '#bidSection>.dash-sec{flex-wrap:wrap;padding-bottom:4px;}', '#bidSection>.dash-sec>h2{min-width:calc(100% - 4px);'],
+    ['B5', '#swList .chk{flex-wrap:wrap;row-gap:4px;padding-left:21px;overflow-wrap:anywhere;}'],
+    ['B6', '#asbReviewRows > div{min-width:556px;min-width:min(556px, calc(172% + 12px));}'],
+    ['B7', '.vs td.vs-b .veh-no-w{flex-wrap:wrap;row-gap:2px;margin:2px 0;}'],
+    ['B8', '#bidList .item-body[data-bid-exp]>div>table>tbody>tr{display:grid;grid-template-columns:93px minmax(0,1fr);}', '#bidList .item-body[data-bid-exp]>div>table>tbody>tr>td[colspan]{grid-column:1 / -1;margin-left:0;}'],
+    ['B10', '#docList .item:not(.doc-trash-row) .item-meta>.dday.red{white-space:normal;'],
+    ['B11', '.ab-unm-row .dday,.ab-sheet td .dday{display:inline-block;max-width:100%;white-space:normal;'],
+    ['B13', '#qtEditBackdrop .modal > div:has(> #qtDate),', '#qtEditBackdrop #qtVat{flex-basis:34% !important;}']];
+  const chkB = (d) => {
+    const head = cutB(d.ix, '<style>', '</style>'), blk = cutB(head, '/* 폰 줄 눌림 수리 B1~B13', '</style>');
+    const mC = NEEDB.filter((g) => g.slice(1).some((x) => blk.indexOf(x) < 0)).map((g) => g[0]);
+    const ftv = cutB(d.ft, '\n### v513 (11/20)', '\n### '), tlv = cutB(d.tl, '\n## v513 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), op = cb.filter((l) => /^- \[ \] \(운영 확인\)/.test(l));
+    const FT = ['B1', 'B13', 'C254', 'C247', '`bidShow`', '`bidLegSoon`', '`bidsDrawAfterLoad`', '52 → 43'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const sumFn = cutB(d.ix, '    var taskUndone = 0, hasOverdue = false;', '    var taskCell = ');
+    const ok = /기준: v513 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length >= 3 && gate.length >= 1 && op.length >= 1
+      && blk.length > 0 && mC.length === 0 && d.ix.indexOf('<style>') < d.ix.indexOf('/* 폰 줄 눌림 수리 B1~B13') && d.ix.indexOf('/* 폰 줄 눌림 수리 B1~B13') < d.ix.indexOf('</head>')
+      && /if \(t\.status !== "open" && t\.status !== "hold"\) return;/.test(sumFn) && !/if \(t\.status === "done"\) return;/.test(sumFn)
+      && /<input type="number" id="bcLow" step="0\.5" style="flex:1"><span>~<\/span><input type="number" id="bcHigh" step="0\.5" style="flex:1">/.test(d.ix)
+      && d.cl.indexOf('**폰 줄 눌림 수리(v513') > 0 && /SHELL_CACHE = 'jw-shell-v513'/.test(d.sw);
+    return { ok, info: { mC, mF, cb: cb.length, gate: gate.length, op: op.length, blk: blk.length } };
+  };
+  const rB = chkB(DB);
+  const muB = (k, f) => chkB(Object.assign({}, DB, { [k]: f(DB[k]) })).ok;
+  const MB = [muB('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v512 (')), muB('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v512'")),
+    muB('ix', (s) => s.replace('header.topbar>.brand{flex-shrink:0;}', '')), muB('ix', (s) => s.replace('#asbReviewRows > div{min-width:556px;', '#asbReviewRows > div{')),
+    muB('ix', (s) => s.replace('if (t.status !== "open" && t.status !== "hold") return;', 'if (t.status === "done") return;')),
+    muB('ix', (s) => s.replace('<input type="number" id="bcLow" step="0.5"', '<input type="number" id="bcLow" value="-3" step="0.5"')),
+    muB('cl', (s) => s.replace('**폰 줄 눌림 수리(v513', '폰 줄 눌림 수리(v513')), muB('ft', (s) => s.split('`bidLegSoon`').join('bidLegSoon'))];
+  T('v513 폰 줄 눌림 B1~B13 CSS(묶음 글자 11항목 · head 첫 <style> 끝 자리) · C247 ③ 업무 요약 = 진행·보류만 · ④ 계산기 사정률 칸 기본값 없음 · FEATURES·TESTLIST·CLAUDE.md·sw 판 번호 · 결함 사본 8건 다 잡힘',
+    rB.ok && MB.every((v) => v === false), JSON.stringify({ r: rB.info, mut: MB }));
+} catch (e) { console.log('  (v513 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
