@@ -2494,6 +2494,50 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   delete mem.gw_data['col:promo']; delete mem.gw_files[A1]; delete mem.gw_files[A3]; delete mem.gw_data['promo:share:' + 'f'.repeat(64)];
 }
 
+// ===== 42-C265. 홍보 사진 형식 — 올릴 때 머리 바이트로 그림만(보낸 type 안 믿음) · 공개 주소는 그림 형식 허용 목록 + nosniff =====
+{
+  const IMG = require(join(FN, '_lib/imgsniff.js'));
+  const b = (hex, n) => Buffer.concat([Buffer.from(hex, 'hex'), Buffer.alloc(n || 24, 7)]).toString('base64');
+  const JPG = b('ffd8ffe000104a464946'), PNG = b('89504e470d0a1a0a0000000d'), WEBP = Buffer.concat([Buffer.from('RIFF'), Buffer.from([1, 0, 0, 0]), Buffer.from('WEBPVP8 '), Buffer.alloc(20, 3)]).toString('base64');
+  const HTML = Buffer.from('<html><body><script>1</script></body></html>').toString('base64'), SVG = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>1</script></svg>').toString('base64');
+  const PRO = { id: 'upro265', name: '홍보265', admin: false, perms: { promo: 'do' } }; mem.gw_users['member:upro265'] = PRO; const tokP = issueSession(PRO).token;
+  const put = (o) => call(Object.assign({ action: 'att_put', kind: 'promo' }, o), tokP, 'dev1');
+  const rH = await put({ name: 'a.jpg', type: 'image/jpeg', data: HTML }), rS = await put({ name: 'b.svg', type: 'image/svg+xml', data: SVG }), rH2 = await put({ name: 'c.html', type: 'text/html', data: HTML });
+  const rJ = await put({ name: 'd.jpg', type: 'text/html', data: JPG }), rP = await put({ name: 'e.png', type: 'image/jpeg', data: PNG }), rW = await put({ name: 'f.webp', type: '', data: WEBP });
+  T('C265 올리기(홍보): html·svg 위장(보낸 type jpeg·svg·html) = 400 NOT_IMAGE·저장 없음 · 정상 jpeg는 보낸 type이 text/html이어도 통과·저장 type image/jpeg · png·webp도 머리 바이트 형식으로 저장',
+    [rH, rS, rH2].every((x) => x.code === 400 && x.body.error_code === 'NOT_IMAGE' && !x.body.id) && rJ.code === 200 && mem.gw_files[rJ.body.id].type === 'image/jpeg' && rP.code === 200 && mem.gw_files[rP.body.id].type === 'image/png' && rW.code === 200 && mem.gw_files[rW.body.id].type === 'image/webp',
+    JSON.stringify([rH.code, rS.code, rH2.code, rJ.code, rP.code, rW.code]));
+  const rC = await call({ action: 'att_put', kind: 'contract', name: 'k.pdf', type: 'application/pdf', data: Buffer.from('%PDF-1.4 x').toString('base64') }, tokA);
+  T('C265 다른 종류(계약 문서)는 종전대로 받음(보낸 type 그대로)', rC.code === 200 && mem.gw_files[rC.body.id].type === 'application/pdf', rC.code + '');
+  T('C265 imgsniff: jpeg·png·webp 판정 · html·svg·빈 값 = "" · 공개 type은 저장 type이 허용 목록 밖이면 "" ', IMG.sniffB64(JPG) === 'image/jpeg' && IMG.sniffB64(PNG) === 'image/png' && IMG.sniffB64(WEBP) === 'image/webp' && IMG.sniffB64(HTML) === '' && IMG.sniffB64(SVG) === '' && IMG.sniffB64('') === '' && IMG.publicImageType({ type: 'text/html', data: JPG }) === '' && IMG.publicImageType({ type: 'IMAGE/JPEG ', data: JPG }) === 'image/jpeg' && IMG.publicImageType({ type: 'image/jpeg', data: HTML }) === '');
+  // 공개 주소 — 옛 첨부(저장 type text/html) 거절 · 정상은 nosniff · 가린 판도 같은 규칙
+  const gwi = require(join(FN, 'gw-promo-img.js')), gwf = require(join(FN, 'gw-gallery-feed.js'));
+  const O1 = 'att_' + '1a'.repeat(8), O2 = 'att_' + '2b'.repeat(8), O3 = 'att_' + '3c'.repeat(8), O4 = 'att_' + '4d'.repeat(8);
+  mem.gw_files[O1] = { name: 'o1.jpg', type: 'image/jpeg', kind: 'promo', data: JPG, by: 'x', ts: 1 };
+  mem.gw_files[O2] = { name: 'o2.html', type: 'text/html', kind: 'promo', data: HTML, by: 'x', ts: 1 };          // 옛 첨부(이 수리 전 저장분 꼴)
+  mem.gw_files[O3] = { name: 'o3.jpg', type: 'text/html', kind: 'promo', data: JPG, by: 'x', ts: 1 };           // 머리는 그림이어도 저장 type이 목록 밖
+  mem.gw_files[O4] = { name: 'o4.jpg', type: 'image/jpeg', kind: 'promo', data: JPG, by: 'x', ts: 1 };
+  mem.gw_files['mask:' + O4] = { schema: 1, src: O4, type: 'image/svg+xml', kind: 'promo', auto: true, boxes: [{ x: 0.1, y: 0.1, w: 0.1, h: 0.1 }], data: SVG, ts: 2 };   // 가린 판 자리에 그림 아닌 값
+  const S = 'c'.repeat(64);
+  mem.gw_data['promo:share:' + S] = { ids: [O1, O2, O3, O4], promo_id: 'pr265', exp: Date.now() + 100000, by: 'x', ts: 1 };
+  const g = async (i) => gwi.handler({ httpMethod: 'GET', queryStringParameters: { s: S, i: String(i) }, headers: {} });
+  const g0 = await g(0), g1 = await g(1), g2 = await g(2), g3 = await g(3);
+  T('C265 공유 주소: 정상 jpeg 200·Content-Type image/jpeg·X-Content-Type-Options nosniff · 저장 type text/html 옛 첨부 415 · 머리 그림이어도 type 목록 밖 415 · 그림 아닌 가린 판 415 — 거절 응답은 JSON(바이트 없음)',
+    g0.statusCode === 200 && g0.headers['Content-Type'] === 'image/jpeg' && g0.headers['X-Content-Type-Options'] === 'nosniff'
+    && [g1, g2, g3].every((x) => x.statusCode === 415 && !x.isBase64Encoded && x.headers['Content-Type'] === 'application/json' && JSON.parse(x.body).error_code === 'NOT_IMAGE'),
+    [g0, g1, g2, g3].map((x) => x.statusCode + ':' + x.headers['Content-Type']).join(','));
+  const savedPromo = mem.gw_data['col:promo'], savedFk = process.env.GW_GALLERY_FEED_KEY; process.env.GW_GALLERY_FEED_KEY = 'feed-265';
+  mem.gw_data['col:promo'] = { schema: 1, items: [{ id: 'pr265', title: 't', status: 'posted', blog_url: 'https://blog.example/265', posted_at: '2026-11-20', photos: [{ id: O1 }, { id: O2 }, { id: O3 }] }] };
+  const fi = JSON.parse((await gwf.handler({ httpMethod: 'GET', queryStringParameters: { key: 'feed-265' }, headers: {} })).body);
+  const f0 = await gwf.handler({ httpMethod: 'GET', queryStringParameters: { key: 'feed-265', img: O1 }, headers: {} }), f2 = await gwf.handler({ httpMethod: 'GET', queryStringParameters: { key: 'feed-265', img: O3 }, headers: {} });
+  T('C265 갤러리 피드: index는 허용 type 사진만(O1 1장) · img 정상 nosniff·image/jpeg · 목록 밖 type 415',
+    fi.count === 1 && fi.items[0].images.length === 1 && fi.items[0].images[0].att === O1 && f0.statusCode === 200 && f0.headers['X-Content-Type-Options'] === 'nosniff' && f0.headers['Content-Type'] === 'image/jpeg' && f2.statusCode === 415,
+    JSON.stringify([fi.count, fi.items && fi.items[0] && fi.items[0].images, f0.statusCode, f2.statusCode]));
+  mem.gw_data['col:promo'] = savedPromo; process.env.GW_GALLERY_FEED_KEY = savedFk || '';
+  delete mem.gw_data['promo:share:' + S];
+  [O1, O2, O3, O4, rJ.body.id, rP.body.id, rW.body.id, rC.body.id].forEach((id) => { delete mem.gw_files[id]; delete mem.gw_files['mask:' + id]; });
+}
+
 // ===== 43. v360 사진AI 자동 생성 — 서버 책임(PM 9/16 "틀어막지 말고 근본적으로"): 결과 직접 적용·상태 기록·크론 재시작·옛 작업 적용 =====
 {
   const PJ = require(join(FN, '_lib/promoai_job.js'));

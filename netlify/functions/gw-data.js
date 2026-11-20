@@ -8,6 +8,7 @@ const zlib = require('zlib');   // v378 큰 본문 gzip(응답·요청) — 10/8
 const { setupBlobContext, store, blobGet, blobSet, blobDelete, blobList } = require('./_lib/blobs');
 const { verifyToken, bearer } = require('./_lib/session');
 const { appendAudit, auditKey, diffItems, MAX_PER_MONTH: AUDIT_MAX_PER_MONTH } = require('./_lib/audit');
+const IMG = require('./_lib/imgsniff');   // C265 홍보 사진 형식(머리 바이트) 확인
 const { badBlobKey } = require('./_lib/blobkey');   // v453 Blobs 키 이름 검사(backup_get·backup_put 400 BAD_KEY — blobs.js도 같은 검사로 SDK 앞에서 막음)
 const AL = require('./_lib/apprlearn');   // v413 결재 학습 신호(clog:appr → lessons:appr, 모델 없음)
 const DONEIF = require('./_lib/doneif');   // v413 clogAppend(해시 체인) 재사용
@@ -4998,7 +4999,14 @@ async function handleAttPut(event, d, R) {
   if (b64.length > ATT_MAX) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', request_id: R });
   const id = 'att_' + crypto.randomBytes(8).toString('hex');
   const kind = ['asbestos', 'contract', 'bldg', 'biz', 'promo'].indexOf(String(d.kind || '')) >= 0 ? String(d.kind) : '';
-  const w = await blobSet(store(FILES), id, { name: name, type: String(d.type || ''), kind: kind, data: b64, by: c.member.name, ts: Date.now() });
+  // C265: 홍보 사진(공개 주소로 나가는 종류)은 그림만 — 보낸 type은 믿지 않고 내용 머리 바이트(JPEG·PNG·WebP)로 정한다. 그림이 아니면 400.
+  //   다른 종류(계약·석면 등 문서)는 앱 안에서만 열려 종전대로 둔다.
+  let type = String(d.type || '');
+  if (kind === 'promo') {
+    type = IMG.sniffB64(b64);
+    if (!type) return jr(400, { status: 'REJECTED', error_code: 'NOT_IMAGE', request_id: R });
+  }
+  const w = await blobSet(store(FILES), id, { name: name, type: type, kind: kind, data: b64, by: c.member.name, ts: Date.now() });
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '첨부등록', id: id, t: name.slice(0, 60) }] }); } catch (e) {}
   // 판독은 백그라운드 함수(gw-parse-background)에서 — 첨부는 즉시 완료(타임아웃 방지). promo(현장 사진)는 판독 대상 아님
