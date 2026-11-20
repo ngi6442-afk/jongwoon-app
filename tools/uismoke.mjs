@@ -1258,8 +1258,8 @@ try {
   {
     const cut = (name) => { const i = html.indexOf('function ' + name + '('); if (i < 0) throw new Error(name + ' 없음'); let dpt = 0, j = html.indexOf('{', i); for (let k = j; k < html.length; k++) { if (html[k] === '{') dpt++; else if (html[k] === '}') { dpt--; if (!dpt) return html.slice(i, k + 1); } } throw new Error(name + ' 끝 없음'); };
     const consts = html.match(/var AB_EXTRA_ROW_MIN = 40, AB_EXTRA_ROW_MAX = 999;/)[0] + html.match(/var AB_XLSX_1P = \d+, AB_XLSX_2P = \d+, AB_XLSX_NEAR = \d+;/)[0];
-    const mk = new Function('LIST', 'CAN', 'var esc = function(s){ return String(s); }; function abRouteList(){ return LIST; } function abCanLearn(){ return CAN; }' + consts
-      + ['abXlsxVisN', 'abXlsxPages', 'abXlsxLeft', 'abXlsxPageText', 'abXlsxNearHtml', 'abXlsxGrowNote', 'abFreeReserve'].map(cut).join('\n')
+    const mk = new Function('LIST', 'CAN', 'var esc = function(s){ return String(s); }; var abDay = { data: {} }, abStatus = { routes: LIST }; function abRouteList(){ return LIST; } function abCanLearn(){ return CAN; }' + consts
+      + ['abXlsxVisN', 'abXlsxPages', 'abXlsxLeft', 'abXlsxPageText', 'abXlsxNearHtml', 'abXlsxGrowNote', 'abRoutesKnown', 'abFreeReserve'].map(cut).join('\n')
       + 'return { vis: abXlsxVisN, pages: abXlsxPages, left: abXlsxLeft, text: abXlsxPageText, near: abXlsxNearHtml, grow: abXlsxGrowNote, free: abFreeReserve };');
     const base = [...html.matchAll(/\{s:"([LR])",r:(\d+),f:"([^"]*)",t:"([^"]*)",i:"([^"]*)"\}/g)].map((m) => ({ s: m[1], r: Number(m[2]), f: m[3], t: m[4], i: m[5], h: false }));
     const prod = base.map((x) => Object.assign({}, x));
@@ -1282,8 +1282,8 @@ try {
     T('abFreeReserve 경계: 빈 표 L40·R41(R40은 기본표) · 왼쪽 40~999 소진이면 L 0(빈 번호 없음)·R 41 · 범위 밖 번호(1000)·모르는 열은 무시',
       (() => { const a = mk(base, true).free(), b = mk(fullL, true).free(), c = mk(base.concat([{ s: 'L', r: 1000, f: 'a', t: 'b', i: '', h: false }, { s: 'X', r: 40, f: 'a', t: 'b', i: '', h: false }]), true).free(); return a.L === 40 && a.R === 41 && b.L === 0 && b.R === 41 && c.L === 40 && c.R === 41; })(), '');
     T('화면 글: 새 노선 폼·확인창·나누기에 "예비 줄/예비 행" 말이 없다(줄 번호·가나다순 자동) · 표 아래 미리 알림이 숨긴 노선 줄 다음에 걸려 있다',
-      /새 노선 — 노선표에 새 줄로 추가하고 이 조합을 바로 지정합니다\. 엑셀·화면 자리는 배출자 가나다순으로 자동이고, 줄 번호는 식별용입니다\./.test(html) && /"\\n→ 줄 번호 " \+ side \+ free\[side\] \+ " \(엑셀 자리는 가나다순 자동\)/.test(html)
-      && />왼쪽\(L\) 번호' \+ \(free\.L \? " — L" \+ free\.L : " — 빈 번호 없음"\)/.test(html) && /에서 떼어 별도 줄로 만듭니다\./.test(html) && !/예비 행에 별도 줄|\(양식 예비 줄\)|빈 줄 없음"/.test(html)
+      /새 노선 — 노선표에 새 줄로 추가하고 이 조합을 바로 지정합니다\. 엑셀·화면 자리는 배출자 가나다순으로 자동이고, 줄 번호는 식별용입니다\./.test(html) && /var numTxt = free\.known \? \("줄 번호 " \+ side \+ free\[side\] \+ " 예정"\) : \("줄 번호는 저장할 때 정해집니다"\);/.test(html) && /"\\n→ " \+ numTxt \+ " \(엑셀 자리는 가나다순 자동\)/.test(html)
+      && />왼쪽\(L\) 번호' \+ num\("L"\) \+ '<\/option>'/.test(html) && /free\[s\] \? " — " \+ s \+ free\[s\] \+ " 예정" : " — 빈 번호 없음"/.test(html) && /에서 떼어 별도 줄로 만듭니다\./.test(html) && !/예비 행에 별도 줄|\(양식 예비 줄\)|빈 줄 없음"/.test(html)
       && /h \+= abHiddenListHtml\(\);[^\n]*\n\s*h \+= abXlsxNearHtml\(\);/.test(html), '');
     { const g0 = html.indexOf('function abRouteAddGo('), g1 = html.indexOf('function abLearnGo(', g0), go = html.slice(g0, g1);
       T('새 노선 길이 한도(상·하차지 60·품목 40 — 서버 cleanExtraRoute와 같은 값)를 보내기 전에 정확한 글로 알린다(확인창·서버 호출보다 앞)',
@@ -1294,8 +1294,57 @@ try {
       const f0 = html.indexOf('function abNewRouteFormHtml('), fm = html.slice(f0, html.indexOf('function abRouteAddGo(', f0));
       const v0 = html.indexOf('function abVariantSplit('), vs = html.slice(v0, html.indexOf('function abFreeReserve(', v0));
       T('배선: 폼 머리글에 쪽수 줄(abXlsxPageText) · 새 노선·[별도 줄로 나누기] 확인창에 쪽 늘어남 덧글(abXlsxGrowNote) · abRouteAddGo·abVariantSplit이 줄 번호 상한을 직접 적어 막지 않는다(빈 번호 없음 = abFreeReserve 0 뿐)',
-        /esc\(abXlsxPageText\(abXlsxVisN\(\)\)\)/.test(fm) && /그 줄로 지정합니다\." \+ abXlsxGrowNote\(\)\)\) return;/.test(go) && /반영됩니다\." \+ abXlsxGrowNote\(\) \+ "\\n\\n진행할까요\?"\)\) return;/.test(vs)
-        && /if \(!free\[side\]\)\{ alert\(AB_CODE_TEXT\.ROWS_FULL\); return; \}/.test(go) && !/free\[side\] *[<>]=? *\d|free\.[LR] *[<>]=? *\d|[<>]=? *49\b/.test(go + vs + fm), ''); }
+        /esc\(free\.known \? abXlsxPageText\(abXlsxVisN\(\)\) : /.test(fm) && /그 줄로 지정합니다\." \+ abXlsxGrowNote\(\)\)\) return;/.test(go) && /반영됩니다\." \+ abXlsxGrowNote\(\) \+ "\\n\\n진행할까요\?"\)\) return;/.test(vs)
+        && /if \(free\.known && !free\[side\]\)\{ alert\(AB_CODE_TEXT\.ROWS_FULL\); return; \}/.test(go) && !/free\[side\] *[<>]=? *\d|free\.[LR] *[<>]=? *\d|[<>]=? *49\b/.test(go + vs + fm), '');
+      // C279(11/20): 줄 번호 = 쓴 번호의 최댓값 + 1 · 서버 노선표를 못 받은 순간엔 번호를 적지 않음 · 겹침 안내(ROUTE_OVERLAP) 확인 뒤에만 force · [별도 줄로 나누기] 실패 글 — 실제 함수를 흐름째 돌린다
+      const gap = base.concat(Array.from({ length: 10 }, (_, i) => ({ s: 'L', r: 40 + i, f: 'a', t: 'b', i: '', h: false })).filter((x) => x.r !== 44));
+      T('C279 abFreeReserve: 가운데 L44가 빠져도 다음 번호는 L50(빠진 번호를 물려받지 않는다) · 소수 번호 무시 · known = 서버 노선표를 받았는가',
+        (() => { const a = mk(gap, true).free(), b = mk(base.concat([{ s: 'L', r: 50.5, f: 'a', t: 'b', i: '', h: false }]), true).free(), c = mk([], true).free(); return a.L === 50 && a.R === 41 && a.known === true && b.L === 40 && c.known === false; })(), '');
+      const flow = (LIST, script, opt) => {
+        const o = opt || {}, log = { confirms: [], alerts: [], calls: [], learn: [], toasts: [] };
+        const code = 'var abLearnBusy = false, abLearnNew = "k", abNrDraft = null, abDay = { data: {}, day: "2026-11-20" }, abStatus = { routes: SRV };' + consts + 'var AB_CODE_TEXT = { ROWS_FULL: "RF", FORBIDDEN: "FB" };'
+          + 'function abRouteList(){ return LIST; } function abCanLearn(){ return true; } function abInt(v){ var n = Math.round(Number(v)); return (isFinite(n) && n > 0) ? n : 0; } function esc(s){ return String(s); }'
+          + 'function renderAbSheet(){} function onSessionInvalid(){} function loadAbStatus(){} function abOpenDay(){} function apprToastShow(m){ LOG.toasts.push(m); } function gwToast(m){ LOG.toasts.push(m); }'
+          + 'function abErrText(res, head){ return head + " — " + ((res.body && res.body.code) || res.status); } function abLearnGo(k, v, nc){ LOG.learn.push([v, nc]); }'
+          + 'function confirm(m){ LOG.confirms.push(String(m)); return ANS.length ? ANS.shift() : true; } function alert(m){ LOG.alerts.push(String(m)); }'
+          + 'function gwCall(fn, body){ LOG.calls.push(JSON.parse(JSON.stringify(body))); var res = SCRIPT.shift() || { status: 500, body: {} }; return { then: function(f){ f(res); return { catch: function(){} }; } }; }'
+          + ['abRouteFind', 'abXlsxVisN', 'abXlsxPages', 'abXlsxLeft', 'abXlsxPageText', 'abXlsxGrowNote', 'abRoutesKnown', 'abFreeReserve', 'abOverlapText', 'abNewRouteFormHtml', 'abRouteAddGo', 'abVariantSplit'].map(cut).join('\n')
+          + 'return { form: abNewRouteFormHtml, go: abRouteAddGo, split: abVariantSplit };';
+        const api = new Function('LIST', 'SRV', 'SCRIPT', 'ANS', 'LOG', code)(LIST, o.noSrv ? [] : LIST, script.slice(), (o.ans || []).slice(), log);
+        const vals = Object.assign({ from: '새상차', to: '새하차', item: '분진', side: 'L' }, o.vals || {});
+        const box = { getAttribute: () => 'k', querySelector: (sel) => ({ value: vals[(sel.match(/nr-(\w+)/) || [])[1]] }) };
+        return { api, log, host: { querySelectorAll: () => [box] } };
+      };
+      const OK50 = { status: 200, body: { ok: true, side: 'L', row: 50, existed: false } };
+      const OVL = { status: 409, body: { ok: false, code: 'ROUTE_OVERLAP', side: 'L', row: 50, days_checked: 14, loosened: [{ side: 'L', row: 8, bundles: 1, trips: 3, days: 1 }, { side: 'R', row: 40, bundles: 2, trips: 5, days: 2 }] } };
+      let f1 = flow(prod, [OK50]); const formTxt = f1.api.form({ key: 'k', from: '새상차', to: '새하차', item: '분진' }); f1.api.go('k', f1.host);
+      T('C279 흐름 ①(겹침 없음): 폼 "보이는 노선 81줄"·"왼쪽(L) 번호 — L50 예정" · 확인창 "줄 번호 L50 예정" 1번 · 서버 호출 1번(force 없음) → 응답 번호로 바로 지정 L|50',
+        /보이는 노선 81줄 · 엑셀 인쇄 2쪽/.test(formTxt) && />왼쪽\(L\) 번호 — L50 예정</.test(formTxt) && />오른쪽\(R\) 번호 — R50 예정</.test(formTxt) && f1.log.confirms.length === 1 && /→ 줄 번호 L50 예정 \(엑셀 자리는 가나다순 자동\)/.test(f1.log.confirms[0])
+        && f1.log.calls.length === 1 && f1.log.calls[0].action === 'ab_route_add' && f1.log.calls[0].force === undefined && JSON.stringify(f1.log.learn) === '[["L|50",true]]' && f1.log.alerts.length === 0, JSON.stringify([f1.log.confirms.length, f1.log.calls, f1.log.learn]).slice(0, 300));
+      let f2 = flow(prod, [OVL, OK50], { ans: [true, true] }); f2.api.go('k', f2.host);
+      T('C279 흐름 ②(겹침 → 확인): 409 ROUTE_OVERLAP이면 안내 확인창(풀리는 줄 L8·R40 이름·묶음·회수·본 일수)을 보이고, 확인해야만 force:true로 한 번 더 보내 지정까지',
+        f2.log.confirms.length === 2 && /미배정으로 풀립니다/.test(f2.log.confirms[1]) && /최근 14일치/.test(f2.log.confirms[1]) && / · L8 동국제강 → 베페사 · 지정분진 — 1묶음 3회\(1일\)/.test(f2.log.confirms[1]) && / · R40 한라티씨 → 거성산업 · 분진 — 2묶음 5회\(2일\)/.test(f2.log.confirms[1])
+        && f2.log.calls.length === 2 && f2.log.calls[0].force === undefined && f2.log.calls[1].force === true && JSON.stringify(f2.log.learn) === '[["L|50",true]]' && f2.log.alerts.length === 0, JSON.stringify([f2.log.confirms[1], f2.log.calls]).slice(0, 400));
+      let f3 = flow(prod, [OVL, OK50], { ans: [true, false] }); f3.api.go('k', f3.host);
+      let f4 = flow(prod, [OVL, OVL], { ans: [true, true] }); f4.api.go('k', f4.host);
+      T('C279 흐름 ③: 겹침 안내에서 취소하면 다시 보내지 않고 지정도 없음 · force로 보냈는데 또 409면 되풀이하지 않고 실패 알림 1번',
+        f3.log.calls.length === 1 && f3.log.learn.length === 0 && f3.log.alerts.length === 0 && f4.log.calls.length === 2 && f4.log.confirms.length === 2 && f4.log.learn.length === 0 && f4.log.alerts.length === 1 && /ROUTE_OVERLAP/.test(f4.log.alerts[0]), JSON.stringify([f3.log.calls.length, f4.log.calls.length, f4.log.alerts]));
+      { const fd = flow(prod, [OVL, OK50], { ans: [true, false, true], vals: { from: '고친상차', to: '고친하차', item: '고친품목', side: 'R' } }); fd.api.go('k', fd.host);
+        const again = fd.api.form({ key: 'k', from: '처음상차', to: '처음하차', item: '처음품목' }), other = fd.api.form({ key: 'other', from: '처음상차', to: '처음하차', item: '처음품목' });
+        fd.api.go('k', fd.host); const done = fd.api.form({ key: 'k', from: '처음상차', to: '처음하차', item: '처음품목' });
+        T('C279 흐름 ⑤: 겹침 안내에서 취소해 화면이 다시 그려져도 사람이 고쳐 넣은 이름·열(R)이 폼에 남는다(다른 조합의 폼에는 안 섞임) · 성공하면 비운다 · 날짜 이동·취소 단추·로그아웃에서도 비운다',
+          /value="고친상차"/.test(again) && /value="고친하차"/.test(again) && /value="고친품목"/.test(again) && /<option value="R" selected>/.test(again) && !/처음상차/.test(again) && /value="처음상차"/.test(other)
+          && fd.log.calls.length === 2 && /value="처음상차"/.test(done) && (html.match(/abNrDraft = null;/g) || []).length >= 4, JSON.stringify([again.slice(0, 260), fd.log.calls.length])); }
+      let f5 = flow(base, [OK50], { noSrv: true }); const form5 = f5.api.form({ key: 'k', from: '새상차', to: '새하차', item: '분진' }); f5.api.go('k', f5.host);
+      T('C279 흐름 ④(서버 노선표를 못 받은 순간): 폼·확인창에 줄 수·줄 번호를 적지 않는다("저장할 때 정해집니다") · 추가는 그대로 되고 지정은 서버가 준 번호 L|50',
+        /노선표를 아직 불러오지 못했습니다 — 줄 수·줄 번호는 저장할 때 정해집니다\./.test(form5) && !/L40|R41|보이는 노선 \d+줄/.test(form5) && />왼쪽\(L\) 번호</.test(form5)
+        && /→ 줄 번호는 저장할 때 정해집니다 \(엑셀 자리는 가나다순 자동\)/.test(f5.log.confirms[0]) && !/L40/.test(f5.log.confirms[0]) && f5.log.calls.length === 1 && JSON.stringify(f5.log.learn) === '[["L|50",true]]', JSON.stringify([form5.slice(0, 200), f5.log.confirms]).slice(0, 400));
+      let f6 = flow(prod, [{ status: 400, body: { ok: false, code: 'STR_TOO_LONG' } }]); f6.api.split('L', 34, '가'.repeat(61));
+      let f7 = flow(prod, [OVL, OK50], { ans: [true, true] }); f7.api.split('L', 34, '에코프로비엠(CAM9)');
+      let f8 = flow(prod, [{ status: 403, body: { ok: false, code: 'FORBIDDEN' } }]); f8.api.split('L', 34, '에코프로비엠(CAM9)');
+      T('C279 [별도 줄로 나누기]: 이름 61자는 보내기 전에 문장으로 알림(서버 호출 0) · 겹침 안내 확인 뒤 force로 한 번 더 · 실패 글은 코드만 띄우지 않고 abErrText를 거친다',
+        f6.log.calls.length === 0 && f6.log.alerts.length === 1 && /이름이 60자를 넘어 별도 줄로 만들 수 없습니다\(지금 61자\)/.test(f6.log.alerts[0]) && f7.log.calls.length === 2 && f7.log.calls[1].force === true && f7.log.calls[1].from === '에코프로비엠(CAM9)' && /새 줄 L50/.test(f7.log.toasts.join('|'))
+        && f8.log.toasts.length === 1 && f8.log.toasts[0] === '줄 추가 실패 — FORBIDDEN' && !/줄 추가 실패: /.test(html), JSON.stringify([f6.log, f7.log.calls.length, f8.log.toasts]).slice(0, 400)); }
   }
 } catch (e) { console.log('  (v351 검사 생략 — ' + e.message + ')'); fails++; }
 

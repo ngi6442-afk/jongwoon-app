@@ -3986,7 +3986,7 @@
     if (typeof imSt === "function") imSt("checklist").rb = null;   // 검토 반영: 받은 체크 기록도(다음 사람 병합이 앞사람 기록을 기준으로 보지 않게)
     abStatus = null; abDay = { day: "", data: null, loading: false, error: "" }; abPresets = { items: null, loading: false, saving: false, error: "" };
     abManual = { day: "", items: [], loaded: false, timer: null, saving: false, dirty: false, savedTs: 0, bad: 0, err: "", errBad: false, pendingRender: false };
-    abLearnDone = {}; abLearnOpen = ""; abLearnNew = "";
+    abLearnDone = {}; abLearnOpen = ""; abLearnNew = ""; abNrDraft = null;
     stmtReset();   // 29 판② 월말명세서 — 연 달·상세·고치던 줄
   }
   // v452(원장 C104 — 개인정보): 로그인 창 '전환'(로그아웃 없이 다른 사람으로 다시 로그인 — 새로고침 없음)과 세션 만료 뒤 다른 사람의 로그인은 clearSessionData를 거치지 않아
@@ -30755,6 +30755,7 @@ function dutyStage(nx){
   var abManual = { day: "", items: [], loaded: false, timer: null, saving: false, dirty: false, savedTs: 0, bad: 0, err: "", errBad: false, pendingRender: false };
   var abLearnOpen = "";         // [노선 지정] UI가 열린 미매칭 조합 키
   var abLearnBusy = false;
+  var abNrDraft = null;         // C279: 새 노선 폼에 사람이 넣어 보낸 값{key,from,to,item,side} — 실패·겹침 안내 취소로 다시 그려져도 유지, 성공·취소·날짜 이동·로그아웃에 비움
   var abLearnNew = "";          // v351: [노선 지정] 드롭다운에서 "＋ 새 노선으로 추가"를 고른 미매칭 조합 키 — 인라인 폼이 열린다
   var abLearnDone = {};         // 이번 화면에서 지정한 조합 key -> 'R27' (v327: 저장 즉시 서버가 그날부터 재정렬 → 그날 재조회)
   var abPresetEdit = false;     // 단골 노선 삭제 버튼 노출 토글
@@ -30845,8 +30846,8 @@ function dutyStage(nx){
   ];
   // 2026-11-20(PM "예비줄 건부터 먼저"): 추가 노선의 줄 번호(식별자 행) 범위 — 서버 _lib/allbaro.js EXTRA_ROW_MIN/MAX와 같은 값(uismoke 대조).
   //   (열,번호)는 노선 식별자일 뿐 엑셀의 물리 행이 아니다(자리는 가나다순 자동, 모자라면 엑셀 생성기가 행을 늘린다) — 종전 40~49는
-  //   양식 예비 행 수에 묶여 좌우 20칸이 차면 새 노선 추가가 막혔다. 숨긴 줄·지난 기록·학습 지정이 번호를 가리키는데, 노선을 지우는 기능이 없어
-  //   쓴 번호가 비지 않는다(숨긴 줄도 번호를 차지). 추가분 blob에서 항목이 빠지면 그 번호를 새 줄이 물려받으니 blob을 손으로 지우지 말 것.
+  //   양식 예비 행 수에 묶여 좌우 20칸이 차면 새 노선 추가가 막혔다. 숨긴 줄·지난 기록·학습 지정이 번호를 가리키므로 쓴 번호는 다시 주지 않는다
+  //   (다음 번호 = 그 열에서 쓴 번호의 최댓값 + 1 — abFreeReserve·서버 nextExtraRow).
   var AB_EXTRA_ROW_MIN = 40, AB_EXTRA_ROW_MAX = 999;
   // 엑셀 인쇄 쪽수 경계(보이는 노선 줄 수) — appdata generate.py PAGE_PT 주석의 2026-11-20 Excel 실측(A4·배율 77%·지금 줄 높이):
   //   52줄까지 한 장 · 124줄까지 두 장. 생성기의 줄 높이·배율을 바꾸면 같이 다시 잰다. 경계까지 AB_XLSX_NEAR줄 안이면 표 아래에 미리 알린다.
@@ -30947,6 +30948,7 @@ function dutyStage(nx){
     BAD_ROUTE: "양식 노선표에 없는 줄입니다 — 앱을 새로고침해 최신 노선표로 다시 지정하세요(계속 나오면 관리자에게 알려주세요).",
     BAD_ROUTE_ID: "노선 식별자가 올바르지 않습니다 — 앱을 새로고침한 뒤 다시 시도하세요.",
     ROWS_FULL: "이 열의 줄 번호를 다 썼습니다 — 다른 열(왼쪽/오른쪽)을 골라 추가하세요. 계속 나오면 관리자에게 알려주세요.",
+    ROUTE_OVERLAP: "이 이름으로 줄을 만들면 다른 줄에 들어가 있는 인계서가 미배정으로 풀립니다 — 이름을 그 줄과 겹치지 않게 고치거나, 앱을 새로고침한 뒤 다시 시도하면 자세한 안내가 나옵니다.",
     BAD_INPUT: "상차지·하차지와 왼쪽/오른쪽 열을 모두 입력하세요.",
     BAD_PRESET_ID: "단골 노선 식별자가 올바르지 않습니다 — 앱을 새로고침한 뒤 다시 시도하세요.",
     DUP_PRESET_ID: "단골 노선 식별자가 중복됩니다 — 앱을 새로고침한 뒤 다시 시도하세요.",
@@ -31007,7 +31009,7 @@ function dutyStage(nx){
     }
     if (abManual.day && abManual.day !== day) abFlushManualSave();   // 날짜를 옮기기 전에 밀린 저장부터 끝낸다
     abDay = { day: day, data: null, loading: true, error: "" };
-    abLearnOpen = ""; abLearnNew = "";
+    abLearnOpen = ""; abLearnNew = ""; abNrDraft = null;
     if (abManual.day !== day){
       abManual = { day: day, items: [], loaded: false, timer: null, saving: false, dirty: false, savedTs: 0, bad: 0, err: "", errBad: false, pendingRender: false };
     }
@@ -31432,25 +31434,58 @@ function dutyStage(nx){
     if (abCanLearn()) h += '<button type="button" class="ab-hide-btn" data-ab-split="' + esc(r.s + "|" + r.r + "|" + names[0]) + '">별도 줄로 나누기</button>';
     return h;
   }
+  // C279(2026-11-20 독립 검토): 서버가 새 줄을 저장하기 전에 최근 14일을 실제로 재판정해 보고, 지금 다른 줄에 들어가 있는 인계서가 새 줄 때문에
+  //   '어느 줄인지 모호'(미배정)로 풀리면 409 ROUTE_OVERLAP(좌표·수)로 답한다 — 그 답을 사람 말로. 확인하면 force:true로 다시 보내 만든다.
+  function abOverlapText(b){
+    var L = Array.isArray(b && b.loosened) ? b.loosened : [], lines = [], i, x, rt;
+    for (i = 0; i < L.length && i < 5; i++){
+      x = L[i] || {}; rt = abRouteFind(String(x.side || ""), Number(x.row));
+      lines.push(" · " + String(x.side || "") + abInt(x.row) + (rt ? " " + rt.f + " → " + rt.t + " · " + rt.i : "") + " — " + abInt(x.bundles) + "묶음 " + abInt(x.trips) + "회(" + abInt(x.days) + "일)");
+    }
+    if (L.length > 5) lines.push(" · 그 밖에 " + (L.length - 5) + "줄");
+    return "이 이름으로 줄을 만들면, 지금 아래 줄에 들어가 있는 인계서가 '어느 줄인지 모호'가 되어 미배정으로 풀립니다.\n(최근 " + abInt(b && b.days_checked) + "일치를 다시 판정해 본 수 — 더 지난 날짜도 열 때 같이 풀립니다)\n\n" + lines.join("\n") +
+      "\n\n새 줄의 하차지·품목 이름이 그 줄과 서로 겹치기 때문입니다.\n[취소] → 이름을 그 줄과 겹치지 않게 고쳐 다시 추가하거나, 새 줄 없이 기존 줄로 [노선 지정]\n[확인] → 그대로 만들고, 풀린 인계서는 미배정 목록에서 다시 지정";
+  }
   function abVariantSplit(side, row, name){
     if (abLearnBusy || !abCanLearn() || !name) return;
     var rt = null, rs = abRouteList(); for (var i = 0; i < rs.length; i++){ if (rs[i].s === side && rs[i].r === row){ rt = rs[i]; break; } }
     if (!rt) return;
+    if (String(name).length > 60){ alert("이름이 60자를 넘어 별도 줄로 만들 수 없습니다(지금 " + String(name).length + "자).\n[노선 지정] → ＋ 새 노선으로 추가…에서 이름을 줄여 넣어 주세요."); return; }
     if (!confirm("'" + name + "'을(를) 줄 " + side + row + " '" + rt.f + "'에서 떼어 별도 줄로 만듭니다.\n하차지 '" + rt.t + "' · 품목 '" + rt.i + "' 그대로. 만든 뒤 이 날 일지는 다시 열 때 재판정되고 엑셀은 다음 재생성에 반영됩니다." + abXlsxGrowNote() + "\n\n진행할까요?")) return;
-    var fr = abFreeReserve(), sd = fr[side] ? side : (fr.L ? "L" : (fr.R ? "R" : ""));
+    var fr = abFreeReserve(), sd = (!fr.known || fr[side]) ? side : (fr.L ? "L" : (fr.R ? "R" : ""));
     if (!sd){ gwToast("줄 번호를 다 썼습니다 — 관리자에게 알려주세요", true, 2500); return; }
-    abLearnBusy = true;
-    gwCall("gw-allbaro", { action: "ab_route_add", from: name, to: rt.t, item: rt.i, side: sd }).then(function(res){
-      abLearnBusy = false;
-      if (!(res.status === 200 && res.body && res.body.side && res.body.row)){ gwToast("줄 추가 실패: " + ((res.body && res.body.code) || res.status), true, 2500); return; }
-      gwToast(res.body.existed ? ("이미 있는 줄 → " + res.body.side + res.body.row) : ("새 줄 " + res.body.side + res.body.row + " '" + name + "' 추가 — 이 날 일지를 다시 판정합니다"), false, 2400);
-      loadAbStatus(); if (abDay.day) abOpenDay(abDay.day);
-    }).catch(function(){ abLearnBusy = false; gwToast("줄 추가 실패(네트워크)", true, 2500); });
+    (function send(force){
+      abLearnBusy = true;
+      var body = { action: "ab_route_add", from: name, to: rt.t, item: rt.i, side: sd };
+      if (force) body.force = true;
+      gwCall("gw-allbaro", body).then(function(res){
+        abLearnBusy = false;
+        if (res.status === 409 && res.body && res.body.code === "ROUTE_OVERLAP" && !force){ if (confirm(abOverlapText(res.body))) send(true); return; }
+        if (!(res.status === 200 && res.body && res.body.side && res.body.row)){ gwToast(abErrText(res, "줄 추가 실패"), true, 3500); return; }
+        gwToast(res.body.existed ? ("이미 있는 줄 → " + res.body.side + res.body.row) : ("새 줄 " + res.body.side + res.body.row + " '" + name + "' 추가 — 이 날 일지를 다시 판정합니다"), false, 2400);
+        loadAbStatus(); if (abDay.day) abOpenDay(abDay.day);
+      }).catch(function(){ abLearnBusy = false; gwToast("줄 추가 실패(네트워크)", true, 2500); });
+    })(false);
   }
+  // 서버 노선표(ab_status·일자 문서의 routes)를 받았는가 — 못 받았으면 abRouteList가 내장 기본표(71줄)로 내려가 줄 수·줄 번호가 실제와 다르다.
+  function abRoutesKnown(){
+    var d = abDay.data || {}, s = abStatus || {};
+    return !!((Array.isArray(d.routes) && d.routes.length) || (Array.isArray(s.routes) && s.routes.length));
+  }
+  // 다음 줄 번호(예정) — 서버 nextExtraRow와 같은 규칙: 그 열에서 쓴 번호의 최댓값 + 1(끝 번호까지 쓴 뒤에만 빈 번호 중 가장 낮은 것, 없으면 0).
+  //   C279: 종전 '가장 낮은 빈 번호'는 빠진 번호를 새 줄이 물려받았다. 서버는 숨김·학습 지정이 가리키는 번호까지 쳐서 정하므로 실제 번호는 서버 응답이 정한다.
+  //   known:false(서버 노선표를 못 받음)면 화면은 번호를 적지 않는다.
   function abFreeReserve(){
-    var rs = abRouteList(), used = { L: {}, R: {} }, i, side, row, out = { L: 0, R: 0 };
-    for (i = 0; i < rs.length; i++){ if (used[rs[i].s] && rs[i].r >= AB_EXTRA_ROW_MIN && rs[i].r <= AB_EXTRA_ROW_MAX) used[rs[i].s][rs[i].r] = true; }
-    for (side in out){ for (row = AB_EXTRA_ROW_MIN; row <= AB_EXTRA_ROW_MAX; row++){ if (!used[side][row]){ out[side] = row; break; } } }
+    var rs = abRouteList(), used = { L: {}, R: {} }, max = { L: AB_EXTRA_ROW_MIN - 1, R: AB_EXTRA_ROW_MIN - 1 }, i, s, r, row, out = { L: 0, R: 0, known: abRoutesKnown() };
+    for (i = 0; i < rs.length; i++){
+      s = rs[i].s; r = rs[i].r;
+      if (!used[s] || !(r >= AB_EXTRA_ROW_MIN && r <= AB_EXTRA_ROW_MAX) || r !== Math.floor(r)) continue;
+      used[s][r] = true; if (r > max[s]) max[s] = r;
+    }
+    ["L", "R"].forEach(function(side){
+      if (max[side] < AB_EXTRA_ROW_MAX){ out[side] = max[side] + 1; return; }
+      for (row = AB_EXTRA_ROW_MIN; row <= AB_EXTRA_ROW_MAX; row++){ if (!used[side][row]){ out[side] = row; break; } }
+    });
     return out;
   }
   // 줄을 하나 더하면 엑셀 인쇄 쪽이 늘어나는 때만 확인창에 한 줄 붙인다(그 밖엔 빈 글).
@@ -31460,14 +31495,19 @@ function dutyStage(nx){
   }
   function abNewRouteFormHtml(u){
     var free = abFreeReserve(), def = (!free.L || (free.R && free.R < free.L)) ? "R" : "L";
+    function num(s){ return !free.known ? "" : (free[s] ? " — " + s + free[s] + " 예정" : " — 빈 번호 없음"); }   // 번호는 서버가 저장할 때 정한다(예정) · 노선표를 못 받았으면 적지 않는다
+    // C279: 보냈다가 실패·겹침 안내 취소로 화면이 다시 그려져도 사람이 고쳐 넣은 이름·열을 지우지 않는다(종전엔 처음 채운 값으로 되돌아가 다시 쳐야 했다)
+    var dr = (abNrDraft && abNrDraft.key === u.key) ? abNrDraft : null;
+    if (dr){ u = { key: u.key, from: dr.from, to: dr.to, item: dr.item }; if (dr.side === "L" || dr.side === "R") def = dr.side; }
     return '<div class="ab-nr" data-ab-nr="' + esc(u.key) + '">' +
-      '<div class="ab-nr-hd">새 노선 — 노선표에 새 줄로 추가하고 이 조합을 바로 지정합니다. 엑셀·화면 자리는 배출자 가나다순으로 자동이고, 줄 번호는 식별용입니다.<br>' + esc(abXlsxPageText(abXlsxVisN())) + '</div>' +
+      '<div class="ab-nr-hd">새 노선 — 노선표에 새 줄로 추가하고 이 조합을 바로 지정합니다. 엑셀·화면 자리는 배출자 가나다순으로 자동이고, 줄 번호는 식별용입니다.<br>' +
+        esc(free.known ? abXlsxPageText(abXlsxVisN()) : "노선표를 아직 불러오지 못했습니다 — 줄 수·줄 번호는 저장할 때 정해집니다.") + '</div>' +
       '<input class="ab-in" data-ab-nr-from="1" maxlength="60" placeholder="상차지" value="' + esc(u.from || "") + '">' +
       '<input class="ab-in" data-ab-nr-to="1" maxlength="60" placeholder="하차지" value="' + esc(u.to || "") + '">' +
       '<input class="ab-in" data-ab-nr-item="1" maxlength="40" placeholder="품목" value="' + esc(u.item || "") + '">' +
       '<select class="ab-in" data-ab-nr-side="1">' +
-        '<option value="L"' + (def === "L" ? " selected" : "") + '>왼쪽(L) 번호' + (free.L ? " — L" + free.L : " — 빈 번호 없음") + '</option>' +
-        '<option value="R"' + (def === "R" ? " selected" : "") + '>오른쪽(R) 번호' + (free.R ? " — R" + free.R : " — 빈 번호 없음") + '</option>' +
+        '<option value="L"' + (def === "L" ? " selected" : "") + '>왼쪽(L) 번호' + num("L") + '</option>' +
+        '<option value="R"' + (def === "R" ? " selected" : "") + '>오른쪽(R) 번호' + num("R") + '</option>' +
       '</select>' +
       '</div>';
   }
@@ -31488,32 +31528,41 @@ function dutyStage(nx){
       return;
     }
     var free = abFreeReserve();
-    if (!free[side]){ alert(AB_CODE_TEXT.ROWS_FULL); return; }
+    if (free.known && !free[side]){ alert(AB_CODE_TEXT.ROWS_FULL); return; }
+    // 줄 번호는 서버가 저장할 때 정한다(화면 값은 예정 — 숨김·학습 지정이 가리키는 번호까지 서버가 친다). 노선표를 못 받았으면 번호를 적지 않는다.
+    var numTxt = free.known ? ("줄 번호 " + side + free[side] + " 예정") : ("줄 번호는 저장할 때 정해집니다");
     if (!confirm("새 노선을 추가하고 이 조합을 그 줄로 지정할까요?\n\n" + from + " → " + to + (item ? " · " + item : "") +
-        "\n→ 줄 번호 " + side + free[side] + " (엑셀 자리는 가나다순 자동)\n\n같은 상·하차지·품목이 이미 있으면 새로 만들지 않고 그 줄로 지정합니다." + abXlsxGrowNote())) return;
-    abLearnBusy = true;
-    renderAbSheet();
-    gwCall("gw-allbaro", { action: "ab_route_add", from: from, to: to, item: item, side: side }).then(function(res){
-      abLearnBusy = false;
-      if (res.status === 401){ renderAbSheet(); onSessionInvalid(); return; }
-      if (res.status === 200 && res.body && res.body.ok !== false && res.body.side && res.body.row){
-        var sd = res.body.side, rw = Number(res.body.row), nr = { side: sd, row: rw, from: from, to: to, item: item, extra: true };
-        // 화면 노선표에 바로 얹는다(ab_status 재조회 전에도 abRouteFind가 찾도록) — 서버 표에는 이미 들어갔다
-        if (!abRouteFind(sd, rw)){
-          if (abStatus && Array.isArray(abStatus.routes)) abStatus.routes.push(nr);
-          if (abDay.data && Array.isArray(abDay.data.routes)) abDay.data.routes.push(nr);
-        }
-        apprToastShow(res.body.existed ? ("이미 있는 노선 → " + sd + rw + "로 지정") : ("새 노선 " + sd + rw + " 추가"));
-        abLearnNew = "";
-        abLearnGo(key, sd + "|" + rw, true);   // 확인창은 위에서 한 번 — 바로 지정·재정렬
-        return;
-      }
+        "\n→ " + numTxt + " (엑셀 자리는 가나다순 자동)\n\n같은 상·하차지·품목이 이미 있으면 새로 만들지 않고 그 줄로 지정합니다." + abXlsxGrowNote())) return;
+    abNrDraft = { key: key, from: from, to: to, item: item, side: side };   // 다시 그려져도 넣은 값 유지(성공하면 비움)
+    (function send(force){
+      abLearnBusy = true;
       renderAbSheet();
-      alert(abErrText(res, "새 노선 추가 실패"));
-    }).catch(function(){
-      abLearnBusy = false; renderAbSheet();
-      alert("새 노선을 저장하지 못했습니다(네트워크).");
-    });
+      var body = { action: "ab_route_add", from: from, to: to, item: item, side: side };
+      if (force) body.force = true;   // 겹침 안내(ROUTE_OVERLAP)를 보고 사람이 그래도 만들겠다고 한 경우만
+      gwCall("gw-allbaro", body).then(function(res){
+        abLearnBusy = false;
+        if (res.status === 401){ renderAbSheet(); onSessionInvalid(); return; }
+        if (res.status === 200 && res.body && res.body.ok !== false && res.body.side && res.body.row){
+          var sd = res.body.side, rw = Number(res.body.row), nr = { side: sd, row: rw, from: from, to: to, item: item, extra: true };
+          // 화면 노선표에 바로 얹는다(ab_status 재조회 전에도 abRouteFind가 찾도록) — 서버 표에는 이미 들어갔다
+          if (!abRouteFind(sd, rw)){
+            if (abStatus && Array.isArray(abStatus.routes)) abStatus.routes.push(nr);
+            if (abDay.data && Array.isArray(abDay.data.routes)) abDay.data.routes.push(nr);
+          }
+          apprToastShow(res.body.existed ? ("이미 있는 노선 → " + sd + rw + "로 지정") : ("새 노선 " + sd + rw + " 추가"));
+          abLearnNew = ""; abNrDraft = null;
+          abLearnGo(key, sd + "|" + rw, true);   // 확인창은 위에서 한 번 — 바로 지정·재정렬
+          return;
+        }
+        renderAbSheet();
+        // C279: 이 줄이 생기면 다른 줄의 인계서가 미배정으로 풀린다 — 저장 전에 서버가 알려 준 것을 보이고, 그래도 만들겠다고 하면 한 번만 다시 보낸다
+        if (res.status === 409 && res.body && res.body.code === "ROUTE_OVERLAP" && !force){ if (confirm(abOverlapText(res.body))) send(true); return; }
+        alert(abErrText(res, "새 노선 추가 실패"));
+      }).catch(function(){
+        abLearnBusy = false; renderAbSheet();
+        alert("새 노선을 저장하지 못했습니다(네트워크).");
+      });
+    })(false);
   }
   function abLearnGo(key, val, noConfirm){
     if (abLearnBusy) return;
@@ -31895,7 +31944,7 @@ function dutyStage(nx){
       b.addEventListener("click", function(){ abLearnOpen = b.getAttribute("data-ab-learn"); renderAbSheet(); });
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-ab-learn-cancel]"), function(b){
-      b.addEventListener("click", function(){ abLearnOpen = ""; abLearnNew = ""; renderAbSheet(); });
+      b.addEventListener("click", function(){ abLearnOpen = ""; abLearnNew = ""; abNrDraft = null; renderAbSheet(); });
     });
     // v351: 드롭다운에서 "＋ 새 노선으로 추가…"를 고르면 폼을 펴고, 다른 줄로 바꾸면 접는다
     Array.prototype.forEach.call(host.querySelectorAll("[data-ab-rsel]"), function(sl){

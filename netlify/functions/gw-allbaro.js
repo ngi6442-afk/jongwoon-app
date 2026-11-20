@@ -639,12 +639,34 @@ async function handleRouteAdd(st, c, d, R) {
   if (!AB.cleanExtraRoute({ side: side, row: AB.EXTRA_ROW_MIN, from: from, to: to, item: item })) return jr(400, { ok: false, code: 'STR_TOO_LONG', request_id: R });
   const dup = AB.routes().find(function (x) { return normName(x.from) === normName(from) && normName(x.to) === normName(to) && normItem(x.item) === normItem(item); });
   if (dup) return jr(200, { ok: true, side: dup.side, row: dup.row, existed: true, request_id: R });
-  const r = await blobGet(st, EXTRA_KEY);
-  if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { ok: false, code: r.code || 'STORAGE_READ_FAILED', request_id: R });   // C225 판 A: 추가 노선을 못 읽으면 빈 목록으로 보고 옛 줄 번호를 다시 차지하지 않음
+  // C279: 추가분·숨김·학습을 같이 읽는다 — 숨김·학습 지정이 가리키는 번호는 쓴 번호로 쳐서 다시 주지 않고(nextExtraRow), 학습은 아래 겹침 미리 보기에 쓴다.
+  //   추가분을 못 읽었으면 저장하지 않는다(C225 판 A와 같은 원칙 — 빈 목록으로 보고 옛 줄 번호를 다시 차지하거나 있던 줄을 덮어쓰지 않음).
+  //   숨김·학습을 못 읽으면 번호는 추가분만으로 정하고 겹침 확인은 건너뛴다.
+  const reads = await Promise.all([blobGet(st, EXTRA_KEY), blobGet(st, HIDDEN_KEY), blobGet(st, LEARNED_KEY)]);
+  const r = reads[0], hr = reads[1], lr = reads[2];
+  if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { ok: false, code: r.code || 'STORAGE_READ_FAILED', request_id: R });   // 없는 키: 실제 저장소 = ok·null, 시험 대역 = NOT_FOUND — 둘 다 '아직 없음'
   const items = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : [];
-  const row = AB.nextExtraRow(side, items);
+  const refs =[].concat((hr.ok && hr.data && Array.isArray(hr.data.items)) ? hr.data.items : [], lr.ok ? learnedItems(lr.data) : []);
+  const row = AB.nextExtraRow(side, items, refs);
   if (!row) return jr(409, { ok: false, code: 'ROWS_FULL', side: side, request_id: R });   // 그 열의 식별자 960개(40~999)를 다 쓴 경우뿐 — 다른 열을 고르면 된다(2026-11-20, 종전: 예비 행 10줄 소진)
   const entry = { side: side, row: row, from: from, to: to, item: item, count_col: side === 'L' ? 5 : 11, by: c.member.name, bid: c.member.id, ts: Date.now() };
+  // C279 겹침 미리 보기(2026-11-20 독립 검토): 이 줄이 생기면 지금 다른 줄에 들어가 있는 묶음이 '후보 2줄'이 되어 미배정으로 풀리는지 최근 STATUS_DAYS일 문서를
+  //   저장 없이 재판정해 센다. 풀리는 묶음이 있으면 저장하지 않고 409 ROUTE_OVERLAP(좌표·수만) — 화면이 사람에게 보이고 force:true로 다시 보내면 만든다.
+  //   학습·일자 문서를 못 읽으면 확인 없이 만든다(종전 동작 — 응답 overlap_checked:false).
+  let overlapChecked = false;
+  if (lr.ok) {
+    try {
+      const wanted = []; for (let i = 0; i < STATUS_DAYS; i++) wanted.push(kstDate(-i));
+      const dr = await Promise.all(wanted.map(function (day) { return blobGet(st, dayKey(day)); }));
+      const docs = [];
+      for (let i = 0; i < wanted.length; i++) { if (dr[i] && dr[i].ok && dr[i].data) docs.push({ day: wanted[i], doc: dr[i].data }); }
+      const imp = AB.routeAddImpact(docs, items, entry, learnedItems(lr.data));
+      overlapChecked = true;
+      if (imp.loosened.length && d.force !== true) {
+        return jr(409, { ok: false, code: 'ROUTE_OVERLAP', side: side, row: row, days_checked: imp.checked, loosened: imp.loosened, request_id: R });
+      }
+    } catch (e) { AB.setExtraRoutes(items); overlapChecked = false; }
+  }
   items.push(entry);
   const w = await blobSet(st, EXTRA_KEY, { schema: 1, items: items, updated_at: Date.now() });
   if (!w.ok) return jr(500, { ok: false, code: w.code, request_id: R });
@@ -654,7 +676,7 @@ async function handleRouteAdd(st, c, d, R) {
       ev: [{ op: '노선추가', id: side + row, t: from + ' → ' + to + (item ? ' · ' + item : '') }] });
   } catch (e) {}
   try { await requestXlsxRegen(st, 'route_add', c.member.name); } catch (e) {}   // v352
-  return jr(200, { ok: true, side: side, row: row, existed: false, routes_ver: AB.routesVer(), request_id: R });
+  return jr(200, { ok: true, side: side, row: row, existed: false, routes_ver: AB.routesVer(), overlap_checked: overlapChecked, request_id: R });
 }
 
 // 수동 수집 — 관리자 또는 개발자만. 날짜는 정규식+달력 왕복 검증, 오늘−60일~오늘, 최대 14개.

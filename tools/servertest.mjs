@@ -2267,6 +2267,77 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   T('왼쪽 40~999 소진 → 409 ROWS_FULL · blob 그대로 960건', r.code === 409 && r.body.code === 'ROWS_FULL' && r.body.side === 'L' && extra().length === 960, r.code + '/' + r.body.code);
   r = await ab({ action: 'ab_route_add', from: '번호없음', to: '끝', item: '', side: 'R' }, tokA);
   T('같은 때 오른쪽은 된다 → R41', r.code === 200 && r.body.side === 'R' && r.body.row === 41, JSON.stringify(r.body).slice(0, 120));
+  // C279(2026-11-20 독립 검토 반영): ① 줄 번호 = 쓴 번호의 최댓값 + 1(빠진 번호·유령 좌표를 새 줄이 물려받지 않게) ② 새 줄 때문에 기존 묶음이 미배정으로 풀리면 저장 전에 409 ROUTE_OVERLAP
+  //   ③ 추가분을 못 읽었으면 저장하지 않는다(빈 목록으로 덮어쓰면 있던 줄이 사라진다)
+  {
+    const tdy = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+    const ten = (skip) => Array.from({ length: 10 }, (_, i) => ({ side: 'L', row: 40 + i, from: '열줄' + i, to: '열줄', item: '', count_col: 5 })).filter((x) => x.row !== skip);
+    mem.gw_data['allbaro:routes_hidden'] = { schema: 1, items: [] }; mem.gw_data['allbaro:learned'] = { schema: 1, items: [] };
+    mem.gw_data['allbaro:routes_extra'] = { schema: 1, items: ten(44) };
+    r = await ab({ action: 'ab_route_add', from: '빠진번호뒤', to: '새하차', item: '', side: 'L' }, tokA);
+    T('C279 ① 가운데 번호 L44가 빠진 추가분(L45~49는 있음) → 새 줄은 L50(빠진 L44를 물려받지 않는다 — 옛 지정·기록이 그 번호를 가리킬 수 있다)', r.code === 200 && r.body.side === 'L' && r.body.row === 50, JSON.stringify(r.body).slice(0, 120));
+    mem.gw_data['allbaro:routes_extra'] = { schema: 1, items: ten(-1) };
+    mem.gw_data['allbaro:learned'] = { schema: 1, items: [{ from: '유령상차', to: '유령하차', item: '', side: 'L', row: 57, by: 'x', ts: 1 }] };
+    mem.gw_data['allbaro:routes_hidden'] = { schema: 1, items: [{ side: 'R', row: 63, by: 'x', bid: 'x', ts: 1 }] };
+    r = await ab({ action: 'ab_route_add', from: '유령뒤왼', to: '새하차', item: '', side: 'L' }, tokA);
+    const gL = r.body.row;
+    r = await ab({ action: 'ab_route_add', from: '유령뒤오른', to: '새하차', item: '', side: 'R' }, tokA);
+    T('C279 ① 노선표에 줄은 없는데 학습 지정이 L57을 · 숨김이 R63을 가리킴 → 새 줄은 L58·R64(유령 좌표를 물려받지 않는다)', gL === 58 && r.code === 200 && r.body.row === 64, gL + '/' + r.body.row);
+    mem.gw_data['allbaro:learned'] = { schema: 1, items: [] }; mem.gw_data['allbaro:routes_hidden'] = { schema: 1, items: [] };
+    mem.gw_data['allbaro:routes_extra'] = { schema: 1, items: ten(-1).concat([{ side: 'L', row: 70, from: '', to: '이름깨짐', item: '' }, { side: 'l', row: '72', from: '문자번호', to: 'x', item: '' }]) };
+    r = await ab({ action: 'ab_route_add', from: '깨진줄뒤', to: '새하차', item: '', side: 'L' }, tokA);
+    T('C279 ① 이름이 깨져 노선표에서 버려지는 항목(L70)·문자 번호("72")도 쓴 번호로 친다 → L73', r.code === 200 && r.body.row === 73, JSON.stringify(r.body).slice(0, 120));
+    T('C279 ① nextExtraRow: 끝 번호까지 쓴 뒤에만 빈 번호 중 가장 낮은 것 · 다 찼으면 0 · 다른 열 좌표는 세지 않음',
+      abLib.nextExtraRow('L', [{ side: 'L', row: 999 }]) === 40 && abLib.nextExtraRow('L', [{ side: 'L', row: 999 }, { side: 'L', row: 40 }]) === 41
+      && abLib.nextExtraRow('L', Array.from({ length: 960 }, (_, i) => ({ side: 'L', row: 40 + i }))) === 0 && abLib.nextExtraRow('L', [{ side: 'R', row: 500 }], [{ side: 'R', row: 600 }]) === 40
+      && abLib.nextExtraRow('R', [], [{ side: 'R', row: 600 }]) === 601, '');
+    // ② 겹침 미리 보기 — 오늘 문서에 기본표 L8(동국제강→베페사 지정분진)로 간 묶음 3회 + 다른 줄 묶음. 하차지가 L8과 서로 품는 새 줄을 만들면 그 묶음이 후보 2줄로 풀린다.
+    mem.gw_data['allbaro:routes_extra'] = { schema: 1, items: ten(-1) };
+    const b8 = abLib.matchRouteEx({ from: '동국제강(주) 포항공장', to: '베페사징크포항(주)', item: '지정분진(고상)' }, {});
+    const dayDoc = () => ({ schema: 2, day: tdy, total: 5, total_qty_ton: 50, qty_unknown: 0, unmatched: [], excluded: [], pending: [], veh_totals: {}, routes_ver: abLib.routesVer(), ts: 1,
+      counts: [{ from: '동국제강(주) 포항공장', to: '베페사징크포항(주)', item: '지정분진(고상)', n: 3, n_pending: 0, qty_ton: 30, qty_unknown: 0, qty_src: 'recv', weak: false, manf_nums: ['1', '2', '3'], route: { side: 'L', row: 8, count_col: 5, item: '지정분진' } },
+        { from: '한라티씨(주)', to: '거성산업(주)', item: '분진(고상)', n: 2, n_pending: 0, qty_ton: 20, qty_unknown: 0, qty_src: 'recv', weak: false, manf_nums: ['4', '5'], route: { side: 'R', row: 40, count_col: 11, item: '분진' } }] });
+    abLib.setExtraRoutes(ten(-1));
+    mem.gw_data['allbaro:day:' + tdy] = dayDoc();
+    const exBefore = JSON.stringify(mem.gw_data['allbaro:routes_extra']), verBefore = abLib.routesVer();
+    r = await ab({ action: 'ab_route_add', from: '동국제강', to: '베페사징크포항', item: '지정분진', side: 'L' }, tokO, 'dev1');
+    T('C279 ② 기존 줄 L8 묶음을 미배정으로 푸는 새 줄 → 저장 없이 409 ROUTE_OVERLAP · loosened [L8 1묶음 3회 1일] · 본 일수 1~14 · 이름·회원 정보 없음 · 추가분 그대로 · 노선표 원복',
+      !!b8.route && b8.route.side === 'L' && b8.route.row === 8 && r.code === 409 && r.body.code === 'ROUTE_OVERLAP' && r.body.side === 'L' && r.body.row === 50 && r.body.days_checked >= 1 && r.body.days_checked <= 14
+      && JSON.stringify(r.body.loosened) === JSON.stringify([{ side: 'L', row: 8, bundles: 1, trips: 3, days: 1 }]) && !/동국|베페사/.test(JSON.stringify(r.body))
+      && JSON.stringify(mem.gw_data['allbaro:routes_extra']) === exBefore, JSON.stringify(r.body).slice(0, 220));
+    r = await ab({ action: 'ab_status' }, tokA);
+    T('C279 ② 거절 뒤 노선표는 그대로(81줄 · routes_ver 같음) · 오늘 문서도 그대로 L8', r.code === 200 && r.body.routes.length === 81 && abLib.routesVer() === verBefore && mem.gw_data['allbaro:day:' + tdy].counts[0].route.row === 8, String(r.body.routes.length));
+    r = await ab({ action: 'ab_route_add', from: '동국제강', to: '베페사징크포항', item: '지정분진', side: 'L', force: 'true' }, tokO, 'dev1');
+    T('C279 ② force가 글자 "true"면 통과시키지 않는다(불 값 true만) → 다시 409', r.code === 409 && r.body.code === 'ROUTE_OVERLAP', r.code + '/' + r.body.code);
+    r = await ab({ action: 'ab_route_add', from: '동국제강', to: '베페사징크포항', item: '지정분진', side: 'L', force: true }, tokO, 'dev1');
+    const forced = r.code === 200 && r.body.row === 50 && r.body.overlap_checked === true && extra().length === 11;
+    r = await ab({ action: 'ab_day', day: tdy }, tokO, 'dev1');
+    T('C279 ② 사람이 확인(force:true)하면 만든다 → 200 L50 · 그 뒤 오늘 문서를 열면 그 묶음은 미배정(어느 줄인지 모호 · 후보 L8·L50)으로 드러나고 다른 줄 묶음(R40)은 그대로',
+      forced && r.code === 200 && r.body.counts.some((x) => x.n === 3 && !x.route && x.reason === 'AMBIGUOUS' && JSON.stringify((x.candidates || []).map((k) => k.side + k.row)) === '["L8","L50"]')
+      && r.body.counts.some((x) => x.n === 2 && x.route && x.route.side === 'R' && x.route.row === 40), JSON.stringify(r.body.counts.map((x) => [x.n, x.route && x.route.side + x.route.row, x.reason])));
+    // 겹치지 않는 새 줄(상·하차지가 어느 줄과도 안 맞음)은 확인 없이 바로 만든다
+    mem.gw_data['allbaro:routes_extra'] = { schema: 1, items: ten(-1) }; abLib.setExtraRoutes(ten(-1)); mem.gw_data['allbaro:day:' + tdy] = dayDoc();
+    r = await ab({ action: 'ab_route_add', from: '전혀다른상차', to: '전혀다른하차', item: '분진', side: 'L' }, tokO, 'dev1');
+    T('C279 ② 겹치지 않는 새 줄 → 200 L50 · overlap_checked:true(확인 없이)', r.code === 200 && r.body.row === 50 && r.body.overlap_checked === true, JSON.stringify(r.body).slice(0, 140));
+    // routeAddImpact 순수 함수: 옮겨 가는 묶음(구체 줄 우선)은 moved로 따로 — 막지 않는다
+    { const docs = [{ day: tdy, doc: Object.assign(dayDoc(), { counts: [{ from: '한라티씨(주) 2공장', to: '거성산업(주)', item: '분진(고상)', n: 4, route: { side: 'R', row: 40, count_col: 11, item: '분진' } }] }) }];
+      abLib.setExtraRoutes(ten(-1));
+      const v0 = abLib.routesVer();
+      const imp = abLib.routeAddImpact(docs, ten(-1), { side: 'R', row: 41, from: '한라티씨(주) 2공장', to: '거성산업', item: '분진' }, []);
+      T('C279 ② routeAddImpact: 더 구체적인 상차지 줄을 만들면 그 이름의 묶음은 새 줄로 옮겨 감 = moved [R40 1묶음 4회] · loosened 없음 · 끝나면 노선표 원복',
+        JSON.stringify(imp) === JSON.stringify({ checked: 1, loosened: [], moved: [{ side: 'R', row: 40, bundles: 1, trips: 4, days: 1 }] }) && abLib.routesVer() === v0, JSON.stringify(imp)); }
+    // ③ 읽기 실패
+    blobsMock.hooks.failGet = (k) => k === 'allbaro:routes_extra';
+    const exKeep = JSON.stringify(mem.gw_data['allbaro:routes_extra']);
+    r = await ab({ action: 'ab_route_add', from: '읽기실패상차', to: '읽기실패하차', item: '', side: 'L' }, tokO, 'dev1');
+    T('C279 ③ 추가분을 못 읽으면 저장하지 않는다 → 500 STORAGE_READ_FAILED · 추가분 그대로(종전: 빈 목록으로 알고 새 줄 1건만 남겨 덮어씀)', r.code === 500 && r.body.code === 'STORAGE_READ_FAILED' && JSON.stringify(mem.gw_data['allbaro:routes_extra']) === exKeep, r.code + '/' + r.body.code);
+    blobsMock.hooks.failGet = (k) => k === 'allbaro:learned';
+    r = await ab({ action: 'ab_route_add', from: '동국제강', to: '베페사징크포항', item: '지정분진', side: 'L' }, tokO, 'dev1');
+    T('C279 ③ 학습 사전을 못 읽으면 겹침 확인 없이 만든다(종전 동작) → 200 · overlap_checked:false', r.code === 200 && r.body.existed === false && r.body.overlap_checked === false, JSON.stringify(r.body).slice(0, 140));
+    blobsMock.hooks.failGet = null;
+    delete mem.gw_data['allbaro:day:' + tdy];
+    mem.gw_data['allbaro:routes_hidden'] = { schema: 1, items: [] }; mem.gw_data['allbaro:learned'] = { schema: 1, items: [] };
+  }
   T('cleanExtraRoute 경계: 39·1000·소수·문자 거절 · 40·50·999 통과 · nextExtraRow 빈 표 = L40·R41',
     !abLib.cleanExtraRoute({ side: 'L', row: 39, from: 'a', to: 'b' }) && !abLib.cleanExtraRoute({ side: 'L', row: 1000, from: 'a', to: 'b' }) && !abLib.cleanExtraRoute({ side: 'L', row: 50.5, from: 'a', to: 'b' }) && !abLib.cleanExtraRoute({ side: 'L', row: 'x', from: 'a', to: 'b' })
     && [40, 50, 999].every((n) => { const c = abLib.cleanExtraRoute({ side: 'r', row: n, from: 'a', to: 'b' }); return c && c.side === 'R' && c.row === n && c.count_col === 11 && c.extra === true; })
