@@ -15279,6 +15279,118 @@ try {
   const kill220 = MU220.map(([a, b, nm]) => { if (BLK7.split(a).length !== 2) return 'err 자리 ' + nm; const mb = BLK7.replace(a, () => b); try { return !(chk220(mb).ok && chk7A(mb).ok); } catch (e) { return true; } });
   T('C220 ② 결함 사본 ' + MU220.length + '개(' + MU220.map((x) => x[2]).join('·') + ') = 모두 ✗',
     kill220.every((v) => v === true), JSON.stringify(kill220.map((v, i) => (v === true ? 1 : MU220[i][2] + ':' + v))));
+  // C260 — 행정규칙 이름(끝말 여섯 = 규정·고시·지침·요령·예규·훈령)은 감지 목록에 그 이름이 있을 때만 인용으로 더 읽음(41행 꼴 '건설업 관리규정') — 실제 licRkParse·licRkMarks
+  //   기준 = 같은 구간에서 끝말 표를 끈 판(LIC_RK_ADM → 아무것도 안 맞음 = 고치기 전 읽기와 같음 — 오프라인 C260_invariant_check.mjs가 진짜 옛 판 a677cf4와 5만 건 대조) — 결함 사본도 늘 고치지 않은 구간의 이 판과 견줌
+  const ADM260 = 'var LIC_RK_ADM = /(규정|고시|지침|요령|예규|훈령)$/;';
+  if (BLK7.split(ADM260).length !== 2) throw new Error('C260 끝말 표 자리 없음·둘');
+  const REF260 = mk220(BLK7.replace(ADM260, () => 'var LIC_RK_ADM = /(?!)/;'));
+  const chk260 = (blk) => {
+    const X = mk220(blk), got = [];
+    const m = (list, names) => JSON.stringify(Object.keys(X.marks(list, names.map((n) => ({ name: n, date: D7 })))).map(Number));
+    const one = (law) => [{ no: 1, law: law }];
+    const R41 = '가짜건설법 제49조제1항·제7항, 영 제45조제3항, 가짜업 관리규정 별지7';
+    const LONG = '가짜물질 취급시설의 설치·정기·수시검사 및 안전진단의 방법 등에 관한 규정';
+    const CASES = [
+      ['행정규칙 감지 → 그 행(41행 꼴 — 낱말 "관리규정")', one(R41), ['가짜업 관리규정'], '[1]'],
+      ['감지 이름이 붙여 쓴 꼴', one(R41), ['가짜업관리규정'], '[1]'],
+      ['칸이 붙여 쓴 꼴(한 낱말)', one('가짜건설법 제49조, 가짜업관리규정 별지7'), ['가짜업 관리규정'], '[1]'],
+      ['끝말 고시', one('가짜건설법 제1조, 가짜 검사에 관한 고시 제3조'), ['가짜 검사에 관한 고시'], '[1]'],
+      ['끝말 지침', one('가짜건설법 제1조, 가짜실적신고제 시행지침 제3조'), ['가짜실적신고제 시행지침'], '[1]'],
+      ['끝말 요령', one('가짜부서 신고요령 제5조'), ['가짜부서 신고요령'], '[1]'],
+      ['끝말 예규', one('가짜 계약 집행기준 예규 제2장'), ['가짜 계약 집행기준 예규'], '[1]'],
+      ['끝말 훈령', one('가짜청 처리 훈령 제4조'), ['가짜청 처리 훈령'], '[1]'],
+      ['긴 이름(11낱말 · 가운뎃점)', one('가짜화관법 제24조제3항, ' + LONG + ' 제6조제3항'), [LONG], '[1]'],
+      ['가운뎃점 표기 차이', one('가짜해체·제거업자 교육에 관한 규정 제2조'), ['가짜해체ㆍ제거업자 교육에 관한 규정'], '[1]'],
+      ['숫자가 든 이름', one('제2종 가짜시설 관리지침 제4조'), ['제2종 가짜시설 관리지침'], '[1]'],
+      ['숫자가 다르면 다른 이름', one('제3종 가짜시설 관리지침 제4조'), ['제2종 가짜시설 관리지침'], '[]'],
+      ['붙여 쓴 법령 낱말 뒤 행정규칙 이름', one('가짜환경법시행규칙 제2조, 가짜업 관리규정 별지7'), ['가짜업 관리규정'], '[1]'],
+      ['「」 안 이름', one('가짜건설법 제49조, 「가짜업 관리규정」 별지7'), ['가짜업 관리규정'], '[1]'],
+      ['조문 가리킴 있는 괄호 안 이름 = 인용', one('가짜건설법 제49조(가짜업 관리규정 별지7)'), ['가짜업 관리규정'], '[1]'],
+      ['메모 괄호 안 이름 = 인용 아님', one('가짜건설법 제49조(가짜업 관리규정 기준 다름)'), ['가짜업 관리규정'], '[]'],
+      ['감지 목록에 없는 이름은 안 읽음', one(R41), ['다른업 관리규정'], '[]'],
+      ['감지 목록에 없는 고시 낱말(번호만 적은 칸)', [{ no: 1, law: '가짜운수법 제3조' }, { no: 2, law: '법 제47조의2, 가짜부고시 제2017-824호 제3조' }], ['가짜실적신고제 시행지침'], '[]'],
+      ['낱말 앞이 더 붙은 다른 이름', one('가짜건설법 제49조, 종합가짜업 관리규정 별지7'), ['가짜업 관리규정'], '[]'],
+      ['낱말 가운데부터는 안 맞춤(부분 글자)', one('가짜건설법 제49조, 가짜업관리규정 별지7'), ['관리규정'], '[]'],
+      ['조사가 붙은 낱말', one('가짜건설법 제49조, 가짜업 관리규정에 따른 신고'), ['가짜업 관리규정'], '[]'],
+      ['쉼표 건너 잇지 않음', one('가짜건설법 제49조, 가짜업, 관리규정 별지7'), ['가짜업 관리규정'], '[]'],
+      ['law 밖 칸 안 읽음', [{ no: 1, law: '가짜건설법 제49조', lic: '가짜업 관리규정', duty: '가짜업 관리규정 신고', basis: '가짜업 관리규정 별지7', precheck: '가짜업 관리규정' }], ['가짜업 관리규정'], '[]'],
+      ['대조군 — 일반 규칙 감지는 종전 그대로(…에 관한 규칙)', [{ no: 1, law: R41 }, { no: 2, law: '가짜법 제19조 / 가짜 검사에 관한 규칙 별표 1' }], ['가짜 검사에 관한 규칙'], '[2]'],
+      ['대조군 — 시행령 감지는 영 인용 행', [{ no: 1, law: R41 }, { no: 2, law: '규칙 제3조' }], ['가짜건설법 시행령'], '[1]'],
+      ['대조군 — 시행규칙 감지는 규칙 인용 행', [{ no: 1, law: R41 }, { no: 2, law: '규칙 제3조' }], ['가짜건설법 시행규칙'], '[2]'],
+      ['행정규칙 감지는 이름 없는 행에 안 붙음', [{ no: 1, law: R41 }, { no: 2, law: '법 제3조, 영 제4조, 규칙 제5조' }], ['가짜업 관리규정'], '[1]'],
+      ['행정규칙 이름으로 시작하는 행 뒤 행에 행정규칙 감지가 안 붙음', [{ no: 1, law: '가짜건설법 제1조' }, { no: 2, law: '가짜업 관리규정 별지7' }, { no: 3, law: '영 제3조' }], ['가짜업 관리규정'], '[2]'],
+      ['v505 괄호 메모 꼴(85행 꼴)은 여전히 안 걸림', one('가짜폐법 제42조제1항, 영 제19조~제22조(배율 1.5배/3배 — 가짜환경법 2배/5배와 다름)'), ['가짜환경법', '가짜업 관리규정'], '[]'],
+      ['v505 74행 꼴은 여전히 인용', one('가짜폐법 제21조제1항(법·영·규칙 전문에 유효기간 조문 부존재)'), ['가짜폐법 시행규칙', '가짜업 관리규정'], '[1]']];
+    CASES.forEach(([nm, list, ns, want]) => { const g = m(list, ns); if (g !== want) got.push(nm + ' ' + g); });
+    // 표시 내용 = 감지 이름·날짜 그대로 · 법령과 행정규칙이 같이 감지되면 둘 다 · 긴 이름이 있으면 짧은 이름으로 안 읽음 · 확인 날짜 ≥ 감지 날짜면 풀림(종전 규칙)
+    const both = X.marks(one(R41), [{ name: '가짜업 관리규정', date: '2026-11-20' }, { name: '가짜건설법 시행령', date: D7 }]);
+    if (JSON.stringify(both[1]) !== JSON.stringify({ laws: ['가짜업 관리규정', '가짜건설법 시행령'], date: '2026-11-20' })) got.push('표시 내용 ' + JSON.stringify(both));
+    // 이어받기는 옛 읽기 그대로(행정규칙·시행령이 같이 감지된 목록에서): 같은 칸 행정규칙 이름 뒤 '영' = 앞 법령의 영 · 행정규칙 이름으로 시작하는 행 다음 행의 '영' = 그 앞 행 법령의 영
+    const CH2 = [{ name: '가짜업 관리규정', date: D7 }, { name: '가짜건설법 시행령', date: D7 }];
+    const sc = X.marks(one('가짜건설법 제1조, 가짜업 관리규정 별지7, 영 제3조'), CH2);
+    if (JSON.stringify(sc) !== JSON.stringify({ 1: { laws: ['가짜업 관리규정', '가짜건설법 시행령'], date: D7 } })) got.push('같은 칸 뒤 영 ' + JSON.stringify(sc));
+    const cr = X.marks([{ no: 1, law: '가짜건설법 제1조' }, { no: 2, law: '가짜업 관리규정 별지7' }, { no: 3, law: '영 제3조' }], CH2);
+    if (JSON.stringify(cr) !== JSON.stringify({ 2: { laws: ['가짜업 관리규정'], date: D7 }, 3: { laws: ['가짜건설법 시행령'], date: D7 } })) got.push('다음 행 이어받기 ' + JSON.stringify(cr));
+    const lng = X.marks(one(R41), [{ name: '관리규정', date: D7 }, { name: '가짜업 관리규정', date: D7 }]);
+    if (JSON.stringify(lng[1]) !== JSON.stringify({ laws: ['가짜업 관리규정'], date: D7 })) got.push('가장 긴 이름 ' + JSON.stringify(lng));
+    const rel = (o) => JSON.stringify(Object.keys(X.marks([Object.assign({ no: 1, law: R41 }, o)], [{ name: '가짜업 관리규정', date: D7 }])).map(Number));
+    if (rel({ confirmed_at: D7 }) !== '[]' || rel({ recheck_at: '2026-11-10' }) !== '[]' || rel({ confirmed_at: '2026-11-08' }) !== '[1]') got.push('풀림');
+    if (got.length) return { ok: false, info: got };   // 정해 둔 꼴에서 이미 ✗면 무작위는 돌리지 않음(결함 사본 시간 줄임 — 판정은 같음)
+    // 불변식(한 칸 · 같은 이어받기): 기준(끝말 표 끈 판) 인용 ⊆ 새 인용(순서 보존 · 빠진 인용 0) · 행의 첫 법령 같음 · 더해진 인용은 모두 감지 목록의 행정규칙 이름이고 그 글자 전체가 칸 글에 있음
+    const LAWN = ['폐기물관리법', '대기환경보전법 시행규칙', '가짜 검사에 관한 규칙', '소음ㆍ진동관리법 시행규칙'], ADMN = ['가짜업 관리규정', '가짜 검사에 관한 고시', '가짜사업장 평가에 관한 지침', '가짜부서 신고요령', '가짜 계약 예규', '가짜청 훈령', LONG];
+    const mkKnown = (names) => { const k = {}; names.forEach((n) => { k[REF260.split(n).base] = 1; }); Object.keys(REF260.ABBR).forEach((a) => { k[REF260.ABBR[a]] = 1; }); return k; };
+    const knownA = mkKnown(LAWN.concat(ADMN)), knownL = mkKnown(LAWN), admSet = {}; ADMN.forEach((n) => { admSet[REF260.norm(n)] = 1; });
+    const key = (r) => r.base + '/' + r.lv;
+    const inv = (t, carry) => { const a = REF260.parse(t, carry, knownA), b = X.parse(t, carry, knownA), e = []; let j = 0; const add = [];
+      b.refs.forEach((r) => { if (j < a.refs.length && key(a.refs[j]) === key(r)) j++; else add.push(r); });
+      if (j !== a.refs.length) e.push('옛 인용 빠짐·순서 바뀜');
+      if (a.first !== b.first) e.push('first ' + a.first + '→' + b.first);
+      add.forEach((r) => { if (!(r.lv === '법' && admSet[r.base] === 1 && REF260.norm(t).indexOf(r.base) >= 0)) e.push('목록 밖 새 인용 ' + key(r)); });
+      if (JSON.stringify(REF260.parse(t, carry, knownL)) !== JSON.stringify(X.parse(t, carry, knownL))) e.push('감지 목록에 행정규칙이 없는데 읽기가 다름');
+      return { e, add: add.length }; };
+    let seed = 20261120; const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; }; const pick = (a) => a[Math.floor(rnd() * a.length)];
+    const NAMES = ['폐기물관리법', '대기환경보전법', '건폐법', '가짜 검사에 관한 규칙', '소음·진동관리법', '폐기물관리법시행규칙', '대기환경보전법시행령'],
+      ADMV = ADMN.concat(ADMN.map((n) => n.replace(/\s/g, '')), ['가짜업  관리규정', '가짜업·관리규정', '가짜 검사에 관한\n고시']),
+      DECOY = ['관리규정', '국토부고시', '다른업 관리규정', '종합가짜업 관리규정', '가짜업 관리규정에', '가짜업, 관리규정', '세부지침', '고시', '규정', '예규', '훈령', '신고요령', '가짜 검사에 관한 기준', '가짜시 조례', '환경부령'],
+      LV = ['시행령', '시행규칙', '법', '영', '규칙', '같은 법', '동법'], PTR = ['제25조', '제 3조', '별표 13', '별지7', '별지 제1호서식', '부칙 제2조', '제2017-824호'], MEMO = ['기준', '다름', '준용', '이하', '에 따른', '및', '한정', '부존재', '제3호', '모법'], SEP = [' ', ' ', '', ', ', '·', '\n'];
+    const word = (pp) => { const r = rnd(); return r < 0.2 ? pick(NAMES) : r < 0.42 ? pick(ADMV) : r < 0.55 ? pick(DECOY) : r < 0.67 ? pick(LV) : r < 0.67 + pp ? pick(PTR) : pick(MEMO); };
+    const words = (n, pp) => { let t = ''; for (let k = 0; k < n; k++) t += (k ? pick(SEP) : '') + word(pp); return t; };
+    const gen = () => { if (rnd() < 0.3) { let t = ''; const L = 1 + Math.floor(rnd() * 10); for (let k = 0; k < L; k++) t += (k ? pick(SEP) : '') + pick(NAMES.concat(ADMV, DECOY, LV, PTR, MEMO, ['(', ')', '（', '）', '「', '」', '[', ']'])); return t; }
+      let t = ''; const segs = 1 + Math.floor(rnd() * 4);
+      for (let k = 0; k < segs; k++) { if (k) t += pick([', ', ' ', '·', ' — ', '\n']); if (rnd() < 0.5) t += words(1 + Math.floor(rnd() * 3), 0.2);
+        else { const fw = rnd() < 0.15; t += (fw ? '（' : '(') + words(1 + Math.floor(rnd() * 5), rnd() < 0.5 ? 0 : 0.15) + (fw ? '）' : ')'); if (rnd() < 0.2) t += pick([' ', '', ', ']) + pick(PTR); } }
+      if (rnd() < 0.05) t += pick(['(', ')', '「', '[', '）']); return t; };
+    let bad = 0, added = 0; const ex = [];
+    for (let n = 0; n < 20000; n++) { const t = gen(), r = inv(t, pick(['', '폐기물관리법', '대기환경보전법'])); if (r.e.length) { bad++; if (ex.length < 3) ex.push(JSON.stringify(t) + ' ' + r.e.join('/')); } if (r.add) added++; }
+    if (bad || added < 3000) got.push('무작위 어긋남 ' + bad + ' · 인용이 더해진 글 ' + added + ' ' + ex.join(' | '));
+    return { ok: got.length === 0, info: got };
+  };
+  const r260 = chk260(BLK7), r260off = chk260(BLK7.replace(ADM260, () => 'var LIC_RK_ADM = /(?!)/;'));
+  // 읽기 → 맞춤 → 배지 글 한 줄기(실제 licRkNow·licRkLoad·licRkMarks·licRkBadge): 서버가 행정규칙 이름을 내리면 그 행 배지 제목에 그 이름·감지 날짜 · 옆 행은 배지 없음
+  const e2e260 = (blk) => { const A = mk7p(blk, { duties: [{ no: 1, lic: '가짜 허가 A', law: '가짜건설법 제49조제1항, 영 제45조제3항, 가짜업 관리규정 별지7' }, { no: 2, lic: '가짜 허가 A', law: '영 제3조' }], me: 'u1', resp: { status: 200, body: { status: 'OK', changed: [{ name: '가짜업 관리규정', date: D7 }] } } });
+    const n = A.api.now(), b1 = A.api.badge(n[1]), b2 = A.api.badge(n[2]);
+    return JSON.stringify(Object.keys(n)) === '["1"]' && A.E.calls.join() === 'gw-data:lic_recheck_get' && A.E.rd === 1 && b1.indexOf('class="duty-badge pre"') > 0 && b1.indexOf('근거 재확인 필요') > 0 && b1.indexOf('법령 개정 감지 ' + D7 + ' — 가짜업 관리규정') > 0 && b2 === ''; };
+  const r260e = e2e260(BLK7), r260eOff = e2e260(BLK7.replace(ADM260, () => 'var LIC_RK_ADM = /(?!)/;'));
+  T('C260 ① 행정규칙 이름(실행 — 실제 licRkParse·licRkMarks): 감지 목록에 있는 이름(끝말 규정·고시·지침·요령·예규·훈령)이 law 칸에 글자 전체로 있으면 그 행에 표시(41행 꼴 "… 관리규정" · 붙여 쓴 한 낱말 · 11낱말 긴 이름 · 가운뎃점 표기 차이 · 숫자 든 이름 · 「」) · 목록에 없는 이름·고시 번호만 적은 칸·앞이 더 붙은 낱말·낱말 가운데·조사 붙은 낱말·쉼표 건넘·law 밖 칸 = 표시 없음 · 메모 괄호 안 = 인용 아님(조문 가리킴 있는 괄호는 인용) · 대조군(…에 관한 규칙·시행령·시행규칙 감지) 종전 그대로 · 행정규칙 이름은 뒤 "영"·다음 행 이어받기를 안 바꿈 · v505 괄호 메모 꼴 여전히 안 걸림 · 가장 긴 이름 · 풀림 종전 규칙 · 무작위 2만 건 불변식(옛 인용 ⊆ 새 인용 · 순서·첫 법령 같음 · 더해진 인용 = 감지 목록의 행정규칙 이름뿐 · 목록에 행정규칙이 없으면 읽기 완전 같음) · 서버 응답 → licRkNow → 배지 제목에 행정규칙 이름·감지 날짜(옆 행 배지 없음) · 고치기 전 읽기(끝말 표 끈 판)는 이 검사에서 ✗',
+    r260.ok && !r260off.ok && r260e && !r260eOff, JSON.stringify([r260.info, r260off.ok ? '끈 판이 통과' : '', r260e ? '' : '배지 한 줄기 ✗', r260eOff ? '끈 판 배지 한 줄기가 통과' : '']));
+  const LOOP260 = 'for (k = i; k >= 0; k--){ c = licRkNorm(s.slice(wp[k], e));', PUSH260 = 'if (!mg[i] && (nm = admNamed(i))) refs.push({ base: nm, lv: "법" }); continue; }   // C260';
+  const MU260 = [
+    [ADM260, 'var LIC_RK_ADM = /(?!)/;', '고치기 전(행정규칙 안 읽음)'],
+    ...['규정|', '고시|', '지침|', '요령|', '예규|', '|훈령'].map((sfx) => [ADM260, ADM260.replace(sfx, ''), '끝말 ' + sfx.replace('|', '') + ' 뺌']),
+    [PUSH260, 'if (!mg[i] && (nm = admNamed(i) || x)) refs.push({ base: nm, lv: "법" }); continue; }   // C260', '목록에 없는 낱말도 읽음(추측)'],
+    ['if (known[c]) hit = c; } return hit; };', 'if (known[c]) return c; } return hit; };', '짧은 이름에서 멈춤'],
+    ['if (known[c]) hit = c; } return hit; };', 'if (known[c]) hit = c; } if (!hit) Object.keys(known).forEach(function(n){ if (LIC_RK_ADM.test(n) && licRkNorm(s.slice(0, e)).slice(-n.length) === n) hit = n; }); return hit; };', '낱말 가운데부터 맞춤(부분 글자)'],
+    [LOOP260, 'for (k = i; k >= 0; k--){ c = w.slice(k, i + 1).join("");', '구분 글자·숫자 무시하고 낱말만 이음'],
+    [LOOP260, 'for (k = i - 1; k >= 0; k--){ c = licRkNorm(s.slice(wp[k], e));', '붙여 쓴 한 낱말 안 봄'],
+    [LOOP260, 'for (k = i; k >= Math.max(0, i - 6); k--){ c = licRkNorm(s.slice(wp[k], e));', '낱말 수 한도(긴 이름 놓침)'],
+    [LOOP260, 'for (k = i; k >= 0; k--){ c = licRkNorm(s.slice(wp[k], e)); if (c.indexOf(",") >= 0) c = c.replace(/,/g, "");', '쉼표 건너 이음'],
+    [PUSH260, 'if ((nm = admNamed(i))) refs.push({ base: nm, lv: "법" }); continue; }   // C260', '메모 괄호 안 가름'],
+    [PUSH260, 'if (!mg[i] && (nm = admNamed(i))){ cur = nm; refs.push({ base: nm, lv: "법" }); } continue; }   // C260', "뒤 '영'이 행정규칙에 붙음"],
+    [PUSH260, 'if (!mg[i] && (nm = admNamed(i))){ refs.push({ base: nm, lv: "법" }); if (!first) first = nm; } continue; }   // C260', '다음 행이 행정규칙을 이어받음'],
+    ['wp.push(mt.index); if (m) wp.push(mt.index + m[1].length);', 'wp.push(mt.index);', '붙여 쓴 법령 낱말 뒤 자리 어긋남']];
+  const kill260 = MU260.map(([a, b, nm]) => { if (BLK7.split(a).length !== 2 || a === b) return 'err 자리 ' + nm; const mb = BLK7.replace(a, () => b); try { return !(chk260(mb).ok && chk7A(mb).ok && chk220(mb).ok); } catch (e) { return true; } });
+  T('C260 ② 결함 사본 ' + MU260.length + '개(' + MU260.map((x) => x[2]).join('·') + ') = 모두 ✗',
+    kill260.every((v) => v === true), JSON.stringify(kill260.map((v, i) => (v === true ? 1 : MU260[i][2] + ':' + v))));
 } catch (e) { console.log('  ✗ P1 판7 검사 실행 — ' + e.message); fails++; }
 
 // ── v475(Phase 1 판7·10·11·19 + 홈 [완료] 수리 C156 — PM 11/14 19:28 "다음"): C156 정적 검사 + 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '475 이상'으로 풀 것
