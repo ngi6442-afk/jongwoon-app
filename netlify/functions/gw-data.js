@@ -3226,7 +3226,7 @@ async function handleAutotaskRevert(event, d, R) {
   const rules = autotaskDefaults(); Object.keys(a.prev.rules).forEach(function (k) { if (autotaskValid(k, a.prev.rules[k])) rules[k] = a.prev.rules[k]; });
   Object.keys(rules).forEach(function (rk) { if (rules[rk] === 'live' && !autotaskReady(rk)) rules[rk] = 'dry'; });   // C185 판2(ⓙ 8): 직전 판에 준비 안 된 규칙의 live가 있으면 그 규칙만 연습으로 낮춰 진행(종전 400 대신)   // C185 판1 — 준비 안 된 규칙을 되돌림으로 켜지 않음
   // C185 판3(판2 검토에서 넘어옴): 되돌린 결과 live인 규칙 가운데 배정표 줄을 쓰는 규칙(입·퇴사)은 켜기와 같은 가드 — 쓰는 줄 담당이 하나라도 빈칸·재직자 아님·못 읽음이면 400 ASSIGN_NEEDED(스위치 그대로)
-  const liveUses = Object.keys(rules).filter(function (rk) { return rules[rk] === 'live' && ((AUTOTASK_SRV_RULES[rk] || {}).uses || []).length; });
+  const liveUses = Object.keys(rules).filter(function (rk) { return rules[rk] === 'live' && a.rules[rk] !== 'live' && ((AUTOTASK_SRV_RULES[rk] || {}).uses || []).length; });   // 판3 검토 반영 2: 되돌려서 새로 켜지는 규칙만(이미 켜진 규칙 때문에 관계없는 되돌리기가 막히지 않게)
   if (liveUses.length) { const asR = await autotaskAssignState(st, liveUses); if (Object.keys(asR).some(function (pf) { return asR[pf] !== 'ok'; })) return jr(400, { status: 'REJECTED', error_code: 'ASSIGN_NEEDED', request_id: R }); }
   // C185 판1 켠 시각: 되돌린 결과 새로 live가 된 규칙 = 지금 시각 · 그대로 live인 규칙 = 지금 값 · 나머지 = 없음
   const now0 = Date.now(), since = {};

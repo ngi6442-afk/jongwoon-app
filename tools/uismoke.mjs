@@ -13729,7 +13729,8 @@ try {
     JSON.stringify({ b1, b2: b2.choice, b3: [b3.choice, b3.def_is_rec], b4: [b4.def_is_rec, b4.args] }));
   // ④ 기존 카드 그대로(함수 해시 — 판29 착수 전 v460 387b98e와 같음) + renderPermMgmt 카드 호출 그대로
   const HASH29 = { renderPermMgmt: '9634640c8096104c', renderAssignCard: '0224820afb855ba0', assignSet: 'c4dd84fd50465303', renderNotifyCard: '732f47e42cc4be01', renderDoneifRow: '2b5840e3d2b0ce80', doneifSet: '154d942b3f411d9f', notifySet: '2bef31b5c054b599',
-    renderBriefCard: '593629d27006f18d', briefSet: 'e495abde62818c48', renderAutoRulesCard: '485ac6738f31e203', autoRulesSet: '52839ac6fbfb1105', renderConLearnCard: '41d94b8e8b5223b5' /* P1 판16: 한글 양식 칸 비교(hwpx_tok) 상태 글·안내 한 문장만 바뀜(v460 '3c2765291ce8e16f') */, renderConProcCard: 'a268c635c59e1787', conProcBgSet: 'd487c1839cb6ce91' };
+    renderBriefCard: '593629d27006f18d', briefSet: 'e495abde62818c48', renderAutoRulesCard: '485ac6738f31e203', autoRulesSet: '9d58c46d488f5df1', renderConLearnCard: '41d94b8e8b5223b5' /* P1 판16: 한글 양식 칸 비교(hwpx_tok) 상태 글·안내 한 문장만 바뀜(v460 '3c2765291ce8e16f') */, renderConProcCard: 'a268c635c59e1787', conProcBgSet: 'd487c1839cb6ce91' };
+  // C185 판3 검토 반영 3(11/20): autoRulesSet 해시 갱신 — 되돌리기 거절(400 ASSIGN_NEEDED)이면 켜기와 같은 글로 알리는 갈래 하나만 더함(실행 시험 'C185 판3 검토 반영 ③')
   const shaP = (s) => createHash('sha256').update(s).digest('hex').slice(0, 16);
   const hBadP = Object.keys(HASH29).filter((n) => shaP(fnP(n).replace(/^function [\w$]+/, '').replace(/\r\n/g, '\n')) !== HASH29[n]);
   T('P1 판29 ④ 기존 카드 그대로: 권한관리 카드 7종 그리기·저장 함수 ' + Object.keys(HASH29).length + '개 해시 = 판29 착수 전(v460) · 권한관리 화면 카드 자리 7개 그대로(assignCard·notifyCard·autoRulesCard·briefCard·conProcCard·conLearnCard + 완료 판정 줄 doneifRow) — 콘솔은 그 위의 목록(설정 편집기 새로 없음)',
@@ -21357,8 +21358,8 @@ try {
     const f = boxS3(src), base = { mode: 'dry', ready: true, win: 30, events: 1, found: 1, tasks: 7, who: [{ id: 'u1', n: 6 }, { id: 'u2', n: 1 }], no_who: 0, no_due: 0, old: 1, gone: 0, marked: 0, no_row: [], skip: '' };
     const lv = f(Object.assign({}, base, { ref: { new: 2, no_date: 0, jiip: 0, test: 0, del: 0, rejoin_mark: 2, past12_leave: 3, bg_off: 0 } }));
     const jn = f(Object.assign({}, base, { tasks: 8, ref: { new: 1, no_hire: 0, rejoin: 0, past12: 4, bg_off: 0 } }));
-    return /최근 30일 기준으로 켰다면 지시 7건\(사건 1\)/.test(lv) && lv.indexOf('재입사 표식이 찍힌 2명(입사 쪽에서 셈)') >= 0 && lv.indexOf('참고: 지난 12개월 퇴사 3명(퇴사일을 새로 저장한 일만 셈 — 표식 없는 옛 퇴사자 소급 없음)') >= 0
-      && lv.indexOf('지난 12개월 입사') < 0 && /켠 날보다 앞선 일이라 뺀 1건/.test(lv) && !/rejoin_mark|past12_leave|no_date|uLv|u2/.test(lv)
+    return /최근 30일 기준으로 켰다면 지시 7건\(사건 1\)/.test(lv) && lv.indexOf('재입사 표식이 찍힌 2명(입사 쪽에서 셈)') >= 0 && lv.indexOf('참고: 지난 12개월 퇴사 3명(지시는 켠 뒤 퇴사일을 새로 저장한 일만 — 소급 없음)') >= 0
+      && lv.indexOf('지난 12개월 입사') < 0 && /켠 날보다 앞선 일이라 뺀 1명/.test(lv) && f(Object.assign({}, base, { ref: { rejoin_mark: 0, past12_leave: 0 } })).indexOf('재입사 표식') < 0 && !/rejoin_mark|past12_leave|no_date|uLv|u2/.test(lv)
       && jn.indexOf('참고: 지난 12개월 입사 4명') >= 0 && jn.indexOf('퇴사') < 0 && jn.indexOf('재입사 표식') < 0;
   };
   const A3 = await chkA3();
@@ -21374,6 +21375,85 @@ try {
   const kS3 = MS3.map(([a, b]) => { try { return chkS3(mutL3(a, b)); } catch (e) { return 'err ' + e.message; } });
   T('C185 판3 ①② 결함 사본 ' + (kA3.length + kS3.length) + '개(콘솔 거절 글 걷음 · 카드 거절 글 걷음 · 재입사 표식 수 글 걷음 · 지난 12개월 퇴사 글 걷음) = 모두 ✗', kA3.concat(kS3).every((v) => v === false), JSON.stringify({ kA3, kS3 }));
 } catch (e) { console.log('  (C185 판3 검사 생략 — ' + e.message + ')'); fails++; }
+
+
+// ---- C185 판3 검토 반영(11/20) — 화면(실행): ① [인사 카드] 대상이 퇴사자·시험 계정이면 그 묶음을 이 화면에서만 펼쳐 카드를 엶 · ③ 규칙 카드 되돌리기 거절 글 · ⑤ 준비된 규칙의 옛 '준비 중' 요약
+try {
+  const fnR3 = (name, src) => { src = src || html; const i = src.indexOf('function ' + name + '('); if (i < 0 || src.indexOf('function ' + name + '(', i + 1) >= 0) throw new Error('함수 없음·둘: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('함수 끝 없음: ' + name); };
+  const segR3 = (src, a, b) => { src = src || html; const i = src.indexOf(a), j = src.indexOf(b, i + 1); if (i < 0 || j < 0) throw new Error('구간 없음: ' + a); return src.slice(i, j); };
+  const stR3 = (re, src) => { const m = (src || html).match(re); if (!m) throw new Error('문장 없음: ' + re); return m[0]; };
+  const ASSIGN_R3 = '배정표 담당을 먼저 정해 주세요 — 이 규칙이 쓰는 배정표 줄의 담당이 비었거나 재직자가 아닙니다.';
+  const TD_R3 = '2026-11-20';
+  const MEM_R3 = () => [{ id: 'a0', name: '관리자', role: '관리자', dept: '관리부', admin: true, seq: 1 }, { id: 'e1', name: '직원하나', role: '직원', dept: '운영부', seq: 2 },
+    { id: 'r1', name: '퇴사자', role: '직원', dept: '운영부', leave_date: '2026-11-19', seq: 3 }, { id: 't1', name: '시험사본', role: '직원', dept: '운영부', test_acct: true, seq: 4 }];
+  // ① 실제 taskHrCardOpen + 실제 drawHrRoster(기억값 hrRetOpen·hrTestOpen = 접힘) — 그린 뒤 그 카드 머리를 엶·그 묶음 몸통이 보임·그 머리로 스크롤 · 기억값 그대로
+  const boxH3 = (src) => new Function('MEMBERS', [
+    'var members = MEMBERS, leaves = [], log = [], els = {};',
+    'function el(id){ return els[id] || (els[id] = { id: id, innerHTML: "", textContent: "", style: {}, querySelectorAll: function(){ return []; }, addEventListener: function(){} }); }',
+    'var document = { getElementById: el, querySelector: function(sel){ var m = /data-hr-toggle="([^"]*)"/.exec(sel); return m ? { scrollIntoView: function(){ log.push("scroll:" + m[1]); } } : null; } };',
+    'function setTimeout(f){ f(); } function switchTab(t){ log.push("tab:" + t); }',
+    fnR3('liveMembers', src), segR3(src, '// @hr-test-start', '// @hr-test-end'), fnR3('findMember', src),
+    'function memberRetired(m){ return !!(m && m.leave_date && m.leave_date < "' + TD_R3 + '"); } function esc(x){ return String(x); } function todayStr(){ return "' + TD_R3 + '"; }',
+    'var hrOpenId = null, hrRetOpen = false, hrTestOpen = false, DEPT_LIST = ["관리부","운영부"], ROLE_ORDER = ["대표","관리자","팀장","직원"];',
+    'function isAdmin(){ return true; } function hrStarted(){ return true; } function hrToggle(id){ log.push("open:" + id); hrOpenId = id; } function hrCollapse(){ log.push("collapse"); hrOpenId = null; } function hrRetToggle(){} function hrTestToggle(){}',
+    'function hrRowHtml(m, isRet){ return "<row " + m.id + (isRet ? " ret" : "") + ">"; }',
+    fnR3('drawHrRoster', src), fnR3('taskHrCardOpen', src),
+    'return function(mid){ log.length = 0; taskHrCardOpen(mid); return { log: log.slice(), roster: el("hrRoster").innerHTML, retOpen: hrRetOpen, testOpen: hrTestOpen }; };'].join('\n'))(MEM_R3());
+  const shown = (roster, bodyId) => { const m = new RegExp('id="' + bodyId + '"([^>]*)>').exec(roster); return !!m && m[1].indexOf('display:none') < 0; };
+  const chkH3 = (src) => {
+    const run = boxH3(src), o = {};
+    const r = run('r1'), t = run('t1'), e = run('e1');
+    o.retired = r.log.join() === 'tab:hr,collapse,open:r1,scroll:r1' && shown(r.roster, 'hrRetBody') && r.roster.indexOf('<row r1 ret>') > r.roster.indexOf('id="hrRetBody"') && r.retOpen === false;
+    o.test = t.log.join() === 'tab:hr,collapse,open:t1,scroll:t1' && shown(t.roster, 'hrTestBody') && !shown(t.roster, 'hrRetBody') && t.testOpen === false;
+    o.active = e.log.join() === 'tab:hr,collapse,open:e1,scroll:e1' && !shown(e.roster, 'hrRetBody') && !shown(e.roster, 'hrTestBody');   // 재직 대상 = 묶음은 접힌 채(종전과 같은 결과)
+    o.ok = Object.values(o).every((v) => v === true); return o;
+  };
+  const H3 = chkH3();
+  T('C185 판3 검토 반영 ① [인사 카드](실행 — 실제 taskHrCardOpen·drawHrRoster · 묶음 기억값 = 접힘): 대상 = 퇴사자 → 인사 탭 · 접음 → 다시 그림(퇴사자 묶음이 이 화면에서만 펼침·기억값 그대로) → 그 카드 엶 → 그 머리로 스크롤 · 대상 = 시험 계정 = 시험 계정 묶음 펼침 · 재직 대상 = 두 묶음 접힌 채 그 카드 엶', H3.ok, JSON.stringify(H3));
+  // ③ 실제 autoRulesSet — 되돌리기 400 ASSIGN_NEEDED = 켜기와 같은 글 · 다른 실패 = 종전 글
+  const boxR3 = (src) => new Function('RES', [
+    'var autoRulesSaving = false, autoRulesTbl = { hr_leave: "dry" }, autoRulesBase = 7, calls = [], toasts = [], renders = 0;',
+    'function confirm(){ return true; } function alert(m){ toasts.push("alert:" + m); } function apprToastShow(m){ toasts.push(m); } function renderAutoRulesCard(){ renders++; }',
+    'function gwCall(fn, b){ calls.push(b); return Promise.resolve(RES); }', fnR3('autoRulesSet', src),
+    'return { set: autoRulesSet, calls: calls, toasts: toasts, renders: function(){ return renders; } };'].join('\n'));
+  const chkR3 = async (src) => {
+    const tick = () => new Promise((r) => setTimeout(r, 0)), o = {};
+    const a = boxR3(src)({ status: 400, body: { error_code: 'ASSIGN_NEEDED' } }); a.set({ revert: true }); await tick();
+    o.revert = a.calls.length === 1 && a.calls[0].action === 'autotask_revert' && JSON.stringify(a.toasts) === JSON.stringify(['alert:' + ASSIGN_R3]) && a.renders() === 1;
+    const b = boxR3(src)({ status: 400, body: { error_code: 'NO_PREV' } }); b.set({ revert: true }); await tick();
+    o.other = JSON.stringify(b.toasts) === JSON.stringify(['alert:규칙 스위치 저장 실패 (NO_PREV)']);
+    o.ok = Object.values(o).every((v) => v === true); return o;
+  };
+  const R3r = await chkR3();
+  T('C185 판3 검토 반영 ③ 규칙 카드 되돌리기 거절 글(실행 — 실제 autoRulesSet): 400 ASSIGN_NEEDED = "' + ASSIGN_R3 + '"(영문 코드 아님) · 다른 실패 = 종전 "규칙 스위치 저장 실패 (코드)"', R3r.ok, JSON.stringify(R3r));
+  // ⑤ 실제 evrCardRender — 준비된 규칙인데 남아 있는 요약이 준비 중(ready:false) = '아직 연습 집계가 없습니다(…)' · 준비 중 규칙 = 종전
+  const FN5 = ['esc', 'pmconPlan', 'pmconRowsAutotask', 'pmconLicWhy', 'evrSeen', 'evrIds', 'evrMd', 'evrSumTxt', 'evrLiveRow', 'evrRows', 'evrCardRender', 'evrCardSet'];
+  const box5 = (src) => new Function([
+    'var pmconSeq = 1, pmconState = { canWrite: true, base: 555 }, calls = [], toasts = [];',
+    'function todayStr(){ return "2026-11-20"; } function memberName(id){ return ""; } function apprToastShow(m){ toasts.push(m); } function renderPmcon(){}',
+    'var confirm = function(){ return true; }, alert = function(m){ toasts.push("alert:" + m); }; function gwCall(fn, b){ calls.push(b); return Promise.resolve({ status: 200, body: {} }); }',
+    [/var EVR_STOP = \{[^}]+\};/, /EVR_STOP\.TEXT_LONG = "[^"]+";/, /var EVR_SKIP = \{[^}]+\};/, /var evrLast = null, evrCardBusy = false;/, /var AUTO_RULE_ORDER = \[[^\]]+\];/, /var PMCON_PLAN = \{[^\n]+\};/].map((re) => stR3(re, src)).join('\n'),
+    FN5.map((n) => fnR3(n, src)).join('\n'),
+    'return { rows: pmconRowsAutotask, card: evrCardRender };'].join('\n'))();
+  const chk5 = (src) => {
+    const b = box5(src), ms = { lic_duty: { label: '인허가' }, hr_leave: { label: '퇴사 체크리스트 지시', ready: true, uses: ['hr:', 'acct:'] }, veh_ceq31: { label: '건설기계', ready: false } };
+    const B = { rules: { lic_duty: 'live', hr_leave: 'dry', veh_ceq31: 'dry' }, since: {}, meta: {}, meta_srv: ms, updated_at: 44, assign_state: { 'hr:': 'ok', 'acct:': 'ok' }, dry: { rules: { hr_leave: { mode: 'dry', ready: false }, veh_ceq31: { mode: 'dry', ready: false } } } };
+    const rows = b.rows(B); const e = { innerHTML: '', querySelectorAll: () => [] }; b.card(e);
+    const t = e.innerHTML.replace(/<[^>]+>/g, ' ');
+    const iL = t.indexOf('퇴사 체크리스트 지시'), iV = t.indexOf('건설기계');
+    return iL >= 0 && t.slice(iL, iV).indexOf('아직 연습 집계가 없습니다(다음 평일 08:10 정기업무 봇 뒤에 보입니다).') >= 0 && t.slice(iL, iV).indexOf('준비 중 — 계산') < 0 && t.slice(iV).indexOf('준비 중') >= 0
+      && !rows.some((r) => r.id === 'autotask:hr_leave:live');   // 낡은 요약으로는 켜기 줄도 안 띄움(종전 그대로)
+  };
+  const C5 = chk5();
+  T('C185 판3 검토 반영 ⑤ 점검 카드(실행 — 실제 evrCardRender): 준비된 규칙인데 요약이 옛 "준비 중"(배포 날 ~ 다음 집계 전) = "아직 연습 집계가 없습니다(다음 평일 08:10 정기업무 봇 뒤에 보입니다)." · 준비 중 규칙은 종전 · 켜기 줄 없음', C5);
+  const mutR3 = (from, to) => { if (html.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); return html.replace(from, () => to); };
+  const k = [];
+  try { k.push(chkH3(mutR3('    setTimeout(function(){ hrCollapse(); drawHrRoster(mid); var el', '    setTimeout(function(){ if (hrOpenId !== mid) hrToggle(mid); var el')).ok); } catch (e) { k.push('err ' + e.message); }
+  try { k.push(chkH3(mutR3('    setTimeout(function(){ hrCollapse(); drawHrRoster(mid); var el', '    setTimeout(function(){ drawHrRoster(mid); var el')).ok); } catch (e) { k.push('err ' + e.message); }
+  try { k.push((await chkR3(mutR3('alert(res.body && res.body.error_code === "ASSIGN_NEEDED" ? "' + ASSIGN_R3 + '" : "규칙 스위치 저장 실패 ("', 'alert(false ? "" : "규칙 스위치 저장 실패 ("'))).ok); } catch (e) { k.push('err ' + e.message); }
+  try { k.push(chk5(mutR3('      if (m.ready === true && cur !== "off" && s && s.ready === false) line =', '      if (false) line ='))); } catch (e) { k.push('err ' + e.message); }
+  T('C185 판3 검토 반영 ①③⑤ 결함 사본 ' + k.length + '개(종전 hrToggle만 · 접기 걷음 · 되돌리기 거절 글 걷음 · 낡은 요약 갈래 걷음) = 모두 ✗', k.every((v) => v === false), JSON.stringify(k));
+} catch (e) { console.log('  (C185 판3 검토 반영 검사 생략 — ' + e.message + ')'); fails++; }
 
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');

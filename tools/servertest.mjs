@@ -15723,4 +15723,129 @@ function J91a(x) { return JSON.stringify(x); }
   finally { pushMock.sendTo = sendSaveL; pushMock.tierCtx = tierSaveL; require.cache[rpEVL] = keepEVL; require.cache[rpDIL] = keepDIL; const s = JSON.parse(snapL); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; }
 }
 
+{ // ---- C185 판3 검토 반영(11/20 다섯 각도 — 확정 1 + 원천 2 + 시험 보강) ----
+  //   ② 되돌리기 가드 = 되돌려서 새로 켜지는 규칙만(이미 켜진 규칙 때문에 막히지 않음 · 담당 퇴사·배정표 못 읽음은 막음) · ⑥ 퇴사 5/7 본문
+  //   ⑦ 표본 보강: 승격본에 law.nhi.10-2만 빠짐 · 다른 회원의 회수 기록 · 명부 못 읽은 회차의 퇴사·삭제된 관리자 승인권자·읽기 예외(승인 요청·크론) · 복원 감사 '지킨 칸' · 지난 12개월 경계 · 본문 꼬리
+  const fsW = require('fs'), ModW = require('module');
+  const EVPW = join(FN, '_lib', 'evrules.js'), GWPW = join(FN, 'gw-data.js'), DIPW = join(FN, '_lib', 'doneif.js'), CRPW = join(FN, 'gw-doneif-cron.js');
+  const SRCW = { ev: fsW.readFileSync(EVPW, 'utf8'), gw: fsW.readFileSync(GWPW, 'utf8'), di: fsW.readFileSync(DIPW, 'utf8'), cr: fsW.readFileSync(CRPW, 'utf8') };
+  const rpDIW = require.resolve(DIPW), keepDIW = require.cache[rpDIW];
+  const compW = (file, src) => { const m = new ModW(file); m.filename = file; m.paths = ModW._nodeModulePaths(dirname(file)); m._compile(src, file); return m.exports; };
+  const mutW = (src, from, to) => { if (src.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return src.replace(from, () => to); };
+  const clW = (mod) => async (body, tok, dev) => { const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+  const snapW = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  const KEYW = 'test-ingest-key', TDW = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+  const addW = (n, base) => new Date(Date.parse((base || TDW) + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+  const pushesW = [], sendSaveW = pushMock.sendTo, tierSaveW = pushMock.tierCtx;
+  const ROWSW = ['law.lsa.17', 'law.nhi.8-2', 'law.nhi.10-2', 'law.lsa.36', 'law.rba.9-1'];
+  const BGW = (rows) => ({ on: true, bg: { rows: (rows || ROWSW).map((id) => ({ id: id, calc: true })) } });
+  // 순수
+  const chkPW = (srcEv) => {
+    const o = {}, E = compW(EVPW, srcEv || SRCW.ev);
+    const nowMs = Date.parse(TDW + 'T03:00:00Z'), since = nowMs - 1000, ctx = E.ctxFor('hr_leave', 'live', since, nowMs, TDW).ctx, L = addW(5);
+    const M = (id, x) => Object.assign({ id: id, name: '가짜' + id, created: 1, hire_date: '2020-01-02', leave_date: L, leave_ev: { at0: nowMs } }, x || {});
+    const opt = () => ({ rules: { 'hr:': { who_id: 'uHR' }, 'acct:': { who_id: 'uAC' } }, active: { uHR: 'a', uAC: 'b' }, names: [], mkId: (() => { let n = 0; return () => 'w' + (++n); })() });
+    const t1 = []; const r1 = E.run('hr_leave', { members: [M('uA')], hrbg: BGW(ROWSW.filter((x) => x !== 'law.nhi.10-2')) }, ctx, t1, opt(), true);
+    o.row102 = t1[4].due === '' && t1[5].due === addW(14, L) && t1[0].due === L && JSON.stringify(r1.sum.no_row) === '["law.nhi.10-2"]';
+    const TAIL = ' 대상 직원은 관리자 화면의 [인사 카드](지시 펼침·지시 카드)에서 확인합니다.';
+    o.body = t1.every((t) => t.detail.slice(-TAIL.length) === TAIL) && t1[4].detail.indexOf('건강보험은 퇴사일 + 14일까지') === 0 && t1[4].detail.indexOf('퇴사일부터 14일 안') < 0;
+    // 지난 12개월 퇴사 경계: 오늘 = 셈 · 내일 = 안 셈 · 365일 전 = 셈 · 366일 전 = 안 셈(표식 없어도 셈 — 참고 수)
+    const cnt = (ld) => E.run('hr_leave', { members: [M('u1', { leave_date: ld, leave_ev: undefined })], hrbg: BGW() }, ctx, [], opt(), false).sum.ref.past12_leave;
+    o.past12 = cnt(TDW) === 1 && cnt(addW(1)) === 0 && cnt(addW(-365)) === 1 && cnt(addW(-366)) === 0;
+    o.ok = Object.keys(o).every((k) => o[k] === true); return o;
+  };
+  // 실제 서버
+  const USTW = { id: 'uSTW', name: '승인가짜W', admin: false, perms: { tasks: 'do' } }, UHRW = { id: 'uHRW', name: '인사가짜W', admin: false, perms: { tasks: 'do' } };
+  const seedW = (o) => { o = o || {}; const s = JSON.parse(snapW); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; blobsMock.hooks.beforeGet = null;
+    ['settings:autotask', 'settings:assign', 'settings:notify', 'settings:doneif', 'it:doneif:last'].forEach((k) => { delete mem.gw_data[k]; });
+    mem.gw_users['member:uSTW'] = USTW; mem.gw_users['member:uHRW'] = UHRW; mem.gw_users['member:uGoW'] = { id: 'uGoW', name: '퇴사가짜W', admin: false, perms: {}, leave_date: addW(-30) };
+    mem.gw_data['settings:assign'] = { schema: 1, rules: Object.assign({ 'hr:': { who_id: 'uHRW' }, 'acct:': { who_id: 'uadmin' } }, o.rules || {}), approver_id: o.apv || '', prev: null, updated_at: 5, updated_by: 'x' };
+    mem.gw_data['settings:notify'] = { schema: 1, events: { task_review: 'issuer_approver' }, prev: null, updated_at: Date.now() - 30 * 86400000, updated_by: 'x' };
+    mem.gw_data['col:tasks'] = { schema: 1, updated_at: 7, items: [{ id: 'hw1', title: '퇴사 체크', auto_key: 'hr:uLW:leave:' + addW(-2) + ':1', status: 'open', who_id: 'uHRW', scope: ['uHRW'] }] };
+  };
+  const chkEW = async (gw) => {
+    const c = clW(gw), o = {}, I = {};
+    try {
+      // 되돌리기 가드 = 새로 켜지는 규칙만
+      const rv = async (cur, prev, rules, fg) => { seedW({ rules: rules }); mem.gw_data['settings:autotask'] = { schema: 1, rules: cur, prev: { rules: prev, updated_at: 3 }, updated_at: 7, updated_by: 'x' }; blobsMock.hooks.failGet = fg || null;
+        const r = await c({ action: 'autotask_revert', base: 7 }, tokA); blobsMock.hooks.failGet = null; return { code: r.code, err: r.body.error_code || '', rules: JSON.stringify(mem.gw_data['settings:autotask'].rules) }; };
+      const g1 = await rv({ hr_join: 'live', lic_duty: 'live' }, { hr_join: 'live', lic_duty: 'dry' }, { 'hr:': { who_id: 'uGoW' } });   // 입사는 이미 켜짐(담당 퇴사) · 인허가만 끔 = 막지 않음
+      const g2 = await rv({ hr_leave: 'dry' }, { hr_leave: 'live' }, { 'hr:': { who_id: 'uGoW' } });                                  // 새로 켜짐 · 담당 퇴사 = 막음
+      const g3 = await rv({ hr_leave: 'dry' }, { hr_leave: 'live' }, {}, (k) => (k === 'settings:assign' ? 'STORAGE_READ_FAILED' : null));   // 배정표 못 읽음 = 막음
+      const g4 = await rv({ hr_leave: 'dry' }, { hr_leave: 'live' }, {});                                                               // 담당 재직 = 켬
+      o.revert = g1.code === 200 && JSON.parse(g1.rules).hr_join === 'live' && JSON.parse(g1.rules).lic_duty === 'dry' && g2.code === 400 && g2.err === 'ASSIGN_NEEDED' && JSON.parse(g2.rules).hr_leave === 'dry'
+        && g3.code === 400 && g3.err === 'ASSIGN_NEEDED' && g4.code === 200 && JSON.parse(g4.rules).hr_leave === 'live';
+      I.revert = [g1, g2, g3, g4].map((x) => x.code + '/' + x.err);
+      // 명부 못 읽은 회차: 관리자 승인권자가 퇴사·삭제됨·레코드 읽기 예외 = 관리자 아님 → 입·퇴사 승인 요청 503
+      const tH = issueSession(UHRW).token;
+      const un = async (apvRec) => { seedW({ apv: 'uApW' }); mem.gw_users['member:uApW'] = apvRec; pushesW.length = 0;
+        pushMock.tierCtx = async () => Object.assign({}, await tierSaveW(), { unavailable: true, adminIds: [] });
+        if (apvRec === 'THROW') { delete mem.gw_users['member:uApW']; blobsMock.hooks.beforeGet = async (k) => { if (k === 'member:uApW') throw new Error('down'); }; }
+        const r = await c({ action: 'push_send', to: '__admins__', title: 'x', body: 'y', tag: 'task-rv-hw1' }, tH, 'dev1');
+        pushMock.tierCtx = tierSaveW; blobsMock.hooks.beforeGet = null; return { code: r.code, err: r.body.error_code || '', to: pushesW.map((p) => p.ids.join(',')).join('|') }; };
+      const ADMW = { id: 'uApW', name: '승인관리W', admin: true, perms: {} };
+      const u1 = await un(ADMW), u2 = await un(Object.assign({}, ADMW, { leave_date: addW(-1) })), u3 = await un(Object.assign({}, ADMW, { del: 1 })), u4 = await un('THROW');
+      o.unavail = u1.code === 200 && u1.to === 'uApW' && [u2, u3, u4].every((x) => x.code === 503 && x.err === 'MEMBERS_UNAVAILABLE' && x.to === '');
+      I.unavail = [u1, u2, u3, u4].map((x) => x.code + '/' + x.to.length);
+      // 복원 감사 '지킨 칸'에 leave_ev·join_ev
+      seedW(); mem.gw_users['member:uRW'] = { id: 'uRW', name: '복원가짜W', role: '직원', admin: false, perms: {}, leave_date: addW(5), leave_ev: { at0: 11 }, join_ev: { at0: 33 } };
+      const n0 = auditMock.logs.length;
+      const rs = await c({ action: 'backup_put', secret: KEYW, restore: true, store: 'gw_users', key: 'member:uRW', data: { id: 'uRW', name: '복원가짜W', role: '직원', perms: {}, leave_date: addW(9), leave_ev: { at0: 22 }, join_ev: { at0: 44 } }, confirm: true });
+      const au = auditMock.logs.slice(n0).map((e) => e.ev && e.ev[0] && e.ev[0].t).join(' | ');
+      const kept = (/지킨 칸 \[([^\]]*)\]/.exec(au) || ['', ''])[1].split(',');
+      o.keptAudit = rs.code === 200 && kept.indexOf('leave_ev') >= 0 && kept.indexOf('join_ev') >= 0 && kept.indexOf('leave_date') >= 0;
+      I.kept = kept;
+    } catch (e) { o.err = String((e && e.stack) || e).slice(0, 300); pushMock.tierCtx = tierSaveW; blobsMock.hooks.failGet = null; blobsMock.hooks.beforeGet = null; }
+    o.ok = ['revert', 'unavail', 'keptAudit'].every((k) => o[k] === true);
+    return { o, I };
+  };
+  // 크론: 다른 회원의 회수 기록 = 신호 없음 · 명부 못 읽은 회차의 퇴사·삭제된 관리자 승인권자 = 관리자 아님(notify_fail)
+  const chkCW = async (cron) => {
+    const o = {}, L = addW(-1);
+    const run = async (st, apv, apvRec) => { seedW({ apv: apv || '' }); mem.gw_data['settings:doneif'] = { schema: 1, on: true, updated_at: 1 }; pushesW.length = 0;
+      mem.gw_data['col:tasks'] = { schema: 1, items: [{ id: 'aw1', title: '퇴사 계정', auto_key: 'acct:uLW:leave:' + L, status: 'open', who_id: 'uadmin' }], updated_at: 5 };
+      mem.gw_users['devauto:state'] = st; if (apvRec) mem.gw_users['member:' + apv] = apvRec;
+      if (apvRec) pushMock.tierCtx = async () => Object.assign({}, await tierSaveW(), { unavailable: true, adminIds: [] });
+      await cron.run(blobsMock.store('gw_data'), Date.parse(TDW + 'T05:33:00Z')); pushMock.tierCtx = tierSaveW;
+      return { st: mem.gw_data['col:tasks'].items[0].status, to: pushesW.map((p) => p.ids.join(',')).join('|'), fail: (mem.gw_data['it:doneif:last'] || {}).notify_fail || '' }; };
+    const other = await run({ schema: 1, rev: { uOtherW: { tag: 'leave:' + L, at: 1 } } });
+    const both = await run({ schema: 1, rev: { uOtherW: { tag: 'leave:' + L, at: 1 }, uLW: { tag: 'leave:' + L, at: 1 } } });
+    o.member = other.st === 'open' && both.st === 'review';
+    const ST = { schema: 1, rev: { uLW: { tag: 'leave:' + L, at: 1 } } }, ADMW = { id: 'uApW', name: '승인관리W', admin: true, perms: {} };
+    const a1 = await run(ST, 'uApW', ADMW), a2 = await run(ST, 'uApW', Object.assign({}, ADMW, { leave_date: addW(-1) })), a3 = await run(ST, 'uApW', Object.assign({}, ADMW, { del: 1 }));
+    o.apv = a1.to === 'uApW' && a1.fail === '' && a2.to === '' && a2.fail === 'MEMBERS_UNAVAILABLE' && a3.to === '' && a3.fail === 'MEMBERS_UNAVAILABLE';
+    o.I = [other.st, both.st, a1, a2, a3];
+    o.ok = o.member === true && o.apv === true; return o;
+  };
+  try {
+    pushMock.sendTo = async (ids, p) => { pushesW.push({ ids: ids.slice(), p: p }); return { sent: ids.length, removed: 0 }; };
+    const P0 = chkPW();
+    T('C185 판3 검토 반영 ⑥⑦ 순수: 승격본에 law.nhi.10-2만 빠짐 = 5번만 기한 없이·no_row(6번 +14일 그대로) · 7항 본문 끝 = 관리자 화면 [인사 카드] 안내 · 5/7 본문 "건강보험은 퇴사일 + 14일까지"(종전 "퇴사일부터 14일 안" 없음) · 지난 12개월 퇴사 경계(오늘·365일 전 셈 · 내일·366일 전 안 셈)', P0.ok, JSON.stringify(P0));
+    const MPW = [["rows: ['law.nhi.10-2'], d: '건강보험은", "rows: [], d: '건강보험은"], ["detail: (it.d + HR_JOIN_TAIL).trim(), due: due, priv: true", "detail: (it.d).trim(), due: due, priv: true"],
+      ["ldOk && ld >= y1 && ld <= today) out.ref.past12_leave++;", "ldOk && ld >= y1) out.ref.past12_leave++;"], ["ldOk && ld >= y1 && ld <= today) out.ref.past12_leave++;", "ldOk && ld > y1 && ld <= today) out.ref.past12_leave++;"]];
+    const kP = MPW.map(([a, b]) => { try { return chkPW(mutW(SRCW.ev, a, b)).ok; } catch (e) { return 'err ' + e.message; } });
+    T('C185 판3 검토 반영 ⑦ 순수 결함 사본 ' + kP.length + '개(5번 짝 행 걷음 · 본문 꼬리 걷음 · 12개월 위 끝 · 아래 끝) = 모두 ✗', kP.every((v) => v === false), JSON.stringify(kP));
+    const E0 = await chkEW(gwd);
+    T('C185 판3 검토 반영 ②⑦ 실제 서버: 되돌리기 가드 = 새로 켜지는 입·퇴사 규칙만(이미 켜진 입사의 담당이 퇴사자여도 인허가만 끄는 되돌리기 200) · 새로 켜짐 + 담당 퇴사 = 400 ASSIGN_NEEDED · 배정표 못 읽음 = 400 · 담당 재직 = 켬 · 명부 못 읽은 회차 승인권자 = 재직 관리자면 그 사람 · 퇴사·삭제된 관리자·레코드 읽기 예외 = 503 · 재해 복원 감사 "지킨 칸"에 leave_ev·join_ev',
+      E0.o.ok, JSON.stringify(E0.o.ok ? E0.o : E0));
+    const MEW = [["return rules[rk] === 'live' && a.rules[rk] !== 'live' && ((AUTOTASK_SRV_RULES[rk]", "return rules[rk] === 'live' && ((AUTOTASK_SRV_RULES[rk]"],
+      ["return !!(r.ok && r.data && r.data.admin === true && r.data.del !== 1 && !tier.retired(r.data)); } catch (e) { return false; } }", "return !!(r.ok && r.data && r.data.admin === true && r.data.del !== 1); } catch (e) { return false; } }"],
+      ["return !!(r.ok && r.data && r.data.admin === true && r.data.del !== 1 && !tier.retired(r.data)); } catch (e) { return false; } }", "return !!(r.ok && r.data && r.data.admin === true && !tier.retired(r.data)); } catch (e) { return false; } }"],
+      ["return !!(r.ok && r.data && r.data.admin === true && r.data.del !== 1 && !tier.retired(r.data)); } catch (e) { return false; } }", "return !!(r.ok && r.data && r.data.admin === true && r.data.del !== 1 && !tier.retired(r.data)); } catch (e) { return true; } }"],
+      ["const evKeep = function (f, v) { if (JSON.stringify(prev[f]) !== JSON.stringify(payload[f])) kept.push(f);", "const evKeep = function (f, v) {"]];
+    const kE = [];
+    for (const [a, b] of MEW) { let v; try { v = (await chkEW(compW(GWPW, mutW(SRCW.gw, a, b)))).o.ok; } catch (e) { v = 'err ' + e.message; } kE.push(v); }
+    T('C185 판3 검토 반영 ②⑦ 서버 결함 사본 ' + kE.length + '개(되돌리기 가드 전체로 · 퇴사 관리자 판정 걷음 · 삭제 판정 걷음 · 읽기 예외를 관리자로 · 복원 지킨 칸 걷음) = 모두 ✗', kE.every((v) => v === false), JSON.stringify(kE));
+    const C0 = await chkCW(require(CRPW));
+    T('C185 판3 검토 반영 ⑦ 완료 판정 크론: 다른 회원의 회수 기록뿐 = 그대로 · 그 회원 기록도 있으면 승인 대기 · 명부 못 읽은 회차 승인권자 = 재직 관리자면 그 사람 1발 · 퇴사·삭제된 관리자 = 알림 0·notify_fail', C0.ok, JSON.stringify(C0));
+    const MCW = [["const r = ds.rev && typeof ds.rev === 'object' ? ds.rev[k.id] : null;", "const r = ds.rev && typeof ds.rev === 'object' ? ds.rev[Object.keys(ds.rev)[0]] : null;"]];
+    const kC = [];
+    for (const [a, b] of MCW) { let v; try { const di = compW(DIPW, mutW(SRCW.di, a, b)); require.cache[rpDIW] = { id: rpDIW, filename: rpDIW, loaded: true, exports: di }; try { v = (await chkCW(compW(CRPW, SRCW.cr))).ok; } finally { require.cache[rpDIW] = keepDIW; } } catch (e) { v = 'err ' + e.message; } kC.push(v); }
+    const MRW = [["mr.data.del !== 1 && !(mr.data.leave_date && String(mr.data.leave_date) < today)", "mr.data.del !== 1"], ["mr.data.del !== 1 && !(mr.data.leave_date && String(mr.data.leave_date) < today)", "!(mr.data.leave_date && String(mr.data.leave_date) < today)"]];
+    for (const [a, b] of MRW) { let v; try { v = (await chkCW(compW(CRPW, mutW(SRCW.cr, a, b)))).ok; } catch (e) { v = 'err ' + e.message; } kC.push(v); }
+    T('C185 판3 검토 반영 ⑦ 크론 결함 사본 ' + kC.length + '개(회원 id 안 봄 · 퇴사 관리자 판정 걷음 · 삭제 판정 걷음) = 모두 ✗', kC.every((v) => v === false), JSON.stringify(kC));
+  } catch (e) { T('C185 판3 검토 반영 검사 실행', false, String(e && e.stack || e).slice(0, 500)); }
+  finally { pushMock.sendTo = sendSaveW; pushMock.tierCtx = tierSaveW; require.cache[rpDIW] = keepDIW; const s = JSON.parse(snapW); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; blobsMock.hooks.beforeGet = null; }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);
