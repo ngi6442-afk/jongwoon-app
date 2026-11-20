@@ -2683,6 +2683,9 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   mem.gw_files[O3] = { name: 'o3.jpg', type: 'text/html', kind: 'promo', data: JPG, by: 'x', ts: 1 };           // 머리는 그림이어도 저장 type이 목록 밖
   mem.gw_files[O4] = { name: 'o4.jpg', type: 'image/jpeg', kind: 'promo', data: JPG, by: 'x', ts: 1 };
   mem.gw_files['mask:' + O4] = { schema: 1, src: O4, type: 'image/svg+xml', kind: 'promo', auto: true, boxes: [{ x: 0.1, y: 0.1, w: 0.1, h: 0.1 }], data: SVG, ts: 2 };   // 가린 판 자리에 그림 아닌 값
+  // C259 뒤: 공개 길은 가린 판이 확인된 사진만 낸다 — O1~O3은 '가릴 것 없음'(빈 판 + 상태 n 0)으로 두어 원본이 형식 검사까지 가게 한다
+  [O1, O2, O3].forEach((id) => { mem.gw_files['mask:' + id] = { schema: 1, src: id, type: 'image/jpeg', kind: 'promo', auto: true, boxes: [], data: '', ts: 2 }; mem.gw_files['maskmeta:' + id] = { schema: 1, has: true, n: 0, human: false, auto: true, ts: 2 }; });
+  mem.gw_files['maskmeta:' + O4] = { schema: 1, has: true, n: 1, human: false, auto: true, ts: 2 };
   const S = 'c'.repeat(64);
   mem.gw_data['promo:share:' + S] = { ids: [O1, O2, O3, O4], promo_id: 'pr265', exp: Date.now() + 100000, by: 'x', ts: 1 };
   const g = async (i) => gwi.handler({ httpMethod: 'GET', queryStringParameters: { s: S, i: String(i) }, headers: {} });
@@ -2700,7 +2703,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     JSON.stringify([fi.count, fi.items && fi.items[0] && fi.items[0].images, f0.statusCode, f2.statusCode]));
   mem.gw_data['col:promo'] = savedPromo; process.env.GW_GALLERY_FEED_KEY = savedFk || '';
   delete mem.gw_data['promo:share:' + S];
-  [O1, O2, O3, O4, rJ.body.id, rP.body.id, rW.body.id, rC.body.id].forEach((id) => { delete mem.gw_files[id]; delete mem.gw_files['mask:' + id]; });
+  [O1, O2, O3, O4, rJ.body.id, rP.body.id, rW.body.id, rC.body.id].forEach((id) => { delete mem.gw_files[id]; delete mem.gw_files['mask:' + id]; delete mem.gw_files['maskmeta:' + id]; });
 }
 
 // ===== 43. v360 사진AI 자동 생성 — 서버 책임(PM 9/16 "틀어막지 말고 근본적으로"): 결과 직접 적용·상태 기록·크론 재시작·옛 작업 적용 =====
@@ -2833,6 +2836,8 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     { id: 'bad:id/x', title: 't', body: 'b', status: 'review', photos: [{ id: A9, name: 'p9.jpg' }], ai: { ts: 1 }, tags: ['x'] },
   ] };
   mem.gw_data['promomask:usage'] = { schema: 1, months: {} };
+  // C259: 절 43 크론(AI 키 없음)이 판 없는 사진 가리기를 걸다 ENV_MISSING 전역 중단 표식을 남긴다 — 이 절은 깨끗한 상태에서 시작
+  Object.keys(mem.gw_data).filter((k) => k === 'promomask:remask' || k.indexOf('promomask:remask:') === 0).forEach((k) => { delete mem.gw_data[k]; });
   const savedKey = process.env.GW_ANTHROPIC_KEY, savedUrl = process.env.URL; process.env.GW_ANTHROPIC_KEY = 'test-anthropic-key-0000'; process.env.URL = 'https://x.test';
   const realFetch = global.fetch; const kicks = [];
   const visionBoxes = [{ kind: 'face', x: 0.5, y: 0.5, w: 0.1, h: 0.1 }, { kind: 'plate', x: 0.7, y: 0.7, w: 0.1, h: 0.05 }];
@@ -2913,7 +2918,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     let rc = await cron44.handler({}); let oc = JSON.parse(rc.body);
     T('크론 ③ 재감지: 옛 판 1장(새 판 A10·사람 판 A11 제외) → prv364 mask_start(force true, ids=[A9]만) 1회 · 잠금·job queued(n 1) · 게시 완료 prv364p·형식 밖 id는 대상 아님', rc.statusCode === 200 && oc.remask && oc.remask.promo === 'prv364' && oc.remask.old === 1 && oc.remask.seen === 3 && oc.remask.ok === true && kicks.length === 1 && kicks[0].promo_id === 'prv364' && kicks[0].force === true && kicks[0].ids.length === 1 && kicks[0].ids[0] === A9 && kicks[0].only_old === true && auditMock.logs.some((l) => l.ev && l.ev[0].op === '가리기재감지') && mem.gw_data['promomask:lock:prv364'].job === kicks[0].job && mem.gw_data['promomask:job:' + kicks[0].job].status === 'queued' && mem.gw_data['promomask:job:' + kicks[0].job].n === 1 && !mem.gw_data['promomask:remask:bad:id/x'], JSON.stringify(oc.remask) + ' kicks ' + JSON.stringify(kicks));
     rc = await cron44.handler({}); oc = JSON.parse(rc.body);
-    T('크론 ③ 멱등: 잠금 살아 있으면 그 기록은 읽지도 않는다(scanned 0·기동 0·시도 수 그대로 1)', oc.remask && oc.remask.scanned === 0 && !oc.remask.promo && kicks.length === 1 && mem.gw_data['promomask:remask:prv364'].tries === 1, JSON.stringify(oc.remask));
+    T('크론 ③ 멱등: 잠금 살아 있으면 그 기록은 읽지도 않는다(기동 0·시도 수 그대로 1 · C259: scanned 1 = 게시 완료 prv364p만 — 판 다 있어 done v2)', oc.remask && oc.remask.scanned === 1 && mem.gw_data['promomask:remask:prv364p'] && mem.gw_data['promomask:remask:prv364p'].v === 2 && !oc.remask.promo && kicks.length === 1 && mem.gw_data['promomask:remask:prv364'].tries === 1, JSON.stringify(oc.remask));
     mem.gw_data['promomask:lock:prv364'] = { ts: 0, job: '' };
     rc = await cron44.handler({}); oc = JSON.parse(rc.body);
     T('크론 ③ 2회차: 옛 판이 그대로면 한 번 더(시도 2)', oc.remask && oc.remask.promo === 'prv364' && oc.remask.ok === true && kicks.length === 2 && mem.gw_data['promomask:remask:prv364'].tries === 2, JSON.stringify(oc.remask));
@@ -2983,6 +2988,167 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     }
     // 사람이 만진 판(human)은 재감지 대상에서 제외돼야 하나? — 아니다: force는 '자동 판만 다시'라 워커가 human을 지킨다(절 41). 여기서는 model만 본다.
   } finally { global.fetch = realFetch; process.env.GW_ANTHROPIC_KEY = savedKey; process.env.URL = savedUrl; faceMock.fail = true; faceMock.boxes = []; }
+}
+
+// ===== 44-C259. 공개 길 가림 확인(원천) — 세 길(공유 주소·갤러리 피드·갤러리 릴레이)이 _lib/maskgate 하나로 판정 · 크론 판 없는 사진 가리기(게시 완료 포함) =====
+{
+  const MG = require(join(FN, '_lib/maskgate.js'));
+  const gwi = require(join(FN, 'gw-promo-img.js')), gwf = require(join(FN, 'gw-gallery-feed.js')), rel = require(join(FN, 'gw-gallery-relay.js'));
+  const { Jimp } = require('jimp');
+  const imgC = new Jimp({ width: 600, height: 400, color: 0x336699ff }); for (let y = 100; y < 200; y++) for (let x = 200; x < 300; x++) imgC.setPixelColor((((x * 3) % 256 << 24) | ((y * 5) % 256 << 16) | (90 << 8) | 255) >>> 0, x, y);
+  const raw = (await imgC.getBuffer('image/jpeg', { quality: 90 })).toString('base64');
+  const maskB = (await new Jimp({ width: 60, height: 40, color: 0x777777ff }).getBuffer('image/jpeg', { quality: 80 })).toString('base64');
+  const G = (c) => 'att_' + c.repeat(16);
+  const [G1, G2, G3, G4, G5, G6, G7, G8] = ['3', '4', '5', '6', '7', '8', '9', '0'].map(G);
+  const ORIG = (id) => ({ name: id + '.jpg', type: 'image/jpeg', kind: 'promo', data: raw, by: 'x', ts: 1 });
+  [G1, G2, G3, G4, G5, G6, G7].forEach((id) => { mem.gw_files[id] = ORIG(id); });
+  mem.gw_files[G8] = { name: 'c.pdf', type: 'application/pdf', kind: 'contract', data: raw, by: 'x', ts: 1 };
+  const MASK = (id, data, boxes, kind) => ({ schema: 1, src: id, type: 'image/jpeg', kind: kind || 'promo', auto: true, human: false, boxes: boxes, w: 600, h: 400, data: data, model: 'facedet+platedet2+claude-sonnet-5', ts: 5 });
+  const META = (n) => ({ schema: 1, has: true, n: n, human: false, auto: true, w: 600, h: 400, ts: 5, model: 'facedet+platedet2+claude-sonnet-5' });
+  mem.gw_files['mask:' + G1] = MASK(G1, maskB, [{ kind: 'face', x: 0.1, y: 0.1, w: 0.1, h: 0.1, by: 'auto' }]); mem.gw_files['maskmeta:' + G1] = META(1);   // 가린 판 있음
+  mem.gw_files['mask:' + G2] = MASK(G2, '', []); mem.gw_files['maskmeta:' + G2] = META(0);                                                               // 감지기가 '가릴 것 없음'으로 끝냄
+  /* G3: mask·maskmeta 둘 다 없음(작업 기록 없음·실패·시간 초과) */
+  mem.gw_files['mask:' + G4] = MASK(G4, '', []);                                                                                                          // 빈 판 + 상태 문서 없음
+  mem.gw_files['mask:' + G5] = MASK(G5, '', []); mem.gw_files['maskmeta:' + G5] = META(2);                                                               // 빈 판인데 상태 문서는 상자 2개(어긋남)
+  mem.gw_files['mask:' + G6] = MASK(G6, maskB, [{ kind: 'face', x: 0.1, y: 0.1, w: 0.1, h: 0.1, by: 'auto' }]); mem.gw_files['maskmeta:' + G6] = META(1);   // 읽기 실패 시험용
+  mem.gw_files['mask:' + G7] = MASK(G7, '', []); mem.gw_files['maskmeta:' + G7] = META(0);                                                               // 상태 문서 읽기 실패 시험용
+  const savedFail = blobsMock.hooks.failGet;
+  try {
+    // ① 판정 함수(순수 규칙표)
+    const pk = {};
+    for (const id of [G1, G2, G3, G4, G5]) pk[id] = await MG.pickPublic(id);
+    blobsMock.hooks.failGet = (k) => k === 'mask:' + G6 || k === 'maskmeta:' + G7;
+    pk[G6] = await MG.pickPublic(G6); pk[G7] = await MG.pickPublic(G7);
+    blobsMock.hooks.failGet = savedFail;
+    mem.gw_files['mask:' + G8] = MASK(G8, maskB, [], 'contract'); pk[G8] = await MG.pickPublic(G8); delete mem.gw_files['mask:' + G8];
+    T('C259 pickPublic 규칙: 가린 판 → 가린 판(masked) · 빈 판+상태 n0 → 원본 · 판 없음 409 NOT_MASKED · 빈 판+상태 없음 409 · 빈 판+상태 n2 409 MISMATCH · 판 읽기 실패 503 · 상태 읽기 실패 503 · 홍보 아님 403',
+      pk[G1].ok && pk[G1].masked === true && pk[G1].rec.data === maskB && pk[G2].ok && pk[G2].masked === false && pk[G2].rec.data === raw
+      && !pk[G3].ok && pk[G3].status === 409 && pk[G3].code === 'NOT_MASKED' && !pk[G4].ok && pk[G4].status === 409 && pk[G5].status === 409 && pk[G5].code === 'MASK_META_MISMATCH'
+      && pk[G6].status === 503 && pk[G6].code === 'MASK_READ_FAILED' && pk[G7].status === 503 && pk[G7].code === 'META_READ_FAILED' && pk[G8].status === 403 && pk[G8].code === 'NOT_PROMO'
+      && [G3, G4, G5, G6, G7, G8].every((id) => !pk[id].rec), JSON.stringify(Object.keys(pk).map((k) => [pk[k].ok, pk[k].status || '', pk[k].code || ''])));
+    // ② 공유 주소(gw-promo-img GET)
+    const S = 'e'.repeat(64);
+    mem.gw_data['promo:share:' + S] = { ids: [G1, G2, G3, G4, G5, G6], promo_id: 'prc259', exp: Date.now() + 100000, by: 'x', ts: 1 };
+    const share = async (i) => gwi.handler({ httpMethod: 'GET', queryStringParameters: { s: S, i: String(i) }, headers: {} });
+    const s0 = await share(0), s1 = await share(1), s2 = await share(2), s3 = await share(3), s4 = await share(4);
+    blobsMock.hooks.failGet = (k) => k === 'mask:' + G6;
+    const s5 = await share(5);
+    blobsMock.hooks.failGet = savedFail;
+    T('C259 공유 주소: 가린 판 200(가린 바이트) · 가릴 것 없음 200(원본) · 판 없음 409 · 상태 없음 409 · 어긋남 409 · 읽기 실패 503 — 거절 응답에 이미지 바이트 없음',
+      s0.statusCode === 200 && s0.body === maskB && s1.statusCode === 200 && s1.body === raw && s2.statusCode === 409 && JSON.parse(s2.body).error_code === 'NOT_MASKED'
+      && s3.statusCode === 409 && s4.statusCode === 409 && JSON.parse(s4.body).error_code === 'MASK_META_MISMATCH' && s5.statusCode === 503 && JSON.parse(s5.body).error_code === 'MASK_READ_FAILED'
+      && [s2, s3, s4, s5].every((x) => !x.isBase64Encoded && x.body.indexOf(raw.slice(0, 40)) < 0), [s0, s1, s2, s3, s4, s5].map((x) => x.statusCode).join(','));
+    // ③ 갤러리 피드(index·img)
+    const savedPromo = mem.gw_data['col:promo'], savedFk = process.env.GW_GALLERY_FEED_KEY; process.env.GW_GALLERY_FEED_KEY = 'feed-c259-key';
+    mem.gw_data['col:promo'] = { schema: 1, items: [
+      { id: 'prc259a', title: 'a', status: 'posted', blog_url: 'https://blog.example/a/1', posted_at: '2026-11-20', photos: [{ id: G3 }, { id: G1 }, { id: G2 }, { id: G4 }] },
+      { id: 'prc259b', title: 'b', status: 'posted', blog_url: 'https://blog.example/b/1', posted_at: '2026-11-19', photos: [{ id: G3 }, { id: G4 }, { id: G5 }, { id: G1 }] },
+    ] };
+    const fidx = await gwf.handler({ httpMethod: 'GET', queryStringParameters: { key: 'feed-c259-key' }, headers: {} });
+    const fj = JSON.parse(fidx.body);
+    const ca = (fj.items || []).filter((x) => x.promo_id === 'prc259a')[0];
+    const fimg = async (att) => gwf.handler({ httpMethod: 'GET', queryStringParameters: { key: 'feed-c259-key', img: att }, headers: {} });
+    const f1 = await fimg(G1), f2 = await fimg(G2), f3 = await fimg(G3), f4 = await fimg(G4);
+    blobsMock.hooks.failGet = (k) => k === 'mask:' + G1;
+    const f1x = await fimg(G1);
+    const fidx2 = JSON.parse((await gwf.handler({ httpMethod: 'GET', queryStringParameters: { key: 'feed-c259-key' }, headers: {} })).body);
+    blobsMock.hooks.failGet = savedFail;
+    const ca2 = (fidx2.items || []).filter((x) => x.promo_id === 'prc259a')[0];
+    T('C259 갤러리 피드: index는 가린 판 확인 사진만(카드 a = G1·G2, 판 없는 G3 빠짐) · 확인 사진이 앞 3장에 없는 카드 b는 통째로 빠짐(4번째를 올리지 않음) · img 가린 판 200·가릴 것 없음 원본 200·판 없음 409·빈 판+상태 없음 409 · 판 읽기 실패면 img 503·index에서 그 사진 빠짐',
+      fidx.statusCode === 200 && fj.count === 1 && ca && ca.images.length === 2 && ca.images[0].att === G1 && ca.images[1].att === G2 && !(fj.items || []).some((x) => x.promo_id === 'prc259b')
+      && f1.statusCode === 200 && f1.body === maskB && f2.statusCode === 200 && f2.body === raw && f3.statusCode === 409 && JSON.parse(f3.body).code === 'NOT_MASKED' && f4.statusCode === 409 && JSON.parse(f4.body).code === 'NOT_MASKED'
+      && f1x.statusCode === 503 && !f1x.isBase64Encoded && ca2 && ca2.images.length === 1 && ca2.images[0].att === G2,
+      JSON.stringify([fidx.statusCode, fj.count, ca && ca.images, f1.statusCode, f2.statusCode, f3.statusCode, f4.statusCode, f1x.statusCode, ca2 && ca2.images]).slice(0, 400));
+    // ④ 갤러리 릴레이(pickImages)
+    const pr1 = await rel.pickImages({ photos: [{ id: G3 }, { id: G1 }, { id: G4 }, { id: G2 }, { id: G5 }] }, 'prc259a');
+    const pr2 = await rel.pickImages({ photos: [{ id: G3 }, { id: G4 }, { id: G5 }] }, 'prc259b');
+    blobsMock.hooks.failGet = (k) => k === 'mask:' + G1;
+    const pr3 = await rel.pickImages({ photos: [{ id: G1 }] }, 'prc259c');
+    blobsMock.hooks.failGet = savedFail;
+    T('C259 갤러리 릴레이: 가린 판·가릴 것 없음만 보냄(가린 바이트·원본 각 1) · 판 없음·상태 없음·어긋남만이면 0장(NO_PHOTOS로 거절) · 판 읽기 실패면 0장(원본으로 안 넘어감)',
+      pr1.length === 2 && pr1[0].bytesB64 === maskB && pr1[1].bytesB64 === raw && pr2.length === 0 && pr3.length === 0, JSON.stringify([pr1.length, pr2.length, pr3.length]));
+    mem.gw_data['col:promo'] = savedPromo; process.env.GW_GALLERY_FEED_KEY = savedFk || '';
+    delete mem.gw_data['promo:share:' + S];
+  } finally { blobsMock.hooks.failGet = savedFail; }
+
+  // ⑤ 크론: 판 없는 사진 가리기 — 게시 완료 기록 포함 · 처음 감지와 같게(only_old·force 아님) · 간격·상한 · 읽기 실패는 '판 없음' 아님 · 옛 done 표식(v 없음) 한 번 다시
+  const cronC = require(join(FN, 'gw-promo-ai-cron.js'));
+  const wk = require(join(FN, 'gw-promo-mask-background.js'));
+  const M1 = G('d'), M2 = 'att_' + '0123456789abcdef', M3 = 'att_' + 'fedcba9876543210';
+  mem.gw_files[M1] = ORIG(M1); mem.gw_files[M2] = ORIG(M2); mem.gw_files[M3] = ORIG(M3);
+  mem.gw_files['mask:' + M2] = MASK(M2, maskB, [{ kind: 'face', x: 0.1, y: 0.1, w: 0.1, h: 0.1, by: 'auto' }]); mem.gw_files['maskmeta:' + M2] = META(1);   // 새 판
+  mem.gw_files['mask:' + M3] = Object.assign(MASK(M3, maskB, [{ kind: 'face', x: 0.1, y: 0.1, w: 0.1, h: 0.1, by: 'auto' }]), { model: 'claude-sonnet-5' }); mem.gw_files['maskmeta:' + M3] = Object.assign(META(1), { model: 'claude-sonnet-5' });   // 옛 판
+  delete mem.gw_files['mask:' + M1]; delete mem.gw_files['maskmeta:' + M1];
+  const savedPromo2 = mem.gw_data['col:promo'];
+  mem.gw_data['col:promo'] = { schema: 1, items: [
+    { id: 'prc259p', title: 't', body: 'b', status: 'posted', blog_url: 'https://blog.example/p/1', photos: [{ id: M1 }, { id: M2 }, { id: M3 }], ai: { ts: 1 }, tags: ['x'] },
+  ] };
+  ['promomask:remask', 'promomask:remask:prc259p', 'promomask:lock:prc259p'].forEach((k) => { delete mem.gw_data[k]; });
+  mem.gw_data['promomask:usage'] = { schema: 1, months: {} };
+  const savedKey = process.env.GW_ANTHROPIC_KEY, savedUrl = process.env.URL; process.env.GW_ANTHROPIC_KEY = 'test-anthropic-key-0000'; process.env.URL = 'https://x.test';
+  const realFetch = global.fetch; const kicks = [];
+  global.fetch = async (url, opt) => {
+    const u = String(url);
+    if (/gw-promo-mask-background/.test(u)) { kicks.push(JSON.parse(opt.body)); return { ok: true, status: 202 }; }
+    if (/api\.anthropic\.com/.test(u)) return { status: 200, text: async () => JSON.stringify({ model: 'claude-sonnet-5', stop_reason: 'end_turn', usage: { input_tokens: 10, output_tokens: 5 }, content: [{ type: 'text', text: JSON.stringify({ boxes: [{ kind: 'face', x: 0.3, y: 0.3, w: 0.1, h: 0.1 }] }) }] }) };
+    return { ok: true, status: 202 };
+  };
+  const tk = () => mem.gw_data['promomask:remask:prc259p'] || {};
+  const unlock = () => { mem.gw_data['promomask:lock:prc259p'] = { ts: 0, job: '' }; };
+  const savedFail2 = blobsMock.hooks.failGet;
+  try {
+    const sh0 = await MG.pickPublic(M1);
+    let rc = await cronC.handler({}); let oc = JSON.parse(rc.body);
+    T('C259 크론: 게시 완료 기록의 판 없는 사진 1장 → 처음 감지로 기동(ids=[M1]만·force false·only_old false) · 게시 완료 기록의 옛 판 M3는 재감지 대상 아님(old 0) · 표식 mtries 1 · 감사 "판 없음"',
+      sh0.status === 409 && rc.statusCode === 200 && oc.remask && oc.remask.mode === 'missing' && oc.remask.promo === 'prc259p' && oc.remask.miss === 1 && oc.remask.old === 0 && oc.remask.ok === true
+      && kicks.length === 1 && kicks[0].ids.length === 1 && kicks[0].ids[0] === M1 && kicks[0].force === false && kicks[0].only_old === false && tk().mtries === 1 && tk().mts > 0
+      && auditMock.logs.some((l) => l.ev && l.ev[0].op === '가리기재감지' && /^판 없음 1장/.test(l.ev[0].t)), JSON.stringify(oc.remask) + ' ' + JSON.stringify(kicks));
+    // 워커(처음 감지)가 판을 만들면 공개 길이 열린다
+    const itok = issueSession({ id: '__promomask__', role: 'system' }).token;
+    faceMock.fail = true;
+    await wk.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + itok }, body: JSON.stringify({ job: kicks[0].job, promo_id: 'prc259p', ids: kicks[0].ids, force: kicks[0].force, only_old: kicks[0].only_old }) }, {});
+    const jw = mem.gw_data['promomask:job:' + kicks[0].job]; const sh1 = await MG.pickPublic(M1);
+    T('C259 워커(판 없음 모드): M1 masked · mask·maskmeta 생김 → pickPublic 가린 판 · 원본 그대로 보존',
+      jw && jw.status === 'done' && jw.photos[0].st === 'masked' && mem.gw_files['maskmeta:' + M1] && mem.gw_files['maskmeta:' + M1].n === 1 && sh1.ok && sh1.masked === true && sh1.rec.data !== raw && mem.gw_files[M1].data === raw, JSON.stringify(jw && jw.photos) + ' ' + JSON.stringify(sh1.code || ''));
+    // 판이 다 생기면 다음 회차는 기동 없음·done(v2)
+    unlock(); rc = await cronC.handler({}); oc = JSON.parse(rc.body);
+    T('C259 크론: 판이 다 생긴 게시 완료 기록 → 기동 없음 · done 표식 v2', oc.remask && !oc.remask.promo && kicks.length === 1 && tk().done > 0 && tk().v === 2, JSON.stringify(oc.remask) + ' ' + JSON.stringify(tk()));
+    // 다시 판 없는 상태로(실패 흉내) + 기록이 바뀜 → 간격 규칙
+    delete mem.gw_files['mask:' + M1]; delete mem.gw_files['maskmeta:' + M1];
+    mem.gw_data['col:promo'].items[0].updated_ts = Date.now() - 20 * 60000 + 1;
+    mem.gw_data['promomask:remask:prc259p'] = { done: Date.now() - 30 * 60000, v: 2, mtries: 1, mts: Date.now() - 60000 };
+    unlock(); rc = await cronC.handler({}); oc = JSON.parse(rc.body);
+    T('C259 크론 간격: 1회 시도 1분 뒤 → 기다림(10분 간격) · 기동 없음 · done 안 씀(다음 회차에 다시 본다)', oc.remask && !oc.remask.promo && oc.remask.scanned === 1 && kicks.length === 1 && !(tk().done > Date.now() - 60000), JSON.stringify(oc.remask) + ' ' + JSON.stringify(tk()));
+    mem.gw_data['promomask:remask:prc259p'].mts = Date.now() - 11 * 60000;
+    unlock(); rc = await cronC.handler({}); oc = JSON.parse(rc.body);
+    T('C259 크론 간격: 11분 뒤 → 2회째 기동(mtries 2)', oc.remask && oc.remask.mode === 'missing' && oc.remask.ok === true && kicks.length === 2 && tk().mtries === 2, JSON.stringify(oc.remask));
+    // 상한: 4회 → 더 안 돈다 · mcapped · done(v2) — 영원히 실패하는 사진이 회차를 막지 않는다
+    mem.gw_data['promomask:remask:prc259p'] = { mtries: 4, mts: Date.now() - 999 * 60000 };
+    mem.gw_data['col:promo'].items.push({ id: 'prc259q', title: 't', body: 'b', status: 'review', photos: [{ id: M3 }], ai: { ts: 1 }, tags: ['x'] });
+    ['promomask:remask:prc259q', 'promomask:lock:prc259q'].forEach((k) => { delete mem.gw_data[k]; });
+    unlock(); rc = await cronC.handler({}); oc = JSON.parse(rc.body);
+    T('C259 크론 상한: 판 없는 사진 4회 실패 기록은 건너뛰고(mcapped 1·done v2) 같은 회차에 다음 기록(게시 전 옛 판 prc259q)을 기동', oc.remask && oc.remask.mcapped === 1 && tk().done > 0 && tk().v === 2 && oc.remask.promo === 'prc259q' && kicks.length === 3 && kicks[2].only_old === true && kicks[2].force === true, JSON.stringify(oc.remask) + ' ' + JSON.stringify(tk()));
+    mem.gw_data['col:promo'].items = mem.gw_data['col:promo'].items.filter((x) => x.id !== 'prc259q'); mem.gw_data['promomask:lock:prc259q'] = { ts: 0, job: '' };
+    // 옛 done 표식(v 없음 — 판 없는 사진 규칙 전) → 한 번 다시 본다
+    mem.gw_data['promomask:remask:prc259p'] = { done: Date.now() + 999999, old: 0 };
+    unlock(); rc = await cronC.handler({}); oc = JSON.parse(rc.body);
+    T('C259 크론: 옛 done 표식(v 없음)은 다시 본다 → 판 없는 사진 기동', oc.remask && oc.remask.mode === 'missing' && oc.remask.promo === 'prc259p' && kicks.length === 4, JSON.stringify(oc.remask));
+    // 상태 문서 읽기 실패는 '판 없음'이 아니다
+    mem.gw_data['promomask:remask:prc259p'] = {};
+    blobsMock.hooks.failGet = (k) => k === 'maskmeta:' + M1;
+    unlock(); rc = await cronC.handler({}); oc = JSON.parse(rc.body);
+    blobsMock.hooks.failGet = savedFail2;
+    T('C259 크론: maskmeta 읽기 실패 → 판 없음으로 보지 않음(기동 없음·done 안 씀)', oc.remask && !oc.remask.promo && kicks.length === 4 && !tk().done, JSON.stringify(oc.remask) + ' ' + JSON.stringify(tk()));
+    // 첫 시도는 기록 저장 뒤 10분(앱이 저장 직후 거는 자동 감지와 겹치지 않게)
+    mem.gw_data['col:promo'].items[0].updated_ts = Date.now() - 60000;
+    unlock(); rc = await cronC.handler({}); oc = JSON.parse(rc.body);
+    T('C259 크론: 기록 저장 1분 뒤 첫 시도는 기다림(10분)', oc.remask && !oc.remask.promo && kicks.length === 4, JSON.stringify(oc.remask));
+  } finally {
+    blobsMock.hooks.failGet = savedFail2; global.fetch = realFetch; process.env.GW_ANTHROPIC_KEY = savedKey; process.env.URL = savedUrl; faceMock.fail = true;
+    mem.gw_data['col:promo'] = savedPromo2;
+    Object.keys(mem.gw_data).filter((k) => /prc259/.test(k) || k === 'promomask:remask').forEach((k) => { delete mem.gw_data[k]; });
+    [G1, G2, G3, G4, G5, G6, G7, G8, M1, M2, M3].forEach((id) => { delete mem.gw_files[id]; delete mem.gw_files['mask:' + id]; delete mem.gw_files['maskmeta:' + id]; });
+  }
 }
 
 // ===== 45. 번호판 전용 경로 v371(PM 9/23 "차번호 덜/안 가려짐" → "ㄱ") — 순수 함수 · detectPlates 흐름(주입 차량·가짜 비전) · 워커 platedet 경로/폴백/비전 오류/재감지 · 크론 옛 판 판정

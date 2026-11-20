@@ -38,6 +38,7 @@ async function applyDoneJobs(st, doc, now) {
   return { applied: applied, scanned: scanned };
 }
 
+// C259: 판 없는 사진(maskmeta 없음 — 작업 기록 없음·실패·시간 초과)은 게시 완료 기록까지 처음 감지와 같게 다시 건다(먼저 · 회차당 1건 공유 · 아래 MISS_* 규칙).
 // 옛 판 재감지(v364 → v371): 게시 전 기록의 사진 중 maskmeta.model에 'platedet'가 없는(=번호판 전용 경로 이전) 자동 판만 골라 그 사진들만 mask_start(force). 회차당 1건.
 //   적대 검증(9/16) 반영: 사람 판(human)은 제외 · 옛 판 사진 id만 워커에(새 판·시간 초과 꼬리 재감지 낭비 없음) · 시도 수는 실제 기동 때만(REMASK_MAX회, 잠금·예산·기동 실패는 안 셈)
 //   · 크론은 월 상한의 70%까지만(사람 몫 보호) · 옛 판이 없거나 상한에 닿은 기록은 promomask:remask:<id>.done 표식 → 기록이 바뀌기 전엔 maskmeta를 다시 안 읽는다(10분마다 전수 읽기 방지, 30초 제한)
@@ -47,6 +48,13 @@ const REMASK_GLOBAL_KEY = 'promomask:remask';   // 전역 중단 표식 {until, 
 const GLOBAL_CODES = { BUDGET_CAP: 1, ENV_MISSING: 1, NO_SITE_URL: 1, SERVER_CONFIG_MISSING: 1, KICKOFF_FAILED: 1 };
 const LOCK_TTL_MS = 15 * 60 * 1000;
 const RE_PROMO_ID = /^[A-Za-z0-9_-]{2,48}$/;
+// C259 판 없는 사진(작업 기록 없음·실패·시간 초과) 가리기 — 표식 promomask:remask:<id>의 mtries·mts(옛 판 tries와 따로 센다)
+const RE_ATT = /^att_[a-f0-9]{16}$/i;
+const MISS_MAX = PJ.MAX_TRIES;              // 사진당이 아니라 기록당 시도 상한(4) — 영원히 실패하는 사진이 크론을 막지 않게
+const MISS_GRACE_MS = 10 * 60 * 1000;      // 첫 시도는 기록이 바뀌고 10분 뒤(앱이 저장 직후 거는 자동 감지에 맡김)
+const REMASK_SCAN_MS = 12000;            // ③ 훑기 시간 상한(크론 함수 30초 안 — ①②④⑤⑥ 몫 남김)
+const REMASK_DONE_V = 2;                   // done 표식 판 — 판 없는 사진 규칙 전에 쓴 표식은 한 번 다시 본다
+const { absent } = require('./_lib/maskgate');
 async function remaskOld(st, doc, now) {
   const { blobSet } = require('./_lib/blobs');
   const MK = require('./gw-promo-mask');
@@ -54,35 +62,56 @@ async function remaskOld(st, doc, now) {
   const g = await blobGet(st, REMASK_GLOBAL_KEY);
   if (g.ok && g.data && Number(g.data.until) > now) return { skipped: 'global', code: String(g.data.code || ''), until: Number(g.data.until) };   // 전역 거부 뒤 6시간은 ③ 전체를 쉰다(고아 job·읽기 낭비 방지)
   const fst = store('gw_files');
-  const items = (doc.items || []).filter(function (r) { return r && r.del !== 1 && r.status !== 'posted' && Array.isArray(r.photos) && r.photos.length && RE_PROMO_ID.test(String(r.id || '')); });
-  let capped = 0, scanned = 0;
+  // C259: 게시 완료 기록도 본다(공개 길은 가린 판이 확인된 사진만 내므로 판 없는 사진은 블로그·갤러리에서 빠진다 — 판을 만들어 채운다).
+  //   게시 완료 기록은 '판 없는 사진'만(옛 판 재감지는 종전대로 게시 전 기록만).
+  const items = (doc.items || []).filter(function (r) { return r && r.del !== 1 && Array.isArray(r.photos) && r.photos.length && RE_PROMO_ID.test(String(r.id || '')); });
+  let capped = 0, scanned = 0, mcapped = 0;
   for (const r of items) {
+    if (Date.now() - now > REMASK_SCAN_MS) return { promo: '', old: 0, capped: capped, mcapped: mcapped, scanned: scanned, partial: true };   // C259: 게시 완료 기록까지 넓혀 첫 회차들은 읽을 것이 많다 — 함수 시간 안에서 끊고 다음 회차에 이어 본다(done 표식이 쌓여 줄어든다)
+    const posted = r.status === 'posted';
     const tk = 'promomask:remask:' + r.id;
     const tr = await blobGet(st, tk);
     const td = (tr.ok && tr.data && typeof tr.data === 'object') ? tr.data : {};
     const upd = Math.max(Number(r.updated_ts) || 0, Number(r.updated) || 0, Number(r.ts) || 0);
-    if (td.done && upd <= Number(td.done)) continue;   // 이미 새 판만(또는 상한) — 기록이 바뀌면 다시 본다
+    if (td.done && td.v === REMASK_DONE_V && upd <= Number(td.done)) continue;   // 이미 새 판만(또는 상한) — 기록이 바뀌면 다시 본다 · C259: 판 없는 사진 규칙 전에 쓴 done(v 없음)은 한 번 다시 본다
     if (td.det_down && now - Number(td.det_down) < REMASK_PAUSE_MS) continue;   // 검출기 장애 직후 — 6시간 뒤 다시(시도 수는 워커가 되돌려 둠)
     if ((Number(td.fails) || 0) >= REMASK_MAX) continue;   // 기동 실패 상한(기록별) — 기록이 바뀌어도 사람이 [자동 감지 실행]으로 푼다
     const lk = await blobGet(st, 'promomask:lock:' + r.id);
     if (lk.ok && lk.data && Number(lk.data.ts) && now - Number(lk.data.ts) < LOCK_TTL_MS) continue;   // 가리기 작업이 도는 중 — 판이 생기는 중이라 done 표식을 쓰면 안 된다(검증 #1)
     scanned++;
-    const old = []; let seen = 0;
+    const old = [], miss = []; let seen = 0, readFail = 0;
     for (const p of r.photos.slice(0, REMASK_PHOTOS)) {
       const id = String((p && p.id) || '');
-      if (!id) continue;
+      if (!RE_ATT.test(id)) continue;   // C259: 첨부 id 꼴만(다른 꼴은 판이 생기지 않는다 — 읽지도 세지도 않는다)
       const m = await blobGet(fst, 'maskmeta:' + id);
-      if (!m.ok || !m.data) continue;   // 판이 아직 없음 — 저장 뒤 자동 감지가 만든다
+      if (absent(m)) { miss.push(id); continue; }   // C259: 판 없음(작업 기록 없음·실패·시간 초과) — 판 없는 사진 가리기 대상
+      if (!m.ok) { readFail++; continue; }   // 읽기 실패는 '판 없음'이 아니다 — 이번 회차는 판단하지 않는다(done도 안 씀)
       seen++;
       if (m.data.human === true) continue;   // 사람 판은 그대로
-      if (!/platedet2/.test(String(m.data.model || ''))) old.push(id);   // v372: 번호판 전용 경로 2판(platedet2)을 거치지 않은 판은 전부 옛 판(v364 facedet+claude 판·v371 platedet 1판 포함)
+      if (!posted && !/platedet2/.test(String(m.data.model || ''))) old.push(id);   // v372: 번호판 전용 경로 2판(platedet2)을 거치지 않은 판은 전부 옛 판(v364 facedet+claude 판·v371 platedet 1판 포함)
     }
     const tries = Number(td.tries) || 0;
-    const want = r.photos.slice(0, REMASK_PHOTOS).filter(function (p) { return p && p.id; }).length;
+    const want = r.photos.slice(0, REMASK_PHOTOS).filter(function (p) { return p && RE_ATT.test(String(p.id || '')); }).length;   // C259: 첨부 id 꼴만 센다(다른 꼴이 섞인 기록이 done을 영영 못 받던 것)
+    // C259 판 없는 사진: 시도 상한 MISS_MAX(=사진AI 재시도 상한) · 간격 RETRY_MIN(즉시→10분→30분→2시간, 첫 시도는 기록 저장 뒤 MISS_GRACE_MS — 저장 직후 앱이 거는 자동 감지와 겹치지 않게)
+    const mtries = Number(td.mtries) || 0;
+    const mwait = mtries ? PJ.RETRY_MIN[Math.min(mtries, PJ.RETRY_MIN.length - 1)] * 60000 : MISS_GRACE_MS;
+    const mfrom = mtries ? (Number(td.mts) || 0) : upd;
+    if (miss.length && mtries < MISS_MAX && now - mfrom >= mwait) {
+      const s = await MK.startForCron(st, { promoId: r.id, ids: miss, missing: true, by: '자동(판 없는 사진 가리기)', capRatio: REMASK_CAP_RATIO });
+      if (s.ok) await blobSet(st, tk, Object.assign({}, td, { mts: now, mtries: mtries + 1, mjob: s.job, miss: miss.length }));
+      else if (s.code !== 'ALREADY_RUNNING') {
+        if (GLOBAL_CODES[s.code] || /^KICKOFF_/.test(String(s.code))) await blobSet(st, REMASK_GLOBAL_KEY, { until: now + REMASK_PAUSE_MS, code: String(s.code), promo: r.id, ts: now });
+        else await blobSet(st, tk, Object.assign({}, td, { fails: (Number(td.fails) || 0) + 1, code: String(s.code), ts: now }));
+      }
+      return { promo: r.id, mode: 'missing', miss: miss.length, old: old.length, seen: seen, ok: !!s.ok, code: s.code || '', job: s.job || '', mtries: s.ok ? mtries + 1 : mtries, capped: capped, mcapped: mcapped, scanned: scanned };
+    }
+    if (miss.length && mtries >= MISS_MAX) mcapped++;
     if (!old.length || tries >= REMASK_MAX) {
       if (old.length) capped++;
       // done 표식은 사진마다 판이 다 있을 때(또는 상한)만 — 판이 아직 없는 사진은 다음 회차에 다시 본다(검증 #1: 첫 감지 전 회차에 done을 쓰면 폴백 판이 영영 안 걸린다)
-      if (seen === want || tries >= REMASK_MAX) await blobSet(st, tk, Object.assign({}, td, { done: now, old: old.length }));
+      //   C259: 판 없는 사진이 남아 있으면 그 시도 상한에 닿았을 때만 · 읽기 실패가 있던 회차는 쓰지 않는다
+      const doneOk = !readFail && (miss.length ? mtries >= MISS_MAX : (seen === want || tries >= REMASK_MAX));
+      if (doneOk) await blobSet(st, tk, Object.assign({}, td, { done: now, v: REMASK_DONE_V, old: old.length, miss: miss.length }));
       continue;
     }
     const s = await MK.startForCron(st, { promoId: r.id, ids: old, force: true, by: '자동(검출기 교체 재감지)', capRatio: REMASK_CAP_RATIO });
@@ -91,9 +120,9 @@ async function remaskOld(st, doc, now) {
       if (GLOBAL_CODES[s.code] || /^KICKOFF_/.test(String(s.code))) await blobSet(st, REMASK_GLOBAL_KEY, { until: now + REMASK_PAUSE_MS, code: String(s.code), promo: r.id, ts: now });   // 전역 원인 — ③ 전체 6시간 중단(검증 #6·#12)
       else await blobSet(st, tk, Object.assign({}, td, { fails: (Number(td.fails) || 0) + 1, code: String(s.code), ts: now }));   // 기록 원인(사진 없음 등) — 기록별 상한
     }
-    return { promo: r.id, old: old.length, seen: seen, ok: !!s.ok, code: s.code || '', job: s.job || '', tries: s.ok ? tries + 1 : tries, capped: capped, scanned: scanned };
+    return { promo: r.id, old: old.length, seen: seen, ok: !!s.ok, code: s.code || '', job: s.job || '', tries: s.ok ? tries + 1 : tries, capped: capped, mcapped: mcapped, scanned: scanned };
   }
-  return { promo: '', old: 0, capped: capped, scanned: scanned };
+  return { promo: '', old: 0, capped: capped, mcapped: mcapped, scanned: scanned };
 }
 
 exports.handler = async function (event) {

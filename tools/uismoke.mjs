@@ -266,7 +266,7 @@ try {
     T('v371 동봉·의존: cocossd 6파일(1KB 이상) · package.json @tensorflow-models/coco-ssd · netlify.toml included_files _models/**(cocossd 포함) · platedet.js는 OCR·번호판 전용 모델을 싣지 않고 번호 문자열을 저장하지 않는다(프롬프트 "번호 문자열은 적지 마세요" 2곳)',
       missing.length === 0 && !!pkg.dependencies['@tensorflow-models/coco-ssd'] && /included_files = \["netlify\/functions\/_models\/\*\*"\]/.test(toml) && /lite_mobilenet_v2/.test(pd) && !/ocr|OCR|easyocr|paddle|hyperlpr|yolo/i.test(pd) && (pm.match(/번호 문자열은 적지 마세요/g) || []).length === 2, missing.join(','));
     T('v371·v372 배선: 워커 P.detectPlates(plates·verify·whole 주입)·model platedet2+·차량 검출기 못 실리면 종전 번호판 경로(MODELS_MISSING·WASM만)·비전 오류는 fail: · 재감지 새 판 판정 /platedet/ · 크론 옛 판 = platedet 없음 · promomask askVision·detectPlatesInCrop·verifyPlate(full/partial/none) 내보냄',
-      /P\.detectPlates\(raw, \{/.test(wk) && /model: 'platedet2\+' \+ M\.MODEL/.test(wk) && /code !== 'MODELS_MISSING' && code !== 'WASM_BACKEND_FAILED'\) throw e;/.test(wk) && /prev && onlyOld && \/platedet2\/\.test\(String\(prev\.model \|\| ''\)\)/.test(wk) && /if \(!\/platedet2\/\.test\(String\(m\.data\.model \|\| ''\)\)\) old\.push\(id\);/.test(cr)
+      /P\.detectPlates\(raw, \{/.test(wk) && /model: 'platedet2\+' \+ M\.MODEL/.test(wk) && /code !== 'MODELS_MISSING' && code !== 'WASM_BACKEND_FAILED'\) throw e;/.test(wk) && /prev && onlyOld && \/platedet2\/\.test\(String\(prev\.model \|\| ''\)\)/.test(wk) && /if \((!posted && )?!\/platedet2\/\.test\(String\(m\.data\.model \|\| ''\)\)\) old\.push\(id\);/.test(cr)
       && /async function askVision\(apiKey, mediaType, b64, system, question, schema, maxTokens\)/.test(pm) && /async function detectPlatesInCrop\(apiKey, mediaType, b64\)/.test(pm) && /async function verifyPlate\(apiKey, mediaType, b64\)/.test(pm) && /enum: \['full', 'partial', 'none'\]/.test(pm) && /detectBoxes, askVision, detectPlatesInCrop, verifyPlate, applyBoxes/.test(pm), '');
   } catch (e) { console.log('  (v371 검사 생략 — ' + e.message + ')'); fails++; }
   T('v369 문서함 [열기] 직원 표시: .view.readonly .mini-btn 숨김의 예외로 [data-doc-att-open] 버튼은 남는다(보기 권한 열람 통로) · 행 렌더의 열기 버튼이 그 속성을 갖는다',
@@ -1430,9 +1430,12 @@ try {
     && /v\.payload\.mid !== '__promomask__'/.test(mw) && ['mask_start', 'mask_job', 'mask_state', 'mask_get', 'mask_apply', 'mask_clear'].every((a) => new RegExp("case '" + a + "'").test(mk))
     && !/process\.env\.GW_ANTHROPIC_KEY/.test(ml) && /process\.env\.GW_ANTHROPIC_KEY/.test(mw), '');
   T('소비처 5곳 mask 우선: 공개 서빙·검수 격자 att_get(raw:true는 홍보 do+승인 기기+감사)·갤러리 릴레이·갤러리 실경로(feed index/img)·사진AI 워커 · att_del이 mask·maskmeta 동반 삭제 · 캐시 5분',
-    /blobGet\(store\(FILES\), 'mask:' \+ ids\[i\]\)/.test(img) && /max-age=300/.test(img) && /blobGet\(store\(FILES\), 'mask:' \+ String\(d\.id \|\| ''\)\)/.test(gwd) && /if \(d\.raw !== true\) \{/.test(gwd) && /if \(permOf\(c\.member, 'promo'\) !== 'do'\) return jr\(403/.test(gwd) && /op: '원본열람'/.test(gwd)
-    && /blobGet\(store\(FILES\), 'mask:' \+ id\)/.test(gal) && (feed.match(/blobGet\(store\(FILES\), 'mask:' \+ (id|att)\)/g) || []).length === 2 && /max-age=300/.test(feed) && /blobGet\(fst, 'mask:' \+ id\)/.test(pw)
+    /pickPublic\(ids\[i\], store\(FILES\)\)/.test(img) && /max-age=300/.test(img) && /blobGet\(store\(FILES\), 'mask:' \+ String\(d\.id \|\| ''\)\)/.test(gwd) && /if \(d\.raw !== true\) \{/.test(gwd) && /if \(permOf\(c\.member, 'promo'\) !== 'do'\) return jr\(403/.test(gwd) && /op: '원본열람'/.test(gwd)
+    && /pickPublic\(id, store\(FILES\)\)/.test(gal) && (feed.match(/pickPublic\((id|att), store\(FILES\)\)/g) || []).length === 2 && /max-age=300/.test(feed) && /blobGet\(fst, 'mask:' \+ id\)/.test(pw)
     && /\['mask:' \+ String\(d\.id \|\| ''\), 'maskmeta:' \+ String\(d\.id \|\| ''\)\]/.test(gwd), '');
+  // C259: 공개 길 세 곳은 _lib/maskgate 하나로만 판정 — 원본(첨부 id 직접 읽기)으로 넘어가는 길이 남아 있지 않아야 한다
+  T('C259 공개 길 세 곳(공유 주소·갤러리 피드 index/img·갤러리 릴레이): _lib/maskgate pickPublic 공용 · mask 없으면 원본을 다시 읽던 줄 없음',
+    [img, gal, feed].every((s) => /require\('\.\/_lib\/maskgate'\)/.test(s)) && ![img, gal, feed].some((s) => /fr = await blobGet\(store\(FILES\), (ids\[i\]|id|att)\)/.test(s)) && !/'mask:' \+/.test(img + gal + feed), '');
   T('적대 검증 반영: 비전 stop_reason 검사(REFUSAL·TRUNCATED)·parseBoxes null·MAX_TOKENS 4096·effort low·cleanBoxes 클램프·PAD_MIN · 워커 force=자동 판만(human 보호)·저장 직전 재확인·12분 예산·maskmeta · 디스패처 월 상한·잠금 재확인·apply 검사 · 앱 좌표 클램프·다시 확인창',
     /stop === 'refusal'/.test(ml) && /stop === 'max_tokens'/.test(ml) && /if \(boxes === null\) throw new Error\('PARSE'\)/.test(ml) && /const MAX_TOKENS = 4096;/.test(ml) && /effort: 'low'/.test(ml) && /const x0 = Math\.max\(0, x\), y0 = Math\.max\(0, y\), x1 = Math\.min\(1, x \+ w\), y1 = Math\.min\(1, y \+ h\);/.test(ml) && /const PAD_MIN = 0\.01;/.test(ml)
     && /if \(prev && isHuman\(prev\)\)/.test(mw) && /const again = await blobGet\(fst, M\.maskKey\(id\)\);/.test(mw) && /const BUDGET_MS = 12 \* 60 \* 1000;/.test(mw) && /M\.metaKey\(id\), M\.metaOf\(rec\)/.test(mw)
@@ -1443,6 +1446,22 @@ try {
     && ['maskRefreshState', 'maskKick', 'maskOpenEditor', 'maskDraw', 'maskApply', 'maskPaintBadges'].every((f) => new RegExp('function ' + f + '\\(').test(html))
     && /action:"mask_apply",att_id:maskEd\.id,boxes:boxes/.test(html) && /by:"human"/.test(html) && /action:"att_get",id:attId,raw:true/.test(html)
     && /가리기 확인이 안 된 사진 "\+un\+"장이 있습니다/.test(html) && /id="maskCanvas"/.test(html), '');
+  // C259: 게시 완료 단추 — 판 없음·감지 중·상태 모름이면 장수와 '공개 주소에 나가지 않는다'를 보이는 확인창(실행 시험), 다 가렸으면 확인창 없음 · 단추가 prompt 전에 이 함수를 부름(배선)
+  {
+    const src = (html.match(/(function promoPostMaskWarn\(p\)\{[\s\S]*?\n  \})/) || ['', ''])[1];
+    const mkW = (ms) => new Function('maskState', src + '\nreturn promoPostMaskWarn;')(ms);
+    const ph = [{ id: 'att_' + 'a'.repeat(16) }, { id: 'att_' + 'b'.repeat(16) }, { id: 'att_' + 'c'.repeat(16) }, { id: 'docatt:1' }];
+    const p = { id: 'p1', photos: ph };
+    const w0 = mkW({})(p), w1 = mkW({ p1: { items: [{ id: ph[0].id, has: true }, { id: ph[1].id, has: false }, { id: ph[2].id, has: false }], running: false } })(p);
+    const w2 = mkW({ p1: { items: [{ id: ph[0].id, has: false }], running: true } })(p), w3 = mkW({ p1: { items: ph.slice(0, 3).map((x) => ({ id: x.id, has: true })), running: false } })(p);
+    const w4 = mkW({})({ id: 'p2', photos: [] });
+    const btn = (html.match(/document\.getElementById\("promoPostedBtn"\)\.addEventListener\("click",function\(\)\{([\s\S]*?)\n  \}\);/) || ['', ''])[1];
+    T('C259 게시 완료 확인창: 상태 모름 → 사진 3장(att만)·공개 주소에 나가지 않음 · 판 없음 2장 · 감지 중 1장 · 다 가림/사진 없음 → 확인창 없음 · 단추는 prompt 전에 confirm(취소면 상태 변경 없음)',
+      !!src && /사진 3장의 가림 상태를 아직 확인하지 못했습니다/.test(w0) && /공개 주소\(블로그 사진·홈페이지 갤러리\)에 나가지 않습니다/.test(w0)
+      && /가린 판이 없는 사진이 2장 있습니다/.test(w1) && /나가지 않습니다/.test(w1) && /진행 중입니다\(가린 판이 없는 사진 1장\)/.test(w2) && w3 === '' && w4 === ''
+      && /var mw=promoPostMaskWarn\(p\); if\(mw && !confirm\(mw\)\) return;/.test(btn) && btn.indexOf('promoPostMaskWarn(p)') < btn.indexOf('prompt(') && btn.indexOf('p.status="posted"') > btn.indexOf('promoPostMaskWarn(p)'),
+      JSON.stringify([w0, w1, w2, w3, w4]).slice(0, 300));
+  }
 } catch (e) { console.log('  (v353 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v339: 기본 숨김 모듈 집합이 앱·서버에서 갈라지면 권한 구멍이 된다(9/4 hr·9/10 lic 실사고) ----

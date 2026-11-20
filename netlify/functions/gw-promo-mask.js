@@ -113,14 +113,15 @@ async function startForCron(st, o) {
   if (!(lk3.ok && lk3.data && lk3.data.job === job)) return { ok: false, code: 'ALREADY_RUNNING', job: String((lk3.data && lk3.data.job) || '') };
   const base = { ts: Date.now(), by: String((o && o.by) || '자동'), promo_id: promoId, n: ids.length, done: 0, photos: [] };
   await blobSet(st, jobKey(job), Object.assign({ status: 'queued' }, base));
-  const onlyOld = !!(o && Array.isArray(o.ids) && o.ids.length);
-  const k = await kickBackground(job, promoId, ids, !!(o && o.force), onlyOld);
+  const missing = !!(o && o.missing === true);   // C259: 판 없는 사진 가리기 — 처음 감지와 같게(only_old 아님·force 아님: 판 있는 사진·사람 판은 워커가 그대로 둔다)
+  const onlyOld = !missing && !!(o && Array.isArray(o.ids) && o.ids.length);
+  const k = await kickBackground(job, promoId, ids, !missing && !!(o && o.force), onlyOld);
   if (!k.ok) {
     await blobSet(st, jobKey(job), Object.assign({ status: 'fail', code: k.code }, base));
     try { await blobSet(st, lockKey(promoId), { ts: 0, job: '' }); } catch (e) {}
     return { ok: false, code: k.code };
   }
-  try { await appendAudit({ ts: Date.now(), by: base.by, bid: '__cron__', col: 'promo', ev: [{ op: '가리기재감지', id: promoId.slice(0, 30), t: (onlyOld ? '옛 판 ' : '') + ids.length + '장 · ' + job }] }); } catch (e) {}
+  try { await appendAudit({ ts: Date.now(), by: base.by, bid: '__cron__', col: 'promo', ev: [{ op: '가리기재감지', id: promoId.slice(0, 30), t: (missing ? '판 없음 ' : (onlyOld ? '옛 판 ' : '')) + ids.length + '장 · ' + job }] }); } catch (e) {}
   return { ok: true, job: job, n: ids.length };
 }
 

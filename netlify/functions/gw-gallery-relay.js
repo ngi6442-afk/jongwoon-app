@@ -18,6 +18,7 @@ const REQSHAPE = require('./_lib/reqshape');   // C240 판 A-1 가르는 칸은 
 const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { verifyToken, bearer } = require('./_lib/session');
 const { appendAudit } = require('./_lib/audit');
+const { pickPublic } = require('./_lib/maskgate');   // C259 공개 사진 판정(세 길 공용)
 
 const DATA = 'gw_data';
 const USERS = 'gw_users';
@@ -120,11 +121,10 @@ async function pickImages(rec, pid) {
     if (out.length >= MAX_PHOTOS) break;
     const id = String((ph && ph.id) || '');
     if (!RE_ATT.test(id)) continue;
-    // v354 모자이크: 홈페이지로 나가는 사진은 가린 판이 있으면 그것(원본은 앱 밖으로 안 나간다)
-    let fr = await blobGet(store(FILES), 'mask:' + id);
-    if (!(fr.ok && fr.data && String(fr.data.data || ''))) fr = await blobGet(store(FILES), id);
-    if (!fr.ok || !fr.data || String(fr.data.kind || '') !== 'promo') continue;
-    const b64 = String(fr.data.data || '');
+    // v354 모자이크 → C259: 가린 판이 확인된 사진만(_lib/maskgate pickPublic — 공유 주소·피드와 같은 판정). 판 없음·실패·읽기 실패 사진은 빼고 보낸다(원본으로 넘어가지 않음)
+    const pk = await pickPublic(id, store(FILES));
+    if (!pk.ok) continue;
+    const b64 = String(pk.rec.data || '');
     if (!b64) continue;
     let buf;
     try { buf = Buffer.from(b64, 'base64'); } catch { continue; }
@@ -280,6 +280,8 @@ async function handlePublish(event, d, R) {
   } catch (e) {}
   return jr(201, { ok: true, pr_number: res.pr.number, pr_url: res.pr.html_url, images: images.length, tag: item.tag, request_id: R });
 }
+
+exports.pickImages = pickImages;   // C259 시험용(tools/servertest.mjs) — 공개 판정이 원본으로 넘어가지 않는지
 
 exports.handler = async function (event) {
   const R = rid();

@@ -15,6 +15,7 @@ const REQSHAPE = require('./_lib/reqshape');   // C240 판 A-1 가르는 칸은 
 const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { verifyToken, bearer } = require('./_lib/session');
 const IMG = require('./_lib/imgsniff');   // C265 공개 응답 그림 형식 허용 목록
+const { pickPublic } = require('./_lib/maskgate');   // C259 공개 사진 판정(세 길 공용)
 
 const DATA = 'gw_data';
 const USERS = 'gw_users';
@@ -83,13 +84,12 @@ async function handleImg(qs, R) {
   const ids = r.data.ids || [];
   if (!(i >= 0 && i < ids.length)) return jr(404, { status: 'REJECTED', error_code: 'BAD_INDEX', request_id: R });
 
-  // v353 모자이크: 가린 판(mask:<id>, 얼굴·번호판 픽셀화)이 있으면 그것을 내보낸다 — 이미 발급된 공유 링크도 새로 열리는 요청부터 가린 판(캐시 5분).
-  //   상자 0개로 확인된 mask(data 빈 값)는 '가릴 것 없음'이므로 원본을 낸다.
-  let fr = await blobGet(store(FILES), 'mask:' + ids[i]);
-  if (!(fr.ok && fr.data && String(fr.data.data || ''))) fr = await blobGet(store(FILES), ids[i]);
-  if (!fr.ok || !fr.data) return jr(404, { status: 'REJECTED', error_code: 'NO_FILE', request_id: R });
-  // 홍보 사진만 — 다른 종류 첨부(계약·석면 등)는 이 통로로 절대 나가지 않는다
-  if (String(fr.data.kind || '') !== 'promo') return jr(403, { status: 'FORBIDDEN', error_code: 'NOT_PROMO', request_id: R });
+  // v353 모자이크 → C259: 가린 판이 확인된 사진만 낸다(_lib/maskgate pickPublic — 피드·릴레이와 같은 판정).
+  //   가린 판(mask data) 있음 → 가린 판 · 빈 판 + maskmeta '상자 0개로 끝남' → 원본 · 그 밖(판 없음·실패·시간 초과·읽기 실패) → 거절(원본으로 넘어가지 않음).
+  //   이미 발급된 공유 링크도 새로 열리는 요청부터 같은 규칙(캐시 5분). 홍보 사진(kind promo)만 — 다른 종류 첨부는 이 통로로 나가지 않는다.
+  const pk = await pickPublic(ids[i], store(FILES));
+  if (!pk.ok) return jr(pk.status, { status: pk.status === 403 ? 'FORBIDDEN' : 'REJECTED', error_code: pk.code, request_id: R });
+  const fr = { data: pk.rec };
   // C265: 그림 형식만 — 저장된 type이 허용 목록(jpeg·png·webp) 밖이거나 머리 바이트가 그림이 아니면 거절. Content-Type은 머리 바이트로 정한 값(가린 판도 같은 규칙)
   const ctype = IMG.publicImageType(fr.data);
   if (!ctype) return jr(415, { status: 'REJECTED', error_code: 'NOT_IMAGE', request_id: R });

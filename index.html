@@ -25322,7 +25322,7 @@
     var n=(st.items||[]).length, has=(st.items||[]).filter(function(x){return x.has;}).length, masked=(st.items||[]).filter(function(x){return x.boxes;}).length;
     var h='<span>가리기: '+(st.running? '감지 중… ' : '')+'확인 '+has+'/'+n+'장 · 가린 사진 '+masked+'장</span>';
     if(canDo("promo")) h+='<button class="mini-btn" id="maskRunBtn"'+(st.running?" disabled":"")+'>'+(has<n? "자동 감지 실행" : "자동 감지 다시")+'</button>';
-    if(has<n && !st.running) h+='<span style="color:#a5382c;">미확인 사진은 원본 그대로 게시됩니다 — 자동 감지를 실행하세요</span>';
+    if(has<n && !st.running) h+='<span style="color:#a5382c;">미확인 사진은 공개 주소(블로그 사진·홈페이지 갤러리)에 나가지 않습니다 — 자동 감지를 실행하세요</span>';
     line.innerHTML=h;
     var rb=document.getElementById("maskRunBtn"); if(rb) rb.addEventListener("click", function(){
       var again = has>=n;
@@ -25762,8 +25762,8 @@
     var ms=maskState[p.id];
     if(ms && (ms.items||[]).length){
       var un=(ms.items||[]).filter(function(x){ return !x.has; }).length;
-      if(ms.running){ if(!confirm("사진 가리기 자동 감지가 아직 진행 중입니다. 지금 열면 일부 사진은 원본 그대로입니다.\n\n그래도 열까요?")) return; }
-      else if(un){ if(!confirm("가리기 확인이 안 된 사진 "+un+"장이 있습니다(얼굴·번호판이 그대로 나갈 수 있음). 위 [자동 감지 실행]을 먼저 누르는 것을 권합니다.\n\n그래도 열까요?")) return; }
+      if(ms.running){ if(!confirm("사진 가리기 자동 감지가 아직 진행 중입니다. 지금 열면 가린 판이 없는 사진은 공개 주소에 나가지 않아 빈 사진이 됩니다.\n\n그래도 열까요?")) return; }
+      else if(un){ if(!confirm("가리기 확인이 안 된 사진 "+un+"장이 있습니다(가린 판이 없는 사진은 공개 주소에 나가지 않음). 위 [자동 감지 실행]을 먼저 누르는 것을 권합니다.\n\n그래도 열까요?")) return; }
     }
     var title=document.getElementById("promoDetBlogTitle").value||p.title||"";
     var body=document.getElementById("promoDetBody").value||p.body||"";
@@ -25908,8 +25908,21 @@
     p.blog_url=list[0];
     if(list.length>1) p.blog_urls=list.slice(0,5); else delete p.blog_urls;
   }
+  // C259: 게시 완료 전 가림 확인 — 가린 판이 없는 사진은 공개 주소(블로그 사진·홈페이지 갤러리)에 나가지 않는다. 장수를 보이고 사람이 고른다.
+  function promoPostMaskWarn(p){
+    var n=(p&&p.photos||[]).filter(function(x){ return x && /^att_[a-f0-9]{16}$/i.test(String(x.id||"")); }).length;
+    if(!n) return "";
+    var tail="가린 판이 없는 사진은 공개 주소(블로그 사진·홈페이지 갤러리)에 나가지 않습니다. 상세 화면 [자동 감지 실행]이나 사진 배지로 먼저 확인하는 것을 권합니다.\n\n그래도 게시 완료로 표시할까요?";
+    var ms=maskState[p.id];
+    if(!ms) return "사진 "+n+"장의 가림 상태를 아직 확인하지 못했습니다.\n"+tail;
+    var un=(ms.items||[]).filter(function(x){ return !x.has; }).length;
+    if(ms.running) return "사진 가리기 자동 감지가 진행 중입니다(가린 판이 없는 사진 "+un+"장).\n"+tail;
+    if(un) return "가린 판이 없는 사진이 "+un+"장 있습니다.\n"+tail;
+    return "";
+  }
   document.getElementById("promoPostedBtn").addEventListener("click",function(){
     var p=promoFind(promoDetId); if(!p||!canDo("promo")) return;
+    var mw=promoPostMaskWarn(p); if(mw && !confirm(mw)) return;   // C259 — 취소면 상태 변경 없음
     var u=prompt("게시한 블로그 글 주소(URL)를 붙여넣어 주세요.\n홈페이지 갤러리 카드가 자동 생성되고, 카드의 [블로그 글 보기] 버튼에 이 주소가 연결됩니다.\n\n한 기록을 두 편 이상으로 나눠 올렸으면 주소를 1편·2편 순서대로 띄어 써서 모두 넣어 주세요(학습이 이어 붙여 비교합니다).\n\n(비워 두고 확인하면 게시 완료 표시만 하고 갤러리에는 보내지 않습니다)", (Array.isArray(p.blog_urls)&&p.blog_urls.length)? p.blog_urls.join(" ") : (p.blog_url||""));
     if(u===null) return;   // 취소 — 상태 변경 없음
     var pu=promoParseUrls(u);

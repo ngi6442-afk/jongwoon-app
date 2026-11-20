@@ -17,6 +17,7 @@ const crypto = require('crypto');
 const { setupBlobContext, store, blobGet } = require('./_lib/blobs');
 const { keyMatch } = require('./_lib/keymatch');   // P1 판24-② 비밀키 비교 공용
 const IMG = require('./_lib/imgsniff');   // C265 공개 응답 그림 형식 허용 목록
+const { pickPublic } = require('./_lib/maskgate');   // C259 공개 사진 판정(세 길 공용)
 
 const DATA = 'gw_data';
 const FILES = 'gw_files';
@@ -92,18 +93,18 @@ async function handleIndex(R) {
   for (const rec of recs) {
     const pid = String(rec.id || '');
     if (!pid) continue;
-    const photos = Array.isArray(rec.photos) ? rec.photos : [];
+    // C259: 앞 3장 안에서만 고른다 — img가 허용하는 범위(앞 3장)와 같게(사진이 빠지면 4번째 이후를 올려 넣지 않는다: img가 NOT_IN_FEED로 거절)
+    const photos = (Array.isArray(rec.photos) ? rec.photos : []).slice(0, MAX_PHOTOS);
     const imgs = [];
     for (const ph of photos) {
       if (imgs.length >= MAX_PHOTOS) break;
       const id = String((ph && ph.id) || '');
       if (!RE_ATT.test(id)) continue;
-      // v353 모자이크: 홈페이지로 나가는 사진은 가린 판(mask:<id>) 우선 — 원본은 앱 밖으로 안 나간다
-      let fr = await blobGet(store(FILES), 'mask:' + id);
-      if (!(fr.ok && fr.data && String(fr.data.data || ''))) fr = await blobGet(store(FILES), id);
-      if (!fr.ok || !fr.data || String(fr.data.kind || '') !== 'promo') continue;
-      if (!IMG.publicImageType(fr.data)) continue;   // C265: img가 거절할 사진(허용 목록 밖 type)은 목록에도 싣지 않는다
-      let buf; try { buf = Buffer.from(String(fr.data.data || ''), 'base64'); } catch { continue; }
+      // v353 모자이크 → C259: 가린 판이 확인된 사진만(_lib/maskgate pickPublic) — 판 없음·실패·읽기 실패 사진은 빼고, 남은 사진이 없으면 카드도 뺀다
+      const pk = await pickPublic(id, store(FILES));
+      if (!pk.ok) continue;
+      if (!IMG.publicImageType(pk.rec)) continue;   // C265: img가 거절할 사진(허용 목록 밖 type)은 목록에도 싣지 않는다
+      let buf; try { buf = Buffer.from(String(pk.rec.data || ''), 'base64'); } catch { continue; }
       const ext = detectImageExt(buf);
       if (!ext) continue;
       imgs.push({ file: imgName(pid, imgs.length + 1, ext), att: id, bytes: buf.length });
@@ -139,10 +140,10 @@ async function handleImg(qs, R) {
   });
   if (!allowed) return jr(404, { ok: false, code: 'NOT_IN_FEED', request_id: R });
 
-  let fr = await blobGet(store(FILES), 'mask:' + att);   // v353 모자이크: 가린 판 우선
-  if (!(fr.ok && fr.data && String(fr.data.data || ''))) fr = await blobGet(store(FILES), att);
-  if (!fr.ok || !fr.data) return jr(404, { ok: false, code: 'NO_FILE', request_id: R });
-  if (String(fr.data.kind || '') !== 'promo') return jr(403, { ok: false, code: 'NOT_PROMO', request_id: R });
+  // v353 모자이크 → C259: index와 같은 판정(_lib/maskgate pickPublic) — 가린 판이 확인되지 않은 사진은 원본 대신 거절
+  const pk = await pickPublic(att, store(FILES));
+  if (!pk.ok) return jr(pk.status, { ok: false, code: pk.code, request_id: R });
+  const fr = { data: pk.rec };
   // C265: 공유 주소(gw-promo-img)와 같은 규칙 — 그림 형식 허용 목록·머리 바이트, 밖이면 거절
   const ctype = IMG.publicImageType(fr.data);
   if (!ctype) return jr(415, { ok: false, code: 'NOT_IMAGE', request_id: R });
