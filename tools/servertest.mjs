@@ -4945,6 +4945,27 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       defs(uV).indexOf('asbestos') < 0 && defs(uS).indexOf('asbestos') >= 0 && defs(uS).indexOf('licenses') < 0 && rOk === '전체 면허,본인 면허' && rMg === '전체 면허,관리부 면허' && rRk === '전체 면허,직급 면허' && rAd.split(',').length === 4, JSON.stringify([defs(uV), rOk, rMg, rRk, rAd]));
     const devOk = await A74.deviceApproved({ headers: { 'x-device-id': 'dev74' } }, uV), devNo = await A74.deviceApproved({ headers: {} }, uV), devAdm = await A74.deviceApproved({ headers: {} }, { admin: true });
     T('74 물어보기 기기: 승인 기기만 · 관리자 통과', devOk && !devNo && devAdm, '');
+    { // C248 물어보기 my_tasks = 앱 taskForMe와 같은 규칙(who_id 본인 · scope 본인 포함 · '__all__' · 옛 who 이름) — 종전엔 앱에 없는 assignee_id·assignees로 걸러 늘 0건
+      const mkT = (id, o) => Object.assign({ id: id, title: '지시 ' + id, detail: '', who_id: '', who: '', scope: [], from: '시험', from_id: 'uboss', by: '시험', due: '2026-12-01', status: 'open', done_at: null, done_by: null, created: '2026-11-20', updated: '2026-11-20' }, o);   // index.html tasks.push와 같은 칸
+      const UT = { id: 'utask248', name: '지시받는이', admin: false, perms: { tasks: 'view' }, dept: '운영부', rank: '대리' };
+      const prevT = mem.gw_data['col:tasks'];
+      const mineOf = async (m) => { const o = await A74.runTool('my_tasks', {}, m); return o.error ? 'ERR' : (o.rows || []).map((x) => x.제목.replace('지시 ', '')).sort().join(); };
+      mem.gw_data['col:tasks'] = { schema: 1, items: [mkT('a', { who_id: 'utask248', who: '지시받는이' }), mkT('b', { scope: ['utask248'] }), mkT('c', { who_id: '__all__', who: '전체' }), mkT('d', { who_id: 'uother', who: '남' }), mkT('e', { who_id: 'utask248', who: '지시받는이', del: 1 })] };
+      const m1 = await mineOf(UT), mHide = await mineOf(Object.assign({}, UT, { perms: { tasks: 'hide' } })), mOther = await mineOf({ id: 'uother', name: '남', admin: false, perms: {} });
+      T('C248 my_tasks 앱 꼴 지시: 본인 담당 · scope 본인 · 전사 = 3건(남의 지시·삭제 줄 제외) · 지시 권한 숨김이면 안 줌 · 남은 자기 것 + 전사만', m1 === 'a,b,c' && mHide === 'ERR' && mOther === 'c,d', JSON.stringify([m1, mHide, mOther]));
+      mem.gw_data['col:tasks'] = { schema: 1, items: [mkT('f', { who: '지시받는이' }), mkT('g', { who_id: 'uother', who: '지시받는이' }), mkT('h', { scope: ['dept:운영부'] }), mkT('i', { scope: ['rank:대리'] }), mkT('j', { scope: ['dept:관리부'] }), mkT('k', { scope: ['rank:과장'] })] };   // 대리 = '대리 이상' 듦 · '과장 이상' 안 듦
+      const m2 = await mineOf(UT), mAdm = await mineOf({ id: 'uadm248', name: '관리', admin: true, perms: {} });
+      T('C248 my_tasks: 옛 자료(who_id 없이 이름) 일치 · who_id 있으면 이름으로 안 봄 · scope 부서·직급 이상 · 관리자도 scope 자동 통과 없음(앱 scopeIncludes와 같음)', m2 === 'f,h,i' && mAdm === '', JSON.stringify([m2, mAdm]));
+      if (prevT === undefined) delete mem.gw_data['col:tasks']; else mem.gw_data['col:tasks'] = prevT;
+      // 같은 줄기(C248 전수 표): 인허가 도구가 앱에 없는 칸(due·got·no)으로 걸러 만기 임박이 늘 0건 → 앱 칸(expiry·issued·license_no)
+      const in10 = new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10), in90 = new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10);
+      mem.gw_data['col:licenses'] = { schema: 1, items: [{ id: 'l1', name: '곧 만기', org: '기관', license_no: 'N-1', issued: '2020-01-01', expiry: in10, scope: [] }, { id: 'l2', name: '먼 만기', expiry: in90, scope: [] }, { id: 'l3', name: '만기 없음', expiry: '해당없음', scope: [] }, { id: 'l4', name: '남의 면허', expiry: in10, scope: ['uzz'] }] };
+      const UL = { id: 'ulic248', admin: false, perms: { lic: 'view' } };
+      const ld = await A74.runTool('licenses', { due_within_days: 30 }, UL), lq = await A74.runTool('licenses', { q: 'N-1' }, UL);
+      delete mem.gw_data['col:licenses'];
+      const r0 = (ld.rows || [])[0] || {};
+      T('C248 licenses: 만기 임박 = expiry 기준(해당없음·공개 대상 밖 제외) · 번호·취득·만기 칸이 앱 칸에서 나옴 · q가 번호(license_no)도 거름', (ld.rows || []).length === 1 && r0.이름 === '곧 만기' && r0.번호 === 'N-1' && r0.취득 === '2020-01-01' && r0.만기 === in10 && (lq.rows || []).length === 1, JSON.stringify([ld, lq.count]));
+    }
     // v426 양식 주민번호·백업 흔적
     const rrnFake = '900101-' + '1234567';
     let q6 = await call({ action: 'tpl_put', key: 'work_start', name: '착공계.xlsx', data: b64(mkXl({ A1: '현장대리인', F13: rrnFake })) }, tkA74);

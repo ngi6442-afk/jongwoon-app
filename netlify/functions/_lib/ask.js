@@ -59,6 +59,10 @@ const S = (v) => String(v == null ? '' : v);
 const RANKS = ['대표', '이사', '부장', '차장', '과장', '대리', '주임', '사원'];
 function scopeHas(scope, m) {
   if (m && m.admin) return true;
+  return scopeIncl(scope, m);
+}
+// 앱 scopeIncludes와 같은 판정(관리자 자동 통과 없음) — 지시 scope처럼 '누구에게 온 것인가'를 볼 때(C248). 공개 범위(인허가)는 위 scopeHas
+function scopeIncl(scope, m) {
   if (!Array.isArray(scope) || !scope.length) return true;
   if (!m) return false;
   return scope.some((tk) => {
@@ -69,6 +73,19 @@ function scopeHas(scope, m) {
     return false;
   });
 }
+// 나에게 온 지시(C248) — 앱 index.html taskForMe와 같은 규칙: 전사(who_id '__all__') · 본인 담당(who_id) · scope에 본인 포함 · 옛 자료(who_id 없이 이름).
+//   종전엔 앱에 없는 칸(assignee_id·assignees)으로 걸러 누구에게나 0건이었다. 바꾸면 앱 taskForMe와 동시에(servertest C248)
+function taskForMe(t, m) {
+  if (!t || !m) return false;
+  if (t.who_id === '__all__') return true;
+  if (m.id) {
+    if (t.who_id === m.id) return true;
+    if (Array.isArray(t.scope) && t.scope.length && scopeIncl(t.scope, m)) return true;
+  }
+  if (!t.who_id && m.name && S(t.who).trim() === m.name) return true;
+  return false;
+}
+const isDay = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const hit = (row, q, fields) => {
   if (!q) return true;
   const t = S(q).toLowerCase().replace(/\s+/g, '');
@@ -100,18 +117,19 @@ const TOOLS = [
       .map((c) => ({ 공사명: c.title, 발주처: c.client, 현장: c.site, 구분: c.label, 시작일: c.start, 상태: c.status, 담당: c.who, 계약금액: (c.contract_info || {}).amount })) },
 
   { name: 'licenses', col: 'licenses',
-    description: '인허가·면허 조회. 종류·기관·번호·취득일·만기·등급. q로 이름을 거른다. 만기 임박만 보려면 due_within_days.',
+    description: '인허가·면허 조회. 이름·기관·번호·취득일·만기(만기 없는 것은 "해당없음"). q로 이름·기관·번호를 거른다. 만기 임박만 보려면 due_within_days.',
     schema: { type: 'object', properties: { q: { type: 'string' }, due_within_days: { type: 'number' } } },
+    // C248 같은 줄기: 앱 인허가 줄의 칸(saveLicFromModal) = license_no·issued·expiry — 종전 no·got·due·kind·grade는 앱에 없는 칸이라 만기 임박이 늘 0건·번호/취득/만기가 늘 빈 값이었다
     run: async (a, member) => (await items('licenses'))
       .filter((l) => scopeHas(l.scope, member))   // v424 검토: 화면 licVisible과 같은 판정 — 자르기 전에
-      .filter((l) => hit(l, a.q, ['name', 'org', 'no', 'kind']))
+      .filter((l) => hit(l, a.q, ['name', 'org', 'license_no']))
       .filter((l) => {
         if (a.due_within_days == null) return true;
         const lim = new Date(Date.now() + a.due_within_days * 86400000).toISOString().slice(0, 10);
-        return l.due && l.due <= lim;
+        return isDay(l.expiry) && l.expiry <= lim;
       })
       .slice(0, ROW_CAP)
-      .map((l) => ({ 이름: l.name, 기관: l.org, 번호: l.no, 취득: l.got, 만기: l.due, 등급: l.grade })) },
+      .map((l) => ({ 이름: l.name, 기관: l.org, 번호: l.license_no, 취득: l.issued, 만기: l.expiry })) },
 
   { name: 'asbestos', col: 'asbestos',
     description: '석면 작업 이력 대장(산안법 30년 보존). 연번·공사명·발주처·소재지·기간·자재·면적·투입 인원수. 근로자 **이름과 생년월일은 돌려주지 않는다**(인원수만). q로 공사명·소재지를 거르고, year로 연도를 거른다.',
@@ -157,10 +175,10 @@ const TOOLS = [
     } },
 
   { name: 'my_tasks', col: 'tasks',
-    description: '나에게 온 지시 조회. 제목·기한·상태. 남의 지시는 돌려주지 않는다.',
+    description: '나에게 온 지시 조회(나에게 지정된 것 · 공개 대상에 내가 든 것 · 전 직원 대상). 제목·기한·상태. 남의 지시는 돌려주지 않는다.',
     schema: { type: 'object', properties: {} },
     run: async (a, member) => (await items('tasks'))
-      .filter((t) => S(t.assignee_id) === S(member.id) || (Array.isArray(t.assignees) && t.assignees.indexOf(member.id) >= 0))
+      .filter((t) => taskForMe(t, member))   // C248 앱 taskForMe와 같은 규칙
       .slice(0, ROW_CAP)
       .map((t) => ({ 제목: t.title, 기한: t.due, 상태: t.status })) },
 ];
@@ -291,4 +309,4 @@ async function saveRow(row, r) {
 }
 
 
-module.exports = { TOOLS, SYSTEM, METER_Q, ROW_CAP, MAX_TURNS, toolDefs, runTool, permOf, ask, deviceApproved, scopeHas };
+module.exports = { TOOLS, SYSTEM, METER_Q, ROW_CAP, MAX_TURNS, toolDefs, runTool, permOf, ask, deviceApproved, scopeHas, taskForMe };
