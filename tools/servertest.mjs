@@ -13474,4 +13474,126 @@ function J91a(x) { return JSON.stringify(x); }
   finally { pushMock.sendTo = sendSaveR; const s = JSON.parse(snapR); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; }
 }
 
+{ // ---- 66 급여 판1(원장 C236) 급여 법령 근거 bg:pay:law:v1 — 읽기 pay_bg_get(관리자만 · 승격본일 때만 on·행 · 세액표 본문은 안 실음) · 승격 스위치 pay_bg_set(pmconGate 쓰기 = PM · 낙관락 · prev · 감사 1줄 col pay) · 콘솔 줄 paybg(R2).
+  //   근거 표 = tools/pay_bg_fixture.json(얼린 사본). 결함 사본(gw-data 한 곳을 바꿔 메모리에서 컴파일 — 파일은 쓰지 않음)에서는 실패해야 한다.
+  const fsP = require('fs'), ModP = require('module');
+  const FILEP = join(FN, 'gw-data.js'), SRCP = fsP.readFileSync(FILEP, 'utf8');
+  const loadP = (src) => { const m = new ModP(FILEP); m.filename = FILEP; m.paths = ModP._nodeModulePaths(dirname(FILEP)); m._compile(src, FILEP); return m.exports; };
+  const mutP = (from, to) => { if (SRCP.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return SRCP.replace(from, () => to); };
+  const callerP = (mod) => async (body, tok, dev) => { const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+  const snapP = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  const resetP = () => { const s = JSON.parse(snapP); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; };
+  const KBP = 'bg:pay:law:v1', KFP = 'settings:pay';
+  const FIXP = fsP.readFileSync(join(ROOT, 'tools', 'pay_bg_fixture.json'), 'utf8');
+  const BGP = () => JSON.parse(FIXP);
+  const VP = BGP().ver, SP = BGP().sha;
+  const MHP = { id: 'uhp66', name: '직원66', admin: false, perms: {} }, MVP = { id: 'uvp66', name: '인사수행66', admin: false, perms: { hr: 'do' } }, MNP = { id: 'unp66', name: '관리부66', role: '관리자', admin: true, perms: {} };
+  const tHP = issueSession(MHP).token, tVP = issueSession(MVP).token, tNP = issueSession(MNP).token;
+  const seedP = (bg, flag) => { resetP(); Object.assign(mem.gw_users, { 'member:uhp66': MHP, 'member:uvp66': MVP, 'member:unp66': MNP, 'device:dev1': { status: 'approved' } });
+    if (bg === undefined) delete mem.gw_data[KBP]; else mem.gw_data[KBP] = bg;
+    if (flag === undefined) delete mem.gw_data[KFP]; else mem.gw_data[KFP] = flag;
+    delete mem.gw_data['status:decide']; };
+  const audP = () => auditMock.logs.filter((l) => l.col === 'pay');
+  const withFail = async (key, fn) => { blobsMock.hooks.failGet = (k) => k === key; try { return await fn(); } finally { blobsMock.hooks.failGet = null; } };
+  const chkPA = async (c) => {   // 읽기 — 거절·꺼짐 이유(없음과 못 읽음을 가름)·승격·쓰기 가능 표시·세액표 본문 안 실음
+    const out = [];
+    seedP(); out.push((await c({ action: 'pay_bg_get' }, null)).code, (await c({ action: 'pay_bg_get' }, tHP, 'dev1')).body.error_code, (await c({ action: 'pay_bg_get' }, tVP, 'dev1')).body.error_code);
+    const r0 = await c({ action: 'pay_bg_get' }, tNP); out.push(r0.body.on + ':' + r0.body.why + ':' + r0.body.avail);
+    const bad = BGP(); bad.rows.find((r) => r.id === 'pay.minwage').calc = true;
+    seedP(bad, { bg_ver: VP, bg_sha: SP }); const r1 = await c({ action: 'pay_bg_get' }, tNP); out.push(r1.body.on + ':' + r1.body.why);
+    seedP(BGP()); const r2 = await c({ action: 'pay_bg_get' }, tNP); out.push(r2.body.on + ':' + r2.body.why + ':' + (r2.body.avail && r2.body.avail.n) + ':' + (r2.body.avail && r2.body.avail.n_pending) + ':' + (r2.body.avail && r2.body.avail.tax_rows) + ':' + r2.body.can_write);
+    const FLG = { bg_ver: VP, bg_sha: SP, updated_at: 5 };
+    seedP(BGP(), FLG); const r4 = await c({ action: 'pay_bg_get' }, tNP), r5 = await c({ action: 'pay_bg_get' }, tokA);
+    out.push(r4.body.on + ':' + (r4.body.rows || []).length + ':' + r4.body.can_write + ':' + (r4.body.sum && r4.body.sum.sha === SP), r5.body.on + ':' + r5.body.can_write);
+    const noTax = JSON.stringify(r5.body).indexOf('"simptax"') < 0 && JSON.stringify(r5.body).length < 60000 && !r5.body.rows.some((r) => 'rows' in r);
+    seedP(BGP(), FLG); const r6 = await withFail(KFP, () => c({ action: 'pay_bg_get' }, tokA));
+    seedP(BGP(), FLG); const r7 = await withFail(KBP, () => c({ action: 'pay_bg_get' }, tokA));
+    seedP(BGP(), { bg_ver: VP }); const r8 = await c({ action: 'pay_bg_get' }, tokA);
+    const chg = BGP(); chg.sha = '1111222233334444';
+    seedP(chg, FLG); const r9 = await c({ action: 'pay_bg_get' }, tokA);
+    out.push(r6.body.on + ':' + r6.body.why, r7.body.on + ':' + r7.body.why + ':' + r7.body.bg_ok + ':' + r7.body.avail, r8.body.on + ':' + r8.body.why, r9.body.on + ':' + r9.body.why);
+    const off = [r0, r1, r2, r6, r7, r8, r9].every((r) => r.code === 200 && r.body.on === false && !('rows' in r.body) && !('sum' in r.body));
+    const want = '401|ADMIN_ONLY|ADMIN_ONLY|false:NO_BG:null|false:BAD_BG|false:NOT_PROMOTED:32:2:646:false|true:32:false:true|true:true|false:FLAG_READ_FAILED|false:BG_READ_FAILED:false:null|false:NOT_PROMOTED|false:SHA_CHANGED';
+    return { ok: off && noTax && out.join('|') === want, info: out.join('|') + ' noTax ' + noTax };
+  };
+  const chkPB = async (c) => {   // 승격 스위치
+    const P = {}, I = {};
+    seedP(BGP(), { bg_ver: '', updated_at: 7, keep_me: 1 });
+    const a1 = await c({ action: 'pay_bg_set', bg_ver: VP, base: 7 }, tNP), a2 = await c({ action: 'pay_bg_set', bg_ver: VP, base: 7 }, tVP, 'dev1'), a3 = await c({ action: 'pay_bg_set', bg_ver: VP, base: 7 }, null);
+    const b1 = await c({ action: 'pay_bg_set', bg_ver: 3, base: 7 }, tokA), b2 = await c({ action: 'pay_bg_set', bg_ver: 'v1 2026', base: 7 }, tokA), b3 = await c({ action: 'pay_bg_set', bg_ver: 'v1-20200101', base: 7 }, tokA), b4 = await c({ action: 'pay_bg_set', bg_ver: VP, base: 6 }, tokA);
+    const b5 = await withFail(KBP, () => c({ action: 'pay_bg_set', bg_ver: VP, base: 7 }, tokA));
+    P.deny = a1.code === 403 && a1.body.error_code === 'PM_ONLY' && a2.code === 403 && a3.code === 401 && b1.body.error_code === 'BAD_VALUE' && b2.body.error_code === 'BAD_VALUE' && b3.code === 409 && b3.body.error_code === 'BG_MISSING' && b4.code === 409 && b4.body.error_code === 'PAY_BG_STALE'
+      && b5.code === 503 && b5.body.error_code === 'PAY_BG_READ_FAILED' && mem.gw_data[KFP].bg_ver === '' && mem.gw_data[KFP].updated_at === 7 && audP().length === 0;
+    I.deny = [a1.body.error_code, a2.body.error_code, a3.code, b1.body.error_code, b2.body.error_code, b3.body.error_code, b4.body.error_code, b5.body.error_code, audP().length];
+    const au0 = audP().length;
+    const s1 = await c({ action: 'pay_bg_set', bg_ver: VP, base: 7 }, tokA);
+    const f1 = JSON.parse(JSON.stringify(mem.gw_data[KFP])), au1 = audP().slice(au0);
+    const s2 = await c({ action: 'pay_bg_set', bg_ver: VP, base: f1.updated_at }, tokA);
+    P.on = s1.code === 200 && s1.body.bg_ver === VP && f1.bg_ver === VP && f1.bg_sha === SP && !!f1.prev && f1.prev.bg_ver === '' && f1.prev.updated_at === 7 && f1.updated_by === 'uadmin' && f1.keep_me === 1 && f1.updated_at > 7
+      && au1.length === 1 && au1[0].ev[0].op === '급여근거' && au1[0].ev[0].t === '급여 법령 근거 미승격→' + VP + ' · sha ' + SP + ' · 확인 필요 2건' && au1[0].bid === 'uadmin' && s1.body.audit === true
+      && s2.code === 400 && s2.body.error_code === 'NO_CHANGE';
+    I.on = [s1.code, f1.bg_ver, f1.bg_sha, f1.keep_me, au1.map((l) => l.ev[0].t).join('/'), s2.body.error_code];
+    mem.gw_data[KBP].sha = '1111222233334444';
+    const g5 = await c({ action: 'pay_bg_get' }, tokA), s5 = await c({ action: 'pay_bg_set', bg_ver: VP, base: f1.updated_at }, tokA), f5 = JSON.parse(JSON.stringify(mem.gw_data[KFP])), g6 = await c({ action: 'pay_bg_get' }, tokA);
+    P.re = g5.body.why === 'SHA_CHANGED' && s5.code === 200 && f5.bg_sha === '1111222233334444' && f5.prev.bg_sha === SP && g6.body.on === true;
+    const s3 = await withFail(KFP, () => c({ action: 'pay_bg_set', bg_ver: '', base: f5.updated_at }, tokA));
+    const s4 = await c({ action: 'pay_bg_set', bg_ver: '', base: f5.updated_at }, tokA), f4 = mem.gw_data[KFP];
+    P.off = s3.code === 503 && s3.body.error_code === 'PAY_FLAG_READ_FAILED' && s4.code === 200 && f4.bg_ver === '' && f4.bg_sha === '' && f4.prev.bg_ver === VP && f4.keep_me === 1;
+    I.off = [s3.code, s3.body.error_code, s4.code, f4.bg_ver];
+    return { ok: Object.values(P).every((v) => v === true), info: { P, I } };
+  };
+  const chkPC = async (c) => {   // PM 콘솔 줄 paybg
+    seedP(BGP(), { bg_ver: '', updated_at: 9 });
+    const RW = 'paybg:' + VP;
+    const body = (o) => Object.assign({ action: 'pmcon_decide', kind: 'paybg', row: RW, choice: 'ok', grade: 'R2', due: '', q: '급여 요율 표를 승격할까요? (확인 필요 2건)', rec: '승격', args: { bg_ver: VP }, set_base: 9, base: 0 }, o || {});
+    const g1 = await c(body({ grade: 'R1' }), tokA), g2 = await c(body({ row: 'paybg:v1-20200101' }), tokA), g3 = await c(body(), tNP);
+    const d1 = await c(body({ choice: 'default', args: undefined, set_base: undefined, def_is_rec: false }), tokA);
+    const fD = JSON.parse(JSON.stringify(mem.gw_data[KFP])), mk = (mem.gw_data['status:decide'] || {}).marks || {};
+    const k1 = await c(body({ base: d1.body.updated_at }), tokA), fK = mem.gw_data[KFP], log = (mem.gw_data['status:decide'] || {}).log || [];
+    const ok = g1.code === 400 && g1.body.error_code === 'BAD_GRADE' && g2.code === 400 && g2.body.error_code === 'BAD_ROW' && g3.code === 403 && g3.body.error_code === 'PM_ONLY'
+      && d1.code === 200 && d1.body.applied === false && fD.bg_ver === '' && fD.updated_at === 9 && !!mk[RW] && mk[RW].st === 'keep'
+      && k1.code === 200 && k1.body.applied === true && fK.bg_ver === VP && fK.bg_sha === SP && fK.updated_by === 'uadmin' && log.length === 2 && log[1].kind === 'paybg' && log[1].applied === true;
+    return { ok, info: [g1.body.error_code, g2.body.error_code, g3.body.error_code, d1.code, d1.body.applied, k1.code, k1.body.error_code, fK.bg_ver, log.length] };
+  };
+  try {
+    const c0 = callerP(gwd), RA = await chkPA(c0), RB = await chkPB(c0), RC = await chkPC(c0);
+    T('66 판1 ① pay_bg_get: 비로그인 401 · 직원·인사 수행 권한 직원 403 ADMIN_ONLY(급여는 관리자만) · 근거 없음 NO_BG · 확인 필요 행이 계산에 쓰이면 BAD_BG · 미승격 = 올라온 판 요약만(행·sum 없음) · 승격 = on·sum·행 32(세액표 본문은 안 실음) · can_write = PM만 · 스위치 못 읽음 FLAG_READ_FAILED · 근거 표 못 읽음 BG_READ_FAILED(없음으로 보지 않음) · sha 없는 스위치 NOT_PROMOTED · 내용만 바뀜 SHA_CHANGED', RA.ok, RA.info);
+    T('66 판1 ② pay_bg_set: PM 아닌 관리자 403 PM_ONLY · 직원 403 · 비로그인 401 · 틀린 꼴 400 BAD_VALUE · 다른 판 409 BG_MISSING · 낡은 base 409 PAY_BG_STALE · 근거 표 못 읽음 503 PAY_BG_READ_FAILED(전부 스위치 그대로·감사 0) · 승격 = bg_ver·bg_sha·prev·updated_by·다른 칸 보존·감사 1줄 · 같은 값 400 NO_CHANGE · 내용 바뀐 같은 판 다시 승격 · 스위치 못 읽음 503(덮지 않음) · 해제', RB.ok, JSON.stringify(RB.info));
+    T('66 판1 ③ PM 콘솔 줄 paybg(R2): 등급 R1 400 BAD_GRADE · 줄 id와 값이 다르면 400 BAD_ROW · PM 아닌 관리자 403 · [기본값] = 그대로(미승격 — keep 표시) · [ㄱ] = pay_bg_set 길로 승격·누른 기록', RC.ok, JSON.stringify(RC.info));
+    const othersP = fsP.readdirSync(FN).filter((f) => /\.js$/.test(f) && f !== 'gw-data.js').filter((f) => /bg:pay:law|settings:pay|pay_bg_/.test(fsP.readFileSync(join(FN, f), 'utf8')));
+    const libsP = fsP.readdirSync(join(FN, '_lib')).filter((f) => /\.js$/.test(f)).filter((f) => /^pay/.test(f) && /getStore|blobGet|blobSet|require\(/.test(fsP.readFileSync(join(FN, '_lib', f), 'utf8').replace(/\/\/[^\n]*/g, '')));
+    T('66 판1 ④ 급여 근거 키(bg:pay:law·settings:pay)·동작(pay_bg_*)을 아는 서버 파일 = gw-data.js 하나 · _lib/paybg·paycalc 는 저장소를 모름 · 스위치 쓰기 한 곳 · 콘솔 줄 서버 표 paybg R2',
+      othersP.length === 0 && libsP.length === 0 && (SRCP.match(/blobSet\(st, PAY_BG_KEYS\.flag,/g) || []).length === 1 && (SRCP.match(/PAY_BG_KEYS\.bg/g) || []).length === 1
+      && /\nPMCON_KINDS\.paybg = \{ label: '급여 법령 근거 승격', grade: 'R2', fn: handlePayBgSet, args: \{ bg_ver: 's' \}/.test(SRCP), JSON.stringify({ othersP, libsP }));
+    const MUTP = {
+      A: [["  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });\n  const s = await payBgState(store(DATA));", "  const s = await payBgState(store(DATA));"],
+        ["  if (!br.ok) return Object.assign(pst, { on: false, why: 'BG_READ_FAILED' });\n", ''],
+        ["  if (!r.ok) return r.code === 'NOT_FOUND' ? { ok: true, bg: null } : { ok: false };", "  if (!r.ok) return { ok: true, bg: null };"],
+        ["  if (!pfr.ok) return Object.assign(pst, { on: false, why: 'FLAG_READ_FAILED' });\n  if (!br.ok)", "  if (!br.ok)"],
+        ["  if (!ver || ver !== bg.ver || !paySha) return Object.assign(pst, { on: false, why: 'NOT_PROMOTED' });", "  if (!ver || ver !== bg.ver) return Object.assign(pst, { on: false, why: 'NOT_PROMOTED' });"],
+        ["  if (paySha !== bg.sha) return Object.assign(pst, { on: false, why: 'SHA_CHANGED' });", ''],
+        ["  const good = !!bg && PAYBG.bgOk(bg);", "  const good = !!bg;"],
+        ["out.rows = s.bg.rows.slice(0, 300); }   // 간이세액표", "out.rows = s.bg.rows.slice(0, 300); out.simptax = s.bg.simptax; }   // 간이세액표"],
+        ["  const payCanWrite = !!(tc && !tc.unavailable && tc.tierOf(c.member) === 'pm');   // 승격·해제 버튼을 그릴지(쓰기는 pay_bg_set", "  const payCanWrite = !!c.member.admin;   // 승격·해제 버튼을 그릴지(쓰기는 pay_bg_set"]],
+      B: [["async function handlePayBgSet(event, d, R) {\n  const g = await pmconGate(event, R, true);", "async function handlePayBgSet(event, d, R) {\n  const g = await pmconGate(event, R, false);"],
+        ["    if (!br.ok) return jr(503, { status: 'ERROR', error_code: 'PAY_BG_READ_FAILED', request_id: R });", ''],
+        ["    if (!br.bg || !PAYBG.bgOk(br.bg) || br.bg.ver !== v) return jr(409,", "    if (!br.bg) return jr(409,"],
+        ["  if (d.base !== undefined && Number(d.base) !== Number(cur.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'PAY_BG_STALE', request_id: R });\n", ''],
+        ["  if (!pfr.ok) return jr(503, { status: 'ERROR', error_code: 'PAY_FLAG_READ_FAILED', request_id: R });", '  if (false) return jr(503, {});'],
+        ["  const payDoc = Object.assign({}, cur, { schema: 1, bg_ver: v, bg_sha: payNewSha,", "  const payDoc = Object.assign({}, { schema: 1, bg_ver: v, bg_sha: payNewSha,"],
+        ["  const payDoc = Object.assign({}, cur, { schema: 1, bg_ver: v, bg_sha: payNewSha,", "  const payDoc = Object.assign({}, cur, { schema: 1, bg_ver: v, bg_sha: '',"],
+        ["  try { payAu = await appendAudit({", '  try { payAu = true || await appendAudit({'],
+        ["  if (v === payCurVer && payNewSha === payCurSha) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });\n  const now = Date.now();\n  const payDoc", "  if (v === payCurVer) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });\n  const now = Date.now();\n  const payDoc"]],
+      C: [["PMCON_KINDS.paybg = { label: '급여 법령 근거 승격', grade: 'R2',", "PMCON_KINDS.paybg = { label: '급여 법령 근거 승격', grade: 'R1',"]]
+    };
+    const killP = []; let nP = 0;
+    for (const n of Object.keys(MUTP)) for (const [from, to] of MUTP[n]) {
+      nP++; let k; try { k = !(await ({ A: chkPA, B: chkPB, C: chkPC })[n](callerP(loadP(mutP(from, to))))).ok; } catch (e) { k = 'err ' + e.message; }
+      if (k !== true) killP.push(n + ':' + from.trim().slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k));
+    }
+    T('66 판1 ⑤ 결함 사본 ' + nP + '개(관리자 검사 걷음 · 못 읽은 표를 통과·없음으로 · 못 읽은 스위치 통과 · sha 없는 스위치 통과 · 내용 바뀜 못 봄 · 꼴 검사 걷음 · 세액표 본문 실음 · 쓰기 가능을 관리자 전원으로 · 쓰기 관문을 읽기로 · 못 읽은 표로 승격 · 판 대조 느슨 · 낙관락 걷음 · 못 읽은 스위치 덮기 · 다른 칸 지움 · sha 안 적음 · 감사 없음 · 같은 판 다시 승격 막힘 · 콘솔 등급 R1) = 모두 ✗', killP.length === 0, killP.join(' | '));
+  } catch (e) { T('66 판1 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+  finally { resetP(); }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

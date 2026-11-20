@@ -19969,11 +19969,11 @@ try {
     const FT = ["`hr_join`", "`ASSIGN_NEEDED`", "`HRBG_READ_FAILED`", "원장 C185"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = "<li><b>범위 밖 자동 지시 — 입사 체크리스트</b> (2026-11 v501) — 입사 체크리스트 지", MAN2 = "(2026-11 v501) '입사·퇴사 체크리스트(인사)'·'입사·퇴사 ";
-    const ok = /기준: v501 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 12 && gate.length === 3 && scr.length === 9 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 501 && ftv.length > 0 && mF.length === 0 && cb.length === 12 && gate.length === 3 && scr.length === 9 && !cb.some((l) => /\(PM/.test(l))
       && d.man.indexOf(MAN) > 0 && !/hr_join|hr_leave|veh_ceq31|ks_report|veh_event|evrules|AUTOTASK|RULE_NOT_READY|pmcon_|handleAutotask|gwCall|ASSIGN_NEEDED|HRBG_READ|planHr|HR_JOIN|taskHr|hrScope|assign_state|meta_srv/.test(cut(d.man, MAN, '\n')) && d.man.indexOf(MAN2) > 0
       && d.cl.indexOf('**C185 판2(v501') > 0
       && FIX501.every((x) => d.ix.split(x).length === 2)
-      && /SHELL_CACHE = 'jw-shell-v501'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 501;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX501.map((x) => d.ix.split(x).length - 1) } };
   };
   const r501 = chk501(D501);
@@ -19986,6 +19986,78 @@ try {
   T('v501 문서·판 번호(정확 검사): FEATURES 기준 v501 (2026-11-20)·v501 절(C185 판2) · TESTLIST v501 칸 12(화면·운영 확인 9 · 게이트 [x] 3) · MANUAL 점검 카드 줄·배정표 문장(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 25줄 한 번씩 · sw jw-shell-v501 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL 둘·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
     r501.ok && M501.every((v) => v === false), JSON.stringify({ r: r501.info, mut: M501 }));
 } catch (e) { console.log('  (v501 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── 66 급여 판1(원장 C236 · PM 11/20 'ㄱ') 급여 법령 근거: PM 콘솔 줄 paybg(R2 · 무응답 = 미승격) — 직원 화면 없음. 결함 사본은 실패해야 함
+try {
+  const fnP = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) return ''; let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } return ''; };
+  const gwdP = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8');
+  const PUSHP = /\n  PMCON_KINDS\.push\(\{ kind: "paybg", label: "급여 법령 근거 승격", grade: "R2", get: "pay_bg_get", card: "", revert: "[^"]+", rows: pmconRowsPayBg \}\);/;
+  const wireP = (H) => { const a = H.indexOf('\n  // @pay-start\n'), b = H.indexOf('\n  // @pay-end\n'); const seg = a > 0 && b > a ? H.slice(a, b) : '';
+    return !!seg && H.indexOf('\n  // @hr-law-end\n') < a && PUSHP.test(seg) && H.indexOf('var PMCON_KINDS = [') < a && seg.indexOf('function pmconRowsPayBg(b){') > 0 && seg.indexOf('function payLawPromoted(pf, pa){') > 0
+      && !/gw-auth|meSave|member_upsert/.test(seg)
+      && /if \(d && d\.action === 'pay_bg_get'\) return await handlePayBgGet\(event, d, R\);/.test(gwdP) && /if \(d && d\.action === 'pay_bg_set'\) return await handlePayBgSet\(event, d, R\);/.test(gwdP)
+      && /\nPMCON_KINDS\.paybg = \{ label: '급여 법령 근거 승격', grade: 'R2', fn: handlePayBgSet,/.test(gwdP); };
+  const chkP = (H) => {
+    const I = {};
+    const rowsF = new Function(fnP(H, 'payLawPromoted') + '\n' + fnP(H, 'pmconRowsPayBg') + '\nreturn pmconRowsPayBg;')();
+    const SHA = 'abcdef0123456789', AV = { ver: 'v1-20261120', sha: SHA, checked: '2026-11-20', n: 32, n_pending: 2, n_calc_false: 2, tax_from: '2026-03', tax_rows: 646 };
+    const r1 = rowsF({ flag_ok: true, bg_ok: true, flag: { bg_ver: '', bg_sha: '', updated_at: 0 }, avail: AV });
+    const r2 = rowsF({ flag_ok: true, bg_ok: true, flag: { bg_ver: 'v1-20261120', bg_sha: SHA, updated_at: 5 }, avail: AV }), r3 = rowsF({ flag: {}, avail: null }), r4 = rowsF({ flag: {}, avail: { ver: 'v1 bad', n: 1 } });
+    const r5 = rowsF({ flag_ok: true, bg_ok: true, flag: { bg_ver: 'v1-20261120', bg_sha: 'ffff000011112222', updated_at: 3 }, avail: AV }), r6 = rowsF({ flag_ok: true, bg_ok: true, flag: { bg_ver: 'v1-20261120', updated_at: 3 }, avail: AV });
+    const r7 = rowsF({ flag_ok: false, bg_ok: true, flag: { bg_ver: '', bg_sha: '', updated_at: 0 }, avail: AV }), r8 = rowsF({ flag_ok: true, bg_ok: true, flag: { bg_ver: 'v1-20261101', bg_sha: SHA, updated_at: 9 }, avail: AV });
+    I.rows = r1.length === 1 && r1[0].id === 'paybg:v1-20261120' && r1[0].q === '급여 요율 표를 승격할까요? (확인 필요 2건)' && r1[0].recTxt === '승격' && r1[0].curTxt === '미승격' && r1[0].def === 'keep' && r1[0].block === ''
+      && JSON.stringify(r1[0].args) === '{"bg_ver":"v1-20261120"}' && r1[0].setBase === 0 && /32행\(4대보험 요율·상하한·가산율\) \+ 근로소득 간이세액표 646구간\(2026-03 지급분부터\) · 확인일 2026-11-20\./.test(r1[0].why)
+      && /확인 필요 2건은 계산에 쓰지 않습니다\. 승격해야 급여 계산이 이 표를 씁니다\(새 판이 올라온 뒤 승격 전에는 계산이 멈춥니다\)\. 지금 미승격\./.test(r1[0].why);
+    I.none = r2.length === 0 && r3.length === 0 && r4.length === 0;
+    I.sha = r5.length === 1 && r5[0].curTxt === '승격본 v1-20261120(내용 바뀜)' && r6.length === 1 && r6[0].setBase === 3 && r8.length === 1 && r8[0].curTxt === '승격본 v1-20261101' && r8[0].setBase === 9;
+    I.unread = r7.length === 1 && r7[0].curTxt === '상태를 읽지 못함' && /읽지 못해 지금은 승격할 수 없습니다/.test(r7[0].block) && /지금 상태를 읽지 못함\./.test(r7[0].why);
+    return { ok: Object.values(I).every((v) => v === true), info: I };
+  };
+  const wP = wireP(html), cP = chkP(html);
+  T('66 판1 ① 배선: 앱 구간 @pay-start~end(인사 근거 구간 뒤 · 줄 표 본문은 그대로 두고 PMCON_KINDS.push 한 줄 paybg·R2·pay_bg_get·카드 없음 · 구간 안에 직원 수정 창·회원 저장 호출 없음) · 서버 pay_bg_get·pay_bg_set 디스패치 · 서버 PMCON_KINDS.paybg 같은 이름·R2·handlePayBgSet', wP, '');
+  T('66 판1 ② PM 콘솔 줄: 올라온 판 ≠ 승격본일 때만 "급여 요율 표를 승격할까요? (확인 필요 n건)" R2 · 추천 승격 · 무응답이면 그대로 · args{bg_ver}·setBase = 스위치 updated_at · 까닭 글(행 수·세액표 구간·귀속 달·확인일) · 승격본과 같은 판·지문이면 줄 없음 · 판 이름 꼴 틀리면 줄 없음 · 내용만 바뀜 = "(내용 바뀜)" · sha 없는 스위치 = 줄 · 못 읽음 = 막음 글', cP.ok, JSON.stringify(cP.info));
+  const MUTP = [
+    ['    if (!pa || !pa.ver || !/^[A-Za-z0-9_.-]{2,40}$/.test(String(pa.ver)) || payLawPromoted(pf, pa)) return [];', '    if (!pa || !pa.ver) return [];'],
+    ['function payLawPromoted(pf, pa){ return !!(pf && pa && pf.bg_ver && pf.bg_sha && pf.bg_ver === pa.ver && pf.bg_sha === pa.sha); }', 'function payLawPromoted(pf, pa){ return !!(pf && pa && pf.bg_ver && pf.bg_ver === pa.ver); }'],
+    ['    var pf = b.flag || {}, pa = b.avail || null, unread = b.flag_ok === false || b.bg_ok === false;', '    var pf = b.flag || {}, pa = b.avail || null, unread = false;'],
+    ['    return [{ id: "paybg:" + pa.ver, q: "급여 요율 표를 승격할까요? (확인 필요 " + pn + "건)", recTxt: "승격", curTxt: pcur,\n      def: "keep", args: { bg_ver: String(pa.ver) },', '    return [{ id: "paybg:" + pa.ver, q: "급여 요율 표를 승격할까요? (확인 필요 " + pn + "건)", recTxt: "승격", curTxt: pcur,\n      def: "rec", args: { bg_ver: String(pa.ver) },'],
+    ['      setBase: pf.updated_at || 0 }];\n  }\n  PMCON_KINDS.push({ kind: "paybg"', '      setBase: 0 }];\n  }\n  PMCON_KINDS.push({ kind: "paybg"'],
+    ['  PMCON_KINDS.push({ kind: "paybg", label: "급여 법령 근거 승격", grade: "R2",', '  PMCON_KINDS.push({ kind: "paybg", label: "급여 법령 근거 승격", grade: "R1",'],
+    ['    var pn = Number(pa.n_pending) || 0;\n    var pcur = unread ? "상태를 읽지 못함" : (pf.bg_ver ? "승격본 " + pf.bg_ver + (pf.bg_ver === pa.ver ? "(내용 바뀜)" : "") : "미승격");\n    return [{ id: "paybg:"', '    var pn = Number(pa.n_pending) || 0;\n    var pcur = unread ? "미승격" : (pf.bg_ver ? "승격본 " + pf.bg_ver : "미승격");\n    return [{ id: "paybg:"'],
+  ];
+  const killP = [];
+  for (const [from, to] of MUTP) {
+    if (html.split(from).length !== 2) { killP.push('자리 ' + (html.split(from).length - 1) + ': ' + from.slice(0, 50)); continue; }
+    const Hx = html.replace(from, () => to);
+    let broken; try { broken = !(wireP(Hx) && chkP(Hx).ok); } catch (e) { broken = true; }
+    if (!broken) killP.push(from.trim().slice(0, 60) + ' 안 깨짐');
+  }
+  T('66 판1 ③ 결함 사본 ' + MUTP.length + '개(같은 판이어도 줄 · 지문 비교 걷음 · 못 읽음을 안 봄 · 무응답 기본 승격 · 낙관락 값 0 · 등급 R1 · 못 읽음을 미승격으로·내용 바뀜 표시 걷음) = 모두 ✗', killP.length === 0, killP.join(' | '));
+} catch (e) { console.log('  (66 판1 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v502(66 급여 판1 — PM 11/20 09:14 "ㄱ"): 실행 검사는 위 '66 판1' 블록·tools/paycalc_check.mjs·servertest '66 판1' · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '502 이상'으로 풀 것
+try {
+  const rdN = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DN = { ft: rdN('FEATURES.md'), tl: rdN('TESTLIST.md'), sw: rdN('sw.js'), man: rdN('MANUAL.html'), cl: rdN('CLAUDE.md') };
+  const chkN = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v502 (11/20)', '\n### '), tlv = cut(d.tl, '\n## v502 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[x\] \(AI 시험 화면 대상\)/.test(l)), pm = cb.filter((l) => /^- \[ \] \(PM\)/.test(l));
+    const FT = ['`bg:pay:law:v1`', '`settings:pay`', '`pay_bg_get`', '`pay_bg_set`', '`BG_READ_FAILED`', '`ratesFor', '`calcMonth`', '원장 C236', '부칙 4조①', '별표 2', '지급하는 달', '`PAY_BAD_INPUT`'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = '<li><b>급여 요율 표 승격</b> (2026-11 v502) — ';
+    const ok = /기준: v502 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 1 && pm.length === 1
+      && d.man.indexOf(MAN) > 0 && !/pay_bg|paybg|settings:pay|bg:pay|ratesFor|calcMonth|pmcon|gwCall|BG_READ/.test(cut(d.man, MAN, '\n'))
+      && d.cl.indexOf('**66 급여 판1(v502') > 0 && /SHELL_CACHE = 'jw-shell-v502'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, pm: pm.length } };
+  };
+  const rN = chkN(DN);
+  const muN = (k, f) => chkN(Object.assign({}, DN, { [k]: f(DN[k]) })).ok;
+  const MN = [muN('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v501 (')), muN('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v501'")), muN('ft', (s) => s.split('`settings:pay`').join('settings:pay')),
+    muN('man', (s) => s.replace('승격</b> (2026-11 v502) ', '승격</b> ')), muN('cl', (s) => s.replace('**66 급여 판1(v502', '66 급여 판1(')), muN('tl', (s) => s.replace("\n- [x] (AI) `paycalc_check`", "\n- (AI) `paycalc_check`"))];
+  T('v502 문서·판 번호(정확 검사): FEATURES 기준 v502 (2026-11-20)·v502 절(66 급여 판1) · TESTLIST v502 칸 4(PM 1 · 시험 화면 [x] 1 · 게이트 [x] 2) · MANUAL 한 줄(내부 이름 0) · CLAUDE.md 한 줄 · sw jw-shell-v502 · 결함 사본(기준 줄·sw·FEATURES 글·MANUAL 판 표시·CLAUDE 줄·TESTLIST 칸) ✗',
+    rN.ok && MN.every((v) => v === false), JSON.stringify({ r: rN.info, mut: MN }));
+} catch (e) { console.log('  (v502 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

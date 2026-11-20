@@ -1601,3 +1601,9 @@
 - [x] (AI) `uismoke` 'C185 판2'(화면 거름 · [인사 카드] 단추(표·폰 카드) · 켜기 줄 막힘(배정표 상태) · 점검 카드 글 · 결함 사본) · `servertest` 'C185 판2'(실제 계획 함수 — 사건 표본(소급·지입·시험 계정·삭제·퇴사 0건 · 입사일 고침·되돌림) · 기한과 빈 기한 채움 · 담당·관리자만 보임(읽기·저장 이월·알림 세 길) · 공개 범위를 서버가 지금 담당으로 · 지운 기기 키 · 배정표 담당 없으면 켜기 거절 · 결함 사본은 그 검사 이름에) · 날짜에 묶인 시험 셋을 오늘 기준으로 고침 — ✓ AI 11/20
 - [x] (AI) `servertest` 전 항목(인허가 기한 판20·판1 틀 검사 그대로) · `autorulestest` · 운영 판과 나란히 112상태 성공 길 차이 0 · v500 문서 검사를 이 판 이상으로 풀고 v501 문서·판 번호 정확 검사 — ✓ AI 11/20
 - [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · 원본 읽기 검사 4종(stmtread a·b·c·d) 전부 통과 + node --check(함수·_lib·sw) + 앱 스크립트 전체 파싱 오류 0 + 시험 서버에서 앱 뜸 — 숫자는 커밋 메시지
+
+## v502 — 66 급여 판1: 급여 법령 근거 표 + 승격 길 + 계산 함수(직원 화면 없음)
+- [ ] (PM) PM 콘솔 '급여 요율 표를 승격할까요? (확인 필요 2건)' 줄에서 [ㄱ] — 승격해야 다음 판의 급여 계산이 이 표를 씁니다(무응답이면 미승격 그대로)
+- [x] (AI 시험 화면 대상) 시험 서버 PM 콘솔에 급여 요율 줄(R2 · 추천 승격 · 지금 미승격)이 뜨고 [ㄱ] 뒤 줄이 사라짐 · 저장값 `settings:pay` bg_ver·bg_sha = 올라온 판 — ✓ AI 11/20
+- [x] (AI) `paycalc_check` 10건(간이세액표 칸 되읽기 · 한 달 손계산 · 틀린 입력 던짐 · 결함 사본 37) · `servertest` '66 판1' 5건(결함 사본 19) · `uismoke` '66 판1' 3건(결함 사본 7) — ✓ AI 11/20
+- [x] (AI) `uismoke` · `consheet_check` · `proctpl_check` · `settletest` · `servertest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` · `paycalc_check` 통과 · v501 문서 검사를 이 판 이상으로 풀고 v502 문서·판 번호 정확 검사 — ✓ AI 11/20

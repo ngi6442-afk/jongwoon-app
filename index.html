@@ -33464,6 +33464,23 @@ function dutyStage(nx){
     }, function(){ alert("승격 해제 실패(네트워크)"); });
   }
   // @hr-law-end
+  // @pay-start
+  // 66 급여 판1(원장 C236 · PM 11/20 09:14 'ㄱ') 급여 법령 근거 — PM 콘솔 줄 1(R2 · 무응답 = 미승격). 이 판에는 직원 화면이 없다(계산·명세서는 다음 판).
+  //   서버 pay_bg_get(관리자): 올라온 판 요약(avail)·스위치(flag). 승격 판정 = 판 이름(ver)과 내용 지문(sha)이 둘 다 스위치와 같을 때(서버 payBgState 와 같은 판정).
+  //   줄 표(PMCON_KINDS) 본문은 손대지 않고 아래 push 한 줄로 붙인다 · 근거 표를 볼 카드가 아직 없어 [카드 열기]는 없음(card "").
+  function payLawPromoted(pf, pa){ return !!(pf && pa && pf.bg_ver && pf.bg_sha && pf.bg_ver === pa.ver && pf.bg_sha === pa.sha); }
+  function pmconRowsPayBg(b){
+    var pf = b.flag || {}, pa = b.avail || null, unread = b.flag_ok === false || b.bg_ok === false;
+    if (!pa || !pa.ver || !/^[A-Za-z0-9_.-]{2,40}$/.test(String(pa.ver)) || payLawPromoted(pf, pa)) return [];
+    var pn = Number(pa.n_pending) || 0;
+    var pcur = unread ? "상태를 읽지 못함" : (pf.bg_ver ? "승격본 " + pf.bg_ver + (pf.bg_ver === pa.ver ? "(내용 바뀜)" : "") : "미승격");
+    return [{ id: "paybg:" + pa.ver, q: "급여 요율 표를 승격할까요? (확인 필요 " + pn + "건)", recTxt: "승격", curTxt: pcur,
+      def: "keep", args: { bg_ver: String(pa.ver) }, block: unread ? "승격 상태를 읽지 못해 지금은 승격할 수 없습니다 — 새로고침 후 다시 보세요" : "",
+      why: "새 판 " + pa.ver + " · " + (Number(pa.n) || 0) + "행(4대보험 요율·상하한·가산율) + 근로소득 간이세액표 " + (Number(pa.tax_rows) || 0) + "구간(" + String(pa.tax_from || "-") + " 지급분부터) · 확인일 " + String(pa.checked || "-") + ". 확인 필요 " + pn + "건은 계산에 쓰지 않습니다. 승격해야 급여 계산이 이 표를 씁니다(새 판이 올라온 뒤 승격 전에는 계산이 멈춥니다). 지금 " + pcur + ".",
+      setBase: pf.updated_at || 0 }];
+  }
+  PMCON_KINDS.push({ kind: "paybg", label: "급여 법령 근거 승격", grade: "R2", get: "pay_bg_get", card: "", revert: "승격 해제(단추는 급여 화면이 들어오는 판에 — 그 전에는 이 표를 쓰는 화면이 없음)", rows: pmconRowsPayBg });
+  // @pay-end
   function pmconDueTxt(r){
     if (r.due) return "무응답 적용일 " + pmconMd(r.due) + " — " + (r.def === "rec" ? r.recTxt + " 적용" : "그대로");
     return r.def === "rec" ? "무응답 적용일 — 예고 전" : "무응답이면 그대로(" + (r.curTxt || "지금 값") + ")";

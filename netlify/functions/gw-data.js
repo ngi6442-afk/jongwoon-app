@@ -6284,6 +6284,84 @@ async function handleHrBgSet(event, d, R) {
 }
 PMCON_KINDS.hrbg = { label: '인사 법령 근거 승격', grade: 'R2', fn: handleHrBgSet, args: { bg_ver: 's' }, row: function (a) { return 'hrbg:' + a.bg_ver; } };   // P1 판14 — 콘솔 줄(무응답 = 미승격)
 
+// ---- 66 급여 판1(원장 C236 · PM 11/20 09:14 'ㄱ') 급여 법령 근거 bg:pay:law:v1 ----
+//   근거 표 = 자료 저장소 collectors/pay_bg.py 가 법제처 원문 인용을 대조해 만든 판(4대보험 요율·상하한·간이세액표·가산율 — 값은 분수 n/d · 귀속 달 from~to).
+//   승격 = settings:pay.bg_ver·bg_sha 가 그 판 ver·sha 와 같을 때만(판14 인사 근거와 같은 꼴). 승격 전에는 급여 계산이 이 표를 쓰면 안 된다 — _lib/paybg.ratesFor 는 승격 여부를 모르므로, 계산을 부르는 쪽이 payBgState 의 on 이 참일 때의 bg 만 넘겨야 한다(이 판에는 부르는 곳이 없음).
+//   새 판이 같은 키에 올라오면 앞 판은 덮여 없어지고 스위치는 옛 판을 가리켜 on 이 거짓이 된다(다시 승격할 때까지 계산 멈춤) — 승격본 사본을 따로 두는 일은 계산을 부르는 판에서.
+//   판14 와 다른 점: 근거 표를 '못 읽음'과 '없음'을 가른다(못 읽음 = BG_READ_FAILED — 없음으로 보지 않음) · 읽기는 관리자만(급여 자료 — 권한관리 표에 열이 없음).
+//   읽기 pay_bg_get = 로그인 → 기기 승인 → 관리자 · 쓰기 pay_bg_set = pmconGate 쓰기(PM) → 낙관락 → 직전 값(prev) → 감사 1줄(col pay) · PM 콘솔 줄 paybg(R2 · 무응답 = 미승격).
+const PAYBG = require('./_lib/paybg');
+const PAY_BG_KEYS = { bg: 'bg:pay:law:v1', flag: 'settings:pay' };
+async function payBgReadFlag(st) {   // { ok, flag } — 없음 = 빈 스위치 · 읽기 실패 = ok false(그 위에 쓰지 않음)
+  const r = await blobGet(st, PAY_BG_KEYS.flag);
+  if (!r.ok) return r.code === 'NOT_FOUND' ? { ok: true, flag: {} } : { ok: false, code: r.code || 'STORAGE_READ_FAILED' };
+  if (r.data === null || r.data === undefined) return { ok: true, flag: {} };
+  if (typeof r.data !== 'object' || Array.isArray(r.data)) return { ok: false, code: 'PAY_FLAG_BAD' };
+  return { ok: true, flag: r.data };
+}
+async function payBgReadBg(st) {   // { ok, bg } — 없음 = ok·bg null · 읽기 실패 = ok false
+  let r; try { r = await blobGet(st, PAY_BG_KEYS.bg); } catch (e) { return { ok: false }; }
+  if (!r.ok) return r.code === 'NOT_FOUND' ? { ok: true, bg: null } : { ok: false };
+  return { ok: true, bg: (r.data === undefined ? null : r.data) };
+}
+// 승격 판정 한 곳: 근거 표 꼴 맞음 ∧ settings:pay.bg_ver = 그 판 ver ∧ bg_sha = 그 판 sha. 어느 쪽이든 못 읽으면 on false(fail-closed)
+async function payBgState(st) {
+  let pfr = { ok: false }, br = { ok: false };
+  try { pfr = await payBgReadFlag(st); } catch (e) { pfr = { ok: false }; }
+  try { br = await payBgReadBg(st); } catch (e) { br = { ok: false }; }
+  const flag = pfr.ok ? pfr.flag : {}, bg = br.ok ? br.bg : null;
+  const ver = typeof flag.bg_ver === 'string' ? flag.bg_ver : '';
+  const paySha = typeof flag.bg_sha === 'string' ? flag.bg_sha : '';
+  const good = !!bg && PAYBG.bgOk(bg);
+  const pst = { flag_ok: pfr.ok, bg_ok: br.ok, flag: { bg_ver: ver, bg_sha: paySha, updated_at: Number(flag.updated_at) || 0 }, avail: good ? PAYBG.bgSum(bg) : null };
+  if (!pfr.ok) return Object.assign(pst, { on: false, why: 'FLAG_READ_FAILED' });
+  if (!br.ok) return Object.assign(pst, { on: false, why: 'BG_READ_FAILED' });
+  if (!good) return Object.assign(pst, { on: false, why: bg ? 'BAD_BG' : 'NO_BG' });
+  if (!ver || ver !== bg.ver || !paySha) return Object.assign(pst, { on: false, why: 'NOT_PROMOTED' });
+  if (paySha !== bg.sha) return Object.assign(pst, { on: false, why: 'SHA_CHANGED' });   // 승격한 뒤 같은 판 이름으로 내용이 바뀌어 올라옴
+  return Object.assign(pst, { on: true, bg: bg });
+}
+async function handlePayBgGet(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const s = await payBgState(store(DATA));
+  let tc = null; try { tc = await push.tierCtx(); } catch (e) { tc = null; }
+  const payCanWrite = !!(tc && !tc.unavailable && tc.tierOf(c.member) === 'pm');   // 승격·해제 버튼을 그릴지(쓰기는 pay_bg_set이 다시 봄)
+  const out = { status: 'OK', on: s.on, why: s.why || '', flag: s.flag, flag_ok: s.flag_ok, bg_ok: s.bg_ok, avail: s.avail, can_write: payCanWrite, request_id: R };
+  if (s.on) { out.ver = s.bg.ver; out.sum = PAYBG.bgSum(s.bg); out.rows = s.bg.rows.slice(0, 300); }   // 간이세액표 본문은 싣지 않음(계산은 서버)
+  return jr(200, out);
+}
+async function handlePayBgSet(event, d, R) {
+  const g = await pmconGate(event, R, true); if (g.res) return g.res; const c = g.c;
+  if (typeof d.bg_ver !== 'string') return jr(400, { status: 'REJECTED', error_code: 'BAD_VALUE', request_id: R });
+  const v = d.bg_ver;
+  if (v && !PAYBG.VER.test(v)) return jr(400, { status: 'REJECTED', error_code: 'BAD_VALUE', request_id: R });
+  const st = store(DATA);
+  const pfr = await payBgReadFlag(st);
+  if (!pfr.ok) return jr(503, { status: 'ERROR', error_code: 'PAY_FLAG_READ_FAILED', request_id: R });   // 못 읽은 스위치 위에 쓰지 않음
+  const cur = pfr.flag, payCurVer = typeof cur.bg_ver === 'string' ? cur.bg_ver : '', payCurSha = typeof cur.bg_sha === 'string' ? cur.bg_sha : '';
+  if (d.base !== undefined && Number(d.base) !== Number(cur.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'PAY_BG_STALE', request_id: R });
+  let sum = null;
+  if (v) {
+    const br = await payBgReadBg(st);
+    if (!br.ok) return jr(503, { status: 'ERROR', error_code: 'PAY_BG_READ_FAILED', request_id: R });   // 못 읽은 표를 '없음'으로 보지 않음
+    if (!br.bg || !PAYBG.bgOk(br.bg) || br.bg.ver !== v) return jr(409, { status: 'CONFLICT', error_code: 'BG_MISSING', request_id: R });   // 올라온 판이 없거나 꼴 틀림·다른 판
+    sum = PAYBG.bgSum(br.bg);
+  }
+  const payNewSha = sum ? sum.sha : '';
+  if (v === payCurVer && payNewSha === payCurSha) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
+  const now = Date.now();
+  const payDoc = Object.assign({}, cur, { schema: 1, bg_ver: v, bg_sha: payNewSha, prev: { bg_ver: payCurVer, bg_sha: payCurSha, updated_at: Number(cur.updated_at) || 0, updated_by: cur.updated_by || '' }, updated_by: c.member.id, updated_at: Math.max(now, (Number(cur.updated_at) || 0) + 1) });
+  const w = await blobSet(st, PAY_BG_KEYS.flag, payDoc);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  let payAu = false;
+  try { payAu = await appendAudit({ ts: now, by: c.member.name, bid: c.member.id, col: 'pay', ev: [{ op: '급여근거', id: '', t: '급여 법령 근거 ' + (payCurVer || '미승격') + '→' + (v || '미승격(해제)') + (sum ? ' · sha ' + payNewSha + ' · 확인 필요 ' + sum.n_pending + '건' : '') }] }) !== false; } catch (e) { payAu = false; }
+  return jr(200, { status: 'OK', bg_ver: v, bg_sha: payNewSha, prev: payDoc.prev, updated_at: payDoc.updated_at, audit: payAu, request_id: R });
+}
+PMCON_KINDS.paybg = { label: '급여 법령 근거 승격', grade: 'R2', fn: handlePayBgSet, args: { bg_ver: 's' }, row: function (a) { return 'paybg:' + a.bg_ver; } };   // 66 판1 — 콘솔 줄(무응답 = 미승격)
+
 // v378 큰 본문 양방향 gzip(2026-10-08 실사고): col:bids가 9/11 3.94MB(2,462건)에서 10/8 07:52 분할 전송 수신 뒤 6.69MB(3,953건)로 자라
 // Netlify 동기 함수 응답 한도 6MB(6,291,456B)를 넘자 get이 실패했고, 앱은 그 실패를 삼켜 "수집된 공고가 없습니다"로 보였다(PM "기존거 다 날라갔나").
 // 저장(save) 본문도 같은 6MB 요청 한도라 상태 변경이 조용히 유실될 자리였다.
@@ -6355,6 +6433,8 @@ async function handlerInner(event) {
     if (d && d.action === 'lic_recheck_get') return await handleLicRecheckGet(event, d, R);   // P1 판7 법령 개정 감지 목록(의무 대장 '근거 재확인 필요' 표시 재료 — 읽기만)
     if (d && d.action === 'hr_bg_get') return await handleHrBgGet(event, d, R);   // P1 판14 인사 법령 근거(승격본일 때만 on·행 — 관리자·인사 권한)
     if (d && d.action === 'hr_bg_set') return await handleHrBgSet(event, d, R);   // P1 판14 인사 근거 승격·해제(PM — pmconGate 쓰기)
+    if (d && d.action === 'pay_bg_get') return await handlePayBgGet(event, d, R);   // 66 판1 급여 법령 근거(관리자 — 승격본일 때만 on·행)
+    if (d && d.action === 'pay_bg_set') return await handlePayBgSet(event, d, R);   // 66 판1 급여 근거 승격·해제(PM — pmconGate 쓰기)
     if (d && d.action === 'audit') return await handleAudit(event, d, R);
     if (d && d.action === 'ver_list') return await handleVerList(event, d, R);
     if (d && d.action === 'ver_get') return await handleVerGet(event, d, R);
