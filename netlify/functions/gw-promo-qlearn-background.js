@@ -102,10 +102,10 @@ exports.handler = async function (event, context) {
     const cur = await blobGet(st, QL.QLEARN_KEY);
     if (!cur.ok) { console.log('[품질 학습] 합치기 전 읽기 실패 ' + (cur.code || '') + ' — 이번 결과는 쓰지 않음(토큰 ' + tokens + ')'); return; }
     const base = QL.normQL(cur.data);
-    const merged = QL.mergeQL(base, out, { now: Date.now(), tokens: tokens, sig: QL.basisSig(pq.data, lessons.rules), focus: focus, n: drafts.length });
+    const merged = QL.mergeQL(base, out, { now: Date.now(), tokens: tokens, sig: QL.basisSig(pq.data, lessons.rules), focus: focus, n: drafts.length, over: QL.overOf(stats) });
     const w = await blobSet(st, QL.QLEARN_KEY, merged);
     if (!w.ok) { await release(w.code || 'QL_WRITE_FAILED', '', tokens); return; }
-    console.log('[품질 학습] 학습 — 규칙 ' + merged.rules.length + ' · 버림 ' + merged.dropped + ' · 목표 ' + merged.focus.map(function (f) { return f.code; }).join(',') + ' · 초안 ' + drafts.length + '편 · 토큰 ' + tokens);
+    console.log('[품질 학습] 학습 — 규칙 ' + merged.rules.length + ' · 버림 ' + merged.dropped + (merged.over_dropped ? ' · 넘친 항목 옛 규칙 뺌 ' + merged.over_dropped + '(' + merged.over.join(',') + ')' : '') + (merged.empty_kept ? ' · 빈 목록 — 옛 규칙 지킴' : '') + ' · 목표 ' + merged.focus.map(function (f) { return f.code; }).join(',') + ' · 초안 ' + drafts.length + '편 · 토큰 ' + tokens);
   } catch (e) {
     try { await release('WORKER_THREW', (e && e.message) || String(e)); } catch (e2) {}
   }

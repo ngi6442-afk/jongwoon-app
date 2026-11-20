@@ -324,6 +324,43 @@ const qdoc = Object.assign(QL.normQL(null), { rules: [{ id: 'q1', text: '사진�
   } finally { global.fetch = realFetch; process.env.URL = savedUrl || ''; clearHooks(); }
 }
 
+// ---- ⑧-3 넘친 항목(C146 ①, 11/20) — 긴 문장 범위 점수 · 넘친 항목 옛 규칙은 코드가 뺌 · 빈 목록 보호 · 학습 워커 배선 · 짝 표 규칙 수 ----
+{
+  const PQm = require(join(FN, '_lib/promoqual.js'));
+  const X2 = PQm.ITEMS.find((i) => i[0] === 'X2')[3];
+  const sc = [0.05, 0.09, 0.12, 0.16, 0.20, 0.25, 0.30, 0.43, 0.80].map((v) => X2({ long_sent_ratio: v }));
+  T('⑧-3 X2 범위 점수(triR 12~20% = 2 · 7~12%·20~30% = 1 · 그 밖 0): 0.05→0 · 0.09→1 · 0.12→2 · 0.16→2 · 0.20→2 · 0.25→1 · 0.30→1 · 0.43→0(11/18 초안) · 0.80→0 · 채점 판 q2-20261120(크론이 다시 잼) · 학습 판 ql2-20261120(자료 지문이 바뀌어 다시 학습)',
+    JSON.stringify(sc) === JSON.stringify([0, 1, 2, 2, 2, 1, 1, 0, 0]) && PQm.QUAL_VER === 'q2-20261120' && QL.QL_VER === 'ql2-20261120' && typeof PQm.triR === 'function' && PQm.triR(null, 1, 2, 0, 3) === 0, JSON.stringify(sc));
+  const st = { X2: { avg: 0, low: 8, n: 8, now: 0.45 }, X1: { avg: 2, low: 0, n: 8, now: 1.0 }, C4: { avg: 2, low: 0, n: 8, now: 35 }, D1: { avg: 1, low: 8, n: 8, now: 0.2 } };
+  const ov = QL.overOf(st), ov2 = QL.overOf({ X2: { now: 0.18 }, X1: { now: 1.25 } });
+  T('⑧-3 overOf: 범위 항목 중 최근 중앙값이 위끝을 넘은 것만(X2 45% > 20 · C4 80자 > 50) · X1은 넘쳐도 빠짐(본보기가 위끝을 넘어 기준부터 맞춰야 함) · 범위 안·범위 아닌 항목(D1)·값 없음 = 빠짐', JSON.stringify(ov) === '["X2"]' && ov2.length === 0 && QL.overOf({ C4: { now: 80 } }).join() === 'C4' && QL.overOf({}).length === 0 && QL.overOf(null).length === 0, JSON.stringify([ov, ov2]));
+  const oldX2 = { id: 'qold2', text: '전체 문장 가운데 상당수는 예순 자를 넘는 긴 문장으로 작성한다.', item: 'X2', n: 2, ts: 5 }, oldD1 = { id: 'qoldd1', text: '판독표 장면마다 현장 작업 문장을 한 문장 이상 쓴다.', item: 'D1', n: 4, ts: 5 };
+  const base = Object.assign(QL.normQL(null), { rules: [oldX2, oldD1] });
+  const out = { summary: 's', rules: [
+    { text: oldX2.text, item: 'X2', n: 3, keep_id: 'qold2' },                     // 모델이 옛 규칙을 이어받아 남김
+    { text: ' ' + oldX2.text + ' ', item: 'ALL', n: 1, keep_id: '' },             // 같은 글을 새 규칙처럼 다시 씀(항목도 바꿈)
+    { text: '긴 문장은 다섯 문장에 한 번꼴로만 쓰고 나머지는 짧게 끊는다.', item: 'X2', n: 1, keep_id: '' },
+    { text: '예순 자를 넘는 문장은 줄이고 절 둘에서 끊는다.', item: 'X2', n: 1, keep_id: 'qold2' },   // 검토 11/20: 옛 id를 이어받아 줄이는 쪽으로 고쳐 씀 = 남아야 함
+    { text: oldD1.text, item: 'D1', n: 5, keep_id: 'qoldd1' }] };
+  const m1 = QL.mergeQL(base, out, { now: NOW, sig: 'S', focus: [], n: 8, over: ['X2'] });
+  const t1 = m1.rules.map((r) => r.text);
+  const m0 = QL.mergeQL(base, out, { now: NOW, sig: 'S', focus: [], n: 8 });
+  const me = QL.mergeQL(base, { summary: '', rules: [] }, { now: NOW, sig: 'S', focus: [], n: 8, over: ['X2'] });
+  const me0 = QL.mergeQL(base, { summary: '', rules: [] }, { now: NOW, sig: 'S', focus: [], n: 8 });
+  const mj = QL.mergeQL(base, { summary: '', rules: [{ text: '금액 12345 쓴다' }, { text: '   ' }, null, 'x'] }, { now: NOW, sig: 'S', focus: [], n: 8 });   // 검토: 전부 거름에 걸림
+  const mo = QL.mergeQL(base, out, { now: NOW, sig: 'S', focus: [], n: 8, over: ['D1', '__proto__', 'constructor'] });   // 검토: 넘침 대상 밖 코드는 무시
+  T('⑧-3 합치기: 넘친 항목(X2)의 옛 규칙은 글이 옛 글과 같으면 이어받은 id든 새 규칙처럼 다시 쓴 것이든 코드가 뺌(2건) · id를 이어받아도 줄이는 쪽으로 고쳐 쓴 규칙은 남음(검토) · 새로 쓴 줄이는 규칙·다른 항목(D1) 옛 규칙은 남음 · over·over_dropped 저장·이력 · over 안 넘기면 종전대로(옛 규칙 남음)',
+    t1.length === 3 && t1.indexOf(oldX2.text) < 0 && t1.some((x) => /다섯 문장에 한 번꼴/.test(x)) && m1.rules.some((r) => r.id === 'qold2' && /절 둘에서 끊는다/.test(r.text)) && t1.indexOf(oldD1.text) >= 0 && m1.over_dropped === 2 && JSON.stringify(m1.over) === '["X2"]' && m1.hist[m1.hist.length - 1].over_dropped === 2
+    && m0.rules.some((r) => r.text === oldX2.text) && m0.over_dropped === 0 && QL.normQL(m1).over_dropped === 2, JSON.stringify({ t1, od: m1.over_dropped }));
+  T('⑧-3 빈 목록 보호: 모델이 규칙을 하나도 안 주면 옛 규칙을 지우지 않음(empty_kept) — 넘친 항목 옛 규칙만 뺌 · over 없으면 옛 규칙 둘 다 그대로·id 유지 · 받은 규칙이 전부 거름에 걸려도 빈 목록으로 봄(검토) · 넘침 대상(C4·X2) 밖 코드는 무시',
+    me.empty_kept === true && me.rules.length === 1 && me.rules[0].id === 'qoldd1' && me0.rules.length === 2 && me0.rules.map((r) => r.id).join() === 'qold2,qoldd1' && me0.empty_kept === true && m1.empty_kept === false
+    && mj.empty_kept === true && mj.rules.length === 2 && mj.dropped === 1 && mo.over.length === 0 && mo.over_dropped === 0 && mo.rules.some((r) => r.id === 'qoldd1'), JSON.stringify({ me: me.rules, me0: me0.rules.map((r) => r.id) }));
+  const qw3 = fs.readFileSync(join(FN, 'gw-promo-qlearn-background.js'), 'utf8'), ql3 = fs.readFileSync(join(FN, '_lib/promoqlearn.js'), 'utf8'), pai3 = fs.readFileSync(join(FN, '_lib/promoai.js'), 'utf8'), idx3 = fs.readFileSync(join(FN, '../../index.html'), 'utf8');
+  T('⑧-3 배선: 학습 워커가 합치기에 over: QL.overOf(stats) · 로그 "넘친 항목 옛 규칙 뺌" · 학습 지시에 "범위 위로 넘쳤으면 … 옛 규칙은 빼고, 줄이는 쪽 규칙"·"규칙을 하나도 주지 않으면 앱은 옛 규칙을 그대로" · 생성 품질 블록 "기본 지시와 부딪혀도 기본 지시를 따릅니다" · 블로그 학습 짝 표에 "· 규칙 n"(완료 짝만 — C247 ㉠)',
+    /focus: focus, n: drafts\.length, over: QL\.overOf\(stats\) \}\);/.test(qw3) && /넘친 항목 옛 규칙 뺌/.test(qw3) && /범위 위로 넘쳤으면 그 항목을 늘리던 옛 규칙은 빼고, 줄이는 쪽 규칙을 새로 씁니다/.test(ql3) && /규칙을 하나도 주지 않으면 앱은 옛 규칙을 그대로 둡니다/.test(ql3)
+    && /이 글쓰기 기본 지시\(문장 길이 섞기·분량 상한 등\)와 부딪혀도 기본 지시를 따릅니다\./.test(pai3) && /\(p\.status === "done" \? ' <span style="color:var\(--sub\);" title="[^"]*">· 규칙 ' \+ \(Number\(p\.rules_n\) \|\| 0\) \+ '<\/span>' : ''\)/.test(idx3));
+}
+
 // ---- ⑨ 생성 워커 통합(가짜 모델): 품질 규칙·목표 줄이 입력에 실리고, 끄면 안 실림 · 금지 문자열에 걸리면 품질 자료만 먼저 뺌(검토 gen F1) ----
 {
   const worker = require(join(FN, 'gw-promo-ai-run-background.js'));

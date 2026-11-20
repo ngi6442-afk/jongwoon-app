@@ -20286,9 +20286,9 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[x\] \(AI 시험 화면 대상\)/.test(l)), op = cb.filter((l) => /^- \[ \] \(운영 확인\)/.test(l));
     const FT = ['작성일 달', '`FIRST_YM`', '`stmtDropFillInvs`', '3자 이상', '받은편지함은 거래처를 찾은 것만', '명세 합계 = 주문 총액 합', '10 → 60', '`stmtDropLoad`', '`handleDropDel`', '고치지 않은 것'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v509 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 1 && op.length === 1
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 509 && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 1 && op.length === 1
       && d.man.indexOf('계산서는 작성일이 속한 달 목록으로 들어갑니다') > 0 && d.man.indexOf('명세 합계 칸에는 주문별 총 결제금액의 합이 들어갑니다') > 0 && d.man.indexOf('(2026-11 v503 · v509)') > 0
-      && d.cl.indexOf('**월말명세서 판⑩(v509)**') > 0 && /SHELL_CACHE = 'jw-shell-v509'/.test(d.sw);
+      && d.cl.indexOf('**월말명세서 판⑩(v509)**') > 0 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 509;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, op: op.length } };
   };
   const rQ = chkQ(DQ);
@@ -20299,6 +20299,29 @@ try {
   T('v509 문서·판 번호(정확 검사): FEATURES 기준 v509 (2026-11-20)·v509 절(29 판⑩) · TESTLIST v509 칸 4(운영 확인 1 · 시험 화면 [x] 1 · 게이트 [x] 2) · MANUAL 메일 줄·쿠팡 줄 · CLAUDE.md 한 줄 · sw jw-shell-v509 · 결함 사본(기준 줄·sw·FEATURES 글·MANUAL 둘·CLAUDE 줄·TESTLIST 칸) ✗',
     rQ.ok && MQ.every((v) => v === false), JSON.stringify({ r: rQ.info, mut: MQ }));
 } catch (e) { console.log('  (v509 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v510(체크 10 C146 ① — 긴 문장 범위 점수·넘친 규칙 빼기): 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '504 이상'으로 풀 것
+try {
+  const rdQ = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DQ = { ft: rdQ('FEATURES.md'), tl: rdQ('TESTLIST.md'), sw: rdQ('sw.js') };
+  const chkQ = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v510 (11/20)', '\n### '), tlv = cut(d.tl, '\n## v510 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), op = cb.filter((l) => /^- \[ \] \(운영 확인\)/.test(l));
+    const FT = ['`triR`', '`q2-20261120`', '`overOf`', '`mergeQL`', '`over_dropped`', '`empty_kept`', '`ql2-20261120`', '`rules_n`', '기본 지시를 따릅니다'];
+    const GATE = ['uismoke', 'servertest', 'consheet_check', 'proctpl_check', 'settletest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check', 'paycalc_check', 'stmtread_a_check', 'stmtread_b_check', 'stmtread_c_check', 'stmtread_d_check', 'stmtmail_check'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0), last = gate[gate.length - 1] || '';
+    const ok = /기준: v510 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && op.length === 2 && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => last.indexOf('`' + g + '`') > 0) && /SHELL_CACHE = 'jw-shell-v510'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
+  };
+  const rQ = chkQ(DQ);
+  const muQ = (k, f) => chkQ(Object.assign({}, DQ, { [k]: f(DQ[k]) })).ok;
+  const MQ = [muQ('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v509 (')), muQ('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v509'")),
+    muQ('ft', (s) => s.split('`overOf`').join('overOf')), muQ('tl', (s) => s.split('\n## v510 ').join('\n## vX '))];
+  T('v510 문서·판 번호(정확 검사): FEATURES 기준 v510 (2026-11-20)·v510 절(triR·q2·overOf·mergeQL·over_dropped·empty_kept·ql2·rules_n·기본 지시 우선) · TESTLIST v510 칸 4(운영 확인 2 · AI [x] 2 · 게이트 18종) · sw jw-shell-v510 · 결함 사본 ' + MQ.length + '개 = 모두 ✗',
+    rQ.ok && MQ.every((v) => v === false), JSON.stringify({ r: rQ.info, mut: MQ }));
+} catch (e) { console.log('  (v510 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ── v504(C147 ② — 45-1 작은 판): 실행 검사는 위 'v464 C081 ①'(c1 = 2건)·'v441 ㉑'(안내 글) · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '504 이상'으로 풀 것
 try {

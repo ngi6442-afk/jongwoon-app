@@ -1649,3 +1649,9 @@
 - [x] (AI 시험 화면 대상) 실물 국세청 계산서 19통(10/20~11/19 · 읽기 전용)을 판⑩ 코드로 = 목록 거래처 10통 맞음(3자 대조 뒤에도 그대로) · 목록 밖 9통 · 읽기 실패 0 — ✓ AI 11/20
 - [x] (AI) `stmtmail_check` ⑩ 5건(결함 사본 4) · `uismoke` 29 판⑩ ③-10 3건(결함 사본 4) · `servertest` 91 ④-10 — ✓ AI 11/20
 - [x] (AI) `uismoke` · `servertest` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` · `paycalc_check` 통과 · v503 문서 검사를 이 판 이상으로 풀고 v509 문서·판 번호 정확 검사 — ✓ AI 11/20
+
+## v510 — 체크 10 품질 고리: 긴 문장 범위 점수 · 넘친 항목 옛 규칙 빼기 · 생성 기본 지시 우선 · 짝 표 규칙 수
+- [x] (AI) `promoqlearn_check` ⑧-3 5건(X2 점수·overOf·합치기·빈 목록 보호·배선) + 운영 백업 재현(검토 1명) — ✓ AI 11/20
+- [ ] (운영 확인) 배포 다음 크론 ⑤(00:00) 뒤 품질 카드 사진AI 초안 X2가 긴 문장 43~80% 줄에서 0점 · 그다음 크론 ⑥ 품질 학습 회차에서 목표에 X2(긴 문장)·로그 "넘친 항목 옛 규칙 뺌" · 규칙 "상당수는 예순 자를 넘는" 없음
+- [ ] (운영 확인) 다음 사진AI 초안의 긴 문장 비율이 11/18(43~80%)보다 내려감 · 블로그 학습 짝 표 완료 짝 "· 규칙 n"
+- [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `paycalc_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` 통과 · v509 문서 검사를 이 판 이상으로 풀고 v510 문서·판 번호 정확 검사 — ✓ AI 11/20
