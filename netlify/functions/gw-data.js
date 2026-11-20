@@ -1717,6 +1717,21 @@ async function bidNotifyIds(st, tc) {
   pm.forEach(function (id) { if (out.indexOf(id) < 0) out.push(id); });
   return out;
 }
+// C255(11/20) 봇 알림 되풀이 안전망 — 덧대기(원천은 보내는 쪽: 자료 저장소 watch.py·awards.py가 보낸 것을 기억해 다시 안 부른다).
+//   같은 꼬리표·같은 제목·같은 본문이 오늘(KST) 알림함(push:log)에 이미 있고 그때 받은 사람이 지금 받을 사람을 다 덮으면 → 알림함 줄만 남기고 기기 발송은 건너뛴다.
+//   넷 가운데 하나라도 다르거나(본문 한 글자 · 받는 사람 한 명) 날이 바뀌면 그대로 보낸다. 알림함을 못 읽으면 거르지 않는다(보내는 쪽으로).
+//   빼는 꼬리표 auto-due('정기업무 n건'): 같은 날 다른 지시가 같은 제목으로 생기면 같은 글이 되풀이가 아니다(생략 판정도 아래 갈래가 따로 함).
+const BOT_DUP_SKIP_TAGS = { 'auto-due': 1 };
+async function botNotifyDupToday(title, body, tag, ids) {
+  if (BOT_DUP_SKIP_TAGS[tag]) return false;
+  const lr = await blobGet(store(DATA), 'push:log');
+  if (!lr.ok || !lr.data || !Array.isArray(lr.data.items)) return false;
+  const today = kstDayNow();
+  return lr.data.items.some(function (x) {
+    return !!x && x.tag === tag && x.title === title && x.body === body && Number(x.ts) > 0 && verDay(Number(x.ts)) === today &&
+      Array.isArray(x.to) && ids.every(function (id) { return x.to.indexOf(id) >= 0; });
+  });
+}
 // 봇 알림(정기업무 크론 전용) — 공유 시크릿 인증. 관리자 접속과 무관하게 만기·미수 알림이 나가야 한다.
 async function handleBotNotify(event, d, R) {
   if (!botKeyOk(d.key)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_INGEST_KEY', request_id: R });
@@ -1743,6 +1758,12 @@ async function handleBotNotify(event, d, R) {
     const devices = ids.reduce(function (n, id) { return n + ((subs.members[id] || []).length); }, 0);
     if (!ids.length) return jr(200, { status: 'OK', sent: 0, admins: 0, devices: 0, note: '관리자 없음', request_id: R });
     if (!devices) return jr(200, { status: 'OK', sent: 0, admins: ids.length, devices: 0, note: '구독 기기 없음 — 각 기기에서 [알림 켜기] 필요', request_id: R });
+    let dup = false;
+    try { dup = await botNotifyDupToday(title, body, tag, ids); } catch (e) { dup = false; }
+    if (dup) {   // C255: 오늘 이미 나간 같은 알림 — 알림함 줄만(logOnly), 기기는 안 깨움. dup:1은 보내는 쪽이 '도달 0기기'와 가르는 표시
+      await push.sendTo(ids, { title: title, body: body, url: './', tag: tag }, { ctx: tcN, logOnly: true });
+      return jr(200, { status: 'OK', sent: 0, dup: 1, admins: ids.length, devices: devices, note: '같은 알림이 오늘 이미 나감 — 알림함에만 남김(기기 발송 생략)', request_id: R });
+    }
     const r = await push.sendTo(ids, { title: title, body: body, url: './', tag: tag }, { ctx: tcN });
     return jr(200, { status: 'OK', sent: r.sent, removed: r.removed, admins: ids.length, devices: devices, request_id: R });
   } catch (e) {
