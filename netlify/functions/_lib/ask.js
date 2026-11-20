@@ -18,7 +18,8 @@ const DATA = 'gw_data';
 
 const PERM_CLOSED = { quote: 1, promo: 1, hr: 1, lic: 1, site: 1, safety: 1, hw: 1, stmt: 1 };   // gw-data와 같은 집합(uismoke 대조 — v430 safety 추가, 물어보기 도구는 교육 기록 col:edu를 싣지 않는다 · v431 hw 화관법 추가, 물어보기 도구에 화관법 자료 없음 · 29 stmt 월말명세서 추가, 물어보기 도구에 명세서 자료 없음)
 const COL = { vehicles: 'veh', licenses: 'lic', asbestos: 'site', contracts: 'con',
-  clients: 'cli', documents: 'doc', bids: 'bid', tasks: 'tasks', workers: 'wk' };
+  clients: 'cli', documents: 'doc', bids: 'bid', tasks: 'tasks', workers: 'wk',
+  receivables: 'rec' };   // C248 검토: 도구는 없음 — 지시 숨김(_lib/taskhide 기성 갈래)이 permOf(member, 'receivables')를 gw-data와 같은 키로 보게
 
 const ROW_CAP = 25;          // 도구 한 번이 돌려주는 최대 행 — 원장을 통째로 보내지 않는다
 const MAX_TURNS = 6;         // 도구 왕복 상한(무한 루프 방지)
@@ -33,6 +34,8 @@ function permOf(member, col) {
   const key = COL[col];
   return (member.perms && member.perms[key]) || (PERM_CLOSED[key] ? 'hide' : 'view');
 }
+// C248 검토: 서버가 화면에 내려 주지 않는 지시(기성 연동·입·퇴사)는 물어보기에서도 뺀다 — gw-data 읽기와 같은 함수(_lib/taskhide)
+const TH = require('./taskhide').make(permOf);
 async function currentMember(event) {
   const v = verifyToken(bearer(event));
   if (!v.ok) return { ok: false, reason: v.reason };
@@ -62,16 +65,18 @@ function scopeHas(scope, m) {
   return scopeIncl(scope, m);
 }
 // 앱 scopeIncludes와 같은 판정(관리자 자동 통과 없음) — 지시 scope처럼 '누구에게 온 것인가'를 볼 때(C248). 공개 범위(인허가)는 위 scopeHas
+//   C248 검토: 배열 아닌 값도 앱처럼(!scope || !scope.length = 전체 · 아니면 scope[i]를 length까지) — 종전 Array.isArray 판정은 글자 꼴 범위를 전체 공개로 봐 화면보다 넓었다
 function scopeIncl(scope, m) {
-  if (!Array.isArray(scope) || !scope.length) return true;
+  if (!scope || !scope.length) return true;
   if (!m) return false;
-  return scope.some((tk) => {
-    if (typeof tk !== 'string') return false;
+  for (let i = 0; i < scope.length; i++) {
+    const tk = scope[i];
+    if (typeof tk !== 'string') continue;
     if (tk === m.id) return true;
-    if (tk.indexOf('dept:') === 0) return !!m.dept && m.dept === tk.slice(5);
-    if (tk.indexOf('rank:') === 0) { const ti = RANKS.indexOf(tk.slice(5)), mi = RANKS.indexOf(m.rank); return ti >= 0 && mi >= 0 && mi <= ti; }
-    return false;
-  });
+    if (tk.indexOf('dept:') === 0) { if (m.dept && m.dept === tk.slice(5)) return true; }
+    else if (tk.indexOf('rank:') === 0) { const ti = RANKS.indexOf(tk.slice(5)), mi = RANKS.indexOf(m.rank); if (ti >= 0 && mi >= 0 && mi <= ti) return true; }
+  }
+  return false;
 }
 // 나에게 온 지시(C248) — 앱 index.html taskForMe와 같은 규칙: 전사(who_id '__all__') · 본인 담당(who_id) · scope에 본인 포함 · 옛 자료(who_id 없이 이름).
 //   종전엔 앱에 없는 칸(assignee_id·assignees)으로 걸러 누구에게나 0건이었다. 바꾸면 앱 taskForMe와 동시에(servertest C248)
@@ -80,12 +85,14 @@ function taskForMe(t, m) {
   if (t.who_id === '__all__') return true;
   if (m.id) {
     if (t.who_id === m.id) return true;
-    if (Array.isArray(t.scope) && t.scope.length && scopeIncl(t.scope, m)) return true;
+    if (t.scope && t.scope.length && scopeIncl(t.scope, m)) return true;
   }
   if (!t.who_id && m.name && S(t.who).trim() === m.name) return true;
   return false;
 }
 const isDay = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+// 'n일 안' 끝날 = 한국 날짜 기준(C248 검토 — 종전 UTC라 한국 00~09시엔 D-n 줄이 빠졌다) · 차량·인허가 만기 거르기가 같이 씀
+const dueLimit = (days) => new Date(Date.now() + 9 * 3600000 + days * 86400000).toISOString().slice(0, 10);
 const hit = (row, q, fields) => {
   if (!q) return true;
   const t = S(q).toLowerCase().replace(/\s+/g, '');
@@ -102,7 +109,7 @@ const TOOLS = [
       .filter((v) => hit(v, a.q, ['no', 'type', 'kind', 'driver', 'own', 'permit', 'state']))
       .filter((v) => {
         if (a.due_within_days == null) return true;
-        const lim = new Date(Date.now() + a.due_within_days * 86400000).toISOString().slice(0, 10);
+        const lim = dueLimit(a.due_within_days);
         return (v.insp_due && v.insp_due <= lim) || (v.ins_due && v.ins_due <= lim);
       })
       .slice(0, ROW_CAP)
@@ -125,11 +132,12 @@ const TOOLS = [
       .filter((l) => hit(l, a.q, ['name', 'org', 'license_no']))
       .filter((l) => {
         if (a.due_within_days == null) return true;
-        const lim = new Date(Date.now() + a.due_within_days * 86400000).toISOString().slice(0, 10);
+        const lim = dueLimit(a.due_within_days);
         return isDay(l.expiry) && l.expiry <= lim;
       })
       .slice(0, ROW_CAP)
-      .map((l) => ({ 이름: l.name, 기관: l.org, 번호: l.license_no, 취득: l.issued, 만기: l.expiry })) },
+      // 만기 칸은 날짜·'해당없음'만 그대로(화면은 그 밖의 값을 '만료 미정'으로만 보임 — 원값을 내지 않음)
+      .map((l) => ({ 이름: l.name, 기관: l.org, 번호: l.license_no, 취득: l.issued, 만기: (isDay(l.expiry) || l.expiry === '해당없음') ? l.expiry : '' })) },
 
   { name: 'asbestos', col: 'asbestos',
     description: '석면 작업 이력 대장(산안법 30년 보존). 연번·공사명·발주처·소재지·기간·자재·면적·투입 인원수. 근로자 **이름과 생년월일은 돌려주지 않는다**(인원수만). q로 공사명·소재지를 거르고, year로 연도를 거른다.',
@@ -178,7 +186,7 @@ const TOOLS = [
     description: '나에게 온 지시 조회(나에게 지정된 것 · 공개 대상에 내가 든 것 · 전 직원 대상). 제목·기한·상태. 남의 지시는 돌려주지 않는다.',
     schema: { type: 'object', properties: {} },
     run: async (a, member) => (await items('tasks'))
-      .filter((t) => taskForMe(t, member))   // C248 앱 taskForMe와 같은 규칙
+      .filter((t) => !TH.taskHiddenFor(member, t) && taskForMe(t, member))   // C248 서버 읽기 숨김(gw-data와 같은 함수) 다음 앱 taskForMe와 같은 규칙
       .slice(0, ROW_CAP)
       .map((t) => ({ 제목: t.title, 기한: t.due, 상태: t.status })) },
 ];

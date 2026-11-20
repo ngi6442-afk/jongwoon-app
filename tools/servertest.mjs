@@ -4956,6 +4956,35 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       mem.gw_data['col:tasks'] = { schema: 1, items: [mkT('f', { who: '지시받는이' }), mkT('g', { who_id: 'uother', who: '지시받는이' }), mkT('h', { scope: ['dept:운영부'] }), mkT('i', { scope: ['rank:대리'] }), mkT('j', { scope: ['dept:관리부'] }), mkT('k', { scope: ['rank:과장'] })] };   // 대리 = '대리 이상' 듦 · '과장 이상' 안 듦
       const m2 = await mineOf(UT), mAdm = await mineOf({ id: 'uadm248', name: '관리', admin: true, perms: {} });
       T('C248 my_tasks: 옛 자료(who_id 없이 이름) 일치 · who_id 있으면 이름으로 안 봄 · scope 부서·직급 이상 · 관리자도 scope 자동 통과 없음(앱 scopeIncludes와 같음)', m2 === 'f,h,i' && mAdm === '', JSON.stringify([m2, mAdm]));
+      // C248 검토: 서버가 화면에 내려 주지 않는 지시(입·퇴사 hr:·acct: · 기성 연동 rec_id·rec:)는 물어보기에서도 빠진다 — gw-data와 같은 함수(_lib/taskhide)
+      mem.gw_data['col:tasks'] = { schema: 1, items: [
+        mkT('hr1', { auto_key: 'hr:uz248:join:2026-12-01:1', who_id: '__all__', who: '전체' }),
+        mkT('hr2', { auto_key: 'acct:uz248:join:2026-12-01', who: '직원248' }),
+        mkT('hr3', { auto_key: 'hr:uz248:leave:2026-12-31:2', who_id: 'uo248', who: '담당248', scope: ['dept:운영부'] }),
+        mkT('hr4', { auto_key: 'hr:uz248:leave:2026-12-31:3', who_id: 'uo248', who: '담당248', scope: ['rank:대리'] }),
+        mkT('rc1', { rec_id: 'R248', who_id: 'uo248', who: '담당248', scope: ['dept:운영부'] }),
+        mkT('rc2', { auto_key: 'rec:R248:over45', who: '직원248' }),
+        mkT('rc3', { rec_id: 'R248b', who_id: 'uo248', who: '담당248', scope: ['rank:대리'] }),
+        mkT('norm', { who_id: '__all__', who: '전체' })] };
+      const UE = { id: 'ue248', name: '직원248', admin: false, dept: '운영부', rank: '대리', perms: { tasks: 'view', rec: 'hide' } };
+      const UEv = Object.assign({}, UE, { id: 'uev248', perms: { tasks: 'view', rec: 'view' } });
+      const UO = { id: 'uo248', name: '담당248', admin: false, dept: '관리부', rank: '사원', perms: { tasks: 'view' } };
+      const UA = { id: 'ua248', name: '관리248', admin: true, perms: {} };
+      const h1 = await mineOf(UE), h2 = await mineOf(UEv), h3 = await mineOf(UO), h4 = await mineOf(UA);
+      T('C248 검토 my_tasks 숨김: 입·퇴사 지시(담당 전사 · 담당 빈칸 + 이름 · 범위 부서/직급) = 비관리자 0 · 기성 연동(범위 부서/직급 · 옛 이름) = 기성 숨김 직원 0 · 기성 보기 직원은 기성 연동 그대로 · 담당 본인은 자기 입·퇴사·기성 지시 그대로 · 관리자 종전 그대로',
+        h1 === 'norm' && h2 === 'norm,rc1,rc2,rc3' && h3 === 'hr3,hr4,norm,rc1,rc3' && h4 === 'hr1,norm', JSON.stringify([h1, h2, h3, h4]));
+      // 화면이 받는 것(실제 gw-data get → taskForMe) = 물어보기 my_tasks — 양쪽 차이 0
+      const MSET = [UE, UEv, UO, UT];
+      let onlyAsk = 0, onlyScr = 0;
+      for (const m of MSET) {
+        mem.gw_users['member:' + m.id] = m;
+        const g = await call({ action: 'get', collection: 'tasks' }, issueSession(m).token, 'dev74');
+        const scr = ((g.body && g.body.doc && g.body.doc.items) || []).filter((t) => A74.taskForMe(t, m)).map((t) => t.title.replace('지시 ', '')).sort();
+        const ask = (await mineOf(m)).split(',').filter(Boolean);
+        onlyAsk += ask.filter((x) => scr.indexOf(x) < 0).length; onlyScr += scr.filter((x) => ask.indexOf(x) < 0).length;
+        if (g.code !== 200) onlyScr += 1000;
+      }
+      T('C248 검토 대조: 사람 4꼴 × 지시 8줄 — 화면(실제 gw-data get)에 없는데 물어보기에만 0 · 화면 내 지시 중 물어보기에 빠진 줄 0', onlyAsk === 0 && onlyScr === 0, JSON.stringify([onlyAsk, onlyScr]));
       if (prevT === undefined) delete mem.gw_data['col:tasks']; else mem.gw_data['col:tasks'] = prevT;
       // 같은 줄기(C248 전수 표): 인허가 도구가 앱에 없는 칸(due·got·no)으로 걸러 만기 임박이 늘 0건 → 앱 칸(expiry·issued·license_no)
       const in10 = new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10), in90 = new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10);
@@ -4965,6 +4994,16 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       delete mem.gw_data['col:licenses'];
       const r0 = (ld.rows || [])[0] || {};
       T('C248 licenses: 만기 임박 = expiry 기준(해당없음·공개 대상 밖 제외) · 번호·취득·만기 칸이 앱 칸에서 나옴 · q가 번호(license_no)도 거름', (ld.rows || []).length === 1 && r0.이름 === '곧 만기' && r0.번호 === 'N-1' && r0.취득 === '2020-01-01' && r0.만기 === in10 && (lq.rows || []).length === 1, JSON.stringify([ld, lq.count]));
+      // C248 검토 보강: 돌려주는 칸 이름 고정 · 26줄 = 25줄·capped · 글자 꼴 범위(앱 scopeIncludes = 글자 하나씩 → 닫힘) · 날짜·'해당없음' 아닌 만기 = 빈 값
+      mem.gw_data['col:tasks'] = { schema: 1, items: Array.from({ length: 26 }, (_, i) => mkT('z' + i, { who_id: '__all__', who: '전체' })) };
+      const cap = await A74.runTool('my_tasks', {}, UT);
+      if (prevT === undefined) delete mem.gw_data['col:tasks']; else mem.gw_data['col:tasks'] = prevT;
+      mem.gw_data['col:licenses'] = { schema: 1, items: [{ id: 'l5', name: '글자 범위', scope: 'ulic248', expiry: in10 }, { id: 'l6', name: '이상한 만기', scope: [], expiry: '2026-1-5' }, { id: 'l7', name: '객체 범위', scope: { 0: 'ulic248', length: 1 }, expiry: '해당없음' }] };
+      const lw = await A74.runTool('licenses', {}, UL);
+      delete mem.gw_data['col:licenses'];
+      const lwN = (lw.rows || []).map((x) => x.이름 + ':' + x.만기).join();
+      T('C248 검토 보강: my_tasks 칸 = 제목·기한·상태뿐 · 26줄 → 25줄 capped · 인허가 글자 꼴 범위 = 안 나옴(앱과 같음) · 객체 꼴 범위에 본인 = 나옴(앱과 같음) · 날짜 아닌 만기 = 빈 값',
+        cap.rows.length === 25 && cap.capped === true && Object.keys(cap.rows[0]).join() === '제목,기한,상태' && lwN === '이상한 만기:,객체 범위:해당없음', JSON.stringify([cap.rows.length, Object.keys(cap.rows[0] || {}), lwN]));
     }
     // v426 양식 주민번호·백업 흔적
     const rrnFake = '900101-' + '1234567';
@@ -13256,16 +13295,18 @@ function J91a(x) { return JSON.stringify(x); }
     const R0 = await chkEJ(gwd);
     T('C185 판2 ② e2e(실제 서버): 연습(기본) = 요약만(입사 1명·8건·칸 목록 고정·이름·회원 id 0)·ingest 지시 0·알림 0 · 켬 → 새 직원 등록 + 입사일 → 8건(인사 담당 7·계정 담당 1·담당만 공개·글에 이름 0)·made 0·알림 담당 둘 각 1발(auto-srv 꼬리표·이름 0) · 비관리자 읽기: 기성 "보기" 직원 0건·인사 담당 자기 7건만 · 인사 담당 [완료]·메모 뒤 보기 직원이 다른 지시 저장 = 서버 8건·완료·메모 그대로 · 직전 문서 못 읽은 비관리자 저장 500 · 다음 실행 0·알림 0 · (ⓙ 1) 같은 날 일반 + 실행기 알림 = 꼬리표 둘·응답 사람 수 한 번씩 · (ⓙ 2) 문서엔 live인 준비 안 된 규칙 연습 저장 = 200 · (ⓙ 7) 깨진 지시 문서 = 500·안 씀 · (ⓙ 8) 되돌림 = 준비 안 된 live만 연습으로',
       R0.o.ok, JSON.stringify(R0.o.ok ? R0.o : R0));
-    const MR = [["function taskHiddenFor(member, t) { return taskRecHiddenFor(member, t) || taskHrHiddenFor(member, t); }", 'function taskHiddenFor(member, t) { return taskRecHiddenFor(member, t); }'],
+    // C248 검토: 숨김 판정 본문은 _lib/taskhide.js로 옮김 — 셋째 칸 'th' = 그 파일을 바꾼 사본을 require 자리에 끼워 gw-data를 다시 읽음
+    const THPJ = join(FN, '_lib', 'taskhide.js'); require(THPJ); const rpTHJ = require.resolve(THPJ), keepTHJ = require.cache[rpTHJ], srcTHJ = fsJ.readFileSync(THPJ, 'utf8');
+    const MR = [["function taskHiddenFor(member, t) { return taskRecHiddenFor(member, t) || taskHrHiddenFor(member, t); }", 'function taskHiddenFor(member, t) { return taskRecHiddenFor(member, t); }', 'th'],
       ["  if (col === 'tasks' && !c.member.admin && Array.isArray(doc.items)) {\n    // v464 C078 ①", "  if (col === 'tasks' && !c.member.admin && Array.isArray(doc.items) && permOf(c.member, 'receivables') === 'hide') {\n    // v464 C078 ①"],
       ["items: doc.items.filter(function (t) { return !taskHiddenFor(c.member, t); }) });", 'items: doc.items.filter(function (t) { return !taskRecHiddenFor(c.member, t); }) });'],
-      ["  if (!/^(?:hr|acct):/.test(String(t.auto_key || ''))) return false;\n  if (member.id && t.who_id === member.id) return false;", "  if (!/^(?:hr):/.test(String(t.auto_key || ''))) return false;\n  if (member.id && t.who_id === member.id) return false;"],
+      ["  if (!/^(?:hr|acct):/.test(String(t.auto_key || ''))) return false;\n  if (member.id && t.who_id === member.id) return false;", "  if (!/^(?:hr):/.test(String(t.auto_key || ''))) return false;\n  if (member.id && t.who_id === member.id) return false;", 'th'],
       ["'정기봇', { tag: 'auto-srv', seen: notSeen });", "'정기봇', { seen: notSeen });"], ["notified: srvSent ? Object.keys(notSeen).length : notified,", 'notified: notified + srvSent,'],
       ["if (a.rules[rule] === mode && !(a.stale && a.stale[rule])) return", 'if (a.rules[rule] === mode) return'],
       ["  if (r.ok && r.data && !Array.isArray(r.data.items)) return jr(500, { status: 'ERROR', error_code: 'TASKS_READ_FAILED', request_id: R });", ''],
       ["  Object.keys(rules).forEach(function (rk) { if (rules[rk] === 'live' && !autotaskReady(rk)) rules[rk] = 'dry'; });", '']];
     const kR = [];
-    for (const [a, b] of MR) { let v; try { v = (await chkEJ(compJ(GWPJ, mutJ(SRCJ.gw, a, b)))).o.ok; } catch (e) { v = 'err ' + e.message; } kR.push(v); }
+    for (const [a, b, w] of MR) { let v; try { if (w === 'th') { require.cache[rpTHJ] = { id: rpTHJ, filename: rpTHJ, loaded: true, exports: compJ(THPJ, mutJ(srcTHJ, a, b)) }; v = (await chkEJ(compJ(GWPJ, SRCJ.gw))).o.ok; } else v = (await chkEJ(compJ(GWPJ, mutJ(SRCJ.gw, a, b)))).o.ok; } catch (e) { v = 'err ' + e.message; } finally { require.cache[rpTHJ] = keepTHJ; } kR.push(v); }
     T('C185 판2 ② 결함 사본 ' + MR.length + '개(입·퇴사 거름 걷음 · 저장 이월을 기성 숨김 직원만 · 읽기 거름을 기성만 · 계정 키 거름 빠짐 · 실행기 알림 꼬리표 같음 · 사람 두 번 셈 · 문서 live 잔존 연습 저장 막음 · 깨진 지시 문서 덮음 · 되돌림 낮춤 걷음) = 모두 ✗', kR.every((v) => v === false), JSON.stringify(kR));
     const D0 = await chkDJ(require(DIPJ), require(CRPJ));
     T('C185 판2 ③ 완료 신호: 키 읽기(acct = 기기 · hr = 사람 [완료] · 꼴 어긋남 = 없음 · 인허가 기한 갈래 그대로) · 계정 = 그 직원 승인 기기 1대 이상(대기·남의 기기·못 읽음·퇴사 계정 = 아님) · 크론 = 매 시 첫 회차만 기기 읽음(분 15 = 그대로 · 분 3 = 승인 대기·앱 기준·acct.device 1) · 체크 항목 그대로', D0.ok, JSON.stringify(D0));

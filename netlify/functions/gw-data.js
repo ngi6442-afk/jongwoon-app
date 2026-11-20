@@ -62,29 +62,8 @@ function permOf(member, col) {
   const key = COL[col];
   return (member.perms && member.perms[key]) || (PERM_CLOSED[key] ? 'hide' : 'view');
 }
-// v464(C078 ① PM 11/13 '추천대로'): 기성 연동 지시(입금확인 rec_id · 미수 45일 자동 auto_key 'rec:<기성 id>:…' — 제목에 거래처·금액)는 기성 숨김 직원에게 서버가 내려 주지 않는다.
-//   담당(본인·전사 __all__)·공개범위에 이름·지시자(from_id·from)인 사람은 그대로(앱 taskVisible·taskForMe와 같은 줄 — 넓히지 않고 좁히기만).
-//   그 직원이 지시를 저장하면 빠진 지시는 서버 원본 이월(지워지지 않게), 낡은 사본에 남은 같은 id도 서버 원본으로.
-function taskRecHiddenFor(member, t) {
-  if (!member || member.admin || !t) return false;
-  const rid = t.rec_id || ((/^rec:([^:]+):/.exec(String(t.auto_key || '')) || [])[1]) || '';
-  if (!rid || permOf(member, 'receivables') !== 'hide') return false;
-  if (t.who_id === '__all__' || (member.id && t.who_id === member.id)) return false;
-  if (Array.isArray(t.scope) && member.id && t.scope.indexOf(member.id) >= 0) return false;
-  if ((t.from_id && t.from_id === member.id) || (t.from && t.from === member.name)) return false;
-  return true;
-}
-// C185 판2: 입·퇴사 지시(키 hr:·acct:)는 담당·관리자만 — 담당(who_id)·공개 범위(scope)·지시자가 아니면 비관리자에게 숨김(미래 퇴사일·입사 사실이 다른 직원에게 드러나지 않게).
-//   키 꼴은 넓게(hr:·acct:로 시작하면 — 서버 실행기만 만드는 꼴, 앱 저장은 이 꼴을 못 단다)
-function taskHrHiddenFor(member, t) {
-  if (!member || member.admin || !t) return false;
-  if (!/^(?:hr|acct):/.test(String(t.auto_key || ''))) return false;
-  if (member.id && t.who_id === member.id) return false;
-  if (Array.isArray(t.scope) && member.id && t.scope.indexOf(member.id) >= 0) return false;
-  if (t.from_id && t.from_id === member.id) return false;
-  return true;
-}
-// 비관리자에게 숨는 지시 = 기성 연동 지시(v464 — 기성 숨김 직원) ∨ 입·퇴사 지시(C185 판2). 읽기 거름·저장 이월이 이 한 함수를 부른다
+// 비관리자에게 숨는 지시(기성 연동 v464 · 입·퇴사 C185 판2) — C248: 판정 본문은 _lib/taskhide.js 한 곳(물어보기 my_tasks도 같은 함수). 기성 권한은 이 파일 permOf
+const { taskRecHiddenFor, taskHrHiddenFor, taskHiddenFor } = require('./_lib/taskhide').make(permOf);
 // C185 판2 검토 8: 입·퇴사 지시의 공개 범위는 서버가 늘 [지금 담당] 하나(담당이 비면 [] — taskHrHiddenFor·화면 taskVisible이 관리자만 보게 함)
 function hrScopeFix(items) {
   let n = 0;
@@ -95,7 +74,6 @@ function hrScopeFix(items) {
   });
   return n;
 }
-function taskHiddenFor(member, t) { return taskRecHiddenFor(member, t) || taskHrHiddenFor(member, t); }
 // 인가된 기기만 데이터 접근. 관리자는 항상 허용.
 async function deviceApproved(event, member) {
   if (member.admin) return true;
