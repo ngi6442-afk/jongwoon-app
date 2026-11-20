@@ -640,6 +640,7 @@ async function handleRouteAdd(st, c, d, R) {
   const dup = AB.routes().find(function (x) { return normName(x.from) === normName(from) && normName(x.to) === normName(to) && normItem(x.item) === normItem(item); });
   if (dup) return jr(200, { ok: true, side: dup.side, row: dup.row, existed: true, request_id: R });
   const r = await blobGet(st, EXTRA_KEY);
+  if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { ok: false, code: r.code || 'STORAGE_READ_FAILED', request_id: R });   // C225 판 A: 추가 노선을 못 읽으면 빈 목록으로 보고 옛 줄 번호를 다시 차지하지 않음
   const items = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : [];
   const row = AB.nextExtraRow(side, items);
   if (!row) return jr(409, { ok: false, code: 'ROWS_FULL', side: side, request_id: R });   // 그 열의 식별자 960개(40~999)를 다 쓴 경우뿐 — 다른 열을 고르면 된다(2026-11-20, 종전: 예비 행 10줄 소진)

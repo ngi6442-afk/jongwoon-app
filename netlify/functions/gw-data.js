@@ -390,8 +390,11 @@ async function handleSave(event, d, R) {
   if (permOf(c.member, col) !== 'do' && col !== 'tasks' && col !== 'leaves') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
   if (!d.doc || typeof d.doc !== 'object') return jr(400, { status: 'REJECTED', error_code: 'INVALID_DOC', request_id: R });
   // 감사 로그용 이전 문서(diff 원본) — 읽기 실패해도 저장은 진행
-  let oldItems = [], prevDoc = null, prevReadFailed = false;
-  try { const prev = await blobGet(store(DATA), colKey(col)); if (prev.ok) { if (prev.data) { prevDoc = prev.data; if (Array.isArray(prev.data.items)) oldItems = prev.data.items; } } else prevReadFailed = true; } catch (e) { prevReadFailed = true; }
+  let oldItems = [], prevDoc = null, prevReadFailed = false, prevMissing = false;
+  try { const prev = await blobGet(store(DATA), colKey(col)); if (prev.ok) { if (prev.data) { prevDoc = prev.data; if (Array.isArray(prev.data.items)) oldItems = prev.data.items; } } else { prevReadFailed = true; prevMissing = prev.code === 'NOT_FOUND'; } } catch (e) { prevReadFailed = true; }
+  // C225 판 A: 직전 문서를 못 읽었으면(읽기·파싱 실패) 어느 갈래도 저장하지 않는다 — 빈 문서로 보고 재구성(휴가 타인 줄·차량 관리자 칸 등)한 뒤 덮던 길 · 알림·변경 기록보다 먼저
+  //   (NOT_FOUND = 시험 mock의 '없음' — 실 blobs.js는 없음을 ok:true·null로 준다. 갈래별 기존 PREV_READ_FAILED 가드는 그대로 둔다)
+  if (prevReadFailed && !prevMissing) return jr(500, { status: 'ERROR', error_code: 'PREV_READ_FAILED', request_id: R });
   // 낙관적 락: 클라이언트가 로드했던 문서 시각(base)과 서버 현재가 다르면 409 → 프런트의 기존 충돌 병합 경로가 재조회·병합·재시도.
   // 종전엔 감지 자체가 없어 두 관리자 동시 저장 시 늦은 쪽이 앞선 수정을 통째로 덮었다. base 미전송(구버전 캐시)·첫 저장은 종전대로.
   // v456(원장 C079): 저장된 문서의 updated_at이 유한한 숫자가 아니면(바깥 도구·스크립트가 글자 시각으로 쓴 경우 등) base 비교를 건너뛴다(종전 첫 저장처럼) —
@@ -901,6 +904,7 @@ async function handleBidsIngest(event, d, R, attempt) {
   const st = store(DATA);
   const r = await blobGet(st, colKey(target));
   if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: r.code || 'STORAGE_READ_FAILED', request_id: R });   // v444 검토 ①
+  if (r.ok && r.data != null && !Array.isArray(r.data.items)) return jr(500, { status: 'ERROR', error_code: 'BIDS_READ_FAILED', request_id: R });   // C225 판 A: 읽혔지만 꼴이 깨진 원장(items 배열 아님)을 빈 원장으로 보고 덮지 않음
   const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
   const at0 = (r.ok && r.data) ? r.data.updated_at : undefined, inItems = d.items;   // v444 검토 ② 처음 읽은 원장 시각 · 받은 줄(되살림 방지가 d.items를 거른 사본으로 바꾸므로 다시 할 때 되돌림)
   const cut = bidsCutDate();
@@ -1450,6 +1454,7 @@ async function handleBidsRefresh(event, d, R) {
   }
   for (const it of kaptItems) found.push(it);
   const r = await blobGet(st, colKey('bids'));
+  if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: 'BIDS_READ_FAILED', request_id: R });   // C225 판 A: 원장을 못 읽으면 빈 원장에 새 공고만 쓰지 않음
   const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
   await verSnapshot('bids', doc, c.member.name, true);   // 수동 수집도 병합 전 보존(일 1개)
   const m = mergeBidItems(doc, found);
@@ -1472,6 +1477,7 @@ async function handleBidsPurge(event, d, R) {
   }
   const st = store(DATA);
   const r = await blobGet(st, colKey('bids'));
+  if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: 'BIDS_READ_FAILED', request_id: R });   // C225 판 A: 못 읽은 원장을 빈 목록으로 저장하지 않음(세기 dry도 0건으로 답하지 않음)
   const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
   const cutP = bidsCutDate();
   const dryRun = d.dry === true || d.dry === 'true' || d.dry === 1;   // 관용(검토 발견: 문자열 'true'로 실제 정리가 돌지 않게)
@@ -1663,6 +1669,7 @@ async function handleBidsResults(event, d, R) {
   if (!Array.isArray(d.results)) return jr(400, { status: 'REJECTED', error_code: 'INVALID_RESULTS', request_id: R });
   const st = store(DATA);
   const r = await blobGet(st, colKey('bids'));
+  if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: 'BIDS_READ_FAILED', request_id: R });   // C225 판 A: 종전 200 applied 0(봇이 결과를 버림) → 500(봇 실패로 드러남 · 다음 회차가 다시)
   const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
   await verSnapshot('bids', doc, '수집봇', true);   // 결과 반영이 항목을 제자리 변형하므로 변형 전에(일 1개)
   const byId = {};
@@ -1799,10 +1806,12 @@ async function handleProofPut(event, d, R) {
   if (!name || name === '__index__' || !b64 || b64.length > ATT_MAX) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });   // __index__ 이름 충돌 시 색인 자기파괴 방지
   const st = store(FILES);
   const now = Date.now();
+  // C225 판 A: 색인을 본문보다 먼저 읽는다 — 못 읽으면(읽기·파싱 실패) 본문도 올리지 않고 500(빈 색인으로 덮지 않음 · 색인에 없는 고아 본문을 남기지 않음)
+  const idx = await blobGet(st, 'proof:__index__');
+  if (!idx.ok && idx.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: idx.code || 'STORAGE_READ_FAILED', request_id: R });
   const w = await blobSet(st, 'proof:' + name, { name: String(d.name || '').slice(0, 120), data: b64, by: c.member.name, ts: now });
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '증빙등록', id: name.slice(0, 40), t: '' }] }); } catch (e) {}
-  const idx = await blobGet(st, 'proof:__index__');
   const list = (idx.ok && idx.data && Array.isArray(idx.data.names)) ? idx.data.names : [];
   if (list.indexOf(name) < 0) list.push(name);
   // P1 판19: 색인에 올린 시각(서버)·원래 이름·올린 사람 id를 같이 남긴다 — 완료 신호 크론이 파일 본문 없이 색인 한 번만 읽고 판정(시각 없는 옛 항목은 신호로 안 셈, 옛 자료 이행 없음)
@@ -1840,8 +1849,10 @@ async function handleProofDel(event, d, R) {
   const name = proofSlug(d.name);
   if (!name || name === '__index__') return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
   const st = store(FILES);
-  await blobDelete(st, 'proof:' + name);
+  // C225 판 A: 색인을 먼저 읽는다 — 못 읽으면 본문도 지우지 않고 500(지울 한 건이 아니라 나머지 목록 전부가 사라지던 길)
   const idx = await blobGet(st, 'proof:__index__');
+  if (!idx.ok && idx.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: idx.code || 'STORAGE_READ_FAILED', request_id: R });
+  await blobDelete(st, 'proof:' + name);
   const list = ((idx.ok && idx.data && Array.isArray(idx.data.names)) ? idx.data.names : []).filter(function (n) { return n !== name; });
   const om = (idx.ok && idx.data && idx.data.meta && typeof idx.data.meta === 'object' && !Array.isArray(idx.data.meta)) ? idx.data.meta : {};
   const meta = {}; list.forEach(function (n) { if (hasOwn(om, n) && om[n] && typeof om[n] === 'object') meta[n] = om[n]; });   // P1 판19: 지운 항목의 시각 메타도 같이 뺀다
@@ -2079,7 +2090,8 @@ const APPR_LESSONS_KEY = 'lessons:appr';
 async function apprClogAppend(st, rows, nowMs) {
   const ym = new Date(nowMs + 9 * 3600000).toISOString().slice(0, 7);
   const ck = 'clog:appr:' + ym; const cr = await blobGet(st, ck);
-  let cd = (cr.ok && cr.data && Array.isArray(cr.data.items)) ? cr.data : null;
+  if (!cr.ok && cr.code !== 'NOT_FOUND') return { ok: false, code: cr.code || 'STORAGE_READ_FAILED' };   // C225 판 A: 그달 기록을 못 읽으면 새 체인으로 덮지 않음(기록 실패로 돌려줌)
+  let cd =(cr.ok && cr.data && Array.isArray(cr.data.items)) ? cr.data : null;
   rows.forEach(function (r) { cd = DONEIF.clogAppend(cd, Object.assign({ ts: nowMs }, r)); });
   const w = await blobSet(st, ck, cd); if (!w.ok) return { ok: false, code: w.code };
   const L = AL.tally(cd.items, ym); L.updated_at = nowMs;
@@ -3365,10 +3377,12 @@ const CON_CLOG_OPS = { docs_set: 1, docs_del: 1, map_add: 1, map_del: 1, scen_de
 const CON_STAGE_ACTS = { done: 1, undo: 1, na: 1, add: 1, del: 1 };
 function conClogHash(prev, entry) { return crypto.createHash('sha256').update(prev + '|' + JSON.stringify(entry)).digest('hex').slice(0, 16); }
 function conClogChainOk(doc) { let prev = ''; for (const it of (doc.items || [])) { const e = Object.assign({}, it); delete e.h; delete e.p; if (it.p !== prev || conClogHash(prev, e) !== it.h) return false; prev = it.h; } return prev === (doc.head || ''); }
-async function conClogRead(st, key) {
-  let doc = { schema: 1, items: [], head: '' };
-  try { const r = await blobGet(st, key || CON_CLOG_KEY); if (r.ok && r.data && Array.isArray(r.data.items)) { doc = { schema: 1, items: r.data.items, head: r.data.head || '' }; if (Array.isArray(r.data.restored)) doc.restored = r.data.restored; } } catch (e) {}
-  return doc;
+async function conClogRead(st, key) { return (await conClogReadF(st, key)).doc; }
+// C225 판 A: 못 읽음(읽기·파싱 실패) 코드도 함께 돌려준다({ doc, code }) — 문서는 종전 conClogRead와 같음(못 읽으면 빈 체인). 사건 기록 쓰기(handleConClogAdd)가 code를 보고 500
+async function conClogReadF(st, key) {
+  let doc = { schema: 1, items: [], head: '' }, code = '';
+  try { const r = await blobGet(st, key || CON_CLOG_KEY); if (!r.ok && r.code !== 'NOT_FOUND') code = r.code || 'STORAGE_READ_FAILED'; if (r.ok && r.data && Array.isArray(r.data.items)) { doc = { schema: 1, items: r.data.items, head: r.data.head || '' }; if (Array.isArray(r.data.restored)) doc.restored = r.data.restored; } } catch (e) { code = 'STORAGE_READ_FAILED'; }
+  return { doc: doc, code: code };
 }
 // v453 검토: 재해 복원(backup_put)이 남긴 되살린 범위 restored[{ts,from,to,bk,added,rechained}]를 다음 기록 쓰기가 지우지 않게 — 쓰는 두 곳이 이것으로 문서를 만든다
 function conClogDoc(doc, extra) { return Object.assign({ schema: 1, items: doc.items, head: doc.head }, extra, Array.isArray(doc.restored) ? { restored: doc.restored } : {}); }
@@ -3489,7 +3503,8 @@ async function handleConClogAdd(event, d, R) {
   const cid = String(d.cid || ''), pipe = String(d.pipe || ''), i = Number(d.i), k = String(d.k || ''), act = String(d.act || '');
   if (!/^[A-Za-z0-9_-]{1,40}$/.test(cid) || !/^[A-Za-z0-9_-]{1,20}$/.test(pipe) || !Number.isInteger(i) || i < 0 || i > 99 || !/^[A-Za-z0-9가-힣_:.-]{1,60}$/.test(k) || !Object.prototype.hasOwnProperty.call(CON_STAGE_ACTS, act)) return jr(400, { status: 'REJECTED', error_code: 'BAD_VALUE', request_id: R });
   const st = store(DATA), key = conClogMonthKey();
-  const doc = await conClogRead(st, key);
+  const crd = await conClogReadF(st, key), doc = crd.doc;
+  if (crd.code) return jr(500, { status: 'ERROR', error_code: crd.code, request_id: R });   // C225 판 A: 그달 기록을 못 읽으면 빈 기록에 새 줄만 쓰지 않음
   if (doc.items.length >= CON_CLOG_MONTH_MAX) return jr(409, { status: 'CONFLICT', error_code: 'CLOG_FULL', request_id: R });
   const entry = { ts: Date.now(), by: c.member.id, op: 'stage_docs', cid: cid, pipe: pipe, i: i, k: k, act: act };
   const h = conClogHash(doc.head || '', entry);
@@ -3532,6 +3547,7 @@ async function appendRecLog(st, entry) {
   try {
     const key = recLogKey();
     const r = await blobGet(st, key);
+    if (!r.ok && r.code !== 'NOT_FOUND') return false;   // C225 판 A: 그달 기록을 못 읽으면 빈 기록에 이번 줄만 쓰지 않음(기록 실패로 돌려줌)
     const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
     doc.items.push(entry);
     if (doc.items.length > RECLOG_MAX) doc.items = doc.items.slice(-RECLOG_MAX);
@@ -4217,14 +4233,14 @@ async function handleCdocGet(event, d, R) {
     if (!Number.isInteger(j) || j < 0 || j >= Number(r.data.parts)) return jr(400, { status: 'REJECTED', error_code: 'BAD_PART', request_id: R });
     if (j === 0 || it.pii === 2) {
       const lg = await appendRecLog(st, { ts: Date.now(), bid: c.member.id, by: String(c.member.name || ''), dept: String(c.member.dept || ''), cid: cid, n: n, i: it.i, dk: it.dk, kind: it.kind, pii: it.pii, name: String(it.name || '').slice(0, 80), reason: reason });
-      if (it.pii === 2 && !lg) return jr(500, { status: 'ERROR', error_code: 'RECLOG_FAILED', request_id: R });
+      if ((it.pii === 2 || it.pii === 1) && !lg) return jr(500, { status: 'ERROR', error_code: 'RECLOG_FAILED', request_id: R });   // C225 판 A: 개인정보(pii 1)도 기록 없이는 내주지 않음
     }
     const pr = await blobGet(store(FILES), BF.attPartKey(r.data.att, j));
     if (!pr.ok || !pr.data) return jr(404, { status: 'REJECTED', error_code: 'NO_FILE', request_id: R });
     return jr(200, { status: 'OK', cid: cid, n: n, part: j, parts: r.data.parts, data: pr.data.data, request_id: R });
   }
   const logged = await appendRecLog(st, { ts: Date.now(), bid: c.member.id, by: String(c.member.name || ''), dept: String(c.member.dept || ''), cid: cid, n: n, i: it.i, dk: it.dk, kind: it.kind, pii: it.pii, name: String(it.name || '').slice(0, 80), reason: reason });
-  if (it.pii === 2 && !logged) return jr(500, { status: 'ERROR', error_code: 'RECLOG_FAILED', request_id: R });   // 민감정보는 기록 없이는 내주지 않는다(fail-closed)
+  if ((it.pii === 2 || it.pii === 1) && !logged) return jr(500, { status: 'ERROR', error_code: 'RECLOG_FAILED', request_id: R });   // 민감정보는 기록 없이는 내주지 않는다(fail-closed) · C225 판 A: 개인정보(pii 1)도 같게(pii 0은 종전대로 logged:false)
   const out = { status: 'OK', cid: cid, n: n, name: it.name, orig: it.orig, kind: it.kind, pii: it.pii, type: (r.data.fill && !r.data.data) ? 'application/json' : docAttMime(it.name), logged: logged, request_id: R };
   if (r.data.data) out.data = r.data.data; else if (r.data.fill) out.fill = r.data.fill;   // v424 초안은 파일이 먼저(옛 초안은 채움 맵만)
   return jr(200, out);
@@ -5441,7 +5457,8 @@ async function handleBackupPut(event, d, R) {
   if (d.confirm !== true) return jr(400, { status: 'REJECTED', error_code: 'NEED_CONFIRM', preview: preview, request_id: R });
   if (plan && plan.status) return jr(plan.status, Object.assign(plan.body, { request_id: R }));
   const payload = plan ? plan.payload : d.data, note = plan ? plan.note : '';
-  const w = await blobSet(store(sn), key, payload);
+  // C225 판 A: 깨진 지금 값(STORAGE_PARSE_FAILED)을 백업으로 바꾸는 것은 이 길의 목적이라 force(_lib/blobs.js 층 1을 지나감) · 일시 읽기 실패면 force 없음 → 막힘(다시 시도)
+  const w = await blobSet(store(sn), key, payload, { force: !cur.ok && cur.code === 'STORAGE_PARSE_FAILED' });
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   try { await appendAudit({ ts: Date.now(), by: '복원', bid: 'restore', col: sn, ev: [{ op: restore ? '재해복원' : '백업복원', id: key, t: (JSON.stringify(preview).slice(0, 120) + note).slice(0, 300) }] }); } catch (e) {}
   return jr(200, { status: 'OK', store: sn, key: key, preview: preview, restore: restore, request_id: R });
@@ -5474,7 +5491,8 @@ async function handleTplGet(event, d, R) {
   if (hasOwn(TPL_PERSON, tplKey)) {
     if (permOf(c.member, 'contracts') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
     if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
-    await appendRecLog(store(DATA), { ts: Date.now(), bid: c.member.id, by: String(c.member.name || ''), dept: String(c.member.dept || ''), cid: '', n: 0, i: -1, dk: 'tpl.' + tplKey, kind: 'tpl', pii: 1, name: tplKey, reason: '' });
+    const tlg = await appendRecLog(store(DATA), { ts: Date.now(), bid: c.member.id, by: String(c.member.name || ''), dept: String(c.member.dept || ''), cid: '', n: 0, i: -1, dk: 'tpl.' + tplKey, kind: 'tpl', pii: 1, name: tplKey, reason: '' });
+    if (!tlg) return jr(500, { status: 'ERROR', error_code: 'RECLOG_FAILED', request_id: R });   // C225 판 A: 사람 정보가 든 양식은 열람 기록 없이 내주지 않음(cdoc 민감정보와 같은 코드)
   }
   const r = await blobGet(store(FILES), 'tpl:' + tplKey);
   if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: r.code || 'STORAGE_READ_FAILED', request_id: R });   // v422: 읽기 실패 ≠ 미등록
@@ -5635,11 +5653,13 @@ async function appendDocLog(st, entry) {
   try {
     const key = docLogKey();
     const r = await blobGet(st, key);
+    if (!r.ok && r.code !== 'NOT_FOUND') return false;   // C225 판 A: 그달 기록을 못 읽으면 빈 기록에 이번 줄만 쓰지 않음
     const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
     doc.items.push(entry);
     if (doc.items.length > DOCLOG_MAX) doc.items = doc.items.slice(-DOCLOG_MAX);
-    await blobSet(st, key, doc);
-  } catch (e) { /* no-op */ }
+    const w = await blobSet(st, key, doc);
+    return !!(w && w.ok);   // C225: 남겼는지 돌려줌(종전엔 돌려주는 값 없음)
+  } catch (e) { return false; }
 }
 async function handleDocLogGet(event, d, R) {
   const c = await currentMember(event);
@@ -5759,9 +5779,10 @@ async function handleDocAttGet(event, d, R) {
   const r = await blobGet(store(FILES), docAttKey(docId, n));
   if (!r.ok || !r.data) return jr(404, { status: 'REJECTED', error_code: 'NO_FILE', request_id: R });
   // 열람 기록(v388) — 누가·언제·어느 문서·어느 파일·원본/열람용. 관리자 열람도 남긴다(유출 추적은 전원)
-  await appendDocLog(st, { ts: Date.now(), bid: c.member.id, by: String(c.member.name || ''), dept: String(c.member.dept || ''), doc: docId, no: String(ld.it.no || ''), title: String(ld.it.title || '').slice(0, 60), n: n, name: String(meta.name || '').slice(0, 80), kind: meta.view === 1 ? 'view' : (isOrig ? 'orig' : 'file') });
+  const dlg = await appendDocLog(st, { ts: Date.now(), bid: c.member.id, by: String(c.member.name || ''), dept: String(c.member.dept || ''), doc: docId, no: String(ld.it.no || ''), title: String(ld.it.title || '').slice(0, 60), n: n, name: String(meta.name || '').slice(0, 80), kind: meta.view === 1 ? 'view' : (isOrig ? 'orig' : 'file') });
   // type은 저장값이 아니라 확장자 고정표(high1) — 저장 시점에 위장값이 들어갔더라도 응답은 표의 값만
-  return jr(200, { status: 'OK', name: r.data.name, type: docAttMime(r.data.name || meta.name), data: r.data.data, request_id: R });
+  // C225 판 A: 기록을 못 남긴 열람은 응답에 logged:false로 드러낸다(계약 기록물 cdoc pii 0 — 개인정보 없음 — 과 같은 꼴 · 문서함 열람은 막지 않음 · 남겼으면 응답 종전 그대로)
+  return jr(200, Object.assign({ status: 'OK', name: r.data.name, type: docAttMime(r.data.name || meta.name), data: r.data.data }, dlg ? {} : { logged: false }, { request_id: R }));
 }
 async function handleDocAttDel(event, d, R) {
   const c = await currentMember(event);
@@ -6043,7 +6064,8 @@ async function handleVerRestore(event, d, R) {
   const cur = await blobGet(store(DATA), colKey(col));
   if (cur.ok && cur.data) await verSnapshot(col, cur.data, g.c.member.name + '(복구 전 자동보존)', false, true);
   const doc = Object.assign({}, vr.data.doc, { updated_by: g.c.member.id, updated_at: Date.now() });
-  const w = await blobSet(store(DATA), colKey(col), doc);
+  // C225 판 A: 지금 문서가 깨졌으면(STORAGE_PARSE_FAILED) 되돌리기가 다시 세우는 길이라 force · 일시 읽기 실패면 force 없음 → 막힘(복구 전 자동보존 없이 덮지 않음)
+  const w = await blobSet(store(DATA), colKey(col), doc, { force: !cur.ok && cur.code === 'STORAGE_PARSE_FAILED' });
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   try {
     const when = new Date(vr.data.ts + 9 * 3600000).toISOString().replace('T', ' ').slice(0, 16);

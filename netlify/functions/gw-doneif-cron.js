@@ -52,6 +52,7 @@ async function run(st, nowMs) {
   }
   const p = D.plan(tdoc.items, recs);
   const last = { ts: nowMs, today: today, on: on, scanned: p.scanned, candidates: p.candidates.slice(0, 50), moved: 0, notified: 0 };
+  let clogFail = '';   // C225 판 A
   if (on && p.candidates.length) {
     try {   // 전환 전 문서 일일 스냅샷 1회(ver 링과 별도 키, 되돌리기 재료)
       const sk = 'ver:tasks:appbase:' + today;
@@ -65,9 +66,13 @@ async function run(st, nowMs) {
     try {
       const ck = 'clog:appr:' + today.slice(0, 7);
       const cr = await blobGet(st, ck);
-      let cd = (cr.ok && cr.data) ? cr.data : null;
-      p.candidates.forEach(function (c) { cd = D.clogAppend(cd, { ts: nowMs, id: c.id, f: 'status', from: 'open', to: 'review', why: 'data:' + c.why, by: '앱 기준' }); });
-      await blobSet(st, ck, cd);
+      // C225 판 A: 그달 변경 기록을 못 읽으면 새 체인으로 덮지 않고 이 회차를 실패로 돌려준다(크론 스탬프 ok:false · 지시 전환·알림은 그대로)
+      if (!cr.ok && cr.code !== 'NOT_FOUND') clogFail = cr.code || 'STORAGE_READ_FAILED';
+      else {
+        let cd = (cr.ok && cr.data) ? cr.data : null;
+        p.candidates.forEach(function (c) { cd = D.clogAppend(cd, { ts: nowMs, id: c.id, f: 'status', from: 'open', to: 'review', why: 'data:' + c.why, by: '앱 기준' }); });
+        await blobSet(st, ck, cd);
+      }
     } catch (e) {}
     try { await audit.appendAudit({ ts: nowMs, by: '앱 기준', bid: 'bot', col: 'tasks', ev: [{ op: '앱기준전환', id: '', t: '승인 대기 ' + last.moved + '건' }] }); } catch (e) {}
     try {   // 승인권자 1발 — 자동 지시의 승인 축은 배정표 approver_id(없으면 관리자 전원), 우선기기
@@ -94,6 +99,7 @@ async function run(st, nowMs) {
     } catch (e) {}
   }
   try { await blobSet(st, D.DONEIF_LAST, last); } catch (e) {}
+  if (clogFail) return Object.assign({ ok: false, code: 'CLOG_' + clogFail }, last);   // C225 판 A: 변경 기록 한 줄을 못 남긴 회차 = 실패(지금까지는 조용히 지나감)
   return Object.assign({ ok: true }, last);
 }
 

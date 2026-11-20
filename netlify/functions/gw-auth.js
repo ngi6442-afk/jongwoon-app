@@ -82,8 +82,10 @@ async function devAllowed(st, member) {
   if (isDev(member)) return true;
   if (!member || !member.admin) return false;
   const all = await listMembers(st);
+  if (all.unavailable) return null;   // C225 판 A: 명부를 다 못 읽으면 판정 불가(null) — 부르는 쪽이 500 MEMBERS_READ_FAILED
   return !all.some(isDev);
 }
+const MEMBERS_FAIL = function (R) { return jr(500, { status: 'ERROR', error_code: 'MEMBERS_READ_FAILED', request_id: R }); };   // C225 판 A
 // 마지막 PM 보호(v321·9/6 검증 S3) — 저장·삭제 결과로 재직 유효 pm이 0명이 되는 변화를 막는다(① 전결·PM 큐 결재 주체 소멸 방지).
 // 변경 전 컨텍스트(tcBefore — m 수정 전에 만든 것)와 변경 후 목록으로 등급 컨텍스트(tier.ctxOf — 명시 tier·부트스트랩·퇴사 제외)를 비교해 "있다가 없어짐"만 409.
 // 이미 0명이면(부트스트랩 미완·등급 지정 전) 저장을 막지 않는다 — 막으면 pm을 지정하는 저장 자체가 불가능한 교착
@@ -137,10 +139,15 @@ function cleanPerms(p) { const out = {}; MODULES.forEach(function (k) { out[k] =
 async function listMembers(st) {
   const { blobs } = await st.list({ prefix: 'member:' });
   const out = [];
+  let miss = 0;
   for (const b of (blobs || [])) {
     const r = await blobGet(st, b.key);
     if (r.ok && r.data && r.data.del !== 1) out.push(r.data);
+    else if (!r.ok && r.code !== 'NOT_FOUND') miss++;
   }
+  // C225 판 A: 못 읽은 회원 레코드가 있으면 표시(배열 칸 unavailable — JSON에는 안 실림 · _lib/push.js loadMembers와 같은 꼴).
+  //   종전엔 조용히 빠져 '회원 없음'으로 보고 무인증 첫 계정 만들기·개발자 권한·이름 중복·마지막 PM 판정이 열린 쪽으로 갔다 — 판정하는 자리가 이 표시를 보고 500
+  if (miss) out.unavailable = true;
   // 연번(seq) 오름차순 → 없는 항목은 뒤로, 동률은 이름순
   out.sort(function (a, b) {
     const sa = (typeof a.seq === 'number') ? a.seq : 1e9;
@@ -167,6 +174,7 @@ async function currentMember(st, event) {
 async function handleBootstrap(st, d, R) {
   // 회원이 하나도 없을 때만: 최초 관리자 생성(무인증). 이후엔 거부.
   const existing = await listMembers(st);
+  if (existing.unavailable) return MEMBERS_FAIL(R);   // C225 판 A: 못 읽은 회원이 있으면 '회원 없음'으로 보고 열지 않음
   if (existing.length > 0) return jr(409, { status: 'REJECTED', error_code: 'ALREADY_INITIALIZED', request_id: R });
   const name = cleanText(d.name);
   const pin = (d.pin || '').trim();
@@ -280,7 +288,8 @@ async function handleMemberUpsert(st, event, d, R) {
   if (!c.ok || !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   // 회원 전수 1회 로드(변경 전 스냅샷 — 아래 m 수정보다 앞) — 개발자 부트스트랩·요청자 등급·이름 중복·LAST_PM 판정 공용
   const allBefore = await listMembers(st);
-  const canDev = isDev(c.member) || !allBefore.some(isDev);
+  if (allBefore.unavailable) return MEMBERS_FAIL(R);   // C225 판 A: 개발자·이름 중복·마지막 PM·개발자 판정을 못 읽은 명부로 하지 않음
+  const canDev =isDev(c.member) || !allBefore.some(isDev);
   const tcBefore = tier.ctxOf(allBefore);
   const reqTier = tcBefore.tierOf(c.member);
   const bossOrDev = reqTier === 'boss' || isDev(c.member);   // role '대표' 지정·예약 이름(나종운·나경일) 사용 권한(S1) — 부트스트랩 파생의 근거를 아무 관리자나(개발자 부트스트랩 통과 상태 포함) 못 만들게. 실제 dev 플래그만 인정
@@ -344,6 +353,7 @@ async function handleMemberUpsert(st, event, d, R) {
     const lower = name.toLowerCase();
     if (allBefore.some(function (x) { return x && x.id !== m.id && cleanText(x.name).toLowerCase() === lower; })) return jr(409, { status: 'REJECTED', error_code: 'NAME_TAKEN', request_id: R });
     const ix = await blobGet(st, nameKey(name));
+    if (!ix.ok && ix.code !== 'NOT_FOUND') return MEMBERS_FAIL(R);   // C225 판 A
     if (ix.ok && ix.data && ix.data !== m.id) return jr(409, { status: 'REJECTED', error_code: 'NAME_TAKEN', request_id: R });
   }
   if (!isNew) {
@@ -385,7 +395,7 @@ async function handleMemberUpsert(st, event, d, R) {
     const nu = normUid(d.uid);
     if (!validUid(nu)) return jr(400, { status: 'REJECTED', error_code: 'INVALID_UID', request_id: R });
     const dup = await uidTaken(st, nu, m.id);
-    if (dup) return jr(409, { status: 'REJECTED', error_code: dup, request_id: R });
+    if (dup) return dup === 'MEMBERS_READ_FAILED' ? MEMBERS_FAIL(R) : jr(409, { status: 'REJECTED', error_code: dup, request_id: R });
     if (m.uid && normUid(m.uid) !== nu) await blobSet(st, uidKey(m.uid), null);
     m.uid = nu;
   }
@@ -478,10 +488,13 @@ async function handleMemberUpsert(st, event, d, R) {
 async function handleMemberDelete(st, event, d, R) {
   const c = await currentMember(st, event);
   if (!c.ok || !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
-  if (!(await devAllowed(st, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEV_ONLY', request_id: R });
+  const da = await devAllowed(st, c.member);
+  if (da === null) return MEMBERS_FAIL(R);   // C225 판 A
+  if (!da) return jr(403, { status: 'FORBIDDEN', error_code: 'DEV_ONLY', request_id: R });
   if (!d.id || d.id === c.member.id) return jr(400, { status: 'REJECTED', error_code: 'INVALID_INPUT', request_id: R });
   const r = await blobGet(st, memberKey(d.id));
   const all = await listMembers(st);
+  if (all.unavailable) return MEMBERS_FAIL(R);   // C225 판 A: 마지막 개발자·PM 판정을 못 읽은 명부로 하지 않음
   // 마지막 개발자 계정은 삭제 불가 — 시스템 관리 주체가 사라지는 것 방지
   if (r.ok && r.data && isDev(r.data)) {
     const devs = all.filter(isDev);
@@ -504,7 +517,7 @@ async function handleSetUid(st, event, d, R) {
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: 'NO_SESSION', request_id: R });
   // 타인 아이디 지정도 개발자만 — 아이디는 로그인 식별자라 계정 탈취로 이어질 수 있다.
   const wantOtherUid = !!(d.id && d.id !== c.member.id);
-  if (wantOtherUid && !(await devAllowed(st, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEV_ONLY', request_id: R });
+  if (wantOtherUid) { const da = await devAllowed(st, c.member); if (da === null) return MEMBERS_FAIL(R); if (!da) return jr(403, { status: 'FORBIDDEN', error_code: 'DEV_ONLY', request_id: R }); }   // C225 판 A: 판정 불가 = 500
   const targetId = wantOtherUid ? d.id : c.member.id;
   const uid = normUid(d.uid);
   if (!validUid(uid)) return jr(400, { status: 'REJECTED', error_code: 'INVALID_UID', request_id: R });
@@ -523,7 +536,7 @@ async function handleSetUid(st, event, d, R) {
   }
 
   const dup = await uidTaken(st, uid, targetId);
-  if (dup) return jr(409, { status: 'REJECTED', error_code: dup, request_id: R });
+  if (dup) return dup === 'MEMBERS_READ_FAILED' ? MEMBERS_FAIL(R) : jr(409, { status: 'REJECTED', error_code: dup, request_id: R });
 
   const prev = normUid(r.data.uid);
   if (prev && prev !== uid) await blobSet(st, uidKey(prev), null);   // 옛 아이디 색인 회수
@@ -538,8 +551,10 @@ async function handleSetUid(st, event, d, R) {
 // 아이디 중복 검사. 남의 아이디는 물론 **남의 이름과도 겹치면 거부** — 이사 기간에 이름 로그인을 가로채는 것을 막는다.
 async function uidTaken(st, uid, selfId) {
   const hit = await blobGet(st, uidKey(uid));
+  if (!hit.ok && hit.code !== 'NOT_FOUND') return 'MEMBERS_READ_FAILED';   // C225 판 A: 못 읽은 색인을 '비어 있음'으로 보지 않음(부르는 쪽 500)
   if (hit.ok && hit.data && hit.data !== selfId) return 'UID_TAKEN';
   const nm = await blobGet(st, nameKey(uid));
+  if (!nm.ok && nm.code !== 'NOT_FOUND') return 'MEMBERS_READ_FAILED';   // C225 판 A
   if (nm.ok && nm.data && nm.data !== selfId) return 'UID_TAKEN';
   return null;
 }
@@ -549,7 +564,7 @@ async function handleSetPin(st, event, d, R) {
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: 'NO_SESSION', request_id: R });
   // 타인 PIN 재설정은 개발자만(계정 탈취 통로). 본인 변경은 누구나 가능.
   const wantOther = !!(d.id && d.id !== c.member.id);
-  if (wantOther && !(await devAllowed(st, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEV_ONLY', request_id: R });
+  if (wantOther) { const da = await devAllowed(st, c.member); if (da === null) return MEMBERS_FAIL(R); if (!da) return jr(403, { status: 'FORBIDDEN', error_code: 'DEV_ONLY', request_id: R }); }   // C225 판 A: 판정 불가 = 500
   const targetId = wantOther ? d.id : c.member.id;
   const pin = (d.pin || '').trim();
   const r = await blobGet(st, memberKey(targetId));
@@ -584,7 +599,9 @@ async function handleDeviceSet(st, event, d, R, status) {
   const c = await currentMember(st, event);
   if (!c.ok || !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   // 기기 승인·해제·삭제는 시스템 영역 — 개발자만. (승인된 기기 = 데이터 접근 열쇠)
-  if (!(await devAllowed(st, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEV_ONLY', request_id: R });
+  const da = await devAllowed(st, c.member);
+  if (da === null) return MEMBERS_FAIL(R);   // C225 판 A
+  if (!da) return jr(403, { status: 'FORBIDDEN', error_code: 'DEV_ONLY', request_id: R });
   const id = String(d.device || '').trim();
   if (!id) return jr(400, { status: 'REJECTED', error_code: 'INVALID_INPUT', request_id: R });
   if (status === null) { await blobSet(st, deviceKey(id), null); try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'login', ev: [{ op: '기기삭제', id: id.slice(0, 20), t: '' }] }); } catch (e) {} return jr(200, { status: 'OK', request_id: R }); }
