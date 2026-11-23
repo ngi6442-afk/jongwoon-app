@@ -19594,7 +19594,7 @@ try {
   const M493 = [mu493('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v492 (')), mu493('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v492'")),
     mu493('ft', (s) => s.split('`SECRETS_SCAN_OMIT_KEYS=STMT_MAIL_USER`').join('SECRETS_SCAN_OMIT_KEYS')),
     mu493('cl', (s) => s.replace('**v493**: 멈춤 감시 켬', 'v493: 감시')),
-    mu493('ix', (s) => s.replace(',"gw-stmtmail-cron"]', ']')),
+    mu493('ix', (s) => s.replace(',"gw-stmtmail-cron"', '')),   // C251(11/23): 감시 목록 끝이 gw-audit-fold-cron으로 바뀜 — 결함 사본은 '목록에서 gw-stmtmail-cron을 뺌'(자리 무관)
     mu493('tl', (s) => s.replace('\n- [x] (AI) `uismoke` v399', '\n- (AI) `uismoke` v399'))];
   T('v493 문서·판 번호(정확 검사): FEATURES 기준 v493 (2026-11-17)·v493 절 · TESTLIST v493 칸 3(운영 확인 1 · 게이트 [x] 2) · CLAUDE.md 한 줄 · 감시 목록 gw-stmtmail-cron 한 번 · sw jw-shell-v493 · 결함 사본 ' + M493.length + '개 = 모두 ✗',
     r493.ok && M493.every((v) => v === false), JSON.stringify({ r: r493.info, mut: M493 }));

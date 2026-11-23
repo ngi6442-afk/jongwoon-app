@@ -17,8 +17,8 @@ const DATA = 'gw_data';
 //     시각(ts)으로 끼워 넣는다 — 줄 열쇠가 없는 달은 결과가 종전과 글자째 같다. 줄 열쇠는 LINE_READ_POOL개씩 나란히 읽는다(하나라도 못 읽으면 달 전체 실패 — 일부만 보이지 않음).
 //   · 운영 판으로 되돌려도 옛 코드는 깨지지 않는다: 옛 조각 목록 정규식은 숫자 조각(':<1~3자리>')만 집어 줄 열쇠를 지나친다 — 다만 옛 코드는 줄 열쇠의 줄을 보지 못한다(되돌린 동안 새 줄은 다시 조각에 쌓임).
 //   · 줄 열쇠 수 = 줄 수(운영 최근 30일 하루 평균 104줄·최대 389줄). 읽는 비용이 열쇠 수에 비례하고(아래 LINE_READ_POOL 실측) 줄 열쇠 하나 읽기마다 저장소 API 요청 1번이라
-//     접기(아래 foldMonth — 크론 gw-audit-fold-cron 하루 3번)가 쓴 지 20분 넘은 줄 열쇠를 접은 문서 'audit:YYYY-MM:f:<묶음 마지막 줄 열쇠 꼬리>' 1개로 묶고 그 줄 열쇠를 지운다.
-//     접은 문서 = { schema:1, items:[줄 + k:<줄 열쇠 꼬리>], keys:[꼬리…] } — 새 이름에 한 번만 쓰고 다시 쓰지 않는다(경합 없음). 줄마다 k를 두는 까닭: 재해 복원 병합(gw-data backupLogMerge)은
+//     접기(아래 foldMonth — 크론 gw-audit-fold-cron 하루 3번)가 쓴 지 20분 넘은 줄 열쇠를 접은 문서 'audit:YYYY-MM:f:<묶음 마지막 줄 열쇠 꼬리>-<무작위 8자리>' 1개로 묶고 그 줄 열쇠를 지운다.
+//     접은 문서 = { schema:1, items:[줄 + k:<줄 열쇠 꼬리>], keys:[꼬리…] } — 실행마다 고유한 새 이름에 한 번만 쓰고 다시 쓰지 않는다(경합 없음 — 겹친 두 실행이 같은 줄을 각자 접어도 읽는 쪽이 꼬리로 한 번만 셈). 줄마다 k를 두는 까닭: 재해 복원 병합(gw-data backupLogMerge)은
 //     items만 다루고 줄을 시각순으로 다시 늘어놓으므로(keys 칸은 지금 값이 없으면 빠짐) 꼬리를 줄 안에 두어야 복원 뒤에도 '같은 줄을 한 번만'이 지켜진다. 읽는 쪽은 k를 걷어 내고 돌려준다.
 //     설계·수치 = 09_조사_문서/감사줄유실_자료_20261120/01_설계_전수표.md §6·§7.
 const MAX_PER_MONTH = 8000;   // 한 키(조각) 줄 상한 — 백업 복원 병합(gw-data backupLogMerge)이 이 값을 넘기면 400 AUDIT_FULL. P1 판31부터 appendAudit는 잘라 내지 않고 아래 조각 상한에서 새 조각으로 넘긴다 · C251부터 appendAudit는 조각을 쓰지 않는다(줄 열쇠)
@@ -75,7 +75,7 @@ async function auditListMonth(st, head) {
   const l = await blobList(st, head + ':');
   if (!l || !l.ok) return null;
   const esc = head.replace(/[-:]/g, '\\$&');
-  const reP = new RegExp('^' + esc + ':(\\d{1,3})$'), reL = new RegExp('^' + esc + LINE_TAG + '\\d{13}-\\d{4}-[0-9a-f]{12}$'), reF = new RegExp('^' + esc + FOLD_TAG + '\\d{13}-\\d{4}-[0-9a-f]{12}$');
+  const reP = new RegExp('^' + esc + ':(\\d{1,3})$'), reL = new RegExp('^' + esc + LINE_TAG + '\\d{13}-\\d{4}-[0-9a-f]{12}$'), reF = new RegExp('^' + esc + FOLD_TAG + '\\d{13}-\\d{4}-[0-9a-f]{12}-[0-9a-f]{8}$');
   const parts = [], seen = {}, lines = [], folds = [];
   (l.keys || []).forEach(function (k) {
     const m = reP.exec(k);
@@ -236,19 +236,17 @@ async function foldReadLines(st, head, keys, out) {
   return res.filter(Boolean);
 }
 // 한 묶음 쓰기 → 다시 읽어 쓴 그대로인지 확인 → 그때만 그 줄 열쇠를 지움
-//   names = 이 달에 이미 있는 접은 문서 이름(목록) — 묶음 마지막 꼬리의 이름이 이미 있으면(다른 실행이 같은 이름에 다른 묶음을 쓴 뒤) 그 문서를 덮지 않도록 끝 줄을 이번 묶음에서 뺀다
-//   (뺀 줄은 줄 열쇠로 남아 읽히고, 다음 실행에서 더 새 줄과 함께 다른 이름으로 접힘)
-async function foldWrite(st, head, batch, out, names) {
-  while (batch.length && names.has(head + FOLD_TAG + batch[batch.length - 1].tail)) { batch = batch.slice(0, -1); out.name_taken++; }
-  if (!batch.length) return true;
+//   이름 = 묶음 마지막 꼬리 + '-' + 무작위 8자리(실행마다 고유) — 두 실행이 겹쳐 끝 꼬리가 같은 다른 묶음을 만들어도 서로 덮지 않는다(11/23 독립 확인 재현: 같은 이름이면 앞 실행의 줄이 사라짐).
+//   같은 줄이 두 접은 문서에 들어가도 읽는 쪽이 꼬리(k)로 한 번만 센다 · 이름순 = 끝 꼬리순(= 시각순)
+async function foldWrite(st, head, batch, out) {
   const items = [], keys = [];
   batch.forEach(function (b) { b.doc.items.forEach(function (e) { items.push(Object.assign({}, e, { k: b.tail })); }); keys.push(b.tail); });
-  const name = head + FOLD_TAG + keys[keys.length - 1], doc = { schema: 1, items: items, keys: keys };
+  const name = head + FOLD_TAG + keys[keys.length - 1] + '-' + crypto.randomBytes(4).toString('hex'), doc = { schema: 1, items: items, keys: keys };
   const w = await blobSet(st, name, doc);
   if (!w || !w.ok) { out.write_fail++; return false; }
   const r = await blobGet(st, name);
-  if (!r.ok || JSON.stringify(r.data) !== JSON.stringify(doc)) { out.verify_fail++; return false; }   // 다른 실행이 같은 이름에 다른 묶음을 썼거나 못 읽음 — 지우지 않음(다음 실행이 접은 문서를 보고 찌꺼기로 정리)
-  names.add(name); out.docs++; out.folded += batch.length;
+  if (!r.ok || JSON.stringify(r.data) !== JSON.stringify(doc)) { out.verify_fail++; return false; }   // 못 읽음·쓴 것과 다름 — 지우지 않음(다음 실행이 접은 문서를 보고 찌꺼기로 정리)
+  out.docs++; out.folded += batch.length;
   const dr = await auditDeleteKeys(st, batch.map(function (b) { return b.key; }));
   out.deleted += dr.ok; out.del_fail += dr.fail;
   return true;
@@ -256,12 +254,12 @@ async function foldWrite(st, head, batch, out, names) {
 // 한 달 접기 — month 'YYYY-MM' · nowMs = 지금(20분 판정) · deadline = 이 시각이 지나면 새 묶음을 시작하지 않음
 async function foldMonth(month, nowMs, deadline) {
   const head = auditKey(month), st = store(DATA);
-  const out = { month: head.slice(6), ok: true, code: '', docs: 0, folded: 0, deleted: 0, residue: 0, del_fail: 0, read_fail: 0, gone: 0, bad: 0, write_fail: 0, verify_fail: 0, name_taken: 0, young: 0, left: 0 };
+  const out = { month: head.slice(6), ok: true, code: '', docs: 0, folded: 0, deleted: 0, residue: 0, del_fail: 0, read_fail: 0, gone: 0, bad: 0, write_fail: 0, verify_fail: 0, young: 0, left: 0 };
   const ls = await auditListMonth(st, head);
   if (!ls) return Object.assign(out, { ok: false, code: 'STORAGE_LIST_FAILED' });
   const fd = await auditLineDocs(st, ls.folds, auditFoldOk);
   if (!fd.ok) return Object.assign(out, { ok: false, code: fd.code });   // 이미 접은 꼬리를 모르면 이 달은 이번에 건너뜀(찌꺼기를 지우지도, 새로 접지도 않음)
-  const folded = new Set(), names = new Set(ls.folds);
+  const folded = new Set();
   fd.docs.forEach(function (d) { if (d) foldTails(d).forEach(function (t) { folded.add(t); }); });
   const cut = head.length + LINE_TAG.length, tailOf = function (k) { return k.slice(cut); };
   // 찌꺼기 — 이미 접은 문서에 든 꼬리의 줄 열쇠(지우다 멈춘 것)
@@ -282,12 +280,12 @@ async function foldMonth(month, nowMs, deadline) {
       const b = Buffer.byteLength(JSON.stringify(g.doc.items), 'utf8') + 60 * g.doc.items.length, n = g.doc.items.length;
       if (batch.length && (nItems + n > FOLD_MAX_ITEMS || nBytes + b > FOLD_MAX_BYTES)) {
         if (Date.now() > deadline) { out.code = 'TIME_CAP'; batch = []; break; }
-        if (!(await foldWrite(st, head, batch, out, names))) { batch = []; break; }
+        if (!(await foldWrite(st, head, batch, out))) { batch = []; break; }
         batch = []; nItems = 0; nBytes = 0;
       }
       batch.push(g); nItems += n; nBytes += b;
     }
-    if (batch.length && !(await foldWrite(st, head, batch, out, names))) break;   // 쓰기·확인 실패 = 이 달은 여기서 멈춤(남은 줄은 다음 실행)
+    if (batch.length && !(await foldWrite(st, head, batch, out))) break;   // 쓰기·확인 실패 = 이 달은 여기서 멈춤(남은 줄은 다음 실행)
     if (out.write_fail || out.verify_fail || out.code === 'TIME_CAP') break;
   }
   const after = await auditListMonth(st, head);
