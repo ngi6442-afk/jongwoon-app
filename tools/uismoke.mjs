@@ -18915,7 +18915,7 @@ try {
     'csFetchServerContract', 'csEmpty', 'csApprRank', 'csMergeDocs', 'csChgRank', 'csChgMerge', 'csSyncFromServer', 'csApprPending', 'csApprFind', 'csApprSync', 'csApprTake', 'csApprApply', 'csApprRef', 'csApprOnDecided', 'csSaveNow', 'conStatusFix', 'csAlignTasksAll',
     'b64EncodeUnicode', 'b64DecodeUnicode', '_ghResp', 'emptyDoc', '_urlCollection', 'saveConflictStop', 'saveConflictToast', 'apprRefresh', 'conBillToRec'];
   const NEWH40 = ['csApprHealList', 'csApprHeal', 'csApprHealLoaded', 'csApprMine', 'csApprWho', 'csSaveSettled', 'csApprHealFail', 'csApprHealSeen', 'csApprHealBillAsk', 'csApprGuardAsk'];
-  const STUBH40 = new Set(['genId', 'memberName', 'myName', 'myId', 'saveTasksCache', 'scheduleTasksSave', 'renderTasks', 'renderSummary', 'renderContracts', 'alert', 'conAmtEff', 'fmtAmount', 'saveRecCache', 'renderReceivables', 'scheduleRecSave', 'apprToastShow', 'loadTasks', 'fetch', 'gwCall', 'setTimeout', 'clearTimeout', 'confirm', 'esc', 'csSiteDone', 'conStageDue', 'canSee', 'canDo', 'todayStr', 'findProc', 'csDocsLost', 'csStageDocItems', 'getToken', 'ghHeaders', 'b64EncodeUnicode', 'b64DecodeUnicode', 'runAwardAutoCon', 'conBldgAutoTry', 'renderDashboard', 'curMember', 'isAdmin', 'apprBadgeRender', 'apprOpen', 'apprWaitItems', 'apprHoldItems']);
+  const STUBH40 = new Set(['genId', 'pushNotify', 'spawnNextRecur', 'memberName', 'myName', 'myId', 'saveTasksCache', 'scheduleTasksSave', 'renderTasks', 'renderSummary', 'renderContracts', 'alert', 'conAmtEff', 'fmtAmount', 'saveRecCache', 'renderReceivables', 'scheduleRecSave', 'apprToastShow', 'loadTasks', 'fetch', 'gwCall', 'setTimeout', 'clearTimeout', 'confirm', 'esc', 'csSiteDone', 'conStageDue', 'canSee', 'canDo', 'todayStr', 'findProc', 'csDocsLost', 'csStageDocItems', 'getToken', 'ghHeaders', 'b64EncodeUnicode', 'b64DecodeUnicode', 'runAwardAutoCon', 'conBldgAutoTry', 'renderDashboard', 'curMember', 'isAdmin', 'apprBadgeRender', 'apprOpen', 'apprWaitItems', 'apprHoldItems']);
   const closeH40 = (H, roots, have) => { const all = new Set([...H.matchAll(/\n  function ([A-Za-z_$][\w$]*)\(/g)].map((m) => m[1])); const got = new Map(); const q = roots.slice(); while (q.length) { const n = q.shift(); if (got.has(n) || STUBH40.has(n) || have.has(n) || !all.has(n)) continue; const b = fnH40(H, n); got.set(n, b); for (const m of b.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g)) q.push(m[1]); } return [...got.keys()]; };
   const varBlockH40 = (H, name) => { const i = H.search(new RegExp('\\n  var ' + name + ' = \\{')); if (i < 0) throw new Error('변수 없음 ' + name); let d = 0; for (let j = H.indexOf('{', i); j < H.length; j++) { if (H[j] === '{') d++; else if (H[j] === '}') { d--; if (d === 0) return H.slice(i + 1, j + 1) + ';'; } } throw new Error('중괄호 ' + name); };
   const srcH40 = new Map();
@@ -18970,16 +18970,20 @@ try {
         'var receivables = []; function conAmtEff(){ return 1000; } function fmtAmount(n){ return String(n); } function saveRecCache(){} function renderReceivables(){} function scheduleRecSave(){} function confirm(m){ ENV.bills++; ENV.confirms.push(String(m)); ENV.log.push("CONFIRM"); return ENV.confirmAns === true; }',
         // 지시 읽기 대역 — 서버 지시 목록을 응답처럼 늦게 들이고(이 기기에 없는 것만) 실제 csAlignTasksAll을 돌림(실제 loadTasks 성공 뒤와 같은 순서)
         'function loadTasks(){ ENV.loadTasksN++; Promise.resolve().then(function(){ ENV.srvTasks.forEach(function(t){ if (!findTask(t.id)) tasks.push(JSON.parse(JSON.stringify(t))); }); csAlignTasksAll(); }); }',
-        'var tasks = [], genN = 0;', 'function genId(p){ return p + "A" + (++genN); } function memberName(){ return ""; } function csSiteDone(){ return false; } function conStageDue(){ return null; } function canSee(){ return true; } function canDo(){ return true; }',
+        // C222: 무작위 번호 대역은 기기마다 다른 꼴(ENV.gidp — 안 주면 종전 "A") · 승인 알림은 수만 셈(ENV.pushes)
+        'var tasks = [], genN = 0;', 'function genId(p){ return p + (ENV.gidp || "A") + (++genN); } function pushNotify(){ ENV.pushes = (ENV.pushes || 0) + 1; } function spawnNextRecur(){} function memberName(){ return ""; } function csSiteDone(){ return false; } function conStageDue(){ return null; } function canSee(){ return true; } function canDo(){ return true; }',
         ['CON_PROC_SRC', 'CON_MAP', 'CON_ADDED', 'SITE_KIND', 'CON_APPR_KINDS', 'STAGE_DOC_MAP'].map((v) => varH40(H, v)).join('\n'), varBlockH40(H, 'STAGE_DOCS'),
-        closeH40(H, ['materializeStage', 'advanceProc', 'findTask', 'csApprApply', 'csChgOpenAt', 'conDueOn', 'csOnDone', 'csApprKindOf'], new Set(names)).map((n) => fnH40(H, n)).join('\n'),
+        closeH40(H, ['materializeStage', 'advanceProc', 'findTask', 'csApprApply', 'csChgOpenAt', 'conDueOn', 'csOnDone', 'csApprKindOf', 'approveTask', 'csSkipStage', 'csJumpStage', 'mergeTasks', 'mergeRec'], new Set(names)).map((n) => fnH40(H, n)).join('\n'),   // C222: 지시 탭 [승인]·단계 카드 [건너뜀]·[이 단계부터]·지시·기성 병합도 실제 함수
         'function csDocsLost(){ return false; } function csStageDocItems(s){ if (conIsArr(s.docs)) return s.docs; return (s.dk || []).map(function(k, i){ return { k: k + ":" + i, t: k, n: "", st: "todo" }; }); }',
         'function findProc(id){ return contracts.filter(function(c){ return c && c.id === id; })[0] || null; }',
         'function renderContracts(){ ENV.renders++; }',
         'var console = { warn: function(){ ENV.warns++; }, log: function(){} };',
         names.map((n) => fnH40(H, n)).join('\n'), wrapH40(H), 'var fetch = window.fetch;',
         'return { get: function(){ return contracts; }, find: findProc, load: loadContracts, sched: scheduleContractSave, decided: csApprOnDecided, advance: advanceProc, refresh: apprRefresh, tasks: function(){ return tasks; }, setTasks: function(v){ tasks = v; }, base: function(){ return conBase; },',
-        '  heal: (typeof csApprHeal === "function") ? csApprHeal : null, healList: (typeof csApprHealList === "function") ? csApprHealList : null, healN: function(){ return (typeof csApprHealN !== "undefined") ? csApprHealN : {}; }, setAppr: function(v){ apprItems = v; }, sync: csApprSync, recs: function(){ return receivables; } };'].join('\n');
+        '  heal: (typeof csApprHeal === "function") ? csApprHeal : null, healList: (typeof csApprHealList === "function") ? csApprHealList : null, healN: function(){ return (typeof csApprHealN !== "undefined") ? csApprHealN : {}; }, setAppr: function(v){ apprItems = v; }, sync: csApprSync, recs: function(){ return receivables; },',
+        // C222: 지시 탭 [승인]·단계 카드 [건너뜀]·[이 단계부터]·다음 단계 지시 만들기·종결 훅·기성 연동 + 지시·기성 저장 409 뒤 병합(실제 mergeTasks·mergeRec — 서버 목록을 이 기기 목록에 합침)
+        '  approve: approveTask, skip: csSkipStage, jump: csJumpStage, mat: materializeStage, onDone: csOnDone, bill: conBillToRec, setRecs: function(v){ receivables = v; },',
+        '  mergeT: function(r){ tasks = mergeTasks(tasks, r); return tasks; }, mergeR: function(r){ receivables = mergeRec(receivables, r); return receivables; } };'].join('\n');
       srcH40.set(H, src);
     }
     const fakeDate = { now: () => env.now, parse: (s) => Date.parse(s) };
@@ -19339,6 +19343,138 @@ try {
     okH40(/^[bn]/).length >= 12 && okH40(/^[bn]/).every((k) => RH40[k]), JSON.stringify(okH40(/^[bn]/).map((k) => k.slice(0, -2) + '=' + RH40[k.slice(0, -2)])));
   T('P1 판40 결함 사본 ' + KGH40.length + '개(첫 수리: 없는 계약 들이기·기준 사본·지시 다시 읽기·다시 하기·다시 하기 상한·저장 겹쳐 보내기·결재함 목록 대조·계약 읽은 뒤 대조·차례로 돌리기·20초 규칙·대상 짝·횟수 상한·반려 대조·결정된 단계 대조·남은 것 한 번 더·도는 중 표시 2분 / 검토 반영: 가드 결재함 먼저 확인·관리자 아닌 남의 상신 가름·5초 타이머·승인 뒤 20초 기다림·미전송 가름·넘기기 다시 하기·지운 계약 거름 ·결재 동기화의 남의 상신 대조·내 상신 없을 때 목록 읽기·올린 사람 가름·관리자 가름 · 409 뒤 이미 끝난 단계 보기·넘기는 순간 묻지 않기·저장 바로·서버 기성 연결 보기·자동 반영 글 · 거절 뒤 처리·거절된 상신 다시 안 풀기·실패 뒤 다시 읽기 건너뜀·실패한 회차 멈춤·5xx 조용히·사람 저장 5xx는 알림·5xx 횟수 되돌림 · 다른 사람 세션 타이머) = 모두 ✗',
     KGH40.length === 40 && KH40r.every((x) => x), JSON.stringify(KH40r));
+  // ── C222(원장 C222 — 판40이 남긴 것의 뿌리 수리 · 미루기 설계 8f5eedd 폐기 뒤 줄인 판): 두 관리자 화면이 같은 계약 단계를 같이 넘기면 다음 단계 지시·종결 할 일 '실적신고'·기성 줄이 두 건씩 생기던 길
+  //   「원천」 넘김이 만드는 것의 번호를 무작위(genId)가 아니라 계약 번호·줄·단계에서 정해지는 꼴(csDetId)로 — 두 화면이 같은 번호를 지어 지시·기성 병합(id 단위)에서 한 건 · 계약에 적는 지시 번호·기성 번호도 같은 값(단계 진행 충돌 없음)
+  //   만드는 때·글·저장 예약은 종전 그대로(미루지 않음 — 한 화면 흐름은 번호 꼴만 다름)
+  //   (실행 — 판40 틀: 실제 approveTask·advanceProc·materializeStage·csOnDone·conBillToRec·csSkipStage·csJumpStage·csApprHeal·doSaveContracts·mergeContracts + 실제 mergeTasks·mergeRec · 두 기기 한 서버 · 무작위 번호 대역은 기기마다 다른 꼴)
+  const tk222 = (id, cid, i, name, st) => ({ id, proc_id: cid, pipe: 'main', stage_i: i, stage_name: name, stage_total: 3, title: 'J' + id, status: st || 'review', done_at: '2026-11-18', done_by: '직원', from: '지시', from_id: 'uS', by: '지시', who_id: '', created: '2026-11-18', updated: '2026-11-18' });
+  const kN222 = (id, names, scen) => Object.assign({ id, type: 'dredge', label: '준설', status: 'active', updated: '2026-11-18', title: 'T' + id, client: 'C' + id, who_id: '', contract_info: { amount: 1000 },
+    pipes: [{ key: 'main', cur: 0, stages: names.map((n, j) => Object.assign({ name: n, due: 'manual', status: j === 0 ? 'open' : 'pending', task_id: j === 0 ? 't' + id : null, done_at: null }, /^\(.+\)$/.test(n) ? { opt: 1 } : {})) }] }, scen === false ? {} : { scen: { type: 'dredge', pub: false, ver: 1 } });
+  const drain222 = async (Es) => { for (let n = 0; n < 60; n++) { let any = false; for (const E of Es) { const i = E.timers.findIndex((x) => x); if (i >= 0) { any = true; const f = E.timers[i]; E.timers[i] = null; f(); await E.flush(); } } if (!any) break; } };
+  // 지시·기성 저장 겹침: 먼저 들어간 기기(A)의 목록이 서버 사본 → 늦은 기기(B)는 409 → 다시 읽어 실제 병합 → 그 결과가 서버 사본(실제 doSaveTasks·doSaveRec의 409 길과 같은 순서)
+  const srvT222 = (A, B) => cloneH40(B.api.mergeT(cloneH40(A.api.tasks())));
+  const srvR222 = (A, B) => cloneH40(B.api.mergeR(cloneH40(A.api.recs())));
+  const live222 = (xs) => xs.filter((x) => x && x.del !== 1);
+  const run222 = async (H) => {
+    const R = {};
+    const mk2 = (items, tasks0, appr) => {
+      const A = mkH40(H, items, appr || [], tasks0); A.confirmAns = true; A.gidp = 'A';
+      const B = mkH40(H, items, [], tasks0).share(A); B.confirmAns = true; B.gidp = 'B'; B.uid = 'uB'; B.uname = '시험B';
+      return [A, B];
+    };
+    const prog = (Es) => Es.reduce((n, E) => n + E.toasts.filter((x) => /단계 진행/.test(String(x))).length, 0);
+    const stageT = (ts, cid, i) => live222(ts).filter((t) => t.proc_id === cid && t.stage_i === i);
+    // X1 지시 탭 [승인] × [승인] — 다음 단계 있음: 다음 단계 지시 1 · 두 기기·서버 단계의 지시 번호가 그 지시 · '단계 진행' 충돌 알림 0 · 승인 알림 수 그대로(기기마다 1)
+    { const [A, B] = mk2([kN222('k1', ['작업 수행', '준공서류 작성', '현장 정리'])], [tk222('tk1', 'k1', 0, '작업 수행')]);
+      A.api.load(); B.api.load(); await A.flush(); await B.flush();
+      A.api.approve('tk1'); B.api.approve('tk1'); await drain222([A, B]);
+      const S = srvT222(A, B), n = stageT(S, 'k1', 1), sp = A.sv('k1').pipes[0];
+      R.x1 = '지시 ' + n.length + '|가리킴 ' + (n.length === 1 && sp.stages[1].task_id === n[0].id && A.api.find('k1').pipes[0].stages[1].task_id === n[0].id && B.api.find('k1').pipes[0].stages[1].task_id === n[0].id ? '같음' : '다름') + '|서버 cur ' + sp.cur + '|충돌 알림 ' + prog([A, B]) + '|저장 ' + A.puts() + ' · ' + B.puts() + '|승인 알림 ' + (A.pushes || 0) + '/' + (B.pushes || 0);
+      R.x1ok = R.x1 === '지시 1|가리킴 같음|서버 cur 1|충돌 알림 0|저장 200 · 409,200|승인 알림 0/0'; }
+    // X2 [승인] × [승인] — 마지막 단계: 종결 할 일 '실적신고(2/15)' 1 · 계약 종결
+    { const [A, B] = mk2([kN222('k2', ['작업 수행'])], [tk222('tk2', 'k2', 0, '작업 수행')]);
+      A.api.load(); B.api.load(); await A.flush(); await B.flush();
+      A.api.approve('tk2'); B.api.approve('tk2'); await drain222([A, B]);
+      const S = srvT222(A, B), hk = live222(S).filter((t) => /^실적신고\(2\/15\)/.test(t.title || ''));
+      R.x2 = '실적신고 ' + hk.length + '|' + A.sv('k2').status + '|' + (A.sv('k2').task_hook ? '표식' : '-') + '|충돌 알림 ' + prog([A, B]);
+      R.x2ok = R.x2 === '실적신고 1|done|표식|충돌 알림 0'; }
+    // X3 [승인] × [승인] — 청구 단계(옛 꼴 계약): 기성 확인 창은 기기마다(종전 그대로) · 기성 줄 1 · 계약의 기성 번호가 그 줄 · 다음 단계(수금확인) 지시 1
+    { const [A, B] = mk2([kN222('k3', ['청구', '수금확인'], false)], [tk222('tk3', 'k3', 0, '청구')]);
+      A.api.load(); B.api.load(); await A.flush(); await B.flush();
+      A.api.approve('tk3'); B.api.approve('tk3'); await drain222([A, B]);
+      const SR = srvR222(A, B), rs = live222(SR).filter((r) => r.con_id === 'k3'), S = srvT222(A, B);
+      R.x3 = '기성 줄 ' + rs.length + '|확인 창 ' + A.bills + '/' + B.bills + '|기성 번호 ' + (rs.length === 1 && A.sv('k3').rec_id === rs[0].id && A.api.find('k3').rec_id === rs[0].id && B.api.find('k3').rec_id === rs[0].id ? '같음' : '다름') + '|지시 ' + stageT(S, 'k3', 1).length + '|충돌 알림 ' + (A.toasts.length + B.toasts.length);
+      R.x3ok = R.x3 === '기성 줄 1|확인 창 1/1|기성 번호 같음|지시 1|충돌 알림 0'; }
+    // X4 [승인] × 단계 카드 [건너뜀] — 같은 현재 단계(선택 단계): 다음 단계 지시 1(단계 0의 끝남·건너뜀 겹침은 종전대로 뒤에 저장한 쪽 + 알림)
+    { const [A, B] = mk2([kN222('k4', ['(선택 작업)', '준공서류 작성', '현장 정리'])], [tk222('tk4', 'k4', 0, '(선택 작업)')]);
+      A.api.load(); B.api.load(); await A.flush(); await B.flush();
+      A.api.approve('tk4'); { const c = B.api.find('k4'); B.api.skip(c, c.pipes[0], 0); } await drain222([A, B]);
+      const S = srvT222(A, B), n = stageT(S, 'k4', 1);
+      R.x4 = '지시 ' + n.length + '|가리킴 ' + (n.length === 1 && A.sv('k4').pipes[0].stages[1].task_id === n[0].id ? '같음' : '다름') + '|서버 cur ' + A.sv('k4').pipes[0].cur;
+      R.x4ok = R.x4 === '지시 1|가리킴 같음|서버 cur 1'; }
+    // X5 [이 단계부터] × [이 단계부터] — 같은 단계로: 그 단계 지시 1 · 충돌 알림 0
+    { const [A, B] = mk2([kN222('k5', ['작업 수행', '준공서류 작성', '현장 정리'])], [tk222('tk5', 'k5', 0, '작업 수행')]);
+      A.api.load(); B.api.load(); await A.flush(); await B.flush();
+      for (const E of [A, B]) { const c = E.api.find('k5'); E.api.jump(c, c.pipes[0], 2); } await drain222([A, B]);
+      const S = srvT222(A, B), n = stageT(S, 'k5', 2);
+      R.x5 = '지시 ' + n.length + '|가리킴 ' + (n.length === 1 && A.sv('k5').pipes[0].stages[2].task_id === n[0].id ? '같음' : '다름') + '|충돌 알림 ' + prog([A, B]);
+      R.x5ok = R.x5 === '지시 1|가리킴 같음|충돌 알림 0'; }
+    // X6 자동 풀기 × 자동 풀기(관리자 기기 둘 — 결재함은 승인·단계 상신 기록은 대기 · 다음 단계 있음): 다음 단계 지시 1 · 단계 완료
+    { const k = kCH40('k6', 6); k.pipes[0].stages.push({ name: '실적신고·대장 종결', due: 'manual', status: 'pending', task_id: null, done_at: null });
+      const A = mkH40(H, [k, kOH40()], [apH40(6, 'k6', '승인')], [tkH40(6, 'k6')]); A.confirmAns = true; A.gidp = 'A';
+      const B = mkH40(H, [k, kOH40()], [], [tkH40(6, 'k6')]).share(A); B.confirmAns = true; B.gidp = 'B'; B.uid = 'uB'; B.uname = '시험B';
+      A.api.load(); B.api.load(); await A.flush(); A.api.refresh(); B.api.refresh(); await A.flush(); await B.flush(); await drain222([A, B]);
+      const S = srvT222(A, B), n = stageT(S, 'k6', 2);
+      R.x6 = A.st('k6') + '|지시 ' + n.length + '|가리킴 ' + (n.length === 1 && A.sv('k6').pipes[0].stages[2].task_id === n[0].id ? '같음' : '다름');
+      R.x6ok = R.x6 === 'done/승인|지시 1|가리킴 같음'; }
+    // R1 되돌렸다 다시 넘김(한 기기): 그 단계의 열린 지시가 남아 있으면 그것을 가리킴(새로 만들지 않음 — 저장이 거절돼 되돌아간 넘김을 다시 할 때 고아 지시가 한 건 더 생기던 길) ·
+    //   끝난 지시·지운 지시는 되살리지 않고 다음 회차 번호(…r1·…r2) · 번호가 겹친 줄 0
+    { const A = mkH40(H, [kN222('k7', ['작업 수행', '준공서류 작성', '현장 정리'])], [], [tk222('tk7', 'k7', 0, '작업 수행')]); A.gidp = 'A';
+      A.api.load(); await A.flush();
+      const back = () => { const c = A.api.find('k7'), p = c.pipes[0]; p.cur = 0; p.stages[0].status = 'open'; p.stages[0].done_at = null; p.stages[1].status = 'pending'; p.stages[1].task_id = null; const t = A.api.tasks().filter((x) => x.id === 'tk7')[0]; t.status = 'review'; };
+      const cur1 = () => A.api.find('k7').pipes[0].stages[1].task_id, st1 = () => stageT(A.api.tasks(), 'k7', 1), open1 = () => st1().filter((t) => t.status !== 'done').length;
+      A.api.approve('tk7'); const id0 = cur1();
+      back(); A.api.approve('tk7'); const a = (cur1() === id0 ? '같은 지시' : '새 지시') + ' ' + st1().length;
+      st1()[0].status = 'done'; back(); A.api.approve('tk7'); const id1 = cur1(), b = (id1 === id0 + 'r1' ? 'r1' : '?') + ' ' + st1().length + '/열림 ' + open1();
+      A.api.tasks().filter((t) => t.id === id1)[0].del = 1; back(); A.api.approve('tk7'); const id2 = cur1(), c2 = (id2 === id0 + 'r2' ? 'r2' : '?') + ' 열림 ' + open1();
+      const ids = A.api.tasks().map((t) => t.id);
+      R.r1 = a + '|' + b + '|' + c2 + '|겹친 번호 ' + (ids.length - new Set(ids).size);
+      R.r1ok = R.r1 === '같은 지시 1|r1 2/열림 1|r2 열림 1|겹친 번호 0'; await A.fire(); }
+    // R2 기성 줄: 계약의 기성 번호가 빠졌는데(저장 거절 뒤 다시 읽기 등) 그 계약의 기성 줄이 있으면 새 줄 없이 다시 이음 · 지운 줄은 되살리지 않고 다음 회차
+    { const A = mkH40(H, [kN222('k8', ['청구', '수금확인'], false)], [], [tk222('tk8', 'k8', 0, '청구')]); A.confirmAns = true; A.gidp = 'A';
+      A.api.load(); await A.flush(); A.api.approve('tk8'); await A.fire();
+      const c = A.api.find('k8'), id0 = c.rec_id;
+      delete c.rec_id; A.api.bill(c); const a = (c.rec_id === id0 ? '다시 이음' : '새 줄') + ' ' + live222(A.api.recs()).length;
+      A.api.recs()[0].del = 1; A.api.bill(c); const b = (c.rec_id === id0 + 'r1' ? 'r1' : '?') + ' ' + live222(A.api.recs()).length + '/' + A.api.recs().length;
+      R.r2 = a + '|' + b; R.r2ok = R.r2 === '다시 이음 1|r1 1/2'; await A.fire(); }
+    // R3 계약 번호가 영숫자 꼴이 아니면 종전 무작위 번호(지시 저장·상신 ref가 받는 꼴 밖으로 나가지 않게)
+    { const A = mkH40(H, [kN222('k-9', ['작업 수행', '준공서류 작성'])], [], [tk222('tk9', 'k-9', 0, '작업 수행')]); A.gidp = 'A';
+      A.api.load(); await A.flush(); A.api.approve('tk9');
+      const id = A.api.find('k-9').pipes[0].stages[1].task_id;
+      R.r3 = /^tA\d+$/.test(String(id)) ? '무작위' : '정해진 꼴'; R.r3ok = R.r3 === '무작위'; await A.fire(); }
+    // P 한 기기 보통 흐름(운영 판과 같음 견줌용 — 번호만 지운 사본): 지시 탭 [승인](다음 단계·마지막·청구) · [건너뜀] · [이 단계부터] — 만든 지시·할 일·기성 줄·계약·확인 창 글·알림·저장
+    { const A = mkH40(H, [kN222('p1', ['작업 수행', '준공서류 작성', '현장 정리']), kN222('p2', ['작업 수행']), kN222('p3', ['청구', '수금확인'], false), kN222('p4', ['(선택 작업)', '준공서류 작성']), kN222('p5', ['작업 수행', '준공서류 작성', '현장 정리'])],
+        [], ['p1', 'p2', 'p3', 'p4', 'p5'].map((id, j) => tk222('t' + id, id, 0, ['작업 수행', '작업 수행', '청구', '(선택 작업)', '작업 수행'][j]))); A.confirmAns = true; A.gidp = 'A';
+      A.api.load(); await A.flush();
+      A.api.approve('tp1'); A.api.approve('tp2'); A.api.approve('tp3'); { const c = A.api.find('p4'); A.api.skip(c, c.pipes[0], 0); } { const c = A.api.find('p5'); A.api.jump(c, c.pipes[0], 2); }
+      await A.fire(); await A.fire();
+      let s = JSON.stringify({ tasks: A.api.tasks(), recs: A.api.recs(), cons: A.srv.doc.items, confirms: A.confirms, alerts: A.alertTexts, toasts: A.toasts, puts: A.puts(), pushes: A.pushes || 0 });
+      A.api.tasks().forEach((t, i) => { s = s.split(JSON.stringify(t.id)).join('"#T' + i + '"'); }); A.api.recs().forEach((r, i) => { s = s.split(JSON.stringify(r.id)).join('"#R' + i + '"'); });
+      R.p = s; R.pn = A.api.tasks().length + '/' + A.api.recs().length; R.pnok = R.pn === '10/1'; }
+    R.ok = Object.keys(R).filter((k) => /ok$/.test(k)).every((k) => R[k]);
+    return R;
+  };
+  // 운영 판 꼴(번호 세 자리를 무작위로 되돌린 사본) — 한 기기 흐름의 견줌 기준 · 두 기기 겹침은 이 사본에서 두 건(고치기 전 결함이 이 검사에 잡힘)
+  const DET222 = [
+    ['var k = csDetId("t", c, "p" + String(pipe.key || "").replace(/[^0-9a-zA-Z]/g, "") + (pipe.cur < 10 ? "0" : "") + pipe.cur, tasks, function(x){ return x.del !== 1 && x.status !== "done"; });', 'var k = { id: genId("t"), hit: null };'],
+    ['tasks.push({ id: csDetId("t", c, "zhook", tasks).id, title: title,', 'tasks.push({ id: genId("t"), title: title,'],
+    ['var k=csDetId("r", c, "bill", receivables, function(x){ return x.del!==1; });', 'var k={ id: genId("r"), hit: null };'],
+  ];
+  const R222 = await run222(html);
+  const OLD222 = await run222(DET222.reduce((s, [a, b]) => onceH40(s, a, b), html));
+  const KG222 = DET222.concat([
+    ['    if (!k.hit) tasks.push(t);\n', '    tasks.push(t);\n'],
+    ['    if(!k.hit) receivables.push(r);\n', '    receivables.push(r);\n'],
+    ['function(x){ return x.del !== 1 && x.status !== "done"; });', 'function(x){ return x.del !== 1; });'],
+    ['function(x){ return x.del !== 1 && x.status !== "done"; });', 'function(x){ return x.status !== "done"; });'],
+    ['function(x){ return x.del !== 1 && x.status !== "done"; });', 'function(x){ return false; });'],
+    ['function(x){ return x.del!==1; });', 'function(x){ return true; });'],
+    ['function(x){ return x.del!==1; });', 'function(x){ return false; });'],
+    ['      if (reuse && reuse(x)) return { id: id, hit: x };\n', ''],
+    ['    if (!/^[0-9a-zA-Z]+$/.test(cid)) return { id: genId(pre), hit: null };\n', ''],
+    ['      id = pre + cid + kind + (n ? "r" + n : ""); x = null;', '      id = pre + cid + (n ? "r" + n : ""); x = null;'],
+  ]);
+  const KR222 = [];
+  for (const [a, b] of KG222) { let r; try { r = await run222(onceH40(html, a, b)); } catch (e) { r = { ok: false, threw: e.message }; } KR222.push(!r.ok); }
+  T('C222 두 관리자 화면이 같은 계약 단계를 같이 넘김 = 한 건(실행 — 판40 틀 · 두 기기 한 서버 · 실제 approveTask·advanceProc·materializeStage·csOnDone·conBillToRec·csSkipStage·csJumpStage·csApprHeal·mergeContracts·mergeTasks·mergeRec): X1 지시 탭 [승인] 같이 = 다음 단계 지시 1·두 기기와 서버 단계의 지시 번호가 그 지시·단계 진행 충돌 알림 0(운영 판 꼴 사본: 지시 2) · X2 마지막 단계 = 실적신고 할 일 1(사본 2) · X3 청구 = 기성 줄 1·계약의 기성 번호가 그 줄·확인 창은 기기마다 1(사본 줄 2) · X4 [승인] × [건너뜀] = 다음 단계 지시 1 · X5 [이 단계부터] 같이 = 1 · X6 자동 풀기 두 기기 = 1',
+    ['x1', 'x2', 'x3', 'x4', 'x5', 'x6'].every((k) => R222[k + 'ok']) && ['x1', 'x2', 'x3', 'x4', 'x5', 'x6'].every((k) => !OLD222[k + 'ok']) && /^지시 2\|/.test(OLD222.x1) && /^실적신고 2\|/.test(OLD222.x2) && /^기성 줄 2\|/.test(OLD222.x3),
+    JSON.stringify(['x1', 'x2', 'x3', 'x4', 'x5', 'x6'].map((k) => k + ' ' + R222[k] + ' ↔ 사본 ' + OLD222[k])));
+  T('C222 되돌렸다 다시 넘김·옛 번호(실행): 그 단계의 열린 지시가 남아 있으면 그것을 가리킴(지시 1 — 운영 판 꼴 사본: 2) · 끝난 지시·지운 지시는 되살리지 않고 다음 회차 번호(r1·r2)·겹친 번호 0 · 기성 번호가 빠진 계약은 있는 줄에 다시 이음(줄 1)·지운 줄은 다음 회차 · 계약 번호가 영숫자 꼴이 아니면 종전 무작위 번호',
+    R222.r1ok && R222.r2ok && R222.r3ok && !OLD222.r1ok && !OLD222.r2ok, JSON.stringify([R222.r1, R222.r2, R222.r3, OLD222.r1, OLD222.r2]));
+  T('C222 한 기기 보통 흐름은 운영 판 꼴 사본과 같음(실행 — 지시 탭 [승인] 다음 단계·마지막·청구 · [건너뜀] · [이 단계부터]): 만든 지시·할 일·기성 줄의 모든 칸·계약 단계·확인 창 글·알림·저장 순서가 번호만 빼고 글자째 같음',
+    R222.pnok && typeof R222.p === 'string' && R222.p.length > 2000 && R222.p === OLD222.p, R222.pn + ' · ' + String(R222.p).length + '/' + String(OLD222.p).length);
+  T('C222 결함 사본 ' + KG222.length + '개(번호 세 자리 무작위로 되돌림 — 단계 지시·종결 할 일·기성 줄 · 있는 지시를 또 넣음 · 있는 기성 줄을 또 넣음 · 끝난 지시 되살림 · 지운 지시 되살림 · 열린 지시 안 씀 · 지운 기성 줄 되살림 · 있는 기성 줄 안 씀 · 다시 쓰기 걷음 · 영숫자 가름 걷음 · 번호에서 종류 뺌) = 모두 ✗',
+    KG222.length === 13 && KR222.every((x) => x), JSON.stringify(KR222));
 } catch (e) { console.log('  (P1 판40 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ── v489(판24f — 계약 저장 충돌 병합을 칸 단위로 · 원장 C196): 실행 검사는 위 'P1 판24f' 블록 · 여기는 문서·판 번호 정확 검사 + 칸 단위 병합을 부르는 줄·기준 사본을 세우는 줄 등 고정 글 12줄이 그대로 한 번씩 있는지 — 다음 판은 기준 줄·sw를 '489 이상'으로 풀 것
@@ -21571,7 +21707,7 @@ try {
     'var tasks = [], saved = 0; function todayStr(){ return "2026-11-20"; } function genId(){ return "tX"; } function csSiteDone(){} function csSiteKindOf(){ return "asbestos"; } function csTitle(c){ return c.label; }',
     'function saveTasksCache(){} function scheduleTasksSave(){ saved++; } function scheduleContractSave(){}',
     'function memberName(){ return ""; } function myName(){ return ""; } function myId(){ return ""; }',   // 운영 v508 뒤 csOnDone이 담당·보낸 사람 칸을 채움 — 이 시험은 con_ref·기한만 봄
-    fnK5('csNextFeb15'), fnK5('csOnDone'), 'return { run: function(c){ csOnDone(c); return tasks; } };'].join('\n'))();
+    fnK5('csNextFeb15'), fnK5('csOnDone'), fnK5('csDetId'), 'return { run: function(c){ csOnDone(c); return tasks; } };'].join('\n'))();   // C222: csOnDone이 할 일 번호를 csDetId로 지음
   const cTask = boxC5().run({ id: 'cK1', scen: 'x', status: 'done', label: '가짜 계약' });
   const conRefOk = cTask.length === 1 && cTask[0].con_ref === 'cK1' && cTask[0].due === '2027-02-15' && /^실적신고\(2\/15\)/.test(cTask[0].title);
   T('C185 판5 ① 앱 csOnDone(실행 — 실제 함수): 계약 종결 = 실적신고(2/15) 할 일 1건 · con_ref = 계약 id(서버 실적 신고 지시가 이 칸으로 그 현장을 뺌) · 기한 = 다음 2/15 — 이 판은 csOnDone을 고치지 않음', conRefOk, JSON.stringify(cTask.map((t) => [t.con_ref, t.due])));

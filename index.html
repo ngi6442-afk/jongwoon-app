@@ -17149,7 +17149,7 @@
     if (!c.task_hook && csSiteKindOf(c)){   // 매년 2/15 실적신고 할 일(건설업 등록 — 통합실적관리시스템) — 같은 제목이 열려 있으면 안 만든다
       var title = "실적신고(2/15) — " + (csTitle(c) || c.site || c.label || "");
       if (!tasks.some(function(t){ return t && t.del !== 1 && t.title === title && t.status !== "done"; })){
-        tasks.push({ id: genId("t"), title: title, detail: "통합실적관리시스템(icms.or.kr) 연도별 신고 — 안전 › 현장 대장(계약액 행)과 계약 탭 연결 탭의 실적 초안(업종·금액·계약일)을 확인하고 신고. 신고번호 입력 칸은 후속(현재는 메모로)", who_id: c.who_id || "", who: memberName(c.who_id || ""), from: myName() || "", from_id: myId(), by: myName() || "",
+        tasks.push({ id: csDetId("t", c, "zhook", tasks).id, title: title, detail: "통합실적관리시스템(icms.or.kr) 연도별 신고 — 안전 › 현장 대장(계약액 행)과 계약 탭 연결 탭의 실적 초안(업종·금액·계약일)을 확인하고 신고. 신고번호 입력 칸은 후속(현재는 메모로)", who_id: c.who_id || "", who: memberName(c.who_id || ""), from: myName() || "", from_id: myId(), by: myName() || "",
           due: csNextFeb15(), status: "open", done_at: null, done_by: null, created: todayStr(), updated: todayStr(), con_ref: c.id });
         saveTasksCache(); scheduleTasksSave();
       }
@@ -17450,6 +17450,21 @@
     return out;
   }
   function procStageTitle(c, sname){ var who=(c.client||c.site||"").trim(); return "[" + c.label + "] " + (who?who+" · ":"") + sname; }
+  // C222: 계약 단계가 만드는 것(그 단계 지시 · 종결 할 일 '실적신고(2/15)' · 청구 단계의 기성 줄)의 번호는 무작위(genId)가 아니라 계약 번호에서 정해지는 꼴 — 두 화면이 같은 단계를 같이 넘겨도 같은 번호라
+  //   지시·기성 병합(id 단위 — mergeTasks·mergeRec)에서 한 건이 되고, 계약에 적는 지시 번호(task_id)·기성 번호(rec_id)도 두 화면이 같은 값(단계 진행 충돌 없음). 만드는 때·글·저장 예약은 종전 그대로(미루지 않음)
+  //   꼴 = 머리(지시 t · 기성 r) + 계약 id + kind(단계 지시 "p" + 줄 + 단계 두 자리 · 종결 할 일 "zhook" · 기성 "bill") + 회차("r1"·"r2"… — 그 번호가 목록에 이미 있을 때만: 끝난 것·지운 것은 되살리지 않고 다음 회차)
+  //   reuse(목록에 있는 그 번호의 항목) = 참이면 그것을 그대로 씀(hit — 새로 만들지 않음: 다른 화면이 먼저 만든 것을 이미 받아 둔 화면 · 저장이 거절돼 되돌아간 넘김을 다시 할 때) · 계약 id가 영숫자 꼴이 아니면 종전 무작위 번호
+  function csDetId(pre, c, kind, list, reuse){
+    var cid = String((c && c.id) || ""), n = 0, id, i, x;
+    if (!/^[0-9a-zA-Z]+$/.test(cid)) return { id: genId(pre), hit: null };
+    for (;;){
+      id = pre + cid + kind + (n ? "r" + n : ""); x = null;
+      for (i = 0; i < list.length; i++){ if (list[i] && list[i].id === id){ x = list[i]; break; } }
+      if (!x) return { id: id, hit: null };
+      if (reuse && reuse(x)) return { id: id, hit: x };
+      n++;
+    }
+  }
   function materializeStage(c, pipe, baseDate){
     while(pipe.cur < pipe.stages.length && pipe.stages[pipe.cur].status==="skipped") pipe.cur++;   // v382: 건너뛴 선택 단계는 지시 없이 지나간다
     if(pipe.cur >= pipe.stages.length) return;
@@ -17460,10 +17475,12 @@
     if(!due && c.scen && conDueOn()){ var dd = conStageDue(s, c, pipe); if(dd){ due = dd.due || ""; if(dd.src) s.due_src = dd.src; else delete s.due_src; if(dd.badge) s.due_badge = dd.badge; else delete s.due_badge; } }   // v404 D2 기한 엔진 — 켜짐일 때만, 새 키만(꺼짐 = 바이트 동일)
     if(s.aw==="amt" && s.amt0==null){ s.eff0 = csChgBase(c); s.amt0 = csChgLastAmt(c)||s.eff0; }   // v402 변경계약: 현재 단계가 될 때 금액 기준을 굳힘(R15 계약액 기준, 정산액 제외)
     if(s.aw==="amt" && s.term0==null) s.term0 = csChgLastEnd(c)||csEnd(c);   // v418 카드 9: 계약기간 기준도 같이 굳힘 — 직전 완료 차수의 종료일, 없으면 계약 종료일(contract_info.d3)
-    var t = { id:genId("t"), title:procStageTitle(c, csStageLabel(s)), detail:(stageDocsOf(s)||""), who_id:c.who_id||"", who:memberName(c.who_id||""), from:myName()||"", from_id:myId(), by:myName()||"",
+    // C222: 지시 번호 = 계약·줄·단계에서 정해지는 꼴(csDetId) — 그 번호의 열린 지시가 이미 있으면(지운 것·끝난 것 아님) 새로 만들지 않고 그것을 가리킴
+    var k = csDetId("t", c, "p" + String(pipe.key || "").replace(/[^0-9a-zA-Z]/g, "") + (pipe.cur < 10 ? "0" : "") + pipe.cur, tasks, function(x){ return x.del !== 1 && x.status !== "done"; });
+    var t = k.hit || { id:k.id, title:procStageTitle(c, csStageLabel(s)), detail:(stageDocsOf(s)||""), who_id:c.who_id||"", who:memberName(c.who_id||""), from:myName()||"", from_id:myId(), by:myName()||"",
       due:due, status:"open", done_at:null, done_by:null, created:todayStr(), updated:todayStr(),
       proc_id:c.id, proc_label:c.label, pipe:pipe.key, stage_i:pipe.cur, stage_name:s.name, stage_total:pipe.stages.length, stage_auto:(s.due==="auto") };
-    tasks.push(t);
+    if (!k.hit) tasks.push(t);
     s.status="open"; s.task_id=t.id;
     saveTasksCache(); scheduleTasksSave();
   }
@@ -17537,11 +17554,13 @@
     var amt=conAmtEff(c);   // v382 정산액(준공 단계 입력)이 있으면 정산액
     if(!confirm((lead||"")+"청구 단계 완료 — 기성(미수)에 청구 건을 등록할까요?\n"+(c.client||"발주처?")+" · "+(c.title||c.label)+(amt?" · "+fmtAmount(amt)+"원":" · 금액 미확인(기성에서 입력)"))) return;
     var today=todayStr();
-    var r={ id:genId("r"), client:c.client||"", site:c.site||"", desc:(c.title||c.label||""),
+    // C222: 기성 번호 = 계약에서 정해지는 꼴(csDetId) — 그 번호의 줄이 이미 있으면(지운 것 아님) 새 줄을 넣지 않고 그 줄에 잇기만
+    var k=csDetId("r", c, "bill", receivables, function(x){ return x.del!==1; });
+    var r=k.hit || { id:k.id, client:c.client||"", site:c.site||"", desc:(c.title||c.label||""),
       co:((c.type==="asbestos"||c.type==="demolition")?"con":"env"),   // 두 회사 규칙: 석면·철거=건설, 운반·폐기물·준설=환경
       amount:amt, billed:today, invoice:false, paid:null, due_hint:"", note:"계약 연동", con_id:c.id,
       assignee:"", scope:[], task_id:null, mismatch:false, created:today, updated:today };
-    receivables.push(r);
+    if(!k.hit) receivables.push(r);
     c.rec_id=r.id; scheduleContractSave();
     saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
     alert("기성(미수)에 등록되었습니다 — 입금되면 기성에서 입금 처리하세요(수금확인 단계가 따로 열려 있는 계약은 자동 제안됩니다).");
