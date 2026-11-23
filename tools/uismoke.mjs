@@ -21847,11 +21847,11 @@ try {
     const FT = ["`ks_report`", "원장 C185"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = "<li><b>범위 밖 자동 지시 — 현장 실적 신고</b> (2026-11 v525) — 현장 실적 신고 지", MAN2 = "(2026-11 v525) 현장 실적 신고 지시의 담당은 '현장 실적 신";
-    const ok = /기준: v525 \(2026-11-23\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 9 && gate.length === 2 && scr.length === 7 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 525 && ftv.length > 0 && mF.length === 0 && cb.length === 9 && gate.length === 2 && scr.length === 7 && !cb.some((l) => /\(PM/.test(l))
       && d.man.indexOf(MAN) > 0 && !/hr_join|hr_leave|veh_ceq31|ks_report|veh_event|evrules|AUTOTASK|RULE_NOT_READY|pmcon_|handleAutotask|gwCall|ASSIGN_NEEDED|HRBG_READ|planHr|HR_JOIN|HR_LEAVE|taskHr|hrScope|assign_state|meta_srv|leave_ev|join_ev|ceq31|ksTargets|ksWindow|veh_unread|srv/.test(cut(d.man, MAN, '\n')) && d.man.indexOf(MAN2) > 0
       && d.cl.indexOf('**C185 판5(v525') > 0
       && FIX525.every((x) => d.ix.split(x).length === 2)
-      && /SHELL_CACHE = 'jw-shell-v525'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 525;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX525.map((x) => d.ix.split(x).length - 1) } };
   };
   const r525 = chk525(D525);
@@ -21864,6 +21864,31 @@ try {
   T('v525 문서·판 번호(정확 검사): FEATURES 기준 v525 (2026-11-23)·v525 절(C185 판5) · TESTLIST v525 칸 9(화면·운영 확인 7 · 게이트 [x] 2) · MANUAL 점검 카드 줄·배정표 문장(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 2줄 한 번씩 · sw jw-shell-v525 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL 둘·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
     r525.ok && M525.every((v) => v === false), JSON.stringify({ r: r525.info, mut: M525 }));
 } catch (e) { console.log('  (v525 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v526(C222 — 넘김이 만드는 지시·할 일·기성 줄 번호를 정해진 꼴로 · 원장 C222): 실행 검사는 위 'C222' 블록 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd526 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D526 = { ft: rd526('FEATURES.md'), tl: rd526('TESTLIST.md'), sw: rd526('sw.js'), man: rd526('MANUAL.html'), cl: rd526('CLAUDE.md') };
+  const chk526 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v526 (11/23)', '\n### '), tlv = cut(d.tl, '\n## v526 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`csDetId`", "원장 C222"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v526 \(2026-11-23\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 2 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C222(v526') > 0
+      && /SHELL_CACHE = 'jw-shell-v526'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r526 = chk526(D526);
+  const mu526 = (k, f) => chk526(Object.assign({}, D526, { [k]: f(D526[k]) })).ok;
+  const M526 = [mu526('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v525 (')), mu526('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v525'")),
+    mu526('ft', (s) => s.split('`csDetId`').join('csDetId')),
+    mu526('cl', (s) => s.replace('**C222(v526', 'C222(')),
+    mu526('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v525 0227e3b 위 · ffdfaad + a499e58) uismoke ✓ 952 · servertest 1489 · 14종 0(consheet 포함) · node --check 105 · 인라인 파싱 오류 0 · paycalc_check 10 · autorulestest 9 · 바꾼 3파일 CR 0 — ✓ AI 11/23', '\n- (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v525 0227e3b 위 · ffdfaad + a499e58) uismoke ✓ 952 · servertest 1489 · 14종 0(consheet 포함) · node --check 105 · 인라인 파싱 오류 0 · paycalc_check 10 · autorulestest 9 · 바꾼 3파일 CR 0 — ✓ AI 11/23'))];
+  T('v526 문서·판 번호(정확 검사): FEATURES 기준 v526 (2026-11-23)·v526 절(C222) · TESTLIST v526 칸 6(화면·운영 확인 4 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v526 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
+    r526.ok && M526.every((v) => v === false), JSON.stringify({ r: r526.info, mut: M526 }));
+} catch (e) { console.log('  (v526 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
