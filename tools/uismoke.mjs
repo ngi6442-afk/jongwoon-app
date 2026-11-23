@@ -21629,11 +21629,11 @@ try {
     const FT = ["`hr_leave`", "원장 C185"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = "<li><b>범위 밖 자동 지시 — 퇴사 체크리스트</b> (2026-11 v523) — 퇴사 체크리스트 지", MAN2 = "(2026-11 v523) '입사·퇴사 체크리스트(인사)'·'입사·퇴사 ";
-    const ok = /기준: v523 \(2026-11-23\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 9 && gate.length === 2 && scr.length === 7 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 523 && ftv.length > 0 && mF.length === 0 && cb.length === 9 && gate.length === 2 && scr.length === 7 && !cb.some((l) => /\(PM/.test(l))
       && d.man.indexOf(MAN) > 0 && !/hr_join|hr_leave|veh_ceq31|ks_report|veh_event|evrules|AUTOTASK|RULE_NOT_READY|pmcon_|handleAutotask|gwCall|ASSIGN_NEEDED|HRBG_READ|planHr|HR_JOIN|HR_LEAVE|taskHr|hrScope|assign_state|meta_srv|leave_ev|join_ev|ceq31|ksTargets|ksWindow|veh_unread|srv/.test(cut(d.man, MAN, '\n')) && d.man.indexOf(MAN2) > 0
       && d.cl.indexOf('**C185 판3(v523') > 0
       && FIX523.every((x) => d.ix.split(x).length === 2)
-      && /SHELL_CACHE = 'jw-shell-v523'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 523;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX523.map((x) => d.ix.split(x).length - 1) } };
   };
   const r523 = chk523(D523);
@@ -21646,6 +21646,37 @@ try {
   T('v523 문서·판 번호(정확 검사): FEATURES 기준 v523 (2026-11-23)·v523 절(C185 판3) · TESTLIST v523 칸 9(화면·운영 확인 7 · 게이트 [x] 2) · MANUAL 점검 카드 줄·배정표 문장(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 14줄 한 번씩 · sw jw-shell-v523 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL 둘·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
     r523.ok && M523.every((v) => v === false), JSON.stringify({ r: r523.info, mut: M523 }));
 } catch (e) { console.log('  (v523 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v524(C185 판4 — 건설기계 31일 전 · 원장 C185): 실행 검사는 위 'C185 판4' 블록 · 여기는 문서·판 번호 정확 검사 + 고정 글 8줄(실행 검사가 못 지키는 고침 줄 — 빼면 ✗)
+try {
+  const rd524 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D524 = { ft: rd524('FEATURES.md'), tl: rd524('TESTLIST.md'), sw: rd524('sw.js'), man: rd524('MANUAL.html'), cl: rd524('CLAUDE.md'), ix: rd524('index.html') };
+  const FIX524 = ["NOT_PROMOTED: \"차량 근거가 승격 전이라 쉬는 중입니다(그동안 30일 전 지시가 그대로 나갑니다)\", NO_ROW: \"승격된 차량 근거에 31일 전 기준 행이 없어 쉬는 중입니다(그동안 30일 전 지시가 그대로 나갑니다)\",", "    var ceqTxt = (s.ref && s.ref.ceq_total !== undefined) ? \"규모 건설기계 \" + (Number(s.ref.ceq) || 0) + \"대(전체 \" + (Number(s.ref.ceq_total) || 0) + \"대) · 오늘 31일 남은 건설기계 \" + (Number(s.ref.ceq_d31) || 0) + \"대\" : \"\";", "    if (s.skip && ceqTxt) return (EVR_STOP[s.skip] || EVR_SKIP[s.skip] || \"이번에는 세지 못했습니다\") + \" · \" + ceqTxt + \".\";", "    if (ceqTxt) p.push(ceqTxt);", "    if (EVR_LIVE_NOTE[k]) row.why = row.why.replace(\"(켠 뒤에 생긴 일만 — 지난 일 소급 없음)\", EVR_LIVE_NOTE[k]);", "    var EVR_LIVE_NOTE = { veh_ceq31: \"(켠 날부터 평일마다 그날 31일 남은 건설기계마다 — 31일째가 주말이면 30일 전 지시로 · 관리자 접속 때 만드는 30일 전 지시는 그대로)\" };", "    var EVR_SKIP_BLOCK = { NOT_PROMOTED: \"차량 근거 승격 뒤에 정해 주세요\", NO_ROW: \"차량 근거에 31일 전 기준 행이 들어간 뒤 정해 주세요\" }, EVR_SKIP_REC = { NOT_PROMOTED: \"그대로(근거 승격 뒤)\", NO_ROW: \"그대로(근거 행 뒤)\" };", "    else if (!row.block && skipped && EVR_SKIP_BLOCK[s.skip]) row.block = EVR_SKIP_BLOCK[s.skip];"];
+  const MANA524 = "(2026-11 v524) 건설기계 31일 전 지시의 담당은 '차량 만기";
+  const chk524 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v524 (11/23)', '\n### '), tlv = cut(d.tl, '\n## v524 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`veh_ceq31`", "원장 C185"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = "<li><b>범위 밖 자동 지시 — 건설기계 정기검사 31일 전</b> (2026-11 v524) — 건설기", MAN2 = "(2026-11 v524) 건설기계 31일 전 지시의 담당은 '차량 만기";
+    const ok = /기준: v524 \(2026-11-23\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 9 && gate.length === 2 && scr.length === 7 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf(MAN) > 0 && !/hr_join|hr_leave|veh_ceq31|ks_report|veh_event|evrules|AUTOTASK|RULE_NOT_READY|pmcon_|handleAutotask|gwCall|ASSIGN_NEEDED|HRBG_READ|planHr|HR_JOIN|HR_LEAVE|taskHr|hrScope|assign_state|meta_srv|leave_ev|join_ev|ceq31|ksTargets|ksWindow|veh_unread|srv/.test(cut(d.man, MAN, '\n')) && d.man.indexOf(MAN2) > 0
+      && d.cl.indexOf('**C185 판4(v524') > 0
+      && FIX524.every((x) => d.ix.split(x).length === 2)
+      && /SHELL_CACHE = 'jw-shell-v524'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX524.map((x) => d.ix.split(x).length - 1) } };
+  };
+  const r524 = chk524(D524);
+  const mu524 = (k, f) => chk524(Object.assign({}, D524, { [k]: f(D524[k]) })).ok;
+  const M524 = [mu524('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v523 (')), mu524('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v523'")),
+    mu524('ft', (s) => s.split('`veh_ceq31`').join('veh_ceq31')),
+    mu524('man', (s) => s.replace('전</b> (2026-11 v524) ', '전</b> ')), mu524('man', (s) => s.replace(MANA524, '')), mu524('cl', (s) => s.replace('**C185 판4(v524', 'C185 판4(')),
+    mu524('tl', (s) => s.replace('\n- [x] (AI) `uismoke` \'C185 판4\'', '\n- (AI) `uismoke` \'C185 판4\''))]
+    .concat(FIX524.map((x) => mu524('ix', (s) => s.replace(x, ''))));
+  T('v524 문서·판 번호(정확 검사): FEATURES 기준 v524 (2026-11-23)·v524 절(C185 판4) · TESTLIST v524 칸 9(화면·운영 확인 7 · 게이트 [x] 2) · MANUAL 점검 카드 줄·배정표 문장(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 8줄 한 번씩 · sw jw-shell-v524 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL 둘·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
+    r524.ok && M524.every((v) => v === false), JSON.stringify({ r: r524.info, mut: M524 }));
+} catch (e) { console.log('  (v524 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
