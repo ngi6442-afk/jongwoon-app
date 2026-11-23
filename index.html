@@ -15190,7 +15190,8 @@
       if (!cur){ byId[r.id] = r; return; }
       var mine = Object.keys(st.sent).map(function(k){ return st.sent[k][r.id]; }).filter(Boolean);
       var pre = opt.fix ? mgCopy(cur) : null;   // 판24j: 고치기 전 이 화면 줄(차량 만기 표식·검사 기록처럼 종전 보호가 '고치기 전 이 화면 값'을 봄)
-      var b = st.base[r.id], c0 = cfs.length, m = b && opt.fast ? imFast(b, cur, r) : null;
+      // C222: 받은 사본이 없고 이 화면이 정해진 번호로 막 지은 새 항목(csDetKeep — 지은 때의 사본)이면 그 사본을 기준으로 칸 단위 — 이 화면이 지은 뒤 안 고친 칸은 이미 있던 쪽(서버) 값
+      var b = st.base[r.id] || (st.det && st.det[r.id]) || undefined, c0 = cfs.length, m = b && opt.fast ? imFast(b, cur, r) : null;
       if (!m) m = b ? imMerge3(b, cur, r, cfs, opt, mine) : null;
       if (!m && opt.whole) m = opt.whole(cur, r);   // 판24j: 자료별 종전 통째 규칙(홍보·문서함 = 시각 비교 · 체크 추가 항목 = 같으면 이 화면)
       if (!m) m = imWhole(cur, r);
@@ -17151,6 +17152,7 @@
       if (!tasks.some(function(t){ return t && t.del !== 1 && t.title === title && t.status !== "done"; })){
         tasks.push({ id: csDetId("t", c, "zhook", tasks).id, title: title, detail: "통합실적관리시스템(icms.or.kr) 연도별 신고 — 안전 › 현장 대장(계약액 행)과 계약 탭 연결 탭의 실적 초안(업종·금액·계약일)을 확인하고 신고. 신고번호 입력 칸은 후속(현재는 메모로)", who_id: c.who_id || "", who: memberName(c.who_id || ""), from: myName() || "", from_id: myId(), by: myName() || "",
           due: csNextFeb15(), status: "open", done_at: null, done_by: null, created: todayStr(), updated: todayStr(), con_ref: c.id });
+        csDetKeep("tasks", tasks[tasks.length - 1]);   // C222 검토: 지은 때 사본(병합 기준 — 화면 메모리만)
         saveTasksCache(); scheduleTasksSave();
       }
       c.task_hook = todayStr(); c.updated = todayStr(); scheduleContractSave();
@@ -17465,6 +17467,9 @@
       n++;
     }
   }
+  // C222 검토: 정해진 번호로 막 지은 새 항목의 사본을 화면 메모리(imSt(col).det — 저장 자료에 안 실림)에 둠 — 다른 화면이 먼저 지어 그 뒤 고친 같은 번호 항목을 409 병합에서 만나면
+  //   받은 사본이 없어 통째 고르기(updated 같은 날 = 이 화면)로 이 화면의 빈 새 항목이 상대 고침을 덮던 것을, 이 사본을 기준으로 칸 단위(imMerge3)로 — 이 화면이 지은 뒤 고친 칸만 이 화면 값
+  function csDetKeep(col, x){ if (typeof imSt !== "function" || typeof mgCopy !== "function" || !x || !x.id) return; var st = imSt(col); if (!st.det) st.det = {}; st.det[x.id] = mgCopy(x); }
   function materializeStage(c, pipe, baseDate){
     while(pipe.cur < pipe.stages.length && pipe.stages[pipe.cur].status==="skipped") pipe.cur++;   // v382: 건너뛴 선택 단계는 지시 없이 지나간다
     if(pipe.cur >= pipe.stages.length) return;
@@ -17480,7 +17485,7 @@
     var t = k.hit || { id:k.id, title:procStageTitle(c, csStageLabel(s)), detail:(stageDocsOf(s)||""), who_id:c.who_id||"", who:memberName(c.who_id||""), from:myName()||"", from_id:myId(), by:myName()||"",
       due:due, status:"open", done_at:null, done_by:null, created:todayStr(), updated:todayStr(),
       proc_id:c.id, proc_label:c.label, pipe:pipe.key, stage_i:pipe.cur, stage_name:s.name, stage_total:pipe.stages.length, stage_auto:(s.due==="auto") };
-    if (!k.hit) tasks.push(t);
+    if (!k.hit){ tasks.push(t); csDetKeep("tasks", t); }
     s.status="open"; s.task_id=t.id;
     saveTasksCache(); scheduleTasksSave();
   }
@@ -17560,7 +17565,7 @@
       co:((c.type==="asbestos"||c.type==="demolition")?"con":"env"),   // 두 회사 규칙: 석면·철거=건설, 운반·폐기물·준설=환경
       amount:amt, billed:today, invoice:false, paid:null, due_hint:"", note:"계약 연동", con_id:c.id,
       assignee:"", scope:[], task_id:null, mismatch:false, created:today, updated:today };
-    if(!k.hit) receivables.push(r);
+    if(!k.hit){ receivables.push(r); csDetKeep("receivables", r); }
     c.rec_id=r.id; scheduleContractSave();
     saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
     alert("기성(미수)에 등록되었습니다 — 입금되면 기성에서 입금 처리하세요(수금확인 단계가 따로 열려 있는 계약은 자동 제안됩니다).");

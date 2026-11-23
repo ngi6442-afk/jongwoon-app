@@ -19441,6 +19441,20 @@ try {
       let s = JSON.stringify({ tasks: A.api.tasks(), recs: A.api.recs(), cons: A.srv.doc.items, confirms: A.confirms, alerts: A.alertTexts, toasts: A.toasts, puts: A.puts(), pushes: A.pushes || 0 });
       A.api.tasks().forEach((t, i) => { s = s.split(JSON.stringify(t.id)).join('"#T' + i + '"'); }); A.api.recs().forEach((r, i) => { s = s.split(JSON.stringify(r.id)).join('"#R' + i + '"'); });
       R.p = s; R.pn = A.api.tasks().length + '/' + A.api.recs().length; R.pnok = R.pn === '10/1'; }
+    // X7 낡은 화면(C222 검토 확정 1): A가 넘겨 지은 다음 단계 지시·기성 줄을 A가 그 뒤 고침(완료 요청·기한·담당 / 발행·입금) → 그 항목을 아직 받지 않은 B가 같은 단계를 넘겨 같은 번호로 새로 지음 →
+    //   B의 409 병합(실제 mergeTasks·mergeRec · B엔 그 번호의 받은 사본 없음) = A가 고친 칸이 남음 · 1건 · 알림 0 · B가 지은 뒤 고친 칸(상세)은 B 값
+    { const [A, B] = mk2([kN222('k9', ['작업 수행', '준공서류 작성', '현장 정리']), kN222('k10', ['청구', '수금확인'], false)], [tk222('tk9', 'k9', 0, '작업 수행'), tk222('tk10', 'k10', 0, '청구')]);
+      A.api.load(); B.api.load(); await A.flush(); await B.flush();
+      A.api.approve('tk9'); A.api.approve('tk10'); await A.fire();
+      const xid = A.api.find('k9').pipes[0].stages[1].task_id, ax = A.api.tasks().filter((t) => t.id === xid)[0];
+      Object.assign(ax, { status: 'review', done_at: '2026-11-19', done_by: '직원', due: '2026-11-30', who_id: 'uA' });
+      const ar = A.api.recs().filter((r) => r.con_id === 'k10')[0] || {}; Object.assign(ar, { invoice: true, paid: '2026-11-19' });
+      const t0 = B.toasts.length;
+      B.api.approve('tk9'); B.api.approve('tk10'); await B.fire();
+      const bx = B.api.tasks().filter((t) => t.id === xid)[0]; if (bx) bx.detail = 'B 메모';
+      const mt = B.api.mergeT(cloneH40(A.api.tasks())).filter((t) => t.id === xid), mr = B.api.mergeR(cloneH40(A.api.recs())).filter((r) => r.con_id === 'k10');
+      R.x7 = '지시 ' + mt.length + '|' + (mt[0] ? [mt[0].status, mt[0].due, mt[0].who_id, mt[0].detail].join(',') : '-') + '|기성 ' + mr.length + '|' + (mr[0] ? [mr[0].invoice, mr[0].paid, mr[0].id === ar.id ? '같은 번호' : '다른 번호'].join(',') : '-') + '|알림 ' + (B.toasts.length - t0);
+      R.x7ok = R.x7 === '지시 1|review,2026-11-30,uA,B 메모|기성 1|true,2026-11-19,같은 번호|알림 0'; await drain222([A, B]); }
     R.ok = Object.keys(R).filter((k) => /ok$/.test(k)).every((k) => R[k]);
     return R;
   };
@@ -19453,8 +19467,12 @@ try {
   const R222 = await run222(html);
   const OLD222 = await run222(DET222.reduce((s, [a, b]) => onceH40(s, a, b), html));
   const KG222 = DET222.concat([
-    ['    if (!k.hit) tasks.push(t);\n', '    tasks.push(t);\n'],
-    ['    if(!k.hit) receivables.push(r);\n', '    receivables.push(r);\n'],
+    ['    if (!k.hit){ tasks.push(t); csDetKeep("tasks", t); }\n', '    tasks.push(t); csDetKeep("tasks", t);\n'],
+    ['    if(!k.hit){ receivables.push(r); csDetKeep("receivables", r); }\n', '    receivables.push(r); csDetKeep("receivables", r);\n'],
+    // C222 검토 확정 1: 지은 때 사본 기준 병합 걷음(imMerge) · 지시·기성 사본 두기 걷음
+    ['var b = st.base[r.id] || (st.det && st.det[r.id]) || undefined, c0', 'var b = st.base[r.id], c0'],
+    ['    if (!k.hit){ tasks.push(t); csDetKeep("tasks", t); }\n', '    if (!k.hit){ tasks.push(t); }\n'],
+    ['    if(!k.hit){ receivables.push(r); csDetKeep("receivables", r); }\n', '    if(!k.hit){ receivables.push(r); }\n'],
     ['function(x){ return x.del !== 1 && x.status !== "done"; });', 'function(x){ return x.del !== 1; });'],
     ['function(x){ return x.del !== 1 && x.status !== "done"; });', 'function(x){ return x.status !== "done"; });'],
     ['function(x){ return x.del !== 1 && x.status !== "done"; });', 'function(x){ return false; });'],
@@ -19473,8 +19491,10 @@ try {
     R222.r1ok && R222.r2ok && R222.r3ok && !OLD222.r1ok && !OLD222.r2ok, JSON.stringify([R222.r1, R222.r2, R222.r3, OLD222.r1, OLD222.r2]));
   T('C222 한 기기 보통 흐름은 운영 판 꼴 사본과 같음(실행 — 지시 탭 [승인] 다음 단계·마지막·청구 · [건너뜀] · [이 단계부터]): 만든 지시·할 일·기성 줄의 모든 칸·계약 단계·확인 창 글·알림·저장 순서가 번호만 빼고 글자째 같음',
     R222.pnok && typeof R222.p === 'string' && R222.p.length > 2000 && R222.p === OLD222.p, R222.pn + ' · ' + String(R222.p).length + '/' + String(OLD222.p).length);
-  T('C222 결함 사본 ' + KG222.length + '개(번호 세 자리 무작위로 되돌림 — 단계 지시·종결 할 일·기성 줄 · 있는 지시를 또 넣음 · 있는 기성 줄을 또 넣음 · 끝난 지시 되살림 · 지운 지시 되살림 · 열린 지시 안 씀 · 지운 기성 줄 되살림 · 있는 기성 줄 안 씀 · 다시 쓰기 걷음 · 영숫자 가름 걷음 · 번호에서 종류 뺌) = 모두 ✗',
-    KG222.length === 13 && KR222.every((x) => x), JSON.stringify(KR222));
+  T('C222 낡은 화면이 같은 번호로 새로 지음(실행 — 검토 확정 1 · 실제 approveTask·materializeStage·conBillToRec·mergeTasks·mergeRec): A가 지은 뒤 고친 다음 단계 지시(완료 요청·기한·담당)·기성 줄(발행·입금)을 그 항목을 받지 않은 B가 같은 번호로 새로 지어도 B의 병합 뒤 A 값이 남음 · 1건 · 알림 0 · B가 지은 뒤 고친 칸(상세)은 B 값',
+    R222.x7ok, R222.x7);
+  T('C222 결함 사본 ' + KG222.length + '개(번호 세 자리 무작위로 되돌림 — 단계 지시·종결 할 일·기성 줄 · 있는 지시를 또 넣음 · 있는 기성 줄을 또 넣음 · 끝난 지시 되살림 · 지운 지시 되살림 · 열린 지시 안 씀 · 지운 기성 줄 되살림 · 있는 기성 줄 안 씀 · 다시 쓰기 걷음 · 영숫자 가름 걷음 · 번호에서 종류 뺌 · 지은 때 사본 기준 병합 걷음 · 지시·기성 사본 두기 걷음) = 모두 ✗',
+    KG222.length === 16 && KR222.every((x) => x), JSON.stringify(KR222));
 } catch (e) { console.log('  (P1 판40 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ── v489(판24f — 계약 저장 충돌 병합을 칸 단위로 · 원장 C196): 실행 검사는 위 'P1 판24f' 블록 · 여기는 문서·판 번호 정확 검사 + 칸 단위 병합을 부르는 줄·기준 사본을 세우는 줄 등 고정 글 12줄이 그대로 한 번씩 있는지 — 다음 판은 기준 줄·sw를 '489 이상'으로 풀 것
@@ -21707,7 +21727,7 @@ try {
     'var tasks = [], saved = 0; function todayStr(){ return "2026-11-20"; } function genId(){ return "tX"; } function csSiteDone(){} function csSiteKindOf(){ return "asbestos"; } function csTitle(c){ return c.label; }',
     'function saveTasksCache(){} function scheduleTasksSave(){ saved++; } function scheduleContractSave(){}',
     'function memberName(){ return ""; } function myName(){ return ""; } function myId(){ return ""; }',   // 운영 v508 뒤 csOnDone이 담당·보낸 사람 칸을 채움 — 이 시험은 con_ref·기한만 봄
-    fnK5('csNextFeb15'), fnK5('csOnDone'), fnK5('csDetId'), 'return { run: function(c){ csOnDone(c); return tasks; } };'].join('\n'))();   // C222: csOnDone이 할 일 번호를 csDetId로 지음
+    fnK5('csNextFeb15'), fnK5('csOnDone'), fnK5('csDetId'), fnK5('csDetKeep'), 'return { run: function(c){ csOnDone(c); return tasks; } };'].join('\n'))();   // C222: csOnDone이 할 일 번호를 csDetId로 지음
   const cTask = boxC5().run({ id: 'cK1', scen: 'x', status: 'done', label: '가짜 계약' });
   const conRefOk = cTask.length === 1 && cTask[0].con_ref === 'cK1' && cTask[0].due === '2027-02-15' && /^실적신고\(2\/15\)/.test(cTask[0].title);
   T('C185 판5 ① 앱 csOnDone(실행 — 실제 함수): 계약 종결 = 실적신고(2/15) 할 일 1건 · con_ref = 계약 id(서버 실적 신고 지시가 이 칸으로 그 현장을 뺌) · 기한 = 다음 2/15 — 이 판은 csOnDone을 고치지 않음', conRefOk, JSON.stringify(cTask.map((t) => [t.con_ref, t.due])));
