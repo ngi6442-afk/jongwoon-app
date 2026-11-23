@@ -21660,11 +21660,11 @@ try {
     const FT = ["`veh_ceq31`", "원장 C185"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = "<li><b>범위 밖 자동 지시 — 건설기계 정기검사 31일 전</b> (2026-11 v524) — 건설기", MAN2 = "(2026-11 v524) 건설기계 31일 전 지시의 담당은 '차량 만기";
-    const ok = /기준: v524 \(2026-11-23\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 9 && gate.length === 2 && scr.length === 7 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 524 && ftv.length > 0 && mF.length === 0 && cb.length === 9 && gate.length === 2 && scr.length === 7 && !cb.some((l) => /\(PM/.test(l))
       && d.man.indexOf(MAN) > 0 && !/hr_join|hr_leave|veh_ceq31|ks_report|veh_event|evrules|AUTOTASK|RULE_NOT_READY|pmcon_|handleAutotask|gwCall|ASSIGN_NEEDED|HRBG_READ|planHr|HR_JOIN|HR_LEAVE|taskHr|hrScope|assign_state|meta_srv|leave_ev|join_ev|ceq31|ksTargets|ksWindow|veh_unread|srv/.test(cut(d.man, MAN, '\n')) && d.man.indexOf(MAN2) > 0
       && d.cl.indexOf('**C185 판4(v524') > 0
       && FIX524.every((x) => d.ix.split(x).length === 2)
-      && /SHELL_CACHE = 'jw-shell-v524'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 524;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX524.map((x) => d.ix.split(x).length - 1) } };
   };
   const r524 = chk524(D524);
@@ -21677,6 +21677,37 @@ try {
   T('v524 문서·판 번호(정확 검사): FEATURES 기준 v524 (2026-11-23)·v524 절(C185 판4) · TESTLIST v524 칸 9(화면·운영 확인 7 · 게이트 [x] 2) · MANUAL 점검 카드 줄·배정표 문장(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 8줄 한 번씩 · sw jw-shell-v524 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL 둘·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
     r524.ok && M524.every((v) => v === false), JSON.stringify({ r: r524.info, mut: M524 }));
 } catch (e) { console.log('  (v524 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v525(C185 판5 — 현장 실적 신고 · 원장 C185): 실행 검사는 위 'C185 판5' 블록 · 여기는 문서·판 번호 정확 검사 + 고정 글 2줄(실행 검사가 못 지키는 고침 줄 — 빼면 ✗)
+try {
+  const rd525 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D525 = { ft: rd525('FEATURES.md'), tl: rd525('TESTLIST.md'), sw: rd525('sw.js'), man: rd525('MANUAL.html'), cl: rd525('CLAUDE.md'), ix: rd525('index.html') };
+  const FIX525 = ["    if (rf.ks_win !== undefined) p.push((Number(rf.ks_win) ? \"기간 안\" : \"기간 전(1/15~2/15)\") + \" · 지난해 끝난 현장 \" + (Number(rf.ks_done) || 0) + \"곳(번호 있음 \" + (Number(rf.ks_numbered) || 0) + \" · 계약별 할 일 있음 \" + (Number(rf.ks_task) || 0) + \") → 지금 세면 대상 \" + (Number(rf.ks_target) || 0) + \"곳\" + (Number(rf.ks_no_end) ? \" · 끝난 날이 빈 종결 \" + Number(rf.ks_no_end) + \"곳(세지 않음)\" : \"\") + \" · 미리 보기: 올해 끝난 현장으로 세면 \" + (Number(rf.ks_preview) || 0) + \"곳\");", "    EVR_LIVE_NOTE.ks_report = \"(기간 1/15~2/15 안이면 켠 다음 실행에 지난해 끝난 현장 묶음 1건 — 켠 시각과 견주지 않음 · 계약별 실적신고 할 일이 있는 현장은 뺌)\";"];
+  const MANA525 = "(2026-11 v525) 현장 실적 신고 지시의 담당은 '현장 실적 신";
+  const chk525 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v525 (11/23)', '\n### '), tlv = cut(d.tl, '\n## v525 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`ks_report`", "원장 C185"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = "<li><b>범위 밖 자동 지시 — 현장 실적 신고</b> (2026-11 v525) — 현장 실적 신고 지", MAN2 = "(2026-11 v525) 현장 실적 신고 지시의 담당은 '현장 실적 신";
+    const ok = /기준: v525 \(2026-11-23\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 9 && gate.length === 2 && scr.length === 7 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf(MAN) > 0 && !/hr_join|hr_leave|veh_ceq31|ks_report|veh_event|evrules|AUTOTASK|RULE_NOT_READY|pmcon_|handleAutotask|gwCall|ASSIGN_NEEDED|HRBG_READ|planHr|HR_JOIN|HR_LEAVE|taskHr|hrScope|assign_state|meta_srv|leave_ev|join_ev|ceq31|ksTargets|ksWindow|veh_unread|srv/.test(cut(d.man, MAN, '\n')) && d.man.indexOf(MAN2) > 0
+      && d.cl.indexOf('**C185 판5(v525') > 0
+      && FIX525.every((x) => d.ix.split(x).length === 2)
+      && /SHELL_CACHE = 'jw-shell-v525'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX525.map((x) => d.ix.split(x).length - 1) } };
+  };
+  const r525 = chk525(D525);
+  const mu525 = (k, f) => chk525(Object.assign({}, D525, { [k]: f(D525[k]) })).ok;
+  const M525 = [mu525('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v524 (')), mu525('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v524'")),
+    mu525('ft', (s) => s.split('`ks_report`').join('ks_report')),
+    mu525('man', (s) => s.replace('신고</b> (2026-11 v525) ', '신고</b> ')), mu525('man', (s) => s.replace(MANA525, '')), mu525('cl', (s) => s.replace('**C185 판5(v525', 'C185 판5(')),
+    mu525('tl', (s) => s.replace('\n- [x] (AI) `uismoke` \'C185 판5\'', '\n- (AI) `uismoke` \'C185 판5\''))]
+    .concat(FIX525.map((x) => mu525('ix', (s) => s.replace(x, ''))));
+  T('v525 문서·판 번호(정확 검사): FEATURES 기준 v525 (2026-11-23)·v525 절(C185 판5) · TESTLIST v525 칸 9(화면·운영 확인 7 · 게이트 [x] 2) · MANUAL 점검 카드 줄·배정표 문장(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 2줄 한 번씩 · sw jw-shell-v525 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL 둘·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
+    r525.ok && M525.every((v) => v === false), JSON.stringify({ r: r525.info, mut: M525 }));
+} catch (e) { console.log('  (v525 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
