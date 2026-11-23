@@ -21310,9 +21310,9 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ["`gw-audit-fold-cron`", "원장 C251"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v522 \(2026-11-23\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 11 && gate.length === 2 && scr.length === 9 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 522 && ftv.length > 0 && mF.length === 0 && cb.length === 11 && gate.length === 2 && scr.length === 9 && !cb.some((l) => /\(PM/.test(l))
       && d.cl.indexOf('**C251(v522') > 0
-      && /SHELL_CACHE = 'jw-shell-v522'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 522;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r522 = chk522(D522);
@@ -21615,6 +21615,37 @@ try {
   T('C185 판5 ② 결함 사본 ' + kK5.length + '개(참고 수 글 걷음 · 켜기 줄 규칙별 글 걷음) = 모두 ✗', kK5.every((v) => v === false), JSON.stringify(kK5));
 } catch (e) { console.log('  (C185 판5 검사 생략 — ' + e.message + ')'); fails++; }
 
+
+// ── v523(C185 판3 — 퇴사 자동 지시 · 원장 C185): 실행 검사는 위 'C185 판3' 블록 · 여기는 문서·판 번호 정확 검사 + 고정 글 14줄(실행 검사가 못 지키는 고침 줄 — 빼면 ✗)
+try {
+  const rd523 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D523 = { ft: rd523('FEATURES.md'), tl: rd523('TESTLIST.md'), sw: rd523('sw.js'), man: rd523('MANUAL.html'), cl: rd523('CLAUDE.md'), ix: rd523('index.html') };
+  const FIX523 = ["    if (Number(rf.rejoin_mark)) p.push(\"재입사 표식이 찍힌 \" + Number(rf.rejoin_mark) + \"명(입사 쪽에서 셈)\");", "    if (rf.past12_leave !== undefined) p.push(\"참고: 지난 12개월 퇴사 \" + (Number(rf.past12_leave) || 0) + \"명(지시는 켠 뒤 퇴사일을 새로 저장한 일만 — 소급 없음)\");", "    var leaveSum = !!(s.ref && s.ref.past12_leave !== undefined);", "    if (s.old) p.push(\"켠 날보다 앞선 일이라 뺀 \" + s.old + (leaveSum ? \"명\" : \"건\"));", "      if (m.ready === true && cur !== \"off\" && s && s.ready === false) line = '<br><span style=\"color:var(--sub);\">' + (cur === \"live\" ? \"켠 뒤 첫 집계 전(다음 평일 08:10 정기업무 봇 뒤에 보입니다).\" : \"아직 연습 집계가 없습니다(다음 평일 08:10 정기업무 봇 뒤에 보입니다).\") + '</span>';", "  var hrPendOpen = null;", "    if (po == null){ drawHrRoster(); return; }", "    drawHrRoster(po);", "      hrOpenPending();", "    }).catch(function(){ if (my !== hrRosterSeq) return; if (hrPendOpen != null) hrOpenPending(); });", "    hrPendOpen = String(mid);", "alert(res.body && res.body.error_code === \"ASSIGN_NEEDED\" ? \"배정표 담당을 먼저 정해 주세요 — 이 규칙이 쓰는 배정표 줄의 담당이 비었거나 재직자가 아닙니다.\" : \"규칙 스위치 저장 실패 (\" + ((res.body && res.body.error_code) || res.status) + \")\");", "else if (res.body && res.body.error_code === \"ASSIGN_NEEDED\") alert(\"배정표 담당을 먼저 정해 주세요 — 이 규칙이 쓰는 배정표 줄의 담당이 비었거나 재직자가 아닙니다.\");", "if (res.status !== 200 && res.body && res.body.error_code === \"ASSIGN_NEEDED\"){ alert(\"배정표 담당을 먼저 정해 주세요 — 이 규칙이 쓰는 배정표 줄의 담당이 비었거나 재직자가 아닙니다.\"); renderPmcon(); return; }"];
+  const MANA523 = "(2026-11 v523) '입사·퇴사 체크리스트(인사)'·'입사·퇴사 ";
+  const chk523 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v523 (11/23)', '\n### '), tlv = cut(d.tl, '\n## v523 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`hr_leave`", "원장 C185"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = "<li><b>범위 밖 자동 지시 — 퇴사 체크리스트</b> (2026-11 v523) — 퇴사 체크리스트 지", MAN2 = "(2026-11 v523) '입사·퇴사 체크리스트(인사)'·'입사·퇴사 ";
+    const ok = /기준: v523 \(2026-11-23\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 9 && gate.length === 2 && scr.length === 7 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf(MAN) > 0 && !/hr_join|hr_leave|veh_ceq31|ks_report|veh_event|evrules|AUTOTASK|RULE_NOT_READY|pmcon_|handleAutotask|gwCall|ASSIGN_NEEDED|HRBG_READ|planHr|HR_JOIN|HR_LEAVE|taskHr|hrScope|assign_state|meta_srv|leave_ev|join_ev|ceq31|ksTargets|ksWindow|veh_unread|srv/.test(cut(d.man, MAN, '\n')) && d.man.indexOf(MAN2) > 0
+      && d.cl.indexOf('**C185 판3(v523') > 0
+      && FIX523.every((x) => d.ix.split(x).length === 2)
+      && /SHELL_CACHE = 'jw-shell-v523'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX523.map((x) => d.ix.split(x).length - 1) } };
+  };
+  const r523 = chk523(D523);
+  const mu523 = (k, f) => chk523(Object.assign({}, D523, { [k]: f(D523[k]) })).ok;
+  const M523 = [mu523('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v522 (')), mu523('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v522'")),
+    mu523('ft', (s) => s.split('`hr_leave`').join('hr_leave')),
+    mu523('man', (s) => s.replace('체크리스트</b> (2026-11 v523) ', '체크리스트</b> ')), mu523('man', (s) => s.replace(MANA523, '')), mu523('cl', (s) => s.replace('**C185 판3(v523', 'C185 판3(')),
+    mu523('tl', (s) => s.replace('\n- [x] (AI) `uismoke` \'C185 판3\'', '\n- (AI) `uismoke` \'C185 판3\''))]
+    .concat(FIX523.map((x) => mu523('ix', (s) => s.replace(x, ''))));
+  T('v523 문서·판 번호(정확 검사): FEATURES 기준 v523 (2026-11-23)·v523 절(C185 판3) · TESTLIST v523 칸 9(화면·운영 확인 7 · 게이트 [x] 2) · MANUAL 점검 카드 줄·배정표 문장(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 14줄 한 번씩 · sw jw-shell-v523 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL 둘·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
+    r523.ok && M523.every((v) => v === false), JSON.stringify({ r: r523.info, mut: M523 }));
+} catch (e) { console.log('  (v523 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
