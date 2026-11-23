@@ -766,6 +766,7 @@ async function handleSave(event, d, R) {
   const w = await blobSet(store(DATA), colKey(col), doc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   // 감사 로그: 누가·언제·무엇을(이전값→새값). 서버측 기록이라 클라이언트 위변조 불가.
+  let saveAuFail = false;   // C251 「덧대기」: 감사 줄을 못 남겼으면(appendAudit false·예외) 응답에 audit:false — 응답 꼴만(화면 글 없음 · 저장은 이미 됨)
   try {
     let ev;
     if (col === 'checklist') {
@@ -789,8 +790,8 @@ async function handleSave(event, d, R) {
     if (vehDueKept) ev.push({ op: '만기일 보호', id: '-', t: '낡은 사본이 지시 완료 창 만기일 ' + vehDueKept + '칸을 바꾸기 전 날짜로 되돌리려 해 서버 값을 지켰습니다 — 그 사람의 앱 화면이 낡은 사본입니다' });   // P1 판2 검토(S1)
     if (conKept.length) ev.push({ op: '낡은 사본의 승인 차수 이월', id: conKept.slice(0, 10).map(function (x) { return x.cid + '|' + x.pipe + '|' + x.i; }).join(',').slice(0, 200), t: '승인된 변경계약 ' + conKept.length + '차수를 승인 전 사본(같은 상신 번호·같은 사본)으로 보낸 저장 — 그 단계는 서버 승인 값을 지키고 나머지 고침은 저장(그 사람의 앱 화면이 낡은 사본입니다)' });   // P1 판24 5차
     conOrig.slice(0, 20).forEach(function (x) { ev.push({ op: '원계약 칸 바뀜', id: x.cid, t: '승인된 변경계약이 있는 계약의 원계약 ' + x.f.map(function (k) { return k === 'amount' ? '금액' : '준공일'; }).join('·') + ' 칸이 바뀜(값은 적지 않음 — 유효 금액·종료일은 승인된 변경계약 값)' }); });   // P1 판24-③ 3차 재검토 B1
-    if (ev.length) await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: col, ev: ev });
-  } catch (e) {}
+    if (ev.length && (await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: col, ev: ev })) === false) saveAuFail = true;
+  } catch (e) { saveAuFail = true; }
   // 문서함 등재 결재 훅(v314): 비관리자의 '대기' 문서마다 결재함에 '문서함 등재' 카드를 서버가 대신 기안(by=등재한 직원, ref 'doc:'+id, cid 멱등).
   // 문서 저장이 먼저(사용자 본선), 상신은 그 뒤 — 상신 실패는 감사로그로 남기고 이 직원의 다음 문서 저장 때 같은 cid로 다시 시도(멱등이라 중복 0).
   // 재상신(reg_n) 건도 같은 경로. 정정 상신(dupOpenRef)은 'ab:' 전용이라 doc: 중복은 cid 멱등에만 의존한다.
@@ -817,6 +818,7 @@ async function handleSave(event, d, R) {
   if (regWarn) okOut.register_warn = regWarn;
   if (licKept.length) okOut.lic_kept = licKept;
   if (conKept.length) okOut.con_kept = conKept;   // P1 판24 5차: 앱이 그 계약을 서버 값으로 다시 읽음
+  if (saveAuFail) okOut.audit = false;   // C251: 정상 때는 칸 없음(응답 종전 그대로)
   return jr(200, okOut);
 }
 
@@ -4916,7 +4918,8 @@ async function handleApprovalDecide(event, d, R) {
       } else if (chk.data.updated_at) newBase = chk.data.updated_at;
     }
   } catch (e) {}
-  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'approvals', ev: [{ op: '결재', id: it.id, t: ((isPmStep ? '승인→대표' : (decision === '확인' ? '열람 확인' : decision)) + (reason ? ' — ' + reason.slice(0, 40) : '') + ' · ' + String(it.title || '').slice(0, 40)) }] }); } catch (e) {}
+  let apprAuFail = false;   // C251 「덧대기」: '결재' 감사 줄을 못 남겼으면 응답에 audit:false — 응답 꼴만(화면 글 없음 · 결재는 이미 됨)
+  try { if ((await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'approvals', ev: [{ op: '결재', id: it.id, t: ((isPmStep ? '승인→대표' : (decision === '확인' ? '열람 확인' : decision)) + (reason ? ' — ' + reason.slice(0, 40) : '') + ' · ' + String(it.title || '').slice(0, 40)) }] })) === false) apprAuFail = true; } catch (e) { apprAuFail = true; }
   // 문서함 등재 훅(v314): 최종 승인='등재'·반려='반려'를 문서 블롭에 반영. 결재 상태(위 쓰기)가 먼저 확정된 뒤라 여기 실패는 결재를 되돌리지 않는다 —
   // 감사로그 '등재반영실패'만 남기고 다음 결재함 조회(approvals_list 폴)에서 같은 함수가 멱등으로 재시도한다. ② 1단계 전환·보류는 문서 무변경.
   let docReg = null;
@@ -4947,7 +4950,7 @@ async function handleApprovalDecide(event, d, R) {
           (isSys || itGrade) ? { ctx: tc, primaryOnly: true } : { ctx: tc });   // 등급 건·자동상신 결과는 우선기기 1발(결정 ③), 구건은 현행(전 기기). ctx 재사용 — 결재 1건에 회원 전수 재스캔이 2~3회 붙던 것 제거
     }
   } catch (e) {}
-  return jr(200, { status: 'OK', id: it.id, decided: it.status, to: it.to, base: newBase, request_id: R });
+  return jr(200, Object.assign({ status: 'OK', id: it.id, decided: it.status, to: it.to, base: newBase, request_id: R }, apprAuFail ? { audit: false } : {}));   // C251: 정상 때는 칸 없음(응답 종전 그대로)
 }
 
 // ---- 계약 첨부파일(석면조사서 등) — Blobs 저장 + 서버측 텍스트 추출 ----
@@ -5254,6 +5257,7 @@ function _bkCount(v) {
 //       합쳐서 월 상한(audit = _lib/audit.js MAX_PER_MONTH · doclog DOCLOG_MAX · reclog RECLOG_MAX)을 넘으면 400 AUDIT_FULL — 이번 달 감사 키(auditKey())는 이 핸들러가 뒤이어 쓰는
 //       '재해복원' 1줄 자리를 남긴다(상한 꽉 채우면 그 1줄이 가장 오래된 진짜 줄을 밀어내므로).
 //       알려진 한계: 읽기 → 병합 → 쓰기 사이에 앱의 appendAudit이 같은 달 키에 쓴 줄은 덮일 수 있다(appendAudit도 같은 읽고-쓰기 — 조건부 쓰기가 없는 SDK). 재해 복원은 앱 사용이 없는 때에.
+//       C251(11/20): appendAudit는 조각 문서를 더는 쓰지 않고 줄마다 새 열쇠(audit:YYYY-MM:e:…)에 쓴다 — 위 한계는 옛 판으로 되돌린 동안에만 남는다. 줄 열쇠도 같은 갈래(audit)로 복원된다(값이 { items:[줄] }라 같은 병합 — 열쇠 하나씩).
 //     · clog:*(해시 체인 — clog:contract·clog:contract:YYYY-MM은 첫 줄 p '' 엄격, clog:appr:YYYY-MM은 상한에서 앞이 잘려 시작 p 허용 · 상한 CON_CLOG_MAX·CON_CLOG_MONTH_MAX·DONEIF.CLOG_MAX):
 //       백업 체인이 온전해야(아니면 400 CLOG_CHAIN_BAD) · 지금 체인 뒤를 잇는 백업이면 그 뒤 줄만 붙이고, 백업이 같거나 짧으면 400 CLOG_NOT_AHEAD,
 //       갈라졌거나 지금 체인이 깨졌으면 지금 줄을 버리지 않고 다시 잇는다(backupClogMerge — rechained 표식 · 문서 restored 범위 · 감사 from/to) · 상한 넘으면 400 CLOG_FULL.

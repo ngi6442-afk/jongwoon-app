@@ -14191,7 +14191,7 @@ try {
       && ['완료+수령 올리기', '기한 정정', '해당 없음', '기준일 입력'].every((b) => m341.indexOf(b) > 0) && d.man.indexOf('이번 달 칸은 아직 할 일을 자동으로 만들지 않고') < 0
       && m2171.indexOf('정하실 분: PM') > 0 && m2171.indexOf('저절로 적용되지 않습니다') > 0
       && CL.every((c) => d.cl.indexOf(c) > 0) && d.html.indexOf('보험사는 표에서 이름만 맞춰 보입니다(저장된 글은 그대로). 📖 사용 안내 16-1절') > 0
-      && /if \(!r\.ok && r\.code !== 'NOT_FOUND'\) return false;/.test(d.au) && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 463;
+      && /blobSet\(store\(DATA\), auditLineKey\(auditKey\(\), Date\.now\(\)\), \{ schema: 1, items: \[entry\] \}\);/.test(d.au) && !/blobSet\(st, auditPartKey\(key, n\), cur\)/.test(d.au) && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 463;
     return { ok, info: { mF, cb: cb.length, scr: scr.length, gate: gate.length, m161: m161.length, m341: m341.length, m2171: m2171.length } };
   };
   const r63 = chk63(D63);
@@ -14204,8 +14204,8 @@ try {
     mu63('man', (s) => s.replace('<h3 id="s34-1">', '<h3>')),
     mu63('cl', (s) => s.replace('**PM 콘솔(v463', '**PM 콘솔(')),
     mu63('html', (s) => s.replace(' 📖 사용 안내 16-1절<br>', '<br>')),
-    mu63('au', (s) => s.replace("if (!r.ok && r.code !== 'NOT_FOUND') return false;", ''))];
-  T('v463 문서·판 번호(정확 검사): FEATURES 기준 v463 (2026-11-13)·v463 절(원장 T476·T451·T165·T179·T478·T666·C130 · 든 것 ①~⑤ · 판26 vehModalSnap · 판27 vehLawCalc·insp_log·veh_bg_get · 판28 lic_month_get·lic_duty_set·LIC_ATT_KEEP·BAD_RANGE·licNarrowGuard·dutyCur · 판29 pmcon_decide·PMCON_MARKS_FULL·status:decide·자동 적용 없음 · appendAudit fail-closed · 승격 전 확인할 것·알려진 한계·정한 값 · servertest P1 판28 8항목 · sw v463) · TESTLIST v463 칸 32(화면 "[ ] (AI 시험 화면 대상" 26 — "PM" 낱말 0 · 게이트 [x] 6 · 사람·PM 몫 칸 0)·게이트 12종·servertest 절 이름 5 · MANUAL 16-1·34-1(단추 4)·21-7-1 PM 콘솔 · 17절 옛 "아직 할 일을 자동으로 만들지 않고" 0 · CLAUDE.md 줄 4 · 도움말 차량 속성 줄 16-1절 · audit.js 읽기 실패 막음 줄 · sw jw-shell-v463 · 결함 사본 ' + M63.length + '개 = 모두 ✗',
+    mu63('au', (s) => s.replace('auditLineKey(auditKey(), Date.now()), { schema: 1, items: [entry] });', 'auditKey(), { schema: 1, items: [entry] });'))];   // C251(11/20): appendAudit가 그달 문서를 읽지도 쓰지도 않게 됨(줄마다 새 열쇠) — 종전 '읽기 실패 막음 줄' 대신 '줄 열쇠에 쓰는 줄'을 본다(결함 사본 = 그달 머리에 씀)
+  T('v463 문서·판 번호(정확 검사): FEATURES 기준 v463 (2026-11-13)·v463 절(원장 T476·T451·T165·T179·T478·T666·C130 · 든 것 ①~⑤ · 판26 vehModalSnap · 판27 vehLawCalc·insp_log·veh_bg_get · 판28 lic_month_get·lic_duty_set·LIC_ATT_KEEP·BAD_RANGE·licNarrowGuard·dutyCur · 판29 pmcon_decide·PMCON_MARKS_FULL·status:decide·자동 적용 없음 · appendAudit fail-closed · 승격 전 확인할 것·알려진 한계·정한 값 · servertest P1 판28 8항목 · sw v463) · TESTLIST v463 칸 32(화면 "[ ] (AI 시험 화면 대상" 26 — "PM" 낱말 0 · 게이트 [x] 6 · 사람·PM 몫 칸 0)·게이트 12종·servertest 절 이름 5 · MANUAL 16-1·34-1(단추 4)·21-7-1 PM 콘솔 · 17절 옛 "아직 할 일을 자동으로 만들지 않고" 0 · CLAUDE.md 줄 4 · 도움말 차량 속성 줄 16-1절 · audit.js 그달 문서를 덮지 않는 줄(C251부터 줄 열쇠에 씀 — 종전 읽기 실패 막음 줄) · sw jw-shell-v463 · 결함 사본 ' + M63.length + '개 = 모두 ✗',
     r63.ok && M63.every((v) => v === false), JSON.stringify({ r: r63.info, mut: M63 }));
 } catch (e) { console.log('  (v463 검사 생략 — ' + e.message + ')'); fails++; }
 
