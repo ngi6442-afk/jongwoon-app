@@ -21284,9 +21284,9 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ["`dateFieldRead", "원장 C280"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v521 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 10 && gate.length === 2 && scr.length === 8 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 521 && ftv.length > 0 && mF.length === 0 && cb.length === 10 && gate.length === 2 && scr.length === 8 && !cb.some((l) => /\(PM/.test(l))
       && d.cl.indexOf('**C280(v521') > 0
-      && /SHELL_CACHE = 'jw-shell-v521'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 521;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r521 = chk521(D521);
@@ -21298,6 +21298,31 @@ try {
   T('v521 문서·판 번호(정확 검사): FEATURES 기준 v521 (2026-11-20)·v521 절(C280) · TESTLIST v521 칸 10(화면·운영 확인 8 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v521 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
     r521.ok && M521.every((v) => v === false), JSON.stringify({ r: r521.info, mut: M521 }));
 } catch (e) { console.log('  (v521 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v522(C251 — 감사 줄 줄마다 새 열쇠 + 접기 · 원장 C251): 실행 검사는 servertest 'C251' 블록 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd522 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D522 = { ft: rd522('FEATURES.md'), tl: rd522('TESTLIST.md'), sw: rd522('sw.js'), man: rd522('MANUAL.html'), cl: rd522('CLAUDE.md') };
+  const chk522 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v522 (11/23)', '\n### '), tlv = cut(d.tl, '\n## v522 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`gw-audit-fold-cron`", "원장 C251"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v522 \(2026-11-23\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 11 && gate.length === 2 && scr.length === 9 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C251(v522') > 0
+      && /SHELL_CACHE = 'jw-shell-v522'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r522 = chk522(D522);
+  const mu522 = (k, f) => chk522(Object.assign({}, D522, { [k]: f(D522[k]) })).ok;
+  const M522 = [mu522('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v521 (')), mu522('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v521'")),
+    mu522('ft', (s) => s.split('`gw-audit-fold-cron`').join('gw-audit-fold-cron')),
+    mu522('cl', (s) => s.replace('**C251(v522', 'C251(')),
+    mu522('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v521 39c031a 위 · e1954ca + 722f653 + 19adfb1) uismoke ✓ 927(판 번호 넣기 전 \'sw.js 버전업\' 칸만 남음) · servertest 1465 · 14종 0 · node --check 105 · 인라인 파싱 오류 0 · paycalc_check 10 · autorulestest 8 · CR 0 — ✓ AI 11/23', '\n- (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v521 39c031a 위 · e1954ca + 722f653 + 19adfb1) uismoke ✓ 927(판 번호 넣기 전 \'sw.js 버전업\' 칸만 남음) · servertest 1465 · 14종 0 · node --check 105 · 인라인 파싱 오류 0 · paycalc_check 10 · autorulestest 8 · CR 0 — ✓ AI 11/23'))];
+  T('v522 문서·판 번호(정확 검사): FEATURES 기준 v522 (2026-11-23)·v522 절(C251) · TESTLIST v522 칸 11(화면·운영 확인 9 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v522 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
+    r522.ok && M522.every((v) => v === false), JSON.stringify({ r: r522.info, mut: M522 }));
+} catch (e) { console.log('  (v522 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
