@@ -33017,6 +33017,7 @@ function dutyStage(nx){
   // ---- 인사 탭(대표·관리자 전용): 부서별 직원 명부 ----
   // C185 판3 좁은 재확인: [인사 카드](taskHrCardOpen)가 맡긴 열 카드 id — 명부 읽기 응답(성공·실패 응답·통신 실패)에서 한 번 쓰고 비움. 맡긴 것이 없으면 종전처럼 그리기만
   var hrPendOpen = null;
+  var hrRosterSeq = 0;   // C185 판3 독립 확인: 명부 요청 번호(renderHrRoster — 마지막 요청의 응답만 그림)
   function hrOpenPending(){
     var po = hrPendOpen; hrPendOpen = null;
     if (po == null){ drawHrRoster(); return; }
@@ -33029,10 +33030,12 @@ function dutyStage(nx){
     if (!host || !isAdmin()) return;
     if (hrOpenId != null) hrCollapse();   // 카드가 열려 있으면 폼을 먼저 홀더로 — 아래 innerHTML이 #memberEditForm을 통째로 지운다(탭을 나갔다 오는 경로)
     host.innerHTML = '<div class="loading">불러오는 중…</div>';
+    var my = ++hrRosterSeq;   // C185 판3 독립 확인(원천): 명부 요청 번호 — 요청 두 개가 겹치면 마지막 요청의 응답만 그림(앞 응답이 카드를 연 뒤 뒤 응답의 다시 그리기가 편집 폼을 지우던 길)
     gwCall("gw-auth", { action: "member_list" }).then(function(res){
+      if (my !== hrRosterSeq) return;   // 앞 요청의 응답 = 버림(맡긴 카드 열기도 마지막 응답 뒤에)
       if (res.status === 200 && res.body && Array.isArray(res.body.members)) members = res.body.members;
       hrOpenPending();   // C185 판3 좁은 재확인: 맡긴 카드가 있으면 그 카드를 열며 그림 · 없으면 종전 drawHrRoster()
-    }).catch(function(){ if (hrPendOpen != null) hrOpenPending(); });   // 통신 실패 = 맡긴 카드만 지금 명부로 엶(맡긴 것이 없으면 종전 그대로)
+    }).catch(function(){ if (my !== hrRosterSeq) return; if (hrPendOpen != null) hrOpenPending(); });   // 통신 실패 = 맡긴 카드만 지금 명부로 엶(맡긴 것이 없으면 종전 그대로) · 앞 요청의 실패 = 버림
   }
   // 퇴사자 그룹 펼침은 기기별로 기억(운반일지 빈 줄 토글 AB_HIDE_EMPTY_KEY와 같은 방식). 기본 접힘.
   var HR_RET_OPEN_KEY = "jw_hr_ret_open";

@@ -21389,7 +21389,7 @@ try {
   const MEM_R3 = () => [{ id: 'a0', name: '관리자', role: '관리자', dept: '관리부', admin: true, seq: 1 }, { id: 'e1', name: '직원하나', role: '직원', dept: '운영부', seq: 2 },
     { id: 'e2', name: '직원둘', role: '직원', dept: '운영부', seq: 3 }, { id: 'r1', name: '퇴사자', role: '직원', dept: '운영부', leave_date: '2026-11-19', seq: 4 }, { id: 't1', name: '시험사본', role: '직원', dept: '운영부', test_acct: true, seq: 5 }];
   const boxH3 = (src, delay, fail) => new Function('MEMBERS', 'DELAY', 'FAIL', [
-    'var members = MEMBERS, leaves = [], log = [], els = {}, rosterHtml = "";',
+    'var members = MEMBERS, leaves = [], log = [], els = {}, rosterHtml = "", callN = 0;',
     'var backdrop = { id: "memberEditBackdrop", appendChild: function(f){ f.parent = backdrop; } };',
     'var form = { id: "memberEditForm", parent: backdrop, removed: false, classList: { add: function(){}, remove: function(){} } };',
     'function mkPanel(id, disp){ var p = { id: id, style: { display: disp }, appendChild: function(f){ f.parent = p; }, scrollIntoView: function(){} }; return p; }',
@@ -21398,14 +21398,14 @@ try {
     'function el(id){ if (id === "hrRoster") return host; if (id === "memberEditForm") return form.removed ? null : form; if (id === "memberEditBackdrop") return backdrop; if (id.indexOf("hrpanel-") === 0) return els[id] || null; return els["x:" + id] || (els["x:" + id] = { id: id, textContent: "", style: {}, addEventListener: function(){} }); }',
     'var document = { getElementById: el, querySelector: function(sel){ var m = /data-hr-toggle="([^"]*)"/.exec(sel); if (!m || rosterHtml.indexOf(\'data-hr-toggle="\' + m[1] + \'"\') < 0) return null; return { classList: { add: function(){}, remove: function(){} }, scrollIntoView: function(){ log.push("scroll:" + m[1]); } }; } };',
     'function switchTab(t){ log.push("tab:" + t); if (t === "hr") renderHrRoster(); }',
-    'function gwCall(fn, b){ log.push("call:" + b.action); return new Promise(function(res, rej){ setTimeout(function(){ if (FAIL) rej(new Error("net")); else res({ status: 200, body: { members: MEMBERS } }); }, DELAY); }); }',
+    'function gwCall(fn, b){ var d = Array.isArray(DELAY) ? (DELAY[callN++] || 0) : DELAY; log.push("call:" + b.action); return new Promise(function(res, rej){ setTimeout(function(){ if (FAIL) rej(new Error("net")); else res({ status: 200, body: { members: MEMBERS } }); }, d); }); }',   // 독립 확인: DELAY 배열 = 요청마다 지연 따로(요청 두 개 겹침)
     fnR3('liveMembers', src), segR3(src, '// @hr-test-start', '// @hr-test-end'), fnR3('findMember', src),
     'function memberRetired(m){ return !!(m && m.leave_date && m.leave_date < "' + TD_R3 + '"); } function esc(x){ return String(x); } function todayStr(){ return "' + TD_R3 + '"; }',
     'var hrOpenId = null, hrRetOpen = false, hrTestOpen = false, DEPT_LIST = ["관리부","운영부"], ROLE_ORDER = ["대표","관리자","팀장","직원"];',
     'function isAdmin(){ return true; } function hrStarted(){ return true; } function hrRetToggle(){} function hrTestToggle(){} function hrCloseNew(){} function openMemberEdit(id){ log.push("edit:" + id); }',
     'function hrRowHtml(m, isRet){ return \'<div data-hr-toggle="\' + m.id + \'"></div><div id="hrpanel-\' + m.id + \'" style="display:none"></div>\'; }',
-    stR3(/var hrPendOpen = null;/, src), fnR3('hrOpenPending', src), fnR3('renderHrRoster', src), fnR3('drawHrRoster', src), fnR3('hrToggle', src), fnR3('hrCollapse', src), fnR3('taskHrCardOpen', src),
-    'return { first: function(){ drawHrRoster(); }, open: function(id){ hrToggle(id); }, click: function(mid){ taskHrCardOpen(mid); },',
+    stR3(/var hrPendOpen = null;/, src), stR3(/var hrRosterSeq = 0;/, src), fnR3('hrOpenPending', src), fnR3('renderHrRoster', src), fnR3('drawHrRoster', src), fnR3('hrToggle', src), fnR3('hrCollapse', src), fnR3('taskHrCardOpen', src),
+    'return { first: function(){ drawHrRoster(); }, open: function(id){ hrToggle(id); }, click: function(mid){ taskHrCardOpen(mid); }, tab: function(){ switchTab("hr"); },',
     '  state: function(){ var p = form.removed ? null : form.parent; return { formAlive: !form.removed, formIn: p && p.id ? p.id : "", panelShown: !!(p && p.style && p.style.display === ""), hrOpenId: hrOpenId, retShown: /id="hrRetBody">/.test(rosterHtml), testShown: /id="hrTestBody">/.test(rosterHtml), retOpen: hrRetOpen, testOpen: hrTestOpen, log: log.slice() }; } };'].join('\n'))(MEM_R3(), delay, !!fail);
   const sleepR3 = (ms) => new Promise((r) => setTimeout(r, ms));
   const chkH3 = async (src) => {
@@ -21428,6 +21428,26 @@ try {
   const H3 = await chkH3();
   T('C185 판3 검토 반영 ① [인사 카드](실행 — 실제 taskHrCardOpen·renderHrRoster·hrOpenPending·drawHrRoster·hrToggle·hrCollapse · 실제 타이머 · 늦은 명부 응답 0·300·500·1500ms × 대상 재직·퇴사자·시험 계정 × 다른 카드 편집 중 + 통신 실패 ' + H3.n + '꼴): 명부 읽기 뒤에 그 카드를 엶 · 편집 폼이 지워지지 않고 대상 카드에 붙어 보임 · 퇴사자·시험 계정 묶음은 이 화면에서만 펼침(기억값 그대로) · 그 머리로 스크롤',
     H3.ok, JSON.stringify(H3));
+  // ① 독립 확인(11/23): 명부 요청 두 개 겹침 — 먼저 온 응답이 카드를 열고 뒤 응답의 다시 그리기가 편집 폼을 지우던 길(요청 번호 = 마지막 요청의 응답만 그림)
+  //   세 꼴: [인사 카드] 뒤 응답 기다리며 인사 탭 한 번 더(700/1200ms) · 인사 탭 명부가 늦는 사이 [인사 카드](1200/700ms) · 같은 것 차례로 답(700/700ms)
+  const chkO3 = async (src) => {
+    const C = [{ k: '[인사 카드] 뒤 인사 탭 다시(700/1200ms)', d: [700, 1200], first: 'click', gap: 200, wait: 1500 },
+      { k: '인사 탭 늦는 중 [인사 카드](1200/700ms)', d: [1200, 700], first: 'tab', gap: 200, wait: 1500 },
+      { k: '인사 탭 늦는 중 [인사 카드](700/700ms · 차례대로 답)', d: [700, 700], first: 'tab', gap: 100, wait: 1200 }];
+    const res = await Promise.all(C.map(async (c) => {
+      const b = boxH3(src, c.d); b.first();
+      if (c.first === 'click') { b.click('e1'); await sleepR3(c.gap); b.tab(); } else { b.tab(); await sleepR3(c.gap); b.click('e1'); }
+      await sleepR3(c.wait); const s = b.state();
+      const calls = s.log.filter((x) => x === 'call:member_list').length;
+      const ok = calls === 2 && s.formAlive && s.formIn === 'hrpanel-e1' && s.panelShown && s.hrOpenId === 'e1' && s.log.indexOf('scroll:e1') >= 0;
+      return { k: c.k, ok, s: ok ? null : { calls, alive: s.formAlive, in: s.formIn, open: s.hrOpenId } };
+    }));
+    const bad = res.filter((x) => !x.ok);
+    return { ok: bad.length === 0, n: res.length, bad };
+  };
+  const O3 = await chkO3();
+  T('C185 판3 독립 확인 ① 명부 요청 두 개 겹침(실행 — 같은 실제 함수 · 실제 타이머 · 요청마다 지연 따로 ' + O3.n + '꼴: [인사 카드] 뒤 인사 탭 다시 700/1200ms · 인사 탭 늦는 중 [인사 카드] 1200/700ms · 차례대로 답 700/700ms): 마지막 요청의 응답만 그림 · 편집 폼이 지워지지 않고 대상 카드에 붙어 열림 · 그 머리로 스크롤',
+    O3.ok, JSON.stringify(O3));
   // ③ 실제 autoRulesSet — 되돌리기 400 ASSIGN_NEEDED = 켜기와 같은 글 · 다른 실패 = 종전 글
   const boxR3 = (src) => new Function('RES', [
     'var autoRulesSaving = false, autoRulesTbl = { hr_leave: "dry" }, autoRulesBase = 7, calls = [], toasts = [], renders = 0;',
@@ -21474,11 +21494,15 @@ try {
   const k = [];
   try { k.push((await chkH3(mutR3('      hrOpenPending();   // C185 판3 좁은 재확인: 맡긴', '      drawHrRoster();   // C185 판3 좁은 재확인: 맡긴'))).ok); } catch (e) { k.push('err ' + e.message); }
   try { k.push((await chkH3(mutR3('    hrPendOpen = String(mid);\n    switchTab("hr");', '    switchTab("hr");\n    setTimeout(function(){ hrCollapse(); drawHrRoster(mid); }, 300);'))).ok); } catch (e) { k.push('err ' + e.message); }
-  try { k.push((await chkH3(mutR3('    }).catch(function(){ if (hrPendOpen != null) hrOpenPending(); });', '    });'))).ok); } catch (e) { k.push('err ' + e.message); }
+  try { k.push((await chkH3(mutR3('    }).catch(function(){ if (my !== hrRosterSeq) return; if (hrPendOpen != null) hrOpenPending(); });', '    });'))).ok); } catch (e) { k.push('err ' + e.message); }
   try { k.push((await chkR3(mutR3('alert(res.body && res.body.error_code === "ASSIGN_NEEDED" ? "' + ASSIGN_R3 + '" : "규칙 스위치 저장 실패 ("', 'alert(false ? "" : "규칙 스위치 저장 실패 ("'))).ok); } catch (e) { k.push('err ' + e.message); }
   try { k.push(chk5(mutR3('      if (m.ready === true && cur !== "off" && s && s.ready === false) line =', '      if (false) line ='))); } catch (e) { k.push('err ' + e.message); }
   try { k.push(chk5L(mutR3('(cur === "live" ? "켠 뒤 첫 집계 전(다음 평일 08:10 정기업무 봇 뒤에 보입니다)." : "아직 연습 집계가', '(false ? "" : "아직 연습 집계가'))); } catch (e) { k.push('err ' + e.message); }
   T('C185 판3 검토 반영 ①③⑤ 결함 사본 ' + k.length + '개(명부 응답 뒤에 안 엶 · 종전 300ms 타이머 길 · 통신 실패 갈래 걷음 · 되돌리기 거절 글 걷음 · 낡은 요약 갈래 걷음) = 모두 ✗', k.every((v) => v === false), JSON.stringify(k));
+  // 독립 확인 결함 사본: 요청 번호 걷음(응답·실패 두 자리의 '앞 요청 버림' 줄을 빼면 겹침 세 꼴이 다시 폼을 지움)
+  let kO;
+  try { const G = 'if (my !== hrRosterSeq) return;'; if (html.split(G).length !== 3) throw new Error('요청 번호 자리가 두 곳이 아님'); kO = (await chkO3(html.split(G).join(''))).ok; } catch (e) { kO = 'err ' + e.message; }
+  T('C185 판3 독립 확인 ① 결함 사본(요청 번호 걷음 — 앞 요청의 응답도 그림) = ✗', kO === false, JSON.stringify(kO));
 } catch (e) { console.log('  (C185 판3 검토 반영 검사 생략 — ' + e.message + ')'); fails++; }
 
 
