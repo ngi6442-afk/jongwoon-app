@@ -15784,6 +15784,8 @@
     var sentSeq = (typeof csValEditSeq !== "undefined") ? csValEditSeq : 0;
     // 판24f 검토(나): 보낼 때의 기준 세대 — 200이 왔을 때 그 사이 기준을 새로 세웠으면(다시 읽기·409·다른 저장 200) 이 body로 되돌리지 않음(거꾸로 도착한 200)
     var sentGen = (typeof conBaseGen !== "undefined") ? conBaseGen : 0;
+    // C281: 이 저장이 자동 풀기가 바로 보낸 저장인가(그 저장에만 단 표식 — csApprHealSend) · 5xx 알림 창 가름과 409 뒤 다시 보낼 때 이어 받기에 씀
+    var healS = (typeof csApprHealNext !== "undefined" && csApprHealNext === true);
     var payload={message:"contracts: 업데이트", content:b64EncodeUnicode(body), branch:"main"};
     if(contractSha) payload.sha=contractSha;
     // 판24g(C201 J5): 나가 있는 저장 수 — 결재 동기화 사본이 오는 순간 저장이 나가 있으면 접목하지 않음(csApprSync·csApprOnDecided)
@@ -15792,12 +15794,13 @@
       if (typeof conSaveOut !== "undefined" && conSaveOut > 0) conSaveOut--;
       if(resp.status===401) return;
       // 판24g(C201 J4): 409 뒤 다시 읽기가 실패(5xx·네트워크)하면 병합·기준 사본 세우기를 하지 않음 — 종전엔 빈 목록으로 기준 사본을 지워 다음 병합이 칸 단위가 아닌 통째 고르기(같은 날이면 이 화면 통째)였다. 1.4초 뒤 다시 저장(409가 이어지면 공통 길의 3번째 멈춤 알림)
-      if(resp.status===409||resp.status===422){ return fetch(CONTRACT_API,{headers:ghHeaders()}).then(function(r){ if(r.status!==404&&!r.ok) return { gwReadFail: 1 }; return r.status===404?null:r.json();}, function(){ return { gwReadFail: 1 }; }).then(function(j){ if(j&&j.gwReadFail){ scheduleContractSave(); return; } if(j){ var up={}; try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} if (typeof csApprHealSeen === "function"){ try { csApprHealSeen(up.items||[]); } catch(e){} } contracts=mergeContracts(contracts, up.items||[]); if (typeof conBaseSet === "function") conBaseSet(up.items||[]); contractSha=j.sha; if (typeof renderContracts === "function") renderContracts(); } return doSaveContracts(); }); }
+      if(resp.status===409||resp.status===422){ return fetch(CONTRACT_API,{headers:ghHeaders()}).then(function(r){ if(r.status!==404&&!r.ok) return { gwReadFail: 1 }; return r.status===404?null:r.json();}, function(){ return { gwReadFail: 1 }; }).then(function(j){ if(j&&j.gwReadFail){ if (healS && typeof csApprHealLater === "function" && csApprHealLater()) return; scheduleContractSave(); return; } if(j){ var up={}; try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} if (typeof csApprHealSeen === "function"){ try { csApprHealSeen(up.items||[]); } catch(e){} } contracts=mergeContracts(contracts, up.items||[]); if (typeof conBaseSet === "function") conBaseSet(up.items||[]); contractSha=j.sha; if (typeof renderContracts === "function") renderContracts(); } if (healS && typeof csApprHealOnly === "function" && csApprHealOnly()){ csApprHealSend(doSaveContracts); return; } return doSaveContracts(); }); }
       // P1 판24-③: 서버가 결재 없는 단계 완료·결재함에 없는 승인·상신 사본 바뀜을 거절(400 CON_APPR_REQUIRED) — 조용히 넘기지 않고 알린 뒤 서버 값으로 다시 읽는다(이 저장에 같이 들어간 다른 고침도 서버에 없음)
       if(resp.status===400){ return resp.json().then(function(json){ var ec=(json&&json.error_code)||""; if (typeof csApprHealFail === "function") csApprHealFail(400); contractSha=json&&json.content&&json.content.sha; contractsPending=false; if (typeof csValEditsDone === "function") csValEditsDone(sentSeq); if(ec==="CON_APPR_REQUIRED"){ alert(CON_APPR_REJECT_MSG); loadContracts(); } else if(ec==="CON_APPR_REVOKED"){ alert(CON_APPR_REVOKED_MSG); loadContracts(); } else if(ec==="CON_DUP_ID"){ alert(CON_DUP_ID_MSG); loadContracts(); } }); }   // 5차 B: 승인된 변경계약 되돌리기 거절은 그 까닭의 글
       // P1 판24-③ 검토(11/15 B9): 서버 오류(5xx — 결재함 못 읽음 APPROVALS_READ_FAILED 포함)도 조용히 넘기지 않는다(종전: 저장 대기 표시만 풀려 결재한 기기엔 '진행됨'으로 보이고 서버엔 없음)
       // P1 판40 검토 N2: 자동 풀기(csApprHeal)가 방금 보낸 저장의 5xx는 알림 창 없이 서버 값으로 다시 읽기만(사람이 고친 것이 실리지 않은 저장 — 다음 결재함 목록 때 다시 풂) · 그 밖의 5xx는 아래 종전 줄 그대로
-      if(resp.status>=500 && typeof csApprHealFail === "function" && csApprHealFail(resp.status)){ contractsPending=false; if (typeof csValEditsDone === "function") csValEditsDone(sentSeq); loadContracts(); return; }
+      // C281: 조용히 넘기는 것은 그 저장 표식이 있고(자동 풀기가 보낸 저장 · 409로 다시 보낸 것 포함) 지금 사람 고침 저장 예약·나가 있는 다른 저장이 없을 때만(다시 읽기가 그 고침을 덮으므로 그때는 아래 종전 알림 창)
+      if(resp.status>=500 && typeof csApprHealFail === "function" && csApprHealFail(resp.status, healS && typeof csApprHealOnly === "function" && csApprHealOnly())){ contractsPending=false; if (typeof csValEditsDone === "function") csValEditsDone(sentSeq); loadContracts(); return; }
       if(resp.status>=500){ return resp.json().catch(function(){ return {}; }).then(function(json){ contractsPending=false; if (typeof csValEditsDone === "function") csValEditsDone(sentSeq); alert(CON_SAVE_FAIL_MSG + (json && json.error_code ? " (" + json.error_code + ")" : "")); loadContracts(); }); }
       // 11/16(남은 것 2 — 재현됨): 이월 응답 뒤 다시 읽을 때, 이 저장을 보낸 뒤 고친 내용(디바운스로 아직 안 나간 것)이 있으면 대기 표시를 다시 세워
       //   다시 읽기가 통째로 덮지 않고 병합(mergeContracts — 로컬 고침은 남고 승인 차수만 서버 값 csKeepApproved)하게 한다. 그 고침은 걸려 있는 디바운스 저장이 보낸다
@@ -17448,9 +17451,20 @@
       })();
     });
   }
-  // 저장 실패 뒤(doSaveContracts 400·5xx) — 돌려줌 = 알림 창을 띄우지 않아도 되는가(자동 풀기가 방금 보낸 저장의 5xx)
-  function csApprHealFail(status){
-    var quiet = status !== 400 && Date.now() - csApprHealOutAt < 30000;
+  // C281: 자동 풀기의 저장 가름을 시각(종전 '보낸 뒤 30초' — csApprHealOutAt은 v498 고정 글 줄이라 선언만 남음)이 아니라 그 저장에 단 표식으로
+  //   csApprHealNext = 지금 보내는 저장이 자동 풀기의 것(doSaveContracts가 보낼 때 읽음) · 409 뒤 다시 보낼 때는 사람 고침 저장 예약·나가 있는 다른 저장이 없을 때만 이어 받음
+  var csApprHealNext = false;
+  function csApprHealSend(fn){ csApprHealNext = true; try { fn(); } finally { csApprHealNext = false; } }
+  function csApprHealOnly(){ return !contractSaveTimer && (typeof conSaveOut === "undefined" || conSaveOut === 0); }
+  // 409 뒤 다시 읽기 실패(1.4초 뒤 다시 보냄)도 표식을 이어 받음 — 그 사이 사람이 고치면 scheduleContractSave가 이 예약을 지우고 종전 저장(표식 없음)으로
+  function csApprHealLater(){
+    if (!csApprHealOnly()) return false;
+    contractsPending = true; contractSaveTimer = setTimeout(function(){ contractSaveTimer = null; csApprHealSend(doSaveContracts); }, 1400);
+    return true;
+  }
+  // 저장 실패 뒤(doSaveContracts 400·5xx) — 돌려줌 = 알림 창을 띄우지 않아도 되는가(mine = 그 저장 표식이 있고 사람 고침이 실려 있지 않음 · 5xx일 때만)
+  function csApprHealFail(status, mine){
+    var quiet = status !== 400 && mine === true;
     csApprHealHold = true; csApprHealStop = true;
     Object.keys(csApprHealSt).forEach(function(k){
       var h = csApprHealSt[k]; h.bill = "skip";
@@ -17505,7 +17519,7 @@
         csApprHealSt[id] = { cids: cids[id], bill: "wait", at: Date.now() };
         return Promise.resolve(csApprSync(c, true)).then(function(){
           // 넘긴 것이 있으면 저장을 바로(이 화면에 먼저 걸려 있던 저장 대기가 있었으면 그 예약 저장에 같이 실려 나감 — 그때는 '자동 풀기의 저장'으로 적지 않음: 5xx 알림 창 가름)
-          if (contractsPending && !pend0){ csApprHealOutAt = Date.now(); csSaveNow(); }
+          if (contractsPending && !pend0) csApprHealSend(csSaveNow);   // C281: 바로 나가는 이 저장 하나에만 표식
           return csSaveSettled();
         });
       }).then(function(ok){ return csApprHealBillAsk(id, ok, who); }).catch(function(){ delete csApprHealSt[id]; });
