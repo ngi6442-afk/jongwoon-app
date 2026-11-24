@@ -23438,5 +23438,42 @@ try {
     r535.ok && M535.every((v) => v === false), JSON.stringify({ r: r535.info, mut: M535 }));
 } catch (e) { console.log('  (v535 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ---- C266(11/24): 서버가 받기 한도로 거른 첨부(413 FILE_TOO_LARGE)는 화면 크기 안내와 같은 글 — 문서함 docAttUpload · 넣기 박스 증빙 cbxProofGo · 양식 cbxTplSend(실제 함수 원문을 떼어 돌림)
+try {
+  const fn266 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) return ''; let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } return ''; };
+  const run266 = async (src, code, sizeOver) => {
+    const al = [];
+    const g = { alert: (m) => al.push(String(m)), gwCall: () => Promise.resolve({ status: code, body: { error_code: code === 413 ? 'FILE_TOO_LARGE' : 'X' } }),
+      FileReader: function () { const me = this; me.readAsDataURL = function () { me.result = 'data:x;base64,QUJD'; setTimeout(function () { me.onload(); }, 0); }; },
+      document: { getElementById: () => ({ textContent: '' }) }, findDoc: () => null, apprToastShow: () => {}, docAttRenderModal: () => {}, renderDocuments: () => {}, todayStr: () => '2026-11-24',
+      cbxRedraw: () => {}, cbxDiscard: () => {}, cbxFail: () => {}, renderContracts: () => {}, cbxRenderTop: () => {}, TPL_LABELS: { quote_env: '견적서' } };
+    const body = ['docAttBigMsg', 'docAttExtOf', 'docAttUpload', 'cbxProofGo', 'cbxTplSend'].map((n) => fn266(src, n)).join('\n');
+    const f = new Function(...Object.keys(g), 'var DOC_ATT_EXT = ["pdf"], DOC_ATT_MAX = 100, docAttBusy = false, csTplKeys = null, _colBase = {};\n' + body
+      + '\nreturn { up: docAttUpload, proof: cbxProofGo, tpl: cbxTplSend };');
+    const o = f(...Object.values(g));
+    const sz = sizeOver ? 200 : 10;
+    o.up('d1', [{ name: 'a.pdf', size: sz, type: '' }]);
+    o.proof({ file: {}, size: sz, name: 'b.pdf', scope: 'top' });
+    if (!sizeOver) o.tpl({ file: {}, size: sz, name: 'c.pdf', scope: 'top' }, 'quote_env');
+    await new Promise((r) => setTimeout(r, 30));
+    return al;
+  };
+  const chk266 = async (src) => {
+    const a413 = await run266(src, 413, false), aBig = await run266(src, 200, true), a500 = await run266(src, 500, false);
+    const ok = a413.length === 3 && a413[0] === '"a.pdf"는 서버 전송 한도(약 4.3MB)를 넘어 첨부할 수 없습니다.' && a413[1] === '증빙은 약 4.3MB까지만 보관함에 넣을 수 있습니다. 계약 서류로 넣어 주세요.' && a413[2] === '양식은 약 4.3MB까지만 등록할 수 있습니다.'
+      && aBig.length === 2 && aBig[0] === a413[0] && aBig[1] === a413[1]
+      && a500.length === 3 && a500[0] === '"a.pdf" 첨부 실패 (X)' && a500[1] === '증빙 보관 실패(X)' && a500[2] === '양식 등록 실패(X)';
+    return { ok, info: { a413, aBig, a500 } };
+  };
+  const r266 = await chk266(html);
+  const mu266 = async (a, b) => { if (html.split(a).length !== 2) return 'not-unique'; return (await chk266(html.replace(a, () => b))).ok; };
+  const M266 = [
+    await mu266('alert(res.body && res.body.error_code === "FILE_TOO_LARGE" ? docAttBigMsg(f.name) : \'"\' + f.name', 'alert(false ? docAttBigMsg(f.name) : \'"\' + f.name'),
+    await mu266('alert(res && res.body && res.body.error_code === "FILE_TOO_LARGE" ? "증빙은', 'alert(false ? "증빙은'),
+    await mu266('(tplCode === "FILE_TOO_LARGE" ? "양식은', '(false ? "양식은')];
+  T('C266 받기 한도로 서버가 거른 첨부(413 FILE_TOO_LARGE) = 화면 크기 안내와 같은 글(문서함·증빙·양식) · 화면 크기 거름은 같은 글 · 다른 오류는 종전 코드 글 · 결함 사본 3(서버 거름 안내 걷기) = 모두 ✗',
+    r266.ok && M266.every((v) => v === false), JSON.stringify({ r: r266.info, mut: M266 }));
+} catch (e) { console.log('  (C266 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
