@@ -2135,6 +2135,7 @@
       .pay-modal .pay-hint{font-size:12px;color:var(--sub);margin:6px 0 0}
       .pay-modal .pay-dlg-btns{display:flex;gap:8px;margin-top:12px}
       .pay-modal .pay-dlg-btns button{flex:1 1 0}
+      .pay-modal .slip h2{text-align:center;letter-spacing:.3em;font-size:16px;margin:0 0 4px}.pay-modal .slip .hd,.pay-modal .slip .how{font-size:12px;color:var(--sub)}.pay-modal .slip .who{font-weight:700;margin:6px 0}.pay-modal .slip table{width:100%;border-collapse:collapse;font-size:13px;margin:6px 0}.pay-modal .slip td{padding:3px 2px;border-bottom:1px solid var(--line)}.pay-modal .slip .n{text-align:right;font-variant-numeric:tabular-nums}.pay-modal .slip .t td{font-weight:700}.pay-modal .slip .net{font-size:15px;text-align:right;margin:8px 0}
     </style>
     <div class="dash-sec" style="margin-bottom:8px;"><h2>급여 <span class="cnt">관리자만</span></h2></div>
     <div id="payHost"><div class="loading">불러오는 중…</div></div>
@@ -2413,6 +2414,10 @@
     <section class="group check-only">
       <h2>수시</h2>
       <div class="info-card" id="sudsiHost"></div>
+    </section>
+    <section class="group" id="payMineGroup">
+      <h2>내 급여명세서 <span style="font-size:11px;font-weight:600;color:var(--sub);">· 확정한 달만 · 나만 보기</span></h2>
+      <div id="payMineHost"><button type="button" class="mini-btn" id="payMineBtn">명세서 보기</button></div>
     </section>
   </div>
   </div>
@@ -7114,6 +7119,7 @@
     if (name === "cal"){ renderCalendar(); if (canSee("safety")) loadEdu(); }   // v430 교육·건강진단 다음 예정 = 안전 권한(종전엔 인허가·인사 탭을 거쳐야 읽혔다 — 교육을 안 보여 주는 화면의 읽기는 뺐다)
     if (name === "dash" && prevTab !== "dash") renderDashboard();   // 탭 "복귀" 시만 재렌더(타 탭 체류 중 폴 갱신 반영) — 재클릭은 종전대로 no-op(직원 홈 입력 중 유실 방지)
     if (name === "ask") renderAskTab();
+    if (name === "check") payMineInit();   // 66 판4 내 급여명세서(누를 때만 읽음)
     // 석면 대장(안전 › 현장 칸)은 투입 근로자 이름을 일용직 명부에서 끌어오므로 둘을 같이 읽는다 — 칸 전환·읽기는 setSafetyLayer(칸 없으면 볼 수 있는 첫 칸)
     if (name === "safety") setSafetyLayer(rt.layer);
     if (name === "lic"){ setLicLayer("cert"); }   // 전역검색·캘린더 점프가 의무/이번달 층 위에 내려앉지 않게 ①층 복귀 · v430 교육 기록 읽기 뺌(이 화면은 교육을 안 보여 준다)
@@ -34531,7 +34537,7 @@ function dutyStage(nx){
       why: "새 판 " + pa.ver + " · " + (Number(pa.n) || 0) + "행(4대보험 요율·상하한·가산율) + 근로소득 간이세액표 " + (Number(pa.tax_rows) || 0) + "구간(" + String(pa.tax_from || "-") + " 지급분부터) · 확인일 " + String(pa.checked || "-") + " · 지문 " + String(pa.sha || "").slice(0, 8) + ". 확인 필요 " + pn + "건은 계산에 쓰지 않습니다. 승격해야 급여 계산이 이 표를 씁니다(새 판이 올라온 뒤 승격 전에는 계산이 멈춥니다). 지금 " + pcur + ".",
       setBase: pf.updated_at || 0 }];
   }
-  PMCON_KINDS.push({ kind: "paybg", label: "급여 법령 근거 승격", grade: "R2", get: "pay_bg_get", card: "", revert: "승격 해제(단추는 급여 화면이 들어오는 판에 — 그 전에는 이 표를 쓰는 화면이 없음)", rows: pmconRowsPayBg });
+  PMCON_KINDS.push({ kind: "paybg", label: "급여 법령 근거 승격", grade: "R2", get: "pay_bg_get", card: "", revert: "급여 탭 요율 줄의 [승격 해제](PM만 — 해제하면 확정 안 한 달은 공제를 계산하지 않음 · 확정한 달은 그대로)", rows: pmconRowsPayBg });
   // ── 66 급여 판2(원장 C236 · PM 11/20 16:04 'ㄱ' — 시안 3판) 급여 탭: 급여대장(달·회사) = 회계사무소 대장 꼴 · 한 사람 기준 · 그 달 값 · 하수준설 수당 내역 · 단가·기간 설정 ──
   //   서버 gw-pay(관리자만 · 계산은 서버만 — 화면은 받은 금액을 그리기만). 금액 칸 숫자·요율 숫자를 이 코드에 적지 않는다(설정·근거 표에서 옴).
   var payS = { corp: "env", ym: "", data: null, busy: false, seq: 0 };
@@ -34558,7 +34564,7 @@ function dutyStage(nx){
     if (!l || !l.on) return '요율 표 <b>' + esc(PAY_WHY[l && l.why] || (l && l.why) || "-") + '</b> — 공제는 계산하지 않습니다(PM 콘솔에서 승격)';
     if (!l.rates) return '요율 표 <b>' + esc(l.ver) + '</b> · 이 달은 ' + esc(PAY_WHY[l.off] || l.off || "") + (l.keys && l.keys.length ? "(" + esc(l.keys.join(",")) + ")" : "");
     var p = function(x){ return String(+(x * 100).toFixed(4)) + "%"; }, r = l.rates;
-    return '요율 표 <b>' + esc(l.ver) + '</b> · 국민연금 ' + p(r.pension) + ' · 건강보험 ' + p(r.health) + ' · 장기요양 건강보험료의 ' + p(r.care_ratio) + ' · 고용보험 ' + p(r.emp) + ' · 소득세 간이세액표 · 지방소득세 ' + p(r.local) + ' · 공제는 ' + r.cut + '원 미만 버림';
+    return '요율 표 <b>' + esc(l.ver) + '</b> <button type="button" class="vs-chip" id="payBgOffBtn">승격 해제</button> · 국민연금 ' + p(r.pension) + ' · 건강보험 ' + p(r.health) + ' · 장기요양 건강보험료의 ' + p(r.care_ratio) + ' · 고용보험 ' + p(r.emp) + ' · 소득세 간이세액표 · 지방소득세 ' + p(r.local) + ' · 공제는 ' + r.cut + '원 미만 버림';
   }
   function payRender(){
     var host = document.getElementById("payHost"), d = payS.data; if (!host || !d) return;
@@ -34615,6 +34621,7 @@ function dutyStage(nx){
     Array.prototype.forEach.call(host.querySelectorAll("[data-pay-dredge]"), function(b){ b.onclick = function(){ payDredgeDlg(b.getAttribute("data-pay-dredge")); }; });
     Array.prototype.forEach.call(host.querySelectorAll("[data-pay-out]"), function(b){ b.onclick = function(){ var m = b.getAttribute("data-pay-out"), r = payRow(m); if (!confirm(((r && r.member && r.member.name) || "") + " — " + payS.ym + " " + PAY_CORP[payS.corp] + " 대장에서 뺄까요? (두 회사 재적·이 달 급여 없음)")) return; paySaveRow(m, Object.assign({}, (r && r.row) || {}, { off: true }), null); }; });
     var cb = document.getElementById("payConfBtn"); if (cb) cb.onclick = payConfDlg;
+    var ob = document.getElementById("payBgOffBtn"); if (ob) ob.onclick = payBgOff;   // 66 판4
     var ib = document.getElementById("payImpBtn"); if (ib) ib.onclick = payImportPick;   // 66 판3
     var xb = document.getElementById("payXlsBtn"); if (xb) xb.onclick = payExportXlsx;
     var sb = document.getElementById("paySlipBtn"); if (sb) sb.onclick = function(){ payPrintSlips(); };
@@ -35062,6 +35069,41 @@ function dutyStage(nx){
     if (!w){ alert("팝업이 막혔습니다 — 이 사이트의 팝업 허용 후 다시 눌러 주세요"); return; }
     w.document.write('<!doctype html><meta charset="utf-8"><title>급여명세서 ' + esc(d.ym) + '</title><style>body{font-family:"Malgun Gothic",sans-serif;margin:0;padding:16px;color:#16212B}.bar{margin-bottom:12px}.slip{max-width:520px;border:1px solid #ccc;border-radius:8px;padding:14px 16px;margin:0 0 16px;page-break-after:always}.slip h2{text-align:center;letter-spacing:.3em;font-size:17px;margin:0 0 6px}.hd,.how{font-size:12px;color:#555}.who{font-weight:700;margin:6px 0}table{width:100%;border-collapse:collapse;font-size:13px;margin:6px 0}td{padding:3px 2px;border-bottom:1px solid #eee}.n{text-align:right;font-variant-numeric:tabular-nums}.t td{font-weight:700;border-top:1px solid #999}.net{font-size:15px;text-align:right;margin:8px 0}@media print{.bar{display:none}.slip{border:0}}</style><div class="bar"><button onclick="print()">인쇄</button></div>' + list.map(function(r){ return paySlipHtml(r, d); }).join(""));
     w.document.close();
+  }
+  // ── 66 판4: 요율 표 승격 해제(PM만 — 서버 pay_bg_set 이 PM_ONLY) · 내 급여명세서(확정한 달 · 자기 것만 — 서버 pay_my_slips)
+  function payBgOff(){
+    gwCall("gw-data", { action: "pay_bg_get" }).then(function(res){
+      if (res.status !== 200){ payErr(res, "승격 상태 읽기"); return; }
+      var fl = res.body.flag || {};
+      if (!fl.bg_ver){ alert("지금 승격된 요율 표가 없습니다"); return; }
+      if (!confirm("급여 요율 표 승격(" + fl.bg_ver + ")을 해제할까요?\n해제하면 확정하지 않은 달은 공제를 계산하지 않습니다(확정한 달 금액은 그대로). PM 콘솔에서 다시 승격할 수 있습니다.")) return;
+      gwCall("gw-data", { action: "pay_bg_set", bg_ver: "", base: Number(fl.updated_at) || 0 }).then(function(r2){
+        if (r2.status !== 200){ alert("승격 해제 실패 (" + ((r2.body && r2.body.error_code) === "PM_ONLY" ? "PM만 해제할 수 있습니다" : ((r2.body && r2.body.error_code) || r2.status)) + ")"); return; }
+        gwToast("승격을 해제했습니다"); payLoad();
+      }, function(){ alert("승격 해제 실패(네트워크)"); });
+    }, function(){ alert("승격 상태 읽기 실패(네트워크)"); });
+  }
+  function payMineInit(){
+    var b = document.getElementById("payMineBtn"); if (b) b.onclick = payMineLoad;
+  }
+  function payMineLoad(){
+    var host = document.getElementById("payMineHost"); if (!host) return;
+    host.innerHTML = '<div class="loading">불러오는 중…</div>';
+    gwCall("gw-pay", { action: "pay_my_slips" }).then(function(res){
+      if (res.status !== 200){ host.innerHTML = '<div class="empty-li">명세서를 불러오지 못했습니다 (' + esc(String((res.body && res.body.error_code) || res.status)) + ')</div>'; return; }
+      var list = res.body.slips || [];
+      if (!list.length){ host.innerHTML = '<div class="empty-li">확정된 급여명세서가 없습니다' + (res.body.unread ? ' (읽지 못한 달 ' + res.body.unread + ' — 새로고침)' : '') + '</div>'; return; }
+      host.innerHTML = list.map(function(s, i){ return '<div class="pay-mine-row" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 2px;border-bottom:1px solid var(--line);"><span>' + esc(s.ym) + ' · ' + esc(PAY_CORP[s.corp] || s.corp) + '</span><span style="font-variant-numeric:tabular-nums;font-weight:700;">' + payWon(s.calc && s.calc.net) + '원</span><button type="button" class="vs-chip" data-pay-mine="' + i + '">보기</button></div>'; }).join("") + (res.body.unread ? '<div class="empty-li">읽지 못한 달 ' + res.body.unread + '개 — 새로고침</div>' : '');
+      Array.prototype.forEach.call(host.querySelectorAll("[data-pay-mine]"), function(btn){ btn.onclick = function(){ var s = list[+btn.getAttribute("data-pay-mine")]; payMineShow(s); }; });
+    }, function(){ host.innerHTML = '<div class="empty-li">명세서를 불러오지 못했습니다(네트워크)</div>'; });
+  }
+  function payMineShow(s){
+    var me = (typeof curMember === "function" && curMember()) || {};
+    var d = { ym: s.ym, pay_day: s.pay_day, period: s.period || { from: "", to: "" } };
+    var keep = payS.corp; payS.corp = s.corp;
+    var html = paySlipHtml({ member: { name: s.calc.name || me.name || "", rank: s.calc.rank || "" }, calc: s.calc }, d);
+    payS.corp = keep;
+    payDlg(s.ym + " 급여명세서", '<div class="pay-mine-slip">' + html + '</div>', null);
   }
   // @pay-end
   function pmconDueTxt(r){

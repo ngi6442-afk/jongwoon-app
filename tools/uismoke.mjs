@@ -21250,17 +21250,17 @@ try {
 try {
   const fnQ = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) return ''; let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } return ''; };
   const gpQ = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-pay.js'), 'utf8');
-  const actsQ = ((gpQ.match(/\nconst ACTS = \{([\s\S]*?)\};/) || [0, ''])[1].match(/pay_[a-z_]+(?=:)/g) || []);
+  const actsQ = ((gpQ.match(/\nconst ACTS = \{([\s\S]*?)\};/) || [0, ''])[1].match(/pay_[a-z_]+(?=:)/g) || []).concat(((gpQ.match(/\nconst SELF_ACTS = \{([^}]*)\};/) || [0, ''])[1].match(/pay_[a-z_]+(?=:)/g) || []));   // 66 판4 자기 것만 동작(pay_my_slips)
   const segQ = (H) => { const a = H.indexOf('\n  // @pay-start\n'), b = H.indexOf('\n  // @pay-end\n'); return a > 0 && b > a ? H.slice(a, b) : ''; };
   const chkQ = (H) => {
     const I = {}, seg = segQ(H);
-    const used = (seg.match(/action: "(pay_[a-z_]+)"/g) || []).map((x) => x.slice(9, -1));
+    const used = (seg.match(/gwCall\("gw-pay", \{ action: "(pay_[a-z_]+)"/g) || []).map((x) => x.replace(/^.*action: "/, '').slice(0, -1));
     I.wire = H.indexOf('<button class="tab-btn perm-hidden" data-tab="workers" id="tabWkBtn">인사·일용직</button>\n    <button class="tab-btn perm-hidden" data-tab="pay" id="tabPayBtn">급여</button>') > 0
       && H.indexOf('<section class="view" id="view-pay">') > 0 && H.indexOf('<div id="payHost">') > 0
       && /document\.getElementById\("view-pay"\)\.classList\.toggle\("active", name === "pay"\);/.test(H) && /\n    if \(name === "pay"\) payOpen\(\);/.test(H)
       && /if \(payBtn\) payBtn\.classList\.toggle\("perm-hidden", !adminUser\);[^\n]*\n    if \(currentTab === "pay" && !adminUser\) switchTab\("dash"\);/.test(H)
       && /function payOpen\(\)\{ if \(!isAdmin\(\)\) return;/.test(seg);
-    I.acts = used.length >= 10 && used.every((a) => actsQ.indexOf(a) >= 0) && actsQ.every((a) => used.indexOf(a) >= 0) && seg.indexOf('gwCall("gw-data"') < 0;
+    I.acts = used.length >= 10 && used.every((a) => actsQ.indexOf(a) >= 0) && actsQ.every((a) => used.indexOf(a) >= 0) && (seg.match(/gwCall\("gw-data", \{ action: "([a-z_]+)"/g) || []).every((x) => /pay_bg_(get|set)"$/.test(x));   // 66 판4: gw-data 는 승격 읽기·해제만
     // 금액·요율 숫자를 화면 코드에 적지 않음(다섯 자리 넘는 숫자 없음) · 직원 수정 창·회원 저장 호출 없음
     I.nonum = !/[^\w.]\d{5,}(?![\w])/.test(seg.replace(/\/\/[^\n]*/g, '')) && !/gw-auth|meSave|member_upsert/.test(seg);
     // 사람 이름·글은 esc 를 거쳐 그림(이름 칸·비고 꼬리표·기준 창 제목은 textContent)
@@ -23039,10 +23039,10 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ["`vehModalInspSync`", "원장 C191"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v529 \(2026-11-24\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 7 && gate.length === 2 && scr.length === 5 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 529 && ftv.length > 0 && mF.length === 0 && cb.length === 7 && gate.length === 2 && scr.length === 5 && !cb.some((l) => /\(PM/.test(l))
       && d.cl.indexOf('**판38(v529') > 0
       && FIX529.every((x) => d.ix.split(x).length === 2)
-      && /SHELL_CACHE = 'jw-shell-v529'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 529;   // v530(급여 판4)에서 '529 이상'으로 풂
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX529.map((x) => d.ix.split(x).length - 1) } };
   };
   const r529 = chk529(D529);
@@ -23055,6 +23055,25 @@ try {
   T('v529 문서·판 번호(정확 검사): FEATURES 기준 v529 (2026-11-24)·v529 절(판38) · TESTLIST v529 칸 7(화면·운영 확인 5 · 게이트 [x] 2) · CLAUDE.md 한 줄 · 고정 글 22줄 한 번씩 · sw jw-shell-v529 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
     r529.ok && M529.every((v) => v === false), JSON.stringify({ r: r529.info, mut: M529 }));
 } catch (e) { console.log('  (v529 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v530(66 급여 판4 — PM 11/24 'ㄱ'): 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '530 이상'으로 풀 것
+try {
+  const rdU = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DU = { ft: rdU('FEATURES.md'), tl: rdU('TESTLIST.md'), sw: rdU('sw.js'), cl: rdU('CLAUDE.md'), man: rdU('MANUAL.html') };
+  const chkU = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v530 (11/24)', '\n### '), tlv = cut(d.tl, '\n## v530 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l));
+    const FT = ['`pay_my_slips`', '`pay_bg_set`', '최근 24달'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v530 \(2026-11-24\)\./.test(d.ft) && mF.length === 0 && cb.length === 4 && /SHELL_CACHE = 'jw-shell-v530'/.test(d.sw) && d.cl.indexOf('- **66 급여 판4(v530)**') > 0 && d.man.indexOf('<li><b>내 급여명세서</b> (2026-11 v530)') > 0;
+    return { ok, info: { mF, cb: cb.length } };
+  };
+  const rU = chkU(DU);
+  const muU = (k, f) => chkU(Object.assign({}, DU, { [k]: f(DU[k]) })).ok;
+  const MU = [muU('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v529 (')), muU('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v529'")), muU('ft', (s) => s.split('`pay_my_slips`').join('pay_my_slips')), muU('cl', (s) => s.replace('- **66 급여 판4(', '- 66 급여 판4(')), muU('man', (s) => s.replace('<li><b>내 급여명세서</b>', '<li>내 급여명세서'))];
+  T('v530 문서·판 번호(정확 검사): FEATURES 기준 v530 (2026-11-24)·v530 절 · TESTLIST v530 칸 4 · sw v530 · CLAUDE.md·MANUAL 한 줄 · 결함 사본 ' + MU.length + '개 = 모두 ✗', rU.ok && MU.every((v) => v === false), JSON.stringify({ r: rU.info, mut: MU }));
+} catch (e) { console.log('  (v530 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

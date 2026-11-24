@@ -1808,3 +1808,9 @@
 - [ ] (AI 운영 확인 — 판38) 새 근거 판 승격 뒤 운영 차량 표 제안 날짜·칩이 승격 전과 같은지(바뀐 숫자 0 — 칸 셋만 새로 보임)
 - [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v528 0974b0b 위로 다시 얹은 판) — 결과는 배포 전 전체 게이트 기록 판38_게이트_v529_1124.txt
 - [x] (AI) `uismoke` 'P1 판38 8차-e'(㉠ 만기 지우며 수검일 = 막음 · 넣은 뒤 숨김 = 값 없음 · 덜 채운 날 = C280 안내 · 완료 창 연장 미리 채우기) 고치기 전 8항 ✗ → 18항 ✓ · 결함 사본 9 · `P38_LONG=1` 판38 묶음 결함 사본 121·꺼짐 대조 12만 다름 0 · 시험 서버(box.localhost) 실제 화면 ㉠㉡ 끝까지
+
+## v530 — 66 급여 판4: 직원 본인 급여명세서 · 요율 표 승격 해제
+- [ ] (운영 확인) 급여 탭에서 한 달을 [이 달 확정] 한 뒤 그 직원 계정 '내 업무' 맨 아래 [명세서 보기]에 그 달만 보이고 다른 사람 것은 안 보이는지
+- [ ] (운영 확인) 급여 탭 요율 줄 [승격 해제]가 PM 계정에서만 되는지(다른 관리자는 'PM만 해제할 수 있습니다')
+- [x] (AI) `servertest` 66 판4 ①②(자기 것만·확정 달만·기기 승인·감사·못 읽은 달 · 결함 사본 3) — ✓ AI 11/24
+- [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `paycalc_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` 통과 · v529 문서 검사를 이 판 이상으로 풀고 v530 문서·판 번호 정확 검사 — ✓ AI 11/24
