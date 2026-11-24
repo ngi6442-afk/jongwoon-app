@@ -13104,6 +13104,17 @@
       var p2=name2xml[sn]; if(!p2||!raw[p2]) return;
       raw[p2]=enc.encode(dec.decode(raw[p2]).replace(/<drawing\b[^>]*\/>/g,""));
     });
+    // C267: 덮어쓴 칸의 양식 원래 글자(다른 회사 이름·옛 공사명)가 공유 문자열에 남아 파일째 나가던 것 — 어느 시트도 부르지 않는 공유 문자열은 빈 글자로(번호는 그대로라 시트 xml은 안 바뀜)
+    if(raw["xl/sharedStrings.xml"]){
+      var ssUsed={};
+      for(var pn in raw){
+        if(!/^xl\/worksheets\/[^\/]+\.xml$/.test(pn)) continue;
+        dec.decode(raw[pn]).replace(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g, function(w, a, b){ if(/\bt="s"/.test(a)){ var sv=/<v>\s*(\d+)\s*<\/v>/.exec(b||""); if(sv) ssUsed[+sv[1]]=1; } return w; });
+      }
+      var ssI=-1, ss0=dec.decode(raw["xl/sharedStrings.xml"]);
+      var ss1=ss0.replace(/<si\b[^>]*\/>|<si\b[^>]*>[\s\S]*?<\/si>/g, function(w){ ssI++; return ssUsed[ssI]?w:"<si><t></t></si>"; });
+      if(ss1!==ss0) raw["xl/sharedStrings.xml"]=enc.encode(ss1);
+    }
     // 수식 강제 재계산(기본정보→서식 수식 갱신)
     if(/<calcPr /.test(wbx) && wbx.indexOf("fullCalcOnLoad")<0) wbx=wbx.replace("<calcPr ", '<calcPr fullCalcOnLoad="1" ');
     else if(!/<calcPr/.test(wbx)) wbx=wbx.replace("</workbook>", '<calcPr fullCalcOnLoad="1"/></workbook>');
@@ -19062,11 +19073,11 @@
   function docDemoContract(d, flags){
     flags=flags||{asb:true, demo:true};
     var bx=function(on){ return '<span style="font-family:inherit">'+(on?'☑':'☐')+'</span>'; };
-    var title='<div style="text-align:center;margin-bottom:14px;">'
-      +'<div style="font-size:20px;letter-spacing:6px;font-weight:700;">'+bx(!!flags.asb)+' 석 면 해 체</div>'
-      +'<div style="font-size:20px;letter-spacing:6px;font-weight:700;">'+bx(!!flags.demo)+' 철 거 공 사</div>'
-      +'<div style="font-size:20px;letter-spacing:14px;font-weight:700;margin-top:2px;">계 약 서</div></div>';
-    var co = '상호 : '+esc(JW_CON.name)+' &nbsp; 사업자번호 : '+esc(JW_CON.biz)+'<br>주소 : '+esc(JW_CON.addr)+'<br>대표 : '+esc(JW_CON.ceo)+' (인) &nbsp; 전화 : '+esc(JW_CON.tel)+'<br>업종 : '+esc(JW_CON.biztype)+'<br><span style="font-size:11px">※ '+esc(JW_CON.perm1)+' &nbsp; ※ '+esc(JW_CON.perm2)+'</span>';
+    var title='<div style="text-align:center;margin-bottom:14px;">'   // C267: 제목 18pt·표 보조 문구 9pt(문서관리규정 제9조 — 종전 20px=15pt·11px=8.25pt)
+      +'<div style="font-size:18pt;letter-spacing:6px;font-weight:700;">'+bx(!!flags.asb)+' 석 면 해 체</div>'
+      +'<div style="font-size:18pt;letter-spacing:6px;font-weight:700;">'+bx(!!flags.demo)+' 철 거 공 사</div>'
+      +'<div style="font-size:18pt;letter-spacing:14px;font-weight:700;margin-top:2px;">계 약 서</div></div>';
+    var co = '상호 : '+esc(JW_CON.name)+' &nbsp; 사업자번호 : '+esc(JW_CON.biz)+'<br>주소 : '+esc(JW_CON.addr)+'<br>대표 : '+esc(JW_CON.ceo)+' (인) &nbsp; 전화 : '+esc(JW_CON.tel)+'<br>업종 : '+esc(JW_CON.biztype)+'<br><span style="font-size:9pt">※ '+esc(JW_CON.perm1)+' &nbsp; ※ '+esc(JW_CON.perm2)+'</span>';
     var gap = '상호 : '+dgFill(d.owner)+' &nbsp; 사업자번호 : '+dgFill(d.ownerBiz)+'<br>주소 : '+dgFill(d.ownerAddr)+'<br>대표 : '+dgFill(d.ownerCeo)+' (인) &nbsp; 전화 : '+dgFill(d.ownerTel);
     var amt = d.amount ? Number(String(d.amount).replace(/[^0-9]/g,"")).toLocaleString() : "";
     return '<div class="doc-page">'+title+
@@ -19114,7 +19125,7 @@
   }
   function docContract(d){
     var co = '업체명 : '+esc(JW_CO.name)+'<br>주&nbsp;&nbsp;소 : '+esc(JW_CO.addr)+'<br>대표자 : '+esc(JW_CO.ceo)+' &nbsp;(인)<br>연락처 : '+esc(JW_CO.tel);
-    return '<div class="doc-page"><h1 style="letter-spacing:3px;font-size:20px;">폐기물 수집·운반 및 처리 계약서</h1>'+
+    return '<div class="doc-page"><h1 style="letter-spacing:3px;">폐기물 수집·운반 및 처리 계약서</h1>'+   // C267: 크기는 .doc-page h1(18pt) 그대로(종전 20px=15pt로 덮어씀)
       '<p>본 계약을 함에 있어 편의상 배출자인 <b>'+dgFill(d.name)+'</b> 을(를) "갑", 운반 및 처리자인 (주)종운환경 을(를) "을"이라 하며 상호 신의에 입각하여 다음과 같이 계약을 체결한다.</p>'+
       '<p class="doc-clause"><b>제1조(계약목적)</b> 본 계약은 "갑"이 배출하는 폐기물을 "을"이 수집·운반하여 "을"의 처리장까지 운반하는 것을 목적으로 한다.</p>'+
       '<p class="doc-clause"><b>제2조(위탁업체)</b> "을"은 "갑"의 사업장에서 배출된 폐기물을 위 계약목적에 따라 적법하게 운송하여야 한다.</p>'+
