@@ -15396,7 +15396,8 @@
   var CON_SAVE_FAIL_MSG = "계약이 서버에 저장되지 않았습니다(서버 오류) — 서버에 저장된 값으로 다시 불러옵니다. 방금 고친 내용은 잠시 뒤 다시 입력해 주세요.";   // P1 판24-③ 검토 B9
   var CON_DUP_ID_MSG = "계약 저장이 거절됐습니다 — 같은 계약이 목록에 두 번 들어 있습니다. 서버에 저장된 값으로 다시 불러옵니다. 방금 고친 내용이 있으면 다시 입력해 주세요.";
   // 11/16 검토 B2: 디바운스가 끝나 저장이 나가면 타이머 표시를 비운다(저장 요청 중 바뀐 목록에 '예약된 저장이 있는가'를 doSaveContracts가 알게)
-  function scheduleContractSave(){ contractsPending=true; if(contractSaveTimer) clearTimeout(contractSaveTimer); contractSaveTimer=setTimeout(function(){ contractSaveTimer=null; doSaveContracts(); }, 1400); }
+  // C281 확인 A1: 결재 동기화 응답 처리(csApprSyncIn)·자동 풀기 표식 저장(csApprHealNext) 밖에서 걸린 저장 예약 수 — 자동 풀기가 표식 저장을 보내기 전에 그 사이 사람 고침이 있었는지 봄
+  function scheduleContractSave(){ if (typeof csApprSchedN !== "undefined" && !csApprSyncIn && !csApprHealNext) csApprSchedN++; contractsPending=true; if(contractSaveTimer) clearTimeout(contractSaveTimer); contractSaveTimer=setTimeout(function(){ contractSaveTimer=null; doSaveContracts(); }, 1400); }
   // P1 판24 5차: 병합 결과 m에서, 서버(r) 쪽에 승인·반영된 변경계약 차수(aw amt · 끝남 · 승인 · 사본)가 있고 m의 같은 자리가 같은 상신 번호의 승인 전 사본이면 그 단계만 서버 값(상태·완료일·상신 기록)으로 — 서버 carryStale과 같은 조건
   function csKeepApproved(m, r){
     if (!m || !r || m === r || !Array.isArray(m.pipes) || !Array.isArray(r.pipes)) return;
@@ -17333,6 +17334,7 @@
     // 판40: 끝나는 때를 돌려줌(csApprHeal이 계약을 차례로 돌림 — 그 밖의 부르는 자리는 돌려준 값을 쓰지 않음)
     return csFetchServerContract(id).then(function(sc){
       c = findProc(id) || c;   // 응답 대기 중 409 병합이 객체를 바꿨을 수 있다(F6)
+      if (typeof csApprSyncMark === "function") csApprSyncMark();   // C281: 이 응답 처리(동기 구간) 안의 저장 예약은 동기화 자신의 것
       // 판24g 검토 X2r(원천): 사본 읽기 자체가 실패했으면 이 회차는 결재 반영 없이 끝냄 — 종전엔 실패를 '서버에 없음'으로 받아 결재함 목록으로 이 화면이 단계를 따로 진행(지시 겹침·결재자 기기 지시 바뀜)
       //   60초 제한은 그대로(서버가 앓는 동안 그릴 때마다 다시 읽지 않게) — 60초 뒤 다음 그리기에서 다시
       if (sc && sc.gwReadFail) return null;
@@ -17355,6 +17357,7 @@
     }).then(function(res){
       if (!(res && res.status === 200 && res.body && Array.isArray(res.body.items))) return;
       c = findProc(id) || c;
+      if (typeof csApprSyncMark === "function") csApprSyncMark();   // C281: 위와 같음
       var changed = false;
       (c.pipes || []).forEach(function(p){ (p.stages || []).forEach(function(s, i){
         if (!s.appr || s.appr.status === "승인" || s.appr.status === "반려") return;
@@ -17453,7 +17456,9 @@
   }
   // C281: 자동 풀기의 저장 가름을 시각(종전 '보낸 뒤 30초' — csApprHealOutAt은 v498 고정 글 줄이라 선언만 남음)이 아니라 그 저장에 단 표식으로
   //   csApprHealNext = 지금 보내는 저장이 자동 풀기의 것(doSaveContracts가 보낼 때 읽음) · 409 뒤 다시 보낼 때는 사람 고침 저장 예약·나가 있는 다른 저장이 없을 때만 이어 받음
-  var csApprHealNext = false;
+  var csApprHealNext = false, csApprSchedN = 0, csApprSyncIn = false;
+  // 결재 동기화 응답 처리 구간 표시 — 그 콜백이 끝난 바로 뒤(마이크로태스크)에 내림 · 사람 누름(매크로태스크)은 그 안에 끼지 못함
+  function csApprSyncMark(){ csApprSyncIn = true; Promise.resolve().then(function(){ csApprSyncIn = false; }); }
   function csApprHealSend(fn){ csApprHealNext = true; try { fn(); } finally { csApprHealNext = false; } }
   function csApprHealOnly(){ return !contractSaveTimer && (typeof conSaveOut === "undefined" || conSaveOut === 0); }
   // 409 뒤 다시 읽기 실패(1.4초 뒤 다시 보냄)도 표식을 이어 받음 — 그 사이 사람이 고치면 scheduleContractSave가 이 예약을 지우고 종전 저장(표식 없음)으로
@@ -17514,12 +17519,13 @@
     hits.forEach(function(h){ csApprHealN[h.cid] = (csApprHealN[h.cid] || 0) + 1; if (ids.indexOf(h.id) < 0){ ids.push(h.id); cids[h.id] = []; } cids[h.id].push(h.cid); });
     ids.forEach(function(id){
       q = q.then(function(){
-        var c = findProc(id), pend0 = contractsPending;
+        var c = findProc(id), pend0 = contractsPending, hum0 = !!contractSaveTimer, n0 = csApprSchedN;   // C281 확인 A1b: 앞 저장 200이 대기 표시를 내렸어도 사람 저장 예약이 걸려 있으면(hum0) 표식 없이 — 보내는 때·횟수는 종전 그대로
         if (!c || who !== csApprWho()) return false;
         csApprHealSt[id] = { cids: cids[id], bill: "wait", at: Date.now() };
         return Promise.resolve(csApprSync(c, true)).then(function(){
           // 넘긴 것이 있으면 저장을 바로(이 화면에 먼저 걸려 있던 저장 대기가 있었으면 그 예약 저장에 같이 실려 나감 — 그때는 '자동 풀기의 저장'으로 적지 않음: 5xx 알림 창 가름)
-          if (contractsPending && !pend0) csApprHealSend(csSaveNow);   // C281: 바로 나가는 이 저장 하나에만 표식
+          // C281: 바로 나가는 이 저장 하나에만 표식 — 동기화를 기다리는 사이 사람 저장 예약이 걸렸으면(그 고침이 이 저장에 실림) 표식 없이(종전 사람 저장 5xx 알림 창)
+          if (contractsPending && !pend0){ if (hum0 || csApprSchedN !== n0) csSaveNow(); else csApprHealSend(csSaveNow); }
           return csSaveSettled();
         });
       }).then(function(ok){ return csApprHealBillAsk(id, ok, who); }).catch(function(){ delete csApprHealSt[id]; });

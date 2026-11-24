@@ -18914,7 +18914,7 @@ try {
     'mergeContracts', 'doSaveContracts', 'scheduleContractSave', 'loadContracts', 'liveContracts', 'csValEditNote', 'csValEditsApply', 'csValEditsDone', 'csValMerge', 'conIsArr', 'csTitle',
     'csFetchServerContract', 'csEmpty', 'csApprRank', 'csMergeDocs', 'csChgRank', 'csChgMerge', 'csSyncFromServer', 'csApprPending', 'csApprFind', 'csApprSync', 'csApprTake', 'csApprApply', 'csApprRef', 'csApprOnDecided', 'csSaveNow', 'conStatusFix', 'csAlignTasksAll',
     'b64EncodeUnicode', 'b64DecodeUnicode', '_ghResp', 'emptyDoc', '_urlCollection', 'saveConflictStop', 'saveConflictToast', 'apprRefresh', 'conBillToRec'];
-  const NEWH40 = ['csApprHealList', 'csApprHeal', 'csApprHealLoaded', 'csApprMine', 'csApprWho', 'csSaveSettled', 'csApprHealFail', 'csApprHealSeen', 'csApprHealBillAsk', 'csApprGuardAsk', 'csApprHealSend', 'csApprHealOnly', 'csApprHealLater'];   // C281: 자동 풀기 저장 표식 3함수(없는 판은 hasH40로 빠짐)
+  const NEWH40 = ['csApprHealList', 'csApprHeal', 'csApprHealLoaded', 'csApprMine', 'csApprWho', 'csSaveSettled', 'csApprHealFail', 'csApprHealSeen', 'csApprHealBillAsk', 'csApprGuardAsk', 'csApprHealSend', 'csApprHealOnly', 'csApprHealLater', 'csApprSyncMark'];   // C281: 자동 풀기 저장 표식 3함수(없는 판은 hasH40로 빠짐)
   const STUBH40 = new Set(['genId', 'pushNotify', 'spawnNextRecur', 'memberName', 'myName', 'myId', 'saveTasksCache', 'scheduleTasksSave', 'renderTasks', 'renderSummary', 'renderContracts', 'alert', 'conAmtEff', 'fmtAmount', 'saveRecCache', 'renderReceivables', 'scheduleRecSave', 'apprToastShow', 'loadTasks', 'fetch', 'gwCall', 'setTimeout', 'clearTimeout', 'confirm', 'esc', 'csSiteDone', 'conStageDue', 'canSee', 'canDo', 'todayStr', 'findProc', 'csDocsLost', 'csStageDocItems', 'getToken', 'ghHeaders', 'b64EncodeUnicode', 'b64DecodeUnicode', 'runAwardAutoCon', 'conBldgAutoTry', 'renderDashboard', 'curMember', 'isAdmin', 'apprBadgeRender', 'apprOpen', 'apprWaitItems', 'apprHoldItems']);
   const closeH40 = (H, roots, have) => { const all = new Set([...H.matchAll(/\n  function ([A-Za-z_$][\w$]*)\(/g)].map((m) => m[1])); const got = new Map(); const q = roots.slice(); while (q.length) { const n = q.shift(); if (got.has(n) || STUBH40.has(n) || have.has(n) || !all.has(n)) continue; const b = fnH40(H, n); got.set(n, b); for (const m of b.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g)) q.push(m[1]); } return [...got.keys()]; };
   const varBlockH40 = (H, name) => { const i = H.search(new RegExp('\\n  var ' + name + ' = \\{')); if (i < 0) throw new Error('변수 없음 ' + name); let d = 0; for (let j = H.indexOf('{', i); j < H.length; j++) { if (H[j] === '{') d++; else if (H[j] === '}') { d--; if (d === 0) return H.slice(i + 1, j + 1) + ';'; } } throw new Error('중괄호 ' + name); };
@@ -18931,7 +18931,9 @@ try {
         if (env.listHold) return new Promise(() => {});
         if (env.listFail > 0) { env.listFail--; return Promise.resolve({ status: 500, body: {} }); }
         let its = cloneH40(env.srv.approvals); if (env.admin === false) its = its.filter((x) => x && x.by && x.by.id === env.uid);
-        return Promise.resolve({ status: 200, body: { items: its, base: 1 } });
+        const la = { status: 200, body: { items: its, base: 1 } };
+        if (env.hold && env.hold('LIST')) return new Promise((res) => env.held.push({ kind: 'LIST', go: () => res(la) }));   // C281: 결재함 목록 응답 붙잡기
+        return Promise.resolve(la);
       }
       let ans;
       if (b.action === 'get') {
@@ -18942,6 +18944,7 @@ try {
       }
       if (b.action === 'save') {
         const prev = env.srv.doc, oldItems = prev.items, its = cloneH40(b.doc.items || []);
+        if (env.putNet > 0) { env.putNet--; env.log.push('PUT → NET'); return Promise.reject(new Error('net')); }   // C281: 저장 끊김(응답 없음 — 서버에 안 들어감)
         if (env.putFail > 0) { env.putFail--; env.log.push('PUT → 500'); ans = { status: 500, body: { error_code: 'STORAGE_WRITE_FAILED' } }; }
         else if (b.base !== undefined && prev.updated_at && Number(b.base) !== Number(prev.updated_at)) { env.log.push('PUT base ' + b.base + ' → 409'); ans = { status: 409, body: { error_code: 'STALE_BASE' } }; }
         else {
@@ -19309,7 +19312,7 @@ try {
     // N1·기성 확인 창: 409 뒤 서버 사본에서 이미 끝난 단계를 안 봄(두 기기가 다 물음) · 넘기는 순간에 바로 물음 · 저장을 바로 안 보냄 · 서버 기성 연결 안 봄
     [' if (typeof csApprHealSeen === "function"){ try { csApprHealSeen(up.items||[]); } catch(e){} }', ''],
     ['    if (hw && Date.now() - (hw.at || 0) < 120000){ if (hw.bill === "wait") hw.bill = "due"; return; }\n', ''],
-    ['if (contractsPending && !pend0) csApprHealSend(csSaveNow);', 'if (contractsPending && !pend0) csApprHealSend(function(){});'],   // C281: 줄 꼴이 바뀜(30초 시각 → 저장 표식) — 같은 결함(저장을 바로 안 보냄)
+    ['if (contractsPending && !pend0){ if (hum0 || csApprSchedN !== n0) csSaveNow(); else csApprHealSend(csSaveNow); }', 'if (contractsPending && !pend0){ }'],   // C281: 줄 꼴이 바뀜(30초 시각 → 저장 표식) — 같은 결함(저장을 바로 안 보냄)
     [' || (sc && !sc.gwReadFail && sc.rec_id)) return;', ') return;'],
     ['conBillToRec(c, "결재함에서 승인된 청구 검수를 계약에 반영했습니다(자동 반영).\\n");', 'conBillToRec(c);'],
     // N2: 거절 뒤 처리 걷음(알림 되풀이) · 거절된 상신을 다음 폴에 또 풂 · 실패 뒤 다시 읽기가 또 풂 · 실패한 회차에 한 번 더 · 5xx 알림 창 · 사람 저장 5xx도 조용히 · 5xx가 횟수 상한을 씀
@@ -19555,22 +19558,43 @@ try {
     { const E = mk(); E.putFail = 1; E.api.load(); await E.flush(); E.api.refresh(); await E.flush(); await E.fire(); await E.fire();
       const a = out(E); E.now += 300000; E.api.refresh(); await E.flush(); await E.fire(); await E.fire();
       R.c8 = a + ' → ' + out(E); R.c8ok = R.c8 === '알림 0|저장 500|서버 kO O0|k1 open/대기 → 알림 0|저장 500,200|서버 kO O0|k1 done/승인'; }
-    R.ok = Object.keys(R).filter((k) => /ok$/.test(k)).every((k) => R[k]);
+    // a1·a1l(독립 확인 A1): 자동 풀기의 결재 동기화가 서버 사본(GET)·결재함 목록(LIST)을 기다리는 사이 사람이 다른 계약을 고침 → 동기화 뒤 나간 저장(그 고침이 실림) 5xx = 알림 1(6578be0: 0 — 표식 저장이 사람 예약을 지우고 나감)
+    for (const [key, kind] of [['a1', 'GET'], ['a1l', 'LIST']]) {
+      const E = mk(); E.api.load(); await E.flush();
+      let nL = 0; E.hold = (k) => k === kind && (kind === 'GET' || ++nL === 2);   // LIST는 apprRefresh 첫 목록은 보내고 동기화 안의 둘째만
+      E.api.refresh(); await E.flush(); E.hold = null;
+      const h0 = E.held.map((h) => h.kind).join(',');
+      human(E); E.putFail = 1; await E.release(kind); await E.fire(); await E.fire();
+      R[key] = '붙잡음 ' + h0 + '|' + out(E); R[key + 'ok'] = R[key] === '붙잡음 ' + kind + '|알림 1|저장 500|서버 kO O0|k1 open/대기'; }
+    // a1b(독립 확인 A1b): 자동 풀기가 k1·k2를 차례로 풂 — k1 저장이 나가 있는 사이 사람이 고침 → k1 200이 저장 대기 표시를 내림 → k2 차례의 저장(사람 고침이 실림) 5xx = 알림 1(6578be0: 0)
+    { const E = mkH40(H, [kCH40('k1', 1), kCH40('k2', 2), kOH40()], [apH40(1, 'k1', '승인'), apH40(2, 'k2', '승인')], [tkH40(1, 'k1'), tkH40(2, 'k2')]);
+      E.api.load(); await E.flush();
+      E.hold = (k, st) => k === 'PUT' && st === 200; E.api.refresh(); await E.flush(); E.hold = null;
+      human(E); await E.release('PUT200'); E.putFail = 1; await E.fire(); await E.fire(); await E.fire();
+      R.a1b = out(E) + '|k2 ' + E.st('k2'); R.a1bok = R.a1b === '알림 1|저장 200,500|서버 kO O0|k1 done/승인|k2 open/대기'; }
+    // a2: 자동 풀기 두 회차가 겹침(첫 회차가 서버 사본을 기다리는 사이 2분 넘어 둘째 회차) · 사람 고침 없음 — 첫 회차 표식 저장 끊김 → 둘째 회차 저장 5xx = 알림 0(자동 풀기 자기 저장의 예약을 사람 것으로 세면 1)
+    { const E = mkH40(H, [kCH40('k1', 1), kCH40('k2', 2), kCH40('k3', 3), kOH40()], [apH40(1, 'k1', '승인'), apH40(2, 'k2', '승인'), apH40(3, 'k3')], [tkH40(1, 'k1'), tkH40(2, 'k2'), tkH40(3, 'k3')]);
+      E.api.load(); await E.flush();
+      E.hold = (k) => k === 'GET'; E.now += 400000; E.api.refresh(); await E.flush();
+      E.putNet = 1; E.putFail = 1; E.now += 200000; E.api.refresh(); await E.flush(); E.hold = null;
+      for (let k = 0; k < 30 && (E.held.length || E.left()); k++) { while (E.held.length) await E.release(E.held[0].kind); await E.fire(); }
+      R.a2 = '알림 ' + E.alerts + '|저장 ' + E.log.filter((l) => l.indexOf('PUT') === 0).map((l) => l.split('→ ')[1].split(' ')[0]).join(','); R.a2ok = R.a2 === '알림 0|저장 NET,500,200'; }
+    R.ok =Object.keys(R).filter((k) => /ok$/.test(k)).every((k) => R[k]);
     return R;
   };
   // 운영 판 꼴 사본(이번 고침 다섯 자리를 종전 글로) — 고치기 전 값
   const OLD281 = [
     ['csApprHealFail(resp.status, healS && typeof csApprHealOnly === "function" && csApprHealOnly())', 'csApprHealFail(resp.status)'],
     ['    var quiet = status !== 400 && mine === true;', '    var quiet = status !== 400 && Date.now() - csApprHealOutAt < 30000;'],
-    ['if (contractsPending && !pend0) csApprHealSend(csSaveNow);', 'if (contractsPending && !pend0){ csApprHealOutAt = Date.now(); csSaveNow(); }'],
+    ['if (contractsPending && !pend0){ if (hum0 || csApprSchedN !== n0) csSaveNow(); else csApprHealSend(csSaveNow); }', 'if (contractsPending && !pend0){ csApprHealOutAt = Date.now(); csSaveNow(); }'],
     ['if (healS && typeof csApprHealOnly === "function" && csApprHealOnly()){ csApprHealSend(doSaveContracts); return; } ', ''],
     ['if(j&&j.gwReadFail&&healS&&typeof csApprHealLater === "function"&&csApprHealLater()) return; ', ''],
   ];
   const R281 = await run281(html);
   const O281 = await run281(OLD281.reduce((s, [a, b]) => onceH40(s, a, b), html));
-  const C281K = ['c1', 'c2', 'c3', 'c4', 'c5', 'c5b', 'c5c', 'c6', 'c7', 'c8'];
+  const C281K = ['c1', 'c2', 'c3', 'c4', 'c5', 'c5b', 'c5c', 'c6', 'c7', 'c8', 'a1', 'a1l', 'a1b', 'a2'];
   T('C281 자동 풀기 저장의 5xx 알림 창 가름 = 그 저장 표식(실행 — 판40 틀 · 실제 csApprHeal·doSaveContracts·loadContracts·approveTask·csApprOnDecided): c1 자동 풀기 저장 200 → 5초 뒤 사람이 고친 저장 5xx = 알림 1(운영 판 꼴: 0) · c2 자동 풀기 저장이 나가 있는 사이 사람이 고침 → 그 저장 5xx = 알림 1(0) · c4 같은 꼴 409 뒤 다시 보낸 저장 5xx = 알림 1(0) · c5b·c5c 409 뒤 다시 읽기 실패 길에서 사람 고침 = 알림 1(0) · c6 지시 탭 [승인] 저장 5xx = 알림 1(0) · c7 결재함 승인 반영 저장 5xx = 알림 1(0) / 자동 풀기 자기 실패는 그대로 알림 0: c3 409 뒤 다시 보낸 저장 5xx · c5 다시 읽기 실패 뒤 다시 보낸 저장 5xx · c8 첫 저장 5xx(다음 목록 때 완료)',
-    C281K.every((k) => R281[k + 'ok']) && ['c1', 'c2', 'c4', 'c5b', 'c5c', 'c6', 'c7'].every((k) => /^알림 0\|/.test(O281[k])) && ['c3', 'c5', 'c8'].every((k) => O281[k] === R281[k]),
+    C281K.every((k) => R281[k + 'ok']) && ['c1', 'c2', 'c4', 'c5b', 'c5c', 'c6', 'c7', 'a1', 'a1l', 'a1b'].every((k) => /(^|\|)알림 0\|/.test(O281[k])) && ['c3', 'c5', 'c8'].every((k) => O281[k] === R281[k]),
     JSON.stringify(C281K.map((k) => k + ' ' + R281[k] + ' ↔ 운영 꼴 ' + O281[k])));
   // 결함 사본 — 고친 줄마다(빼거나 되돌리면 위 길 가운데 하나가 ✗)
   const KG281 = [
@@ -19583,12 +19607,23 @@ try {
     ['    if (!csApprHealOnly()) return false;\n    contractsPending = true;', '    contractsPending = true;'],
     ['contractsPending = true; contractSaveTimer = setTimeout(function(){ contractSaveTimer = null; csApprHealSend(doSaveContracts); }, 1400);', 'contractsPending = true; setTimeout(function(){ csApprHealSend(doSaveContracts); }, 1400);'],
     ['  function csApprHealSend(fn){ csApprHealNext = true; try { fn(); } finally { csApprHealNext = false; } }', '  function csApprHealSend(fn){ csApprHealNext = true; try { fn(); } finally {} }'],
-    ['if (contractsPending && !pend0) csApprHealSend(csSaveNow);', 'if (contractsPending && !pend0) csSaveNow();'],
+    ['else csApprHealSend(csSaveNow); }', 'else csSaveNow(); }'],
+    // 독립 확인 A1·A1b 반영: 기다리는 사이 사람 저장 예약 보기 걷음 · 동기화 안 예약도 사람 것으로 셈 · 둘째 응답 구간 표시 걷음 · 앞 저장 200 뒤 걸린 사람 예약 안 봄 · 구간 표시를 안 내림
+    ['{ if (hum0 || csApprSchedN !== n0) csSaveNow(); else csApprHealSend(csSaveNow); }', '{ csApprHealSend(csSaveNow); }'],
+    ['if (hum0 || csApprSchedN !== n0) csSaveNow();', 'if (hum0) csSaveNow();'],
+    ['if (typeof csApprSchedN !== "undefined" && !csApprSyncIn && !csApprHealNext) csApprSchedN++;', 'if (typeof csApprSchedN !== "undefined" && !csApprHealNext) csApprSchedN++;'],
+    ['if (typeof csApprSchedN !== "undefined" && !csApprSyncIn && !csApprHealNext) csApprSchedN++;', 'if (typeof csApprSchedN !== "undefined" && !csApprSyncIn) csApprSchedN++;'],
+    ['      c = findProc(id) || c;\n      if (typeof csApprSyncMark === "function") csApprSyncMark();   // C281: 위와 같음\n', '      c = findProc(id) || c;\n'],
+    ['if (hum0 || csApprSchedN !== n0) csSaveNow();', 'if (csApprSchedN !== n0) csSaveNow();'],
+    ['Promise.resolve().then(function(){ csApprSyncIn = false; });', ''],
   ];
   const KR281 = [];
   for (const [a, b] of KG281) { let r; try { r = await run281(onceH40(html, a, b)); } catch (e) { r = { ok: false, threw: e.message }; } KR281.push(!r.ok); }
   T('C281 결함 사본 ' + KG281.length + '개(표식 읽기 걷음 · 5xx 가름에서 사람 고침 보기 걷음 · 30초 시각 가름으로 되돌림 · 409 다시 보냄 이어 받기 걷음 · 다시 읽기 실패 이어 받기 걷음 · 사람 고침 보기 늘 참 · 다시 읽기 실패 때 사람 고침 보기 걷음 · 그 예약을 사람 고침이 못 지우게 · 표식 안 내림 · 자동 풀기 저장에 표식 안 닮) = 모두 ✗',
-    KG281.length === 10 && KR281.every((x) => x), JSON.stringify(KR281));
+    KG281.length === 17 && KR281.every((x) => x), JSON.stringify(KR281));
+  // 고정 글 — 첫 응답(서버 사본 접목) 구간 표시: 접목이 저장을 예약하는 꼴(변경계약 차수 병합 chgPush)은 이 틀에서 짓지 않아 실행으로 못 잡음 → 정확히 한 번
+  const FIX281 = '      c = findProc(id) || c;   // 응답 대기 중 409 병합이 객체를 바꿨을 수 있다(F6)\n      if (typeof csApprSyncMark === "function") csApprSyncMark();   // C281: 이 응답 처리(동기 구간) 안의 저장 예약은 동기화 자신의 것\n';
+  T('C281 고정 글 1줄(결재 동기화 첫 응답 구간 표시) 정확히 한 번 · 빼면 ✗', html.split(FIX281).length === 2 && html.replace(FIX281, '      c = findProc(id) || c;   // 응답 대기 중 409 병합이 객체를 바꿨을 수 있다(F6)\n').split(FIX281).length === 1, String(html.split(FIX281).length - 1));
 } catch (e) { console.log('  (P1 판40 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ── v489(판24f — 계약 저장 충돌 병합을 칸 단위로 · 원장 C196): 실행 검사는 위 'P1 판24f' 블록 · 여기는 문서·판 번호 정확 검사 + 칸 단위 병합을 부르는 줄·기준 사본을 세우는 줄 등 고정 글 12줄이 그대로 한 번씩 있는지 — 다음 판은 기준 줄·sw를 '489 이상'으로 풀 것
