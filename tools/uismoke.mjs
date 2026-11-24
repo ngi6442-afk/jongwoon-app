@@ -21875,9 +21875,9 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ["`csDetId`", "원장 C222"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v526 \(2026-11-23\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 2 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 526 && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 2 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
       && d.cl.indexOf('**C222(v526') > 0
-      && /SHELL_CACHE = 'jw-shell-v526'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 526;   // v527(급여 백업 암호화)에서 '526 이상'으로 풂
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r526 = chk526(D526);
@@ -21889,6 +21889,25 @@ try {
   T('v526 문서·판 번호(정확 검사): FEATURES 기준 v526 (2026-11-23)·v526 절(C222) · TESTLIST v526 칸 6(화면·운영 확인 4 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v526 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
     r526.ok && M526.every((v) => v === false), JSON.stringify({ r: r526.info, mut: M526 }));
 } catch (e) { console.log('  (v526 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v527(66 급여 백업 암호화 — PM 11/24 'ㄱ'): 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '527 이상'으로 풀 것
+try {
+  const rdS = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DS = { ft: rdS('FEATURES.md'), tl: rdS('TESTLIST.md'), sw: rdS('sw.js'), cl: rdS('CLAUDE.md') };
+  const chkS = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v527 (11/24)', '\n### '), tlv = cut(d.tl, '\n## v527 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l));
+    const FT = ['`_lib/sealbox.js`', '`PAY_BACKUP_KEY`', '`pay_held`', '`PAY_BACKUP_KEY_MISSING`', '`PAY_BAD_SEAL`', '`PAY_KID_MISMATCH`'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v527 \(2026-11-24\)\./.test(d.ft) && mF.length === 0 && cb.length === 4 && /SHELL_CACHE = 'jw-shell-v527'/.test(d.sw) && d.cl.indexOf('- **66 급여 백업 암호화(v527)**') > 0;
+    return { ok, info: { mF, cb: cb.length } };
+  };
+  const rS = chkS(DS);
+  const muS = (k, f) => chkS(Object.assign({}, DS, { [k]: f(DS[k]) })).ok;
+  const MS = [muS('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v526 (')), muS('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v526'")), muS('ft', (s) => s.split('`PAY_BAD_SEAL`').join('PAY_BAD_SEAL')), muS('cl', (s) => s.replace('- **66 급여 백업 암호화(', '- 66 급여 백업 암호화('))];
+  T('v527 문서·판 번호(정확 검사): FEATURES 기준 v527 (2026-11-24)·v527 절(sealbox·PAY_BACKUP_KEY·pay_held·오류 코드 3) · TESTLIST v527 칸 4 · sw v527 · CLAUDE.md 한 줄 · 결함 사본 ' + MS.length + '개 = 모두 ✗', rS.ok && MS.every((v) => v === false), JSON.stringify({ r: rS.info, mut: MS }));
+} catch (e) { console.log('  (v527 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
