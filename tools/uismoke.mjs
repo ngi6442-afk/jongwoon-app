@@ -23609,9 +23609,9 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ["`_lib/doneif.clogAppend`", "원장 C272"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v539 \(2026-11-24\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 2 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 539 && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 2 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
       && d.cl.indexOf('**C272(v539') > 0
-      && /SHELL_CACHE = 'jw-shell-v539'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 539;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r539 = chk539(D539);
@@ -23690,6 +23690,31 @@ try {
   T('C269 ①② 해 넘기기: 적격 건설 안전성평가 12/31 D → 1/1 B(2026 평가) → 2029-01-01 무등급 — 계산기 기본값·입찰 카드 통과선·현황 ⑤ 석면 줄 세 곳 같은 등급(qualSafeAt 한 곳 · 옛 D 통보서 있어도) · 인허가 등급 만료일은 그 단계에만 · 현황 연간·반기 지난 주기 미완(기한 달 있는 것) = 새 주기 첫날 지남(지난 주기 표시) · 이번 주기에 끝내면 완료 · 기한 달 없는 연간은 미완 그대로 · 기록 없던 해는 지남 없음 · 결함 사본 ' + M269.length + '(next 걷음·인허가 단계 무시·next 등급 안 씀·입찰 카드 옛 식·계산기 옛 식·현황 ⑤ 옛 읽기·지남 걷음·기한 달 조건·처음 쓰는 해 조건) = 모두 ✗',
     r269.ok && M269.every((v) => v === false), JSON.stringify({ r: r269.info, mut: M269 }));
 } catch (e) { console.log('  (C269 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v540(C269 — 해 넘기기: 적격 기본 등급 · 현황 지난 주기 '지남' · 신분증·면허증 판독 막기 · 원장 C269): 실행 검사는 위 C269 블록·servertest C269 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd540 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D540 = { ft: rd540('FEATURES.md'), tl: rd540('TESTLIST.md'), sw: rd540('sw.js'), man: rd540('MANUAL.html'), cl: rd540('CLAUDE.md') };
+  const chk540 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v540 (11/24)', '\n### '), tlv = cut(d.tl, '\n## v540 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`sfNowState`", "원장 C269"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v540 \(2026-11-24\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 2 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C269(v540') > 0
+      && /SHELL_CACHE = 'jw-shell-v540'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r540 = chk540(D540);
+  const mu540 = (k, f) => chk540(Object.assign({}, D540, { [k]: f(D540[k]) })).ok;
+  const M540 = [mu540('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v539 (')), mu540('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v539'")),
+    mu540('ft', (s) => s.split('`sfNowState`').join('sfNowState')),
+    mu540('cl', (s) => s.replace('**C269(v540', 'C269(')),
+    mu540('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 배포 전 전체 게이트 기록 C269_게이트_v540_1124.txt', '\n- (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 배포 전 전체 게이트 기록 C269_게이트_v540_1124.txt'))];
+  T('v540 문서·판 번호(정확 검사): FEATURES 기준 v540 (2026-11-24)·v540 절(C269) · TESTLIST v540 칸 6(화면·운영 확인 4 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v540 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
+    r540.ok && M540.every((v) => v === false), JSON.stringify({ r: r540.info, mut: M540 }));
+} catch (e) { console.log('  (v540 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
