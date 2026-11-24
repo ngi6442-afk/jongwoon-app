@@ -23424,9 +23424,9 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ["`csSiteStartFill`", "원장 C256"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v535 \(2026-11-24\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 535 && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
       && d.cl.indexOf('**C256(v535') > 0
-      && /SHELL_CACHE = 'jw-shell-v535'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 535;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r535 = chk535(D535);
@@ -23480,6 +23480,34 @@ try {
   const kill264 = MU264.filter(([a, b]) => { if (html.split(a).length !== 2) return true; try { return chk264(html.replace(a, () => b)).ok; } catch (e) { return false; } }).map(([a]) => a.slice(0, 40));
   T('C264 결함 사본 ' + MU264.length + '개(판정·명세서·첨부 판독·넣기 박스·전용 판독·블로그·등급확인서 하나씩 되돌림) = 모두 ✗', kill264.length === 0, kill264.join(' | '));
 } catch (e) { console.log('  (C264 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v536(C264 — AI 호출 실패 가르기 · 원장 C264): 실행 검사는 위 C264 블록·servertest C264 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd536 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D536 = { ft: rd536('FEATURES.md'), tl: rd536('TESTLIST.md'), sw: rd536('sw.js'), man: rd536('MANUAL.html'), cl: rd536('CLAUDE.md') };
+  const MANA536 = "'관리자 확인 필요'가 나오면 기다려도 풀리지 않으니 관리자에게 알려 주";
+  const chk536 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v536 (11/24)', '\n### '), tlv = cut(d.tl, '\n## v536 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`aiAdminFail`", "원장 C264"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = "'관리자 확인 필요'가 나오면 기다려도 풀리지 않으니 관리자에게 알려 주";
+    const ok = /기준: v536 \(2026-11-24\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf(MAN) > 0
+      && d.cl.indexOf('**C264(v536') > 0
+      && /SHELL_CACHE = 'jw-shell-v536'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r536 = chk536(D536);
+  const mu536 = (k, f) => chk536(Object.assign({}, D536, { [k]: f(D536[k]) })).ok;
+  const M536 = [mu536('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v535 (')), mu536('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v535'")),
+    mu536('ft', (s) => s.split('`aiAdminFail`').join('aiAdminFail')),
+    mu536('man', (s) => s.replace(MANA536, '')), mu536('cl', (s) => s.replace('**C264(v536', 'C264(')),
+    mu536('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위로 다시 얹은 판) — 결과는 배포 전 전체 게이트 기록 C264_게이트_v536_1124.txt', '\n- (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위로 다시 얹은 판) — 결과는 배포 전 전체 게이트 기록 C264_게이트_v536_1124.txt'))];
+  T('v536 문서·판 번호(정확 검사): FEATURES 기준 v536 (2026-11-24)·v536 절(C264) · TESTLIST v536 칸 5(화면·운영 확인 3 · 게이트 [x] 2) · MANUAL 물어보기 실패 안내(내부 이름 0) · CLAUDE.md 한 줄 · sw jw-shell-v536 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL·CLAUDE.md·게이트 칸) 모두 ✗',
+    r536.ok && M536.every((v) => v === false), JSON.stringify({ r: r536.info, mut: M536 }));
+} catch (e) { console.log('  (v536 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
