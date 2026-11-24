@@ -13106,13 +13106,15 @@
     });
     // C267: 덮어쓴 칸의 양식 원래 글자(다른 회사 이름·옛 공사명)가 공유 문자열에 남아 파일째 나가던 것 — 어느 시트도 부르지 않는 공유 문자열은 빈 글자로(번호는 그대로라 시트 xml은 안 바뀜)
     if(raw["xl/sharedStrings.xml"]){
-      var ssUsed={};
+      var ssUsed={}, ssOdd=false;
       for(var pn in raw){
         if(!/^xl\/worksheets\/[^\/]+\.xml$/.test(pn)) continue;
-        dec.decode(raw[pn]).replace(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g, function(w, a, b){ if(/\bt="s"/.test(a)){ var sv=/<v>\s*(\d+)\s*<\/v>/.exec(b||""); if(sv) ssUsed[+sv[1]]=1; } return w; });
+        var sx=dec.decode(raw[pn]);
+        if(/<\w+:c\b|\bt\s*=\s*'s'|\bt\s+=|=\s+"s"/.test(sx)) ssOdd=true;   // 좁은 확인 의심: 접두어 칸·홑따옴표 등 이 정규식이 못 읽는 꼴이면 쓰는 문자열을 놓쳐 보이는 칸이 비므로 비우기를 통째 건너뜀(종전 그대로)
+        sx.replace(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g, function(w, a, b){ if(/\bt="s"/.test(a)){ var sv=/<v>\s*(\d+)\s*<\/v>/.exec(b||""); if(sv) ssUsed[+sv[1]]=1; } return w; });
       }
       var ssI=-1, ss0=dec.decode(raw["xl/sharedStrings.xml"]);
-      var ss1=ss0.replace(/<si\b[^>]*\/>|<si\b[^>]*>[\s\S]*?<\/si>/g, function(w){ ssI++; return ssUsed[ssI]?w:"<si><t></t></si>"; });
+      var ss1=ssOdd?ss0:ss0.replace(/<si\b[^>]*\/>|<si\b[^>]*>[\s\S]*?<\/si>/g, function(w){ ssI++; return ssUsed[ssI]?w:"<si><t></t></si>"; });
       if(ss1!==ss0) raw["xl/sharedStrings.xml"]=enc.encode(ss1);
     }
     // 수식 강제 재계산(기본정보→서식 수식 갱신)
