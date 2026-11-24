@@ -23493,10 +23493,10 @@ try {
     const FT = ["`aiAdminFail`", "원장 C264"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = "'관리자 확인 필요'가 나오면 기다려도 풀리지 않으니 관리자에게 알려 주";
-    const ok = /기준: v536 \(2026-11-24\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 536 && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
       && d.man.indexOf(MAN) > 0
       && d.cl.indexOf('**C264(v536') > 0
-      && /SHELL_CACHE = 'jw-shell-v536'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 536;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r536 = chk536(D536);
@@ -23545,6 +23545,34 @@ try {
   T('C266 받기 한도로 서버가 거른 첨부(413 FILE_TOO_LARGE) = 화면 크기 안내와 같은 글(문서함·증빙·양식) · 화면 크기 거름은 같은 글 · 다른 오류는 종전 코드 글 · 결함 사본 3(서버 거름 안내 걷기) = 모두 ✗',
     r266.ok && M266.every((v) => v === false), JSON.stringify({ r: r266.info, mut: M266 }));
 } catch (e) { console.log('  (C266 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v537(C266 — 올라가는 첨부는 다시 받을 수 있는 크기만 · 원장 C266): 실행 검사는 위 C266 블록·servertest C266 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd537 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D537 = { ft: rd537('FEATURES.md'), tl: rd537('TESTLIST.md'), sw: rd537('sw.js'), man: rd537('MANUAL.html'), cl: rd537('CLAUDE.md') };
+  const MANA537 = "스캔 PDF·사진처럼 압축이 안 되는 파일은 4.3MB보다 조금 작아도(";
+  const chk537 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v537 (11/24)', '\n### '), tlv = cut(d.tl, '\n## v537 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`wholeGetFits`", "원장 C266"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = "스캔 PDF·사진처럼 압축이 안 되는 파일은 4.3MB보다 조금 작아도(";
+    const ok = /기준: v537 \(2026-11-24\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf(MAN) > 0
+      && d.cl.indexOf('**C266(v537') > 0
+      && /SHELL_CACHE = 'jw-shell-v537'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r537 = chk537(D537);
+  const mu537 = (k, f) => chk537(Object.assign({}, D537, { [k]: f(D537[k]) })).ok;
+  const M537 = [mu537('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v536 (')), mu537('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v536'")),
+    mu537('ft', (s) => s.split('`wholeGetFits`').join('wholeGetFits')),
+    mu537('man', (s) => s.replace(MANA537, '')), mu537('cl', (s) => s.replace('**C266(v537', 'C266(')),
+    mu537('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위로 다시 얹은 판) — 결과는 배포 전 전체 게이트 기록 C266_게이트_v537_1124.txt', '\n- (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위로 다시 얹은 판) — 결과는 배포 전 전체 게이트 기록 C266_게이트_v537_1124.txt'))];
+  T('v537 문서·판 번호(정확 검사): FEATURES 기준 v537 (2026-11-24)·v537 절(C266) · TESTLIST v537 칸 5(화면·운영 확인 3 · 게이트 [x] 2) · MANUAL 문서함 첨부 크기(내부 이름 0) · CLAUDE.md 한 줄 · sw jw-shell-v537 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL·CLAUDE.md·게이트 칸) 모두 ✗',
+    r537.ok && M537.every((v) => v === false), JSON.stringify({ r: r537.info, mut: M537 }));
+} catch (e) { console.log('  (v537 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
