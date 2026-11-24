@@ -3812,21 +3812,29 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     const lw57 = r57.code === 200 && r57.body.lawwatch && r57.body.lawwatch.date === '2026-11-03' && r57.body.lawwatch.bg_recheck.length === 1 && r57.body.lawwatch.bg_recheck[0].id === 'law.osh.r181-1';
     T('57 get: 관리자에겐 map(scen 10키·81단계·sha)·bg(ver·rows 1)·lawwatch(bg_recheck 1, v405) 동봉 · 직원+꺼짐엔 null(S4) · 두 층 불변', light57 && lw57 && r57.code === 200 && r57.body.map && Object.keys(r57.body.map.scen).length === 10 && Object.values(r57.body.map.scen).reduce((a, b) => a + b.length, 0) === 81 && typeof r57.body.map.sha === 'string' && r57.body.bg && r57.body.bg.ver === 'v1-test' && r57.body.bg.rows.length === 1 && !!r57.body.proc && !!r57.body.list);
     r57 = await call({ action: 'con_proc_bg_set', bg_ver: 'v1-test' }, tokW, 'dev1'); const f57a = r57.code === 403;
-    r57 = await call({ action: 'con_proc_bg_set', bg_ver: 'v9-none' }, tokA); const f57b = r57.code === 409 && r57.body.error_code === 'BG_MISSING';
-    r57 = await call({ action: 'con_proc_bg_set', bg_ver: 'bad ver!' }, tokA); const f57c = r57.code === 400;
-    r57 = await call({ action: 'con_proc_bg_set' }, tokA); const f57d = r57.code === 400 && r57.body.error_code === 'NO_CHANGE';
-    T('57 bg_set: 직원 403 · 4층 판 불일치 409 BG_MISSING · 판 형식 400 · 바꿀 것 없음 400', f57a && f57b && f57c && f57d);
+    r57 = await call({ action: 'con_proc_bg_set', bg_ver: 'v9-none', bg_sha: 'abcdef1234567890', base: 0 }, tokA); const f57b = r57.code === 409 && r57.body.error_code === 'BG_MISSING';
+    r57 = await call({ action: 'con_proc_bg_set', bg_ver: 'bad ver!', base: 0 }, tokA); const f57c = r57.code === 400 && r57.body.error_code === 'BAD_VALUE';
+    r57 = await call({ action: 'con_proc_bg_set', base: 0 }, tokA); const f57d = r57.code === 400 && r57.body.error_code === 'NO_CHANGE';
+    r57 = await call({ action: 'con_proc_bg_set', bg_ver: 'v1-test', bg_sha: 'abcdef1234567890' }, tokA); const f57e = r57.code === 400 && r57.body.error_code === 'NEED_BASE' && !mem.gw_data['settings:contract'];   // C275 ③
+    T('57 bg_set: 직원 403 · 4층 판 불일치 409 BG_MISSING · 판 형식 400 · 바꿀 것 없음 400 · base 없음 400 NEED_BASE(C275)', f57a && f57b && f57c && f57d && f57e);
+    // C275 ②: 매핑(appdata proc_map_v1)이 부르는 근거 행이 다 있는 판이어야 승격 — 위 1행 판은 BG_INCOMPLETE, 부르는 id 를 다 채운 판으로 승격
+    r57 = await call({ action: 'con_proc_bg_set', bg_ver: 'v1-test', bg_sha: 'abcdef1234567890', base: 0 }, tokA); const inc57 = r57.code === 409 && r57.body.error_code === 'BG_INCOMPLETE' && Array.isArray(r57.body.keys) && r57.body.keys.length > 0 && !mem.gw_data['settings:contract'];
+    { const refs = new Set(), m = mem.gw_data['map:contract:v1'], add = (s) => { if (s && s.due_rule && s.due_rule.law) refs.add(s.due_rule.law); };
+      Object.values(m.scen || {}).forEach((a) => a.forEach(add)); Object.values(m.added || {}).forEach(add);
+      const g = mem.gw_data['bg:contract:law:v1']; [...refs].filter((id) => !g.rows.some((x) => x.id === id)).forEach((id) => g.rows.push({ id: id, law: '시험 법', art: '제1조', mst: 1, eff: '2026-08-01', checked: '2026-10-31', grade: '실측', days: 7, base: '작업 시작일' })); }
+    T('57 bg_set 꼭 읽는 값(C275 ②): 매핑이 부르는 근거 행이 빠진 판 = 409 BG_INCOMPLETE(keys · 스위치 안 생김)', inc57);
     const an57 = auditMock.logs.length;
-    r57 = await call({ action: 'con_proc_bg_set', bg_ver: 'v1-test', base: 0 }, tokA);
+    r57 = await call({ action: 'con_proc_bg_set', bg_ver: 'v1-test', bg_sha: 'abcdef1234567890', base: 0 }, tokA);
     T('57 bg_set 승격: 200 · settings:contract.bg_ver v1-test · use_blob 유지(false) · 감사 계약배경', r57.code === 200 && r57.body.bg_ver === 'v1-test' && mem.gw_data['settings:contract'].bg_ver === 'v1-test' && mem.gw_data['settings:contract'].use_blob === false && auditMock.logs.length === an57 + 1 && auditMock.logs[an57].ev[0].op === '계약배경');
     const at57 = mem.gw_data['settings:contract'].updated_at;
     r57 = await call({ action: 'con_proc_flag_set', use_blob: true, base: at57 }, tokA);
     const keep57 = r57.code === 200 && mem.gw_data['settings:contract'].bg_ver === 'v1-test' && mem.gw_data['settings:contract'].use_blob === true;
-    r57 = await call({ action: 'con_proc_bg_set', annual_override: { 'law.cic.23-3': '2027-02-20' } }, tokA);
+    const ub57 = () => mem.gw_data['settings:contract'].updated_at;   // C275 ③ base 필수
+    r57 = await call({ action: 'con_proc_bg_set', annual_override: { 'law.cic.23-3': '2027-02-20' }, base: ub57() }, tokA);
     const ov57 = r57.code === 200 && mem.gw_data['settings:contract'].annual_override['law.cic.23-3'] === '2027-02-20' && mem.gw_data['settings:contract'].bg_ver === 'v1-test';
-    r57 = await call({ action: 'con_proc_bg_set', annual_override: { 'law.cic.23-3': '2027-2-20' } }, tokA); const bad57 = r57.code === 400;
-    r57 = await call({ action: 'con_proc_bg_set', annual_override: { 'law.cic.23-3': '2027-02-20' } }, tokA); const same57 = r57.code === 400 && r57.body.error_code === 'NO_CHANGE';   // S5: 같은 값 = 변경 없음
-    r57 = await call({ action: 'con_proc_bg_set', annual_override: { 'law.cic.23-3': '' }, bg_ver: '' }, tokA);
+    r57 = await call({ action: 'con_proc_bg_set', annual_override: { 'law.cic.23-3': '2027-2-20' }, base: ub57() }, tokA); const bad57 = r57.code === 400;
+    r57 = await call({ action: 'con_proc_bg_set', annual_override: { 'law.cic.23-3': '2027-02-20' }, base: ub57() }, tokA); const same57 = r57.code === 400 && r57.body.error_code === 'NO_CHANGE';   // S5: 같은 값 = 변경 없음
+    r57 = await call({ action: 'con_proc_bg_set', annual_override: { 'law.cic.23-3': '' }, bg_ver: '', base: ub57() }, tokA);
     const off57 = r57.code === 200 && mem.gw_data['settings:contract'].bg_ver === '' && !mem.gw_data['settings:contract'].annual_override['law.cic.23-3'] && mem.gw_data['settings:contract'].prev.bg_ver === 'v1-test';
     T('57 스위치 토글이 bg_ver 보존(prev에도) · override 설정(날짜 형식 검사·같은 값 NO_CHANGE)·해제 · 승격 해제 prev.bg_ver 기록', keep57 && ov57 && bad57 && same57 && off57);
     delete mem.gw_data['settings:contract']; delete mem.gw_data['proc:contract:v1']; delete mem.gw_data['list:contract']; delete mem.gw_data['map:contract:v1']; delete mem.gw_data['bg:contract:law:v1']; delete mem.gw_data['lawwatch:last'];
@@ -3836,13 +3844,13 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
 { // ---- P1 판4 계약 법령 기준표 '확인일만 바뀐 판' 자동 이월(스위치 기본 꺼짐) — 고정물 tools/bg_law_carry_fixture.json(운영 v1-20261031 · 11월 초안 v1-20261113에서 5행) ----
   const fx = JSON.parse(require('fs').readFileSync(join(ROOT, 'tools', 'bg_law_carry_fixture.json'), 'utf8'));
   const cp = (o) => JSON.parse(JSON.stringify(o));
-  const chkOnly = (src, ver) => { const g = cp(src); g.ver = ver; g.sha = 'chk' + ver.replace(/[^0-9]/g, '').padEnd(13, '0'); g.built_at = '2026-12-01T09:00:00+09:00'; g.source = 'bg_law_draft.json(DRF 재확인 2026-12-01)'; g.rows.forEach((r) => { r.checked = '2026-12-01'; }); g.rows.reverse(); return g; };   // 확인일·판 메타·행 순서만 바뀐 판
+  const chkOnly = (src, ver) => { const g = cp(src); g.ver = ver; g.sha = 'ccc' + ver.replace(/[^0-9]/g, '').padEnd(13, '0');   /* C275: 지문 꼴(16진) — 수집기 sha 와 같은 꼴이어야 자동 이월 꼴 방어 통과 */ g.built_at = '2026-12-01T09:00:00+09:00'; g.source = 'bg_law_draft.json(DRF 재확인 2026-12-01)'; g.rows.forEach((r) => { r.checked = '2026-12-01'; }); g.rows.reverse(); return g; };   // 확인일·판 메타·행 순서만 바뀐 판
   const reset = () => { delete mem.gw_data['settings:contract']; delete mem.gw_data['bg:contract:law:v1']; delete mem.gw_data['lawwatch:last']; };
   reset();
   mem.gw_data['bg:contract:law:v1'] = cp(fx.old);
   let r = await call({ action: 'con_proc_get' }, tokA);
   const def = r.code === 200 && r.body.flag.bg_auto === false && r.body.flag.bg_fp === '' && r.body.flag.bg_carry === null;
-  r = await call({ action: 'con_proc_bg_set', bg_ver: 'v1-20261031' }, tokA);
+  r = await call({ action: 'con_proc_bg_set', bg_ver: 'v1-20261031', bg_sha: fx.old.sha, base: 0 }, tokA);   // C275 ①③
   const fp0 = mem.gw_data['settings:contract'].bg_fp;
   const prom = r.code === 200 && typeof fp0 === 'string' && /^[0-9a-f]{16}$/.test(fp0) && r.body.bg_fp === fp0 && mem.gw_data['settings:contract'].bg_auto === false;
   // 스위치 꺼짐(기본): 확인일만 바뀐 판이 올라와도 이월 없음
@@ -3855,9 +3863,9 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   au = auditMock.logs.length;
   r = await call({ action: 'con_proc_bg_set', bg_auto: true, base: mem.gw_data['settings:contract'].updated_at }, tokA);
   const on = r.code === 200 && r.body.bg_auto === true && mem.gw_data['settings:contract'].bg_auto === true && mem.gw_data['settings:contract'].prev.bg_auto === false && mem.gw_data['settings:contract'].bg_fp === fp0 && auditMock.logs.length === au + 1 && /자동 이월 끔→켬/.test(auditMock.logs[au].ev[0].t);
-  r = await call({ action: 'con_proc_bg_set', bg_auto: 'yes' }, tokA); const badT = r.code === 400;
+  r = await call({ action: 'con_proc_bg_set', bg_auto: 'yes', base: mem.gw_data['settings:contract'].updated_at }, tokA); const badT = r.code === 400 && r.body.error_code === 'BAD_VALUE';
   r = await call({ action: 'con_proc_bg_set', bg_auto: true }, tokW, 'dev1'); const staff = r.code === 403;
-  r = await call({ action: 'con_proc_bg_set', bg_auto: true }, tokA); const same = r.code === 400 && r.body.error_code === 'NO_CHANGE';
+  r = await call({ action: 'con_proc_bg_set', bg_auto: true, base: mem.gw_data['settings:contract'].updated_at }, tokA); const same = r.code === 400 && r.body.error_code === 'NO_CHANGE';
   T('P1 판4 스위치: 관리자 켜기 200(감사 1줄 끔→켬 · prev.bg_auto false · 지문 유지) · 형식 400 · 직원 403 · 같은 값 NO_CHANGE', on && badT && staff && same);
   // 켜짐 + 11월 실제 판(판만 바뀜·인용 번호·새 실측) → 이월 안 됨
   mem.gw_data['bg:contract:law:v1'] = cp(fx.nov);
@@ -3911,7 +3919,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   T('P1 판4 검토(P1-3) 새 판만 이월: 기준 확인일 승격 10-31 → 이월 뒤 12-01(prev 10-31) · 옛 판 다시 올림(같은 지문·확인일 10-31)·같은 확인일 다른 판·한 행만 옛 확인일 = 이월 안 함(bg_ver v1-20261201 그대로·감사 0) · 모든 행 12-15 = 이월(bg_chk 12-15·prev 12-01·감사 "확인일 2026-12-01→2026-12-15")',
     chk0 && wrongCarry.length === 0 && noAud && fwd, JSON.stringify({ chk0, wrongCarry, noAud, fwd, flag: { ver: st2.bg_ver, chk: st2.bg_chk } }));
   // 해제(bg_ver '') 상태에선 켜져 있어도 이월 없음 · 해제 = 기준 지문 비움
-  r = await call({ action: 'con_proc_bg_set', bg_ver: '' }, tokA);
+  r = await call({ action: 'con_proc_bg_set', bg_ver: '', base: mem.gw_data['settings:contract'].updated_at }, tokA);
   const offFp = r.code === 200 && mem.gw_data['settings:contract'].bg_fp === '' && mem.gw_data['settings:contract'].bg_ver === '';
   mem.gw_data['bg:contract:law:v1'] = chkOnly(fx.old, 'v1-20261203');
   r = await call({ action: 'con_proc_get' }, tokA);
@@ -11546,8 +11554,8 @@ function J91a(x) { return JSON.stringify(x); }
   const snap13 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
   const MN13 = { id: 'u13n', name: '관리부13', role: '관리자', admin: true, perms: {} }, MV13 = { id: 'u13v', name: '보기13', admin: false, perms: { veh: 'view' } };
   const tN13 = issueSession(MN13).token, tV13 = issueSession(MV13).token;
-  const BG13 = (o) => Object.assign({ schema: 1, ver: 'veh-t1', sha: 'abcdef0123456789', status: 'draft', groups: [{ id: 'g1' }, { id: 'g2' }], rules: [{ id: 'r1' }],
-    rows: [{ id: 't.car.a', title: '시험 행', grade: '실측', cites: [{ law: '시험' }], cls: 'car', every_m: 12, checked: '2026-11-15' }, { id: 't.car.h', title: '보류 행', grade: '확인 필요', hold_why: '시험 보류 이유', cls: 'car', every_m: 24, checked: '2026-11-14' }, { id: 't.ref', title: '참고', grade: '실측', kind: 'ref', checked: '2026-11-15' }] }, o || {});
+  const BG13 = (o) => Object.assign({ schema: 1, domain: 'veh', ver: 'veh-t1', sha: 'abcdef0123456789', status: 'draft', groups: [{ id: 'g1' }, { id: 'g2' }], rules: [{ id: 'r1' }],
+    rows: [{ id: 't.car.a', title: '시험 행', grade: '실측', cites: [{ law: '시험' }], cls: 'car', every_m: 12, checked: '2026-11-15' }, { id: 't.ceq.a', title: '시험 건설기계 행', grade: '실측', cites: [{ law: '시험' }], cls: 'ceq', every_m: 12, checked: '2026-11-15' }, { id: 't.car.h', title: '보류 행', grade: '확인 필요', hold_why: '시험 보류 이유', cls: 'car', every_m: 24, checked: '2026-11-14' }, { id: 't.ref', title: '참고', grade: '실측', kind: 'ref', checked: '2026-11-15' }] }, o || {});
   const seed13 = (bg, flag) => { const s = JSON.parse(snap13); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null;
     Object.assign(mem.gw_users, { 'member:u13n': JSON.parse(JSON.stringify(MN13)), 'member:u13v': MV13, 'device:dev1': { status: 'approved' } });
     for (const k of ['bg:veh:law:v1', 'settings:veh', 'status:decide']) delete mem.gw_data[k];
@@ -11565,7 +11573,7 @@ function J91a(x) { return JSON.stringify(x); }
     I.A = a.map((r) => r.code + ':' + (r.body.error_code || r.body.can_write));
     // B 요약 — 행 값(주기)은 내리지 않음 · 확인 필요 목록 · 근거 없음 = bg null · 꼴 틀림 = bad_bg
     const s = a[6].body.bg || {};
-    P.B = s.ver === 'veh-t1' && s.sha === 'abcdef0123456789' && s.n === 3 && s.n_sil === 2 && s.n_chk === 1 && s.n_cyc === 2 && s.groups === 2 && s.n_rules === 1 && s.checked === '2026-11-15'
+    P.B = s.ver === 'veh-t1' && s.sha === 'abcdef0123456789' && s.n === 4 && s.n_sil === 3 && s.n_chk === 1 && s.n_cyc === 3 && s.shape_ok === true && JSON.stringify(s.missing) === '[]' && s.groups === 2 && s.n_rules === 1 && s.checked === '2026-11-15'
       && JSON.stringify(s.hold) === '[{"id":"t.car.h","t":"보류 행","why":"시험 보류 이유"}]' && !('rows' in s) && a[6].body.on === false && a[6].body.flag.bg_ver === '';
     seed13(); const b1 = await c({ action: 'veh_bg_pm_get' }, tokA); seed13({ schema: 1, ver: 'x', rows: 'no', sha: 'abcdef0123456789' }); const b2 = await c({ action: 'veh_bg_pm_get' }, tokA);
     P.B = P.B && b1.code === 200 && b1.body.bg === null && b1.body.bad_bg === false && b2.code === 200 && b2.body.bg === null && b2.body.bad_bg === true;
@@ -11580,21 +11588,21 @@ function J91a(x) { return JSON.stringify(x); }
     I.C = v.map((r) => r.code + ':' + r.body.error_code).concat([v8.code]);
     // D 승격 → 앱 읽기 켜짐 · 해제 → 꺼짐 · prev 1판 · 감사 · sha 기록
     seed13(BG13(), { bg_ver: '', updated_at: 100, updated_by: 'x', other: 'keep' });
-    const d1 = await c({ action: 'veh_bg_set', bg_ver: 'veh-t1', base: 100 }, tokA); const f1 = JSON.parse(flag13());
+    const d1 = await c({ action: 'veh_bg_set', bg_ver: 'veh-t1', bg_sha: 'abcdef0123456789', base: 100 }, tokA); const f1 = JSON.parse(flag13());
     const g1 = await c({ action: 'veh_bg_get' }, tV13), p1 = await c({ action: 'veh_bg_pm_get' }, tokA);
     const d2 = await c({ action: 'veh_bg_set', bg_ver: '', base: f1.updated_at }, tokA); const f2 = JSON.parse(flag13()); const g2 = await c({ action: 'veh_bg_get' }, tV13);
     const au = aud13();
     P.D = d1.code === 200 && d1.body.bg_ver === 'veh-t1' && d1.body.prev === '' && f1.bg_ver === 'veh-t1' && f1.bg_sha === 'abcdef0123456789' && f1.updated_by === 'uadmin' && f1.updated_at > 100 && f1.other === 'keep'
-      && JSON.stringify(f1.prev) === '{"bg_ver":"","bg_sha":"","updated_at":100,"updated_by":"x"}' && g1.body.on === true && g1.body.ver === 'veh-t1' && (g1.body.rows || []).length === 3 && p1.body.on === true && p1.body.flag.prev.bg_ver === ''
+      && JSON.stringify(f1.prev) === '{"bg_ver":"","bg_sha":"","updated_at":100,"updated_by":"x"}' && g1.body.on === true && g1.body.ver === 'veh-t1' && (g1.body.rows || []).length === 4 && p1.body.on === true && p1.body.flag.prev.bg_ver === ''
       && d2.code === 200 && f2.bg_ver === '' && f2.bg_sha === '' && f2.prev.bg_ver === 'veh-t1' && f2.prev.bg_sha === 'abcdef0123456789' && g2.body.on === false && g2.body.why === 'NOT_PROMOTED'
       && au.length === 2 && au[0].bid === 'uadmin' && /^차량 법령 근거 미승격→veh-t1 · sha abcdef0123456789$/.test(au[0].ev[0].t) && au[1].ev[0].t === '차량 법령 근거 veh-t1→미승격(해제)';
     I.D = { d1: d1.code, f1, g1: g1.body.on, d2: d2.code, g2: g2.body.why, au: au.map((x) => x.ev[0].t) };
     // E 같은 판 이름·다른 내용 = 꺼짐(SHA_CHANGED) · sha 없는 옛 스위치는 종전대로 켜짐
-    seed13(BG13()); await c({ action: 'veh_bg_set', bg_ver: 'veh-t1', base: 0 }, tokA);
+    seed13(BG13()); await c({ action: 'veh_bg_set', bg_ver: 'veh-t1', bg_sha: 'abcdef0123456789', base: 0 }, tokA);
     mem.gw_data['bg:veh:law:v1'] = BG13({ sha: '0123456789abcdef' }); const e1 = await c({ action: 'veh_bg_get' }, tV13);
-    const fE = JSON.parse(flag13()), e3 = await c({ action: 'veh_bg_set', bg_ver: 'veh-t1', base: fE.updated_at }, tokA), fE2 = JSON.parse(flag13()), e4 = await c({ action: 'veh_bg_get' }, tV13);   // 검토 11/15: 같은 판 다시 승격 한 번
-    const e5 = await c({ action: 'veh_bg_set', bg_ver: 'veh-t1', base: fE2.updated_at }, tokA), auE = aud13();
-    seed13(BG13(), { bg_ver: 'veh-t1' }); const e2 = await c({ action: 'veh_bg_get' }, tV13), e6 = await c({ action: 'veh_bg_set', bg_ver: 'veh-t1', base: 0 }, tokA);
+    const fE = JSON.parse(flag13()), e3 = await c({ action: 'veh_bg_set', bg_ver: 'veh-t1', bg_sha: '0123456789abcdef', base: fE.updated_at }, tokA), fE2 = JSON.parse(flag13()), e4 = await c({ action: 'veh_bg_get' }, tV13);   // 검토 11/15: 같은 판 다시 승격 한 번
+    const e5 = await c({ action: 'veh_bg_set', bg_ver: 'veh-t1', bg_sha: '0123456789abcdef', base: fE2.updated_at }, tokA), auE = aud13();
+    seed13(BG13(), { bg_ver: 'veh-t1' }); const e2 = await c({ action: 'veh_bg_get' }, tV13), e6 = await c({ action: 'veh_bg_set', bg_ver: 'veh-t1', bg_sha: 'abcdef0123456789', base: 0 }, tokA);
     P.E = e1.body.on === false && e1.body.why === 'SHA_CHANGED' && e2.body.on === true && e3.code === 200 && e3.body.re_sha === true && fE2.bg_sha === '0123456789abcdef' && fE2.prev.bg_sha === 'abcdef0123456789' && e4.body.on === true
       && e5.code === 400 && e5.body.error_code === 'NO_CHANGE' && e6.code === 400 && e6.body.error_code === 'NO_CHANGE' && auE.length === 2 && /sha abcdef0123456789→0123456789abcdef \(같은 판 내용 바뀜 — 다시 승격\)$/.test(auE[1].ev[0].t);
     I.E = [e1.body.why, e2.body.on, e3.code, e3.body.re_sha, fE2.bg_sha, e4.body.on, e5.body.error_code, e6.body.error_code, auE.map((x) => x.ev[0].t)];
@@ -11607,7 +11615,7 @@ function J91a(x) { return JSON.stringify(x); }
     I.F = f.map((r) => r.code + ':' + r.body.error_code);
     // G 콘솔 — pmcon_decide kind vehbg(R2) → 같은 핸들러 · 누른 기록 1줄 · 등급·줄 틀림 거절 · PM 아님 거절
     seed13(BG13());
-    const body = (o) => Object.assign({ action: 'pmcon_decide', kind: 'vehbg', row: 'vehbg:veh-t1', choice: 'ok', grade: 'R2', due: '', q: '차량 법령 근거를 승격할까요?', rec: '승격', args: { bg_ver: 'veh-t1' }, set_base: 0, base: 0 }, o || {});
+    const body = (o) => Object.assign({ action: 'pmcon_decide', kind: 'vehbg', row: 'vehbg:veh-t1', choice: 'ok', grade: 'R2', due: '', q: '차량 법령 근거를 승격할까요?', rec: '승격', args: { bg_ver: 'veh-t1', bg_sha: 'abcdef0123456789' }, set_base: 0, base: 0 }, o || {});
     const gN = await c(body(), tN13), gG = await c(body({ grade: 'R1' }), tokA), gR = await c(body({ row: 'vehbg:veh-t2' }), tokA);
     const okNone = flag13() === 'null';
     const gO = await c(body(), tokA); const fl = JSON.parse(flag13()), dec = mem.gw_data['status:decide'] || { log: [] };
@@ -11626,13 +11634,13 @@ function J91a(x) { return JSON.stringify(x); }
     T('P1 판13 ⑥ 읽기 실패: 스위치 못 읽음 = veh_bg_set·veh_bg_pm_get 503 FLAG_READ_FAILED · 근거 표 못 읽음 = veh_bg_set 503 BG_READ_FAILED · 쓰기·감사 0', R13.P.F, JSON.stringify(R13.I.F));
     T('P1 판13 ⑦ PM 콘솔 길: pmcon_decide kind vehbg(R2 · 줄 vehbg:<판>) = PM 아닌 관리자 403 · 등급 R1 400 BAD_GRADE · 바꾸는 판과 줄이 다르면 400 BAD_ROW(쓰기 0) · PM [ㄱ] = 같은 handleVehBgSet로 승격(updated_by PM)·누른 기록 1줄(applied)·차량근거 감사 1줄', R13.P.G, JSON.stringify(R13.I.G));
     const MUT13 = [
-      ["  if (v && !(vehBgOk(s.bg) && s.bg.ver === v)) return jr(409, { status: 'CONFLICT', error_code: 'BG_MISSING', request_id: R });", ''],
+      ["  if (v && !(vehBgOk(s.bg) && bgShapeOk(s.bg, 'veh') && s.bg.ver === v)) return jr(409, { status: 'CONFLICT', error_code: 'BG_MISSING', request_id: R });", ''],
       ["async function handleVehBgSet(event, d, R) {\n  const g = await pmconGate(event, R, true);", "async function handleVehBgSet(event, d, R) {\n  const g = await pmconGate(event, R, false);"],
       ["  if (Number(d.base) !== (Number(cur.updated_at) || 0)) return jr(409,", '  if (false) return jr(409,'],
       ["  if (flag.bg_sha && flag.bg_sha !== bg.sha) return { on: false, why: 'SHA_CHANGED' };", ''],
       ["bg_sha: v ? s.bg.sha : '', prev:", "bg_sha: '', prev:"],
       ["prev: { bg_ver: before, bg_sha: typeof cur.bg_sha === 'string' ? cur.bg_sha : '', updated_at: Number(cur.updated_at) || 0, updated_by: String(cur.updated_by || '') },", ''],
-      ["  if (Object.keys(d || {}).some(function (k) { return k !== 'action' && k !== 'bg_ver' && k !== 'base'; })) return jr(400,", '  if (false) return jr(400,'],
+      ["  if (Object.keys(d || {}).some(function (k) { return k !== 'action' && k !== 'bg_ver' && k !== 'base' && k !== 'bg_sha'; })) return jr(400,", '  if (false) return jr(400,'],
       ["PMCON_KINDS.vehbg = { label: '차량 근거 승격', grade: 'R2',", "PMCON_KINDS.vehbg = { label: '차량 근거 승격', grade: 'R1',"],
       ["  if (!rf.ok && rf.code !== 'NOT_FOUND') return { ok: false, code: 'FLAG_READ_FAILED' };", ''],
       ["  try { au = (await appendAudit({ ts: now, by: c.member.name, bid: c.member.id, col: 'vehicles',", "  try { au = (await (async () => false)({ ts: now, by: c.member.name, bid: c.member.id, col: 'vehicles',"],
@@ -11690,7 +11698,7 @@ function J91a(x) { return JSON.stringify(x); }
     out.push(r7.body.on + ':' + r7.body.why, r8.body.on + ':' + r8.body.why + ':' + r8.body.flag.bg_sha + ':' + r8.body.avail.sha);
     const off = [r0, r1, r2, r3, r6, r7, r8].every((r) => r.code === 200 && r.body.on === false && !('rows' in r.body) && !('sum' in r.body));
     const SUMJ = '{"ver":"v1-20261115","sha":"abcdef0123456789","checked":"2026-11-15","n":3,"n_pending":1,"n_calc_false":2}';
-    const want = '401|NO_ACCESS|DEVICE_NOT_APPROVED|false:NO_BG:null|false:BAD_BG|false:NOT_PROMOTED:' + SUMJ + '|false:NOT_PROMOTED:v1-20261101:5:false'
+    const want = '401|NO_ACCESS|DEVICE_NOT_APPROVED|false:NO_BG:null|false:BAD_BG|false:NOT_PROMOTED:' + SUMJ.replace(/\}$/, ',"shape_ok":true}') + '|false:NOT_PROMOTED:v1-20261101:5:false'   // C275: avail 에 승격 꼴 방어 결과 shape_ok
       + '|true:' + SUMJ + ':3:false|true:true|false:FLAG_READ_FAILED|false:NOT_PROMOTED|false:SHA_CHANGED:abcdef0123456789:1111222233334444';
     return { ok: off && out.join('|') === want, info: out.join('|') };
   };
@@ -11703,16 +11711,16 @@ function J91a(x) { return JSON.stringify(x); }
       && mem.gw_data[KF].bg_ver === '' && mem.gw_data[KF].updated_at === 7 && audH14().length === 0;
     I.deny = [a1.body.error_code, a2.body.error_code, a3.code, b1.body.error_code, b2.body.error_code, b3.body.error_code, b4.body.error_code, audH14().length];
     const au0 = audH14().length;
-    const s1 = await c({ action: 'hr_bg_set', bg_ver: 'v1-20261115', base: 7 }, tokA);
+    const s1 = await c({ action: 'hr_bg_set', bg_ver: 'v1-20261115', bg_sha: 'abcdef0123456789', base: 7 }, tokA);
     const f1 = JSON.parse(JSON.stringify(mem.gw_data[KF])), au1 = audH14().slice(au0);
-    const s2 = await c({ action: 'hr_bg_set', bg_ver: 'v1-20261115', base: f1.updated_at }, tokA);
+    const s2 = await c({ action: 'hr_bg_set', bg_ver: 'v1-20261115', bg_sha: 'abcdef0123456789', base: f1.updated_at }, tokA);
     P.on = s1.code === 200 && s1.body.bg_ver === 'v1-20261115' && f1.bg_ver === 'v1-20261115' && f1.bg_sha === 'abcdef0123456789' && !!f1.prev && f1.prev.bg_ver === '' && f1.prev.bg_sha === '' && f1.prev.updated_at === 7 && f1.updated_by === 'uadmin' && f1.keep_me === 1 && f1.updated_at > 7
       && au1.length === 1 && au1[0].ev[0].op === '인사근거' && /미승격→v1-20261115 · sha abcdef0123456789 · 확인 필요 1건/.test(au1[0].ev[0].t) && au1[0].bid === 'uadmin' && s1.body.audit === true
       && s2.code === 400 && s2.body.error_code === 'NO_CHANGE';
     I.on = [s1.code, f1.bg_ver, f1.bg_sha, f1.prev && f1.prev.bg_ver, f1.keep_me, au1.map((l) => l.ev[0].t).join('/'), s2.body.error_code];
     // 검토 ②: 같은 판 이름으로 내용이 바뀌어 올라오면 꺼지고(SHA_CHANGED), 같은 ver로 다시 승격하면 새 sha가 스위치에 적힘
     mem.gw_data[KB].sha = '1111222233334444';
-    const g5 = await c({ action: 'hr_bg_get' }, tokA), s5 = await c({ action: 'hr_bg_set', bg_ver: 'v1-20261115', base: f1.updated_at }, tokA), f5 = JSON.parse(JSON.stringify(mem.gw_data[KF])), g6 = await c({ action: 'hr_bg_get' }, tokA);
+    const g5 = await c({ action: 'hr_bg_get' }, tokA), s5 = await c({ action: 'hr_bg_set', bg_ver: 'v1-20261115', bg_sha: '1111222233334444', base: f1.updated_at }, tokA), f5 = JSON.parse(JSON.stringify(mem.gw_data[KF])), g6 = await c({ action: 'hr_bg_get' }, tokA);
     P.re = g5.body.on === false && g5.body.why === 'SHA_CHANGED' && s5.code === 200 && f5.bg_ver === 'v1-20261115' && f5.bg_sha === '1111222233334444' && !!f5.prev && f5.prev.bg_sha === 'abcdef0123456789' && g6.body.on === true;
     I.re = [g5.body.why, s5.code, s5.body.error_code, f5.bg_sha, g6.body.on];
     blobsMock.hooks.failGet = (k) => k === KF; let s3; try { s3 = await c({ action: 'hr_bg_set', bg_ver: '', base: f5.updated_at }, tokA); } finally { blobsMock.hooks.failGet = null; }
@@ -11723,7 +11731,7 @@ function J91a(x) { return JSON.stringify(x); }
   };
   const chkC = async (c) => {   // PM 콘솔 줄 hrbg — [ㄱ] = 기존 길(hr_bg_set)로 승격 + 누른 기록 · 등급·줄 id 검사 · [기본값] = 그대로(미승격 — 표시만)
     seedH14(BG14(), { bg_ver: '', updated_at: 9 });
-    const body = (o) => Object.assign({ action: 'pmcon_decide', kind: 'hrbg', row: 'hrbg:v1-20261115', choice: 'ok', grade: 'R2', due: '', q: '인사 법령 근거를 승격할까요? (확인 필요 1건)', rec: '승격', args: { bg_ver: 'v1-20261115' }, set_base: 9, base: 0 }, o || {});
+    const body = (o) => Object.assign({ action: 'pmcon_decide', kind: 'hrbg', row: 'hrbg:v1-20261115', choice: 'ok', grade: 'R2', due: '', q: '인사 법령 근거를 승격할까요? (확인 필요 1건)', rec: '승격', args: { bg_ver: 'v1-20261115', bg_sha: 'abcdef0123456789' }, set_base: 9, base: 0 }, o || {});
     const g1 = await c(body({ grade: 'R1' }), tokA), g2 = await c(body({ row: 'hrbg:v1-20261101' }), tokA), g3 = await c(body(), tN14);
     const d1 = await c(body({ choice: 'default', args: undefined, set_base: undefined, def_is_rec: false }), tokA);
     const fD = JSON.parse(JSON.stringify(mem.gw_data[KF])), mk = (mem.gw_data['status:decide'] || {}).marks || {};
@@ -11744,7 +11752,7 @@ function J91a(x) { return JSON.stringify(x); }
     const libs = fsH14.readdirSync(join(FN, '_lib')).filter((f) => /\.js$/.test(f)).filter((f) => /bg:hr:law|settings:hr|hr_bg_/.test(fsH14.readFileSync(join(FN, '_lib', f), 'utf8')));
     const inData = (SRCH14.match(/HR_BG_KEYS\.(bg|flag)/g) || []).length;
     T('P1 판14 ④ 계산 그대로: 인사 근거 키(bg:hr:law·settings:hr)·동작(hr_bg_*)을 아는 서버 파일 = gw-data.js 하나(다른 함수 파일·_lib 0 — 연차·계약직 레이더 계산은 이 표를 읽지 않음) · gw-data 안에서도 HR_BG_KEYS 쓰는 자리 = 읽기 세 곳(스위치 1·표 2)·스위치 쓰기 한 곳뿐',
-      others.length === 0 && libs.length === 0 && inData === 4 && /PMCON_KINDS\.hrbg = \{ label: '인사 법령 근거 승격', grade: 'R2', fn: handleHrBgSet, args: \{ bg_ver: 's' \}/.test(SRCH14), JSON.stringify({ others, libs, inData }));
+      others.length === 0 && libs.length === 0 && inData === 4 && /PMCON_KINDS\.hrbg = \{ label: '인사 법령 근거 승격', grade: 'R2', fn: handleHrBgSet, args: \{ bg_ver: 's', bg_sha: 's' \}/.test(SRCH14), JSON.stringify({ others, libs, inData }));
     const MUT = {
       A: [["  if (!ver || ver !== bg.ver) return Object.assign(base, { on: false, why: 'NOT_PROMOTED' });\n", ''],
         ["  if (!c.member.admin && hp !== 'view' && hp !== 'do') return jr(403,", '  if (false) return jr(403,'],
@@ -11754,8 +11762,8 @@ function J91a(x) { return JSON.stringify(x); }
         ["  if (!hrFsha) return Object.assign(base, { on: false, why: 'NOT_PROMOTED' });", ''],   // 검토 ②: sha 없는 옛 스위치를 승격으로
         ["  if (hrFsha !== bg.sha) return Object.assign(base, { on: false, why: 'SHA_CHANGED' });", '']],   // 검토 ②: 내용 바뀜을 못 봄
       B: [["async function handleHrBgSet(event, d, R) {\n  const g = await pmconGate(event, R, true);", "async function handleHrBgSet(event, d, R) {\n  const g = await pmconGate(event, R, false);"],
-        ["    if (!hrBgOk(bg) || bg.ver !== v) return jr(409, { status: 'CONFLICT', error_code: 'BG_MISSING', request_id: R });", '    if (!bg) return jr(409, { status: \'CONFLICT\', error_code: \'BG_MISSING\', request_id: R });'],
-        ["  if (d.base !== undefined && Number(d.base) !== Number(cur.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'HR_BG_STALE', request_id: R });\n", ''],
+        ["    if (!hrBgOk(bg) || !bgShapeOk(bg, 'hr') || bg.ver !== v) return jr(409, { status: 'CONFLICT', error_code: 'BG_MISSING', request_id: R });", '    if (!bg) return jr(409, { status: \'CONFLICT\', error_code: \'BG_MISSING\', request_id: R });'],
+        ["  if (d.base !== Number(cur.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'HR_BG_STALE', request_id: R });\n", ''],
         ["  if (!fr.ok) return jr(503, { status: 'ERROR', error_code: 'HR_FLAG_READ_FAILED', request_id: R });", '  if (false) return jr(503, {});'],
         ["prev: { bg_ver: curVer, bg_sha: curSha, updated_at: Number(cur.updated_at) || 0, updated_by: cur.updated_by || '' }, ", ''],
         ["  try { hrAu = await appendAudit({", '  try { hrAu = true || await appendAudit({'],
@@ -16844,6 +16852,152 @@ function J91a(x) { return JSON.stringify(x); }
     T('C269 ③ 결함 사본 ' + MU9.length + '개(parseAttachment 입구 걷기 · 면허증·운전면허 빼기 · 보이지 않는 글자 안 지움 · 외국인등록 빼기 · 여권·passport 빼기 · id card 앞 조건 걷기 · 띄운 신 분 증 · grade_parse 입구 걷기) = 모두 ✗', kill9.length === 0, kill9.join(' | '));
   } catch (e) { T('C269 ③ 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
   finally { global.fetch = realFetch9; process.env.ANTHROPIC_API_KEY = savedK9[0] || ''; process.env.GW_ANTHROPIC_KEY = savedK9[1] || ''; load9(null); const s = JSON.parse(snap9); mem.gw_users = s.u; mem.gw_data = s.d; mem.gw_files = s.f; }
+}
+
+{ // ---- C275 근거 표 승격 줄 방어 — 급여(v511 pay_bg_set)에 있는 ① 지문 대조(bg_sha) ② 꼭 읽는 값(BG_INCOMPLETE) ③ 밑판 필수(NEED_BASE) ④ 꼴 방어(bgShapeOk)를
+  //   인사 hr_bg_set · 차량 veh_bg_set · 계약 con_proc_bg_set(+ 자동 이월)에 · 콘솔 줄 kind hrbg·vehbg·bg 의 인자 bg_sha. 실제 핸들러(mock 저장소) · 시각에 기대지 않음(낙관락 값은 저장된 값을 읽어 씀).
+  //   결함 사본(gw-data 한 곳을 바꿔 메모리에서 컴파일)에서는 실패해야 한다. C275_BASE=<옛 gw-data.js 경로> 를 주면 그 판으로 같은 검사를 돌려 결과만 찍는다(고치기 전 실패 확인용 — 집계 밖).
+  const fs75 = require('fs'), Mod75 = require('module'), crypto75 = require('crypto');
+  const FILE75 = join(FN, 'gw-data.js'), SRC75 = fs75.readFileSync(FILE75, 'utf8');
+  const load75 = (src) => { const m = new Mod75(FILE75); m.filename = FILE75; m.paths = Mod75._nodeModulePaths(dirname(FILE75)); m._compile(src, FILE75); return m.exports; };
+  const mut75 = (from, to) => { if (SRC75.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return SRC75.replace(from, () => to); };
+  const caller75 = (mod) => async (body, tok, dev) => { const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+  const snap75 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  const reset75 = () => { const s = JSON.parse(snap75); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; auditMock.logs.length = 0; };
+  const cp75 = (o) => JSON.parse(JSON.stringify(o));
+  const code75 = (r) => r.code + ':' + (r.body.error_code || r.body.status) + (r.body.keys ? ':' + r.body.keys.join('+') : '');
+  const SHA75 = 'abcdef0123456789';
+  // 인사
+  const HRBG = () => ({ schema: 1, layer: 'bg', domain: 'hr', ver: 'v1-20261115', sha: SHA75, rows: [{ id: 'law.t.1', grade: '실측', calc: true, checked: '2026-11-15' }, { id: 'rule.t.2', grade: '확인 필요', calc: false, checked: '2026-11-14' }] });
+  const chkHr = async (c) => {
+    const seed = (bg) => { reset75(); mem.gw_data['bg:hr:law:v1'] = bg; mem.gw_data['settings:hr'] = { bg_ver: '', updated_at: 7 }; };
+    const out = [];
+    const one = async (bg, body) => { seed(bg); const r = await c(Object.assign({ action: 'hr_bg_set' }, body), tokA); out.push(code75(r)); return r; };
+    await one(HRBG(), { bg_ver: 'v1-20261115', bg_sha: SHA75 });                             // ③ base 없음
+    await one(HRBG(), { bg_ver: 'v1-20261115', base: 7 });                                   // ① 지문 없음
+    await one(HRBG(), { bg_ver: 'v1-20261115', bg_sha: '1111222233334444', base: 7 });       // ① 지문 다름
+    const dup = HRBG(); dup.rows[1].id = 'law.t.1'; await one(dup, { bg_ver: 'v1-20261115', bg_sha: SHA75, base: 7 });   // ④ 행 id 중복
+    const nh = HRBG(); nh.sha = 'zzzzzzzzzzzz'; await one(nh, { bg_ver: 'v1-20261115', bg_sha: 'zzzzzzzzzzzz', base: 7 });   // ④ 지문 꼴(16진 아님)
+    const big = HRBG(); for (let i = 0; i < 500; i++) big.rows.push({ id: 'law.x.' + i, grade: '실측', calc: true }); await one(big, { bg_ver: 'v1-20261115', bg_sha: SHA75, base: 7 });   // ④ 행 수 상한
+    await one(HRBG(), { bg_ver: '', bg_sha: 'x', base: 7 });                                  // 해제에 지문 = 400
+    const still = mem.gw_data['settings:hr'].bg_ver === '' && mem.gw_data['settings:hr'].updated_at === 7 && auditMock.logs.filter((l) => l.col === 'hr').length === 0;
+    const ok1 = await one(HRBG(), { bg_ver: 'v1-20261115', bg_sha: SHA75, base: 7 });
+    const on = ok1.code === 200 && mem.gw_data['settings:hr'].bg_sha === SHA75;
+    seed(HRBG()); const g = await c({ action: 'hr_bg_get' }, tokA); out.push('get:' + (g.body.avail && g.body.avail.shape_ok));
+    // 콘솔 줄 hrbg — 지문이 다르면 핸들러 거절 그대로(기록 0) · 맞으면 승격
+    seed(HRBG());
+    const cb = (sha) => ({ action: 'pmcon_decide', kind: 'hrbg', row: 'hrbg:v1-20261115', choice: 'ok', grade: 'R2', due: '', q: '인사 법령 근거를 승격할까요?', rec: '승격', args: { bg_ver: 'v1-20261115', bg_sha: sha }, set_base: 7, base: 0 });
+    const k1 = await c(cb('1111222233334444'), tokA), k0 = await c(Object.assign(cb(SHA75), { args: { bg_ver: 'v1-20261115' } }), tokA), dec0 = !mem.gw_data['status:decide'], k2 = await c(cb(SHA75), tokA);
+    out.push('con:' + code75(k1) + '/' + code75(k0) + '/' + dec0 + '/' + k2.code + ':' + (mem.gw_data['settings:hr'].bg_sha === SHA75));
+    const want = '400:NEED_BASE|409:BG_CHANGED|409:BG_CHANGED|409:BG_MISSING|409:BG_MISSING|409:BG_MISSING|400:BAD_VALUE|200:OK|get:true|con:409:BG_CHANGED/400:BAD_ARGS/true/200:true';
+    return { ok: still && on && out.join('|') === want, info: out.join('|') + ' still ' + still + ' on ' + on };
+  };
+  // 차량
+  const VR = (id, cls) => ({ id: id, title: '시험', grade: '실측', cites: [{ law: '시험' }], cls: cls, every_m: 12, checked: '2026-11-15' });
+  const VEHBG = (o) => Object.assign({ schema: 1, layer: 'bg', domain: 'veh', ver: 'veh-t1', sha: SHA75, rows: [VR('t.car', 'car'), VR('t.ceq', 'ceq'), { id: 't.h', title: '보류', grade: '확인 필요', cls: 'car', every_m: 24 }] }, o || {});
+  const chkVeh = async (c) => {
+    const seed = (bg) => { reset75(); mem.gw_data['bg:veh:law:v1'] = bg; mem.gw_data['settings:veh'] = { bg_ver: '', updated_at: 7 }; };
+    const out = [];
+    const one = async (bg, body) => { seed(bg); const r = await c(Object.assign({ action: 'veh_bg_set' }, body), tokA); out.push(code75(r)); return r; };
+    await one(VEHBG(), { bg_ver: 'veh-t1', base: 7 });                                      // ① 지문 없음
+    await one(VEHBG(), { bg_ver: 'veh-t1', bg_sha: '1111222233334444', base: 7 });          // ① 지문 다름
+    await one(VEHBG({ rows: [VR('t.car', 'car'), { id: 't.h', grade: '확인 필요', cls: 'ceq', every_m: 12 }] }), { bg_ver: 'veh-t1', bg_sha: SHA75, base: 7 });   // ② 건설기계 쓸 행 없음
+    await one(VEHBG({ rows: [VR('t.ceq', 'ceq'), Object.assign(VR('t.car', 'car'), { cites: [] })] }), { bg_ver: 'veh-t1', bg_sha: SHA75, base: 7 });   // ② 자동차 행이 조문 인용 없음 = 쓸 행 아님
+    await one(VEHBG({ rows: [VR('t.car', 'car'), VR('t.car', 'ceq')] }), { bg_ver: 'veh-t1', bg_sha: SHA75, base: 7 });   // ④ 행 id 중복
+    await one(VEHBG({ domain: 'hr' }), { bg_ver: 'veh-t1', bg_sha: SHA75, base: 7 });       // ④ 다른 영역 표
+    await one(VEHBG({ rows: [VR('t.car', 'car'), VR('t.ceq', 'ceq'), { id: 't.x', grade: '초안', cls: 'car' }] }), { bg_ver: 'veh-t1', bg_sha: SHA75, base: 7 });   // ④ 등급 꼴
+    await one(VEHBG(), { bg_ver: '', bg_sha: SHA75, base: 7 });                             // 해제에 지문 = 400
+    const still = mem.gw_data['settings:veh'].bg_ver === '' && mem.gw_data['settings:veh'].updated_at === 7 && auditMock.logs.filter((l) => l.col === 'vehicles').length === 0;
+    const ok1 = await one(VEHBG(), { bg_ver: 'veh-t1', bg_sha: SHA75, base: 7 });
+    const on = ok1.code === 200 && mem.gw_data['settings:veh'].bg_sha === SHA75;
+    seed(VEHBG({ rows: [VR('t.car', 'car')] })); const g = await c({ action: 'veh_bg_pm_get' }, tokA); out.push('get:' + g.body.bg.shape_ok + ':' + g.body.bg.missing.join('+'));
+    seed(VEHBG());
+    const cb = (sha) => ({ action: 'pmcon_decide', kind: 'vehbg', row: 'vehbg:veh-t1', choice: 'ok', grade: 'R2', due: '', q: '차량 법령 근거를 승격할까요?', rec: '승격', args: { bg_ver: 'veh-t1', bg_sha: sha }, set_base: 7, base: 0 });
+    const k1 = await c(cb('1111222233334444'), tokA), dec0 = !mem.gw_data['status:decide'], k2 = await c(cb(SHA75), tokA);
+    out.push('con:' + code75(k1) + '/' + dec0 + '/' + k2.code + ':' + (mem.gw_data['settings:veh'].bg_sha === SHA75));
+    const want = '409:BG_CHANGED|409:BG_CHANGED|409:BG_INCOMPLETE:ceq|409:BG_INCOMPLETE:car|409:BG_MISSING|409:BG_MISSING|409:BG_MISSING|400:BAD_VALUE|200:OK|get:true:ceq|con:409:BG_CHANGED/true/200:true';
+    return { ok: still && on && out.join('|') === want, info: out.join('|') + ' still ' + still + ' on ' + on };
+  };
+  // 계약(+ 자동 이월)
+  const MAP75 = (refs) => ({ schema: 1, proc_ver: 'v1', sha: 'map0123456789', scen: { 'demo:pub': [{ i: 0, name: '가', due_rule: { kind: 'law', law: refs[0] } }, { i: 1, name: '나', due_rule: { kind: 'manual' } }] }, added: refs[1] ? { a1: { due_rule: { kind: 'law', law: refs[1] } } } : {} });
+  const CR = (id, ck) => ({ id: id, law: '시험 법', art: '제1조', mst: 1, eff: '2026-08-01', checked: ck || '2026-10-31', grade: '실측', days: 7, base: '작업 시작일', kind: 'days' });
+  const CONBG = (o) => Object.assign({ schema: 1, layer: 'bg', ver: 'v1-20261031', sha: SHA75, rows: [CR('law.a'), CR('law.b')] }, o || {});
+  const chkCon = async (c) => {
+    const seed = (bg, refs) => { reset75(); mem.gw_data['bg:contract:law:v1'] = bg; mem.gw_data['map:contract:v1'] = MAP75(refs || ['law.a', 'law.b']); mem.gw_data['settings:contract'] = { schema: 1, use_blob: true, bg_ver: '', annual_override: {}, updated_at: 7 }; };
+    const out = [];
+    const one = async (bg, body, refs) => { seed(bg, refs); const r = await c(Object.assign({ action: 'con_proc_bg_set' }, body), tokA); out.push(code75(r)); return r; };
+    await one(CONBG(), { bg_ver: 'v1-20261031', bg_sha: SHA75 });                            // ③ base 없음
+    await one(CONBG(), { bg_auto: true });                                                   // ③ 같은 길의 자동 이월 스위치도 base 필수
+    await one(CONBG(), { bg_ver: 'v1-20261031', base: 7 });                                  // ① 지문 없음
+    await one(CONBG(), { bg_ver: 'v1-20261031', bg_sha: '1111222233334444', base: 7 });      // ① 지문 다름
+    await one(CONBG(), { bg_ver: 'v1-20261031', bg_sha: SHA75, base: 7 }, ['law.a', 'law.z']);   // ② 매핑이 부르는 행 없음(신설 단계)
+    await one(CONBG(), { bg_ver: 'v1-20261031', bg_sha: SHA75, base: 7 }, ['law.y']);        // ② 매핑이 부르는 행 없음(시나리오 단계)
+    await one(CONBG({ rows: [CR('law.a'), CR('law.a')] }), { bg_ver: 'v1-20261031', bg_sha: SHA75, base: 7 }, ['law.a']);   // ④ 행 id 중복
+    await one(CONBG({ rows: [] }), { bg_ver: 'v1-20261031', bg_sha: SHA75, base: 7 }, ['']);   // ④ 빈 표
+    await one(CONBG(), { bg_ver: '', bg_sha: SHA75, base: 7 });                               // 해제에 지문 = 400
+    const still = mem.gw_data['settings:contract'].bg_ver === '' && mem.gw_data['settings:contract'].updated_at === 7 && auditMock.logs.filter((l) => l.col === 'contracts').length === 0;
+    const ok1 = await one(CONBG(), { bg_ver: 'v1-20261031', bg_sha: SHA75, base: 7 });
+    const on = ok1.code === 200 && mem.gw_data['settings:contract'].bg_ver === 'v1-20261031';
+    seed(CONBG(), ['law.a', 'law.q']); const g = await c({ action: 'con_proc_get' }, tokA); out.push('get:' + JSON.stringify(g.body.bg_guard));
+    seed(CONBG());
+    const cb = (sha) => ({ action: 'pmcon_decide', kind: 'bg', row: 'bg:v1-20261031', choice: 'ok', grade: 'R2', due: '', q: '계약 법령 기준표 새 판을 승격할까요?', rec: '승격', args: { bg_ver: 'v1-20261031', bg_sha: sha }, set_base: 7, base: 0 });
+    const k1 = await c(cb('1111222233334444'), tokA), dec0 = !mem.gw_data['status:decide'], k2 = await c(cb(SHA75), tokA);
+    out.push('con:' + code75(k1) + '/' + dec0 + '/' + k2.code + ':' + mem.gw_data['settings:contract'].bg_ver);
+    // 자동 이월(스위치 켜짐 · 확인일만 바뀐 새 판): 매핑이 부르는 행이 다 있고 꼴이 맞으면 이월 · 매핑이 새 행을 부르면(판에 없음) 이월 안 함 · 지문 꼴이 틀린 판도 이월 안 함
+    const carry = async (refs2, sha2) => {
+      seed(CONBG(), ['law.a', 'law.b']); mem.gw_data['settings:contract'] = { schema: 1, use_blob: true, bg_ver: '', annual_override: {}, updated_at: 7 };
+      const p = await c({ action: 'con_proc_bg_set', bg_ver: 'v1-20261031', bg_sha: SHA75, base: 7 }, tokA);
+      const a = await c({ action: 'con_proc_bg_set', bg_auto: true, base: mem.gw_data['settings:contract'].updated_at }, tokA);
+      mem.gw_data['bg:contract:law:v1'] = CONBG({ ver: 'v1-20261201', sha: sha2, rows: [CR('law.b', '2026-12-01'), CR('law.a', '2026-12-01')] });
+      mem.gw_data['map:contract:v1'] = MAP75(refs2);
+      const r = await c({ action: 'con_proc_get' }, tokA);
+      return p.code + '/' + a.code + '/' + r.body.flag.bg_ver;
+    };
+    out.push('carry:' + await carry(['law.a', 'law.b'], 'fedcba9876543210') + ',' + await carry(['law.a', 'law.n'], 'fedcba9876543210') + ',' + await carry(['law.a', 'law.b'], 'NOTHEX-NOTHEX'));
+    const want = '400:NEED_BASE|400:NEED_BASE|409:BG_CHANGED|409:BG_CHANGED|409:BG_INCOMPLETE:law.z|409:BG_INCOMPLETE:law.y|409:BG_MISSING|409:BG_MISSING|400:BAD_VALUE|200:OK'
+      + '|get:{"shape_ok":true,"missing":["law.q"]}|con:409:BG_CHANGED/true/200:v1-20261031|carry:200/200/v1-20261201,200/200/v1-20261031,200/200/v1-20261031';
+    return { ok: still && on && out.join('|') === want, info: out.join('|') + ' still ' + still + ' on ' + on };
+  };
+  const CH75 = { hr: chkHr, veh: chkVeh, con: chkCon };
+  try {
+    if (process.env.C275_BASE) {   // 고치기 전 판으로 같은 검사(집계 밖 — 결과만)
+      const mb = load75(fs75.readFileSync(process.env.C275_BASE, 'utf8'));
+      for (const n of Object.keys(CH75)) { let r; try { r = await CH75[n](caller75(mb)); } catch (e) { r = { ok: 'err', info: String(e.message).slice(0, 200) }; } console.log('  [C275 고치기 전 ' + n + '] ' + (r.ok === true ? '통과' : '실패') + ' — ' + r.info); }
+      reset75();
+    }
+    const c0 = caller75(gwd), RH = await chkHr(c0), RV = await chkVeh(c0), RC = await chkCon(c0);
+    T('C275 ① 인사 hr_bg_set: base 없음 400 NEED_BASE · 지문 없음·다름 409 BG_CHANGED · 행 id 중복·지문 꼴(16진 아님)·행 500 넘음 409 BG_MISSING · 해제에 지문 400 BAD_VALUE(전부 스위치·감사 그대로) · 맞으면 200(bg_sha 기록) · hr_bg_get avail.shape_ok · 콘솔 hrbg 지문 다름 409 그대로(누른 기록 0)·지문 칸 없는 옛 앱 400 BAD_ARGS·맞으면 승격', RH.ok, RH.info);
+    T('C275 ② 차량 veh_bg_set: 지문 없음·다름 409 BG_CHANGED · 건설기계·자동차 쓸 수 있는 주기 행 없음 409 BG_INCOMPLETE(keys ceq·car — 조문 인용 없는 행은 쓸 행 아님) · 행 id 중복·다른 영역 표·등급 꼴 409 BG_MISSING · 해제에 지문 400 · 맞으면 200 · veh_bg_pm_get 요약 shape_ok·missing · 콘솔 vehbg 지문 다름 409(기록 0)·맞으면 승격', RV.ok, RV.info);
+    T('C275 ③ 계약 con_proc_bg_set: base 없음 400 NEED_BASE(승격·자동 이월 스위치 같은 길) · 지문 없음·다름 409 BG_CHANGED · 매핑 due_rule.law 가 부르는 행 없음(시나리오·신설) 409 BG_INCOMPLETE(keys) · 행 id 중복·빈 표 409 BG_MISSING · 해제에 지문 400 · 맞으면 200 · con_proc_get bg_guard · 콘솔 bg 지문 다름 409(기록 0) · 자동 이월: 맞는 판 = 이월 · 매핑이 부르는 행이 빠진 판·지문 꼴 틀린 판 = 이월 안 함', RC.ok, RC.info);
+    const MUT75 = [
+      ['hr', "    if (typeof d.bg_sha !== 'string' || sum.sha !== d.bg_sha) return jr(409, { status: 'CONFLICT', error_code: 'BG_CHANGED', request_id: R });   // C275 ①", '    // C275 ①'],
+      ['hr', "  if (typeof d.base !== 'number' || !isFinite(d.base)) return jr(400, { status: 'REJECTED', error_code: 'NEED_BASE', request_id: R });   // C275 ③ 낙관락 값은 늘 받는다(스위치 없음 = 0 — 급여와 같게)\n  if (d.base !== Number(cur.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'HR_BG_STALE'", "  if (d.base !== undefined && Number(d.base) !== Number(cur.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'HR_BG_STALE'"],
+      ['hr', "    if (!hrBgOk(bg) || !bgShapeOk(bg, 'hr') || bg.ver !== v)", '    if (!hrBgOk(bg) || bg.ver !== v)'],
+      ['hr', "PMCON_KINDS.hrbg = { label: '인사 법령 근거 승격', grade: 'R2', fn: handleHrBgSet, args: { bg_ver: 's', bg_sha: 's' }", "PMCON_KINDS.hrbg = { label: '인사 법령 근거 승격', grade: 'R2', fn: handleHrBgSet, args: { bg_ver: 's' }"],
+      ['hr', "  } else if (d.bg_sha !== undefined && d.bg_sha !== '') return jr(400, { status: 'REJECTED', error_code: 'BAD_VALUE', request_id: R });\n  const newSha", '  }\n  const newSha'],
+      ['veh', "    if (typeof d.bg_sha !== 'string' || d.bg_sha !== s.bg.sha) return jr(409, { status: 'CONFLICT', error_code: 'BG_CHANGED', request_id: R });   // C275 ①", '    // C275 ①'],
+      ['veh', "    if (miss.length) return jr(409, { status: 'CONFLICT', error_code: 'BG_INCOMPLETE', keys: miss, request_id: R });", ''],
+      ['veh', "vehBgOk(s.bg) && bgShapeOk(s.bg, 'veh') && s.bg.ver === v", 'vehBgOk(s.bg) && s.bg.ver === v'],
+      ['veh', "return !rows.some(function (r) { return vehLawRowOkS(r) && r.cls === cls; });", "return !rows.some(function (r) { return r && r.cls === cls; });"],
+      ['veh', "PMCON_KINDS.vehbg = { label: '차량 근거 승격', grade: 'R2', fn: handleVehBgSet, args: { bg_ver: 's', bg_sha: 's' }", "PMCON_KINDS.vehbg = { label: '차량 근거 승격', grade: 'R2', fn: handleVehBgSet, args: { bg_ver: 's' }"],
+      ['con', "      if (typeof d.bg_sha !== 'string' || d.bg_sha !== L.bg.sha) return jr(409, { status: 'CONFLICT', error_code: 'BG_CHANGED', request_id: R });", ''],
+      ['con', "      if (miss.length) return jr(409, { status: 'CONFLICT', error_code: 'BG_INCOMPLETE', keys: miss.slice(0, 40), request_id: R });", ''],
+      ['con', "if (!L.bg || !bgShapeOk(L.bg) || L.bg.ver !== v)", 'if (!L.bg || L.bg.ver !== v)'],
+      ['con', "  if (typeof d.base !== 'number' || !isFinite(d.base)) return jr(400, { status: 'REJECTED', error_code: 'NEED_BASE', request_id: R });   // C275 ③ 낙관락 값은 늘 받는다(스위치 없음 = 0 — 급여와 같게 · 이 길의", '  // ('],
+      ['con', "  if (map && map.added && typeof map.added === 'object') Object.keys(map.added)", "  if (false) Object.keys(map.added)"],
+      ['con', "  if (!bgShapeOk(bg)) return null;   // C275 ④ 자동 이월도", '  // C275 ④ 자동 이월도'],
+      ['con', "  if (conBgMissing(bg, (await conProcReadLayers(st)).map).length) return null;", ''],
+      ['con', "bg: { label: '근거 승격', grade: 'R2', fn: handleConProcBgSet, args: { bg_ver: 's', bg_sha: 's' }", "bg: { label: '근거 승격', grade: 'R2', fn: handleConProcBgSet, args: { bg_ver: 's' }"],
+      ['con', "  const bgGuard = (heavy && L.bg) ? { shape_ok: bgShapeOk(L.bg), missing: conBgMissing(L.bg, L.map).slice(0, 40) } : null;", '  const bgGuard = null;'],
+      ['hr', "    if (!(r && typeof r === 'object' && !Array.isArray(r) && typeof r.id === 'string' && r.id && !ids[r.id] && (r.grade === '실측' || r.grade === '확인 필요'))) return false;", "    if (!(r && typeof r === 'object')) return false;"],
+      ['hr', "&& x.rows.length <= PAYBG.ROWS_MAX && typeof x.sha === 'string' && PAYBG.SHA.test(x.sha)", "&& typeof x.sha === 'string'"],
+      ['veh', "x.schema === 1 && (!domain || x.domain === domain) &&", 'x.schema === 1 &&'],
+    ];
+    const kill = [];
+    for (const [n, from, to] of MUT75) { let k; try { k = !(await CH75[n](caller75(load75(mut75(from, to))))).ok; } catch (e) { k = 'err ' + e.message; } if (k !== true) kill.push(n + ':' + from.trim().slice(0, 60) + (k === false ? ' 안 깨짐' : ' ' + k)); }
+    T('C275 ④ 결함 사본 ' + MUT75.length + '개(세 줄 각각 지문 대조 걷음·base 선택으로·꼴 방어 걷음·콘솔 인자 bg_sha 뺌·해제 지문 통과 · 차량 꼭 읽는 값 걷음·쓸 행 판정 느슨 · 계약 꼭 읽는 값 걷음·신설 단계 참조 안 셈·조회 bg_guard 없음·자동 이월 꼴·꼭 읽는 값 걷음 · 공용 꼴: 행 검사·행 수·지문 꼴·영역) = 모두 ✗', kill.length === 0, kill.join(' / '));
+  } catch (e) { T('C275 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+  finally { reset75(); }
 }
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

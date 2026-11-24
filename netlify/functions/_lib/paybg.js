@@ -99,4 +99,4 @@ function ageFor(bg, key, ym) {
   const hit = bg.rows.filter(function (r) { return r.key === key && r.calc === true && r.from <= ym && (r.to === '' || ym <= r.to); });
   return hit.length === 1 ? hit[0].n / hit[0].d : null;
 }
-module.exports = { VER: VER, NEED: NEED, ROWS_MAX: ROWS_MAX, missing: missing, bgOk: bgOk, bgSum: bgSum, ratesFor: ratesFor, lawPick: lawPick, capsFor: capsFor, ageFor: ageFor };
+module.exports = { VER: VER, SHA: SHA, NEED: NEED, ROWS_MAX: ROWS_MAX, missing: missing, bgOk: bgOk, bgSum: bgSum, ratesFor: ratesFor, lawPick: lawPick, capsFor: capsFor, ageFor: ageFor };

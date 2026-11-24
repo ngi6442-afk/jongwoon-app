@@ -2404,8 +2404,11 @@ function vehBgSum(bg) {
   let chk = '';
   rows.forEach(function (r) { const c = typeof r.checked === 'string' ? r.checked : ''; if (/^\d{4}-\d{2}-\d{2}$/.test(c) && c > chk) chk = c; });
   return { ver: bg.ver, sha: bg.sha, n: rows.length, n_sil: rows.filter(function (r) { return r.grade === '실측'; }).length, n_cyc: rows.filter(function (r) { return r.cls === 'car' || r.cls === 'ceq'; }).length,
-    n_chk: hold.length, hold: hold.slice(0, 40), checked: chk, groups: Array.isArray(bg.groups) ? bg.groups.length : 0, n_rules: Array.isArray(bg.rules) ? bg.rules.length : 0, status: txt(bg.status, 20) };
+    n_chk: hold.length, hold: hold.slice(0, 40), checked: chk, groups: Array.isArray(bg.groups) ? bg.groups.length : 0, n_rules: Array.isArray(bg.rules) ? bg.rules.length : 0, status: txt(bg.status, 20),
+    shape_ok: bgShapeOk(bg, 'veh'), missing: vehBgMissing(bg) };   // C275: 승격 꼴 방어·꼭 읽는 값(콘솔 줄이 [ㄱ]을 막는 데만 — 판정은 veh_bg_set)
 }
+// C275 ② 꼭 읽는 값(차량): 앱·서버가 제안·기록에 쓰는 주기 행 = vehLawRowOkS 통과 행(앱 vehLawRowOk 같은 규칙) — 자동차(car)·건설기계(ceq) 가운데 그런 행이 하나도 없는 쪽
+function vehBgMissing(bg) { const rows = (bg && Array.isArray(bg.rows)) ? bg.rows : []; return ['car', 'ceq'].filter(function (cls) { return !rows.some(function (r) { return vehLawRowOkS(r) && r.cls === cls; }); }); }
 async function vehBgReadBoth(st) {   // { ok, flag, bg } — 없음 = null · 읽기 실패 = ok false(그 위에 판단하지 않음)
   const rf = await blobGet(st, VEH_BG_KEYS.flag);
   if (!rf.ok && rf.code !== 'NOT_FOUND') return { ok: false, code: 'FLAG_READ_FAILED' };
@@ -2425,7 +2428,7 @@ async function handleVehBgPmGet(event, d, R) {
 }
 async function handleVehBgSet(event, d, R) {
   const g = await pmconGate(event, R, true); if (g.res) return g.res; const c = g.c;
-  if (Object.keys(d || {}).some(function (k) { return k !== 'action' && k !== 'bg_ver' && k !== 'base'; })) return jr(400, { status: 'REJECTED', error_code: 'BAD_FIELD', request_id: R });
+  if (Object.keys(d || {}).some(function (k) { return k !== 'action' && k !== 'bg_ver' && k !== 'base' && k !== 'bg_sha'; })) return jr(400, { status: 'REJECTED', error_code: 'BAD_FIELD', request_id: R });   // C275: bg_sha(① 지문) 칸 더함
   const v = d.bg_ver;
   if (typeof v !== 'string' || (v && !/^[A-Za-z0-9_.-]{2,40}$/.test(v))) return jr(400, { status: 'REJECTED', error_code: 'BAD_VALUE', request_id: R });
   if (typeof d.base !== 'number' || !isFinite(d.base)) return jr(400, { status: 'REJECTED', error_code: 'NEED_BASE', request_id: R });
@@ -2434,7 +2437,12 @@ async function handleVehBgSet(event, d, R) {
   if (!s.ok) return jr(503, { status: 'ERROR', error_code: s.code, request_id: R });
   const cur = s.flag, before = typeof cur.bg_ver === 'string' ? cur.bg_ver : '';
   if (Number(d.base) !== (Number(cur.updated_at) || 0)) return jr(409, { status: 'CONFLICT', error_code: 'VEH_BG_STALE', request_id: R });
-  if (v && !(vehBgOk(s.bg) && s.bg.ver === v)) return jr(409, { status: 'CONFLICT', error_code: 'BG_MISSING', request_id: R });   // 올라온 판과 같은 ver 만 승격
+  if (v && !(vehBgOk(s.bg) && bgShapeOk(s.bg, 'veh') && s.bg.ver === v)) return jr(409, { status: 'CONFLICT', error_code: 'BG_MISSING', request_id: R });   // 올라온 판과 같은 ver 만 승격 · C275 ④ 꼴 방어
+  if (v) {
+    const miss = vehBgMissing(s.bg);
+    if (miss.length) return jr(409, { status: 'CONFLICT', error_code: 'BG_INCOMPLETE', keys: miss, request_id: R });   // C275 ② 자동차·건설기계 어느 쪽이든 쓸 수 있는 주기 행이 없으면 승격해도 그쪽 제안이 하나도 안 나옴
+    if (typeof d.bg_sha !== 'string' || d.bg_sha !== s.bg.sha) return jr(409, { status: 'CONFLICT', error_code: 'BG_CHANGED', request_id: R });   // C275 ① 화면에서 본 판의 내용 지문과 지금 올라온 판이 다르면 승격하지 않음
+  } else if (d.bg_sha !== undefined && d.bg_sha !== '') return jr(400, { status: 'REJECTED', error_code: 'BAD_VALUE', request_id: R });
   const reSha = !!(v && v === before && cur.bg_sha && cur.bg_sha !== s.bg.sha);   // 검토 11/15: 같은 판 이름·다른 내용(SHA_CHANGED) = 한 번에 다시 승격(새 sha 기록)
   if (v === before && !reSha) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
   const now = Date.now();
@@ -3433,6 +3441,15 @@ function conBgChk(bg) {
   bg.rows.forEach(function (r) { const c = (r && typeof r.checked === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.checked)) ? r.checked : ''; if (lo === null || c < lo) lo = c; if (c > hi) hi = c; });
   return { lo: lo || '', hi: hi };
 }
+// C275 ② 꼭 읽는 값(계약): 매핑(map:contract:v1)의 단계·신설 due_rule.law 가 부르는 근거 행 id 가운데 판에 없는 것(수집기 contract_bg.py validate 와 같은 규칙 — 없으면 기한 엔진이 '근거 미승격'으로 비움)
+//   매핑이 없거나 꼴이 틀리면(map null) 엔진이 꺼져 있으므로 부를 행도 없음 = 빈 목록
+function conBgMissing(bg, map) {
+  const ids = Object.create(null); ((bg && Array.isArray(bg.rows)) ? bg.rows : []).forEach(function (r) { if (r && typeof r.id === 'string') ids[r.id] = 1; });
+  const refs = Object.create(null), add = function (s) { const l = s && s.due_rule && s.due_rule.law; if (typeof l === 'string' && l) refs[l] = 1; };
+  if (map && map.scen && typeof map.scen === 'object') Object.keys(map.scen).forEach(function (k) { if (Array.isArray(map.scen[k])) map.scen[k].forEach(add); });
+  if (map && map.added && typeof map.added === 'object') Object.keys(map.added).forEach(function (k) { add(map.added[k]); });
+  return Object.keys(refs).filter(function (k) { return !ids[k]; }).sort();
+}
 function conFlagKeep(cur) { return { bg_fp: cur.bg_fp || '', bg_auto: cur.bg_auto === true, bg_carry: cur.bg_carry || null, bg_chk: cur.bg_chk || '' }; }   // 스위치·승격 저장이 판4 칸을 지우지 않게
 // 자동 이월: 스위치 켜짐 ∧ 승격본 있음(bg_ver) ∧ 기준 지문 있음 ∧ 올라온 판 ver 가 다름 ∧ 지문 같음 ∧ 올라온 판 행 확인일이 모두 기준 확인일(bg_chk) 뒤(검토 P1-3) → 승격 없이 bg_ver 를 새 판으로(감사 1줄·bg_carry). 해제(bg_ver '') 상태에선 하지 않음.
 async function conBgAutoCarry(st, flag, bg) {
@@ -3441,6 +3458,8 @@ async function conBgAutoCarry(st, flag, bg) {
   // 검토 P1-3: 새 판이어야 함 — 올라온 판의 모든 행 확인일이 승격본(또는 마지막 이월본)의 가장 늦은 확인일보다 뒤일 때만(옛 판을 다시 올리면 같은 지문이어도 이월 안 함 · 기준 날짜가 없으면 이월 안 함)
   const ck = conBgChk(bg);
   if (!flag.bg_chk || !ck.lo || !(ck.lo > flag.bg_chk)) return null;
+  if (!bgShapeOk(bg)) return null;   // C275 ④ 자동 이월도 승격 줄 — 꼴이 틀린 판으로는 넘기지 않음(사람 승격 길과 같은 꼴 방어)
+  if (conBgMissing(bg, (await conProcReadLayers(st)).map).length) return null;   // C275 ② 매핑이 부르는 근거 행이 빠진 판으로는 넘기지 않음(이월 조건을 다 맞춘 드문 때만 한 번 더 읽음)
   const cur = await conProcReadFlag(st);   // 쓰기 직전 다시 읽음(동시 조회 두 번째는 여기서 멈춤)
   if (!cur.bg_auto || cur.bg_ver !== flag.bg_ver || cur.bg_fp !== flag.bg_fp || cur.bg_chk !== flag.bg_chk) return null;
   const now = Date.now();
@@ -3481,16 +3500,22 @@ async function handleConProcBgSet(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
   if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  if (typeof d.base !== 'number' || !isFinite(d.base)) return jr(400, { status: 'REJECTED', error_code: 'NEED_BASE', request_id: R });   // C275 ③ 낙관락 값은 늘 받는다(스위치 없음 = 0 — 급여와 같게 · 이 길의 자동 이월 스위치·연 1회 override 도 같은 길)
   const st = store(DATA);
   const cur = await conProcReadFlag(st);
-  if (d.base !== undefined && Number(d.base) !== Number(cur.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'CON_PROC_STALE', request_id: R });
+  if (d.base !== Number(cur.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'CON_PROC_STALE', request_id: R });
   const doc = Object.assign({ schema: 1, use_blob: cur.use_blob, prev: { use_blob: cur.use_blob, updated_at: cur.updated_at, updated_by: cur.updated_by, bg_ver: cur.bg_ver || '', bg_fp: cur.bg_fp || '', bg_auto: cur.bg_auto === true, bg_chk: cur.bg_chk || '' }, bg_ver: cur.bg_ver || '', annual_override: Object.assign({}, cur.annual_override || {}) }, conFlagKeep(cur), { updated_by: c.member.id, updated_at: Date.now() });
   const changed = [];
   let Lbg = null;
   if (d.bg_ver !== undefined) {
     const v = String(d.bg_ver || '');
     if (v && !/^[A-Za-z0-9_.-]{2,40}$/.test(v)) return jr(400, { status: 'REJECTED', error_code: 'BAD_VALUE', request_id: R });
-    if (v) { const L = await conProcReadLayers(st); if (!L.bg || L.bg.ver !== v) return jr(409, { status: 'CONFLICT', error_code: 'BG_MISSING', request_id: R }); Lbg = L.bg; }
+    if (v) {
+      const L = await conProcReadLayers(st); if (!L.bg || !bgShapeOk(L.bg) || L.bg.ver !== v) return jr(409, { status: 'CONFLICT', error_code: 'BG_MISSING', request_id: R }); Lbg = L.bg;   // C275 ④ 꼴 방어
+      const miss = conBgMissing(L.bg, L.map);
+      if (miss.length) return jr(409, { status: 'CONFLICT', error_code: 'BG_INCOMPLETE', keys: miss.slice(0, 40), request_id: R });   // C275 ② 매핑이 기한 계산에 부르는 근거 행이 빠진 판은 받지 않음
+      if (typeof d.bg_sha !== 'string' || d.bg_sha !== L.bg.sha) return jr(409, { status: 'CONFLICT', error_code: 'BG_CHANGED', request_id: R });   // C275 ① 화면에서 본 판의 내용 지문과 지금 올라온 판이 다르면 승격하지 않음
+    } else if (d.bg_sha !== undefined && d.bg_sha !== '') return jr(400, { status: 'REJECTED', error_code: 'BAD_VALUE', request_id: R });
     if (v !== (cur.bg_ver || '')) {
       doc.bg_ver = v; changed.push('배경 ' + (cur.bg_ver || '없음') + '→' + (v || '없음'));
       doc.bg_fp = v ? conBgFp(Lbg) : ''; doc.bg_carry = null;   // P1 판4: 승격 = 그 판의 확인일 뺀 지문을 비교 기준으로 · 해제 = 기준도 비움(자동 이월 안 함)
@@ -3586,7 +3611,8 @@ async function handleConProcGet(event, d, R) {
   const heavy = !!(flag.use_blob || c.member.admin);   // v404 검토 S4: 꺼짐이면 직원에게 map·bg(약 100KB) 안 보냄(앱은 null = 엔진 꺼짐)
   let lawwatch = null;   // v405 D2: lawwatch 주간 크론이 남긴 재확인 행(bg_recheck) — 엔진이 그 행을 '재확인 필요(개정 감지)'로
   if (heavy) { try { const lw = await blobGet(st, 'lawwatch:last'); if (lw.ok && lw.data) lawwatch = { date: String(lw.data.date || ''), ts: lw.data.ts || 0, bg_recheck: Array.isArray(lw.data.bg_recheck) ? lw.data.bg_recheck.slice(0, 100) : [] }; } catch (e) {} }
-  return jr(200, { status: 'OK', flag: flag, proc: proc, list: list, map: heavy ? L.map : null, bg: heavy ? L.bg : null, lawwatch: lawwatch, clog: clogOut, edit_state: state, request_id: R });   // v404: map·bg 층 동봉(없으면 null)
+  const bgGuard = (heavy && L.bg) ? { shape_ok: bgShapeOk(L.bg), missing: conBgMissing(L.bg, L.map).slice(0, 40) } : null;   // C275: 승격 꼴 방어·꼭 읽는 값(콘솔 줄·카드가 [승격]을 막는 데만 — 판정은 con_proc_bg_set)
+  return jr(200, { status: 'OK', flag: flag, proc: proc, list: list, map: heavy ? L.map : null, bg: heavy ? L.bg : null, bg_guard: bgGuard, lawwatch: lawwatch, clog: clogOut, edit_state: state, request_id: R });   // v404: map·bg 층 동봉(없으면 null)
 }
 async function handleConProcEdit(event, d, R) {
   const c = await currentMember(event);
@@ -6307,9 +6333,9 @@ const PMCON_KINDS = {   // 줄 종류 → 등급(서버 표 — 보낸 등급이
   learn: { label: '계약 학습', grade: 'R2', fn: handleLearnSettingsSet, args: { on: 'b' }, row: function (a) { return 'learn:' + (a.on ? 'on' : 'off'); } },
   learnhw: { label: '계약 학습(한글 양식)', grade: 'R2', fn: handleLearnAllow2Set, args: { on: 'b' }, row: function (a) { return 'learnhw:' + (a.on ? 'on' : 'off'); } },   // P1 판16 허용 칸 추천 2차
   brief: { label: '브리핑 설정', grade: 'R1', fn: handleBriefSet, args: { field: 'on', value: 'b' }, row: function (a) { return 'brief:' + (a.value ? 'on' : 'off'); } },
-  bg: { label: '근거 승격', grade: 'R2', fn: handleConProcBgSet, args: { bg_ver: 's' }, row: function (a) { return 'bg:' + a.bg_ver; } },
+  bg: { label: '근거 승격', grade: 'R2', fn: handleConProcBgSet, args: { bg_ver: 's', bg_sha: 's' }, row: function (a) { return 'bg:' + a.bg_ver; } },
 };
-PMCON_KINDS.vehbg = { label: '차량 근거 승격', grade: 'R2', fn: handleVehBgSet, args: { bg_ver: 's' }, row: function (a) { return 'vehbg:' + a.bg_ver; } };   // P1 판13 차량 법령 근거(11/20 카드 ②) — 위 표 밖 한 줄(판29 표·검사는 그대로 · 앱 PMCON_KINDS.push 와 짝)
+PMCON_KINDS.vehbg = { label: '차량 근거 승격', grade: 'R2', fn: handleVehBgSet, args: { bg_ver: 's', bg_sha: 's' }, row: function (a) { return 'vehbg:' + a.bg_ver; } };   // P1 판13 차량 법령 근거(11/20 카드 ②) — 위 표 밖 한 줄(판29 표·검사는 그대로 · 앱 PMCON_KINDS.push 와 짝)
 const PMCON_CHOICES = { ok: 'ㄱ', 'default': '기본값', hold: '보류', reopen: '다시 열기' };
 const PMCON_ROW = /^[a-z]{2,10}:[0-9A-Za-z_.:-]{0,80}$/;
 const PMCON_DATE = /^20\d{2}-\d{2}-\d{2}$/;
@@ -6472,6 +6498,22 @@ async function handleRnoteSave(event, d, R) { const g = await pmconGate(event, R
 //   확인 필요 행 = calc false(기한 계산에 쓰지 않음) — 서버도 다시 본다(어긴 행이 하나라도 있으면 꼴 틀림 = 승격 안 됨).
 //   읽기 hr_bg_get = 로그인 → 기기 승인 → 관리자 또는 인사 권한(perms.hr 보기·수행) · 쓰기 hr_bg_set = pmconGate 쓰기(PM) → 낙관락 → 직전 값(prev) → 감사 1줄(col hr)
 //   PM 콘솔 줄 hrbg(R2 · 무응답 = 미승격)는 아래 PMCON_KINDS.hrbg 로 붙는다(줄 표 본문은 손대지 않음).
+// C275(원장 C275 · PM 11/24 '45. 진행.') 근거 표 승격 줄 방어 — 급여 판1 보완(v511 handlePayBgSet)에 있는 방어를 같은 꼴의 승격 줄(인사 hr_bg_set · 차량 veh_bg_set · 계약 con_proc_bg_set·자동 이월)에 그대로:
+//   ① 지문 대조: 승격 요청이 화면에서 본 판의 내용 지문(bg_sha)을 보내고 지금 올라온 판의 sha 와 다르면 409 BG_CHANGED · 해제('')에 bg_sha 를 보내면 400 BAD_VALUE
+//   ② 꼭 읽는 값: 지금 앱·서버가 꼭 읽는 값이 빠진 표는 409 BG_INCOMPLETE(keys) — 차량 = 쓸 수 있는 주기 행(vehLawRowOkS)이 자동차·건설기계 각각 1행 이상 ·
+//      계약 = 매핑(map:contract:v1)의 due_rule.law 참조 id 가 전부 행에 있음(수집기 contract_bg.py validate 와 같은 규칙) · 인사 = 계산이 표를 읽지 않음(해당 없음)
+//   ③ 밑판 필수: base(스위치 updated_at) 없으면 400 NEED_BASE
+//   ④ 꼴 방어(승격 때만 — 읽는 쪽 판정은 종전 그대로): 아래 bgShapeOk(급여 bgOk 의 머리·행 꼴 — 판 이름 꼴 · 행 1~ROWS_MAX · 지문 꼴 · 행 id 글자·중복 없음 · 등급 실측|확인 필요). 틀리면 409 BG_MISSING(급여와 같은 코드)
+function bgShapeOk(x, domain) {
+  if (!(x && typeof x === 'object' && !Array.isArray(x) && x.schema === 1 && (!domain || x.domain === domain) && typeof x.ver === 'string' && PAYBG.VER.test(x.ver)
+    && Array.isArray(x.rows) && x.rows.length && x.rows.length <= PAYBG.ROWS_MAX && typeof x.sha === 'string' && PAYBG.SHA.test(x.sha))) return false;
+  const ids = Object.create(null);
+  for (const r of x.rows) {
+    if (!(r && typeof r === 'object' && !Array.isArray(r) && typeof r.id === 'string' && r.id && !ids[r.id] && (r.grade === '실측' || r.grade === '확인 필요'))) return false;
+    ids[r.id] = 1;
+  }
+  return true;
+}
 const HR_BG_KEYS = { bg: 'bg:hr:law:v1', flag: 'settings:hr' };
 const HR_BG_VER = /^[A-Za-z0-9_.-]{2,40}$/;
 function hrBgOk(x) {
@@ -6500,7 +6542,7 @@ async function hrBgState(st) {
   const ver = typeof flag.bg_ver === 'string' ? flag.bg_ver : '';
   const hrFsha = typeof flag.bg_sha === 'string' ? flag.bg_sha : '';
   const good = hrBgOk(bg);
-  const base = { flag_ok: fr.ok, flag: { bg_ver: ver, bg_sha: hrFsha, updated_at: Number(flag.updated_at) || 0 }, avail: good ? hrBgSum(bg) : null };
+  const base = { flag_ok: fr.ok, flag: { bg_ver: ver, bg_sha: hrFsha, updated_at: Number(flag.updated_at) || 0 }, avail: good ? Object.assign(hrBgSum(bg), { shape_ok: bgShapeOk(bg, 'hr') }) : null };   // C275: shape_ok = 승격 꼴 방어 통과(콘솔 줄이 [ㄱ]을 막는 데만)
   if (!fr.ok) return Object.assign(base, { on: false, why: 'FLAG_READ_FAILED' });
   if (!good) return Object.assign(base, { on: false, why: bg ? 'BAD_BG' : 'NO_BG' });
   if (!ver || ver !== bg.ver) return Object.assign(base, { on: false, why: 'NOT_PROMOTED' });
@@ -6530,13 +6572,15 @@ async function handleHrBgSet(event, d, R) {
   const fr = await hrBgReadFlag(st);
   if (!fr.ok) return jr(503, { status: 'ERROR', error_code: 'HR_FLAG_READ_FAILED', request_id: R });   // 못 읽은 스위치 위에 쓰지 않음
   const cur = fr.flag, curVer = typeof cur.bg_ver === 'string' ? cur.bg_ver : '', curSha = typeof cur.bg_sha === 'string' ? cur.bg_sha : '';
-  if (d.base !== undefined && Number(d.base) !== Number(cur.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'HR_BG_STALE', request_id: R });
+  if (typeof d.base !== 'number' || !isFinite(d.base)) return jr(400, { status: 'REJECTED', error_code: 'NEED_BASE', request_id: R });   // C275 ③ 낙관락 값은 늘 받는다(스위치 없음 = 0 — 급여와 같게)
+  if (d.base !== Number(cur.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'HR_BG_STALE', request_id: R });
   let sum = null;
   if (v) {
     let bg = null; try { const rb = await blobGet(st, HR_BG_KEYS.bg); if (rb.ok && rb.data) bg = rb.data; } catch (e) {}
-    if (!hrBgOk(bg) || bg.ver !== v) return jr(409, { status: 'CONFLICT', error_code: 'BG_MISSING', request_id: R });   // 올라온 판이 없거나 꼴 틀림·다른 판
-    sum = hrBgSum(bg);
-  }
+    if (!hrBgOk(bg) || !bgShapeOk(bg, 'hr') || bg.ver !== v) return jr(409, { status: 'CONFLICT', error_code: 'BG_MISSING', request_id: R });   // 올라온 판이 없거나 꼴 틀림(C275 ④)·다른 판
+    sum = hrBgSum(bg);   // C275 ② 인사: 계산이 이 표를 읽지 않아 꼭 읽는 값 검사 없음(급여 missing 에 해당하는 목록이 없음)
+    if (typeof d.bg_sha !== 'string' || sum.sha !== d.bg_sha) return jr(409, { status: 'CONFLICT', error_code: 'BG_CHANGED', request_id: R });   // C275 ① 화면에서 본 판의 내용 지문과 지금 올라온 판이 다르면 승격하지 않음
+  } else if (d.bg_sha !== undefined && d.bg_sha !== '') return jr(400, { status: 'REJECTED', error_code: 'BAD_VALUE', request_id: R });
   const newSha = sum ? sum.sha : '';
   if (v === curVer && newSha === curSha) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });   // 같은 판 이름이라도 내용(sha)이 바뀌었으면 다시 승격할 수 있음
   const now = Date.now();
@@ -6547,7 +6591,7 @@ async function handleHrBgSet(event, d, R) {
   try { hrAu = await appendAudit({ ts: now, by: c.member.name, bid: c.member.id, col: 'hr', ev: [{ op: '인사근거', id: '', t: '인사 법령 근거 ' + (curVer || '미승격') + '→' + (v || '미승격(해제)') + (sum ? ' · sha ' + newSha + ' · 확인 필요 ' + sum.n_pending + '건' : '') }] }) !== false; } catch (e) { hrAu = false; }
   return jr(200, { status: 'OK', bg_ver: v, bg_sha: newSha, prev: hrDoc.prev, updated_at: hrDoc.updated_at, audit: hrAu, request_id: R });
 }
-PMCON_KINDS.hrbg = { label: '인사 법령 근거 승격', grade: 'R2', fn: handleHrBgSet, args: { bg_ver: 's' }, row: function (a) { return 'hrbg:' + a.bg_ver; } };   // P1 판14 — 콘솔 줄(무응답 = 미승격)
+PMCON_KINDS.hrbg = { label: '인사 법령 근거 승격', grade: 'R2', fn: handleHrBgSet, args: { bg_ver: 's', bg_sha: 's' }, row: function (a) { return 'hrbg:' + a.bg_ver; } };   // P1 판14 — 콘솔 줄(무응답 = 미승격)
 
 // ---- 66 급여 판1(원장 C236 · PM 11/20 09:14 'ㄱ') 급여 법령 근거 bg:pay:law:v1 ----
 //   근거 표 = 자료 저장소 collectors/pay_bg.py 가 법제처 원문 인용을 대조해 만든 판(4대보험 요율·상하한·간이세액표·가산율 — 값은 분수 n/d · 귀속 달 from~to).
