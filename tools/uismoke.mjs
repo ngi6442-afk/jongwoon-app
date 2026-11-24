@@ -17935,7 +17935,7 @@ try {
     ['    if (col === "contracts" && _colBase[col] === undefined) saveBase = 0;\n', ''],   // 읽기 실패 화면의 base 없음 저장
     ['if(r.status!==404&&!r.ok) return { gwReadFail: 1 }; ', ''],   // 409 다시 읽기 500을 빈 목록으로
     ['return r.status===404?null:r.json();}, function(){ return { gwReadFail: 1 }; })', 'return r.status===404?null:r.json();})'],   // 409 다시 읽기 끊김 뒤 다시 저장 없음
-    ['if(j&&j.gwReadFail){ if (healS && typeof csApprHealLater === "function" && csApprHealLater()) return; scheduleContractSave(); return; }', ''],   // C281: 줄 꼴이 바뀜(자동 풀기 표식 이어 받기 앞에 더함) — 같은 결함
+    ['if(j&&j.gwReadFail){ scheduleContractSave(); return; }', ''],
     ['      if (sc && typeof conSaveOut !== "undefined" && conSaveOut > 0){ sc = null; csApprSyncAt[id] = 0; }', ''],   // 저장과 겹친 사본 접목(C198 ②)
     ['conSaveOut > 0){ sc = null; csApprSyncAt[id] = 0; }', 'conSaveOut > 0){ sc = null; }'],   // 검토 G6: 버린 뒤 60초 제한 안 되돌림(다음 그리기에서 다시 안 함)
     ['      if (scGot && !sc) return null;\n', ''],   // 검토 X2: 사본 버린 회차에 결재 반영(이 화면이 단계 진행·지시 만듦)
@@ -19564,7 +19564,7 @@ try {
     ['    var quiet = status !== 400 && mine === true;', '    var quiet = status !== 400 && Date.now() - csApprHealOutAt < 30000;'],
     ['if (contractsPending && !pend0) csApprHealSend(csSaveNow);', 'if (contractsPending && !pend0){ csApprHealOutAt = Date.now(); csSaveNow(); }'],
     ['if (healS && typeof csApprHealOnly === "function" && csApprHealOnly()){ csApprHealSend(doSaveContracts); return; } ', ''],
-    ['if (healS && typeof csApprHealLater === "function" && csApprHealLater()) return; ', ''],
+    ['if(j&&j.gwReadFail&&healS&&typeof csApprHealLater === "function"&&csApprHealLater()) return; ', ''],
   ];
   const R281 = await run281(html);
   const O281 = await run281(OLD281.reduce((s, [a, b]) => onceH40(s, a, b), html));
@@ -19578,7 +19578,7 @@ try {
     ['csApprHealFail(resp.status, healS && typeof csApprHealOnly === "function" && csApprHealOnly())', 'csApprHealFail(resp.status, healS)'],
     ['    var quiet = status !== 400 && mine === true;', '    var quiet = status !== 400 && Date.now() - csApprHealOutAt < 30000;'],
     ['if (healS && typeof csApprHealOnly === "function" && csApprHealOnly()){ csApprHealSend(doSaveContracts); return; } ', ''],
-    ['if (healS && typeof csApprHealLater === "function" && csApprHealLater()) return; ', ''],
+    ['if(j&&j.gwReadFail&&healS&&typeof csApprHealLater === "function"&&csApprHealLater()) return; ', ''],
     ['  function csApprHealOnly(){ return !contractSaveTimer && (typeof conSaveOut === "undefined" || conSaveOut === 0); }', '  function csApprHealOnly(){ return true; }'],
     ['    if (!csApprHealOnly()) return false;\n    contractsPending = true;', '    contractsPending = true;'],
     ['contractsPending = true; contractSaveTimer = setTimeout(function(){ contractSaveTimer = null; csApprHealSend(doSaveContracts); }, 1400);', 'contractsPending = true; setTimeout(function(){ csApprHealSend(doSaveContracts); }, 1400);'],
