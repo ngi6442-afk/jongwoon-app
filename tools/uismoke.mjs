@@ -21900,7 +21900,7 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l));
     const FT = ['`_lib/sealbox.js`', '`PAY_BACKUP_KEY`', '`pay_held`', '`PAY_BACKUP_KEY_MISSING`', '`PAY_BAD_SEAL`', '`PAY_KID_MISMATCH`'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v527 \(2026-11-24\)\./.test(d.ft) && mF.length === 0 && cb.length === 4 && /SHELL_CACHE = 'jw-shell-v527'/.test(d.sw) && d.cl.indexOf('- **66 급여 백업 암호화(v527)**') > 0;
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 527 && mF.length === 0 && cb.length === 4 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 527 && d.cl.indexOf('- **66 급여 백업 암호화(v527)**') > 0;
     return { ok, info: { mF, cb: cb.length } };
   };
   const rS = chkS(DS);
@@ -21955,6 +21955,25 @@ try {
   T('66 판3 ① 대장 읽기·대조·내려받기·명세서(가짜 .xls — Excel 로 만든 BIFF8 · 수식 칸은 저장된 결과값): 두 시트 회사 가름(건설·환경) · 사람 두 줄·지급총액 아랫줄·초과/차감 칸 없는 시트 · 띄어 쓴 이름 붙임 · 대조 같음 13·다름 3 · 기준 없는 사람 채우기 · 앱에만 있는 이름 이스케이프 · 엑셀 칸 순서 = 대장·한 사람 두 줄·합계 · 명세서 이스케이프·하수준설 설명 · 결함 사본 ' + MR.length + '개 = 모두 ✗',
     rR.ok && MR.every((x) => x === false), JSON.stringify({ r: rR.info, mut: MR }));
 } catch (e) { console.log('  (66 판3 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v528(66 급여 판3 — PM 11/24 'ㄱ'): 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '528 이상'으로 풀 것
+try {
+  const rdT = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DT = { ft: rdT('FEATURES.md'), tl: rdT('TESTLIST.md'), sw: rdT('sw.js'), cl: rdT('CLAUDE.md'), man: rdT('MANUAL.html') };
+  const chkT = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v528 (11/24)', '\n### '), tlv = cut(d.tl, '\n## v528 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l));
+    const FT = ['`payXlsSheets`', '`pay_base_save`', '`buildSimpleXlsx`', '`tools/pay_ledger_fixture.xls`', '70·292칸'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v528 \(2026-11-24\)\./.test(d.ft) && mF.length === 0 && cb.length === 4 && /SHELL_CACHE = 'jw-shell-v528'/.test(d.sw) && d.cl.indexOf('- **66 급여 판3(v528)**') > 0 && d.man.indexOf('<li><b>급여 대장 불러오기·내려받기·명세서</b> (2026-11 v528)') > 0;
+    return { ok, info: { mF, cb: cb.length } };
+  };
+  const rT = chkT(DT);
+  const muT = (k, f) => chkT(Object.assign({}, DT, { [k]: f(DT[k]) })).ok;
+  const MT = [muT('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v527 (')), muT('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v527'")), muT('ft', (s) => s.split('`payXlsSheets`').join('payXlsSheets')), muT('cl', (s) => s.replace('- **66 급여 판3(', '- 66 급여 판3(')), muT('man', (s) => s.replace('<li><b>급여 대장 불러오기', '<li>급여 대장 불러오기'))];
+  T('v528 문서·판 번호(정확 검사): FEATURES 기준 v528 (2026-11-24)·v528 절 · TESTLIST v528 칸 4 · sw v528 · CLAUDE.md·MANUAL 한 줄 · 결함 사본 ' + MT.length + '개 = 모두 ✗', rT.ok && MT.every((v) => v === false), JSON.stringify({ r: rT.info, mut: MT }));
+} catch (e) { console.log('  (v528 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
