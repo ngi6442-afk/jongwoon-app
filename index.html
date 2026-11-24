@@ -34122,7 +34122,7 @@ function dutyStage(nx){
     else h += '<tr class="tot"><td class="l" colspan="2">합계 ' + n + '명</td>' + ["base", "allow", "adj", "bonus", "meal", "car"].map(function(x){ return '<td class="num">' + payWon(T[x]) + '</td>'; }).join("") + '<td class="num">' + payWon(T.taxable) + '<small>지급 ' + payWon(T.gross) + '</small></td>' + ["pension", "health", "care", "emp", "income", "local", "ded", "net"].map(function(x){ return '<td class="num">' + payWon(T[x]) + '</td>'; }).join("") + '<td></td></tr>';
     h += '</tbody></table></div>';
     h += '<div class="pay-legend"><span><i class="in"></i>누르면 넣는 칸</span><span><i class="au"></i>앱이 계산하는 칸</span><span>— = 그 보험 대상 아님</span><span>합계 줄은 대장에 없던 것을 더했습니다</span></div>';
-    h += '<div class="pay-btns"><button type="button" class="vs-chip" id="payConfBtn">단가·기간 설정</button>' + (closed ? '<button type="button" class="vs-chip" id="payReopenBtn">확정 풀기</button>' : '<button type="button" class="vs-chip on" id="payCloseBtn">이 달 확정</button>') + '</div>';
+    h += '<div class="pay-btns"><button type="button" class="vs-chip" id="payImpBtn">회계사무소 대장과 대조</button><button type="button" class="vs-chip" id="payXlsBtn">엑셀 내려받기</button><button type="button" class="vs-chip" id="paySlipBtn">명세서</button><button type="button" class="vs-chip" id="payConfBtn">단가·기간 설정</button>' + (closed ? '<button type="button" class="vs-chip" id="payReopenBtn">확정 풀기</button>' : '<button type="button" class="vs-chip on" id="payCloseBtn">이 달 확정</button>') + '</div>';
     h += '<p class="pay-hint">계산 순서는 회계사무소 대장과 같습니다. 4대보험적용총액 = 기본급 + 수당 + 초과/차감 수당 + 상여금(+ 비과세 한도를 넘는 식대·자가운전) · 지급총액 = 적용총액 + 비과세 식대·자가운전보조금 · 차인지급액 = 지급총액 − 공제합계. 이름을 누르면 그 사람 기준(매달 같은 값), 금액 칸을 누르면 이 달에만 쓰는 값을 넣습니다. 지입차주·일용직은 이 대장에 나오지 않습니다.</p>';
     if (d.loose && d.loose.length && !closed) h += '<div class="pay-loose">회사 표시가 비어 어느 대장에도 안 들어간 직원: ' + d.loose.map(function(x){ return '<button type="button" class="vs-chip" data-pay-base="' + esc(x.mid) + '">' + esc(x.name) + (x.rank ? ' ' + esc(x.rank) : '') + ' — 이 대장에 기준 넣기</button>'; }).join(" ") + '</div>';
     host.innerHTML = h;
@@ -34133,6 +34133,9 @@ function dutyStage(nx){
     Array.prototype.forEach.call(host.querySelectorAll("[data-pay-dredge]"), function(b){ b.onclick = function(){ payDredgeDlg(b.getAttribute("data-pay-dredge")); }; });
     Array.prototype.forEach.call(host.querySelectorAll("[data-pay-out]"), function(b){ b.onclick = function(){ var m = b.getAttribute("data-pay-out"), r = payRow(m); if (!confirm(((r && r.member && r.member.name) || "") + " — " + payS.ym + " " + PAY_CORP[payS.corp] + " 대장에서 뺄까요? (두 회사 재적·이 달 급여 없음)")) return; paySaveRow(m, Object.assign({}, (r && r.row) || {}, { off: true }), null); }; });
     var cb = document.getElementById("payConfBtn"); if (cb) cb.onclick = payConfDlg;
+    var ib = document.getElementById("payImpBtn"); if (ib) ib.onclick = payImportPick;   // 66 판3
+    var xb = document.getElementById("payXlsBtn"); if (xb) xb.onclick = payExportXlsx;
+    var sb = document.getElementById("paySlipBtn"); if (sb) sb.onclick = function(){ payPrintSlips(); };
     var cl = document.getElementById("payCloseBtn"); if (cl) cl.onclick = payClose;
     var ro = document.getElementById("payReopenBtn"); if (ro) ro.onclick = payReopen;
   }
@@ -34342,6 +34345,241 @@ function dutyStage(nx){
     var d = payS.data; if (!d) return;
     if (!confirm(d.ym + " 확정을 풀까요? 얼려 둔 금액을 지우고 지금 기준·요율로 다시 계산합니다.")) return;
     gwCall("gw-pay", { action: "pay_month_reopen", corp: payS.corp, ym: d.ym, rev: d.rev }).then(function(res){ if (res.status !== 200){ payErr(res, "확정 풀기"); return; } gwToast("확정을 풀었습니다"); payLoad(); }, function(){ alert("확정 풀기 실패(네트워크)"); });
+  }
+  // 66 급여 판3 옛 엑셀(.xls · BIFF8) 읽기 — 회계사무소 급여대장이 이 형식. 브라우저 안에서만 읽는다(파일을 서버로 보내지 않음).
+  //   복합 문서(CFB) → Workbook 흐름 → 시트별 칸 값(글자·숫자 · 수식은 저장된 결과값). 서식·병합은 읽지 않는다.
+  //   반환 [{ name, rows: [[값, ...], ...] }] (rows[행][열] — 빈 칸 null). 못 읽으면 Error('XLS_…').
+  function payXlsSheets(buf){
+    var u = new Uint8Array(buf), dv = new DataView(u.buffer, u.byteOffset, u.byteLength);
+    var u16 = function(o){ return dv.getUint16(o, true); }, u32 = function(o){ return dv.getUint32(o, true); };
+    if (u.length < 512 || u32(0) !== 0xE011CFD0 || u32(4) !== 0xE11AB1A1) throw new Error("XLS_NOT_CFB");
+    var ss = 1 << u16(30), mss = 1 << u16(32), nFat = u32(44), dirStart = u32(48), miniCut = u32(56), mfStart = u32(60), difStart = u32(68), nDif = u32(72);
+    var sec = function(n){ return 512 + n * ss; };
+    var fatSecs = [], i, j;
+    for (i = 0; i < 109 && fatSecs.length < nFat; i++) fatSecs.push(u32(76 + i * 4));
+    var d = difStart, guard = 0;
+    while (fatSecs.length < nFat && d !== 0xFFFFFFFE && d !== 0xFFFFFFFF && guard++ < nDif + 2){ for (j = 0; j < ss / 4 - 1 && fatSecs.length < nFat; j++) fatSecs.push(u32(sec(d) + j * 4)); d = u32(sec(d) + ss - 4); }
+    var fat = [];
+    fatSecs.forEach(function(s){ for (var k = 0; k < ss / 4; k++) fat.push(u32(sec(s) + k * 4)); });
+    var chain = function(start){ var out = [], s = start, g = 0; while (s < 0xFFFFFFFA && g++ < fat.length + 1){ out.push(s); s = fat[s]; } return out; };
+    var readChain = function(start, size){ var cs = chain(start), out = new Uint8Array(cs.length * ss); cs.forEach(function(s, k){ out.set(u.subarray(sec(s), sec(s) + ss), k * ss); }); return size != null ? out.subarray(0, size) : out; };
+    var dir = readChain(dirStart), dd = new DataView(dir.buffer), ents = [];
+    for (i = 0; i + 128 <= dir.length; i += 128){
+      var nl = dd.getUint16(i + 64, true), nm = "";
+      for (j = 0; j + 2 < nl; j += 2) nm += String.fromCharCode(dd.getUint16(i + j, true));
+      ents.push({ name: nm, type: dir[i + 66], start: dd.getUint32(i + 116, true), size: dd.getUint32(i + 120, true) });
+    }
+    var wb = ents.filter(function(e){ return e.type === 2 && (e.name === "Workbook" || e.name === "Book"); })[0];
+    if (!wb) throw new Error("XLS_NO_WORKBOOK");
+    var w;
+    if (wb.size < miniCut){
+      var root = ents[0], ministream = readChain(root.start, root.size), mfat = [];
+      chain(mfStart).forEach(function(s){ for (var k = 0; k < ss / 4; k++) mfat.push(u32(sec(s) + k * 4)); });
+      w = new Uint8Array(Math.ceil(wb.size / mss) * mss); var ms = wb.start, k2 = 0, g2 = 0;
+      while (ms < 0xFFFFFFFA && g2++ < mfat.length + 1){ w.set(ministream.subarray(ms * mss, ms * mss + mss), k2 * mss); k2++; ms = mfat[ms]; }
+      w = w.subarray(0, wb.size);
+    } else w = readChain(wb.start, wb.size);
+    var wv = new DataView(w.buffer, w.byteOffset, w.byteLength);
+    // 기록 목록(CONTINUE 는 앞 기록에 조각으로 붙임 — SST 글자가 조각을 넘나듦)
+    var recAt = function(off){ return { type: wv.getUint16(off, true), len: wv.getUint16(off + 2, true), off: off + 4 }; };
+    var rk = function(v){ var x; if (v & 2) x = v >> 2; else { var b = new DataView(new ArrayBuffer(8)); b.setUint32(4, v & 0xFFFFFFFC, true); b.setUint32(0, 0, true); x = b.getFloat64(0, true); } return (v & 1) ? x / 100 : x; };
+    var sheets = [], sst = [], pos = 0, r;
+    // 1) 책 머리: 시트 목록(BOUNDSHEET)·글자 표(SST)
+    while (pos + 4 <= w.length){
+      r = recAt(pos);
+      if (r.type === 0x0085){
+        var cch = w[r.off + 6], fl = w[r.off + 7], nm2 = "";
+        for (j = 0; j < cch; j++) nm2 += fl & 1 ? String.fromCharCode(wv.getUint16(r.off + 8 + j * 2, true)) : String.fromCharCode(w[r.off + 8 + j]);
+        sheets.push({ name: nm2, bof: wv.getUint32(r.off, true), hidden: w[r.off + 4] !== 0, kind: w[r.off + 5] });
+      } else if (r.type === 0x00FC){
+        // 조각(SST + 뒤따르는 CONTINUE)들을 모아 글자를 읽는다
+        var segs = [{ s: r.off + 8, e: r.off + r.len }], p2 = r.off + r.len;
+        while (p2 + 4 <= w.length && wv.getUint16(p2, true) === 0x003C){ var cl = wv.getUint16(p2 + 2, true); segs.push({ s: p2 + 4, e: p2 + 4 + cl }); p2 += 4 + cl; }
+        var total = wv.getUint32(r.off + 4, true), si = 0, sp = segs[0].s;
+        var need = function(n){ if (sp + n > segs[si].e){ si++; if (si >= segs.length) throw new Error("XLS_SST"); sp = segs[si].s; } };
+        for (var t = 0; t < total; t++){
+          need(3); var n = wv.getUint16(sp, true), f = w[sp + 2]; sp += 3;
+          var rich = 0, ext = 0;
+          if (f & 8){ need(2); rich = wv.getUint16(sp, true); sp += 2; }
+          if (f & 4){ need(4); ext = wv.getUint32(sp, true); sp += 4; }
+          var str = "", wide = f & 1;
+          while (str.length < n){
+            if (sp >= segs[si].e){ si++; if (si >= segs.length) throw new Error("XLS_SST"); sp = segs[si].s; wide = w[sp] & 1; sp += 1; }   // 조각을 넘으면 새 조각 첫 바이트가 글자 폭
+            if (wide){ str += String.fromCharCode(wv.getUint16(sp, true)); sp += 2; } else { str += String.fromCharCode(w[sp]); sp += 1; }
+          }
+          var skip = rich * 4 + ext;
+          while (skip > 0){ if (sp >= segs[si].e){ si++; if (si >= segs.length) break; sp = segs[si].s; } var take = Math.min(skip, segs[si].e - sp); sp += take; skip -= take; }
+          sst.push(str);
+        }
+      } else if (r.type === 0x000A) break;   // 책 머리 끝(EOF)
+      pos = r.off + r.len;
+    }
+    // 2) 시트마다 칸 값
+    return sheets.filter(function(s){ return s.kind === 0; }).map(function(s){
+      var rows = [], set = function(rr, cc, v){ (rows[rr] = rows[rr] || [])[cc] = v; }, q = s.bof, lastF = null;
+      while (q + 4 <= w.length){
+        var c = recAt(q), o = c.off;
+        if (c.type === 0x000A) break;
+        if (c.type === 0x00FD) set(wv.getUint16(o, true), wv.getUint16(o + 2, true), sst[wv.getUint32(o + 6, true)]);
+        else if (c.type === 0x0203) set(wv.getUint16(o, true), wv.getUint16(o + 2, true), wv.getFloat64(o + 6, true));
+        else if (c.type === 0x027E) set(wv.getUint16(o, true), wv.getUint16(o + 2, true), rk(wv.getUint32(o + 6, true)));
+        else if (c.type === 0x00BD){ var rr2 = wv.getUint16(o, true), cf = wv.getUint16(o + 2, true), cnt = (c.len - 6) / 6; for (j = 0; j < cnt; j++) set(rr2, cf + j, rk(wv.getUint32(o + 4 + j * 6 + 2, true))); }
+        else if (c.type === 0x0006){
+          var fr = wv.getUint16(o, true), fc = wv.getUint16(o + 2, true);
+          if (wv.getUint16(o + 12, true) === 0xFFFF){ var kind = w[o + 6]; if (kind === 0) lastF = [fr, fc]; else if (kind === 1) set(fr, fc, !!w[o + 8]); else set(fr, fc, null); }
+          else set(fr, fc, wv.getFloat64(o + 6, true));
+        } else if (c.type === 0x0207 && lastF){
+          var n3 = wv.getUint16(o, true), f3 = w[o + 2], s3 = "";
+          for (j = 0; j < n3; j++) s3 += f3 & 1 ? String.fromCharCode(wv.getUint16(o + 3 + j * 2, true)) : String.fromCharCode(w[o + 3 + j]);
+          set(lastF[0], lastF[1], s3); lastF = null;
+        } else if (c.type === 0x0204){
+          var n4 = wv.getUint16(o + 6, true), f4 = w[o + 8], s4 = "";
+          for (j = 0; j < n4; j++) s4 += f4 & 1 ? String.fromCharCode(wv.getUint16(o + 9 + j * 2, true)) : String.fromCharCode(w[o + 9 + j]);
+          set(wv.getUint16(o, true), wv.getUint16(o + 2, true), s4);
+        }
+        q = o + c.len;
+      }
+      for (j = 0; j < rows.length; j++) if (!rows[j]) rows[j] = [];
+      return { name: s.name, hidden: s.hidden, rows: rows };
+    });
+  }
+  // ── 66 급여 판3(PM 11/24 'ㄱ'): 회계사무소 대장 불러오기(대조 · 기준 없는 사람 채우기) · 엑셀 내려받기(같은 칸 순서·두 줄) · 명세서 인쇄. 파일은 브라우저 안에서만 읽는다.
+  // xlsx(새 엑셀) 시트 전부 — 행 번호(r)를 지켜 빈 줄이 당겨지지 않게
+  function payXlsxSheets(buf){
+    var zip = xlsxZip(new Uint8Array(buf)), td = new TextDecoder();
+    return Promise.all([xlsxEntry(zip, "xl/workbook.xml"), xlsxEntry(zip, "xl/_rels/workbook.xml.rels"), xlsxEntry(zip, "xl/sharedStrings.xml")]).then(function(a){
+      var wbx = a[0] ? td.decode(a[0]) : "", rel = a[1] ? td.decode(a[1]) : "", shared = a[2] ? xlsxSS(td.decode(a[2])) : [];
+      var tgt = {}, m, re = /<Relationship\b[^>]*Id="([^"]+)"[^>]*Target="([^"]+)"/g; while ((m = re.exec(rel))) tgt[m[1]] = m[2].replace(/^\/?xl\//, "");
+      var list = [], rs = /<sheet\b[^>]*name="([^"]*)"[^>]*r:id="([^"]+)"/g; while ((m = rs.exec(wbx))) list.push({ name: xlsxUnescape(m[1]), path: "xl/" + (tgt[m[2]] || "") });
+      return Promise.all(list.map(function(s){ return xlsxEntry(zip, s.path).then(function(b){
+        var rows = [], rr = /<row\b([^>]*)>([\s\S]*?)<\/row>/g, rm, k = 0;
+        var xml = b ? td.decode(b) : "";
+        while ((rm = rr.exec(xml))){ var rn = rm[1].match(/\br="(\d+)"/), ri = rn ? (+rn[1] - 1) : k; rows[ri] = xlsxSheet("<row>" + rm[2] + "</row>", shared)[0] || []; k = ri + 1; }
+        for (var i = 0; i < rows.length; i++) if (!rows[i]) rows[i] = [];
+        return { name: s.name, rows: rows };
+      }); }));
+    });
+  }
+  // 시트 → 대장 사람 줄(회계사무소 꼴: '사원번호' 머리 줄 + 다음 줄 · 한 사람 두 줄). 반환 [{ name, corp, people:[{ name, no, hire, pos, v:{...} }] }]
+  var PAY_LEDGER_COLS = { "기본급": "base", "수당": "allow", "초과/차감수당": "adj", "상여금": "bonus", "식대": "meal", "자가운전보조금": "car", "4대보험적용총액": "taxable", "국민연금": "pension", "건강보험": "health", "장기요양보험료": "care", "고용보험": "emp", "소득세": "income", "지방소득세": "local", "공제합계": "ded_total", "차인지급액": "net" };
+  function payLedgerParse(sheets){
+    var nz = function(s){ return String(s == null ? "" : s).replace(/\s+/g, ""); };
+    var num = function(x){ if (typeof x === "number") return x; var t = String(x == null ? "" : x).replace(/[,\s]/g, ""); return /^-?\d+(\.\d+)?$/.test(t) ? Number(t) : null; };
+    var out = [];
+    sheets.forEach(function(sh){
+      var rows = sh.rows || [], hi = -1, i;
+      for (i = 0; i < rows.length && hi < 0; i++) if ((rows[i] || []).some(function(c){ return nz(c) === "사원번호"; })) hi = i;
+      if (hi < 0) return;
+      var h1 = rows[hi] || [], col = {};
+      h1.forEach(function(c, j){ var k = PAY_LEDGER_COLS[nz(c)]; if (k && !(k in col)) col[k] = j; });
+      var above = rows.slice(0, hi).map(function(r){ return (r || []).map(nz).join(" "); }).join(" ") + " " + sh.name;
+      var corp = /건설/.test(above) ? "con" : "env", people = [];
+      for (i = hi + 2; i + 1 < rows.length + 1; i += 2){
+        var a = rows[i] || [], b = rows[i + 1] || [], nm = nz(a[1]);
+        if (!nm) break;
+        var v = {}; Object.keys(col).forEach(function(k){ var x = num(a[col[k]]); v[k] = x == null ? 0 : x; });
+        v.gross = col.taxable != null ? (num(b[col.taxable]) || 0) : 0;
+        people.push({ name: nm, no: nz(a[0]), hire: b[0], pos: nz(b[1]), v: v });
+      }
+      out.push({ name: sh.name, corp: corp, people: people });
+    });
+    return out;
+  }
+  function payImportPick(){
+    var inp = document.createElement("input"); inp.type = "file"; inp.accept = ".xls,.xlsx";
+    inp.onchange = function(){ var f = inp.files && inp.files[0]; if (!f) return;
+      var rd = new FileReader();
+      rd.onload = function(){
+        var buf = rd.result, isXls = /\.xls$/i.test(f.name);
+        Promise.resolve().then(function(){ return isXls ? payXlsSheets(buf) : payXlsxSheets(buf); }).then(function(sheets){ payImportShow(f.name, payLedgerParse(sheets)); }, function(e){ alert("대장 파일을 읽지 못했습니다 (" + (e && e.message || e) + ")"); });
+      };
+      rd.readAsArrayBuffer(f);
+    };
+    inp.click();
+  }
+  // 대조 + 기준 채우기 창 — 지금 화면(달·회사)과 같은 회사 시트를 견줌
+  function payImportShow(fname, books){
+    var d = payS.data; if (!d) return;
+    var bk = books.filter(function(x){ return x.corp === payS.corp; })[0];
+    if (!bk){ alert("이 파일에 " + PAY_CORP[payS.corp] + " 시트(사원번호 머리 줄)가 없습니다"); return; }
+    var nz = function(s){ return String(s == null ? "" : s).replace(/\s+/g, ""); };
+    var byName = {}; d.rows.forEach(function(r){ if (r.member) byName[nz(r.member.name)] = r; });
+    var LAB = [["base", "기본급"], ["allow", "수당"], ["adj", "초과/차감"], ["bonus", "상여금"], ["meal", "식대"], ["car", "자가운전"], ["taxable", "적용총액"], ["gross", "지급총액"], ["pension", "국민연금"], ["health", "건강보험"], ["care", "장기요양"], ["emp", "고용보험"], ["income", "소득세"], ["local", "지방소득세"], ["ded_total", "공제합계"], ["net", "차인지급액"]];
+    var appV = function(c, k){ if (!c) return null; if (c.cols && k in c.cols) return c.cols[k]; if (c.ded && k in c.ded) return c.ded[k] || 0; return c[k]; };
+    var diffs = [], same = 0, unmatched = [], noBase = [];
+    bk.people.forEach(function(p){
+      var r = byName[p.name];
+      if (!r){ unmatched.push(p.name); return; }
+      if (!r.calc){ if (r.state === "no_base") noBase.push({ p: p, r: r }); return; }
+      LAB.forEach(function(l){ var a = Math.round(p.v[l[0]] || 0), b = Math.round(appV(r.calc, l[0]) || 0); if (a === b) same++; else diffs.push({ name: p.name, lab: l[1], a: a, b: b }); });
+    });
+    var inFile = {}; bk.people.forEach(function(p){ inFile[p.name] = 1; });
+    var notInFile = d.rows.filter(function(r){ return r.member && r.state !== "excluded" && !inFile[nz(r.member.name)]; }).map(function(r){ return r.member.name; });
+    var h = '<p>' + esc(fname) + ' · ' + esc(bk.name) + ' 시트 ' + bk.people.length + '명 ↔ ' + esc(PAY_CORP[payS.corp]) + ' ' + esc(d.ym) + ' 대장. 파일은 이 화면에서만 읽고 서버로 보내지 않습니다.</p>';
+    h += '<div class="pay-sub">칸 대조 — 같음 ' + same + '칸 · 다름 ' + diffs.length + '칸</div>';
+    if (diffs.length) h += '<table class="pay-vers"><thead><tr><th>사람 · 칸</th><th class="num">대장</th><th class="num">앱</th><th class="num">차이</th></tr></thead><tbody>' + diffs.map(function(x){ return '<tr><td>' + esc(x.name) + ' · ' + esc(x.lab) + '</td><td class="num">' + payWon(x.a) + '</td><td class="num">' + payWon(x.b) + '</td><td class="num">' + (x.b - x.a > 0 ? '+' : '') + payWon(x.b - x.a) + '</td></tr>'; }).join("") + '</tbody></table>';
+    if (unmatched.length) h += '<p class="pay-hint">대장에만 있는 이름(앱 명부·이 회사 대장에 없음): ' + unmatched.map(esc).join(", ") + '</p>';
+    if (notInFile.length) h += '<p class="pay-hint">앱 대장에만 있는 사람: ' + notInFile.map(esc).join(", ") + '</p>';
+    if (noBase.length && d.state !== "closed"){
+      h += '<div class="pay-sub">기준이 없는 ' + noBase.length + '명을 이 대장 값으로 채우기</div><p class="pay-hint">' + noBase.map(function(x){ return esc(x.p.name); }).join(", ") + ' — 기본급·수당·식대·자가운전보조금을 대장 값으로, 국민연금·고용보험이 빈 사람은 대상 아님으로, 가족 수 1명(대장 방식)으로 넣습니다. 적용 시작 달 = ' + esc(d.ym) + '. 수당 칸에 하수준설 수당이 섞여 있으면 기준을 연 뒤 고쳐 주세요.</p>';
+      h += '<div class="pay-grid"><label class="pay-f"><span>월 소정근로시간(모두 같게)</span><input id="piHours" inputmode="decimal" placeholder="통상시급 = 통상임금 ÷ 이 시간"></label></div>';
+    }
+    payDlg("회계사무소 대장과 대조", h, noBase.length && d.state !== "closed" ? function(btn){
+      var hrs = payNum(document.getElementById("piHours"), true);
+      if (!hrs || isNaN(hrs)){ alert("월 소정근로시간을 넣어 주세요"); return; }
+      if (!confirm(noBase.length + "명의 기준을 이 대장 값으로 넣을까요?")) return;
+      payS.busy = true; btn.disabled = true;
+      var ok = 0, bad = [], i = 0;
+      var next = function(){
+        if (i >= noBase.length){ payS.busy = false; btn.disabled = false; alert("넣음 " + ok + "명" + (bad.length ? " · 못 넣음 " + bad.join(", ") : "")); payDlgClose(); payLoad(); return; }
+        var x = noBase[i++], v = x.p.v;
+        var ver = { from: d.ym, base: Math.round(v.base), allow: Math.round(v.allow), allow_ord: false, meal: Math.round(v.meal), car: Math.round(v.car), hours: hrs, fam: 1, kids: 0, pct: 100, pension_base: null, health_base: null, skip: { pension: !(v.pension > 0), health: !(v.health > 0), emp: !(v.emp > 0) }, dredge: false };
+        gwCall("gw-pay", { action: "pay_base_save", corp: payS.corp, mid: x.r.mid, ver: ver, rev: x.r.base_rev || "", kind: "new" }).then(function(res){ if (res.status === 200) ok++; else bad.push(x.p.name + "(" + ((res.body && (res.body.field || res.body.error_code)) || res.status) + ")"); next(); }, function(){ bad.push(x.p.name + "(네트워크)"); next(); });
+      };
+      next();
+    } : null, "기준 채우기");
+  }
+  // 엑셀 내려받기 — 회계사무소 대장과 같은 칸 순서·한 사람 두 줄(서식·병합 없음)
+  function payExportXlsx(){
+    var d = payS.data; if (!d) return;
+    var rows = [[PAY_CORP[payS.corp] + " " + d.ym + " 급여대장" + (d.pay_day ? " · 지급일 " + d.ym + "-" + String(d.pay_day).padStart(2, "0") : "") + " · 근무 기간 " + d.period.from + " ~ " + d.period.to + (d.state === "closed" ? " · 확정" : " · 작성 중")], [],
+      ["사원번호", "성명", "기본급", "수당", "초과/차감 수당", "상여금", "식대", "자가운전보조금", "4대보험적용총액", "국민연금", "건강보험", "장기요양보험료", "고용보험", "소득세", "지방소득세", "공제합계", "차인지급액", "비고"],
+      ["입사일", "직위", "", "", "", "", "", "", "지급총액"]];
+    var T = {};
+    d.rows.forEach(function(r){
+      var m = r.member || {}, c = r.calc;
+      if (!c) return;
+      var k = c.cols, e = c.ded, nd = function(x){ return e[x] == null ? "" : e[x]; };
+      rows.push([m.emp_no || "", m.name || "", k.base, k.allow, k.adj, k.bonus, k.meal, k.car, c.taxable, nd("pension"), nd("health"), nd("care"), nd("emp"), nd("income"), nd("local"), c.ded_total, c.net, (r.row && r.row.note) || ""]);
+      rows.push([m.hire_date || "", m.rank || "", "", "", "", "", "", "", c.gross]);
+      ["base", "allow", "adj", "bonus", "meal", "car"].forEach(function(x){ T[x] = (T[x] || 0) + (k[x] || 0); });
+      ["pension", "health", "care", "emp", "income", "local"].forEach(function(x){ T[x] = (T[x] || 0) + (e[x] || 0); });
+      T.taxable = (T.taxable || 0) + c.taxable; T.gross = (T.gross || 0) + c.gross; T.ded = (T.ded || 0) + c.ded_total; T.net = (T.net || 0) + c.net;
+    });
+    rows.push(["합계", "", T.base || 0, T.allow || 0, T.adj || 0, T.bonus || 0, T.meal || 0, T.car || 0, T.taxable || 0, T.pension || 0, T.health || 0, T.care || 0, T.emp || 0, T.income || 0, T.local || 0, T.ded || 0, T.net || 0]);
+    rows.push(["", "", "", "", "", "", "", "", T.gross || 0]);
+    downloadBlob("급여대장_" + PAY_CORP[payS.corp] + "_" + d.ym + ".xlsx", buildSimpleXlsx(d.ym + " " + PAY_CORP[payS.corp], rows));
+  }
+  // 명세서 — 계산된 사람 전부(또는 한 사람)를 새 창에 한 장씩, 인쇄 단추
+  function paySlipHtml(r, d){
+    var m = r.member || {}, c = r.calc, k = c.cols, e = c.ded, ln = function(a, b){ return '<tr><td>' + a + '</td><td class="n">' + b + '</td></tr>'; };
+    var pay = [["기본급", k.base], ["수당", k.allow], ["초과/차감 수당", k.adj], ["상여금", k.bonus], ["식대", k.meal], ["자가운전보조금", k.car]].filter(function(x){ return x[1]; }).map(function(x){ return ln(esc(x[0]), payWon(x[1])); }).join("");
+    var how = c.lines.filter(function(l){ return l.how; }).map(function(l){ return esc(l.n) + ": " + esc(l.how) + " = " + payWon(l.amt); });
+    if (c.dredge) how.push("하수준설 수당: " + d.period.from + " ~ " + d.period.to + " 근무 " + c.dredge.days + "일 중 추가 지급 " + c.dredge.paid_days + "일 · 연장 " + c.dredge.ot + "시간 = " + payWon(c.dredge.total));
+    var ded = [["국민연금", e.pension], ["건강보험", e.health], ["장기요양보험료", e.care], ["고용보험", e.emp], ["소득세", e.income], ["지방소득세", e.local]].filter(function(x){ return x[1] != null; }).map(function(x){ return ln(x[0], payWon(x[1])); }).join("");
+    return '<section class="slip"><h2>급여명세서</h2><div class="hd">' + esc(PAY_CORP[payS.corp]) + ' · ' + esc(d.ym) + (d.pay_day ? ' · 지급일 ' + esc(d.ym + "-" + String(d.pay_day).padStart(2, "0")) : '') + '</div>'
+      + '<div class="who">' + esc(m.name || "") + ' · ' + esc(m.rank || "") + '</div><table>' + pay + '<tr class="t"><td>지급총액</td><td class="n">' + payWon(c.gross) + '</td></tr></table>'
+      + '<table>' + ded + '<tr class="t"><td>공제합계</td><td class="n">' + payWon(c.ded_total) + '</td></tr></table>'
+      + '<div class="net">차인지급액 <b>' + payWon(c.net) + '원</b></div>' + (how.length ? '<div class="how">' + how.join("<br>") + '</div>' : '') + '</section>';
+  }
+  function payPrintSlips(mid){
+    var d = payS.data; if (!d) return;
+    var list = d.rows.filter(function(r){ return r.calc && (!mid || r.mid === mid); });
+    if (!list.length){ alert("계산된 사람이 없습니다"); return; }
+    var w = window.open("", "_blank");
+    if (!w){ alert("팝업이 막혔습니다 — 이 사이트의 팝업 허용 후 다시 눌러 주세요"); return; }
+    w.document.write('<!doctype html><meta charset="utf-8"><title>급여명세서 ' + esc(d.ym) + '</title><style>body{font-family:"Malgun Gothic",sans-serif;margin:0;padding:16px;color:#16212B}.bar{margin-bottom:12px}.slip{max-width:520px;border:1px solid #ccc;border-radius:8px;padding:14px 16px;margin:0 0 16px;page-break-after:always}.slip h2{text-align:center;letter-spacing:.3em;font-size:17px;margin:0 0 6px}.hd,.how{font-size:12px;color:#555}.who{font-weight:700;margin:6px 0}table{width:100%;border-collapse:collapse;font-size:13px;margin:6px 0}td{padding:3px 2px;border-bottom:1px solid #eee}.n{text-align:right;font-variant-numeric:tabular-nums}.t td{font-weight:700;border-top:1px solid #999}.net{font-size:15px;text-align:right;margin:8px 0}@media print{.bar{display:none}.slip{border:0}}</style><div class="bar"><button onclick="print()">인쇄</button></div>' + list.map(function(r){ return paySlipHtml(r, d); }).join(""));
+    w.document.close();
   }
   // @pay-end
   function pmconDueTxt(r){
