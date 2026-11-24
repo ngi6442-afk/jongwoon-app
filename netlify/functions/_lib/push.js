@@ -15,6 +15,8 @@ const PUSH_LOG_MAX = 1000;
 async function getKeys() {
   const r = await blobGet(store(DATA), 'push:keys');
   if (r.ok && r.data && r.data.publicKey && r.data.privateKey) return r.data;
+  // C225 판 A: 못 읽음(읽기·파싱 실패)이면 새 키를 만들지 않는다 — 새 키로 덮이면 전 직원 기기 구독(옛 공개키로 맺음)이 끊겼다. 없음일 때만 만든다
+  if (!r.ok && r.code !== 'NOT_FOUND') throw new Error('KEYS_READ_FAILED');
   const k = webpush.generateVAPIDKeys();
   const doc = { publicKey: k.publicKey, privateKey: k.privateKey, created: Date.now() };
   const w = await blobSet(store(DATA), 'push:keys', doc);
@@ -93,8 +95,11 @@ async function sendTo(memberIds, payload, opts) {
   }
   // 알림함(push:log) — 폰 팝업이 지나가면 다시 볼 곳이 없다는 PM 지적(2026-08-20).
   // 발송 전에 남기고(구독이 없어도 이력은 남게), 이력 실패가 발송을 막지 않는다. 최근 PUSH_LOG_MAX건 링(P1 판24-②: 100 → 1000).
+  // C225 판 A: 이력을 못 읽으면 빈 이력 위에 쓰지 않는다(_lib/blobs.js 층 1도 막음) — 이번 한 줄을 못 남긴 것은 돌려주는 값 log_failed로 드러낸다(발송은 종전대로)
+  let logFailed = false;
   try {
     const lr = await blobGet(store(DATA), 'push:log');
+    if (!lr.ok && lr.code !== 'NOT_FOUND') throw new Error('LOG_READ_FAILED');
     const ldoc = (lr.ok && lr.data && Array.isArray(lr.data.items)) ? lr.data : { schema: 1, items: [] };
     const ent = { ts: Date.now(), title: String(payload.title || ''), body: String(payload.body || ''),
       url: String(payload.url || ''), tag: String(payload.tag || ''), to: ids.slice(0, 30) };
@@ -103,11 +108,17 @@ async function sendTo(memberIds, payload, opts) {
     if (opts && opts.by) ent.by = String(opts.by).slice(0, 40);   // 발신자(push_send는 임의 제목·본문을 실을 수 있다 — 최소한 누가 쐈는지는 남는다)
     ldoc.items.push(ent);
     if (ldoc.items.length > PUSH_LOG_MAX) ldoc.items = ldoc.items.slice(-PUSH_LOG_MAX);
-    await blobSet(store(DATA), 'push:log', ldoc);
-  } catch (e) {}
-  if (opts && opts.logOnly === true) return { sent: 0, removed: 0, skipped: skipped };
-  if (!ids.length) return { sent: 0, removed: 0, skipped: skipped };
-  const keys = await getKeys();
+    const lw = await blobSet(store(DATA), 'push:log', ldoc);
+    if (!(lw && lw.ok)) logFailed = true;
+  } catch (e) { logFailed = true; }
+  const lf = logFailed ? { log_failed: true } : {};
+  if (opts && opts.logOnly === true) return Object.assign({ sent: 0, removed: 0, skipped: skipped }, lf);
+  if (!ids.length) return Object.assign({ sent: 0, removed: 0, skipped: skipped }, lf);
+  let keys;
+  try { keys = await getKeys(); } catch (e) {
+    if (e && e.message === 'KEYS_READ_FAILED') return Object.assign({ sent: 0, removed: 0, skipped: skipped, why: 'KEYS_READ_FAILED' }, lf);   // C225: 키를 못 읽은 회차는 보내지 않음(새 키로 덮지 않음)
+    throw e;
+  }
   webpush.setVapidDetails('mailto:ngi6442@gmail.com', keys.publicKey, keys.privateKey);
   const doc = await getSubs();
   const body = JSON.stringify(payload);
@@ -139,6 +150,7 @@ async function sendTo(memberIds, payload, opts) {
     if (subs.length) doc.members[mid] = subs; else delete doc.members[mid];
   }
   if (removed) { try { await saveSubs(doc); } catch (e) {} }
+  if (logFailed) return { sent, removed, skipped, log_failed: true };   // C225 판 A
   return { sent, removed, skipped };
 }
 

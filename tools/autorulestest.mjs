@@ -50,6 +50,14 @@ const workers = [
 const w = A.wkMissing(workers, asb, 2025);
 T('wk: 2025~ 참여자 범위 3(w1·w2·w4), 생년월일 공란 1(w2)·연락처 공란 2·동명이인 1쌍·전체 참고(생년월일 공란 2/4)', w.scope === 3 && w.birth_blank === 1 && w.ids_birth_blank[0] === 'w2' && w.phone_blank === 2 && w.dup_pairs === 1 && w.total_live === 4 && w.ref.birth_blank_all === 2, JSON.stringify(w));
 T('wk 산출물에 이름·생년월일·연락처 값 없음(piiScan 통과)', A.piiScan(w) === '' && A.piiScan(s) === '' && A.piiScan(v) === '');
+// C185 판4 ⑦ 건설기계 31일 전(오늘 고정 TODAY 기준 상대 날짜)
+{
+  const add = (n) => new Date(Date.parse(TODAY + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+  const C = (id, x) => Object.assign({ id: id, no: id, state: '운행', size: '건설기계', insp_due: add(31) }, x || {});
+  const vs = [C('c1'), C('c2', { insp_due: add(30) }), C('c3', { insp_due: add(32) }), C('c4', { state: '검사보류' }), C('c5', { insp_due: add(60) }), C('c6', { size: '대형 화물' })];
+  const n90 = A.veh90(vs, TODAY, []).items.map((x) => x.id).join(), q = A.ceq31(vs, TODAY, []), q2 = A.ceq31(vs, TODAY, ['veh:c1:insp:' + add(31)]);
+  T('판4 건설기계: 90일 후보에서 빠짐(31·32·60일 건설기계 0 · 대형 화물 31일만) · 31일만 잡음(30·32 아님) · 회색 제외 · 겹친 키 제외', n90 === 'c6' && q.count === 1 && q.items[0].id === 'c1' && q.ceq === 5 && q2.count === 0 && q2.overlap === 1 && A.isCeq({ size: '건설기계' }) && !A.isCeq({ size: '' }), JSON.stringify({ n90, q: q.count, q2: q2.overlap }));
+}
 T('piiScan: 전화번호 꼴·이름 필드가 들어가면 거부', A.piiScan({ x: '010-1234-5678' }) === 'PHONE' && A.piiScan({ name: '김' }) === 'FIELD');
 T('월 키(KST 날짜 기준)', A.siteKey('2026-11-03') === 'site:missing:2026-11' && A.wkKey('2026-12-01') === 'wk:missing:2026-12');
 
