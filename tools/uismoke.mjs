@@ -23276,9 +23276,9 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ["`handleBotNotify`", "원장 C255"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v534 \(2026-11-24\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 534 && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
       && d.cl.indexOf('**C255(v534') > 0
-      && /SHELL_CACHE = 'jw-shell-v534'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 534;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r534 = chk534(D534);
@@ -23412,6 +23412,31 @@ try {
     n256(/startProcess\(/g) === 5 && n256(/handStart:handStart/g) === 1 && n256(/handStart/g) === 5 && n256(/csLinkSiteLater\(c/g) === 3 && n256(/csSiteStartFill\(c/g) === 4 && n256(/asb\.push\(/g) === 2 && !/start: c\.start \|\| ""/.test(html) && n256(/\br\.start\s*=[^=]/g) === 2,
     JSON.stringify({ sp: n256(/startProcess\(/g), hs: n256(/handStart/g), later: n256(/csLinkSiteLater\(c/g), fill: n256(/csSiteStartFill\(c/g), push: n256(/asb\.push\(/g), rs: n256(/\br\.start\s*=[^=]/g) }));
 } catch (e) { console.log('  (원장 C256 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v535(C256 — 계약이 만드는 현장 대장 줄 시작일 = 착공일 · 원장 C256): 실행 검사는 위 C256 블록 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd535 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D535 = { ft: rd535('FEATURES.md'), tl: rd535('TESTLIST.md'), sw: rd535('sw.js'), man: rd535('MANUAL.html'), cl: rd535('CLAUDE.md') };
+  const chk535 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v535 (11/24)', '\n### '), tlv = cut(d.tl, '\n## v535 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`csSiteStartFill`", "원장 C256"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v535 \(2026-11-24\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C256(v535') > 0
+      && /SHELL_CACHE = 'jw-shell-v535'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r535 = chk535(D535);
+  const mu535 = (k, f) => chk535(Object.assign({}, D535, { [k]: f(D535[k]) })).ok;
+  const M535 = [mu535('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v534 (')), mu535('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v534'")),
+    mu535('ft', (s) => s.split('`csSiteStartFill`').join('csSiteStartFill')),
+    mu535('cl', (s) => s.replace('**C256(v535', 'C256(')),
+    mu535('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위로 다시 얹은 판) — 결과는 배포 전 전체 게이트 기록 C256_게이트_1124.txt', '\n- (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위로 다시 얹은 판) — 결과는 배포 전 전체 게이트 기록 C256_게이트_1124.txt'))];
+  T('v535 문서·판 번호(정확 검사): FEATURES 기준 v535 (2026-11-24)·v535 절(C256) · TESTLIST v535 칸 5(화면·운영 확인 3 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v535 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
+    r535.ok && M535.every((v) => v === false), JSON.stringify({ r: r535.info, mut: M535 }));
+} catch (e) { console.log('  (v535 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
