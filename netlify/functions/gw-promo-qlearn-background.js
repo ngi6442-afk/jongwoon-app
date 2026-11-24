@@ -62,7 +62,9 @@ exports.handler = async function (event, context) {
     const qr = await blobGet(st, QL.QLEARN_KEY);
     if (!qr.ok) { console.log('[품질 학습] 시작 읽기 실패 ' + (qr.code || '') + ' — 모델 호출 안 함'); return; }   // 검토 gen F2(c)
     const q0 = QL.normQL(qr.data);
-    if (q0.off) { await release('', ''); return; }   // 기동 뒤 꺼졌으면 잠금만 푼다
+    const o0 = await QL.offOf(blobGet, st, qr.data);   // v504 C122 N3 — 끄기는 따로 열쇠(없으면 문서 off)
+    if (!o0.ok) { await release('QOFF_READ_FAILED', o0.code); return; }
+    if (o0.off) { await release('', ''); return; }   // 기동 뒤 꺼졌으면 잠금만 푼다
     if (!process.env.GW_ANTHROPIC_KEY) { await release('ENV_MISSING'); return; }
     const lib = loadLib();
     if (!lib) { await release('LIB_MISSING'); return; }
@@ -100,10 +102,10 @@ exports.handler = async function (event, context) {
     const cur = await blobGet(st, QL.QLEARN_KEY);
     if (!cur.ok) { console.log('[품질 학습] 합치기 전 읽기 실패 ' + (cur.code || '') + ' — 이번 결과는 쓰지 않음(토큰 ' + tokens + ')'); return; }
     const base = QL.normQL(cur.data);
-    const merged = QL.mergeQL(base, out, { now: Date.now(), tokens: tokens, sig: QL.basisSig(pq.data, lessons.rules), focus: focus, n: drafts.length });
+    const merged = QL.mergeQL(base, out, { now: Date.now(), tokens: tokens, sig: QL.basisSig(pq.data, lessons.rules), focus: focus, n: drafts.length, over: QL.overOf(stats) });
     const w = await blobSet(st, QL.QLEARN_KEY, merged);
     if (!w.ok) { await release(w.code || 'QL_WRITE_FAILED', '', tokens); return; }
-    console.log('[품질 학습] 학습 — 규칙 ' + merged.rules.length + ' · 버림 ' + merged.dropped + ' · 목표 ' + merged.focus.map(function (f) { return f.code; }).join(',') + ' · 초안 ' + drafts.length + '편 · 토큰 ' + tokens);
+    console.log('[품질 학습] 학습 — 규칙 ' + merged.rules.length + ' · 버림 ' + merged.dropped + (merged.over_dropped ? ' · 넘친 항목 옛 규칙 뺌 ' + merged.over_dropped + '(' + merged.over.join(',') + ')' : '') + (merged.empty_kept ? ' · 빈 목록 — 옛 규칙 지킴' : '') + ' · 목표 ' + merged.focus.map(function (f) { return f.code; }).join(',') + ' · 초안 ' + drafts.length + '편 · 토큰 ' + tokens);
   } catch (e) {
     try { await release('WORKER_THREW', (e && e.message) || String(e)); } catch (e2) {}
   }

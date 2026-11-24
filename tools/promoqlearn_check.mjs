@@ -271,6 +271,96 @@ const qdoc = Object.assign(QL.normQL(null), { rules: [{ id: 'q1', text: '사진�
   } finally { global.fetch = realFetch; process.env.URL = savedUrl || ''; down = false; clearHooks(); }
 }
 
+// ---- ⑧-2 끄기 스위치 따로 열쇠(v504 C122 N3, 11/20) — 스위치와 학습 결과가 한 문서를 통째로 읽고 써서 서로 덮던 창을 없앰 ----
+{
+  const realFetch = global.fetch; const kicks = [];
+  global.fetch = async (url, o) => { kicks.push(String(url)); return { ok: true, status: 202 }; };
+  const savedUrl = process.env.URL; process.env.URL = 'https://jw.test';
+  try {
+    clearHooks();
+    const B = { blobGet: blobsMock.blobGet };
+    mem.gw_data = {};
+    const a1 = await QL.offOf(B.blobGet, 'gw_data', { off: true });
+    const a2 = await QL.offOf(B.blobGet, 'gw_data', { off: false });
+    mem.gw_data[QL.QOFF_KEY] = { off: false, ts: 1 };
+    const a3 = await QL.offOf(B.blobGet, 'gw_data', { off: true });
+    mem.gw_data[QL.QOFF_KEY] = { off: true, ts: 2 };
+    const a4 = await QL.offOf(B.blobGet, 'gw_data', { off: false });
+    mem.gw_data[QL.QOFF_KEY] = { ts: 3 };
+    const a5 = await QL.offOf(B.blobGet, 'gw_data', { off: true });
+    getHooks[QL.QOFF_KEY] = () => READ_FAIL;
+    const a6 = await QL.offOf(B.blobGet, 'gw_data', { off: false });
+    clearHooks();
+    T('⑧-2 offOf: 열쇠 없음(ok·null) = 문서 off 그대로 · 열쇠 off(참·거짓)가 문서보다 먼저 · off 칸 없는 열쇠 = 문서 · 읽기 오류 = ok:false(켬으로 보지 않음)',
+      QL.QOFF_KEY === 'promoai:qlearn_off' && a1.ok && a1.off === true && a1.src === 'doc' && a2.off === false && a3.off === false && a3.src === 'key' && a4.off === true && a4.src === 'key' && a5.off === true && a5.src === 'doc' && a6.ok === false && a6.code === 'STORAGE_READ_FAILED',
+      JSON.stringify([a1, a3, a4, a5, a6]));
+    // 크론: 문서는 켬인데 열쇠가 끔 → 기동 0·저장 안 함 / 열쇠 읽기 오류 → error·기동 0 / 두 번째(쓰기 직전) 열쇠 읽기에서 꺼짐 → off
+    mem.gw_data = { 'promoai:quality': Q, 'promoai:lessons': LES, [QL.QOFF_KEY]: { off: true, ts: 1 } };
+    let r = await QL.kick('gw_data', NOW);
+    const k1 = kicks.length, w1 = 'promoai:qlearn' in mem.gw_data;
+    delete mem.gw_data[QL.QOFF_KEY]; getHooks[QL.QOFF_KEY] = () => READ_FAIL;
+    const r2 = await QL.kick('gw_data', NOW);
+    clearHooks(); getHooks[QL.QOFF_KEY] = (n) => (n === 2 ? { ok: true, data: { off: true, ts: 5 } } : null);
+    const r3 = await QL.kick('gw_data', NOW);
+    clearHooks();
+    T('⑧-2 크론: 열쇠가 끔이면 건너뜀(off)·학습 문서 안 씀 · 열쇠 읽기 오류면 error·기동 0 · 쓰기 직전 다시 읽은 열쇠가 끔이면 off·기동 0',
+      r.skipped === 'off' && k1 === 0 && w1 === false && r2.error === 'STORAGE_READ_FAILED' && r3.skipped === 'off' && kicks.length === 0 && !('promoai:qlearn' in mem.gw_data),
+      JSON.stringify([r, r2, r3, kicks.length]));
+    // 생성 주입·카드: 넘긴 끔 값이 문서 값보다 먼저
+    const qOn = Object.assign({}, qdoc, { off: false }), qOff = Object.assign({}, qdoc, { off: true });
+    T('⑧-2 생성 주입·카드: injectOf(문서 켬, 끔) = null · injectOf(문서 끔, 켬) = 규칙 실림 · 값 안 넘기면 종전대로 문서 off · cardOf 셋째 값이 off',
+      QL.injectOf(qOn, L, true) === null && QL.injectOf(qOff, L, false) !== null && QL.injectOf(qOff, L, false).rules.length === qdoc.rules.length && QL.injectOf(qOff, L) === null && QL.injectOf(qOn, L) !== null
+      && QL.cardOf(qOn, NOW, true).off === true && QL.cardOf(qOff, NOW, false).off === false && QL.cardOf(qOff, NOW).off === true);
+    // 정적: 열쇠를 쓰는 곳은 스위치 한 곳뿐 · 스위치 갈래는 학습 문서를 쓰지 않음 · 워커·크론은 열쇠를 읽기만
+    const rd2 = (p, enc) => fs.readFileSync(join(FN, p), enc || 'utf8');
+    const files = ['_lib/promoqlearn.js', 'gw-promo-ai.js', 'gw-promo-qlearn-background.js', 'gw-promo-ai-cron.js', '_lib/promolearn.js', 'gw-promo-learn-background.js'].map((p) => [p, rd2(p)]).concat([['gw-promo-ai-run-background.js', rd2('gw-promo-ai-run-background.js', 'latin1')]]);
+    const setters = files.filter(([p, s]) => /blobSet\([^)]*QOFF_KEY/.test(s)).map(([p]) => p);
+    const papi2 = rd2('gw-promo-ai.js'), qi = papi2.indexOf("} else if (typeof d.qoff === 'boolean') {"), qj = papi2.indexOf('} else return jr(400', qi), qbr = papi2.slice(qi, qj);
+    const qw2 = rd2('gw-promo-qlearn-background.js');
+    T('⑧-2 정적: QOFF_KEY 쓰기는 gw-promo-ai.js 스위치 갈래 한 곳 · 그 갈래는 학습 문서(QLEARN_KEY)를 읽지도 쓰지도 않음 · 학습 워커는 시작 때 offOf로 읽고 못 읽으면 QOFF_READ_FAILED',
+      setters.length === 1 && setters[0] === 'gw-promo-ai.js' && qi > 0 && qj > qi && /blobSet\(st, QL\.QOFF_KEY, \{ off: d\.qoff, ts: Date\.now\(\), by: /.test(qbr) && !/QLEARN_KEY/.test(qbr)
+      && /const o0 = await QL\.offOf\(blobGet, st, qr\.data\);/.test(qw2) && /if \(!o0\.ok\) \{ await release\('QOFF_READ_FAILED', o0\.code\); return; \}/.test(qw2) && /if \(o0\.off\) \{ await release\('', ''\); return; \}/.test(qw2),
+      JSON.stringify(setters));
+  } finally { global.fetch = realFetch; process.env.URL = savedUrl || ''; clearHooks(); }
+}
+
+// ---- ⑧-3 넘친 항목(C146 ①, 11/20) — 긴 문장 범위 점수 · 넘친 항목 옛 규칙은 코드가 뺌 · 빈 목록 보호 · 학습 워커 배선 · 짝 표 규칙 수 ----
+{
+  const PQm = require(join(FN, '_lib/promoqual.js'));
+  const X2 = PQm.ITEMS.find((i) => i[0] === 'X2')[3];
+  const sc = [0.05, 0.09, 0.12, 0.16, 0.20, 0.25, 0.30, 0.43, 0.80].map((v) => X2({ long_sent_ratio: v }));
+  T('⑧-3 X2 범위 점수(triR 12~20% = 2 · 7~12%·20~30% = 1 · 그 밖 0): 0.05→0 · 0.09→1 · 0.12→2 · 0.16→2 · 0.20→2 · 0.25→1 · 0.30→1 · 0.43→0(11/18 초안) · 0.80→0 · 채점 판 q2-20261120(크론이 다시 잼) · 학습 판 ql2-20261120(자료 지문이 바뀌어 다시 학습)',
+    JSON.stringify(sc) === JSON.stringify([0, 1, 2, 2, 2, 1, 1, 0, 0]) && PQm.QUAL_VER === 'q2-20261120' && QL.QL_VER === 'ql2-20261120' && typeof PQm.triR === 'function' && PQm.triR(null, 1, 2, 0, 3) === 0, JSON.stringify(sc));
+  const st = { X2: { avg: 0, low: 8, n: 8, now: 0.45 }, X1: { avg: 2, low: 0, n: 8, now: 1.0 }, C4: { avg: 2, low: 0, n: 8, now: 35 }, D1: { avg: 1, low: 8, n: 8, now: 0.2 } };
+  const ov = QL.overOf(st), ov2 = QL.overOf({ X2: { now: 0.18 }, X1: { now: 1.25 } });
+  T('⑧-3 overOf: 범위 항목 중 최근 중앙값이 위끝을 넘은 것만(X2 45% > 20 · C4 80자 > 50) · X1은 넘쳐도 빠짐(본보기가 위끝을 넘어 기준부터 맞춰야 함) · 범위 안·범위 아닌 항목(D1)·값 없음 = 빠짐', JSON.stringify(ov) === '["X2"]' && ov2.length === 0 && QL.overOf({ C4: { now: 80 } }).join() === 'C4' && QL.overOf({}).length === 0 && QL.overOf(null).length === 0, JSON.stringify([ov, ov2]));
+  const oldX2 = { id: 'qold2', text: '전체 문장 가운데 상당수는 예순 자를 넘는 긴 문장으로 작성한다.', item: 'X2', n: 2, ts: 5 }, oldD1 = { id: 'qoldd1', text: '판독표 장면마다 현장 작업 문장을 한 문장 이상 쓴다.', item: 'D1', n: 4, ts: 5 };
+  const base = Object.assign(QL.normQL(null), { rules: [oldX2, oldD1] });
+  const out = { summary: 's', rules: [
+    { text: oldX2.text, item: 'X2', n: 3, keep_id: 'qold2' },                     // 모델이 옛 규칙을 이어받아 남김
+    { text: ' ' + oldX2.text + ' ', item: 'ALL', n: 1, keep_id: '' },             // 같은 글을 새 규칙처럼 다시 씀(항목도 바꿈)
+    { text: '긴 문장은 다섯 문장에 한 번꼴로만 쓰고 나머지는 짧게 끊는다.', item: 'X2', n: 1, keep_id: '' },
+    { text: '예순 자를 넘는 문장은 줄이고 절 둘에서 끊는다.', item: 'X2', n: 1, keep_id: 'qold2' },   // 검토 11/20: 옛 id를 이어받아 줄이는 쪽으로 고쳐 씀 = 남아야 함
+    { text: oldD1.text, item: 'D1', n: 5, keep_id: 'qoldd1' }] };
+  const m1 = QL.mergeQL(base, out, { now: NOW, sig: 'S', focus: [], n: 8, over: ['X2'] });
+  const t1 = m1.rules.map((r) => r.text);
+  const m0 = QL.mergeQL(base, out, { now: NOW, sig: 'S', focus: [], n: 8 });
+  const me = QL.mergeQL(base, { summary: '', rules: [] }, { now: NOW, sig: 'S', focus: [], n: 8, over: ['X2'] });
+  const me0 = QL.mergeQL(base, { summary: '', rules: [] }, { now: NOW, sig: 'S', focus: [], n: 8 });
+  const mj = QL.mergeQL(base, { summary: '', rules: [{ text: '금액 12345 쓴다' }, { text: '   ' }, null, 'x'] }, { now: NOW, sig: 'S', focus: [], n: 8 });   // 검토: 전부 거름에 걸림
+  const mo = QL.mergeQL(base, out, { now: NOW, sig: 'S', focus: [], n: 8, over: ['D1', '__proto__', 'constructor'] });   // 검토: 넘침 대상 밖 코드는 무시
+  T('⑧-3 합치기: 넘친 항목(X2)의 옛 규칙은 글이 옛 글과 같으면 이어받은 id든 새 규칙처럼 다시 쓴 것이든 코드가 뺌(2건) · id를 이어받아도 줄이는 쪽으로 고쳐 쓴 규칙은 남음(검토) · 새로 쓴 줄이는 규칙·다른 항목(D1) 옛 규칙은 남음 · over·over_dropped 저장·이력 · over 안 넘기면 종전대로(옛 규칙 남음)',
+    t1.length === 3 && t1.indexOf(oldX2.text) < 0 && t1.some((x) => /다섯 문장에 한 번꼴/.test(x)) && m1.rules.some((r) => r.id === 'qold2' && /절 둘에서 끊는다/.test(r.text)) && t1.indexOf(oldD1.text) >= 0 && m1.over_dropped === 2 && JSON.stringify(m1.over) === '["X2"]' && m1.hist[m1.hist.length - 1].over_dropped === 2
+    && m0.rules.some((r) => r.text === oldX2.text) && m0.over_dropped === 0 && QL.normQL(m1).over_dropped === 2, JSON.stringify({ t1, od: m1.over_dropped }));
+  T('⑧-3 빈 목록 보호: 모델이 규칙을 하나도 안 주면 옛 규칙을 지우지 않음(empty_kept) — 넘친 항목 옛 규칙만 뺌 · over 없으면 옛 규칙 둘 다 그대로·id 유지 · 받은 규칙이 전부 거름에 걸려도 빈 목록으로 봄(검토) · 넘침 대상(C4·X2) 밖 코드는 무시',
+    me.empty_kept === true && me.rules.length === 1 && me.rules[0].id === 'qoldd1' && me0.rules.length === 2 && me0.rules.map((r) => r.id).join() === 'qold2,qoldd1' && me0.empty_kept === true && m1.empty_kept === false
+    && mj.empty_kept === true && mj.rules.length === 2 && mj.dropped === 1 && mo.over.length === 0 && mo.over_dropped === 0 && mo.rules.some((r) => r.id === 'qoldd1'), JSON.stringify({ me: me.rules, me0: me0.rules.map((r) => r.id) }));
+  const qw3 = fs.readFileSync(join(FN, 'gw-promo-qlearn-background.js'), 'utf8'), ql3 = fs.readFileSync(join(FN, '_lib/promoqlearn.js'), 'utf8'), pai3 = fs.readFileSync(join(FN, '_lib/promoai.js'), 'utf8'), idx3 = fs.readFileSync(join(FN, '../../index.html'), 'utf8');
+  T('⑧-3 배선: 학습 워커가 합치기에 over: QL.overOf(stats) · 로그 "넘친 항목 옛 규칙 뺌" · 학습 지시에 "범위 위로 넘쳤으면 … 옛 규칙은 빼고, 줄이는 쪽 규칙"·"규칙을 하나도 주지 않으면 앱은 옛 규칙을 그대로" · 생성 품질 블록 "기본 지시와 부딪혀도 기본 지시를 따릅니다" · 블로그 학습 짝 표에 "· 규칙 n"(완료 짝만 — C247 ㉠)',
+    /focus: focus, n: drafts\.length, over: QL\.overOf\(stats\) \}\);/.test(qw3) && /넘친 항목 옛 규칙 뺌/.test(qw3) && /범위 위로 넘쳤으면 그 항목을 늘리던 옛 규칙은 빼고, 줄이는 쪽 규칙을 새로 씁니다/.test(ql3) && /규칙을 하나도 주지 않으면 앱은 옛 규칙을 그대로 둡니다/.test(ql3)
+    && /이 글쓰기 기본 지시\(문장 길이 섞기·분량 상한 등\)와 부딪혀도 기본 지시를 따릅니다\./.test(pai3) && /\(p\.status === "done" \? ' <span style="color:var\(--sub\);" title="[^"]*">· 규칙 ' \+ \(Number\(p\.rules_n\) \|\| 0\) \+ '<\/span>' : ''\)/.test(idx3));
+}
+
 // ---- ⑨ 생성 워커 통합(가짜 모델): 품질 규칙·목표 줄이 입력에 실리고, 끄면 안 실림 · 금지 문자열에 걸리면 품질 자료만 먼저 뺌(검토 gen F1) ----
 {
   const worker = require(join(FN, 'gw-promo-ai-run-background.js'));
@@ -318,8 +408,8 @@ const qdoc = Object.assign(QL.normQL(null), { rules: [{ id: 'q1', text: '사진�
   T('⑩ 크론 ⑥: try 안에서 늦게 부름 · 결과 로그 out.qlearn(①~⑤ 칸 줄은 그대로) · 모듈 맨 위 require 없음',
     /try \{ qlearn = await require\('\.\/_lib\/promoqlearn'\)\.kick\(st, now\); \} catch \(e\) \{ qlearn = \{ error: /.test(cron) && /out\.qlearn = qlearn;/.test(cron) && /learn: learn, quality: quality \}/.test(cron) && !/^const .*require\('\.\/_lib\/promoqlearn'\)/m.test(cron));
   T('⑩ pl_get qlearn 칸(try·실패면 null — quality·layout 순서 그대로) · pl_set qoff(관리자·감사 "품질 학습 끔/켬" — 골격 off와 따로) · 생성 워커 주입 · 금지 문자열 단계적 되돌림(품질 자료 먼저, 골격 되돌림 줄은 2단계 모양 그대로)',
-    /try \{ const QL = require\('\.\/_lib\/promoqlearn'\); const qq = await blobGet\(st, QL\.QLEARN_KEY\); qlearn = QL\.cardOf\(/.test(papi) && /qlearn: qlearn, quality: quality, layout: layout, request_id: R/.test(papi) && /\} else if \(typeof d\.qoff === 'boolean'\) \{/.test(papi) && /ev = '품질 학습 ' \+ \(d\.qoff \? '끔' : '켬'\);/.test(papi)
-    && /QL\.injectOf\(qr\.ok \? qr\.data : null, lib\)/.test(wk) && /if \(!g1\.ok && \(input\.qrules \|\| input\.qfocus\)\) \{\r\n/.test(wk) && /delete input\.qrules; delete input\.qfocus;\r\n/.test(wk)
+    /try \{ const QL = require\('\.\/_lib\/promoqlearn'\); const qq = await blobGet\(st, QL\.QLEARN_KEY\); const qo = await QL\.offOf\(blobGet, st, qq\.ok \? qq\.data : null\); qlearn = QL\.cardOf\(qq\.ok \? qq\.data : null, Date\.now\(\), qo\.ok \? qo\.off : undefined\);/.test(papi) && /qlearn: qlearn, quality: quality, layout: layout, request_id: R/.test(papi) && /\} else if \(typeof d\.qoff === 'boolean'\) \{/.test(papi) && /ev = '품질 학습 ' \+ \(d\.qoff \? '끔' : '켬'\);/.test(papi)
+    && /const qi = qo\.ok \? QL\.injectOf\(qr\.ok \? qr\.data : null, lib, qo\.off\) : null;\r\n/.test(wk) && /if \(!g1\.ok && \(input\.qrules \|\| input\.qfocus\)\) \{\r\n/.test(wk) && /delete input\.qrules; delete input\.qfocus;\r\n/.test(wk)
     && /if \(!g1\.ok && \(input\.exemplar \|\| input\.lessons \|\| \(input\.recent_heads && input\.recent_heads\.length\)\)\) \{/.test(wk) && /delete input\.exemplar; delete input\.lessons; delete input\.recent_heads;   \/\/ 2/.test(wk)
     && wk.indexOf('if (!g1.ok && (input.qrules || input.qfocus))') < wk.indexOf('if (!g1.ok && (input.exemplar || input.lessons'));
   T('⑩ 짝 목록(검토 loop F2): 키 이름순 자르기 없음 · 전부 읽어 시간순 정렬 뒤 40건 · 간극 칸은 숫자로만', !/\.sort\(\)\.slice\(-LEARN_LIST\)/.test(papi) && /return \{ ok: true, pairs: out\.slice\(0, LEARN_LIST\) \};/.test(papi) && /gap: gapOf\(p\.gap\)/.test(papi));
@@ -349,6 +439,8 @@ const qdoc = Object.assign(QL.normQL(null), { rules: [{ id: 'q1', text: '사진�
     !!F && /본문 일치율 흐름/.test(h3) && /09\/12 <b>95%<\/b>.* → .*10\/12 <b>100%<\/b>.* → .*10\/15 <b>100%<\/b>.* → .*11\/11 <b>100%<\/b>/.test(h3) && /직원 수정 없음 3편 연속\(일치율 100%\)/.test(h3) && !/직원 수정 없음/.test(h2) && F.h([]) === '', (h3 || '').slice(0, 300));
   const card = F && F.q({ off: false, rules: [{ id: 'q1', item: 'D1', n: 2, text: '사진마다 판독표 장비를 쓴다.' }, { id: 'q2', item: 'ALL', n: 1, text: '전체 규칙' }], focus: [{ code: 'D1', say: '현장 문장 비율', avg: 0, now: 13, target: 35, cmp: 'ge', unit: '퍼센트', ex: 45, bound: true, ruled: true }, { code: 'X1', say: '연결어미', avg: 0.5, now: 53, target: 90, target2: 120, cmp: 'range', unit: '개(문장 백 개당)', ex: 104, ruled: false }, { code: 'C3', say: '결함 없애기', nodisp: true, avg: 1, ruled: false }], summary: '요약', learned_at: NOW, n_drafts: 2, code: '', tries: 0, running: false, stats: { calls: 1, tokens: 1200, fail_calls: 2, fail_tokens: 9000 } });
   const cardOff = F && F.q({ off: true, rules: [], focus: [], stats: {} });
+  const cardErr = F && F.q({ off: false, off_error: 'STORAGE_READ_FAILED', rules: [], focus: [], stats: {} });
+  T('⑪ 끄기 열쇠를 못 읽으면(v504 N3 검토) 카드는 "켜짐·꺼짐 상태를 못 읽음" · 끄기·켜기 버튼 없음(옛 값으로 켜짐을 보이지 않음)', !!cardErr && /켜짐·꺼짐 상태를 못 읽음/.test(cardErr) && !/data-pq-off/.test(cardErr) && /data-pq-off/.test(cardOff), (cardErr || '').slice(0, 300));
   T('⑪ 품질 학습 칸: 켜짐 — 끄기 버튼(data-pq-off="1")·꺼짐 — 켜기(="0") · 목표 칩 "13% → 35% 이상 · 판독표만큼"·"53 → 90~120(문장 백 개당)"(규칙 없는 항목은 흐리게)·결함은 숫자 없이 · 규칙(항목 칩·전체) · 요금 나간 실패 2회 · 읽기 실패 문구 · 저장 호출은 카드 바깥(send)만',
     !!F && /data-pq-off="1"[^>]*>켜짐 — 끄기/.test(card) && /data-pq-off="0"[^>]*>꺼짐 — 켜기/.test(cardOff) && /D1 현장 문장 비율 13% → 35% 이상 · 판독표만큼/.test(card) && /opacity:\.55;[^>]*>X1 연결어미 53 → 90~120\(문장 백 개당\)/.test(card) && />C3 결함 없애기</.test(card)
     && /D1 현장 문장<\/span><span style="flex:1;">사진마다 판독표 장비를 쓴다\./.test(card) && />전체<\/span>/.test(card) && /요금 나간 실패 2회/.test(card) && /읽지 못했습니다/.test(F.q(null)) && !/gwCall/.test(src)

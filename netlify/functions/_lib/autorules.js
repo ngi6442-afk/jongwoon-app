@@ -5,6 +5,7 @@
 // 같은 함수를 ① 서버 autotask_facts(appdata autotask.py가 호출 — 생성 여부는 규칙 스위치 settings:autotask) ② 완료 신호(_lib/doneif.js: 다음 회차 미입력 0 → 승인 대기)가 쓴다.
 const GREY = ['말소예정', '매각', '검사보류'];   // 앱 isGreyState·autotask.py GREY와 동일
 const VEH90_MIN = 31, VEH90_MAX = 90;           // D-90 구간: 기존 D-30(≤30)이 이미 잡는 날은 뺀다(같은 auto_key라 live면 서버가 먼저 만들 뿐)
+const CEQ_SIZE = '건설기계', CEQ31 = 31;          // C185 판4 ⑦: 규모 칸 끝 값(앱 VEH_SIZE_DEF·근거 표 attr.size 끝 값과 같은 글자) · 정기검사 31일 전(봇 autotask.py CEQ31과 같은 수 — 앱 runAutoTaskGen은 31을 갖지 않음)
 const WK_SINCE_YEAR = 2025;                      // 일용직 셈 범위 = 2025년 이후 참여자(PM 10/1 '우선')
 
 function live(items) { return (Array.isArray(items) ? items : []).filter(function (x) { return x && typeof x === 'object' && x.del !== 1; }); }
@@ -46,6 +47,7 @@ function veh90(vehRows, today, existingKeys) {
   const items = []; let overlap = 0; const flags = [];
   live(vehRows).forEach(function (v) {
     if (GREY.indexOf(String(v.state || '')) >= 0) return;
+    if (isCeq(v)) return;   // C185 판4 ⑦: 규모 '건설기계'는 90일 규칙에서 늘 뺌(31일 전 규칙 veh_ceq31 몫 — 이 규칙의 스위치·근거 승격과 무관)
     if (!isDate(v.insp_due)) return;
     const d = dayDiff(v.insp_due, today);
     if (d === null || d < VEH90_MIN || d > VEH90_MAX) return;
@@ -57,6 +59,49 @@ function veh90(vehRows, today, existingKeys) {
   items.sort(function (a, b) { return a.days - b.days; });
   return { count: items.length, items: items, overlap: overlap, flags: flags, window: [VEH90_MIN, VEH90_MAX] };
 }
+
+// ---- C185 판4 ⑦ 건설기계 정기검사 31일 전 ----
+// 규모(size)가 '건설기계' ∧ 회색 3종 아님 ∧ 검사 만기가 날짜 ∧ 오늘부터 정확히 31일 · 같은 키(veh:<id>:insp:<만료일> — 30일 전 지시와 같은 키)가 있으면 겹침으로 셈
+function isCeq(v) { return !!(v && typeof v === 'object' && String(v.size || '') === CEQ_SIZE); }
+function ceq31(vehRows, today, existingKeys) {
+  const have = {}; asList(existingKeys).forEach(function (k) { have[String(k)] = 1; });
+  const rows = live(vehRows), items = []; let overlap = 0, ceq = 0;
+  rows.forEach(function (v) {
+    if (!isCeq(v)) return;
+    ceq++;
+    if (GREY.indexOf(String(v.state || '')) >= 0) return;
+    if (!isDate(v.insp_due)) return;
+    if (dayDiff(v.insp_due, today) !== CEQ31) return;
+    const key = 'veh:' + v.id + ':insp:' + v.insp_due;
+    if (have[key]) { overlap++; return; }
+    items.push({ id: v.id, no: String(v.no || ''), due: v.insp_due, key: key });
+  });
+  return { count: items.length, items: items, overlap: overlap, ceq: ceq, total: rows.length };
+}
+
+// ---- C185 판5 ⑤ 현장 실적 신고 대상(evrules 계획 함수와 doneif 신호가 같이 씀) ----
+// 대상 = 대장의 살아 있는 줄 ∧ 종결(status 'done') ∧ 끝난 날 end의 연도 = year ∧ 신고번호 빈칸(대장 ks.no · 연결 계약(con_id)의 어느 단계 vals.ks_no — 건너뛴 단계 빼고) ∧
+//   그 계약의 계약별 할 일이 없음(지우지 않은 지시의 con_ref = con_id — 열림·완료 모두 '있음' · 제목은 보지 않음 — 착수계획 검토 8) · 끝난 날이 빈 종결 줄 = 대상 아님(수만)
+const KS_FROM = '01-15', KS_DUE = '02-15';   // 건설산업기본법 시행규칙 22조①(2월 15일) — 앱 csNextFeb15와 같은 날
+function ksConNo(c) { let v = ''; (c && Array.isArray(c.pipes) ? c.pipes : []).forEach(function (p) { ((p && Array.isArray(p.stages)) ? p.stages : []).forEach(function (s) { const x = (s && s.status !== 'skipped' && s.vals) ? s.vals.ks_no : ''; if (!v && x !== undefined && x !== null && String(x).trim()) v = String(x); }); }); return v; }
+function ksTargets(sites, contracts, tasks, year) {
+  const con = {}; live(contracts).forEach(function (c) { if (c && c.id) con[c.id] = c; });
+  const ref = {}; asList(tasks).forEach(function (t) { if (t && t.del !== 1 && t.con_ref) ref[String(t.con_ref)] = 1; });
+  const out = { done: 0, numbered: 0, has_task: 0, no_end: 0, ids: [], seqs: [] }, y = String(year);
+  live(sites).forEach(function (r) {
+    if (r.status !== 'done') return;
+    if (!isDate(r.end)) { out.no_end++; return; }
+    if (String(r.end).slice(0, 4) !== y) return;
+    out.done++;
+    const no = (r.ks && typeof r.ks === 'object' && String(r.ks.no == null ? '' : r.ks.no).trim()) || (r.con_id ? ksConNo(con[r.con_id]) : '');
+    if (no) { out.numbered++; return; }
+    if (r.con_id && ref[String(r.con_id)]) { out.has_task++; return; }
+    out.ids.push(r.id); if (r.seq != null) out.seqs.push(r.seq);
+  });
+  out.count = out.ids.length;
+  return out;
+}
+function ksWindow(today) { const y = String(today).slice(0, 4); return String(today) >= y + '-' + KS_FROM && String(today) <= y + '-' + KS_DUE; }
 
 // ---- 3-3 worker P0: 일용직 인적사항 ----
 // 생년월일 6자리 정규화: '81.08.17'·'810817'·'1981-08-17' → '810817'. 월 01~12·일 01~31이 아니면 빈칸(=미입력).
@@ -129,4 +174,4 @@ function piiScan(obj) {
   return '';
 }
 
-module.exports = { GREY, VEH90_MIN, VEH90_MAX, WK_SINCE_YEAR, live, isDate, dayDiff, siteMissing, veh90, birth6, wkMissing, monthKeyOf, siteKey, wkKey, piiScan, VEH_DUE_KIND, vehRedo };
+module.exports = { GREY, VEH90_MIN, VEH90_MAX, CEQ_SIZE, CEQ31, isCeq, ceq31, KS_FROM, KS_DUE, ksConNo, ksTargets, ksWindow, WK_SINCE_YEAR, live, isDate, dayDiff, siteMissing, veh90, birth6, wkMissing, monthKeyOf, siteKey, wkKey, piiScan, VEH_DUE_KIND, vehRedo };

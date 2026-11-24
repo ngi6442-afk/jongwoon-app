@@ -20,6 +20,7 @@
 //   어긋나면 응답 idx:false·gap:false로 알린다(앱이 stmt_reindex로 색인을 다시 만듦).
 const crypto = require('crypto');
 const zlib = require('zlib');
+const REQSHAPE = require('./_lib/reqshape');   // C240 판 A-1 가르는 칸은 글자만(들머리)
 const { setupBlobContext, store, blobGet, blobSet, blobList, blobDelete } = require('./_lib/blobs');
 const { verifyToken, bearer } = require('./_lib/session');
 const { appendAudit } = require('./_lib/audit');
@@ -285,7 +286,7 @@ async function handleSave(st, c, d, R) {
   await audit(c, '명세서저장', docKey(k.ym, k.vk), v.name + ' ' + k.ym + ' 줄 ' + doc.rows.length + '건 · ' + status + (chk.ok ? ' · 검산 통과' : ' · 붉은 ' + (chk.bad.length + chk.issues.length)));
   // 29 판⑥ 첨부 원본으로 채운 뒤 저장 = 그 원본에 '채움' 표시(다음에 상세를 열 때 다시 자동으로 채우지 않게) — 실패해도 저장은 끝난 일
   if (Array.isArray(d.drop_ids)) {
-    for (const id of d.drop_ids.slice(0, 10)) {
+    for (const id of d.drop_ids.slice(0, DROP_MAX)) {   // 29 판⑩: 10 → 한 달 첨부 상한(쿠팡 주문이 10통을 넘으면 11번째부터 '채움'이 안 남아 다시 덧붙던 길)
       if (!RE_JOB.test(String(id))) continue;
       try { const g = await getOpt(st, dropKey(k.ym, id)); if (g.ok && g.data && g.data.vk === k.vk && !g.data.applied) { g.data.applied = now; await blobSet(st, dropKey(k.ym, id), g.data); } } catch (e) {}
     }
@@ -635,10 +636,13 @@ async function handleDrop(st, c, d, R) {
   if (d.vk && !fixed) return bad('UNKNOWN_VENDOR', R);
   if (typeof d.b64 !== 'string' || !d.b64) return bad('EMPTY_FILE', R);
   if (d.b64.length > Math.ceil(READ_MAX * 4 / 3) + 8) return bad('FILE_TOO_LARGE', R);
-  const buf = Buffer.from(d.b64, 'base64');
+  let buf = Buffer.from(d.b64, 'base64');
   if (!buf.length) return bad('EMPTY_FILE', R);
   if (buf.length > READ_MAX) return bad('FILE_TOO_LARGE', R);
   const name = dropName(d.name) || '이름 없는 파일';
+  // 29 판⑩ 검토: 사람이 저장해 넣은 쿠팡 주문 메일 본문도 주문 표·결제 금액만 남김(받는 사람·연락처·주소가 첨부 원본에 남지 않게 · 주문일은 메일에서만 알 수 있어 줄 날짜는 사람이 넣음)
+  const CPN = require('./_lib/stmtcoupang');
+  if (CPN.isCoupangOrder(buf) && !/<meta name="jw-src" content="coupang-order">/.test(buf.slice(0, 600).toString('utf8'))) buf = CPN.orderHtml(buf, 0, '');
   const sha = crypto.createHash('sha256').update(buf).digest('hex');
   const cur = await dropList(st, d.ym);
   if (!cur.ok) return fail(cur.code, R);
@@ -737,7 +741,8 @@ async function handleDropDel(st, c, d, R) {   // 잘못 넣은 파일 — 넣은
   const g = await getOpt(st, dropKey(d.ym, d.id));
   if (!g.ok) return fail(g.code, R);
   if (!g.data) return jr(200, { status: 'OK', gone: true, request_id: R });
-  if (g.data.by !== c.member.id && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'NOT_OWNER', request_id: R });
+  // 29 판⑩: 메일 에이전트가 넣은 줄(넣은 사람 = 봇)은 수행 권한이면 지움 — 관리자가 아닌 담당이 엉뚱한 메일 첨부를 못 지워 60개 상한이 차던 길
+  if (g.data.by !== c.member.id && !c.member.admin && g.data.by !== MAIL.BOT) return jr(403, { status: 'FORBIDDEN', error_code: 'NOT_OWNER', request_id: R });
   const a = await blobDelete(store(FILES), fileKey(d.id));
   if (a && a.ok === false) return fail(a.code || 'STORAGE_DELETE_FAILED', R);
   const b = await blobDelete(st, dropKey(d.ym, d.id));
@@ -777,6 +782,7 @@ async function handler(event) {
   let d;
   try { d = parseBody(event); } catch (e) { return bad('INVALID_JSON', R); }
   if (!d || typeof d !== 'object' || Array.isArray(d)) return bad('INVALID_JSON', R);
+  { const bf = REQSHAPE.badField(d, ['action', 'group', 'via', 'vk', 'ym', 'job']); if (bf) return bad('BAD_FIELD', R); }   // C240 판 A-1 가르는 칸은 글자만(배열·객체·숫자 = 400 — 저장소 읽기 전)
   const act = typeof d.action === 'string' ? d.action : '';
   const isRead = Object.prototype.hasOwnProperty.call(READ, act), isWrite = Object.prototype.hasOwnProperty.call(WRITE, act);
   if (!isRead && !isWrite) return bad('UNKNOWN_ACTION', R);

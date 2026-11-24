@@ -6,6 +6,7 @@
 // 완료·삭제된 항목은 대상에서 빠지므로 '완료 시 미발송'이 자연히 성립한다. 경과(D+n) 재알림은 없음(화면 빨강 배지로만).
 const { setupBlobContext, store, blobGet, blobSet, blobList } = require('./_lib/blobs');
 const push = require('./_lib/push');
+const MW = require('./_lib/markwrite');   // C225 판 A 두 번째 검토 — 표식을 못 읽은 회차의 발송 뒤 표식 쓰기
 const { stamp } = require('./_lib/cronstamp');   // v398 실행 흔적 it:cron:<fn>:last
 
 const DATA = 'gw_data';
@@ -44,12 +45,20 @@ exports.handler = async function (event) {
     try {
       // 본문에 제목을 싣지 않는다 — sendTo가 알림함(push:log)에 남기고 그 이력은 관리자 전원이 보므로 '나만 보기' 할 일이 새어 나간다(v310)
       const body = '내 업무 탭 > 내가 할 일에서 확인하세요.';
-      await push.sendTo([mid], { title: '오늘 기한 할 일 ' + dueNow.length + '건', body: body, url: './', tag: 'todo-due-' + today }, ctx ? { ctx: ctx } : null);
-      dueNow.forEach(function (t) { sentDoc.ids[t.id] = today; });
-      // 링 정리 — 오래된 발송 기록은 90일 지나면 버린다(문서가 무한히 자라지 않게)
-      const cutoff = new Date(Date.now() + 9 * 3600000 - 90 * 86400000).toISOString().slice(0, 10);
-      Object.keys(sentDoc.ids).forEach(function (id) { if (String(sentDoc.ids[id]) < cutoff) delete sentDoc.ids[id]; });
-      await blobSet(st, 'todo:sent:' + mid, sentDoc);
+      const rsT = await push.sendTo([mid], { title: '오늘 기한 할 일 ' + dueNow.length + '건', body: body, url: './', tag: 'todo-due-' + today }, ctx ? { ctx: ctx } : null);
+      const addSent = function (doc) {
+        dueNow.forEach(function (t) { doc.ids[t.id] = today; });
+        // 링 정리 — 오래된 발송 기록은 90일 지나면 버린다(문서가 무한히 자라지 않게)
+        const cutoff = new Date(Date.now() + 9 * 3600000 - 90 * 86400000).toISOString().slice(0, 10);
+        Object.keys(doc.ids).forEach(function (id) { if (String(doc.ids[id]) < cutoff) delete doc.ids[id]; });
+        return doc;
+      };
+      if (sr.ok || sr.code === 'NOT_FOUND') await blobSet(st, 'todo:sent:' + mid, addSent(sentDoc));
+      else {   // C225 판 A 두 번째 검토: 표식을 못 읽은 회차 — 다시 읽어 합쳐 씀(깨진 표식은 다시 세움) · 못 쓰면 회차 실패(같은 날 다음 회차 중복을 드러냄)
+        //   마지막 재확인: 실제로 나간 발송이 있으면 다시 읽기도 실패할 때 이번 것만으로 다시 세움(운영 판과 같은 결과 — 중복 발송 없음) · 안 나갔으면(키·구독 못 읽음 등) 표식을 안 써 다음 회차가 살림
+        const mw = (rsT && Number(rsT.sent) > 0) ? await MW.markAfterSend(st, 'todo:sent:' + mid, function (cur) { return addSent((cur && cur.ids && typeof cur.ids === 'object') ? cur : { schema: 1, ids: {} }); }, { rebuild: true }) : { ok: true };
+        if (!(mw && mw.ok)) fails++;
+      }
       members++; items += dueNow.length;
     } catch (e) { fails++; }
   }
@@ -60,14 +69,18 @@ exports.handler = async function (event) {
     if (nfr.ok && nfr.data && nfr.data.events && nfr.data.events.due_digest === 'summary') {
       const tr = await blobGet(st, 'col:tasks');
       const tasks = (tr.ok && tr.data && Array.isArray(tr.data.items)) ? tr.data.items : [];
-      const autos = tasks.filter(function (x) { return x && x.auto_key && x.del !== 1 && x.status !== 'done'; });
-      const due = autos.filter(function (x) { return x.due && String(x.due) <= today; }).length;
-      const noWho = autos.filter(function (x) { return !x.who_id; }).length;
+      const autos0 = tasks.filter(function (x) { return x && x.auto_key && x.del !== 1 && x.status !== 'done'; });
       const ar = await blobGet(st, 'settings:assign');
       const apv = (ar.ok && ar.data && ar.data.approver_id) ? String(ar.data.approver_id) : '';
+      // C185 판2 재확인 1: 승인권자가 관리자가 아니면(명부를 못 읽어 모르면 아닌 쪽) 그 사람에게 가는 수에서 입·퇴사 지시(hr:·acct: — 담당·관리자만 보는 지시)를 뺌 · 관리자에게 보낼 때는 그대로
+      const hrOut = !!(apv && !(ctx && Array.isArray(ctx.adminIds) && ctx.adminIds.indexOf(apv) >= 0));
+      const autos = hrOut ? autos0.filter(function (x) { return !/^(?:hr|acct):/.test(String(x.auto_key || '')); }) : autos0;
+      const due = autos.filter(function (x) { return x.due && String(x.due) <= today; }).length;
+      const noWho = autos.filter(function (x) { return !x.who_id; }).length;
       let to = apv ? [apv] : ((ctx && ctx.adminIds) || []);
       if (gateOn) to = to.filter(function (id) { return !!activeSet[id]; });
       digest = { autos: autos.length, due: due, no_who: noWho, to: to.length };
+      if (hrOut) digest.hr_out = autos0.length - autos.length;
       if (autos.length && to.length) {
         await push.sendTo(to, { title: '자동 지시 요약 ' + autos.length + '건', body: '오늘 기한·경과 ' + due + '건 · 담당 없음 ' + noWho + '건 — 지시함 자동 만기 구역에서 확인', url: './', tag: 'task-digest-' + today }, ctx ? { ctx: ctx, primaryOnly: true } : { primaryOnly: true });
         digest.sent = true;
@@ -101,9 +114,14 @@ exports.handler = async function (event) {
     if (ct.length) {
       let pmIds = (ctx && Array.isArray(ctx.pmIds) && ctx.pmIds.length) ? ctx.pmIds : ((ctx && ctx.adminIds) || []);
       if (gateOn) pmIds = pmIds.filter(function (id) { return !!activeSet[id]; });
-      if (pmIds.length) { const cm = DC.contractBody(ct); await push.sendTo(pmIds, { title: cm.title, body: cm.body, url: './', tag: 'ct-' + today }, { ctx: ctx, primaryOnly: true }); radar.sent = pmIds.length; }
-      ct.forEach(function (x) { sentDoc2.keys[x.key] = today; });
-      await blobSet(st, 'duty:sent', sentDoc2);
+      let rsC = null;
+      if (pmIds.length) { const cm = DC.contractBody(ct); rsC = await push.sendTo(pmIds, { title: cm.title, body: cm.body, url: './', tag: 'ct-' + today }, { ctx: ctx, primaryOnly: true }); radar.sent = pmIds.length; }
+      const addKeys = function (doc) { ct.forEach(function (x) { doc.keys[x.key] = today; }); return doc; };
+      if (sr2.ok || sr2.code === 'NOT_FOUND') await blobSet(st, 'duty:sent', addKeys(sentDoc2));
+      else {   // C225 판 A 두 번째 검토: 표식을 못 읽은 회차 — 다시 읽어 합쳐 씀(깨진 표식은 다시 세움 — 회차당 1회 키라 깨진 채면 매일 다시 나감) · 못 쓰면 회차 실패
+        const mw2 = (rsC && Number(rsC.sent) > 0) ? await MW.markAfterSend(st, 'duty:sent', function (cur) { return addKeys((cur && cur.keys && typeof cur.keys === 'object') ? cur : { schema: 1, keys: {} }); }, { rebuild: true }) : { ok: true };   // 마지막 재확인: 할 일 표식과 같은 규칙
+        if (!(mw2 && mw2.ok)) fails++;
+      }
     }
   } catch (e) { radar = { error: String(e && e.message || e).slice(0, 80) }; fails++; }
   await stamp('gw-todo-cron', { state: 'end', ok: fails === 0, note: 'members ' + members + ' · items ' + items + ' · fails ' + fails + (digest && digest.sent ? ' · digest' : '') + (radar && radar.sent ? ' · radar ' + radar.items : '') });

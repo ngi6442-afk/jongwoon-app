@@ -35,7 +35,8 @@ function finish(res, ctx) {
   ctx = ctx || {};
   const vn = String(res.vendor && res.vendor.name || '').replace(/\s+/g, '');
   const hints = (ctx.vendor && Array.isArray(ctx.vendor.hint) ? ctx.vendor.hint : []).concat(ctx.vendor && ctx.vendor.name ? [String(ctx.vendor.name).replace(/\(.*\)/, '')] : []);
-  if (vn && hints.length && !hints.some(function (h) { const k = String(h || '').replace(/\s+/g, ''); return k && (vn.indexOf(k) >= 0 || k.indexOf(vn) >= 0); })) {
+  const hk = hints.map(function (h) { return String(h || '').replace(/\s+/g, ''); }).filter(function (k) { return k.length >= 3; });   // 29 판⑩: 두 글자 낱말(오천·영남)로는 같은 거래처라 보지 않음
+  if (vn && hk.length && !hk.some(function (k) { return vn.indexOf(k) >= 0 || k.indexOf(vn) >= 0; })) {
     out.warn.unshift('다른 거래처 서류로 보입니다(서류의 공급자: ' + String(res.vendor.name).slice(0, 30) + ') — 맞는 거래처 상세에 넣었는지 확인하세요');
     out.vendor_mismatch = true;
   }
@@ -88,7 +89,16 @@ async function readFile(buf, name, ctx) {
     return { ok: false, code: r.code || 'PDF_FAILED' };
   }
   if (kind === 'image') return { ok: true, ai: 'image' };
-  if (kind === 'html') return { ok: true, ai: 'html' };
+  if (kind === 'html') {
+    // 29 판⑨ 쿠팡 주문 메일 본문(메일 에이전트가 주문 표만 잘라 남긴 HTML · 사람이 넣은 본문 저장본도) — AI 없이 표 그대로
+    const C = require('./stmtcoupang');
+    if (C.isCoupangOrder(buf)) {
+      const r = C.readOrder(buf, '');
+      if (!r.ok) return { ok: false, code: r.code, why: r.why || '' };
+      return { ok: true, result: finish(r, ctx) };
+    }
+    return { ok: true, ai: 'html' };
+  }
   if (kind === 'xlsx') return { ok: false, code: 'UNKNOWN_LAYOUT', why: '아직 모르는 엑셀(xlsx) 양식입니다 — 거래처 원본을 PM께 보내 주시면 틀을 더합니다' };
   return { ok: false, code: 'UNSUPPORTED_TYPE', why: 'PDF·그림(JPG·PNG)·엑셀·계산서 HTML·XML만 읽습니다' };
 }
@@ -158,7 +168,7 @@ async function guessVendor(buf, name, vendors, ym) {
     if (kind === 'nts' || kind === 'xml' || kind === 'xls' || kind === 'pdf') {
       const r = await readFile(buf, name, { ym: ym, vk: '', vendor: null });
       const vn = r.ok && r.result && r.result.vendor && r.result.vendor.name;
-      const v = vn ? matchVendor(vn, act, 2) : null;
+      const v = vn ? matchVendor(vn, act, 3) : null;   // 29 판⑩: 공급자 상호는 3자 이상 낱말로만(오천카센터→오천공구·영남환경→영남주유소처럼 지명 두 글자가 엉뚱한 거래처를 잡음)
       if (v) return { vk: v.vk, how: 'content' };
       if (kind === 'pdf') {
         const P = require('./pdftext');

@@ -1117,7 +1117,7 @@ function buildPrompt(input) {
   const qfocus = Array.isArray(inp.qfocus) ? inp.qfocus.slice(0, 3).map(function (x) { return safeText(x, 120); }).filter(Boolean) : [];
   if (qrules.length) {
     lines.push('');
-    lines.push('[완성도 목표 — 품질 자동 학습 ' + koCount(qrules.length) + ' 건]  (본보기 글과 견줘 최근 초안에 모자란 점에서 모델이 스스로 뽑은 규칙입니다. 위 [직원이 고치는 패턴]과 부딪히면 직원 쪽을 따릅니다. 현장 사실은 사진 판독표·입력·자동 현장 사실에 있는 것만 씁니다.)');
+    lines.push('[완성도 목표 — 품질 자동 학습 ' + koCount(qrules.length) + ' 건]  (본보기 글과 견줘 최근 초안에 모자란 점에서 모델이 스스로 뽑은 규칙입니다. 위 [직원이 고치는 패턴]과 부딪히면 직원 쪽을 따릅니다. 이 글쓰기 기본 지시(문장 길이 섞기·분량 상한 등)와 부딪혀도 기본 지시를 따릅니다. 현장 사실은 사진 판독표·입력·자동 현장 사실에 있는 것만 씁니다.)');
     qrules.forEach(function (l) { lines.push('- ' + l); });
     if (qfocus.length) lines.push('이번에 특히 채울 항목: ' + qfocus.join(' · '));
   }

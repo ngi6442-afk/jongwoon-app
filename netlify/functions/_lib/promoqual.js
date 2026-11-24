@@ -12,7 +12,7 @@ const { blobGet, blobSet } = require('./blobs');
 const EX = require('./promoqual_ex.json');
 
 const QUAL_KEY = 'promoai:quality';
-const QUAL_VER = 'q1-20261110';          // 채점 규칙 판 — 바뀌면 크론이 다음 회차에 전부 다시 잰다
+const QUAL_VER = 'q2-20261120';          // 채점 규칙 판 — 바뀌면 크론이 다음 회차에 전부 다시 잰다
 const LAYOUT_KEY = 'promoai:layout';     // 포장 프로필(promolearn.LAYOUT_KEY와 같은 키 — 복사 창이 쓰는 그 값으로 포장을 재현)
 const HIST_MAX = 120;                    // 초안 점수 이력(생성 작업 단위)
 const SIM_MAX = 60;                      // X5 겹침 비교 대상 상한(같은 회사 글 최근 순)
@@ -165,6 +165,13 @@ function measure(L, title, dateStr, hasMap) {
 }
 
 // ---- 채점(trial_score.py — 16항목 × 0~2점 → 10점 환산, 기준값은 시안) ----
+// v(C146 ①, 11/20) 범위 점수 — lo~hi 2점 · loMid~lo 또는 hi~hiMid 1점 · 그 밖 0점. 한쪽만 보던 tri는 넘쳐도 만점이라
+//   11/18 초안 일곱 편이 긴 문장 43~80%(직원 글 2~20%)인데 X2 만점 → 품질 학습 목표에 안 잡혀 '긴 문장을 늘리라'는 11/13 규칙이 그대로 남았다.
+function triR(v, lo, hi, loMid, hiMid) {
+  if (v === null || v === undefined) return 0;
+  if (v >= lo && v <= hi) return 2;
+  return (v >= loMid && v < lo) || (v > hi && v <= hiMid) ? 1 : 0;
+}
 function tri(v, hi, mid, rev) {
   if (v === null || v === undefined) return 0;
   if (rev) return v <= hi ? 2 : (v <= mid ? 1 : 0);
@@ -183,7 +190,7 @@ const ITEMS = [
   ['D4', 'D', '장소·지형', function (m) { return tri(m.place_distinct, 8, 5); }],
   ['D5', 'D', '현장 수량', function (m) { return tri(m.qty, 3, 1); }],
   ['X1', 'X', '연결어미', function (m) { return tri(m.conn_per_sent, 0.9, 0.6); }],
-  ['X2', 'X', '긴 문장', function (m) { return tri(m.long_sent_ratio, 0.12, 0.07); }],
+  ['X2', 'X', '긴 문장', function (m) { return triR(m.long_sent_ratio, 0.12, 0.20, 0.07, 0.30); }],   // C146 ① 범위 12~20%(qlearn GOAL X2와 같음) — 넘치면 깎임
   ['X3', 'X', '전문 용어', function (m) { return tri(m.terms_distinct, 20, 15); }],
   ['X4', 'X', '분량', function (m) { return tri(m.core_chars, 2500, 1500); }],
   ['X5', 'X', '겹침', function (m) { return tri(m.max_sim, 0.35, 0.6, true); }],
@@ -527,6 +534,7 @@ function summary(raw) {
 }
 
 module.exports = {
+  triR,
   QUAL_KEY, QUAL_VER, LAYOUT_KEY, HIST_MAX, ITEMS, ITEM_METRIC, EX,
   pyRound, cpLen, nch, countOf, linesFromSeq, linesFromPlan, measure, scoreOf, scoreSeq, shingles, jaccard,
   promoOrgOf, promoMarkNums, promoLinesOf, planFromBody, measureText, finish, pack, kindOf, fpOf, kstDay, normQ, sweep, summary,

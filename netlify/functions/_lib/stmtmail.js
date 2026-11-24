@@ -9,8 +9,12 @@
 // 메일 주소·이름·제목은 저장하지 않는다 — 목록 줄에는 보낸 쪽 도메인만(mail.dom).
 const crypto = require('crypto');
 const RD = require('./stmtread');
+const CP = require('./stmtcoupang');
 
 const START_DAY = '2026-11-20';   // 11월분부터(PM 11/14 '11월부터는 메일로') — 10월분은 손으로 이미 넣음(같은 파일이라도 묶음 PDF라 sha가 달라 겹침)
+const FIRST_YM = '2026-11';       // 29 판⑩ 메일로 넣는 첫 달(10월은 손으로 넣음)
+const NTS_NAME = /^NTS_|\.xml$/i;  // 계산서 꼴 첨부 이름(국세청 보안 계산서 NTS_eTaxInvoice.html · 대행사 표준 XML)
+const BODY_START = '2026-11-01';  // 29 판⑨ 쿠팡 주문 본문은 주문한 달에 귀속 — 11월 주문부터(10월 이전 쿠팡은 손으로 넣은 적 없음 · PM 11/20 '쿠팡까지 같이')
 const WINDOW_DAYS = 40;            // 매일 돌며 볼 기간
 const READ_MAX = 4300000;          // gw-stmt READ_MAX와 같음
 const DROP_MAX = 60;               // gw-stmt DROP_MAX와 같음
@@ -45,12 +49,31 @@ function attParts(bs) {
   return out;
 }
 function looksStmt(s) { return STMT_WORD.test(String(s || '')); }
+// 본문 HTML 파트(첨부 없는 메일 — 쿠팡 주문) — 첫 text/html
+function bodyPart(bs) {
+  let hit = null;
+  (function walk(n) {
+    if (hit || !n || typeof n !== 'object') return;
+    if (Array.isArray(n.childNodes) && n.childNodes.length) { n.childNodes.forEach(walk); return; }
+    if (/^text\/html$/i.test(String(n.type || ''))) {
+      const est = Number(n.size) || 0;
+      hit = { part: String(n.part || '1'), est: /base64/i.test(String(n.encoding || '')) ? Math.floor(est * 3 / 4) : est };
+    }
+  })(bs);
+  return hit;
+}
+// 읽을 폴더 — env STMT_MAIL_BOXES(쉼표) · 기본 = 받은편지함 + 청구서함 + 청구서(11/20 실측: 명세는 청구서함, 국세청 계산서는 청구서로 분류됨)
+const BOXES = ['INBOX', '청구서함', '청구서'];
+function mailBoxes(s) {
+  const l = String(s || '').split(',').map(function (x) { return x.trim(); }).filter(function (x) { return x && x.length <= 60; });
+  return l.length ? l.slice(0, 8) : BOXES.slice();
+}
 
 function mailEnv(pe) {
   const e = pe || process.env;
   const user = String(e.STMT_MAIL_USER || '').trim(), pass = String(e.STMT_MAIL_PASS || '');
   if (!user || !pass) return null;
-  return { user: user, pass: pass, host: String(e.STMT_MAIL_HOST || 'imap.daum.net').trim(), port: Number(e.STMT_MAIL_PORT) || 993 };
+  return { user: user, pass: pass, host: String(e.STMT_MAIL_HOST || 'imap.daum.net').trim(), port: Number(e.STMT_MAIL_PORT) || 993, boxes: String(e.STMT_MAIL_BOXES || '') };
 }
 function errCode(e) {
   const s = String((e && (e.responseText || e.message)) || e || '');
@@ -64,39 +87,67 @@ function errCode(e) {
 // 한 번 돌기 — io: { st(gw_data), fst(gw_files), blobGet, blobSet, blobList, blobDelete, mailbox, cfg(vendors), names(), audit(op,id,t), usage(ym,res), now(), budget }
 async function run(io) {
   const t0 = io.now(), sum = { at: t0, ok: true, code: '', msgs: 0, atts: 0, added: 0, read: 0, ai: 0, nov: 0, fail: 0, dup: 0, skip: 0, left: 0, full: 0 };
-  const g = async function (k, dflt) { const r = await io.blobGet(io.st, k); return (r.ok && r.data && typeof r.data === 'object') ? r.data : dflt; };
-  const seenDoc = await g(SEEN, { keys: [] }), seen = new Set(Array.isArray(seenDoc.keys) ? seenDoc.keys : []), seenAdd = [];
-  const senders = await g(SENDERS, { map: {} }), smap = (senders.map && typeof senders.map === 'object') ? senders.map : {};
+  // 29 판⑨(오케스트레이터 C225 전수 표): 읽기 실패와 '없음'을 가름 — 처리 표시·보낸 사람·첨부 목록을 못 읽으면 이번 실행은 아무것도 쓰지 않고 끝냄(빈 목록으로 보고 덮어쓰거나 겹쳐 넣지 않게)
+  const g = async function (k, dflt) {
+    const r = await io.blobGet(io.st, k);
+    if (!r || !r.ok) { const e = new Error('read'); e.readFail = true; throw e; }
+    return (r.data && typeof r.data === 'object') ? r.data : dflt;
+  };
+  let seenDoc, senders;
+  try { seenDoc = await g(SEEN, { keys: [] }); senders = await g(SENDERS, { map: {} }); } catch (e) { sum.ok = false; sum.code = 'STORAGE_READ_FAILED'; return sum; }
+  const seen = new Set(Array.isArray(seenDoc.keys) ? seenDoc.keys : []), seenAdd = [];
+  const smap = (senders.map && typeof senders.map === 'object') ? senders.map : {};
   const act = (io.cfg || []).filter(function (v) { return v && v.active !== false; });
   const byVk = {}; (io.cfg || []).forEach(function (v) { byVk[v.vk] = v; });
   const lists = {};
   async function dropList(ym) {
     if (lists[ym]) return lists[ym];
     const l = await io.blobList(io.st, 'stmtdrop:' + ym + ':');
-    const keys = ((l.ok && l.keys) || []).filter(function (k) { return String(k).indexOf('stmtdrop:' + ym + ':') === 0; });
+    if (!l || !l.ok) { const e = new Error('list'); e.readFail = true; throw e; }
+    const keys = (l.keys || []).filter(function (k) { return String(k).indexOf('stmtdrop:' + ym + ':') === 0; });
     const arr = [];
-    for (const k of keys) { const r = await io.blobGet(io.st, k); if (r.ok && r.data && r.data.id) arr.push(r.data); }
+    for (const k of keys) { const r = await io.blobGet(io.st, k); if (!r || !r.ok) { const e = new Error('read'); e.readFail = true; throw e; } if (r.data && r.data.id) arr.push(r.data); }
     lists[ym] = arr; return arr;
   }
   let names = null;
-  const since = new Date(Math.max(Date.parse(START_DAY + 'T00:00:00+09:00'), t0 - WINDOW_DAYS * 86400000));
+  const floor = t0 - WINDOW_DAYS * 86400000;
+  const sinceAtt = Math.max(Date.parse(START_DAY + 'T00:00:00+09:00'), floor), sinceBody = Math.max(Date.parse(BODY_START + 'T00:00:00+09:00'), floor);
+  const since = new Date(Math.min(sinceAtt, sinceBody));
   let msgs;
   try { msgs = await io.mailbox.list(since); } catch (e) { sum.ok = false; sum.code = errCode(e); return sum; }
+  if (Array.isArray(io.mailbox.missing) && io.mailbox.missing.length) sum.nobox = io.mailbox.missing.length;   // 없는 폴더 수(이름은 남기지 않음)
   msgs.sort(function (a, b) { return a.at - b.at; });
+  // 29 판⑩: 11/20 전 메일은 쿠팡 본문과 계산서 꼴 첨부(NTS_·.xml)만 — 계산서는 작성일 달로 넣으므로 11/1~19에 온 11월 작성 계산서(건별 발행)도 받고, 10월 작성분은 아래에서 거름(10월은 손으로 넣음)
+  const early = function (m, a) { return m.at < sinceAtt && !(a.body || NTS_NAME.test(a.name)); };
   outer:
   for (const m of msgs) {
-    if (m.at < since.getTime()) continue;
+    if (m.at < sinceBody || m.atts.every(function (a) { return early(m, a); })) continue;
     sum.msgs++;
     for (const a of m.atts) {
       const sk = m.key + ':' + a.part;
-      if (seen.has(sk)) continue;
+      if (seen.has(sk) || early(m, a)) continue;
       if (io.now() - t0 > io.budget.total) { sum.left++; continue outer; }
       sum.atts++;
       if (a.est > READ_MAX * 1.05) { sum.skip++; seen.add(sk); seenAdd.push(sk); continue; }
       let buf;
-      try { buf = await io.mailbox.get(m.uid, a.part); } catch (e) { sum.fail++; continue; }   // 표시 안 함 — 다음 날 다시
+      try { buf = await io.mailbox.get(m.uid, a.part, m.box); } catch (e) { sum.fail++; continue; }   // 표시 안 함 — 다음 날 다시
       if (!buf.length || buf.length > READ_MAX) { sum.skip++; seen.add(sk); seenAdd.push(sk); continue; }
-      const ym = ymOf(m.at), list = await dropList(ym);
+      if (a.body === 'coupang') {   // 본문 → 주문 표·결제 금액만 남긴 HTML(받는 사람·연락처·주소·계좌 없이) · 주문 표가 없으면(멤버십 등) 저장 안 함
+        if (!CP.isCoupangOrder(buf)) { sum.skip++; seen.add(sk); seenAdd.push(sk); continue; }
+        buf = CP.orderHtml(buf, m.at, m.key);   // 메일 키를 넣어 같은 날 같은 내용의 두 주문도 sha가 갈림(판⑩ 검토)
+      }
+      // 29 판⑩(12월 첫 실사용 점검): 국세청 계산서·표준 XML은 내용을 먼저 읽어 ① 받는 회사가 종운환경이 아니면(종운건설 등) 거래처가 맞아도 넣지 않음 ② 귀속 달 = 계산서 작성일의 달(받은 날 20일 규칙 아님 — 건별 발행 계산서가 앞달로 가던 것)
+      const fkind = RD.sniff(buf, a.name) || '';
+      let pre = null;
+      if (fkind === 'nts' || fkind === 'xml') {
+        try { const rr = await RD.readFile(buf, a.name, { ym: '', vk: '', vendor: null }); pre = rr && rr.ok ? rr.result : null; } catch (x) { pre = null; }
+        if (pre && pre.buyer_other) { sum.other = (sum.other || 0) + 1; seen.add(sk); seenAdd.push(sk); continue; }
+      }
+      const invYm = pre && pre.inv && /^\d{4}-\d{2}-\d{2}$/.test(String(pre.inv.date || '')) ? pre.inv.date.slice(0, 7) : (pre && /^\d{4}-\d{2}$/.test(String(pre.ym_hint || '')) ? pre.ym_hint : '');
+      const ym = a.body ? kstDay(m.at).slice(0, 7) : (invYm || ymOf(m.at));
+      if (ym < FIRST_YM) { sum.old = (sum.old || 0) + 1; seen.add(sk); seenAdd.push(sk); continue; }   // 10월 이전 달 = 손으로 넣음
+      let list;
+      try { list = await dropList(ym); } catch (e) { sum.ok = false; sum.code = 'STORAGE_READ_FAILED'; break outer; }   // 그 달 목록을 못 읽음 — 겹쳐 넣지 않게 멈춤(이미 처리한 것만 표시)
       const sha = crypto.createHash('sha256').update(buf).digest('hex');
       if (list.some(function (x) { return x.sha === sha; })) { sum.dup++; seen.add(sk); seenAdd.push(sk); continue; }
       if (list.length >= DROP_MAX) { sum.full++; continue; }
@@ -107,6 +158,11 @@ async function run(io) {
       if (!v && smap[fh] && smap[fh].vk && byVk[smap[fh].vk] && byVk[smap[fh].vk].active !== false) { v = byVk[smap[fh].vk]; how = 'mail'; }
       if (!v) { const mv = RD.matchVendor(m.from.name + ' ' + m.subject, act, 2); if (mv) { v = mv; how = 'mail'; } }
       if (!v && !looksStmt(a.name + ' ' + m.subject)) { sum.skip++; seen.add(sk); seenAdd.push(sk); continue; }   // 명세·계산서로 안 보임 — 저장 안 함
+      // 29 판⑩: 받은편지함은 거래처를 찾은 것만 — 낱말(명세·내역·청구…)만으로는 급여명세서·카드 이용대금·보험료 고지 같은 다른 서류까지 '거래처 고르기'로 올라옴(분류 폴더 청구서함·청구서만 낱말로)
+      if (!v && m.box === 'INBOX') { sum.other = (sum.other || 0) + 1; seen.add(sk); seenAdd.push(sk); continue; }
+      // 29 판⑨: 청구서 폴더의 국세청 계산서는 목록 밖 거래처(폐기물 처리·장비 임대 등) 몫이 절반 — 공급자를 읽었는데 목록에 없으면 '거래처 고르기'로 올리지 않음
+      //   판⑩ 검토: 3자 낱말로는 못 찾았지만 2자 낱말(철탑·덕천 등)로 걸리는 거래처가 있으면 버리지 않고 '거래처 고르기'로 올림(철탑공구·덕천셀프세차 꼴)
+      if (!v && pre && pre.vendor && pre.vendor.name && !RD.matchVendor(pre.vendor.name, act, 2)) { sum.other = (sum.other || 0) + 1; seen.add(sk); seenAdd.push(sk); continue; }
       const id = crypto.randomBytes(12).toString('hex');
       const kind = RD.sniff(buf, a.name) || 'etc';
       const name = String(a.name).replace(/\d[\d .\-·_]{7,}\d/g, function (x) { return x.replace(/\D/g, '').length >= 9 ? '…' : x; }).replace(/[\u0000-\u001f]/g, '').slice(0, 120) || '이름 없는 파일';
@@ -160,4 +216,4 @@ function learnSender(doc, fh, vk) {
   return { map: map, at: Date.now() };
 }
 
-module.exports = { run, mailEnv, h, READ_MAX, attParts, ymOf, looksStmt, senderHash, domOf, learnSender, errCode, BOT, START_DAY, SENDERS, SEEN, LAST };
+module.exports = { run, mailEnv, h, READ_MAX, attParts, bodyPart, mailBoxes, BOXES, BODY_START, ymOf, looksStmt, senderHash, domOf, learnSender, errCode, BOT, START_DAY, SENDERS, SEEN, LAST };

@@ -34,7 +34,8 @@ const ONE_PAGE_ROWS = '500';
 // ---------- 노선사전(노선사전.json routes 66개 임베드) ----------
 // 회수 기입: L측=E열(count_col 5), R측=K열(count_col 11).
 // v351(2026-09-11): 기본표(BASE_ROUTES)와 사람이 앱에서 더한 추가분(blob allbaro:routes_extra)을 합쳐 ROUTES가 된다.
-//   추가분은 양식 원본의 예비 행(L40~L49·R40~R49, 2026-09-11 삽입)에 들어간다. 요청마다 setExtraRoutes()로 합친다.
+//   추가분의 (side,row)는 식별자 L40~L999·R40~R999(2026-11-20 — 종전 40~49는 양식 예비 행 수에 묶여 20칸이 차면 막혔다).
+//   요청마다 setExtraRoutes()로 합친다.
 const BASE_ROUTES = [
   // 2026-08-24 배출자 가나다순 전면 재정렬(PM 지시) + 신설 3행 — 양식 원본도 같은 날 재배열.
   // 영문 배출자(SMC·TCC·YK)는 한글 뒤 알파벳순. 이전 행번호·이력 주석은 git 이력 참조.
@@ -110,8 +111,13 @@ const BASE_ROUTES = [
   { side: "R", row: 39, from: "(주)포스코퓨처엠", to: "대화산업", item: "폐석회", count_col: 11 },   // v326(PM 9/8): 9/7 폐석회 별도 줄 — 양식 R39 빈 줄(SUM K5:K39 범위 안), 가나다 재정렬 없이 말미 추가
   { side: "R", row: 40, from: "한라티씨", to: "거성산업", item: "분진", count_col: 11 },   // v351(PM 9/11): 9/10 미매칭 실측 — 양식 예비 행 R40(2026-09-11 삽입)
 ];
-// 추가 노선이 들어갈 수 있는 행 — 양식 원본 예비 행. 넘치면 원본을 다시 늘려야 한다(generate.py 주석 참조).
-const EXTRA_ROW_MIN = 40, EXTRA_ROW_MAX = 49;
+// 추가 노선의 식별자 행 범위. (side,row)는 노선 식별자일 뿐 엑셀의 물리 행이 아니다 — 2026-09-13부터 엑셀 자리는 생성기(appdata
+// collectors/logsheet/generate.py)가 생성 때마다 가나다순으로 정하고, 보이는 노선이 양식 자리(90줄)를 넘으면 생성기가 행을 늘린다.
+// 그래서 범위를 양식 행 수(종전 40~49)에 묶지 않는다. 같은 값: generate.py RESERVE_MIN/MAX · logsheet_daily.py EXTRA_ROW_MIN/MAX ·
+// index.html AB_EXTRA_ROW_MIN/MAX. 상한 999 = countRowKey의 세 자리 정렬 키와 같은 폭(넘기려면 그 자리도 같이).
+// 숨긴 줄·지난 기록·학습 지정이 식별자를 가리키므로 쓴 번호는 다시 주지 않는다 — nextExtraRow는 그 열에서 쓴 번호의 최댓값 + 1
+// (숨김·학습 지정이 가리키는 번호도 쓴 것으로 셈). 끝 번호 999까지 쓴 뒤에만 빈 번호를 찾는다.
+const EXTRA_ROW_MIN = 40, EXTRA_ROW_MAX = 999;
 let ROUTES = BASE_ROUTES.slice();
 
 // ---------- 별칭사전(별칭사전.json 11개 임베드, _설명 키 제외) ----------
@@ -1179,11 +1185,23 @@ function setExtraRoutes(list) {
   ROUTES_VER = routesVerOf(ROUTES);
   return extra.length;
 }
-// 추가 노선이 들어갈 다음 빈 행(예비 행 안에서). 없으면 0.
-function nextExtraRow(side, extraList) {
+// 추가 노선의 다음 식별자 행 — 그 열에서 '쓴 번호의 최댓값 + 1'(C279, 2026-11-20 독립 검토: 종전 '가장 낮은 빈 번호'는 추가분에서 항목이 빠지면
+//   그 번호를 새 줄이 물려받아 옛 학습 지정·지난 기록이 새 줄에 실렸다). 쓴 번호 = 기본표 · 추가분(이름이 깨져 cleanExtraRoute가 버리는 항목의 번호도) ·
+//   alsoUsed(호출부가 넘기는 좌표 목록 [{side,row}] — 숨김·학습 지정이 가리키는 번호. 노선표에 줄이 없어도 쓴 번호로 친다).
+//   끝 번호(EXTRA_ROW_MAX)까지 쓴 뒤에만 빈 번호 중 가장 낮은 것을 주고, 그것도 없으면 0.
+function nextExtraRow(side, extraList, alsoUsed) {
   const used = Object.create(null);
-  BASE_ROUTES.forEach((r) => { if (r.side === side) used[r.row] = true; });
-  (extraList || []).forEach((x) => { const r = cleanExtraRoute(x); if (r && r.side === side) used[r.row] = true; });
+  let max = EXTRA_ROW_MIN - 1;
+  const mark = (s, rw) => {
+    const row = Number(rw);
+    if (String(s || '').toUpperCase() !== side || !Number.isInteger(row) || row < EXTRA_ROW_MIN || row > EXTRA_ROW_MAX) return;
+    used[row] = true;
+    if (row > max) max = row;
+  };
+  BASE_ROUTES.forEach((r) => mark(r.side, r.row));
+  (Array.isArray(extraList) ? extraList : []).forEach((x) => { if (x && typeof x === 'object') mark(x.side, x.row); });
+  (Array.isArray(alsoUsed) ? alsoUsed : []).forEach((x) => { if (x && typeof x === 'object') mark(x.side, x.row); });
+  if (max < EXTRA_ROW_MAX) return max + 1;
   for (let row = EXTRA_ROW_MIN; row <= EXTRA_ROW_MAX; row++) if (!used[row]) return row;
   return 0;
 }
@@ -1249,10 +1267,56 @@ function rematchDoc(doc, opts) {
   return { ok: true, changed: changed, doc: out, notes: notes };
 }
 
+// C279(2026-11-20 독립 검토): 새 줄을 넣으면 '지금 줄이 정해져 있는 묶음'이 어떻게 달라지는지 저장 전에 미리 본다.
+//   하차지·품목 이름이 기존 줄과 서로 품는 새 줄은 기존 줄의 묶음에 후보를 하나 더해 AMBIGUOUS(미배정)로 풀어 버린다(자동 배정 규칙은 그대로 —
+//   조용히 다른 줄에 싣지 않는 대신 지난 날짜까지 미배정이 된다). 실제 재판정(rematchDoc)을 새 줄 없이·있이 두 번 돌려 차이를 센다.
+//   docs = [{day, doc}](일자 문서) · extraList = 지금 추가분 · entry = 넣으려는 줄{side,row,from,to,item} · learned = 학습 목록.
+//   반환 { checked(본 일수), loosened[{side,row,bundles,trips,days}](그 줄에서 미배정으로 풀리는 묶음), moved[…](그 줄에서 새 줄로 옮겨 가는 묶음) }.
+//   묶음은 (상차지·하차지·품목·차량 종류)로 짝짓는다. 끝나면 노선표를 extraList 상태로 되돌린다(저장은 호출부가 따로 다시 합친다).
+function routeAddImpact(docs, extraList, entry, learned) {
+  const list = Array.isArray(extraList) ? extraList : [];
+  const key = (c) => [c.from, c.to, c.item, c.vehicle_type || ''].join('\u0001');
+  const judge = () => (Array.isArray(docs) ? docs : []).map((x) => {
+    const r = rematchDoc(x && x.doc, { learned: learned });
+    const m = new Map();
+    if (r.ok) r.doc.counts.forEach((c) => { const k = key(c); if (!m.has(k)) m.set(k, []); m.get(k).push(c); });
+    return { day: x && x.day, ok: r.ok, m: m };
+  });
+  let base, next;
+  try {
+    setExtraRoutes(list); base = judge();
+    setExtraRoutes(list.concat([entry])); next = judge();
+  } finally { setExtraRoutes(list); }
+  const acc = { loosened: new Map(), moved: new Map() };
+  let checked = 0;
+  const add = (kind, rt, day, n) => {
+    const k = rt.side + ':' + rt.row;
+    if (!acc[kind].has(k)) acc[kind].set(k, { side: rt.side, row: Number(rt.row), bundles: 0, trips: 0, days: Object.create(null) });
+    const a = acc[kind].get(k);
+    a.bundles += 1; a.trips += (Number(n) > 0 ? Math.round(Number(n)) : 0); a.days[day] = 1;
+  };
+  for (let i = 0; i < base.length; i++) {
+    if (!base[i].ok) continue;
+    checked += 1;
+    base[i].m.forEach((bl, k) => {
+      const nl = next[i].m.get(k) || [];
+      for (let j = 0; j < bl.length; j++) {
+        const b = bl[j], n = nl[j];
+        if (!b.route || !n) continue;
+        if (!n.route) add('loosened', b.route, base[i].day, b.n);
+        else if (n.route.side !== b.route.side || Number(n.route.row) !== Number(b.route.row)) add('moved', b.route, base[i].day, b.n);
+      }
+    });
+  }
+  const out = (m) => Array.from(m.values()).map((a) => ({ side: a.side, row: a.row, bundles: a.bundles, trips: a.trips, days: Object.keys(a.days).length }))
+    .sort((a, b) => b.trips - a.trips || (a.side === b.side ? a.row - b.row : (a.side < b.side ? -1 : 1)));
+  return { checked: checked, loosened: out(acc.loosened), moved: out(acc.moved) };
+}
+
 module.exports = {
   // 상수 — ROUTES·ROUTES_VER는 v351부터 접근자 routes()·routesVer()로 읽는다(추가 노선이 합쳐지면 값이 바뀐다).
   //   아래 두 이름은 require 시점 스냅샷이라 기본표만 본다 — 테스트·픽스처 전용. 실서비스 코드는 접근자를 쓴다.
-  BASE_ROUTES, EXTRA_ROW_MIN, EXTRA_ROW_MAX, routes, routesVer, setExtraRoutes, cleanExtraRoute, nextExtraRow,
+  BASE_ROUTES, EXTRA_ROW_MIN, EXTRA_ROW_MAX, routes, routesVer, setExtraRoutes, cleanExtraRoute, nextExtraRow, routeAddImpact,
   get ROUTES() { return ROUTES; }, get ROUTES_VER() { return ROUTES_VER; },
   ALIAS, ITEM_ALIAS, VEHICLE_TAGS, UNIT_FACTOR, BASE, ENTN, ENTN_NAME, TD,
   // 순수 함수(픽스처 테스트 대상)

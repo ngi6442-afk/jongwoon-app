@@ -50,7 +50,9 @@ const SEED_VENDORS = [
   { vk: 'v09', name: '현대상용서비스센터', group: 'veh', kind: '', basis: 'supply', carry: false, hint: ['현대상용'] },
   { vk: 'v10', name: '철탑종합공구상사', group: 'tool', kind: 'tool', basis: 'supply', carry: true, hint: ['철탑'] },
   { vk: 'v11', name: '오천공구', group: 'tool', kind: 'tool', basis: 'supply', carry: true, hint: ['오천공구', '오천'] },
-  { vk: 'v12', name: '드림오피스', group: 'tool', kind: 'tool', basis: 'supply', carry: false, hint: ['드림오피스'] }
+  { vk: 'v12', name: '드림오피스', group: 'tool', kind: 'tool', basis: 'supply', carry: false, hint: ['드림오피스'] },
+  // 29 판⑨(PM 11/20 '쿠팡에서 온 메일도 정리') — 주문 메일 본문의 줄 금액 = 쿠팡가(부가세 포함) → total
+  { vk: 'v13', name: '쿠팡', group: 'tool', kind: 'tool', basis: 'total', carry: false, hint: ['쿠팡'] }
 ];
 
 function dict() { return Object.create(null); }

@@ -12,7 +12,11 @@
 const PQ = require('./promoqual');
 
 const QLEARN_KEY = 'promoai:qlearn';
-const QL_VER = 'ql1-20261113';
+// v504 C122 N3(11/20): 끄기 스위치는 따로 열쇠 — 스위치(pl_set qoff)만 이 열쇠를 쓰고, 크론·워커는 읽기만 한다.
+//   전에는 스위치와 학습 결과가 promoai:qlearn 한 문서를 통째로 읽고 써서, 읽기~쓰기 사이에 서로 덮었다
+//   (워커 합치기가 그새 끈 것을 켬으로, 스위치가 그새 학습된 규칙을 옛 규칙으로). 열쇠가 없으면(스위치를 한 번도 안 누름) 문서의 off를 그대로 본다.
+const QOFF_KEY = 'promoai:qlearn_off';
+const QL_VER = 'ql2-20261120';
 const MAX_QRULES = 10;
 const QRULE_CHARS = 120;
 const RECENT_N = 8;                          // 최근 사진AI 초안 몇 편을 보나(기록마다 최신 보존 초안 1편)
@@ -132,7 +136,7 @@ const QLEARN_SYSTEM = [
   '- [이번 목표] 항목이라도 직원 규칙과 부딪히면 그 항목 규칙은 쓰지 않고 넘어갑니다. 규칙을 쓴 항목만 다음 생성의 목표 줄에 들어갑니다.',
   '- 규칙에는 아라비아 숫자를 쓰지 않습니다. 정도는 말로 씁니다(예: "사진마다 한 문장 이상", "세 문장에 한 번꼴로").',
   '- item에는 그 규칙이 겨냥하는 항목 코드(C1~X5 중 하나, 여러 항목이면 ALL)를 넣습니다.',
-  '- 기존 품질 규칙과 합칩니다: 같은 뜻이면 하나로 합치고 n(근거가 된 초안 수)을 더합니다. 이번 자료와 모순되면 이번 쪽으로 고칩니다. 겨냥한 항목이 이제 기준을 넘었으면 그 규칙은 빼도 됩니다.',
+  '- 기존 품질 규칙과 합칩니다: 같은 뜻이면 하나로 합치고 n(근거가 된 초안 수)을 더합니다. 이번 자료와 모순되면 이번 쪽으로 고칩니다. 겨냥한 항목이 이제 기준을 넘었으면 그 규칙은 빼도 됩니다. 범위 항목(제목 길이·긴 문장)이 범위 위로 넘쳤으면 그 항목을 늘리던 옛 규칙은 빼고, 줄이는 쪽 규칙을 새로 씁니다(글을 그대로 남긴 옛 규칙은 앱이 뺍니다). 규칙을 하나도 주지 않으면 앱은 옛 규칙을 그대로 둡니다.',
   '- 전체 열 개 이내.',
   '',
   '출력은 JSON 하나: summary(이번 판단 요약 이백 자 이내) · rules(합쳐진 전체 품질 규칙 목록 — text, item, n(정수), keep_id(기존 규칙을 이어받았으면 그 id, 새 규칙이면 빈 문자열)).',
@@ -223,6 +227,7 @@ function normQL(x) {
     tries: Math.max(0, Number(q.tries) || 0), lock_ts: Number(q.lock_ts) || 0,
     code: String(q.code || ''), detail: String(q.detail || '').slice(0, 160), fail_ts: Number(q.fail_ts) || 0,
     n_drafts: Number(q.n_drafts) || 0, dropped: Number(q.dropped) || 0,
+    over: (Array.isArray(q.over) ? q.over : []).filter(function (c) { return OVER_CODES.indexOf(c) >= 0; }), over_dropped: Number(q.over_dropped) || 0, empty_kept: q.empty_kept === true,
     stats: { calls: Number(st.calls) || 0, tokens: Number(st.tokens) || 0, fail_calls: Number(st.fail_calls) || 0, fail_tokens: Number(st.fail_tokens) || 0 },
     hist: (Array.isArray(q.hist) ? q.hist : []).slice(-HIST_MAX),
     updated_at: Number(q.updated_at) || 0,
@@ -236,18 +241,37 @@ function normFocus(f) {
   return { code: String(f.code), avg: r2(f.avg), now: g.nodisp ? null : r2(f.now), target: g.t, target2: g.t2 || null, cmp: g.cmp, unit: g.unit, num: g.num, ex: g.nodisp ? null : r2(f.ex), nodisp: !!g.nodisp, bound: !!g.bound };
 }
 // 학습 결과 병합 — base는 쓰기 직전에 다시 읽은 값(끄기 스위치를 그대로 지킨다). ctx = { now, tokens, sig, focus, n }
+// 범위 위로 넘친 항목(C146 ①) — 최근 초안 중앙값이 범위 위끝을 넘은 범위 항목 코드. stats = itemStats(drafts)
+//   점수도 범위로 매기는 항목만(C4·X2) — X1은 본보기 글(연결어미 문장 백 개당 104~142)이 GOAL 위끝 120을 넘어, 기준부터 맞추기 전엔 넘침으로 보지 않는다
+const OVER_CODES = ['C4', 'X2'];
+function overOf(stats) {
+  return CODES.filter(function (c) { if (OVER_CODES.indexOf(c) < 0) return false; const g = GOAL[c], s = stats && stats[c]; if (!g || g.cmp !== 'range' || !g.t2 || !s) return false; const v = scaled(c, s.now); return v !== null && v > g.t2; });
+}
 function mergeQL(base0, out, ctx) {
   const base = normQL(base0), now = Number(ctx.now) || Date.now(), tokens = Number(ctx.tokens) || 0;
-  const rules = normQRules(out, base.rules, now);
+  // C146 ①(11/20): 넘친 항목의 옛 규칙(같은 글 — id를 이어받았어도 글을 고쳤으면 새 규칙)은 모델이 남겨도 코드가 뺀다 — 늘리던 규칙이 계속 늘리지 않게(새로 쓴 줄이는 규칙만 남음)
+  //   빈 목록이 오면(모델이 규칙을 하나도 안 줌) 옛 규칙을 지운 것으로 보지 않고 그대로 둔다(넘친 항목 것만 뺌)
+  const over = Object.create(null); (Array.isArray(ctx.over) ? ctx.over : []).forEach(function (c) { if (OVER_CODES.indexOf(c) >= 0) over[c] = 1; });
+  const oldByText = Object.create(null);
+  base.rules.forEach(function (r) { oldByText[r.text.replace(/\s+/g, '')] = r; });
+  const outRules = (out && Array.isArray(out.rules)) ? out.rules : [];
+  // 글이 옛 글과 같을 때만 뺀다(검토 11/20 — id를 이어받아 줄이는 쪽으로 고쳐 쓴 규칙은 새 규칙으로 받음)
+  const isOldOver = function (r) { if (!r || typeof r !== 'object') return false; const o = oldByText[cleanRule(r.text).replace(/\s+/g, '')]; return !!(o && over[o.item]); };
+  // 검토 11/20: 받은 목록이 비었거나 전부 거름(cleanRule)에 걸려 쓸 규칙이 하나도 없으면 = 빈 목록(옛 규칙을 지킨다)
+  const usable = outRules.filter(function (r) { return r && typeof r === 'object' && cleanRule(r.text); }).length;
+  const emptyKept = !usable && base.rules.length > 0;
+  const src = emptyKept ? base.rules.map(function (r) { return { text: r.text, item: r.item, n: r.n, keep_id: r.id }; }) : outRules;
+  const overDropped = src.filter(isOldOver).length;
+  const rules = normQRules({ rules: src.filter(function (r) { return !isOldOver(r); }) }, base.rules, now);
   // 버린 규칙 수(v455 재검토 N1 — 거름이 보통 규칙까지 버리는지 보이게): 글이 있는데 cleanRule이 비운 것
   const dropped = (out && Array.isArray(out.rules) ? out.rules : []).filter(function (r) { return r && String(r.text || '').trim() && !cleanRule(r.text); }).length;
   const r = Object.assign({}, base, {
     ver: QL_VER, rules: rules, focus: (Array.isArray(ctx.focus) ? ctx.focus : []).map(normFocus).filter(Boolean).slice(0, FOCUS_N), summary: String((out && out.summary) || '').slice(0, 300),
     learned_at: now, basis_sig: String(ctx.sig || ''), try_sig: String(ctx.sig || ''), tries: 0, lock_ts: 0, code: '', detail: '', fail_ts: 0,
-    n_drafts: Number(ctx.n) || 0, dropped: dropped, updated_at: now,
+    n_drafts: Number(ctx.n) || 0, dropped: dropped, over: Object.keys(over), over_dropped: overDropped, empty_kept: emptyKept, updated_at: now,
     stats: Object.assign({}, base.stats, { calls: base.stats.calls + 1, tokens: base.stats.tokens + tokens }),
   });
-  r.hist = base.hist.concat([{ at: now, n: Number(ctx.n) || 0, focus: r.focus.map(function (f) { return f.code; }), rules: rules.length, dropped: dropped, tokens: tokens }]).slice(-HIST_MAX);
+  r.hist = base.hist.concat([{ at: now, n: Number(ctx.n) || 0, focus: r.focus.map(function (f) { return f.code; }), rules: rules.length, dropped: dropped, over_dropped: overDropped, empty_kept: emptyKept || undefined, tokens: tokens }]).slice(-HIST_MAX);
   return r;
 }
 
@@ -272,12 +296,23 @@ function markKick(ql0, sig, now) {
   ql.tries += 1; ql.lock_ts = now; ql.code = ''; ql.detail = ''; ql.updated_at = now;
   return ql;
 }
+// 끄기 스위치 읽기(v504 C122 N3) — get = blobGet. 열쇠에 off(참·거짓)가 있으면 그 값, 열쇠가 없으면(blobGet은 ok·null) 문서(raw)의 off,
+//   읽기 오류면 ok:false(부르는 쪽이 켬으로 보지 않는다)
+async function offOf(get, st, raw) {
+  const o = await get(st, QOFF_KEY);
+  if (!o || !o.ok) return { ok: false, code: (o && o.code) || 'QOFF_READ_FAILED' };
+  if (o.data && typeof o.data === 'object' && typeof o.data.off === 'boolean') return { ok: true, off: o.data.off, src: 'key' };
+  return { ok: true, off: !!(raw && typeof raw === 'object' && raw.off === true), src: 'doc' };
+}
 // 크론 ⑥ — 판정이 '기동'이면 잠금·시도를 적고 워커를 부른다. 반환은 로그용 요약. 골격 키는 읽기만.
 async function kick(st, now) {
   const B = require('./blobs');
   const qr = await B.blobGet(st, QLEARN_KEY);
   if (!qr.ok && qr.code !== 'NOT_FOUND') return { error: qr.code || 'QL_READ_FAILED' };
   const ql = normQL(qr.ok ? qr.data : null);
+  const o1 = await offOf(B.blobGet, st, qr.ok ? qr.data : null);
+  if (!o1.ok) return { error: o1.code };
+  ql.off = o1.off;
   if (ql.off) return { skipped: 'off' };
   if (ql.lock_ts && now - ql.lock_ts < LOCK_TTL_MS) return { skipped: 'running' };
   const q = await B.blobGet(st, PQ.QUAL_KEY);
@@ -292,7 +327,9 @@ async function kick(st, now) {
   const re = await B.blobGet(st, QLEARN_KEY);
   if (!re.ok) return { error: re.code || 'QL_READ_FAILED' };
   const cur = normQL(re.data);
-  if (cur.off) return { skipped: 'off' };
+  const o2 = await offOf(B.blobGet, st, re.data);
+  if (!o2.ok) return { error: o2.code };
+  if (o2.off) return { skipped: 'off' };
   if (cur.lock_ts && now - cur.lock_ts < LOCK_TTL_MS) return { skipped: 'running' };
   if (cur.basis_sig === d.sig && !cur.code) return { skipped: 'same' };
   const nq = markKick(cur, d.sig, now);
@@ -315,8 +352,9 @@ function focusText(f, fmt) {
   const nowTxt = (f.now === null || f.now === undefined || isNaN(Number(f.now))) ? '' : '최근 초안 ' + k(f.now) + u + ' → ';
   return g.say + '(' + nowTxt + '목표 ' + tgt + ')';
 }
-function injectOf(raw, fmt) {
+function injectOf(raw, fmt, offv) {
   const ql = normQL(raw);
+  if (typeof offv === 'boolean') ql.off = offv;   // v504 C122 N3 — 따로 열쇠의 끄기(offOf)
   if (ql.off || !ql.rules.length) return null;
   const F = (fmt && typeof fmt.koNum === 'function' && typeof fmt.koCount === 'function') ? fmt : null;
   // 목표 줄은 모델이 규칙을 쓴 항목만(배포 전 검토 loop F1) — 코치가 직원 규칙과 부딪혀 규칙을 안 쓴 항목은 목표 줄에서도 빠진다
@@ -328,8 +366,9 @@ function injectOf(raw, fmt) {
 }
 
 // ---- 카드(pl_get) ----
-function cardOf(raw, now) {
+function cardOf(raw, now, offv) {
   const ql = normQL(raw);
+  if (typeof offv === 'boolean') ql.off = offv;   // v504 C122 N3 — 따로 열쇠의 끄기(offOf)
   now = now || Date.now();
   return {
     ver: ql.ver, off: ql.off, rules: ql.rules,
@@ -341,10 +380,10 @@ function cardOf(raw, now) {
 }
 
 module.exports = {
-  QLEARN_KEY, QL_VER, MAX_QRULES, QRULE_CHARS, RECENT_N, FOCUS_N, LOCK_TTL_MS, RETRY_MS, CREDIT_WAIT_MS, MIN_GAP_MS, MAX_TRIES, HIST_MAX, CODES, GOAL, DENY, DENY_RE,
+  QLEARN_KEY, QOFF_KEY, QL_VER, MAX_QRULES, QRULE_CHARS, RECENT_N, FOCUS_N, LOCK_TTL_MS, RETRY_MS, CREDIT_WAIT_MS, MIN_GAP_MS, MAX_TRIES, HIST_MAX, CODES, GOAL, DENY, DENY_RE,
   recentDrafts, itemStats, focusOf, basisSig, exValue, critText,
   QLEARN_SYSTEM, QLEARN_SCHEMA, buildQLearnPrompt,
   cleanRule, normQRules, normQL, normFocus, mergeQL,
-  decide, markKick, kick,
+  decide, markKick, kick, offOf, overOf,
   focusText, injectOf, cardOf,
 };
