@@ -16504,6 +16504,118 @@ function J91a(x) { return JSON.stringify(x); }
   finally { const s = JSON.parse(snapM); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; }
 }
 
+{ // ---- C264 AI 호출 실패 가르기 — 잔액·키 문제는 '관리자 확인 필요'(일반 실패·'잠시 뒤 다시' 아님) · 물어보기의 빈 답·잘린 답은 실패(하루 횟수·월 토큰·감사 줄 차감 없음)
+  //   실제 함수·실제 핸들러(_lib/claude·ask·asbestos·boxjudge·promomask · gw-ask-background · gw-ask). 가짜 = 저장소(메모리)·fetch(Anthropic 응답 꼴)뿐 — 실제 API는 부르지 않는다(각본 밖 호출은 오류)
+  const fs264 = require('fs'), Mod264 = require('module');
+  const P264 = { cl: join(FN, '_lib/claude.js'), ask: join(FN, '_lib/ask.js'), asb: join(FN, '_lib/asbestos.js'), bj: join(FN, '_lib/boxjudge.js'), mask: join(FN, '_lib/promomask.js'), bg: join(FN, 'gw-ask-background.js'), sy: join(FN, 'gw-ask.js') };
+  const SRC264 = {}; for (const k of Object.keys(P264)) SRC264[k] = fs264.readFileSync(P264[k], 'utf8').replace(/\r\n/g, '\n');
+  const load264 = (mut) => {   // mut = [파일 키, from, to, 'all'?] — 그 파일만 바꿔 컴파일하고 나머지는 원본을 새로 읽어 서로 묶는다
+    for (const k of Object.keys(P264)) delete require.cache[require.resolve(P264[k])];
+    if (mut) {
+      const [k, from, to, all] = mut, n = SRC264[k].split(from).length - 1;
+      if (all ? n < 2 : n !== 1) throw new Error('결함 자리 수가 다름(' + n + '): ' + from.slice(0, 60));
+      const m = new Mod264(P264[k]); m.filename = P264[k]; m.paths = Mod264._nodeModulePaths(dirname(P264[k]));
+      m._compile(all ? SRC264[k].split(from).join(to) : SRC264[k].replace(from, () => to), P264[k]); m.loaded = true; require.cache[require.resolve(P264[k])] = m;
+    }
+    const o = {}; for (const k of Object.keys(P264)) o[k] = require(P264[k]); return o;
+  };
+  const CREDIT264 = 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.';
+  const J264 = (o, st) => new Response(JSON.stringify(o), { status: st || 200, headers: { 'content-type': 'application/json' } });
+  const EB264 = (msg, type) => ({ type: 'error', error: { type: type || 'invalid_request_error', message: msg } });
+  const U264 = { input_tokens: 1000, output_tokens: 1500 };
+  const ADM264 = /관리자 확인 필요/, WAIT264 = /잠시 뒤 다시/;
+  let sc264 = [];
+  const realFetch264 = global.fetch, savedK264 = [process.env.ANTHROPIC_API_KEY, process.env.GW_ANTHROPIC_KEY], snap264 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  global.fetch = async (url) => { if (!/api\.anthropic\.com/.test(String(url))) throw new Error('각본 밖 주소'); const f = sc264.shift(); if (!f) throw new Error('각본 끝'); return f(); };
+  const setKey264 = (on) => { process.env.ANTHROPIC_API_KEY = on ? 'servertest-dummy' : ''; process.env.GW_ANTHROPIC_KEY = on ? 'servertest-dummy' : ''; };
+  let seq264 = 0;
+  const bg264 = async (m, sc) => {   // 백그라운드 길(화면이 쓰는 길) — 저장된 job · 하루 횟수·월 토큰(ask:usage) 바뀜 · 감사 줄 수
+    sc264 = sc.slice(); const id = 'cxiv' + (seq264++) + 'job', u0 = JSON.stringify(mem.gw_data['ask:usage'] || null), a0 = auditMock.logs.length;
+    await m.bg.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tokA }, body: JSON.stringify({ q: '시험 질문', job: id }) });
+    return { j: mem.gw_data['ask:job:uadmin:' + id] || {}, charged: JSON.stringify(mem.gw_data['ask:usage'] || null) !== u0, audited: auditMock.logs.length !== a0 };
+  };
+  const sy264 = async (m, sc) => {
+    sc264 = sc.slice(); const u0 = JSON.stringify(mem.gw_data['ask:usage'] || null), a0 = auditMock.logs.length;
+    const r = await m.sy.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tokA }, body: JSON.stringify({ q: '시험 질문' }) });
+    return { j: JSON.parse(r.body || '{}'), charged: JSON.stringify(mem.gw_data['ask:usage'] || null) !== u0, audited: auditMock.logs.length !== a0 };
+  };
+  const chk264 = async (m) => {
+    const P = {}, I = {};
+    setKey264(true);
+    // ① 공통 가르기(_lib/claude.js statusError — callApi·callApiStream 길: 넣기 박스·명세서 판독·아침 브리핑·블로그·학습이 같이 탐)
+    const se = (st, b) => { const e = m.cl.statusError(st, b); return e ? e.code : 'null'; };
+    I.se = [se(400, JSON.stringify(EB264(CREDIT264))), se(402, JSON.stringify(EB264('billing', 'billing_error'))), se(400, JSON.stringify(EB264('messages: too many images'))), se(401, '{}'), se(529, '{}'), se(200, '{}')].join();
+    P.se = I.se === 'CREDIT_LOW,CREDIT_LOW,BAD_REQUEST,AUTH,SERVER,null';
+    // ② 물어보기 백그라운드 — 실패 종류별 code·화면 글·차감
+    const TOOL = m.ask.toolDefs(ADMIN)[0].name;
+    const TU = () => J264({ content: [{ type: 'tool_use', id: 'tu1', name: TOOL, input: {} }], stop_reason: 'tool_use', usage: U264 });
+    const TX = (t, s) => () => J264({ content: t == null ? [] : [{ type: 'text', text: t }], stop_reason: s || 'end_turn', usage: U264 });
+    const CASES = {
+      credit: [[() => J264(EB264(CREDIT264), 400)], 'CREDIT_LOW', ADM264],
+      auth: [[() => J264(EB264('invalid x-api-key', 'authentication_error'), 401)], 'AUTH', ADM264],
+      over: [[() => J264(EB264('Overloaded', 'overloaded_error'), 529)], 'CLAUDE_529', WAIT264],
+      turns: [[TU, TU, TU, TU, TU, TU], 'MAX_TURNS', /끊겼습니다/],
+      think: [[() => J264({ content: [{ type: 'thinking', thinking: '', signature: 's' }], stop_reason: 'max_tokens', usage: U264 })], 'MAX_TOKENS', /끊겼습니다/],
+      cut: [[TX('답의 앞부분만', 'max_tokens')], 'MAX_TOKENS', /끊겼습니다/],
+      none: [[TX(null)], 'EMPTY', /답을 만들지 못했습니다/],
+      late: [[() => J264({ content: [{ type: 'text', text: '찾아보겠습니다' }, { type: 'tool_use', id: 'tu2', name: TOOL, input: {} }], stop_reason: 'tool_use', usage: U264 }), TX(null)], 'EMPTY', /답을 만들지 못했습니다/],
+    };
+    I.bg = {}; P.bg = true;
+    for (const k of Object.keys(CASES)) {
+      const [sc, code, re] = CASES[k], r = await bg264(m, sc), a = String(r.j.answer || '');
+      I.bg[k] = [r.j.code, r.j.ok, r.charged ? '차감' : '', r.audited ? '감사' : '', a.slice(0, 24)].join('/');
+      if (!(r.j.state === 'done' && r.j.ok === false && r.j.code === code && re.test(a) && !r.charged && !r.audited && (code === 'CLAUDE_529' || !WAIT264.test(a)))) P.bg = false;
+    }
+    const ok0 = await bg264(m, [TU, TX('정상 답입니다')]);   // 대조: 도구 1회 뒤 글 → 성공·차감·감사
+    P.ctl = ok0.j.ok === true && ok0.j.answer === '정상 답입니다' && ok0.charged && ok0.audited; I.ctl = [ok0.j.ok, ok0.charged, ok0.audited].join('/');
+    setKey264(false); const nk = await bg264(m, []); setKey264(true);   // 키 없음
+    P.nokey = nk.j.code === 'NO_API_KEY' && ADM264.test(String(nk.j.answer || '')) && !nk.charged; I.nokey = [nk.j.code, String(nk.j.answer || '').slice(0, 24)].join('/');
+    // ③ 동기 길(gw-ask) — 같은 가르기·같은 글
+    const s1 = await sy264(m, [() => J264(EB264(CREDIT264), 400)]), s2 = await sy264(m, [TX('', 'end_turn')]);
+    P.sync = s1.j.ok === false && s1.j.code === 'CREDIT_LOW' && ADM264.test(String(s1.j.answer || '')) && !s1.charged && s2.j.ok === false && s2.j.code === 'EMPTY' && !s2.charged && !s2.audited;
+    I.sync = [s1.j.code, s2.j.code, s2.charged ? '차감' : ''].join('/');
+    // ④ 첨부 판독(석면·계약서·대장·등록증 — 자체 fetch) · ⑤ 넣기 박스(callApi) · ⑥ 사진 가리기(자체 fetch)
+    const pa = async (sc, name) => { sc264 = sc.slice(); const r = await m.asb.parseAttachment({ name: name, data: 'JVBERi0xLjQK' }); return (r && r.error) || 'ok'; };
+    I.asb = [await pa([() => J264(EB264(CREDIT264), 400)], '석면조사.pdf'), await pa([() => J264(EB264('invalid x-api-key', 'authentication_error'), 401)], '공사계약서.pdf'), await pa([() => J264(EB264('x', 'api_error'), 500)], '건축물대장.pdf')].join();
+    P.asb = I.asb === 'CREDIT_LOW,AUTH,CLAUDE_500';
+    sc264 = [() => J264(EB264(CREDIT264), 400)]; const bj = await m.bj.judgeBox({ name: '계약서.pdf', b64: 'JVBERi0xLjQK', ctx: {}, fixes: [] });
+    P.box = !!bj && bj.error === 'CREDIT_LOW'; I.box = bj && bj.error;
+    const mk = async (sc) => { sc264 = sc.slice(); try { await m.mask.detectBoxes('servertest-dummy', 'image/jpeg', 'AAAA'); return 'ok'; } catch (e) { return String(e && e.message); } };
+    I.mask = [await mk([() => J264(EB264(CREDIT264), 400)]), await mk([() => J264(EB264('x', 'api_error'), 500)])].join();
+    P.mask = I.mask === 'CREDIT_LOW,HTTP_500';
+    // ⑦ 공통 판정(서버 adminFail·앱 aiAdminFail과 같은 식) — 호출부가 붙인 머리·꼬리도 봄, 일시 실패는 아님
+    I.adm = ['CREDIT_LOW', 'CLAUDE_CREDIT_LOW', 'AUTH', 'CLAUDE_AUTH', 'NO_API_KEY(설정 확인)', 'CLAUDE_529', 'RATE_LIMIT', 'BAD_REQUEST', 'MAX_TOKENS', 'EMPTY'].map((c) => (m.cl.adminFail && m.cl.adminFail(c)) ? 1 : 0).join('');
+    P.adm = I.adm === '1111100000';
+    return { ok: Object.values(P).every((v) => v === true), info: JSON.stringify(I) + ' ✗ ' + Object.keys(P).filter((k) => P[k] !== true).join(',') };
+  };
+  try {
+    const R264 = await chk264(load264(null));
+    T('C264 ① AI 실패 가르기: 잔액 부족(400 잔액 글·402)=CREDIT_LOW · 키 거부=AUTH · 키 없음 → 물어보기·첨부 판독·넣기 박스·사진 가리기 모두 그 코드, 물어보기 화면 글 \'관리자 확인 필요\'(\'잠시 뒤 다시\' 아님) · 과부하 529만 \'잠시 뒤 다시\' · 빈 답·잘린 답(max_tokens)·도구만 6회·끝 회차 글 없음 = 실패(MAX_TOKENS·MAX_TURNS·EMPTY)·하루 횟수·월 토큰·감사 줄 차감 0 · 대조(정상 답)는 성공·차감 · 동기 길 같음', R264.ok, R264.info);
+    const MUT264 = [
+      ['cl', "(status === 402 || CREDIT_RE.test(msg)) ? 'CREDIT_LOW' : 'BAD_REQUEST'", "'BAD_REQUEST'"],
+      ['cl', "return /(^|_)(CREDIT_LOW|AUTH)$|^NO_API_KEY/.test(String(code || ''));", 'return false;'],
+      ['ask', 'return { error: CL.httpFailCode(resp.status, et),', "return { error: 'CLAUDE_' + resp.status,"],
+      ['ask', "lastStop === 'max_tokens' ? 'MAX_TOKENS' : ", ''],
+      ['ask', "(exhausted ? 'MAX_TURNS' : (!String(lastText).trim() ? 'EMPTY' : ''))", "(!String(lastText).trim() ? 'EMPTY' : '')"],
+      ['ask', "(!String(lastText).trim() ? 'EMPTY' : '')", "''"],
+      ['ask', "if (CL.adminFail(code)) return '지금은 답할 수 없습니다 — ' + CL.ADMIN_FAIL_TEXT;", ''],
+      ['bg', "answer: A.failAnswer(r.error)", "answer: '지금은 답할 수 없습니다. 잠시 뒤 다시 물어보세요.'"],
+      ['sy', "answer: A.failAnswer(r.error)", "answer: '지금은 답할 수 없습니다. 잠시 뒤 다시 물어보세요.'"],
+      ['asb', "return { error: CL.httpFailCode(resp.status, await resp.text()) };", "return { error: 'CLAUDE_' + resp.status };", 'all'],
+      ['mask', "throw new Error(CL.httpFailCode(res.status, text, 'HTTP_'));", "throw new Error('HTTP_' + res.status);", 'all'],
+    ];
+    const kill264 = [];
+    for (const mu of MUT264) { let k; try { k = !(await chk264(load264(mu))).ok; } catch (e) { k = 'err ' + e.message; } if (k !== true) kill264.push(mu[0] + ':' + mu[1].trim().slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k)); }
+    T('C264 ② 결함 사본 ' + MUT264.length + '개(공통 잔액 가르기·관리자 판정·물어보기 상태 코드·잘림·회차 소진·빈 답·화면 글·두 핸들러 고정 글·첨부 판독·사진 가리기를 하나씩 되돌림) = 모두 ✗', kill264.length === 0, kill264.join(' | '));
+  } catch (e) { T('C264 검사 실행', false, String(e && e.stack || e).slice(0, 500)); }
+  finally {
+    global.fetch = realFetch264;
+    [['ANTHROPIC_API_KEY', savedK264[0]], ['GW_ANTHROPIC_KEY', savedK264[1]]].forEach(([n, v]) => { if (v === undefined) delete process.env[n]; else process.env[n] = v; });
+    for (const k of Object.keys(P264)) delete require.cache[require.resolve(P264[k])];
+    const s = JSON.parse(snap264); mem.gw_users = s.u; mem.gw_data = s.d;
+  }
+}
+
 { // ---- C266(11/24) 통째로 받는 첨부 — 받기 응답(gzipOut: gzip 뒤 base64 6,000,000자 상한) 안에 드는 것만 올림. 길 6(문서함 · 인허가 수령본 · 계약 첨부 · 증빙 · 양식 · 서류함 직접)
   //   내용은 가짜(무작위 바이트 = 안 줄어드는 스캔·사진 꼴 / 한 글자 반복 = 잘 줄어드는 꼴). 받기는 응답을 브라우저처럼 풀어 원본과 대조 · 첨부 증분 백업(backup_get)도 대조. 결함 사본(거름 한 곳씩 걷기)에서는 실패해야 한다.
   const fs6 = require('fs'), Mod6 = require('module'), zl6 = require('zlib'), cr6 = require('crypto');

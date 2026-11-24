@@ -57,8 +57,8 @@ try {
     const code = async (status, body) => { useFetch(() => new Response(body || '{}', { status, headers: { 'content-type': 'application/json' } })); try { await CL.callApiStream(KEY, {}, 5000); return 'OK'; } catch (e) { return e.code + ':' + e.retryable + ':' + e.detail; } };
     const c400 = await code(400, JSON.stringify({ type: 'error', error: { type: 'invalid_request_error', message: CREDIT_MSG } }));
     const c401 = await code(401), c429 = await code(429), c529 = await code(529), c500 = await code(500);
-    T('② JSON 응답은 그대로 읽음 · 400 = BAD_REQUEST(잔액 문구 → 작업 층 CREDIT_LOW 그대로) · 401 AUTH · 429 RATE_LIMIT(재시도) · 5xx SERVER(재시도)',
-      CL.responseText(r) === 'abc' && /^BAD_REQUEST:false:Your credit balance/.test(c400) && PJ.failCode('BAD_REQUEST', c400.split(':').slice(2).join(':')) === 'CREDIT_LOW' && /^AUTH:false/.test(c401) && /^RATE_LIMIT:true/.test(c429) && /^SERVER:true/.test(c529) && /^SERVER:true/.test(c500), [c400, c401, c429, c529, c500].join(' | '));
+    T('② JSON 응답은 그대로 읽음 · 400 잔액 문구 = CREDIT_LOW(C264 — 공통 statusError가 먼저 가름, 작업 층 failCode는 그대로 통과) · 401 AUTH · 429 RATE_LIMIT(재시도) · 5xx SERVER(재시도)',
+      CL.responseText(r) === 'abc' && /^CREDIT_LOW:false:Your credit balance/.test(c400) && PJ.failCode('CREDIT_LOW', c400.split(':').slice(2).join(':')) === 'CREDIT_LOW' && /^AUTH:false/.test(c401) && /^RATE_LIMIT:true/.test(c429) && /^SERVER:true/.test(c529) && /^SERVER:true/.test(c500), [c400, c401, c429, c529, c500].join(' | '));
   }
   // ③ 'fetch failed'는 원인 코드를 붙여 NETWORK(머리 받기 전 — 재시도) · 비스트리밍 callApi도 같은 사유 표기
   {

@@ -22,6 +22,10 @@ function errDetail(e) {
   const c = (e && e.cause) ? String(e.cause.code || e.cause.name || '') : '';
   return (c && m.indexOf(c) < 0) ? m + ' (' + c + ')' : m;
 }
+// C264: 잔액 부족(402 또는 400 + 잔액 글)은 CREDIT_LOW로 가른다 — 기다려도 풀리지 않아 화면에 '관리자 확인 필요'로 보여야 한다.
+//   10/23~11/03 잔액 소진 때 블로그 탭만(promoai_job.failCode, C061) 갈랐고 물어보기·첨부 판독·넣기 박스·명세서 판독·아침 브리핑은 일반 실패·'잠시 뒤 다시'로만 남았다.
+//   글 판정은 failCode와 같은 식(failCode는 CREDIT_LOW를 그대로 통과시킨다).
+const CREDIT_RE = /credit balance is too low|purchase credits/i;
 // 상태 코드 규칙(callApi·callApiStream 공통) — 2xx면 null
 function statusError(status, text) {
   if (status === 401 || status === 403) return new ApiError('AUTH', 'API 키가 거부되었습니다(' + status + ')', false);
@@ -30,10 +34,20 @@ function statusError(status, text) {
   if (status >= 400) {
     let msg = String(text || '').slice(0, 200);
     try { const j = JSON.parse(text); if (j && j.error && j.error.message) msg = j.error.message; } catch (e) { /* 원문 사용 */ }
-    return new ApiError('BAD_REQUEST', msg, false);
+    return new ApiError((status === 402 || CREDIT_RE.test(msg)) ? 'CREDIT_LOW' : 'BAD_REQUEST', msg, false);
   }
   return null;
 }
+// C264: 자체 fetch 길(물어보기·첨부 판독·사진 가리기)의 실패 코드 — 잔액·키는 공통 코드(CREDIT_LOW·AUTH), 나머지는 종전 꼴(머리 + 상태 번호) 그대로
+function httpFailCode(status, text, head) {
+  const se = statusError(status, text);
+  return (se && (se.code === 'CREDIT_LOW' || se.code === 'AUTH')) ? se.code : String(head == null ? 'CLAUDE_' : head) + status;
+}
+// C264: 기다려도 풀리지 않아 관리자가 봐야 하는 실패 — 잔액·키 거부·키 없음(호출부가 붙인 머리 CLAUDE_·꼬리 '(…)'도 같이 본다). 앱 index.html aiAdminFail과 같은 식
+function adminFail(code) {
+  return /(^|_)(CREDIT_LOW|AUTH)$|^NO_API_KEY/.test(String(code || ''));
+}
+const ADMIN_FAIL_TEXT = '관리자 확인 필요(AI 잔액·키 문제 — 기다려도 풀리지 않습니다)';
 
 async function callApi(apiKey, body, timeoutMs) {
   const ctl = new AbortController();
@@ -195,4 +209,5 @@ function usageTokens(json) {
   return (u.input_tokens || 0) + (u.output_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0);
 }
 
-module.exports = { API_URL, API_VERSION, ApiError, callApi, callApiStream, readSse, errDetail, statusError, responseText, scrubPayload, parseJsonOut, usageTokens };
+module.exports = { API_URL, API_VERSION, ApiError, callApi, callApiStream, readSse, errDetail, statusError, responseText, scrubPayload, parseJsonOut, usageTokens,
+  CREDIT_RE, httpFailCode, adminFail, ADMIN_FAIL_TEXT };

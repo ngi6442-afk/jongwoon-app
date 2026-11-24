@@ -112,8 +112,8 @@ exports.handler = async function (event) {
   const t0 = Date.now();
   let r;
   try { r = await A.ask(q, member); } catch (e) { r = { error: 'ASK_FAILED' }; }
-  if (r.error) {
-    return jr(200, { ok: false, code: r.error, answer: '지금은 답할 수 없습니다. 잠시 뒤 다시 물어보세요.', request_id: R });
+  if (r.error) {   // C264: 실패 글은 코드별(백그라운드 길과 같은 A.failAnswer) — 차감 없음
+    return jr(200, { ok: false, code: r.error, answer: A.failAnswer(r.error), request_id: R });
   }
   const total = (r.in || 0) + (r.out || 0);
   await bumpUsage(member.id, total);

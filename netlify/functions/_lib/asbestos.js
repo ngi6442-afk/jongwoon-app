@@ -1,5 +1,6 @@
 'use strict';
 // 석면조사서 판독(Claude 비전) + §94 신고대상 판정 — gw-data(동기 폴백)와 gw-parse-background(기본 경로) 공용
+const CL = require('./claude');   // C264: 실패 코드 공통 가르기(잔액 부족 CREDIT_LOW·키 거부 AUTH — 나머지는 종전 'CLAUDE_' + 상태 번호)
 
 // §94조 신고대상 판정 — 자재 행(위치·면적)을 법 기준에 대조(판정은 코드가 확정)
 function judgeAsbestos94(rows) {
@@ -50,7 +51,7 @@ async function claudeExtractAsbestos(buf, name, type) {
       body: JSON.stringify({ model: model, max_tokens: 4096,
         messages: [{ role: 'user', content: [media, { type: 'text', text: prompt }] }] })
     });
-    if (!resp.ok) return { error: 'CLAUDE_' + resp.status };
+    if (!resp.ok) return { error: CL.httpFailCode(resp.status, await resp.text()) };
     const j = await resp.json();
     const txt = ((j.content || []).find(function (b) { return b.type === 'text'; }) || {}).text || '';
     const m = txt.match(/\{[\s\S]*\}/);
@@ -91,7 +92,7 @@ async function claudeExtractContract(buf, name) {
       body: JSON.stringify({ model: model, max_tokens: 1024,
         messages: [{ role: 'user', content: [media, { type: 'text', text: prompt }] }] })
     });
-    if (!resp.ok) return { error: 'CLAUDE_' + resp.status };
+    if (!resp.ok) return { error: CL.httpFailCode(resp.status, await resp.text()) };
     const j = await resp.json();
     const txt = ((j.content || []).find(function (b) { return b.type === 'text'; }) || {}).text || '';
     const m = txt.match(/\{[\s\S]*\}/);
@@ -128,7 +129,7 @@ async function claudeExtractBldg(buf, name) {
       body: JSON.stringify({ model: model, max_tokens: 1024,
         messages: [{ role: 'user', content: [media, { type: 'text', text: prompt }] }] })
     });
-    if (!resp.ok) return { error: 'CLAUDE_' + resp.status };
+    if (!resp.ok) return { error: CL.httpFailCode(resp.status, await resp.text()) };
     const j = await resp.json();
     const txt = ((j.content || []).find(function (b) { return b.type === 'text'; }) || {}).text || '';
     const m = txt.match(/\{[\s\S]*\}/);
@@ -167,7 +168,7 @@ async function claudeExtractBiz(buf, name) {
       body: JSON.stringify({ model: model, max_tokens: 512,
         messages: [{ role: 'user', content: [media, { type: 'text', text: prompt }] }] })
     });
-    if (!resp.ok) return { error: 'CLAUDE_' + resp.status };
+    if (!resp.ok) return { error: CL.httpFailCode(resp.status, await resp.text()) };
     const j = await resp.json();
     const txt = ((j.content || []).find(function (b) { return b.type === 'text'; }) || {}).text || '';
     const m = txt.match(/\{[\s\S]*\}/);
@@ -205,7 +206,7 @@ async function claudeExtractGrade(buf, name) {
       body: JSON.stringify({ model: model, max_tokens: 512,
         messages: [{ role: 'user', content: [media, { type: 'text', text: prompt }] }] })
     });
-    if (!resp.ok) return { error: 'CLAUDE_' + resp.status };
+    if (!resp.ok) return { error: CL.httpFailCode(resp.status, await resp.text()) };
     const j = await resp.json();
     const txt = ((j.content || []).find(function (b) { return b.type === 'text'; }) || {}).text || '';
     const m = txt.match(/\{[\s\S]*\}/);
