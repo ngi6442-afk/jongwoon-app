@@ -1787,3 +1787,9 @@
 - [ ] (AI 운영 확인 — C222) 배포 뒤 운영 읽기만: 배포 뒤 생긴 단계 지시·실적신고 할 일·계약 연동 기성 줄의 번호가 정해진 꼴(`t…p…`·`t…zhook`·`r…bill`)인지 · 같은 계약·줄·단계의 열린 지시 2건 이상 0 · 계약 단계가 가리키는 지시 없는 단계 수가 배포 전과 같거나 적음 — 운영에 시험 저장은 하지 않음
 - [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v525 0227e3b 위 · ffdfaad + a499e58) uismoke ✓ 952 · servertest 1489 · 14종 0(consheet 포함) · node --check 105 · 인라인 파싱 오류 0 · paycalc_check 10 · autorulestest 9 · 바꾼 3파일 CR 0 — ✓ AI 11/23
 - [x] (AI) `uismoke` C222 X1~X7(두 기기 · 낡은 화면이 같은 번호로 지어도 먼저 지은 쪽 고침 남음) · R1~R3(되돌렸다 다시·옛 번호) · 한 기기 흐름 운영 판 꼴 사본과 번호 빼고 같음 · 결함 사본 16 모두 잡힘 · 시험 서버(box.localhost) 두 화면 [승인]×[승인]·[승인]×[건너뜀]·[승인]×자동 풀기·자동 풀기×자동 풀기·운영 번호 꼴 계약 × 간격 0~5초 7가지 × 계약 6건 = 2건 생긴 계약 0(운영 판 v525 1초 6/6) · 11/20 검토 확정 12건 중 10건 없음 · ㉥ 1건으로 풀림 · ㉤ 운영과 같음(남김) — ✓ AI 11/23
+
+## v527 — 66 급여 백업 암호화(급여 문서는 봉한 꼴로만 백업)
+- [ ] (PM) 넷리파이 환경 변수 `PAY_BACKUP_KEY` 넣기(PM 터미널 한 줄 — 열쇠는 따로 보관)
+- [ ] (운영 확인) 다음 날 05:30 백업 뒤 자료 저장소 `data/backup/gw` 의 `pay:` 키가 `pay-aesgcm-v1` 봉한 꼴인지(금액 글자 없음)
+- [x] (AI) `servertest` 66 급여 백업 암호화 ①②(열쇠 없음 목록 빼기·503 · 봉함·열기 · 복원 위조·다른 열쇠·열쇠 없음 · 결함 사본 4) — ✓ AI 11/24
+- [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `paycalc_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` 통과 · v526 문서 검사를 이 판 이상으로 풀고 v527 문서·판 번호 정확 검사 — ✓ AI 11/24

@@ -5339,6 +5339,11 @@ async function handleBackupList(event, d, R) {
   if (!BACKUP_STORES[sn]) return jr(400, { status: 'REJECTED', error_code: 'BAD_STORE', request_id: R });
   const r = await blobList(store(sn));
   if (!r.ok) return jr(500, { status: 'ERROR', error_code: r.code, request_id: R });
+  // 66 급여 백업 암호화: 열쇠(PAY_BACKUP_KEY)가 없으면 급여 문서는 목록에서 빼고 수만 알림(pay_held) — 하나씩 503 으로 실패시키면 실패 키 한도를 넘어 백업 전체가 저장되지 않으므로
+  if (sn === 'gw_data' && !PAYCRYPT.keyFrom(process.env.PAY_BACKUP_KEY)) {
+    const held = r.keys.filter(function (k) { return String(k).indexOf('pay:') === 0; });
+    if (held.length) return jr(200, { status: 'OK', keys: r.keys.filter(function (k) { return String(k).indexOf('pay:') !== 0; }), pay_held: held.length, request_id: R });
+  }
   return jr(200, { status: 'OK', keys: r.keys, request_id: R });
 }
 async function handleBackupGet(event, d, R) {
@@ -5350,9 +5355,13 @@ async function handleBackupGet(event, d, R) {
   if (badBlobKey(key)) return jr(400, { status: 'REJECTED', error_code: 'BAD_KEY', request_id: R });
   // 민감키 반출 금지 — 백업 인증이 수집키(BIDS_INGEST_KEY) 겸용이라, 키 유출 = VAPID 개인키·PIN 해시 유출로 번지던 것 차단
   if (sn === 'gw_data' && key === 'push:keys') return jr(403, { status: 'FORBIDDEN', error_code: 'SENSITIVE_KEY', request_id: R });
+  // 66 급여 문서는 열쇠(PAY_BACKUP_KEY)가 없으면 내보내지 않는다(평문으로 백업 git 에 남지 않게 — 읽기 전에 막음)
+  const payKey = sn === 'gw_data' && key.indexOf('pay:') === 0 ? PAYCRYPT.keyFrom(process.env.PAY_BACKUP_KEY) : null;
+  if (sn === 'gw_data' && key.indexOf('pay:') === 0 && !payKey) return jr(503, { status: 'ERROR', error_code: 'PAY_BACKUP_KEY_MISSING', request_id: R });
   const r = await blobGet(store(sn), key);
   if (!r.ok) return jr(500, { status: 'ERROR', error_code: r.code, request_id: R });
   let data = r.data;
+  if (payKey) data = PAYCRYPT.seal(data, payKey);   // AES-256-GCM 봉함 — 백업에는 암호문만
   if (sn === 'gw_users' && data && typeof data === 'object' && !Array.isArray(data)) {
     // PIN 해시·salt는 백업에 싣지 않는다(git 스냅샷에 매일 커밋되던 것 포함 차단) — 복원 시엔 서버가 기존 값을 보존한다
     data = Object.assign({}, data); delete data.pin_salt; delete data.pin_hash;
@@ -5595,6 +5604,13 @@ async function backupRestorePlan(sn, key, cls, cur, data, preview) {
     payload = mg.doc; preview.merge = { added: mg.added, kept: mg.kept, rechained: mg.rechained, mode: mg.mode };
     note += ' · 체인 ' + mg.mode + ' · 백업 줄 ' + mg.added + ' · 지금 줄 ' + mg.kept + (mg.rechained ? ' · 다시 이음 ' + mg.rechained + '줄' : '') + ' · from ' + (mg.from || '-') + ' → to ' + (mg.to || '-');
   } else if (cls === 'pay') {
+    if (PAYCRYPT.isSealed(payload)) {   // 봉한 백업 = 같은 열쇠로 열어서 꼴 검사
+      const pkey = PAYCRYPT.keyFrom(process.env.PAY_BACKUP_KEY);
+      if (!pkey) return { status: 503, body: { status: 'ERROR', error_code: 'PAY_BACKUP_KEY_MISSING' } };
+      const op = PAYCRYPT.open(payload, pkey);
+      if (!op.ok) return { status: 400, body: { status: 'REJECTED', error_code: 'PAY_' + op.code } };
+      payload = op.data; note += ' · 봉한 백업 엶';
+    }
     const pk = PAYLEDGER.docOk(key, payload);   // 66 판2 — 급여 문서 꼴(모르는 pay: 키·틀린 꼴은 거절). 감사 note 에는 금액 없이 꼴 통과만
     if (!pk.ok) return { status: 400, body: { status: 'REJECTED', error_code: 'BAD_PAY_DOC', field: String(pk.field || '').slice(0, 60) } };
     payload = pk.doc; note += ' · 급여 문서 꼴 통과';
@@ -6521,7 +6537,8 @@ PMCON_KINDS.hrbg = { label: '인사 법령 근거 승격', grade: 'R2', fn: hand
 //   판14 와 다른 점: 근거 표를 '못 읽음'과 '없음'을 가른다(못 읽음 = BG_READ_FAILED — 없음으로 보지 않음) · 읽기는 관리자만(급여 자료 — 권한관리 표에 열이 없음).
 //   읽기 pay_bg_get = 로그인 → 기기 승인 → 관리자 · 쓰기 pay_bg_set = pmconGate 쓰기(PM) → 낙관락 → 직전 값(prev) → 감사 1줄(col pay) · PM 콘솔 줄 paybg(R2 · 무응답 = 미승격).
 const PAYBG = require('./_lib/paybg');
-const PAYLEDGER = require('./_lib/payledger');   // 66 판2 — 백업 복원의 급여 문서 꼴 검사만(급여 읽기·쓰기는 gw-pay)
+const PAYLEDGER = require('./_lib/payledger');
+const PAYCRYPT = require('./_lib/sealbox');   // 66 급여 백업 암호화(PM 11/24 'ㄱ' — A안): pay:* 는 봉해서만 반출 · 복원은 열어서   // 66 판2 — 백업 복원의 급여 문서 꼴 검사만(급여 읽기·쓰기는 gw-pay)
 const PAY_BG_KEYS = { bg: 'bg:pay:law:v1', flag: 'settings:pay' };
 async function payBgReadFlag(st) {   // { ok, flag } — 없음 = 빈 스위치 · 읽기 실패 = ok false(그 위에 쓰지 않음)
   const r = await blobGet(st, PAY_BG_KEYS.flag);

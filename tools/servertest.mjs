@@ -16116,6 +16116,59 @@ function J91a(x) { return JSON.stringify(x); }
   finally { require.cache[rpAR5] = keepAR5; require.cache[rpDI5] = keepDI5; require.cache[rpEV5] = keepEV5; const s = JSON.parse(snapK5); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; }
 }
 
+{ // ---- 66 급여 백업 암호화(PM 11/24 'ㄱ' — A안) gw-data backup_list·backup_get·backup_put + _lib/sealbox.js — 열쇠 PAY_BACKUP_KEY(시험은 매번 새로 만든 가짜 열쇠)
+  const fsK = require('fs'), ModK = require('module'), cryptoK = require('crypto');
+  const FILEK = join(FN, 'gw-data.js'), SRCK = fsK.readFileSync(FILEK, 'utf8').replace(/\r\n/g, '\n'), PCK = require(join(FN, '_lib', 'sealbox.js'));
+  const loadK = (from, to) => { if (SRCK.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); const m = new ModK(FILEK); m.filename = FILEK; m.paths = ModK._nodeModulePaths(dirname(FILEK)); m._compile(SRCK.replace(from, () => to), FILEK); return m.exports; };
+  const callK = (mod) => async (body) => { const r = await mod.handler({ httpMethod: 'POST', headers: {}, body: JSON.stringify(body) }); let b = {}; try { b = JSON.parse(r.body || '{}'); } catch (e) {} return { code: r.statusCode, body: b }; };
+  const snapK = JSON.stringify({ u: mem.gw_users, d: mem.gw_data }), envK = process.env.PAY_BACKUP_KEY;
+  const KEY1 = cryptoK.randomBytes(32).toString('base64'), KEY2 = cryptoK.randomBytes(32).toString('base64');
+  const DOCK = { schema: 1, rev: 'abcdef0123456789', vers: [{ from: '2026-11', base: 2345670, allow: 0, allow_ord: false, meal: 200000, car: 0, hours: 209, fam: 1, kids: 0, pct: 100, pension_base: null, health_base: null, skip: { pension: false, health: false, emp: false }, dredge: false }], updated_at: 3, updated_by: 'uadmin' };
+  const KK = 'pay:base:env:qk66';
+  const chkK = async (c) => {
+    const P = {}, I = {};
+    mem.gw_data = { 'col:tasks': { items: [] } }; mem.gw_data[KK] = JSON.parse(JSON.stringify(DOCK));
+    const S = 'test-ingest-key';
+    // 열쇠 없음: 목록에서 급여 키 빼고 수만 · 직접 읽기 503 · 다른 키는 그대로
+    delete process.env.PAY_BACKUP_KEY;
+    const l0 = await c({ action: 'backup_list', secret: S, store: 'gw_data' }), g0 = await c({ action: 'backup_get', secret: S, store: 'gw_data', key: KK }), gt = await c({ action: 'backup_get', secret: S, store: 'gw_data', key: 'col:tasks' });
+    P.nokey = l0.code === 200 && (l0.body.keys || []).indexOf(KK) < 0 && (l0.body.keys || []).indexOf('col:tasks') >= 0 && l0.body.pay_held === 1 && g0.code === 503 && g0.body.error_code === 'PAY_BACKUP_KEY_MISSING' && !/2345670/.test(JSON.stringify(g0.body)) && gt.code === 200;
+    I.nokey = [l0.body.pay_held, g0.code, gt.code];
+    // 열쇠 있음: 목록에 급여 키 · 읽기 = 봉한 꼴(금액 글자 없음) · 같은 열쇠로 열면 원문
+    process.env.PAY_BACKUP_KEY = KEY1;
+    const l1 = await c({ action: 'backup_list', secret: S, store: 'gw_data' }), g1 = await c({ action: 'backup_get', secret: S, store: 'gw_data', key: KK });
+    const sealed = g1.body.data, op = PCK.open(sealed, PCK.keyFrom(KEY1));
+    P.seal = (l1.body.keys || []).indexOf(KK) >= 0 && !('pay_held' in l1.body) && PCK.isSealed(sealed) && !/2345670|"vers"|"base"/.test(JSON.stringify(sealed)) && op.ok && JSON.stringify(op.data) === JSON.stringify(DOCK) && sealed.kid === PCK.kidOf(PCK.keyFrom(KEY1));
+    I.seal = [PCK.isSealed(sealed), op.ok];
+    // 복원: 봉한 꼴 → 열어서 꼴 검사 뒤 씀 · 위조 400 PAY_BAD_SEAL · 다른 열쇠 400 PAY_KID_MISMATCH · 열쇠 없으면 503
+    mem.gw_data[KK] = { schema: 1, rev: '0123456789abcdef', vers: [], updated_at: 9, updated_by: 'x' };
+    const put = (data, env) => { if (env === null) delete process.env.PAY_BACKUP_KEY; else process.env.PAY_BACKUP_KEY = env; return c({ action: 'backup_put', secret: S, store: 'gw_data', key: KK, data: data, confirm: true, restore: true }); };
+    const bad = PCK.isSealed(sealed) ? Object.assign({}, sealed, { ct: Buffer.from('x' + Buffer.from(sealed.ct, 'base64').toString('binary'), 'binary').toString('base64') }) : { enc: PCK.ENC, kid: '', iv: '', tag: '', ct: '' };
+    const p1 = await put(bad, KEY1), p2 = await put(sealed, KEY2), p3 = await put(sealed, null), keepN = JSON.stringify(mem.gw_data[KK]);
+    const p4 = await put(sealed, KEY1);
+    P.restore = p1.code === 400 && p1.body.error_code === 'PAY_BAD_SEAL' && p2.code === 400 && p2.body.error_code === 'PAY_KID_MISMATCH' && p3.code === 503 && p3.body.error_code === 'PAY_BACKUP_KEY_MISSING' && keepN.indexOf('0123456789abcdef') > 0
+      && p4.code === 200 && JSON.stringify(mem.gw_data[KK]) === JSON.stringify(DOCK);
+    I.restore = [p1.body.error_code, p2.body.error_code, p3.code, p4.code];
+    // 열쇠 꼴: 짧은 값·base64 아님은 없음으로
+    P.keyform = PCK.keyFrom('abc') === null && PCK.keyFrom('') === null && PCK.keyFrom(KEY1.slice(0, 40) + '!!!=') === null && PCK.keyFrom(KEY1) !== null;
+    return { ok: Object.values(P).every((v) => v === true), info: '✗ ' + Object.keys(P).filter((k) => P[k] !== true).join(',') + ' ' + JSON.stringify(I) };
+  };
+  try {
+    const RK = await chkK(callK(require(FILEK)));
+    T('66 급여 백업 암호화 ① 열쇠 없음 = 목록에서 급여 키 빼고 수만(pay_held — 백업 전체는 저장) · 직접 읽기 503 PAY_BACKUP_KEY_MISSING(금액 안 나감) · 열쇠 있음 = AES-256-GCM 봉한 꼴만(금액·칸 이름 글자 없음 · 같은 열쇠로 열면 원문) · 복원 = 열어서 꼴 검사 뒤 씀 · 위조 PAY_BAD_SEAL · 다른 열쇠 PAY_KID_MISMATCH · 열쇠 없으면 503(덮지 않음) · 열쇠 꼴', RK.ok, RK.info);
+    const MK = [
+      ["  if (payKey) data = PAYCRYPT.seal(data, payKey);", '  if (false) data = PAYCRYPT.seal(data, payKey);'],
+      ["  if (sn === 'gw_data' && key.indexOf('pay:') === 0 && !payKey) return jr(503,", "  if (false) return jr(503,"],
+      ["    if (held.length) return jr(200,", "    if (false) return jr(200,"],
+      ["      if (!op.ok) return { status: 400, body: { status: 'REJECTED', error_code: 'PAY_' + op.code } };", "      if (!op.ok) op.data = payload;"]
+    ];
+    const killK = [];
+    for (const [a, b] of MK) { let k; try { k = !(await chkK(callK(loadK(a, b)))).ok; } catch (e) { k = 'err ' + e.message; } if (k !== true) killK.push(a.trim().slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k)); }
+    T('66 급여 백업 암호화 ② 결함 사본 ' + MK.length + '개(봉하지 않음 · 열쇠 없이 반출 · 목록에서 안 뺌 · 위조를 그대로 씀) = 모두 ✗', killK.length === 0, killK.join(' | '));
+  } catch (e) { T('66 급여 백업 암호화 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+  finally { const s = JSON.parse(snapK); mem.gw_users = s.u; mem.gw_data = s.d; if (envK === undefined) delete process.env.PAY_BACKUP_KEY; else process.env.PAY_BACKUP_KEY = envK; }
+}
+
 { // ---- P1 판38(원장 C166 · 착수 ㄱ C191 — PM 11/19) 지시 완료 창의 새 칸(이번 수검일·검사 신청일·연장(유예) 만료일) — veh_due_set 기록·검증 + 차량 저장 기록 합치기(vehLogUnion·vehLogKeep)
   //   law 안 insp_done 키가 있으면(판38 앱) 기록 줄에 새 칸 · 차량 줄 연장 만료일(insp_ext)은 기록으로 옮기고 비움(감사 f에 같이) · 키가 없으면(옛 앱) 종전 그대로 · 보험 지시는 새 칸을 보지 않음
   //   검사: 날짜 꼴 BAD_INSP_DATE · 수검일·신청일 오늘(KST) 뒤 INSP_FUTURE · 신청일 > 수검일 INSP_ORDER · 연장 만료일 ≤ 종전 만기 INSP_EXT_EARLY — 거절은 쓰기 전(차량·버전 링·감사 그대로) · 권한(배정표 담당은 그 차 그 칸만)은 종전 순서 그대로 먼저
