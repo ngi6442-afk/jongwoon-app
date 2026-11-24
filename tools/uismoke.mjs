@@ -23558,10 +23558,10 @@ try {
     const FT = ["`wholeGetFits`", "원장 C266"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = "스캔 PDF·사진처럼 압축이 안 되는 파일은 4.3MB보다 조금 작아도(";
-    const ok = /기준: v537 \(2026-11-24\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 537 && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
       && d.man.indexOf(MAN) > 0
       && d.cl.indexOf('**C266(v537') > 0
-      && /SHELL_CACHE = 'jw-shell-v537'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 537;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r537 = chk537(D537);
@@ -23573,6 +23573,31 @@ try {
   T('v537 문서·판 번호(정확 검사): FEATURES 기준 v537 (2026-11-24)·v537 절(C266) · TESTLIST v537 칸 5(화면·운영 확인 3 · 게이트 [x] 2) · MANUAL 문서함 첨부 크기(내부 이름 0) · CLAUDE.md 한 줄 · sw jw-shell-v537 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL·CLAUDE.md·게이트 칸) 모두 ✗',
     r537.ok && M537.every((v) => v === false), JSON.stringify({ r: r537.info, mut: M537 }));
 } catch (e) { console.log('  (v537 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v538(C267 — 계약서 제목 18pt · 양식 채움 숨은 글자 비움 · 원장 C267): 실행 검사는 위 C267 블록 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd538 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D538 = { ft: rd538('FEATURES.md'), tl: rd538('TESTLIST.md'), sw: rd538('sw.js'), man: rd538('MANUAL.html'), cl: rd538('CLAUDE.md') };
+  const chk538 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v538 (11/24)', '\n### '), tlv = cut(d.tl, '\n## v538 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`fillXlsxTemplate`", "원장 C267"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v538 \(2026-11-24\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C267(v538') > 0
+      && /SHELL_CACHE = 'jw-shell-v538'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r538 = chk538(D538);
+  const mu538 = (k, f) => chk538(Object.assign({}, D538, { [k]: f(D538[k]) })).ok;
+  const M538 = [mu538('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v537 (')), mu538('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v537'")),
+    mu538('ft', (s) => s.split('`fillXlsxTemplate`').join('fillXlsxTemplate')),
+    mu538('cl', (s) => s.replace('**C267(v538', 'C267(')),
+    mu538('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v537 위로 다시 얹은 판) — 결과는 배포 전 전체 게이트 기록 C267_게이트_v538_1124.txt', '\n- (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v537 위로 다시 얹은 판) — 결과는 배포 전 전체 게이트 기록 C267_게이트_v538_1124.txt'))];
+  T('v538 문서·판 번호(정확 검사): FEATURES 기준 v538 (2026-11-24)·v538 절(C267) · TESTLIST v538 칸 5(화면·운영 확인 3 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v538 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
+    r538.ok && M538.every((v) => v === false), JSON.stringify({ r: r538.info, mut: M538 }));
+} catch (e) { console.log('  (v538 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
