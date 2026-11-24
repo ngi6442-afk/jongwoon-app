@@ -16616,4 +16616,82 @@ function J91a(x) { return JSON.stringify(x); }
   }
 }
 
+{ // ---- C266(11/24) 통째로 받는 첨부 — 받기 응답(gzipOut: gzip 뒤 base64 6,000,000자 상한) 안에 드는 것만 올림. 길 6(문서함 · 인허가 수령본 · 계약 첨부 · 증빙 · 양식 · 서류함 직접)
+  //   내용은 가짜(무작위 바이트 = 안 줄어드는 스캔·사진 꼴 / 한 글자 반복 = 잘 줄어드는 꼴). 받기는 응답을 브라우저처럼 풀어 원본과 대조 · 첨부 증분 백업(backup_get)도 대조. 결함 사본(거름 한 곳씩 걷기)에서는 실패해야 한다.
+  const fs6 = require('fs'), Mod6 = require('module'), zl6 = require('zlib'), cr6 = require('crypto');
+  const FILE6 = join(FN, 'gw-data.js'), SRC6 = fs6.readFileSync(FILE6, 'utf8').replace(/\r\n/g, '\n');
+  const load6 = (from, to) => { if (SRC6.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); const m = new Mod6(FILE6); m.filename = FILE6; m.paths = Mod6._nodeModulePaths(dirname(FILE6)); m._compile(SRC6.replace(from, () => to), FILE6); return m.exports; };
+  const call6 = (mod) => async (body, tok, dev) => {
+    const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) });
+    let t = r.body || '';
+    if (r.isBase64Encoded) { const buf = Buffer.from(t, 'base64'); t = (r.headers && r.headers['Content-Encoding'] === 'gzip') ? zl6.gunzipSync(buf).toString('utf8') : buf.toString('utf8'); }
+    let b = {}; try { b = JSON.parse(t || '{}'); } catch (e) {} return { code: r.statusCode, body: b, wire: (r.body || '').length };
+  };
+  const snap6 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data, f: mem.gw_files || {} });
+  const A6 = { id: 'u266a', name: '관리266', admin: true, perms: {}, tier: 'pm' }, tA6 = issueSession(A6).token, MiB6 = 1048576;
+  const LONG6 = '가'.repeat(116) + '.pdf';   // 이름 칸 120자(한글 3바이트) — 받기 응답의 칸 여유까지 재는 꼴
+  const seed6 = () => {
+    mem.gw_users = { 'member:u266a': A6, 'device:dev266': { status: 'approved' } };
+    mem.gw_data = { 'col:documents': { schema: 1, updated_at: 1, items: [{ id: 'd266', title: '시험 문서', cat: '02-01', status: '등재', by: { id: 'u266a', name: '관리266' } }] },
+      'col:contracts': { schema: 1, updated_at: 1, items: [{ id: 'c266', title: '시험 계약', scen: 'asbestos:pub', stages: [] }] },
+      'bg:lic:law:v1': { schema: 1, domain: 'lic', ver: 'v1-test', status: 'promoted', rows: [{ no: 1, auto: true, type: 'interval', base: 'manual', every_n: 12, every_unit: 'month', lic_id: 'L1', duty: '시험 의무', lic: '허가', cycle: '연 1회', cites: [] }] } };
+    mem.gw_files = {};
+  };
+  const HEAD6 = Buffer.from('%PDF-1.4\n');
+  const rnd6 = (n) => { const b = cr6.randomBytes(n); HEAD6.copy(b, 0); return b; };
+  const flat6 = (n) => Buffer.concat([HEAD6, Buffer.alloc(n - HEAD6.length, 0x41)]);
+  const P6 = {
+    doc: { put: (b, nm) => ({ action: 'doc_att_put', id: 'd266', name: nm || 'f.pdf', data: b }), get: (pu) => ({ action: 'doc_att_get', id: 'd266', n: pu.body.n }) },
+    lic: { put: (b, nm) => ({ action: 'att_put', kind: 'lic', no: 1, name: nm || 'f.pdf', data: b }), get: (pu) => ({ action: 'att_get', id: pu.body.id }) },
+    con: { put: (b, nm) => ({ action: 'att_put', kind: 'contract', name: nm || 'f.pdf', type: 'application/pdf', data: b }), get: (pu) => ({ action: 'att_get', id: pu.body.id }) },
+    proof: { put: (b, nm) => ({ action: 'proof_put', name: nm || 'pf.pdf', data: b }), get: (pu, nm) => ({ action: 'proof_get', name: nm || 'pf.pdf' }) },
+    tpl: { put: (b, nm) => ({ action: 'tpl_put', key: 'quote_env', name: nm || 'q.pdf', data: b }), get: () => ({ action: 'tpl_get', key: 'quote_env' }) },
+    cdoc: { put: (b, nm) => ({ action: 'cdoc_put', cid: 'c266', i: 0, doc_key: 'asb_survey', kind: 'received', name: nm || 'r.pdf', data: b }), get: (pu) => ({ action: 'cdoc_get', cid: 'c266', n: pu.body.item && pu.body.item.n }) }
+  };
+  const R4_20 = rnd6(Math.floor(4.2 * MiB6)), R4_30 = rnd6(Math.floor(4.3 * MiB6)), RIN = rnd6(4470000), ROUT = rnd6(4485000), F4_5 = flat6(4718592), F6_0 = flat6(6 * MiB6);
+  const chk6 = async (c) => {
+    const P = {}, I = {};
+    const round = async (p, raw, nm) => { seed6(); const b = raw.toString('base64'); const pu = await c(P6[p].put(b, nm), tA6, 'dev266'); const nf = Object.keys(mem.gw_files).length;
+      if (pu.code !== 200) return { put: pu.code + ' ' + (pu.body.error_code || ''), nf: nf, files: (mem.gw_data['col:documents'].items[0].files || []).length };
+      const ge = await c(P6[p].get(pu, nm), tA6, 'dev266'); return { put: '200', get: ge.code + (ge.body.error_code ? ' ' + ge.body.error_code : ''), same: ge.code === 200 && Buffer.from(ge.body.data || '', 'base64').equals(raw), wire: ge.wire, pu: pu }; };
+    for (const p of Object.keys(P6)) {
+      const a = await round(p, R4_20), z = await round(p, R4_30);
+      P['small_' + p] = a.put === '200' && a.get === '200' && a.same === true;
+      P['block_' + p] = z.put === '413 FILE_TOO_LARGE' && z.nf === 0 && z.files === 0;   // 거르면 아무것도 안 남김(바이트·문서 첨부 목록)
+      I[p] = [a.put, a.get, z.put, z.get || '-'];
+    }
+    // 경계 안쪽(셈으로 잼 · 이름 칸 120자) = 올리기 200 · 받기 200 · 첨부 증분 백업 받기 200 / 바로 바깥 = 413
+    const e1 = await round('doc', RIN, LONG6);
+    const bkKey = Object.keys(mem.gw_files).find((k) => k.indexOf('docatt:d266:') === 0);
+    const bk = bkKey ? await c({ action: 'backup_get', secret: 'test-ingest-key', store: 'gw_files', key: bkKey }) : { code: 0, body: {} };
+    P.edgeIn = e1.put === '200' && e1.get === '200' && e1.same === true && e1.wire <= 6000000 && bk.code === 200 && bk.body.data && bk.body.data.data === RIN.toString('base64');
+    const e2 = await round('doc', ROUT, LONG6);
+    P.edgeOut = e2.put === '413 FILE_TOO_LARGE';
+    I.edge = [e1.put, e1.get, e1.wire, bk.code, e2.put];
+    // 잘 줄어드는 큰 파일은 종전대로(서버 상한 크기 문서함 4.5MB · 계약 첨부 6MB = base64 8MB)
+    const f1 = await round('doc', F4_5), f2 = await round('con', F6_0);
+    P.flat = f1.put === '200' && f1.get === '200' && f1.same === true && f2.put === '200' && f2.get === '200' && f2.same === true;
+    I.flat = [f1.put, f1.get, f2.put, f2.get];
+    return { ok: Object.values(P).every((v) => v === true), info: '✗ ' + Object.keys(P).filter((k) => P[k] !== true).join(',') + ' ' + JSON.stringify(I) };
+  };
+  try {
+    const R6 = await chk6(call6(require(FILE6)));
+    T('C266 ① 통째로 받는 첨부 6길(문서함 · 인허가 수령본 · 계약 첨부 · 증빙 · 양식 · 서류함 직접): 안 줄어드는 4.20MB = 올리기 200 · 받기 200(원본과 같음) / 4.30MB(화면 상한) = 올리기 413 FILE_TOO_LARGE(바이트·첨부 목록 안 남김) · 경계 안쪽(이름 120자) = 받기 200·백업 받기 200 · 바로 바깥 413 · 잘 줄어드는 4.5MB·6MB는 종전대로 200', R6.ok, R6.info);
+    const MU6 = [
+      ["  if (b64.length > DOC_ATT_MAX || !wholeGetFits(b64)) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', request_id: R });   // C266 받기(doc_att_get)", "  if (b64.length > DOC_ATT_MAX) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', request_id: R });   // C266 받기(doc_att_get)"],
+      ["  if (b64.length > DOC_ATT_MAX || !wholeGetFits(b64)) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', request_id: R });   // C266 받기(att_get)", "  if (b64.length > DOC_ATT_MAX) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', request_id: R });   // C266 받기(att_get)"],
+      ["  if (b64.length > ATT_MAX || !wholeGetFits(b64)) return jr(413,", "  if (b64.length > ATT_MAX) return jr(413,"],
+      ["  if (!wholeGetFits(b64)) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', request_id: R });   // C266 받기(proof_get) 응답 한도 안만\n", ''],
+      ["  if (!wholeGetFits(b64)) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', request_id: R });   // C266 받기(tpl_get) 응답 한도 안만\n", ''],
+      ["    if (b64.length > CDOC_MAX || !wholeGetFits(b64)) return jr(413,", "    if (b64.length > CDOC_MAX) return jr(413,"],
+      ['const WHOLE_GET_FREE = 5900000;', 'const WHOLE_GET_FREE = 6100000;'],
+      ['.length / 3) * 4 + WHOLE_GET_SLACK <= GZ_MAX_B64;', '.length / 3) * 4 + WHOLE_GET_SLACK <= GZ_MAX_B64 + 40000;']
+    ];
+    const kill6 = [];
+    for (const [a, b] of MU6) { let k; try { k = !(await chk6(call6(load6(a, b)))).ok; } catch (e) { k = 'err ' + e.message; } if (k !== true) kill6.push(a.trim().slice(0, 60) + (k === false ? ' 안 깨짐' : ' ' + k)); }
+    T('C266 ② 결함 사본 ' + MU6.length + '개(거름 걷기 — 문서함 · 인허가 수령본 · 계약 첨부 · 증빙 · 양식 · 서류함 직접 · 셈 없이 통과 폭 넓힘 · 상한 느슨) = 모두 ✗', kill6.length === 0, kill6.join(' | '));
+  } catch (e) { T('C266 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+  finally { const s = JSON.parse(snap6); mem.gw_users = s.u; mem.gw_data = s.d; mem.gw_files = s.f; }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

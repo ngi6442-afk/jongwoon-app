@@ -7924,6 +7924,8 @@
   function docOrigAllowed(d){ var m = curMember(); if (!m || !d) return false; if (m.admin) return true; if (String(m.dept || "") === "관리부") return true; if (docMinorOf(d) === "03") return true; return d.orig_dl === "all"; }
   function docViewFile(d){ var fs = (d && Array.isArray(d.files)) ? d.files : []; for (var i = fs.length - 1; i >= 0; i--){ if (fs[i] && Number(fs[i].view) === 1) return fs[i]; } return null; }   // 열람용 PDF(가장 새 것)
   var docAttBusy = false;
+  // C266: 화면 한도(f.size) 안이라도 안 줄어드는 스캔·사진은 약 4.27MB부터 서버가 거른다(다시 받을 수 있는 크기만 올림) — 두 경우 같은 안내
+  function docAttBigMsg(name){ return '"' + name + '"는 서버 전송 한도(약 4.3MB)를 넘어 첨부할 수 없습니다.'; }
   function docAttKb(n){ n = Number(n) || 0; return n >= 1048576 ? (Math.round(n / 104857.6) / 10) + "MB" : Math.max(1, Math.round(n / 1024)) + "KB"; }
   function docAttExtOf(name){ var m = String(name || "").toLowerCase().match(/\.([a-z0-9]+)$/); return m ? m[1] : ""; }
   function docAttCanPut(d){ return !!(d && canDo("doc") && (isAdmin() || (d.by && d.by.id === myId()))); }
@@ -7962,7 +7964,7 @@
       var f = q.shift();
       if (!f){ done(); return; }
       if (DOC_ATT_EXT.indexOf(docAttExtOf(f.name)) < 0){ alert('"' + f.name + '"는 허용되지 않는 형식입니다(pdf·docx·xlsx·pptx·hwp·hwpx·jpg·png).'); next(); return; }
-      if (f.size > DOC_ATT_MAX){ alert('"' + f.name + '"는 4.5MB를 넘어 첨부할 수 없습니다(서버 전송 한도).'); next(); return; }   // 선택 즉시(읽기 전) 거름
+      if (f.size > DOC_ATT_MAX){ alert(docAttBigMsg(f.name)); next(); return; }   // 선택 즉시(읽기 전) 거름
       if (msg) msg.textContent = "올리는 중… " + f.name;
       var r = new FileReader();
       r.onload = function(){
@@ -7971,7 +7973,7 @@
             var d = findDoc(docId); if (d){ d.files = res.body.files; d.updated_ts = Date.now(); d.updated = todayStr(); if (typeof imBaseAdvance === "function") imBaseAdvance("documents", d.id, { files: res.body.files }); }   // P1 판24j: 서버가 바꾼 첨부 목록 — 받은 사본도
             if (res.body.updated_at) _colBase["documents"] = res.body.updated_at;   // 서버가 문서 블롭을 바꿨다 — 다음 저장의 낙관락 base 갱신(불필요한 409 방지)
             apprToastShow("첨부됨 — " + f.name);
-          } else alert('"' + f.name + '" 첨부 실패 (' + ((res.body && res.body.error_code) || res.status) + ')');
+          } else alert(res.body && res.body.error_code === "FILE_TOO_LARGE" ? docAttBigMsg(f.name) : '"' + f.name + '" 첨부 실패 (' + ((res.body && res.body.error_code) || res.status) + ')');   // C266 서버가 받기 한도로 거른 것도 같은 안내
           next();
         }).catch(function(){ alert('"' + f.name + '" 첨부 실패(네트워크)'); next(); });
       };
@@ -16460,7 +16462,7 @@
     var key = it.tpl; if (!key || !TPL_LABELS[key]){ alert("어느 양식인지 골라 주세요."); return; }
     var want = TPL_EXT[key] || ".xlsx";
     if ("." + docAttExtOf(it.name) !== want){ alert("'" + TPL_LABELS[key] + "' 양식은 " + want + " 파일이어야 합니다."); return; }
-    if (!it.file || it.size > DOC_ATT_MAX){ alert("양식은 4.3MB까지만 등록할 수 있습니다."); return; }
+    if (!it.file || it.size > DOC_ATT_MAX){ alert("양식은 약 4.3MB까지만 등록할 수 있습니다."); return; }
     var ask = function(reg){ if (reg && !confirm("이미 등록된 '" + TPL_LABELS[key] + "' 양식을 이 파일로 교체할까요?")) return; cbxTplSend(it, key); };
     if (csTplKeys) ask(!!csTplKeys[key]);
     else gwCall("gw-data", { action: "tpl_list" }).then(function(res){ if (res && res.status === 200 && res.body && res.body.templates){ csTplSet(res.body.templates); ask(!!csTplKeys[key]); } else ask(true); }).catch(function(){ ask(true); });   // 목록을 못 받으면 항상 묻는다
@@ -16471,7 +16473,7 @@
     r.onerror = function(){ cbxFail(it, "파일을 읽지 못했습니다."); };
     r.onload = function(){
       gwCall("gw-data", { action: "tpl_put", key: key, name: it.name, data: String(r.result).split(",")[1] || "" }).then(function(res){
-        if (!res || res.status !== 200){ it.st = "blank"; cbxRedraw(it.scope); var tplCode = (res && res.body && res.body.error_code) || (res && res.status) || "네트워크"; alert(tplCode === "TPL_HAS_RRN" ? "이 파일에 주민등록번호 꼴 값이 있어 양식으로 등록하지 않았습니다. 값을 지운 뒤 다시 넣어 주세요." : "양식 등록 실패(" + tplCode + ")"); return; }
+        if (!res || res.status !== 200){ it.st = "blank"; cbxRedraw(it.scope); var tplCode = (res && res.body && res.body.error_code) || (res && res.status) || "네트워크"; alert(tplCode === "TPL_HAS_RRN" ? "이 파일에 주민등록번호 꼴 값이 있어 양식으로 등록하지 않았습니다. 값을 지운 뒤 다시 넣어 주세요." : (tplCode === "FILE_TOO_LARGE" ? "양식은 약 4.3MB까지만 등록할 수 있습니다." : "양식 등록 실패(" + tplCode + ")")); return; }   // C266 서버가 받기 한도로 거른 것도 크기 안내
         cbxDiscard(it); if (csTplKeys) csTplKeys[key] = 1; it.st = "done"; it.n = 0; it.msg = it.name + " → '" + TPL_LABELS[key] + "' 양식으로 등록했습니다.";
         renderContracts(); cbxRenderTop();
       }).catch(function(){ it.st = "blank"; cbxRedraw(it.scope); alert("양식 등록 실패(네트워크)"); });
@@ -16479,13 +16481,13 @@
     r.readAsDataURL(it.file);
   }
   function cbxProofGo(it){
-    if (!it.file || it.size > DOC_ATT_MAX){ alert("증빙은 4.3MB까지만 보관함에 넣을 수 있습니다. 계약 서류로 넣어 주세요."); return; }
+    if (!it.file || it.size > DOC_ATT_MAX){ alert("증빙은 약 4.3MB까지만 보관함에 넣을 수 있습니다. 계약 서류로 넣어 주세요."); return; }
     it.st = "placing"; cbxRedraw(it.scope);
     var r = new FileReader();
     r.onerror = function(){ cbxFail(it, "파일을 읽지 못했습니다."); };
     r.onload = function(){
       gwCall("gw-data", { action: "proof_put", name: it.name, data: String(r.result).split(",")[1] || "" }).then(function(res){
-        if (!res || res.status !== 200){ it.st = "proof"; cbxRedraw(it.scope); alert("증빙 보관 실패(" + ((res && res.body && res.body.error_code) || (res && res.status) || "네트워크") + ")"); return; }
+        if (!res || res.status !== 200){ it.st = "proof"; cbxRedraw(it.scope); alert(res && res.body && res.body.error_code === "FILE_TOO_LARGE" ? "증빙은 약 4.3MB까지만 보관함에 넣을 수 있습니다. 계약 서류로 넣어 주세요." : "증빙 보관 실패(" + ((res && res.body && res.body.error_code) || (res && res.status) || "네트워크") + ")"); return; }   // C266 서버가 받기 한도로 거른 것도 크기 안내
         cbxDiscard(it); it.st = "done"; it.n = 0; it.msg = it.name + " → 적격심사 증빙 보관함에 넣었습니다.";
         cbxRedraw(it.scope);
       }).catch(function(){ it.st = "proof"; cbxRedraw(it.scope); alert("증빙 보관 실패(네트워크)"); });
@@ -30930,7 +30932,7 @@ function dutyStage(nx){
     DUTY_STALE: "그 사이 이 행이 바뀌었습니다 — 목록을 새로 읽었으니 다시 열어 주세요.", DUE_STALE: "그 사이 회차가 바뀌었습니다 — 목록을 새로 읽었으니 다시 열어 주세요.",
     BAD_DATE: "달력에 없는 날짜입니다.", BAD_FUTURE: "오늘보다 뒤 날짜는 넣을 수 없습니다.", NEED_PROOF: "접수번호나 수령본 가운데 하나를 넣어 주세요.", BAD_REASON: "사유 유형을 골라 주세요.",
     NEED_REASON: "사유를 적어 주세요.", TOO_LONG: "글이 너무 깁니다.", IS_NA: "이미 해당 없음으로 끈 행입니다.", NO_CHANGE: "바뀐 것이 없습니다.", NO_DUE: "기준일이 없어 회차가 없습니다 — [기준일 입력]부터 해 주세요.",
-    NOT_NEEDED: "기준일이 이미 있는 행입니다 — 기한이 다르면 [기한 정정]으로.", BAD_ATT: "수령본을 다시 올려 주세요.", BAD_EXT: "pdf·jpg·png만 올릴 수 있습니다.", FILE_TOO_LARGE: "파일이 큽니다(6MB까지).",
+    NOT_NEEDED: "기준일이 이미 있는 행입니다 — 기한이 다르면 [기한 정정]으로.", BAD_ATT: "수령본을 다시 올려 주세요.", BAD_EXT: "pdf·jpg·png만 올릴 수 있습니다.", FILE_TOO_LARGE: "파일이 큽니다(약 4.3MB까지).",
     NOT_AUTO: "자동 회차 행이 아닙니다 — 의무 대장에서 봅니다.", BG_READ_FAILED: "기한 근거표를 읽지 못했습니다 — 잠시 뒤 다시 해 주세요.",
     NO_DUTY: "의무 대장에 이 행이 없습니다 — 화면을 새로 읽어 주세요.", DEVICE_NOT_APPROVED: "이 기기는 아직 승인되지 않았습니다 — 관리자에게 기기 승인을 요청해 주세요.", NO_ACCESS: "인허가를 볼 권한이 없습니다.",
     BAD_RANGE: "넣을 수 있는 날짜 범위 밖입니다(기한 정정은 계산 기한 앞뒤 1년, 제출한 날은 회차 기한 1년 전부터 오늘까지).", BAD_FILE: "파일 내용이 pdf·jpg·png가 아니거나 너무 작습니다 — 접수증을 다시 골라 주세요.",

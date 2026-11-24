@@ -23493,10 +23493,10 @@ try {
     const FT = ["`aiAdminFail`", "원장 C264"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = "'관리자 확인 필요'가 나오면 기다려도 풀리지 않으니 관리자에게 알려 주";
-    const ok = /기준: v536 \(2026-11-24\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 536 && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
       && d.man.indexOf(MAN) > 0
       && d.cl.indexOf('**C264(v536') > 0
-      && /SHELL_CACHE = 'jw-shell-v536'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 536;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r536 = chk536(D536);
@@ -23508,6 +23508,71 @@ try {
   T('v536 문서·판 번호(정확 검사): FEATURES 기준 v536 (2026-11-24)·v536 절(C264) · TESTLIST v536 칸 5(화면·운영 확인 3 · 게이트 [x] 2) · MANUAL 물어보기 실패 안내(내부 이름 0) · CLAUDE.md 한 줄 · sw jw-shell-v536 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL·CLAUDE.md·게이트 칸) 모두 ✗',
     r536.ok && M536.every((v) => v === false), JSON.stringify({ r: r536.info, mut: M536 }));
 } catch (e) { console.log('  (v536 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- C266(11/24): 서버가 받기 한도로 거른 첨부(413 FILE_TOO_LARGE)는 화면 크기 안내와 같은 글 — 문서함 docAttUpload · 넣기 박스 증빙 cbxProofGo · 양식 cbxTplSend(실제 함수 원문을 떼어 돌림)
+try {
+  const fn266 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) return ''; let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } return ''; };
+  const run266 = async (src, code, sizeOver) => {
+    const al = [];
+    const g = { alert: (m) => al.push(String(m)), gwCall: () => Promise.resolve({ status: code, body: { error_code: code === 413 ? 'FILE_TOO_LARGE' : 'X' } }),
+      FileReader: function () { const me = this; me.readAsDataURL = function () { me.result = 'data:x;base64,QUJD'; setTimeout(function () { me.onload(); }, 0); }; },
+      document: { getElementById: () => ({ textContent: '' }) }, findDoc: () => null, apprToastShow: () => {}, docAttRenderModal: () => {}, renderDocuments: () => {}, todayStr: () => '2026-11-24',
+      cbxRedraw: () => {}, cbxDiscard: () => {}, cbxFail: () => {}, renderContracts: () => {}, cbxRenderTop: () => {}, TPL_LABELS: { quote_env: '견적서' } };
+    const body = ['docAttBigMsg', 'docAttExtOf', 'docAttUpload', 'cbxProofGo', 'cbxTplSend'].map((n) => fn266(src, n)).join('\n');
+    const f = new Function(...Object.keys(g), 'var DOC_ATT_EXT = ["pdf"], DOC_ATT_MAX = 100, docAttBusy = false, csTplKeys = null, _colBase = {};\n' + body
+      + '\nreturn { up: docAttUpload, proof: cbxProofGo, tpl: cbxTplSend };');
+    const o = f(...Object.values(g));
+    const sz = sizeOver ? 200 : 10;
+    o.up('d1', [{ name: 'a.pdf', size: sz, type: '' }]);
+    o.proof({ file: {}, size: sz, name: 'b.pdf', scope: 'top' });
+    if (!sizeOver) o.tpl({ file: {}, size: sz, name: 'c.pdf', scope: 'top' }, 'quote_env');
+    await new Promise((r) => setTimeout(r, 30));
+    return al;
+  };
+  const chk266 = async (src) => {
+    const a413 = await run266(src, 413, false), aBig = await run266(src, 200, true), a500 = await run266(src, 500, false);
+    const ok = a413.length === 3 && a413[0] === '"a.pdf"는 서버 전송 한도(약 4.3MB)를 넘어 첨부할 수 없습니다.' && a413[1] === '증빙은 약 4.3MB까지만 보관함에 넣을 수 있습니다. 계약 서류로 넣어 주세요.' && a413[2] === '양식은 약 4.3MB까지만 등록할 수 있습니다.'
+      && aBig.length === 2 && aBig[0] === a413[0] && aBig[1] === a413[1]
+      && a500.length === 3 && a500[0] === '"a.pdf" 첨부 실패 (X)' && a500[1] === '증빙 보관 실패(X)' && a500[2] === '양식 등록 실패(X)';
+    return { ok, info: { a413, aBig, a500 } };
+  };
+  const r266 = await chk266(html);
+  const mu266 = async (a, b) => { if (html.split(a).length !== 2) return 'not-unique'; return (await chk266(html.replace(a, () => b))).ok; };
+  const M266 = [
+    await mu266('alert(res.body && res.body.error_code === "FILE_TOO_LARGE" ? docAttBigMsg(f.name) : \'"\' + f.name', 'alert(false ? docAttBigMsg(f.name) : \'"\' + f.name'),
+    await mu266('alert(res && res.body && res.body.error_code === "FILE_TOO_LARGE" ? "증빙은', 'alert(false ? "증빙은'),
+    await mu266('(tplCode === "FILE_TOO_LARGE" ? "양식은', '(false ? "양식은')];
+  T('C266 받기 한도로 서버가 거른 첨부(413 FILE_TOO_LARGE) = 화면 크기 안내와 같은 글(문서함·증빙·양식) · 화면 크기 거름은 같은 글 · 다른 오류는 종전 코드 글 · 결함 사본 3(서버 거름 안내 걷기) = 모두 ✗',
+    r266.ok && M266.every((v) => v === false), JSON.stringify({ r: r266.info, mut: M266 }));
+} catch (e) { console.log('  (C266 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v537(C266 — 올라가는 첨부는 다시 받을 수 있는 크기만 · 원장 C266): 실행 검사는 위 C266 블록·servertest C266 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd537 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D537 = { ft: rd537('FEATURES.md'), tl: rd537('TESTLIST.md'), sw: rd537('sw.js'), man: rd537('MANUAL.html'), cl: rd537('CLAUDE.md') };
+  const MANA537 = "스캔 PDF·사진처럼 압축이 안 되는 파일은 4.3MB보다 조금 작아도(";
+  const chk537 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v537 (11/24)', '\n### '), tlv = cut(d.tl, '\n## v537 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`wholeGetFits`", "원장 C266"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = "스캔 PDF·사진처럼 압축이 안 되는 파일은 4.3MB보다 조금 작아도(";
+    const ok = /기준: v537 \(2026-11-24\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf(MAN) > 0
+      && d.cl.indexOf('**C266(v537') > 0
+      && /SHELL_CACHE = 'jw-shell-v537'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r537 = chk537(D537);
+  const mu537 = (k, f) => chk537(Object.assign({}, D537, { [k]: f(D537[k]) })).ok;
+  const M537 = [mu537('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v536 (')), mu537('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v536'")),
+    mu537('ft', (s) => s.split('`wholeGetFits`').join('wholeGetFits')),
+    mu537('man', (s) => s.replace(MANA537, '')), mu537('cl', (s) => s.replace('**C266(v537', 'C266(')),
+    mu537('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위로 다시 얹은 판) — 결과는 배포 전 전체 게이트 기록 C266_게이트_v537_1124.txt', '\n- (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위로 다시 얹은 판) — 결과는 배포 전 전체 게이트 기록 C266_게이트_v537_1124.txt'))];
+  T('v537 문서·판 번호(정확 검사): FEATURES 기준 v537 (2026-11-24)·v537 절(C266) · TESTLIST v537 칸 5(화면·운영 확인 3 · 게이트 [x] 2) · MANUAL 문서함 첨부 크기(내부 이름 0) · CLAUDE.md 한 줄 · sw jw-shell-v537 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL·CLAUDE.md·게이트 칸) 모두 ✗',
+    r537.ok && M537.every((v) => v === false), JSON.stringify({ r: r537.info, mut: M537 }));
+} catch (e) { console.log('  (v537 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

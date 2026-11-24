@@ -1818,6 +1818,7 @@ async function handleProofPut(event, d, R) {
   const name = proofSlug(d.name);
   const b64 = String(d.data || '');
   if (!name || name === '__index__' || !b64 || b64.length > ATT_MAX) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });   // __index__ 이름 충돌 시 색인 자기파괴 방지
+  if (!wholeGetFits(b64)) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', request_id: R });   // C266 받기(proof_get) 응답 한도 안만
   const st = store(FILES);
   const now = Date.now();
   // C225 판 A: 색인을 본문보다 먼저 읽는다 — 못 읽으면(읽기·파싱 실패) 본문도 올리지 않고 500(빈 색인으로 덮지 않음 · 색인에 없는 고아 본문을 남기지 않음)
@@ -2753,7 +2754,7 @@ async function handleLicAttPut(event, d, R, c) {
   if (!hasOwn(LIC_ATT_MIME, ext)) return jr(400, { status: 'REJECTED', error_code: 'BAD_EXT', request_id: R });
   const b64 = typeof d.data === 'string' ? d.data : '';
   if (!b64 || !/^[A-Za-z0-9+/=\r\n]+$/.test(b64)) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
-  if (b64.length > DOC_ATT_MAX) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', request_id: R });
+  if (b64.length > DOC_ATT_MAX || !wholeGetFits(b64)) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', request_id: R });   // C266 받기(att_get) 응답 한도 안만
   if (!licAttMagicOk(ext, b64)) return jr(400, { status: 'REJECTED', error_code: 'BAD_FILE', request_id: R });   // 검토 6: 앞머리가 확장자와 맞고 최소 크기 이상만
   const id = 'att_' + crypto.randomBytes(8).toString('hex');
   const w = await blobSet(store(FILES), id, { name: name, type: LIC_ATT_MIME[ext], kind: 'lic', no: no, data: b64, by: c.member.name, bid: c.member.id, ts: Date.now() });
@@ -4011,7 +4012,7 @@ async function handleCdocPut(event, d, R) {
     if (!orig || !b64) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
     ext = docAttExt(orig);
     if (!docAttExtOk(ext)) return jr(400, { status: 'REJECTED', error_code: 'BAD_EXT', request_id: R });
-    if (b64.length > CDOC_MAX) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', hint: '파일은 오프라인 보관, 채움 맵(fill)만 올리기', request_id: R });
+    if (b64.length > CDOC_MAX || !wholeGetFits(b64)) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', hint: '파일은 오프라인 보관, 채움 맵(fill)만 올리기', request_id: R });   // C266 받기(cdoc_get 통째) 응답 한도 안만
     if (!docAttMagicOk(ext, b64)) return jr(400, { status: 'REJECTED', error_code: 'BAD_MAGIC', request_id: R });
     // P1 판24-② 검토(11/15 B5): 직접 올리기에도 zip 내부 검증 — 넣기 박스 길(cdoc_attach)과 같은 검증.
     //   11/16(남은 것 4): 빼 두었던 '최종본(final) hwpx' 한 칸도 검증(servertest 58의 10바이트 가짜 hwpx 고정값을 실제 꼴 최소 hwpx로 바꿈) — 종류·형식 예외 없음
@@ -5175,7 +5176,7 @@ async function handleAttPut(event, d, R) {
   const name = String(d.name || '').slice(0, 120);
   const b64 = String(d.data || '');
   if (!name || !b64) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
-  if (b64.length > ATT_MAX) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', request_id: R });
+  if (b64.length > ATT_MAX || !wholeGetFits(b64)) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', request_id: R });   // C266 받기(att_get) 응답 한도 안만
   const id = 'att_' + crypto.randomBytes(8).toString('hex');
   const kind = ['asbestos', 'contract', 'bldg', 'biz', 'promo'].indexOf(String(d.kind || '')) >= 0 ? String(d.kind) : '';
   // C265: 홍보 사진(공개 주소로 나가는 종류)은 그림만 — 보낸 type은 믿지 않고 내용 머리 바이트(JPEG·PNG·WebP)로 정한다. 그림이 아니면 400.
@@ -5664,6 +5665,7 @@ async function handleTplPut(event, d, R) {
   if (!TPL_KEYS[key]) return jr(400, { status: 'REJECTED', error_code: 'BAD_TPL_KEY', request_id: R });
   const b64 = String(d.data || '');
   if (!b64 || b64.length > ATT_MAX) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
+  if (!wholeGetFits(b64)) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', request_id: R });   // C266 받기(tpl_get) 응답 한도 안만
   // v426 양식에 주민등록번호 값을 넣지 않는다(PM 11/6 "착공계양식주민번호빼") — 옛 파일을 다시 등록해도 값이 돌아오지 않게
   if (BJ.rrnScan(Buffer.from(b64, 'base64'))) return jr(400, { status: 'REJECTED', error_code: 'TPL_HAS_RRN', request_id: R });
   const w = await blobSet(store(FILES), 'tpl:' + key, { name: String(d.name || '').slice(0, 120), data: b64, by: c.member.name, ts: Date.now() });
@@ -5922,7 +5924,7 @@ async function handleDocAttPut(event, d, R) {
   if (docAttRecordName(name)) { await cdocAudit(c.member, '기록물차단', docId, name); return jr(403, { status: 'FORBIDDEN', error_code: 'RECORD_NOT_FOR_GIT', request_id: R }); }   // v406: 계약 기록물은 문서함(정본·git 경로)에 못 들어간다 — 설계 §4-1 분기 차단
   const ext = docAttExt(name);
   if (!docAttExtOk(ext)) return jr(400, { status: 'REJECTED', error_code: 'BAD_EXT', request_id: R });
-  if (b64.length > DOC_ATT_MAX) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', request_id: R });
+  if (b64.length > DOC_ATT_MAX || !wholeGetFits(b64)) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', request_id: R });   // C266 받기(doc_att_get) 응답 한도 안만
   if (!docAttMagicOk(ext, b64)) return jr(400, { status: 'REJECTED', error_code: 'BAD_MAGIC', request_id: R });   // 확장자와 내용 불일치(위장 파일)
   const st = store(DATA);
   const ld = await docAttLoad(st, docId);
@@ -6636,6 +6638,18 @@ function gzipOut(event, res) {
     if (b64.length > GZ_MAX_B64) return jr(500, { status: 'ERROR', error_code: 'PAYLOAD_TOO_LARGE', raw_bytes: raw.length, gz_bytes: gz.length, request_id: rid() });
     return { statusCode: res.statusCode, headers: Object.assign({}, res.headers, { 'Content-Encoding': 'gzip', 'Vary': 'Accept-Encoding', 'X-GW-Raw-Bytes': String(raw.length) }), body: b64, isBase64Encoded: true };
   } catch (e) { console.log('[gzipOut] 실패 ' + String(e && e.message)); return res; }
+}
+// C266(11/24): 통째로 받는 첨부는 받기 응답이 위 상한(GZ_MAX_B64) 안에 드는 것만 올린다 — 올리기는 요청 한도(6MB · 화면이 1MB 넘는 본문을 gzip)로,
+//   받기는 이 응답 한도(gzip 뒤 base64 6,000,000자)로 따로 재서, 안 줄어드는 4.27~4.5MB 파일(스캔 PDF·사진)이 '첨부됨' 뒤 다시 받으면 늘 500이던 길.
+//   받기와 같은 셈(본문 utf8 → gzip level 6 → base64 자 수)에 이름·종류 칸 여유를 더해 잰다. 5,900,000자 이하는 안 줄어도 들어가 셈 없이 통과(평소 파일은 그대로).
+//   쓰는 곳 = 문서함 doc_att_put · att_put(인허가 수령본·계약·홍보) · 증빙 proof_put · 양식 tpl_put · 서류함 cdoc_put. 조각으로 받는 넣기 박스(box_put 4.4MB 조각)와
+//   요청 합계 상한이 경계 아래인 일괄 등재(doc_bulk_put 5.5MB)는 이미 들어가 대상 아님.
+const WHOLE_GET_FREE = 5900000;
+const WHOLE_GET_SLACK = 4096;
+function wholeGetFits(b64) {
+  const s = String(b64 || '');
+  if (s.length <= WHOLE_GET_FREE) return true;
+  try { return Math.ceil(zlib.gzipSync(Buffer.from(s, 'utf8'), { level: 6 }).length / 3) * 4 + WHOLE_GET_SLACK <= GZ_MAX_B64; } catch (e) { return false; }
 }
 // v456(원장 C066): 요청 본문 gzip 풀기 상한 — 로그인 확인보다 먼저 풀리므로 6MB 안의 압축 본문이 수백 MB로 풀려 그 호출이 메모리 초과로 죽던 길(데이터 손상·다른 요청 영향은 없었음).
 //   지금 가장 큰 정상 요청 = 일감 저장(풀린 크기 약 6.7MB) — 32MB면 다섯 배 여유. 넘으면 zlib이 ERR_BUFFER_TOO_LARGE를 던지고 handlerInner가 413 BODY_TOO_LARGE로 돌려준다(종전 400 INVALID_JSON으로 뭉뚱그림).
