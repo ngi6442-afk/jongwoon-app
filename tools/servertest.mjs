@@ -16802,7 +16802,7 @@ function J91a(x) { return JSON.stringify(x); }
     const bg = (b) => m.pb.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tA9 }, body: JSON.stringify(b) });
     const I = {}, P = {};
     // ① 넣기 박스 밖 — 동기 att_parse · 백그라운드(박스 아님): 개인정보 이름 = 호출 0·PII_NAME / 사업자등록증·석면조사서 = 호출 1(대조)
-    for (const nm of ['신분증.jpg', '운전면허증.jpg', '건설기계조종사면허증.png', '주민등록증 사본.jpg', '사업자등록증.jpg', '석면조사서.pdf']) {
+    for (const nm of ['신분증.jpg', '운전면허증.jpg', '건설기계조종사면허증.png', '주민등록증 사본.jpg', '외국인등록증.jpg', '신\u200B분증.jpg', '사업자등록증.jpg', '석면조사서.pdf']) {
       const up = await c({ action: 'att_put', name: nm, type: 'image/jpeg', data: IMG9 }), id = up.body.id;
       n9 = 0; const p = await c({ action: 'att_parse', id }); const a = n9, pa = (p.body.parsed && p.body.parsed.error) || 'ok';
       n9 = 0; await bg({ id }); const b = n9, sv = mem.gw_files['parse:' + id] && mem.gw_files['parse:' + id].result, pb = (sv && sv.error) || 'ok';
@@ -16818,18 +16818,30 @@ function J91a(x) { return JSON.stringify(x); }
       I['박스 ' + nm] = [j, rj.read, rj.pii, k, rk.error].join('/');
       if (!(j === 0 && rj.read === 'none' && rj.pii === 1 && k === 0 && rk.error === 'PII_NAME')) P['박스 ' + nm] = false;
     }
-    // ③ 이름 입구 표(계약서 예외 · 사업자 서류는 막지 않음)
-    I.guard = ['운전면허증.pdf', '면허증 사본.png', '신분증.pdf', '사업자등록증.pdf', '건설업 등록증.pdf', '면허증 발급 대행 계약서.pdf'].map((x) => m.bj.nameGuard(x) ? 1 : 0).join('');
-    if (I.guard !== '111000') P.guard = false;
+    // ③ 이름 입구 표 — 막을 것(개인 신분 서류 이름 꼴 전부) · 막지 않을 것(사업자·업 서류 · 계약서 예외)
+    const YES9 = ['운전면허증.pdf', '면허증 사본.png', '신분증.pdf', '운전면허 사본.jpg', '운전 면허 앞면.png', '건설기계 조종사 면허.pdf', '굴삭기조종면허.jpg', '외국인등록증.jpg', '외국인 등록 카드.png', '주민증.png', '주민등록등본.pdf', '여권 사본.pdf',
+      'passport.jpg', 'PASSPORT_scan.pdf', 'ID Card.png', 'id-card front.jpg', 'scan_idcard.jpg', 'driver license.pdf', 'Drivers_Licence.png', '신 분 증.jpg', '면 허 증.jpg', '신\u200B분증.jpg', '운전\u2060면허.jpg', '주민\uFEFF증.png', '신\u200D분\u200C증.pdf'];
+    const NO9 = ['사업자등록증.pdf', '건설업등록증.pdf', '석면해체제거업 등록증.pdf', '석면조사서.pdf', '신용평가등급확인서.pdf', '안전성평가 결과 통보서.pdf', '건축물대장.pdf', '공사계약서.pdf', '폐기물처리업 허가증.pdf',
+      '운반차량 허가증.jpg', 'valid card terms.pdf', 'paid card receipt.pdf', '면허증 발급 대행 계약서.pdf', '여권 발급 대행 계약서.pdf'];
+    const miss9 = YES9.filter((x) => !m.bj.nameGuard(x)), over9 = NO9.filter((x) => m.bj.nameGuard(x));
+    I.guard = 'yes ' + (YES9.length - miss9.length) + '/' + YES9.length + ' no ' + (NO9.length - over9.length) + '/' + NO9.length + (miss9.length ? ' 놓침 ' + miss9.join('|') : '') + (over9.length ? ' 과잉 ' + over9.join('|') : '');
+    if (miss9.length || over9.length) P.guard = false;
+    // ④ 관리자 등급확인서 판독(grade_parse) — 개인 신분 서류 이름 = 호출 0·PII_NAME · 등급확인서 = 호출 1
+    n9 = 0; const g1 = await c({ action: 'grade_parse', name: '운전면허 사본.jpg', data: IMG9 }); const ga = n9;
+    n9 = 0; const g2 = await c({ action: 'grade_parse', name: '안전성평가 결과 통보서.jpg', data: IMG9 }); const gb = n9;
+    I.grade = [g1.code, ga, g1.body.error, g2.code, gb, g2.body.error || 'ok'].join('/');
+    if (!(g1.code === 200 && ga === 0 && g1.body.error === 'PII_NAME' && g2.code === 200 && gb === 1 && g2.body.error !== 'PII_NAME')) P.grade = false;
     return { ok: Object.keys(P).length === 0, info: JSON.stringify(I) + ' ✗ ' + Object.keys(P).join(',') };
   };
   try {
     const R9 = await chk9(load9(null));
-    T('C269 ③ 개인정보 파일명(신분증·운전/건설기계 면허증·주민등록증) = 동기 att_parse·백그라운드(박스 아님) 모델 호출 0·PII_NAME · 넣기 박스 종류 판단·전용 판독도 면허증 호출 0(pii 1) · 사업자등록증·석면조사서는 종전대로 호출 1 · 계약서 이름 예외', R9.ok, R9.info);
-    const MU9 = [['asb', "  if (BJ.nameGuard(name)) return { error: 'PII_NAME' };", ''], ['bj', '신분증|면허증|주민', '신분증|주민']];
+    T('C269 ③ 개인 신분 서류 파일명(신분증·운전/조종 면허·주민등록증·외국인등록증·여권·영문·띄어 쓴 이름·보이지 않는 글자) = 동기 att_parse·백그라운드(박스 아님)·관리자 등급확인서 판독 모델 호출 0·PII_NAME · 넣기 박스 종류 판단·전용 판독도 호출 0(pii 1) · 사업자·건설업 등록증·석면조사서·등급확인서·건축물대장·계약서·허가증은 종전대로 · 계약서 이름 예외', R9.ok, R9.info);
+    const MU9 = [['asb', "  if (BJ.nameGuard(name)) return { error: 'PII_NAME' };", ''], ['bj', '|면\\s*허\\s*증|운전\\s*면허|', '|'], ['bj', "normalize('NFC').replace(GUARD_INVIS, '')", "normalize('NFC')"],
+      ['bj', '|외국인\\s*등록|', '|'], ['bj', '|여권|passport|', '|'], ['bj', '(?:^|[^a-z0-9])id[\\s_-]*card', 'id[\\s_-]*card'], ['bj', '신\\s*분\\s*증', '신분증'],
+      ['gd', "  if (BJ.nameGuard(String(d.name || ''))) return jr(200, { status: 'OK', error: 'PII_NAME', request_id: R });", '']];
     const kill9 = [];
     for (const mu of MU9) { let k; try { k = !(await chk9(load9(mu))).ok; } catch (e) { k = 'err ' + e.message; } if (k !== true) kill9.push(mu[1].trim().slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k)); }
-    T('C269 ③ 결함 사본 ' + MU9.length + '개(parseAttachment 입구 걷기 · 이름 입구에서 면허증 빼기) = 모두 ✗', kill9.length === 0, kill9.join(' | '));
+    T('C269 ③ 결함 사본 ' + MU9.length + '개(parseAttachment 입구 걷기 · 면허증·운전면허 빼기 · 보이지 않는 글자 안 지움 · 외국인등록 빼기 · 여권·passport 빼기 · id card 앞 조건 걷기 · 띄운 신 분 증 · grade_parse 입구 걷기) = 모두 ✗', kill9.length === 0, kill9.join(' | '));
   } catch (e) { T('C269 ③ 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
   finally { global.fetch = realFetch9; process.env.ANTHROPIC_API_KEY = savedK9[0] || ''; process.env.GW_ANTHROPIC_KEY = savedK9[1] || ''; load9(null); const s = JSON.parse(snap9); mem.gw_users = s.u; mem.gw_data = s.d; mem.gw_files = s.f; }
 }

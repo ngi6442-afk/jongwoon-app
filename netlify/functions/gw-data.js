@@ -5163,6 +5163,7 @@ async function handleGradeParse(event, d, R) {
   if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   const b64 = String(d.data || '');
   if (!b64 || b64.length > ATT_MAX) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
+  if (BJ.nameGuard(String(d.name || ''))) return jr(200, { status: 'OK', error: 'PII_NAME', request_id: R });   // C269 개인 신분 서류 이름은 등급확인서 판독 길에서도 모델에 안 보냄(넣기 박스·첨부 판독과 같은 입구)
   const out = await claudeExtractGrade(Buffer.from(b64, 'base64'), String(d.name || ''));
   if (!out) return jr(400, { status: 'REJECTED', error_code: 'UNSUPPORTED_TYPE', request_id: R });
   if (out.error) return jr(200, { status: 'OK', error: out.error, request_id: R });

@@ -3159,7 +3159,7 @@ try {
   //   현황 구간이 내는 직접 저장은 0이고, 이 길은 아래 ②-2가 모양을 못 박고 문서(FEATURES·TESTLIST·CLAUDE.md)가 예외로 적는다 — 길이 늘거나 바뀌면 ②-2가 터진다
   //   v436: isAdmin = ⑤ [고치기] 버튼 글을 관리자에게만 그리는 판정(읽기만 — 누름 배선·창·저장은 구간 밖 @safety-set, v436 묶음 ⑦이 지킴)
   //   v445: siteSheetGo = ③ 현장 줄 이동의 도착(@site-sheet 구간 이어받기 — 그 현장 줄을 펼치고 굴림, 부품 vsSheetReveal: 칩·거르기·묶음 메모리만, 기기 저장·대장 저장 없음 — v445 묶음 ⑪·⑯이 지킴)
-  const ALLOW32 = ['siteSpecKind', 'eduAnyKind', 'canSee', 'checkItemVisible', 'scopeNames', 'getReview', 'todayStr', 'addDays', 'isDate', 'vehDday', 'esc', 'liveEdu', 'eduPersonName', 'eduKindLabel', 'eduLatest', 'findMember', 'memberRetired', 'liveLic', 'licVisible', 'liveDuties', 'liveSites', 'siteKind', 'siteLabel', 'asbNotifyDue', 'asbKeepUntil', 'asbNoSpecial',
+  const ALLOW32 = ['qualSafeAt' /* C269 적격 등급 읽기(순수 — 인허가 목록만 읽음) */, 'siteSpecKind','eduAnyKind', 'canSee', 'checkItemVisible', 'scopeNames', 'getReview', 'todayStr', 'addDays', 'isDate', 'vehDday', 'esc', 'liveEdu', 'eduPersonName', 'eduKindLabel', 'eduLatest', 'findMember', 'memberRetired', 'liveLic', 'licVisible', 'liveDuties', 'liveSites', 'siteKind', 'siteLabel', 'asbNotifyDue', 'asbKeepUntil', 'asbNoSpecial',
     'csPkWhen', 'csPkIk', 'csFlow', 'csRowState', 'liveContracts', 'csSiteText', 'csKind', 'csPass', 'findProc', 'switchTab', 'setLicLayer', 'renderContracts', 'renderDocuments', 'loadEdu', 'loadAsb', 'loadWorkers', 'cdocLoad', 'isAdmin', 'siteSheetGo', 'String', 'Number', 'setTimeout', 'clearTimeout',
     //   v447: eduAnySpecial = ③ 특별교육 줄 '기록 없음' 판정(특별교육 기록 유무 — 서버 has_edu와 같은 규칙) · eduSheetMissSum = ② 5조② 줄의 빠진 항목 수(@edu-sheet 구간 행 원천을 세기만 — v447 묶음이 저장·서버 호출 0을 지킴)
     'eduAnySpecial', 'eduSheetMissSum'];
@@ -3322,7 +3322,7 @@ try {
       fn32('liveSites'), fn32('siteKind'), fn32('siteLabel'), fn32('asbNotifyDue'), fn32('asbKeepUntil'), fn32('asbNoSpecial'), fn32('siteSpecKind'), fn32('eduAnyKind'),
       fn32('liveLic'), fn32('licVisible'), fn32('liveContracts'), fn32('csPkWhen'), fn32('csPkIk'), fn32('csTitle'), fn32('csSiteText'), fn32('csKind'), fn32('findProc'),
       'var currentTab = "safety", safetyLayer = "now";',
-      'var sfSet = __o.set === undefined ? null : __o.set, sfSetDay = __o.setDay || "", sfSetBy = __o.setBy || "";', stmt32(html, /var QUAL_DEF=\{[\s\S]*?\} \};/),   // v436 ⑤ — 안전 설정 상태(구간 밖 @safety-set 선언)·적격 계수(앱 등급 글)
+      'var sfSet = __o.set === undefined ? null : __o.set, sfSetDay = __o.setDay || "", sfSetBy = __o.setBy || "";', stmt32(html, /var QUAL_DEF=\{[\s\S]*?\} \};/), fn32('qualSafeAt'),   // C269 현황 ⑤ 등급 = qualSafeAt(오늘 단계) · v436 ⑤ — 안전 설정 상태(구간 밖 @safety-set 선언)·적격 계수(앱 등급 글)
       (o.mut ? o.mut(sec32) : sec32),   // v471: 결함 사본(회사 칩 판정을 일부러 망가뜨린 구간)
       'sfNowSt.edu = __o.st.edu; sfNowSt.asb = __o.st.asb; sfNowSt.set = (__o.st.set === undefined ? "ok" : __o.st.set); sfNowTicks = __o.ticks || 0;',
       'return { render: function(){ renderSafetyNow(); return __D.sfNowHost.innerHTML; }, setTicks: function(n){ sfNowTicks = n; }, max: function(){ return SF_NOW_TICK_MAX; }, eduDue: sfNowEduDue, homeRow: sfNowHomeEduRow, ck: function(){ return CURRENT_KEYS; },',
@@ -23634,9 +23634,19 @@ try {
     const qi = src.indexOf('var QUAL_DEF='), qj = src.indexOf('} };', qi);
     const body = [fn269(src, 'pad'), fn269(src, 'fmtDate'), fn269(src, 'todayStr'), fn269(src, 'isDate'), src.slice(qi, qj + 4), 'var licenses = __lic, __el = {};',
       'var document = { getElementById: function(id){ return __el[id] || (__el[id] = { value: "", checked: false }); } }; function qualBasisToggle(){}',
-      fn269(src, 'liveLic'), fn269(src, 'qualApplyDefaults'), '__el.xgCo = { value: __co }; qualApplyDefaults(); return __el.xqSafety.value;'].join('\n');
+      fn269(src, 'liveLic'), (src.indexOf('function qualSafeAt(') >= 0 ? fn269(src, 'qualSafeAt') : ''), fn269(src, 'qualApplyDefaults'), '__el.xgCo = { value: __co }; qualApplyDefaults(); return __el.xqSafety.value;'].join('\n');
     return new Function('Date', '__lic', '__co', body)(FD269(kst), lic || [], co || 'con');
   };
+  // 입찰 카드 통과선(bcQualFloor)이 qualScores에 넘기는 안전성평가 등급 — 실제 bcQualFloor 원문 · qualScores는 받은 값만 적는 가짜
+  const card269 = (src, kst, lic) => {
+    const qi = src.indexOf('var QUAL_DEF='), qj = src.indexOf('} };', qi);
+    const body = [fn269(src, 'pad'), fn269(src, 'fmtDate'), fn269(src, 'todayStr'), fn269(src, 'isDate'), src.slice(qi, qj + 4), 'var licenses = __lic, bcQualKind = "석면해체", bcQualBudget = 50000000, __got = null;',
+      'function bcMethodKind(){ return "qual"; } function qualScores(v){ __got = v.safety; return { cfg: { price: 90 }, sub: 10, safety: 0, pivot: 0.88 }; }',
+      fn269(src, 'liveLic'), (src.indexOf('function qualSafeAt(') >= 0 ? fn269(src, 'qualSafeAt') : ''), fn269(src, 'bcQualFloor'), 'bcQualFloor(); return __got;'].join('\n');
+    return new Function('Date', '__lic', body)(FD269(kst), lic || []);
+  };
+  // 현황 ⑤ 석면 줄 글(실제 sfNowEval — v432 현황 시험 틀 SFNOW32, 오늘 = 그 날짜)
+  const now269 = (kst, lic, mut) => { if (!SFNOW32) throw new Error('SFNOW32 없음'); const S = SFNOW32; const o = S.base32(Object.assign(lic ? { licenses: lic } : {}, mut ? { mut: mut } : {}), kst.slice(0, 10)); const ev = S.blk32(S.run32(o).out, 'eval'); const i = ev.indexOf('<span class="sfn-id">석면</span>'); const m = ev.slice(i).match(/<div class="item-meta">([^<]*)<\/div>/); return m ? (/앱 적격 계산 등급(?:은 아직)? (\w+)/.exec(m[1]) || [0, '?'])[1] : '?'; };
   const st269 = (src, kst, rec) => {
     const body = [fn269(src, 'pad'), fn269(src, 'fmtDate'), fn269(src, 'todayStr'), fn269(src, 'mondayOfWeek'), fn269(src, 'periodKeys'), 'var CURRENT_KEYS = periodKeys(new Date());', blk269(src, 'var GROUPS = ['),
       'var records = __rec, checkReview = {};', fn269(src, 'getReview'), fn269(src, 'sfNowDueMonth'), fn269(src, 'sfNowState'),
@@ -23644,8 +23654,12 @@ try {
     return new Function('Date', '__rec', body)(FD269(kst), JSON.parse(JSON.stringify(rec)));
   };
   const REC269 = { yearly: { '2026': { y2: '2026-01-12' } }, half: { '2026-H1': { h1: '2026-06-10' }, '2026-H2': { h1: '2026-12-01' } } };
-  const chk269 = (src) => {
+  const chk269 = (src, secMut) => {
     const I = {}, P = {};
+    // ①-2 세 곳(계산기 기본값 · 입찰 카드 통과선 · 현황 ⑤ 석면 줄)이 같은 날 같은 등급 — 인허가 등급 줄 없음 · 옛 D 통보서(만료 12/31) 있음
+    const DT = ['2026-12-31T09:00', '2027-01-01T09:00', '2028-12-31T09:00', '2029-01-01T09:00'], LD = [{ id: 'lgrade_safe', name: '안전성평가 등급 D', expiry: '2026-12-31' }];
+    I.three = [null, LD].map((lic) => DT.map((k) => [qual269(src, k, lic), card269(src, k, lic), now269(k, lic, secMut)].join('/')).join(',')).join(' ; ');
+    P.three = I.three === 'D/D/D,B/B/B,B/B/B,none_old/none_old/none_old ; D/D/D,B/B/B,B/B/B,none_old/none_old/none_old';
     // ① 기본값: 12/31 D · 1/1 B · 2028-12-31 B · 2029-01-01 무등급 · 환경 그대로 · 인허가 등급 줄은 그 날짜가 속한 단계에만(옛 D 통보서 만료가 B를 끊지 않음 · B 통보서 만료일을 따름)
     I.q = ['2026-12-31T23:50', '2027-01-01T00:10', '2028-12-31T09:00', '2029-01-01T09:00'].map((k) => qual269(src, k)).join(',');
     I.qe = qual269(src, '2027-01-01T00:10', [], 'env');
@@ -23658,18 +23672,22 @@ try {
     const e = st269(src, '2027-01-04T09:00', { yearly: {}, half: {} });
     I.s = [a('y3'), a('y4'), a('y5'), a('h2'), '|', b('y3'), b('y4'), b('y5'), b('y2'), b('h2'), b('h1'), '|', c('h1'), c('h2'), '|', d('y4'), e('y4'), e('h2')].join(',');
     P.s = I.s === '지남,이번 달,미완,지남(2026 상반기 미완),|,지남(2026년 미완),지남(2026년 미완),미완,이번 달,지남(2026 하반기 미완),6월,|,지남(2027 상반기 미완),지남(2027 상반기 미완),|,완료,12월,6월';
-    return { ok: P.q && P.s, info: I };
+    return { ok: P.three && P.q && P.s, info: I };
   };
   const r269 = chk269(html);
   const mu269 = (a, b) => { if (html.split(a).length !== 2) return 'not-unique'; try { return chk269(html.replace(a, () => b)).ok; } catch (e) { return 'err ' + e.message; } };
+  const muS269 = (a, b) => { try { return chk269(html, (s) => { if (s.split(a).length !== 2) throw new Error('구간 결함 자리 수'); return s.replace(a, () => b); }).ok; } catch (e) { return 'err ' + e.message; } };
   const M269 = [
     mu269('next:{v:"B", from:"2027-01-01", until:"2028-12-31"}, ', ''),
-    mu269('if(lx&&(!nx||(onNx?lx>=nx.from:lx<nx.from))) safeUntil=lx;', 'if(lx) safeUntil=lx;'),
-    mu269('(tq<=safeUntil)?(onNx?nx.v:sd.v):sd.fallback', '(tq<=safeUntil)?sd.v:sd.fallback'),
+    mu269('if(lx&&(!nx||(onNx?lx>=nx.from:lx<nx.from))) u=lx;', 'if(lx) u=lx;'),
+    mu269('return (today<=u)?(onNx?nx.v:sd.v):sd.fallback;', 'return (today<=u)?sd.v:sd.fallback;'),
+    mu269('var safety=qualSafeAt(co, today);', 'var safety=(dd.safety.until>=today)?dd.safety.v:dd.safety.fallback;'),
+    mu269('document.getElementById("xqSafety").value=qualSafeAt(co, todayStr());', 'document.getElementById("xqSafety").value=(todayStr()<=d.safety.until)?d.safety.v:d.safety.fallback;'),
+    muS269('String(qualSafeAt("con", todayStr()) || "")', 'String(QUAL_DEF.con.safety.v || "")'),
     mu269('if (used && !(pr && pr[id])) return', 'if (false) return'),
     mu269('if (type === "half" || (type === "yearly" && sfNowDueMonth(type, title))){', 'if (type === "half" || type === "yearly"){'),
     mu269('used = Object.keys(records[type] || {}).some(function(k){ return k <= pk; });', 'used = true;')];
-  T('C269 ①② 해 넘기기: 적격 건설 안전성평가 기본값 12/31 D → 1/1 B(2026 평가) → 2029-01-01 무등급 · 인허가 등급 만료일은 그 단계에만 · 현황 연간·반기 지난 주기 미완(기한 달 있는 것) = 새 주기 첫날 지남(지난 주기 표시) · 이번 주기에 끝내면 완료 · 기한 달 없는 연간은 미완 그대로 · 기록 없던 해는 지남 없음 · 결함 사본 6 = 모두 ✗',
+  T('C269 ①② 해 넘기기: 적격 건설 안전성평가 12/31 D → 1/1 B(2026 평가) → 2029-01-01 무등급 — 계산기 기본값·입찰 카드 통과선·현황 ⑤ 석면 줄 세 곳 같은 등급(qualSafeAt 한 곳 · 옛 D 통보서 있어도) · 인허가 등급 만료일은 그 단계에만 · 현황 연간·반기 지난 주기 미완(기한 달 있는 것) = 새 주기 첫날 지남(지난 주기 표시) · 이번 주기에 끝내면 완료 · 기한 달 없는 연간은 미완 그대로 · 기록 없던 해는 지남 없음 · 결함 사본 ' + M269.length + '(next 걷음·인허가 단계 무시·next 등급 안 씀·입찰 카드 옛 식·계산기 옛 식·현황 ⑤ 옛 읽기·지남 걷음·기한 달 조건·처음 쓰는 해 조건) = 모두 ✗',
     r269.ok && M269.every((v) => v === false), JSON.stringify({ r: r269.info, mut: M269 }));
 } catch (e) { console.log('  (C269 검사 생략 — ' + e.message + ')'); fails++; }
 

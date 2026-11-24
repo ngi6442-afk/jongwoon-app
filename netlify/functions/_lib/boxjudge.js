@@ -154,11 +154,14 @@ function normJudge(o, ctx) {
 }
 
 // 개인정보 파일명 — 모델 호출 없이 판단. 학습 제외 정규식(forbid_re)은 '주민'·'건강'만으로 걸려 주민센터 계약서·건강보험 완납증명까지 막으므로 입구는 서류 이름 단위로 따로 둔다
-const GUARD_RE = /건강\s*(?:진단|검진|검사)|검진|건진|명단|명부|인적\s*사항|신분증|면허증|주민\s*등록|health|roster/i;   // C269 면허증(운전·건설기계 조종 — 첨부 판독 길이 신분증과 같이 다루는 이름)
+// C269: 개인 신분 서류 — 글자 사이 띄움(신 분 증)·증 없는 '운전면허 사본'·조종사 면허·외국인등록증(등록증보다 먼저)·주민증·여권·영문(passport·ID card·driver license).
+//   'id card'는 앞이 영문·숫자가 아닐 때만(valid card 같은 낱말 속 id는 아님). 사업자·건설업 등록증·업 허가증·등급확인서는 걸지 않는다(servertest C269 표)
+const GUARD_RE = /건강\s*(?:진단|검진|검사)|검진|건진|명단|명부|인적\s*사항|신\s*분\s*증|면\s*허\s*증|운전\s*면허|조종사?\s*면허|외국인\s*등록|주민\s*증|주민\s*등록|여권|passport|(?:^|[^a-z0-9])id[\s_-]*card|driv\w*[\s_-]*licen[cs]e|health|roster/i;
+const GUARD_INVIS = /[\u00AD\u180E\u200B-\u200F\u2028-\u202F\u2060-\u206F\uFEFF]/g;   // C269 이름 속 보이지 않는 글자(폭 없는 공백·방향 표시 등)는 검사 전에 지움
 const GUARD_HEALTH_RE = /건강\s*(?:진단|검진|검사)|검진|건진|health/i;
 const GUARD_EXCEPT_RE = /계약서/;   // '건강검진센터 철거공사 계약서' 같은 계약 문서는 내용을 읽는다. '…공사_건강진단 결과표'는 막는다(v424 검토)
 function nameGuard(name) {
-  const n = String(name || '').normalize('NFC');
+  const n = String(name || '').normalize('NFC').replace(GUARD_INVIS, '');
   if (!GUARD_RE.test(n) || GUARD_EXCEPT_RE.test(n)) return null;
   // doc_name은 비운다 — 파일명에 사람 이름이 섞이므로 고친 판단 기록·화면 문구로 번지지 않게
   return { doc: 'box', cls: 'received', sub: 'none', doc_name: '', pii: GUARD_HEALTH_RE.test(n) ? 2 : 1, why: '파일명이 개인정보 서류여서 내용을 읽지 않았습니다', con: null, con_type: 'none', combo: false, pub: true, why_type: '', why_pub: '', our_side: '모름', target: '', contract_id: '', tpl_key: '', draft_tpl: '', read: 'none' };
