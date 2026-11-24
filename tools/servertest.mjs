@@ -14636,7 +14636,7 @@ function J91a(x) { return JSON.stringify(x); }
     T('66 판2 ⑧ 승격 판정 두 벌(gw-pay PAYBG.lawPick ↔ gw-data payBgState) 10가지 입력에서 같은 답(없음·미승격·지문 없음·스위치 못 읽음·꼴 아님·표 못 읽음·꼴 틀림·지문 다름·켜짐)', RW.ok, RW.info);
     // 결함 사본 — 한 곳씩 바꾸면 위 검사 가운데 하나가 깨져야 한다
     const MUTQ = [
-      ['G', "  if (c.member.admin !== true) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });\n", '', 'G'],
+      ['G', "  } else if (c.member.admin !== true) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });", "  }", 'G'],
       ['G', "  if (!r.ok && r.code === 'NOT_FOUND') return { ok: true, data: null };", "  if (!r.ok) return { ok: true, data: null };", 'L'],
       ['G', "  if (NOT_PAYEE.indexOf(String(m.emp_type || '')) >= 0) return false;\n  if (m.hire_date", "  if (m.hire_date", 'L'],
       ['G', "  if (m.leave_date && String(m.leave_date) < period.from) return false;", '', 'L'],
