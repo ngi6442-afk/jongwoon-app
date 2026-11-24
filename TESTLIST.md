@@ -1793,3 +1793,9 @@
 - [ ] (운영 확인) 다음 날 05:30 백업 뒤 자료 저장소 `data/backup/gw` 의 `pay:` 키가 `pay-aesgcm-v1` 봉한 꼴인지(금액 글자 없음)
 - [x] (AI) `servertest` 66 급여 백업 암호화 ①②(열쇠 없음 목록 빼기·503 · 봉함·열기 · 복원 위조·다른 열쇠·열쇠 없음 · 결함 사본 4) — ✓ AI 11/24
 - [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `paycalc_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` 통과 · v526 문서 검사를 이 판 이상으로 풀고 v527 문서·판 번호 정확 검사 — ✓ AI 11/24
+
+## v528 — 66 급여 판3: 회계사무소 대장 대조·기준 채우기 · 엑셀 내려받기 · 명세서
+- [ ] (PM) 급여 탭 [회계사무소 대장과 대조]로 회계사무소 대장 파일을 골라 대조 표·기준 채우기가 맞는지
+- [ ] (운영 확인) 급여 탭 [엑셀 내려받기] 파일이 대장과 같은 칸 순서로 열리는지 · [명세서] 새 창 인쇄
+- [x] (AI) `uismoke` 66 판3 ①(가짜 .xls 읽기·대조·채우기 대상·이스케이프·엑셀 칸 순서·명세서 · 결함 사본 5) · 받은 10월 대장 읽기 = Excel 값과 칸마다 같음 · 시험 화면 단추·엑셀 내려받기 — ✓ AI 11/24
+- [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `paycalc_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` 통과 · v527 문서 검사를 이 판 이상으로 풀고 v528 문서·판 번호 정확 검사 — ✓ AI 11/24

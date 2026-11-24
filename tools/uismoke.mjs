@@ -2164,7 +2164,7 @@ try {
 try {
   const srv24 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8'), ask24 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'ask.js'), 'utf8'), ds24 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'docscope.js'), 'utf8'), dd24 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'docdiff.js'), 'utf8'), pb24 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-parse-background.js'), 'utf8'), lw24 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-learn-background.js'), 'utf8'), sw24 = readFileSync(join(ROOT, 'sw.js'), 'utf8');
   T('v424 물어보기: 문서 도구가 docVisible을 거침 · 판정 한 곳(_lib/docscope.js, gw-data는 가져다 씀) · sw ≥ 424', /DS\.docVisible\(member, d, ds\)/.test(ask24) && /function docVisible\(m, it, settings\)/.test(ds24) && !/function docVisible\(/.test(srv24) && /require\('\.\/_lib\/docscope'\)/.test(srv24) && Number((sw24.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 424);
-  const dl24 = [...html.matchAll(/downloadBlob\(([^\n]{0,60})/g)].map((m) => m[1]).filter((x) => !/^"(?:차량목록|전체백업|실적목록|세무|연구노트_)/.test(x) && !/^r2\.body\.file/.test(x) && !/^res\.body\.name/.test(x) && !/^name, /.test(x) && !/^name\+"_안전 패킷/.test(x) && !/^name, blob\)\{/.test(x));
+  const dl24 = [...html.matchAll(/downloadBlob\(([^\n]{0,60})/g)].map((m) => m[1]).filter((x) => !/^"(?:차량목록|전체백업|실적목록|세무|연구노트_|급여대장_)/.test(x) && !/^r2\.body\.file/.test(x) && !/^res\.body\.name/.test(x) && !/^name, /.test(x) && !/^name\+"_안전 패킷/.test(x) && !/^name, blob\)\{/.test(x));
   T('v424 생성 경로: 양식으로 만든 파일은 전부 xgOut을 거침(직접 내려받기 없음) · 생성 12경로', dl24.length === 0 && (html.match(/xgOut\(|xgHwpxGen\(c, /g) || []).length >= 13 && /function xgHwpxGen\([^)]*\)\{[\s\S]{0,300}?return xgOut\(c, kind, name, blob,/.test(html) && ['"qual_packet"', '"contract_pledge"', '"seal_reg"', '"bond_waiver"', '"labor_exempt"', '"settle_doc"', '"adv_pay"', '"bid_rate"', 'qtKey'].every((k) => html.indexOf('xgOut(c, ' + k) > 0 || html.indexOf('xgHwpxGen(c, ' + k) > 0), JSON.stringify(dl24));   // P1 판16: 한글 양식은 xgHwpxGen(학습 칸 → xgOut) 한 곳을 거침
   T('v426 착공계 주민번호: 창 문구에 "양식 기본값" 없음 · 비우면 확인요망 · 서버가 주민번호 꼴 양식을 거부 · 앱이 쉬운 말로 알림 · 백업 흔적 통로', html.indexOf('양식 기본값 유지') < 0 && html.indexOf('현장대리인 주민등록번호(양식에 넣어 두지 않습니다') > 0 && /BJ\.rrnScan\(Buffer\.from\(b64, 'base64'\)\)/.test(gwd) && html.indexOf('tplCode === "TPL_HAS_RRN"') > 0 && /action === 'backup_stamp'/.test(gwd));
   T('v425 최종본 연결: 넣기가 초안 없으면 xgDraftMake 먼저(내려받기·값 저장·확인창 없음) · 창과 같은 토큰 함수 · 파일이 들어오면 단계 체크 · 사람이 쓰는 창은 안 건드림', /prep = xgDraftMake\(c, tpl\)/.test(html) && /o = \{ noDownload: true, noBack: true, wait: true, late: true \}/.test(html) && /var cdT=xgConTok\(c\)/.test(html) && /var qtT=xgQuoteTok\(\)/.test(html) && /var adT=xgAdvTok\(\)/.test(html) && /dd\.st = "done"; dd\.auto = 1/.test(html) && /back\.classList\.contains\("show"\)\) \|\| xgLateOn/.test(html));
@@ -21900,7 +21900,7 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l));
     const FT = ['`_lib/sealbox.js`', '`PAY_BACKUP_KEY`', '`pay_held`', '`PAY_BACKUP_KEY_MISSING`', '`PAY_BAD_SEAL`', '`PAY_KID_MISMATCH`'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v527 \(2026-11-24\)\./.test(d.ft) && mF.length === 0 && cb.length === 4 && /SHELL_CACHE = 'jw-shell-v527'/.test(d.sw) && d.cl.indexOf('- **66 급여 백업 암호화(v527)**') > 0;
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 527 && mF.length === 0 && cb.length === 4 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 527 && d.cl.indexOf('- **66 급여 백업 암호화(v527)**') > 0;
     return { ok, info: { mF, cb: cb.length } };
   };
   const rS = chkS(DS);
@@ -21909,6 +21909,71 @@ try {
   T('v527 문서·판 번호(정확 검사): FEATURES 기준 v527 (2026-11-24)·v527 절(sealbox·PAY_BACKUP_KEY·pay_held·오류 코드 3) · TESTLIST v527 칸 4 · sw v527 · CLAUDE.md 한 줄 · 결함 사본 ' + MS.length + '개 = 모두 ✗', rS.ok && MS.every((v) => v === false), JSON.stringify({ r: rS.info, mut: MS }));
 } catch (e) { console.log('  (v527 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ── 66 급여 판3(PM 11/24 'ㄱ'): 회계사무소 대장(.xls·.xlsx) 읽기·대조·기준 채우기·엑셀 내려받기·명세서 — 가짜 대장 tools/pay_ledger_fixture.xls(Excel 로 만든 BIFF8 · 가짜 이름·금액)
+try {
+  const fnR = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) return ''; let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } return ''; };
+  const segR = (H) => { const a = H.indexOf('\n  // @pay-start\n'), b = H.indexOf('\n  // @pay-end\n'); return a > 0 && b > a ? H.slice(a, b) : ''; };
+  const escR = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const XLS = readFileSync(join(ROOT, 'tools', 'pay_ledger_fixture.xls'));
+  const runR = (H) => {
+    const seg = segR(H), v = (n) => { const m = new RegExp('\\n  var ' + n + ' = [^\\n]*').exec(seg); return m ? m[0] : ''; };
+    const cap = {};
+    const f = new Function('esc', 'gwCall', 'alert', 'confirm', 'downloadBlob', 'buildSimpleXlsx', 'payLoad', 'payDlgClose',
+      'var cap = {};' + v('payS') + v('PAY_CORP') + v('PAY_LEDGER_COLS') + '\n' + ['payXlsSheets', 'payLedgerParse', 'payImportShow', 'payExportXlsx', 'paySlipHtml', 'payWon', 'payFld', 'payNum'].map((n) => fnR(H, n)).join('\n')
+      + '\nfunction payDlg(t, h, onSave){ cap.title = t; cap.html = h; cap.save = onSave; return {}; }\nreturn { payXlsSheets: payXlsSheets, payLedgerParse: payLedgerParse, payImportShow: payImportShow, payExportXlsx: payExportXlsx, paySlipHtml: paySlipHtml, set: function(d, c){ payS.data = d; payS.corp = c; }, cap: cap };'
+    )(escR, () => Promise.resolve({ status: 200, body: {} }), () => {}, () => true, (name, rows) => { cap.dl = { name: name, rows: rows }; }, (sn, rows) => rows, () => {}, () => {});
+    // f 안의 cap 은 바깥 cap 과 같은 객체가 아니므로(Function 범위) 반환값의 cap 을 쓴다
+    const I = {};
+    const books = f.payLedgerParse(f.payXlsSheets(XLS.buffer.slice(XLS.byteOffset, XLS.byteOffset + XLS.byteLength)));
+    const con = books.filter((b) => b.corp === 'con')[0], env = books.filter((b) => b.corp === 'env')[0];
+    const p1 = con && con.people[0], p2 = env && env.people[0], p3 = env && env.people[1];
+    I.read = books.length === 2 && con.people.length === 1 && env.people.length === 2 && p1.name === '가짜일' && p1.v.taxable === 3100000 && p1.v.gross === 3300000 && p1.v.net === 2905440 && p1.v.ded_total === 394560 && !('adj' in p1.v)
+      && p2.v.adj === 150728 && p2.v.taxable === 2750728 && p2.v.net === 2626258 && p3.name === '가짜삼' && p3.no === '신규입사' && p3.v.meal === 140000;
+    // 대조: 가짜이는 국민연금만 10원 다름 · 가짜삼은 기준 없음(채우기 대상) · 앱에만 있는 사람 1
+    const C = (o) => Object.assign({ cols: { base: 2600000, allow: 0, adj: 150728, bonus: 0, meal: 200000, car: 0 }, taxable: 2750728, gross: 2950728, ded: { pension: 130300, health: 98880, care: 12990, emp: 24750, income: 52310, local: 5230 }, ded_total: 324460, net: 2626268, lines: [], notes: [] }, o || {});
+    const D = { corp: 'env', ym: '2026-11', state: 'open', period: { from: '2026-10-15', to: '2026-11-14' }, pay_day: 15, rows: [
+      { mid: 'a', member: { name: '가짜 이', rank: '반장' }, state: 'ok', calc: C() }, { mid: 'b', member: { name: '가짜삼' }, state: 'no_base', base_rev: '' }, { mid: 'c', member: { name: '<b>앱만</b>' }, state: 'no_base' }] };
+    f.set(D, 'env'); f.payImportShow('가짜.xls', books);
+    const h = f.cap.html || '';
+    I.cmp = /같음 13칸 · 다름 3칸/.test(h) && h.indexOf('가짜이 · 국민연금') > 0 && h.indexOf('기준이 없는 1명') > 0 && h.indexOf('&lt;b&gt;앱만') > 0 && h.indexOf('<b>앱만') < 0 && typeof f.cap.save === 'function';
+    // 엑셀: 머리 두 줄 + 사람 두 줄 + 합계 두 줄 · 칸 순서 = 대장
+    f.payExportXlsx(); const R = (cap.dl || {}).rows || [];
+    I.xls = R.length === 8 && R[2].join('|').indexOf('사원번호|성명|기본급|수당|초과/차감 수당|상여금|식대|자가운전보조금|4대보험적용총액|국민연금') === 0 && R[3][8] === '지급총액' && R[4][1] === '가짜 이' && R[4][16] === 2626268 && R[5][8] === 2950728 && R[6][0] === '합계' && /급여대장_종운환경_2026-11\.xlsx/.test(cap.dl.name);
+    const sl = f.paySlipHtml({ member: { name: '<i>x</i>', rank: '반장' }, calc: C({ dredge: { days: 11, paid_days: 1, ot: 2, total: 190000 } }) }, D);
+    I.slip = sl.indexOf('2,626,268원') > 0 && sl.indexOf('&lt;i&gt;x') > 0 && sl.indexOf('<i>x') < 0 && sl.indexOf('하수준설 수당: 2026-10-15 ~ 2026-11-14 근무 11일 중 추가 지급 1일') > 0;
+    return { ok: Object.values(I).every((x) => x === true), info: I };
+  };
+  const rR = (() => { try { return runR(html); } catch (e) { return { ok: false, info: String(e.message) }; } })();
+  const muR = (a, b) => { if (html.split(a).length !== 2) return 'no-site:' + a.slice(0, 40); try { return runR(html.replace(a, () => b)).ok; } catch (e) { return false; } };
+  const MR = [
+    muR('var corp = /건설/.test(above) ? "con" : "env", people = [];', 'var corp = "env", people = [];'),
+    muR('v.gross = col.taxable != null ? (num(b[col.taxable]) || 0) : 0;', 'v.gross = 0;'),
+    muR('var a = Math.round(p.v[l[0]] || 0), b = Math.round(appV(r.calc, l[0]) || 0);', 'var a = 0, b = 0;'),
+    muR('if (!r.calc){ if (r.state === "no_base") noBase.push({ p: p, r: r }); return; }', 'if (!r.calc) return;'),
+    muR("if (c.type === 0x0006){", "if (c.type === 0x9999){")
+  ];
+  T('66 판3 ① 대장 읽기·대조·내려받기·명세서(가짜 .xls — Excel 로 만든 BIFF8 · 수식 칸은 저장된 결과값): 두 시트 회사 가름(건설·환경) · 사람 두 줄·지급총액 아랫줄·초과/차감 칸 없는 시트 · 띄어 쓴 이름 붙임 · 대조 같음 13·다름 3 · 기준 없는 사람 채우기 · 앱에만 있는 이름 이스케이프 · 엑셀 칸 순서 = 대장·한 사람 두 줄·합계 · 명세서 이스케이프·하수준설 설명 · 결함 사본 ' + MR.length + '개 = 모두 ✗',
+    rR.ok && MR.every((x) => x === false), JSON.stringify({ r: rR.info, mut: MR }));
+} catch (e) { console.log('  (66 판3 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v528(66 급여 판3 — PM 11/24 'ㄱ'): 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '528 이상'으로 풀 것
+try {
+  const rdT = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DT = { ft: rdT('FEATURES.md'), tl: rdT('TESTLIST.md'), sw: rdT('sw.js'), cl: rdT('CLAUDE.md'), man: rdT('MANUAL.html') };
+  const chkT = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v528 (11/24)', '\n### '), tlv = cut(d.tl, '\n## v528 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l));
+    const FT = ['`payXlsSheets`', '`pay_base_save`', '`buildSimpleXlsx`', '`tools/pay_ledger_fixture.xls`', '70·292칸'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v528 \(2026-11-24\)\./.test(d.ft) && mF.length === 0 && cb.length === 4 && /SHELL_CACHE = 'jw-shell-v528'/.test(d.sw) && d.cl.indexOf('- **66 급여 판3(v528)**') > 0 && d.man.indexOf('<li><b>급여 대장 불러오기·내려받기·명세서</b> (2026-11 v528)') > 0;
+    return { ok, info: { mF, cb: cb.length } };
+  };
+  const rT = chkT(DT);
+  const muT = (k, f) => chkT(Object.assign({}, DT, { [k]: f(DT[k]) })).ok;
+  const MT = [muT('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v527 (')), muT('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v527'")), muT('ft', (s) => s.split('`payXlsSheets`').join('payXlsSheets')), muT('cl', (s) => s.replace('- **66 급여 판3(', '- 66 급여 판3(')), muT('man', (s) => s.replace('<li><b>급여 대장 불러오기', '<li>급여 대장 불러오기'))];
+  T('v528 문서·판 번호(정확 검사): FEATURES 기준 v528 (2026-11-24)·v528 절 · TESTLIST v528 칸 4 · sw v528 · CLAUDE.md·MANUAL 한 줄 · 결함 사본 ' + MT.length + '개 = 모두 ✗', rT.ok && MT.every((v) => v === false), JSON.stringify({ r: rT.info, mut: MT }));
+} catch (e) { console.log('  (v528 검사 생략 — ' + e.message + ')'); fails++; }
 // ── P1 판38(원장 C166 · 착수 ㄱ C191 — PM 11/19 · 착수 브리핑 '건 1') 차량 법정 검사 만기 제안의 기산 — 직전 확정 회차에서 한 회씩 이어 세기 + 수검일·검사 신청일·연장(유예) 만료일 칸
 //   실행: 실제 @veh-law 구간 + 실제 openVehModal·saveVehFromModal + 실제 @veh-due 구간(toggleTaskDone·vehDueAsk·vehDueOk) + 실제 mergeVeh(imMerge 부품째)를 가짜 document 위에서(그리기·저장을 빈 함수로 바꾸지 않음 — 저장 뒤 차량 줄을 그대로 읽어 봄)
 //   기대값 = 원문 대조 보고 09_조사_문서/차량검사기산_자료_20261114/기산_대조_20261115.md 4절 사례 1~5(주기는 그 보고의 가정값 = 시험 근거 행 · 가짜) · 기간 일수 = 시험 근거 행 칸(시행규칙 77조② 전 90·후 31 · 건설기계관리법 시행규칙 23조① 전후 31과 같은 수)
