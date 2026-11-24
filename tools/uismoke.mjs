@@ -1567,10 +1567,10 @@ try {
     && /if\(c\.scen && csApprKindOf\(c, s\) && !\(s\.appr && s\.appr\.status==="승인"\)\)\{/.test(html) && /return adv===false \? "locked" : "done";/.test(html) && /var adv = advanceProc\(t\);   \/\/ v384 2차 F5/.test(html)
     && /indexOf\("con:"\) === 0\)\{   \/\/ v384/.test(html) && /indexOf\("con:"\) === 0 && typeof csApprOnDecided === "function"\)\{ try \{ csApprOnDecided\(it\); \}/.test(html) && /csApprSync\(c\); h \+= csStagesHtml\(c\);/.test(html) && /csApprSync\(c, true\); return; \}/.test(html) && /data-cs-done="' \+ esc\(c\.id\) \+ '\|' \+ esc\(key\) \+ '">' \+ esc\(ak\) \+ ' 상신</.test(html), '');
   T('v384 대장: csLinkSiteLater(미로드·로컬에 없는 대장 → 현장 열람 권한(site — v429) 있으면 loadAsb+큐) · csLinkSite(asbLoaded 가드·자기 con_id 행 재연결·삭제 대장 재연결·종결 대장 제외·공사명 또는 발주처+현장·none 해제·옛 계약은 연결만) · startProcess → csLinkSiteLater · csOnDone(scen, task_hook) · csSiteDone(scen, site_hook, 없음≠삭제) · loadAsb/loadContracts → csSiteHooksRetry · 연결 탭 안내 + [대장 연결] · 서버 변경 없음',
-    /function csLinkSiteLater\(c\)/.test(sc) && /if \(!loaded \|\| \(c\.site_id && !findAsb\(c\.site_id\)\)\)\{/.test(sc) && /csSiteLinkQueue\[c\.id\] = 1; if \(typeof loadAsb === "function"\) loadAsb\(\); return "wait";/.test(sc)
+    /function csLinkSiteLater\(c, hand\)/.test(sc) && /if \(!loaded \|\| \(c\.site_id && !findAsb\(c\.site_id\)\)\)\{/.test(sc) && /csSiteLinkQueue\[c\.id\] = hand \|\| csSiteLinkQueue\[c\.id\] \|\| 1; if \(typeof loadAsb === "function"\) loadAsb\(\); return "wait";/.test(sc)   /* 원장 C256: 사람이 고친 시작일(hand)을 큐에 같이 */
     && /if \(typeof asbLoaded !== "undefined" && !asbLoaded\) return null;/.test(sc) && /var hit = liveSites\(\)\.filter\(function\(r\)\{ return r\.con_id === c\.id; \}\)\[0\] \|\| null;/.test(sc) && /\|\| r\.con_id \|\| r\.status === "done"\) return;/.test(sc) && /\(sameClient && st && \(rs === st \|\| rt === st\)\)\) hit = r;/.test(sc) && !/r\.start === c\.start/.test(sc)
     && /if \(c\.site_hook === "none"\) delete c\.site_hook;/.test(sc) && /if \(c\.scen && c\.status === "done"\) csSiteDone\(c\);/.test(sc)
-    && /if\(opts\.scen\)\{ try \{ csLinkSiteLater\(c\); \} catch\(e\)\{\} \}/.test(html) && /if\(c\.status==="done"\) csOnDone\(c\);/.test(html) && /if \(c\.status === "done"\) csOnDone\(c\); \}/.test(html)
+    && /if\(opts\.scen\)\{ try \{ csLinkSiteLater\(c, opts\.handStart \|\| ""\); \} catch\(e\)\{\} \}/.test(html) && /if\(c\.status==="done"\) csOnDone\(c\);/.test(html) && /if \(c\.status === "done"\) csOnDone\(c\); \}/.test(html)
     && /function csOnDone\(c\)\{\s+if \(!c \|\| !c\.scen \|\| c\.status !== "done"\) return;/.test(sc) && /c\.task_hook = todayStr\(\);/.test(sc) && /if \(!c \|\| !c\.scen \|\| \(c\.site_hook && c\.site_hook !== "none"\) \|\| !c\.site_id/.test(sc) && /if \(!r\) return false;   \/\/ 로컬에 없음/.test(sc) && /c\.site_hook = todayStr\(\);/.test(sc) && !/done_hook/.test(html)
     // v432: loadAsb의 보류 훅 줄에 현황 읽기 예외(opt.noHooks)가 붙었다 — 그 밖의 부름(현장 칸·계약 쪽)은 종전대로 훅을 돌린다(실행 검사는 v432 묶음 ⑧)
     && /asbBase = doc\.updated_at\|\|0; asbLoaded = true;\s+if \(!\(opt && opt\.noHooks\) && typeof csSiteHooksRetry === "function"\)\{ try \{ csSiteHooksRetry\(\); \}/.test(html) && /asbLoaded && typeof csSiteHooksRetry === "function"\)\{ try \{ csSiteHooksRetry\(\); \}/.test(html) && /title = "실적신고\(2\/15\) — "/.test(sc)
@@ -23251,10 +23251,10 @@ try {
     const FT = ["`taskHiddenFor`", "원장 C248"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = "· 내게 온 지시(지시 탭 권한이 있는 분만 — 제목·기한·상태, 끝난 ", MAN2 = "물어보기는 지시를 찾아보기만 하고, 완료·승인 처리는 이 두 화면에서 합";
-    const ok = /기준: v533 \(2026-11-24\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 533 && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
       && d.man.indexOf(MAN) > 0 && d.man.indexOf(MAN2) > 0
       && d.cl.indexOf('**C248(v533') > 0
-      && /SHELL_CACHE = 'jw-shell-v533'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 533;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r533 = chk533(D533);
@@ -23267,6 +23267,177 @@ try {
     r533.ok && M533.every((v) => v === false), JSON.stringify({ r: r533.info, mut: M533 }));
 } catch (e) { console.log('  (v533 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ── v534(C255 — 감시·개찰 경보 되풀이 · 원장 C255): 실행 검사는 tools/botdup_check.mjs · 여기는 문서·판 번호 정확 검사
+try {
+  const rd534 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D534 = { ft: rd534('FEATURES.md'), tl: rd534('TESTLIST.md'), sw: rd534('sw.js'), man: rd534('MANUAL.html'), cl: rd534('CLAUDE.md') };
+  const chk534 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v534 (11/24)', '\n### '), tlv = cut(d.tl, '\n## v534 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`handleBotNotify`", "원장 C255"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 534 && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C255(v534') > 0
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 534;
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r534 = chk534(D534);
+  const mu534 = (k, f) => chk534(Object.assign({}, D534, { [k]: f(D534[k]) })).ok;
+  const M534 = [mu534('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v533 (')), mu534('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v533'")),
+    mu534('ft', (s) => s.split('`handleBotNotify`').join('handleBotNotify')),
+    mu534('cl', (s) => s.replace('**C255(v534', 'C255(')),
+    mu534('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v533 위로 다시 얹은 판) — 결과는 배포 전 전체 게이트 기록 C255_게이트_v534_1124.txt', '\n- (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v533 위로 다시 얹은 판) — 결과는 배포 전 전체 게이트 기록 C255_게이트_v534_1124.txt'))];
+  T('v534 문서·판 번호(정확 검사): FEATURES 기준 v534 (2026-11-24)·v534 절(C255) · TESTLIST v534 칸 4(화면·운영 확인 2 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v534 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
+    r534.ok && M534.every((v) => v === false), JSON.stringify({ r: r534.info, mut: M534 }));
+} catch (e) { console.log('  (v534 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── 원장 C256(계약이 만드는 현장 대장 줄의 날짜): 실제 저장 길을 떼어 실행 — cbxStart(계약서 넣기) · openConStart+saveConStart(직접 생성 창) · quoteToContract(견적 승격) → startProcess → csLinkSiteLater → csLinkSite,
+//    cbxFillBlanks·generateDocs(나중에 착공일 채움) → csSiteStartFill, 대장을 받은 뒤 = csSiteHooksRetry. 가짜는 저장(schedule*)·그리기(render*)·단계 목록·지시 만들기·창 요소·오늘 날짜뿐(대장 줄을 만드는 함수는 모두 실제).
+try {
+  const c256Code = (src) => {
+    const grab = (name, opt) => { const i = src.indexOf('function ' + name + '('); if (i < 0) { if (opt) return ''; throw new Error('함수 없음: ' + name); } let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+    return ['startProcess', 'csLinkSiteLater', 'csLinkSite', 'csSiteHooksRetry', 'csSiteDone', 'csSiteKindOf', 'csNorm', 'csTitle', 'liveSites', 'siteKind', 'findAsb', 'csStageNew', 'isDate', 'vehRealDate',
+      'cbxStart', 'saveConStart', 'openConStart', 'quoteToContract', 'cbxFillBlanks', 'generateDocs', 'conModalCombo'].map((n) => grab(n)).join('\n') + '\n' + ['csSiteDay', 'csSiteDates', 'csSiteStartFill'].map((n) => grab(n, true)).join('\n');
+  };
+  const c256World = (code, today) => {
+    const els = {}, el = (id) => (els[id] = els[id] || { id, value: '', checked: false, textContent: '', innerHTML: '', style: {}, classList: { add() {}, remove() {} }, querySelector() { return { textContent: '' }; }, focus() {} });
+    let n = 0;
+    const ctx = {
+      TODAY: today, asb: [], asbLoaded: true, contracts: [], tasks: [], quotes: [], csSiteLinkQueue: {}, csSiteFillQueue: {}, lastBidForCon: null, conStartDef: '',
+      conOpenId: null, conDetTab: '', cbxLastCon: null, cbxLastAt: 0, dgConId: null, DD: null, log: [], alerts: [],
+      SITE_KIND: { asbestos: '석면', demolition: '철거', dredge: '준설' }, CON_SITE_BIZ: {}, CON_SITE_CORP: {},
+      PROC_TEMPLATES: { dredge: { label: '준설', pipes: [] }, asbestos: { label: '석면', pipes: [] }, demolition: { label: '철거', pipes: [] } }, PROC_MILESTONE: {},
+      document: { getElementById: el },
+      canDo: () => true, canSee: () => true, todayStr: () => ctx.TODAY, genId: (p) => p + '_' + (++n), memberName: () => '', myId: () => 'm1', myName: () => '시험',
+      materializeStage: () => {}, csStageTag: () => {}, applyPublicMilestones: (s) => s, csStageLabel: (s) => s.name,
+      conScenStages: () => [{ name: '견적' }, { name: '계약' }, { name: '착공' }, { name: '준공' }], conModalElems: (t) => ({ [t]: 1 }), conModalExtra: () => ({}), conScenTag: (sc) => sc,
+      scheduleAsbSave: () => { ctx.log.push('asbSave'); }, scheduleContractSave: () => { ctx.log.push('conSave'); }, csSaveNow: () => {}, scheduleQuoteSave: () => {},
+      renderSites: () => {}, renderTasks: () => {}, renderSummary: () => {}, renderDashboard: () => {}, renderContracts: () => {}, renderQuotes: () => {}, renderConScen: () => {}, switchTab: () => {}, fillMemberSelect: () => {},
+      loadAsb: () => { ctx.log.push('loadAsb'); }, conAmtEff: () => 0, conBldgLookup: () => {}, fmtAmount: (v) => String(v),
+      liveContracts: () => ctx.contracts.filter((c) => c && c.del !== 1), findProc: (id) => ctx.contracts.filter((c) => c.id === id)[0] || null,
+      liveQuotes: () => ctx.quotes, qtAmt: () => 1000, confirm: () => true, alert: (m) => { ctx.alerts.push(String(m)); },
+      cbxRedraw: () => {}, cbxFindSame: () => null, cbxReportFix: () => [], cbxPlace: () => {},
+      dgDemoData: () => ctx.DD, docDemoContract: () => '', afterSave: () => {}, conPacketKinds: () => [], setTimeout: () => 0,
+    };
+    const f = new Function('ctx', 'with (ctx) {\n' + code + '\nreturn { cbxStart, saveConStart, openConStart, quoteToContract, cbxFillBlanks, generateDocs, csLinkSiteLater, csLinkSite, csSiteHooksRetry, csSiteDone };\n}')(ctx);
+    return { ctx, f, el };
+  };
+  // 장면마다 새 세계 · 돌려주는 값 = 살아 있는 첫 대장 줄의 '시작~끝'(+ 덧값)
+  const c256Run = (src) => {
+    const code = c256Code(src), T0 = '2026-11-20', out = {}, W = () => c256World(code, T0);
+    const row = (w) => { const r = w.ctx.asb.filter((x) => x.del !== 1)[0]; return r ? [r.start, r.end].join('~') : '줄 없음'; };
+    const nLoad = (w) => w.ctx.log.filter((x) => x === 'loadAsb').length;
+    const box = (w, d2, d3) => { w.f.cbxStart({ scope: 'top', name: '가짜계약서.pdf', att: 'a1', form: { type: 'dredge', pub: true, title: '가짜 준설공사', client: '가짜발주', site: '가짜현장', amount: 1000, d1: '2026-08-25', d2, d3, who: '' } }); return w.ctx.contracts[w.ctx.contracts.length - 1]; };
+    const direct = (w, pick, openDay) => { if (openDay) w.ctx.TODAY = openDay; w.f.openConStart(); w.ctx.TODAY = T0; w.el('conType').value = 'dredge'; w.el('conDoc').value = 'public'; w.el('conClient').value = '가짜발주'; w.el('conSite').value = '가짜현장'; w.el('conAmount').value = '1000'; if (pick) w.el('conStart').value = pick; w.f.saveConStart(); return w.ctx.contracts[w.ctx.contracts.length - 1]; };
+    let w, c;
+    w = W(); c = box(w, '2026-09-01', '2026-10-31'); out.box_past = row(w) + ' · 계약 start ' + c.start + ' · 연결 ' + (c.site_id === w.ctx.asb[0].id) + ' · 대장 저장 ' + w.ctx.log.filter((x) => x === 'asbSave').length;   // 끝난 공사를 오늘 등록
+    w = W(); box(w, '2026-12-01', '2027-01-31'); out.box_future = row(w);   // 착공이 앞날
+    w = W(); box(w, '', '2027-01-31'); out.box_no_d2 = row(w);   // 착공일 없음
+    w = W(); box(w, '2026-02-31', '2026-12-31'); out.box_bad_d2 = row(w);   // 달력에 없는 착공일
+    w = W(); box(w, '2026-09-01', '2026-08-15'); out.box_d3_before = row(w);   // 준공일 < 착공일
+    w = W(); c = direct(w, '2026-09-01'); out.direct_hand = row(w) + ' · 계약 start ' + c.start;   // 직접 생성 — 사람이 시작일 칸을 고침
+    w = W(); c = direct(w, ''); out.direct_default = row(w) + ' · 계약 start ' + c.start;   // 직접 생성 — 미리 넣은 오늘 그대로
+    w = W(); c = direct(w, '', '2026-11-19'); out.direct_overnight = row(w) + ' · 계약 start ' + c.start;   // 어제 연 창(미리 넣은 값 = 어제)을 그대로 오늘 저장
+    w = W(); c = direct(w, '2026-11-20', '2026-11-19'); out.direct_pick_today = row(w);   // 어제 연 창에서 오늘로 고침 = 등록일
+    w = W(); w.ctx.quotes.push({ id: 'q1', co: 'env', no: 'Q-1', date: '2026-10-02', recv: '가짜발주', title: '가짜 준설 견적' }); w.f.quoteToContract('q1'); out.quote = row(w) + ' · 계약 start ' + w.ctx.contracts[0].start;   // 견적 승격(계약 start = 견적일)
+    w = W(); c = box(w, '', ''); { const b = row(w), r = w.f.cbxFillBlanks(c, { d2: '2026-12-01', d3: '2027-01-31' }, '가짜.pdf'); out.fill_later = b + ' → ' + row(w) + ' · 채운 칸 ' + r.filled.join('·'); }   // 나중에 착공일 채움(진행 중 계약에 계약서 넣기·서류 생성 창)
+    w = W(); c = direct(w, '2026-09-01'); w.f.cbxFillBlanks(c, { d2: '2026-09-10' }, '가짜.pdf'); out.fill_keep = row(w);   // 대장 시작일에 이미 값
+    w = W(); c = box(w, '', '2026-10-31'); w.f.cbxFillBlanks(c, { d2: '2026-12-01' }, '가짜.pdf'); out.fill_inverted = row(w);   // 대장 끝 < 그 착공일
+    w = W(); c = box(w, '', ''); w.f.cbxFillBlanks(c, { d1: '2026-11-18', d2: '2026-13-01' }, '가짜.pdf'); out.fill_bad = row(w);   // 달력에 없는 착공일이 채워짐
+    w = W(); c = box(w, '', ''); w.ctx.dgConId = c.id; w.el('dgDocType').value = 'demo'; w.ctx.DD = { work: '가짜 공사', owner: '가짜발주', site: '가짜현장', amount: '1000', date: '2026-11-20', startDate: '2026-12-05', endDate: '2027-02-01' }; w.f.generateDocs(); out.fill_docgen = row(w);   // 서류 출력의 계약서 작성
+    w = W(); w.ctx.asbLoaded = false; box(w, '2026-09-01', '2026-10-31'); { const b = row(w) + '(' + nLoad(w) + ')'; w.ctx.asbLoaded = true; w.f.csSiteHooksRetry(); out.wait_box = b + ' → ' + row(w); }   // 대장을 못 받은 기기 — 받은 뒤 연결
+    w = W(); w.ctx.asbLoaded = false; direct(w, '2026-09-01'); w.ctx.asbLoaded = true; w.f.csSiteHooksRetry(); out.wait_direct = row(w);   // 못 받은 기기 — 사람이 고친 시작일이 큐를 지나감
+    w = W(); c = box(w, '', ''); w.ctx.asbLoaded = false; w.ctx.log.length = 0; w.f.cbxFillBlanks(c, { d2: '2026-12-01' }, '가짜.pdf'); { const b = row(w) + '(' + nLoad(w) + ')'; w.ctx.asbLoaded = true; w.f.csSiteHooksRetry(); w.f.csSiteHooksRetry(); out.wait_fill = b + ' → ' + row(w) + '(' + nLoad(w) + ')'; }   // 못 받은 기기에서 착공일 채움 — 받은 뒤 채움(다시 받으러 가지 않음)
+    w = W(); c = direct(w, '2026-09-01'); w.ctx.asb[0].del = 1; { const r = w.f.csLinkSiteLater(c); out.relink_hand = (r && typeof r === 'object') ? [r.start, r.end].join('~') : String(r); }   // 손 [대장 연결] — 계약 줄만 보고 만드는 길
+    w = W(); w.ctx.asb.push({ id: 'a0', kind: 'dredge', title: '가짜 준설공사', client: '가짜발주', site: '가짜현장', start: '2026-08-30', end: '', status: 'run' }); box(w, '2026-09-01', '2026-10-31'); out.link_existing = row(w) + ' · 줄 수 ' + w.ctx.asb.length;   // 사람이 만든 대장에 연결 — 그 줄의 날짜 그대로
+    w = W(); c = box(w, '', ''); w.ctx.asb[0].con_id = 'other'; w.f.cbxFillBlanks(c, { d2: '2026-12-01' }, '가짜.pdf'); out.fill_other = row(w);   // 다른 계약을 가리키는 줄
+    w = W(); c = box(w, '', ''); w.ctx.asb[0].del = 1; w.f.cbxFillBlanks(c, { d2: '2026-12-01' }, '가짜.pdf'); out.fill_deleted = [w.ctx.asb[0].start, w.ctx.asb.length].join('|');   // 지운 줄 — 채우지도 새로 만들지도 않음
+    w = W(); c = box(w, '', ''); c.site_id = 'a_not_here'; w.ctx.log.length = 0; w.f.cbxFillBlanks(c, { d2: '2026-12-01' }, '가짜.pdf'); w.f.csSiteHooksRetry(); w.f.csSiteHooksRetry(); out.fill_missing = String(nLoad(w));   // 받았는데도 그 줄이 이 기기에 없음 — 한 번만 받으러 가고 되풀이하지 않음
+    // 계약 종결이 대장 끝을 오늘로 넣는 자동 길(csSiteDone) — 시작일(착공일)이 아직 앞날이면 끝을 넣지 않는다(종결·실적 초안·표식은 그대로)
+    const done = (w, c) => { c.status = 'done'; const ok = w.f.csSiteDone(c), r = w.ctx.asb[0]; return row(w) + ' · ' + r.status + ' · ' + ok + ' · 표식 ' + (c.site_hook || '없음'); };
+    w = W(); c = box(w, '2026-12-01', ''); out.done_future = done(w, c);   // 착공일이 앞날인데 계약이 오늘 종결
+    w = W(); c = box(w, '2026-09-01', ''); out.done_past = done(w, c);   // 착공일이 지난 줄 — 끝 = 오늘(종전대로)
+    w = W(); c = box(w, '', ''); out.done_blank = done(w, c);   // 시작일 빈 줄 — 끝 = 오늘(종전대로)
+    w = W(); c = box(w, '2026-11-20', ''); out.done_today = done(w, c);   // 착공일 = 오늘 — 끝 = 오늘
+    return out;
+  };
+  const WANT256 = {
+    done_future: '2026-12-01~ · done · true · 표식 2026-11-20', done_past: '2026-09-01~2026-11-20 · done · true · 표식 2026-11-20', done_blank: '~2026-11-20 · done · true · 표식 2026-11-20', done_today: '2026-11-20~2026-11-20 · done · true · 표식 2026-11-20',
+    box_past: '2026-09-01~2026-10-31 · 계약 start 2026-11-20 · 연결 true · 대장 저장 1', box_future: '2026-12-01~2027-01-31', box_no_d2: '~2027-01-31', box_bad_d2: '~2026-12-31', box_d3_before: '2026-09-01~',
+    direct_hand: '2026-09-01~ · 계약 start 2026-09-01', direct_default: '~ · 계약 start 2026-11-20', direct_overnight: '~ · 계약 start 2026-11-19', direct_pick_today: '~', quote: '~ · 계약 start 2026-10-02',
+    fill_later: '~ → 2026-12-01~ · 채운 칸 착공일·준공일', fill_keep: '2026-09-01~', fill_inverted: '~2026-10-31', fill_bad: '~', fill_docgen: '2026-12-05~',
+    wait_box: '줄 없음(1) → 2026-09-01~2026-10-31', wait_direct: '2026-09-01~', wait_fill: '~(1) → 2026-12-01~(1)', relink_hand: '~', link_existing: '2026-08-30~ · 줄 수 1', fill_other: '~', fill_deleted: '|1', fill_missing: '1',
+  };
+  const diff256 = (src) => { const r = c256Run(src); return Object.keys(WANT256).filter((k) => r[k] !== WANT256[k]).map((k) => k + '=' + r[k]); };
+  const d256 = diff256(html);
+  T('원장 C256 ① 대장 줄 날짜(실제 저장 길 · 모두 ' + Object.keys(WANT256).length + '장면): 계약서 넣기 = 착공일(d2)~준공일(d3)(계약 start = 등록일은 그대로) · 착공일 없음·달력에 없는 날 = 시작 빈칸 · 준공일 < 착공일 = 끝 빈칸 · 직접 생성 창 = 사람이 고친 시작일만(미리 넣은 오늘 그대로·어제 연 창·오늘로 고침 = 빈칸) · 견적 승격 = 빈칸(견적일 아님) · 손 [대장 연결] = 빈칸 · 사람이 만든 대장에 연결 = 그 줄 날짜 그대로',
+    d256.length === 0, JSON.stringify(d256));
+  T('원장 C256 ② 나중에 채워진 착공일 → 대장의 빈 시작일에만(cbxFillBlanks · 서류 출력 계약서 작성) · 값이 있는 시작일·다른 계약의 줄·지운 줄·끝 < 시작이 될 값·달력에 없는 날은 그대로 · 대장을 못 받은 기기 = 받으러 가서(1회) 받은 뒤 연결·채움(사람이 고친 시작일도 큐를 지나감)',
+    ['fill_later', 'fill_keep', 'fill_inverted', 'fill_bad', 'fill_docgen', 'wait_box', 'wait_direct', 'wait_fill', 'fill_other', 'fill_deleted', 'fill_missing'].every((k) => !d256.some((x) => x.indexOf(k + '=') === 0)), JSON.stringify(d256));
+  T('원장 C256 ⑤ 계약 종결(실제 csSiteDone)이 대장 끝을 넣는 자동 길: 시작일(착공일)이 앞날인 줄 = 끝 빈칸(종결·표식은 그대로) · 지난 날·오늘·빈 시작일 = 끝 오늘(종전대로)',
+    ['done_future', 'done_past', 'done_blank', 'done_today'].every((k) => !d256.some((x) => x.indexOf(k + '=') === 0)), JSON.stringify(d256));
+  // 결함 사본 — 고친 줄을 하나씩 되돌린 사본마다 적어 둔 장면이 깨져야 한다(바꿀 글자가 소스에 없으면 그것도 실패)
+  const MUT256 = [
+    ['새 줄 날짜를 옛 꼴(계약 start·d3 그대로)로', 'start: dt.start, end: dt.end,', 'start: c.start || "", end: ((c.contract_info||{}).d3) || "",', ['box_past', 'box_future', 'box_no_d2', 'box_bad_d2', 'box_d3_before', 'direct_default', 'direct_overnight', 'quote', 'wait_box', 'relink_hand']],
+    ['착공일이 없으면 계약 start로', 'st = csSiteDay(ci.d2) || csSiteDay(hand),', 'st = csSiteDay(ci.d2) || csSiteDay(hand) || csSiteDay(c.start),', ['box_no_d2', 'box_bad_d2', 'direct_default', 'direct_overnight', 'quote', 'relink_hand']],
+    ['끝 < 시작 검사 뺌', 'return { start: st, end: (en && (!st || en >= st)) ? en : "" };', 'return { start: st, end: en };', ['box_d3_before']],
+    ['달력 검사 뺌', '(typeof vehRealDate === "function" ? vehRealDate(v) : isDate(v))', 'isDate(v)', ['box_bad_d2', 'fill_bad']],
+    ['직접 생성 창이 칸 값을 늘 넘김', 'var handStart=(start!==conStartDef && start!==todayStr()) ? start : "";', 'var handStart=start;', ['direct_default', 'direct_overnight', 'direct_pick_today']],
+    ['미리 넣은 값 대조 뺌', '(start!==conStartDef && start!==todayStr())', '(start!==todayStr())', ['direct_overnight']],
+    ['등록일 대조 뺌', '(start!==conStartDef && start!==todayStr())', '(start!==conStartDef)', ['direct_pick_today']],
+    ['창을 열 때 미리 넣은 값을 안 적음', 'conStartDef=todayStr(); document.getElementById("conStart").value=conStartDef;', 'document.getElementById("conStart").value=todayStr();', ['direct_overnight']],
+    ['startProcess가 사람이 고친 시작일을 안 넘김', 'csLinkSiteLater(c, opts.handStart || "");', 'csLinkSiteLater(c);', ['direct_hand', 'fill_keep', 'wait_direct']],
+    ['바로 연결이 hand를 버림', 'return csLinkSite(c, true, hand) || "none";', 'return csLinkSite(c, true) || "none";', ['direct_hand', 'fill_keep']],
+    ['큐가 hand를 버림', 'csSiteLinkQueue[c.id] = hand || csSiteLinkQueue[c.id] || 1;', 'csSiteLinkQueue[c.id] = 1;', ['wait_direct']],
+    ['받은 뒤 연결이 hand를 안 넘김', 'if (c) csLinkSite(c, true, typeof h === "string" ? h : "");', 'if (c) csLinkSite(c, true);', ['wait_direct']],
+    ['cbxFillBlanks가 대장을 안 채움', 'if (filled.indexOf("착공일") >= 0 && typeof csSiteStartFill === "function") csSiteStartFill(c);', '', ['fill_later', 'wait_fill']],
+    ['계약서 작성이 대장을 안 채움', 'if (typeof csSiteStartFill === "function") csSiteStartFill(cc);', '', ['fill_docgen']],
+    ['값이 있는 시작일을 덮음', 'if (r.del === 1 || r.con_id !== c.id || r.start) return false;', 'if (r.del === 1 || r.con_id !== c.id) return false;', ['fill_keep']],
+    ['다른 계약의 줄을 채움', 'if (r.del === 1 || r.con_id !== c.id || r.start) return false;', 'if (r.del === 1 || r.start) return false;', ['fill_other']],
+    ['지운 줄을 채움', 'if (r.del === 1 || r.con_id !== c.id || r.start) return false;', 'if (r.con_id !== c.id || r.start) return false;', ['fill_deleted']],
+    ['나중 채움의 끝 < 시작 검사 뺌', 'if (csSiteDay(r.end) && r.end < d2) return false;', '', ['fill_inverted']],
+    ['받은 뒤 채움을 안 함', 'Object.keys(csSiteFillQueue).forEach(function(id){ var c = findProc(id); delete csSiteFillQueue[id]; if (c) csSiteStartFill(c, true); });', '', ['wait_fill']],
+    ['못 받은 기기가 받으러 가지 않음', '{ csSiteFillQueue[c.id] = 1; loadAsb(); }', '{ }', ['wait_fill']],
+    ['받은 뒤에도 다시 받으러 감(되풀이)', 'if (c) csSiteStartFill(c, true); });', 'if (c) csSiteStartFill(c); });', ['fill_missing']],
+    ['계약 종결이 앞날 시작일 줄에도 끝 = 오늘', 'if (!r.end && !(/^\\d{4}-\\d{2}-\\d{2}$/.test(String(r.start || "")) && todayStr() < r.start)) r.end = todayStr();', 'if (!r.end) r.end = todayStr();', ['done_future']],
+    ['계약 종결의 앞날 판정을 오늘까지로 넓힘', 'todayStr() < r.start)) r.end = todayStr();', 'todayStr() <= r.start)) r.end = todayStr();', ['done_today']],
+  ];
+  const mr256 = MUT256.map((m) => { const one = html.split(m[1]).length === 2, src = html.replace(m[1], m[2]); let got = []; try { got = one ? diff256(src).map((x) => x.split('=')[0]) : ['(바꿀 글자 ' + (html.split(m[1]).length - 1) + '곳)']; } catch (e) { got = ['(오류 ' + String(e && e.message).slice(0, 60) + ')']; }
+    return { name: m[0], ok: one && got.length > 0 && m[3].every((k) => got.indexOf(k) >= 0), got }; });
+  const bad256 = mr256.filter((x) => !x.ok);
+  T('원장 C256 ③ 결함 사본 ' + MUT256.length + '개(고친 줄을 하나씩 되돌림)가 적어 둔 장면에서 모두 잡힘', bad256.length === 0, JSON.stringify(bad256));
+  // 전수(소스): 계약을 만드는 부름 4곳(계약서 넣기·직접 생성 창·견적 승격·인허가 변경) 가운데 사람이 고친 시작일을 넘기는 곳은 직접 생성 창 1곳 · 대장 줄을 만드는 자리는 csLinkSite 1곳(손 저장 saveAsb 제외) · 대장 시작일을 고치는 자리 = 손 저장·csSiteStartFill
+  const n256 = (re) => (html.match(re) || []).length;
+  T('원장 C256 ④ 전수(소스): startProcess 부름 4곳 중 handStart를 넘기는 곳 1(직접 생성 창) · csLinkSiteLater 부름 2(startProcess·[대장 연결]) · csSiteStartFill 부름 3(cbxFillBlanks·계약서 작성·받은 뒤) · 대장 줄을 새로 만드는 자리 2(csLinkSite·손 저장) · 새 줄에 계약 start를 넣는 글자 없음',
+    n256(/startProcess\(/g) === 5 && n256(/handStart:handStart/g) === 1 && n256(/handStart/g) === 5 && n256(/csLinkSiteLater\(c/g) === 3 && n256(/csSiteStartFill\(c/g) === 4 && n256(/asb\.push\(/g) === 2 && !/start: c\.start \|\| ""/.test(html) && n256(/\br\.start\s*=[^=]/g) === 2,
+    JSON.stringify({ sp: n256(/startProcess\(/g), hs: n256(/handStart/g), later: n256(/csLinkSiteLater\(c/g), fill: n256(/csSiteStartFill\(c/g), push: n256(/asb\.push\(/g), rs: n256(/\br\.start\s*=[^=]/g) }));
+} catch (e) { console.log('  (원장 C256 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v535(C256 — 계약이 만드는 현장 대장 줄 시작일 = 착공일 · 원장 C256): 실행 검사는 위 C256 블록 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd535 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D535 = { ft: rd535('FEATURES.md'), tl: rd535('TESTLIST.md'), sw: rd535('sw.js'), man: rd535('MANUAL.html'), cl: rd535('CLAUDE.md') };
+  const chk535 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v535 (11/24)', '\n### '), tlv = cut(d.tl, '\n## v535 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`csSiteStartFill`", "원장 C256"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v535 \(2026-11-24\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C256(v535') > 0
+      && /SHELL_CACHE = 'jw-shell-v535'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r535 = chk535(D535);
+  const mu535 = (k, f) => chk535(Object.assign({}, D535, { [k]: f(D535[k]) })).ok;
+  const M535 = [mu535('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v534 (')), mu535('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v534'")),
+    mu535('ft', (s) => s.split('`csSiteStartFill`').join('csSiteStartFill')),
+    mu535('cl', (s) => s.replace('**C256(v535', 'C256(')),
+    mu535('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위로 다시 얹은 판) — 결과는 배포 전 전체 게이트 기록 C256_게이트_1124.txt', '\n- (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위로 다시 얹은 판) — 결과는 배포 전 전체 게이트 기록 C256_게이트_1124.txt'))];
+  T('v535 문서·판 번호(정확 검사): FEATURES 기준 v535 (2026-11-24)·v535 절(C256) · TESTLIST v535 칸 5(화면·운영 확인 3 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v535 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
+    r535.ok && M535.every((v) => v === false), JSON.stringify({ r: r535.info, mut: M535 }));
+} catch (e) { console.log('  (v535 검사 생략 — ' + e.message + ')'); fails++; }
 // ── C264(AI 실패 가르기 — 원장 C264): 잔액·키 문제는 화면에 '관리자 확인 필요'(일반 실패·'잠시 실패' 아님). 서버 실행 검사는 servertest C264 · 여기는 앱 실제 함수(떼어 실행)
 try {
   const fn264 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error(name); };
