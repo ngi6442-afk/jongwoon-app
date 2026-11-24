@@ -13320,11 +13320,12 @@
       sub:Math.round(sub*100)/100, total:Math.round((sub+(sPrice||0)+sSafety)*100)/100, rate:r};
   }
   // 회사 실측 등급(증빙 하드리딩 — 만료 지나면 자동 폴백. 갱신 시 여기와 인허가 탭 함께 갱신)
-  // ㈜종운건설 안전성평가: 2025년 평가 D등급, 유효 2026-01-01~2026-12-31(공단 통보서 2026.1.2) → 만료 후 무등급(등록 2년↑)
+  // ㈜종운건설 안전성평가: 2025년 평가 D등급, 유효 2026-01-01~2026-12-31(공단 통보서 2026.1.2) → 2026년 평가 B등급 71.6점(PM 9/21)이 2027-01-01부터(next)
+  //   C269: next 만료 2028-12-31 = 평가주기 B 2년(인허가 판독 주석의 공고 기준)으로 잡은 값 — 통보서를 인허가 탭(lgrade_safe)에 판독해 넣으면 그 만료일을 따름. next까지 지나면 무등급(등록 2년↑)
   // ㈜종운건설 신용평가: B°(NICE D&B 확인서, 평가 2026-05-11, 유효 ~2027-05-10) = B+~B− 군 → 만료 후 미제출(최저)
   // ※ (주)종운환경(구 유한회사) BB°(~2027-06-29)는 별도 명의 — 석면(건설) 적격심사에 사용 금지
   // (주)종운환경(구 유한회사) 신용평가: BB°(NICE D&B 확인서, 유효 ~2027-06-29) = BBB−~BB− 군. 안전성평가는 석면해체업 대상이라 환경은 무등급(0점 취급)
-  var QUAL_DEF={ con:{ safety:{v:"D", until:"2026-12-31", fallback:"none_old"}, credit:{v:"t3", until:"2027-05-10", fallback:""} },
+  var QUAL_DEF={ con:{ safety:{v:"D", until:"2026-12-31", next:{v:"B", from:"2027-01-01", until:"2028-12-31"}, fallback:"none_old"}, credit:{v:"t3", until:"2027-05-10", fallback:""} },
                  env:{ safety:{v:"none_new", until:"9999-12-31", fallback:"none_new"}, credit:{v:"t2", until:"2027-06-29", fallback:""} } };
   function qualApplyDefaults(){
     var co=document.getElementById("xgCo").value;
@@ -13335,9 +13336,13 @@
     // 등급 문자 자체가 바뀌면(승급 등) QUAL_DEF 계수도 함께 갱신해야 하므로 불일치 시 경고만.
     var licById={}; liveLic().forEach(function(l){ licById[l.id]=l; });
     var safeLic=licById["lgrade_safe"], credLic=licById[co==="con"?"lgrade_con":"lgrade_env"];
-    var safeUntil=(co==="con"&&safeLic&&isDate(safeLic.expiry))?safeLic.expiry:d.safety.until;
+    // C269: 다음 평가 결과(next)는 그 시작일부터 — 인허가 만료일은 그 날짜가 속한 단계(앞 등급 · next)에만 쓴다(옛 통보서 만료일이 새 등급을 끊지 않게)
+    var sd=d.safety, nx=sd.next||null, tq=todayStr(), onNx=!!(nx&&tq>=nx.from);
+    var lx=(co==="con"&&safeLic&&isDate(safeLic.expiry))?safeLic.expiry:"";
+    var safeUntil=onNx?nx.until:sd.until;
+    if(lx&&(!nx||(onNx?lx>=nx.from:lx<nx.from))) safeUntil=lx;
     var credUntil=(credLic&&isDate(credLic.expiry))?credLic.expiry:d.credit.until;
-    if(d.safety) document.getElementById("xqSafety").value=(todayStr()<=safeUntil)?d.safety.v:d.safety.fallback;
+    if(d.safety) document.getElementById("xqSafety").value=(tq<=safeUntil)?(onNx?nx.v:sd.v):sd.fallback;
     if(d.credit) document.getElementById("xqCredit").value=(todayStr()<=credUntil)?d.credit.v:d.credit.fallback;
     if(co==="env") document.getElementById("xqLocal").checked=true;   // 포항 소재 — 포항시 발주 접근성 1점(타 지자체면 해제)
   }
@@ -20973,6 +20978,13 @@
     var rv = getReview(type, key, id);
     if (rv) return { t: "승인 대기", c: "am", n: "am", o: 1, by: rv.by || "" };
     if (type === "weekly") return todayStr() > String(CURRENT_KEYS.weekly) ? { t: "지남", c: "bad", n: "bad", o: 0 } : { t: "오늘", c: "am", n: "am", o: 1 };   // 매주 (월요일)
+    // C269: 기한 달이 있는 연간·반기 항목은 바로 앞 주기(지난해 · 지난 반기)를 안 끝냈으면 새 주기 첫날에도 '지남'(이번 주기에 끝내면 완료) — 그 주기까지 기록이 하나라도 있던 앱만(처음 쓰는 해는 빼고).
+    //   기한 달 없는 연간 항목은 지난 주기 끝날에도 '미완'이던 것이라 종전대로(지남으로 바꾸지 않음)
+    if (type === "half" || (type === "yearly" && sfNowDueMonth(type, title))){
+      var ck = String(key), pk = type === "yearly" ? String(Number(ck) - 1) : (ck.slice(-1) === "2" ? ck.slice(0, 4) + "-H1" : (Number(ck.slice(0, 4)) - 1) + "-H2");
+      var pr = records[type] && records[type][pk], used = Object.keys(records[type] || {}).some(function(k){ return k <= pk; });
+      if (used && !(pr && pr[id])) return { t: "지남", c: "bad", n: "bad", o: 0, pt: type === "yearly" ? pk + "년 미완" : pk.slice(0, 4) + (pk.slice(-1) === "1" ? " 상반기" : " 하반기") + " 미완" };
+    }
     var due = sfNowDueMonth(type, title), cm = Number(String(CURRENT_KEYS.monthly).slice(5, 7));
     if (due && cm > due) return { t: "지남", c: "bad", n: "bad", o: 0 };
     if (due && cm === due) return { t: "이번 달", c: "am", n: "am", o: 1 };
@@ -21012,7 +21024,7 @@
       var f = sfNowItem(id);
       if (!f || !checkItemVisible(id)) return;   // 공개범위 — 관리자·담당 본인·공개 대상만(PM이 닫아 둔 범위를 현황이 우회하지 않게)
       var s = sfNowState(f.type, id, f.it.title), an = checkAssignee[id] ? scopeNames([checkAssignee[id]]) : "", who = an ? "담당 " + an : (f.it.who || "");
-      var meta = [TYPE_LABEL[f.type] || "수시", who, s.d ? "✓ " + s.d : "", s.by ? "요청 " + s.by : ""].filter(Boolean).join(" · ") + " · 내 업무 ›";
+      var meta = [TYPE_LABEL[f.type] || "수시", who, s.d ? "✓ " + s.d : "", s.by ? "요청 " + s.by : "", s.pt || ""].filter(Boolean).join(" · ") + " · 내 업무 ›";   // C269 s.pt = 지난 주기 미완
       n[s.n]++;
       rows.push({ o: s.o * 100 + ord, h: sfNowRow(id, f.it.title, meta, s.t, s.c, "check:" + id) });
     });
@@ -21042,7 +21054,7 @@
       var f = sfNowItem(x.id);
       if (!f || !checkItemVisible(x.id)) return;
       var s = sfNowState(f.type, x.id, f.it.title);
-      rows.push(sfNowRow(x.no, x.t, x.id + " " + f.it.title + (x.m ? " · " + x.m : ""), s.t, s.c, "check:" + x.id));
+      rows.push(sfNowRow(x.no, x.t, x.id + " " + f.it.title + (x.m ? " · " + x.m : "") + (s.pt ? " · " + s.pt : ""), s.t, s.c, "check:" + x.id));   // C269 지난 반기 미완
       if (x.no === "5조②1·2" || (x.no === "5조②3·4" && eAt < 0)) eAt = rows.length;
     });
     if (eRow) rows.splice(eAt < 0 ? rows.length : eAt, 0, eRow);

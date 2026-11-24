@@ -1,5 +1,6 @@
 'use strict';
 // 석면조사서 판독(Claude 비전) + §94 신고대상 판정 — gw-data(동기 폴백)와 gw-parse-background(기본 경로) 공용
+const BJ = require('./boxjudge');   // C269 개인정보 파일명 입구(nameGuard) — 넣기 박스와 같은 함수
 const CL = require('./claude');   // C264: 실패 코드 공통 가르기(잔액 부족 CREDIT_LOW·키 거부 AUTH — 나머지는 종전 'CLAUDE_' + 상태 번호)
 
 // §94조 신고대상 판정 — 자재 행(위치·면적)을 법 기준에 대조(판정은 코드가 확정)
@@ -221,6 +222,7 @@ async function claudeExtractGrade(buf, name) {
 // 첨부 레코드 → 문서종류별 판독 라우팅 (kind 우선, 없으면 파일명)
 async function parseAttachment(rec) {
   const name = rec.name || '';
+  if (BJ.nameGuard(name)) return { error: 'PII_NAME' };   // C269: 신분증·면허증 등 개인정보 파일명은 어느 길(동기 att_parse·백그라운드·넣기 박스)에서도 모델에 보내지 않는다 — 넣기 박스와 같은 입구
   let kind = rec.kind || '';
   if (!kind) kind = /등록증|신분증|면허증/.test(name) ? 'biz'
     : (/대장/.test(name) ? 'bldg' : (/계약/.test(name) ? 'contract' : 'asbestos'));

@@ -23624,5 +23624,54 @@ try {
     r539.ok && M539.every((v) => v === false), JSON.stringify({ r: r539.info, mut: M539 }));
 } catch (e) { console.log('  (v539 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ── C269(11/24 해 넘기기): ① 적격심사 건설 안전성평가 기본 등급 — 2027-01-01부터 2026 평가 B(QUAL_DEF next) · ② 현황 연간·반기 — 지난 주기에 안 끝낸 기한 달 항목이 새 주기 첫날 '지남'
+//   실제 qualApplyDefaults·sfNowState(index.html 원문) + 가짜 시계(Date 바꿔 끼움 — PC 시계 안 바꿈) + 가짜 자료
+try {
+  const fn269 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음 ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('짝 ' + name); };
+  const blk269 = (src, tok) => { const i = src.indexOf(tok); if (i < 0) throw new Error(tok); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '[') { d++; st = true; } else if (ch === ']') { d--; if (st && d === 0) return src.slice(i, j + 1) + ';'; } } throw new Error('짝 ' + tok); };
+  const FD269 = (kst) => { const RD = Date; class FD extends RD { constructor(...a) { if (a.length === 0) super(FD.__now); else super(...a); } static now() { return FD.__now; } } FD.__now = RD.parse(kst + ':00+09:00'); return FD; };
+  const qual269 = (src, kst, lic, co) => {
+    const qi = src.indexOf('var QUAL_DEF='), qj = src.indexOf('} };', qi);
+    const body = [fn269(src, 'pad'), fn269(src, 'fmtDate'), fn269(src, 'todayStr'), fn269(src, 'isDate'), src.slice(qi, qj + 4), 'var licenses = __lic, __el = {};',
+      'var document = { getElementById: function(id){ return __el[id] || (__el[id] = { value: "", checked: false }); } }; function qualBasisToggle(){}',
+      fn269(src, 'liveLic'), fn269(src, 'qualApplyDefaults'), '__el.xgCo = { value: __co }; qualApplyDefaults(); return __el.xqSafety.value;'].join('\n');
+    return new Function('Date', '__lic', '__co', body)(FD269(kst), lic || [], co || 'con');
+  };
+  const st269 = (src, kst, rec) => {
+    const body = [fn269(src, 'pad'), fn269(src, 'fmtDate'), fn269(src, 'todayStr'), fn269(src, 'mondayOfWeek'), fn269(src, 'periodKeys'), 'var CURRENT_KEYS = periodKeys(new Date());', blk269(src, 'var GROUPS = ['),
+      'var records = __rec, checkReview = {};', fn269(src, 'getReview'), fn269(src, 'sfNowDueMonth'), fn269(src, 'sfNowState'),
+      'var T = {}; GROUPS.forEach(function(g){ g.items.forEach(function(it){ T[it.id] = [g.type, it.title]; }); }); return function(id){ var s = sfNowState(T[id][0], id, T[id][1]); return s.t + (s.pt ? "(" + s.pt + ")" : ""); };'].join('\n');
+    return new Function('Date', '__rec', body)(FD269(kst), JSON.parse(JSON.stringify(rec)));
+  };
+  const REC269 = { yearly: { '2026': { y2: '2026-01-12' } }, half: { '2026-H1': { h1: '2026-06-10' }, '2026-H2': { h1: '2026-12-01' } } };
+  const chk269 = (src) => {
+    const I = {}, P = {};
+    // ① 기본값: 12/31 D · 1/1 B · 2028-12-31 B · 2029-01-01 무등급 · 환경 그대로 · 인허가 등급 줄은 그 날짜가 속한 단계에만(옛 D 통보서 만료가 B를 끊지 않음 · B 통보서 만료일을 따름)
+    I.q = ['2026-12-31T23:50', '2027-01-01T00:10', '2028-12-31T09:00', '2029-01-01T09:00'].map((k) => qual269(src, k)).join(',');
+    I.qe = qual269(src, '2027-01-01T00:10', [], 'env');
+    I.qD = ['2026-12-31T09:00', '2027-01-01T09:00'].map((k) => qual269(src, k, [{ id: 'lgrade_safe', expiry: '2026-12-31' }])).join(',');
+    I.qB = ['2026-12-31T09:00', '2027-01-01T09:00', '2028-06-30T09:00', '2028-07-01T09:00'].map((k) => qual269(src, k, [{ id: 'lgrade_safe', expiry: '2028-06-30' }])).join(',');
+    P.q = I.q === 'D,B,B,none_old' && I.qe === 'none_new' && I.qD === 'D,B' && I.qB === 'D,B,B,none_old';
+    // ② 12/31 → 1/4: y3(1월·2026 미완) 지남 유지 · y4(12월) 이번 달 → 지남 · y5(기한 달 없음) 미완 그대로 · y2(2026 완료) = 2027 1월 이번 달 · h2(상반기·하반기 미완) 지남 · h1(완료) 6월 · 7/1 반기 경계도 같음
+    const a = st269(src, '2026-12-31T23:50', REC269), b = st269(src, '2027-01-04T09:00', REC269), c = st269(src, '2027-07-01T09:00', REC269);
+    const r2 = JSON.parse(JSON.stringify(REC269)); r2.yearly['2027'] = { y4: '2027-01-05' }; const d = st269(src, '2027-01-06T09:00', r2);
+    const e = st269(src, '2027-01-04T09:00', { yearly: {}, half: {} });
+    I.s = [a('y3'), a('y4'), a('y5'), a('h2'), '|', b('y3'), b('y4'), b('y5'), b('y2'), b('h2'), b('h1'), '|', c('h1'), c('h2'), '|', d('y4'), e('y4'), e('h2')].join(',');
+    P.s = I.s === '지남,이번 달,미완,지남(2026 상반기 미완),|,지남(2026년 미완),지남(2026년 미완),미완,이번 달,지남(2026 하반기 미완),6월,|,지남(2027 상반기 미완),지남(2027 상반기 미완),|,완료,12월,6월';
+    return { ok: P.q && P.s, info: I };
+  };
+  const r269 = chk269(html);
+  const mu269 = (a, b) => { if (html.split(a).length !== 2) return 'not-unique'; try { return chk269(html.replace(a, () => b)).ok; } catch (e) { return 'err ' + e.message; } };
+  const M269 = [
+    mu269('next:{v:"B", from:"2027-01-01", until:"2028-12-31"}, ', ''),
+    mu269('if(lx&&(!nx||(onNx?lx>=nx.from:lx<nx.from))) safeUntil=lx;', 'if(lx) safeUntil=lx;'),
+    mu269('(tq<=safeUntil)?(onNx?nx.v:sd.v):sd.fallback', '(tq<=safeUntil)?sd.v:sd.fallback'),
+    mu269('if (used && !(pr && pr[id])) return', 'if (false) return'),
+    mu269('if (type === "half" || (type === "yearly" && sfNowDueMonth(type, title))){', 'if (type === "half" || type === "yearly"){'),
+    mu269('used = Object.keys(records[type] || {}).some(function(k){ return k <= pk; });', 'used = true;')];
+  T('C269 ①② 해 넘기기: 적격 건설 안전성평가 기본값 12/31 D → 1/1 B(2026 평가) → 2029-01-01 무등급 · 인허가 등급 만료일은 그 단계에만 · 현황 연간·반기 지난 주기 미완(기한 달 있는 것) = 새 주기 첫날 지남(지난 주기 표시) · 이번 주기에 끝내면 완료 · 기한 달 없는 연간은 미완 그대로 · 기록 없던 해는 지남 없음 · 결함 사본 6 = 모두 ✗',
+    r269.ok && M269.every((v) => v === false), JSON.stringify({ r: r269.info, mut: M269 }));
+} catch (e) { console.log('  (C269 검사 생략 — ' + e.message + ')'); fails++; }
+
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

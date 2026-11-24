@@ -16777,4 +16777,61 @@ function J91a(x) { return JSON.stringify(x); }
   finally { const s = JSON.parse(snap6); mem.gw_users = s.u; mem.gw_data = s.d; mem.gw_files = s.f; }
 }
 
+{ // ---- C269(11/24) 개인정보 파일명(신분증·면허증·주민등록증)은 넣기 박스 밖 판독 길(동기 att_parse · 백그라운드 박스 아님)에서도 모델에 보내지 않는다 — 원천: _lib/asbestos.parseAttachment 첫머리 nameGuard + boxjudge GUARD_RE에 면허증
+  //   실제 핸들러(gw-data att_put → att_parse · gw-parse-background 박스 아님·박스 판단·박스 전용 판독) · 가짜 = 저장소(메모리)·fetch(세기만 — 실제 API 호출 없음)·가짜 바이트
+  const fs9 = require('fs'), Mod9 = require('module');
+  const P9 = { bj: join(FN, '_lib/boxjudge.js'), asb: join(FN, '_lib/asbestos.js'), gd: join(FN, 'gw-data.js'), pb: join(FN, 'gw-parse-background.js') };
+  const SRC9 = {}; for (const k of Object.keys(P9)) SRC9[k] = fs9.readFileSync(P9[k], 'utf8').replace(/\r\n/g, '\n');
+  const load9 = (mut) => {
+    for (const k of Object.keys(P9)) delete require.cache[require.resolve(P9[k])];
+    if (mut) {
+      const [k, from, to] = mut; if (SRC9[k].split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60));
+      const m = new Mod9(P9[k]); m.filename = P9[k]; m.paths = Mod9._nodeModulePaths(dirname(P9[k])); m._compile(SRC9[k].replace(from, () => to), P9[k]); m.loaded = true; require.cache[require.resolve(P9[k])] = m;
+    }
+    const o = {}; for (const k of ['bj', 'asb', 'gd', 'pb']) o[k] = require(P9[k]); return o;
+  };
+  const snap9 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data, f: mem.gw_files || {} });
+  const realFetch9 = global.fetch, savedK9 = [process.env.ANTHROPIC_API_KEY, process.env.GW_ANTHROPIC_KEY];
+  let n9 = 0;
+  global.fetch = async (url) => { if (!/api\.anthropic\.com/.test(String(url))) throw new Error('각본 밖 호출 ' + url); n9++; const t = JSON.stringify({ content: [{ type: 'text', text: '{"doc_kind":"사업자등록증","name":"가짜","ceo":"","biz_no":"","birth":"","addr":""}' }], stop_reason: 'end_turn', usage: { input_tokens: 1, output_tokens: 1 } }); return new Response(t, { status: 200, headers: { 'content-type': 'application/json' } }); };
+  process.env.ANTHROPIC_API_KEY = 'servertest-dummy'; process.env.GW_ANTHROPIC_KEY = 'servertest-dummy';
+  const A9 = { id: 'u269a', name: '관리269', admin: true, perms: {}, tier: 'pm' }, tA9 = issueSession(A9).token, IMG9 = Buffer.alloc(3000, 7).toString('base64');
+  const chk9 = async (m) => {
+    mem.gw_users = { 'member:u269a': A9, 'device:dev269': { status: 'approved' } }; mem.gw_data = {}; mem.gw_files = {};
+    const c = async (b) => { const r = await m.gd.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tA9, 'x-device-id': 'dev269' }, body: JSON.stringify(b) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+    const bg = (b) => m.pb.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tA9 }, body: JSON.stringify(b) });
+    const I = {}, P = {};
+    // ① 넣기 박스 밖 — 동기 att_parse · 백그라운드(박스 아님): 개인정보 이름 = 호출 0·PII_NAME / 사업자등록증·석면조사서 = 호출 1(대조)
+    for (const nm of ['신분증.jpg', '운전면허증.jpg', '건설기계조종사면허증.png', '주민등록증 사본.jpg', '사업자등록증.jpg', '석면조사서.pdf']) {
+      const up = await c({ action: 'att_put', name: nm, type: 'image/jpeg', data: IMG9 }), id = up.body.id;
+      n9 = 0; const p = await c({ action: 'att_parse', id }); const a = n9, pa = (p.body.parsed && p.body.parsed.error) || 'ok';
+      n9 = 0; await bg({ id }); const b = n9, sv = mem.gw_files['parse:' + id] && mem.gw_files['parse:' + id].result, pb = (sv && sv.error) || 'ok';
+      I[nm] = [up.code, a, pa, b, pb].join('/');
+      const pii = !/사업자|석면/.test(nm);
+      if (pii ? !(a === 0 && pa === 'PII_NAME' && b === 0 && pb === 'PII_NAME') : !(a === 1 && b === 1 && pa !== 'PII_NAME' && pb !== 'PII_NAME')) P[nm] = false;
+    }
+    // ② 넣기 박스 — 면허증 이름도 종류 판단·전용 판독 둘 다 호출 0(신분증과 같은 입구)
+    for (const nm of ['운전면허증.jpg', '신분증.jpg']) {
+      const id = 'att_' + (nm === '신분증.jpg' ? 'a' : 'b') + '269269269269269'; mem.gw_files[id] = { name: nm, type: 'image/jpeg', kind: 'box', bid: 'u269a', data: IMG9 };
+      n9 = 0; await bg({ id, box: 1, ctx: {} }); const j = n9, rj = (mem.gw_files['parse:' + id] || {}).result || {};
+      n9 = 0; await bg({ id, box: 1, kind: 'biz' }); const k = n9, rk = (mem.gw_files['parse:' + id] || {}).result || {};
+      I['박스 ' + nm] = [j, rj.read, rj.pii, k, rk.error].join('/');
+      if (!(j === 0 && rj.read === 'none' && rj.pii === 1 && k === 0 && rk.error === 'PII_NAME')) P['박스 ' + nm] = false;
+    }
+    // ③ 이름 입구 표(계약서 예외 · 사업자 서류는 막지 않음)
+    I.guard = ['운전면허증.pdf', '면허증 사본.png', '신분증.pdf', '사업자등록증.pdf', '건설업 등록증.pdf', '면허증 발급 대행 계약서.pdf'].map((x) => m.bj.nameGuard(x) ? 1 : 0).join('');
+    if (I.guard !== '111000') P.guard = false;
+    return { ok: Object.keys(P).length === 0, info: JSON.stringify(I) + ' ✗ ' + Object.keys(P).join(',') };
+  };
+  try {
+    const R9 = await chk9(load9(null));
+    T('C269 ③ 개인정보 파일명(신분증·운전/건설기계 면허증·주민등록증) = 동기 att_parse·백그라운드(박스 아님) 모델 호출 0·PII_NAME · 넣기 박스 종류 판단·전용 판독도 면허증 호출 0(pii 1) · 사업자등록증·석면조사서는 종전대로 호출 1 · 계약서 이름 예외', R9.ok, R9.info);
+    const MU9 = [['asb', "  if (BJ.nameGuard(name)) return { error: 'PII_NAME' };", ''], ['bj', '신분증|면허증|주민', '신분증|주민']];
+    const kill9 = [];
+    for (const mu of MU9) { let k; try { k = !(await chk9(load9(mu))).ok; } catch (e) { k = 'err ' + e.message; } if (k !== true) kill9.push(mu[1].trim().slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k)); }
+    T('C269 ③ 결함 사본 ' + MU9.length + '개(parseAttachment 입구 걷기 · 이름 입구에서 면허증 빼기) = 모두 ✗', kill9.length === 0, kill9.join(' | '));
+  } catch (e) { T('C269 ③ 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+  finally { global.fetch = realFetch9; process.env.ANTHROPIC_API_KEY = savedK9[0] || ''; process.env.GW_ANTHROPIC_KEY = savedK9[1] || ''; load9(null); const s = JSON.parse(snap9); mem.gw_users = s.u; mem.gw_data = s.d; mem.gw_files = s.f; }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

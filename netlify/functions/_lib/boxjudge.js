@@ -154,7 +154,7 @@ function normJudge(o, ctx) {
 }
 
 // 개인정보 파일명 — 모델 호출 없이 판단. 학습 제외 정규식(forbid_re)은 '주민'·'건강'만으로 걸려 주민센터 계약서·건강보험 완납증명까지 막으므로 입구는 서류 이름 단위로 따로 둔다
-const GUARD_RE = /건강\s*(?:진단|검진|검사)|검진|건진|명단|명부|인적\s*사항|신분증|주민\s*등록|health|roster/i;
+const GUARD_RE = /건강\s*(?:진단|검진|검사)|검진|건진|명단|명부|인적\s*사항|신분증|면허증|주민\s*등록|health|roster/i;   // C269 면허증(운전·건설기계 조종 — 첨부 판독 길이 신분증과 같이 다루는 이름)
 const GUARD_HEALTH_RE = /건강\s*(?:진단|검진|검사)|검진|건진|health/i;
 const GUARD_EXCEPT_RE = /계약서/;   // '건강검진센터 철거공사 계약서' 같은 계약 문서는 내용을 읽는다. '…공사_건강진단 결과표'는 막는다(v424 검토)
 function nameGuard(name) {
