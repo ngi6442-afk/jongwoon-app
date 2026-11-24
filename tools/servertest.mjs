@@ -4260,7 +4260,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   r62 = await call({ action: 'task_notmine', id: 't62a' }, tokW, 'dev1');
   const ta = mem.gw_data['col:tasks'].items.find((x) => x.id === 't62a'); const cl1 = mem.gw_data['clog:appr:' + ym62];
   const n6 = r62.code === 200 && r62.body.task.who_id === '' && r62.body.task.who_by === 'notmine' && ta.who_id === '' && ta.who_by === 'notmine' && ta.notmine.prev === 'uwork' && ta.notmine.by === 'uwork' && r62.body.updated_at > 1000
-    && cl1 && cl1.items.length === 1 && cl1.items[0].f === 'who_id' && cl1.items[0].why === 'notmine' && cl1.items[0].p === 'veh:' && cl1.items[0].to === '' && cl1.items[0].h && cl1.head === cl1.items[0].h && JSON.stringify(cl1).indexOf('직원') < 0
+    && cl1 && cl1.items.length === 1 && cl1.items[0].f === 'who_id' && cl1.items[0].why === 'notmine' && cl1.items[0].px === 'veh:' && cl1.items[0].p === '' && cl1.items[0].to === '' && cl1.items[0].h && cl1.head === cl1.items[0].h && JSON.stringify(cl1).indexOf('직원') < 0
     && r62.body.signal && r62.body.signal.notmine === 1 && r62.body.signal.recard === false && auditMock.logs.length === auditN62 + 1 && auditMock.logs[auditN62].ev[0].op === '내것아님';
   r62 = await call({ action: 'task_notmine', id: 't62a' }, tokW, 'dev1'); const n7 = r62.code === 403;   // 이미 비워져 본인 아님
   T('62 task_notmine: 수동 NOT_AUTO · 타인 NOT_ASSIGNEE · 관리자도 본인 아니면 403 · 완료 TASK_DONE · 없음 404 · 성공=담당 비움+notmine{prev,by}+clog 1행(값 없음·해시)+신호 1건+감사 내것아님 · 재요청 403',
@@ -4286,10 +4286,15 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   r62 = await call({ action: 'save', collection: 'tasks', base: b2, doc: { schema: 1, items: edited } }, tokA);
   const ta3 = mem.gw_data['col:tasks'].items.find((x) => x.id === 't62a'); const tc3 = mem.gw_data['col:tasks'].items.find((x) => x.id === 't62c'); const cl3 = mem.gw_data['clog:appr:' + ym62].items.slice(3); const LA3 = mem.gw_data['lessons:appr'];
   const s2 = r62.code === 200 && ta3.who_id === 'uwork' && ta3.who_by === 'edit' && tc3.who_id === 'uwork2' && tc3.who_by === 'assign' && cl3.length === 3
-    && cl3.some((r) => r.id === 't62a' && r.f === 'who_id' && r.why === 'edit' && r.from === '' && r.to === 'set' && r.p === 'veh:' && r.by === 'uadmin')
-    && cl3.some((r) => r.id === 't62o' && r.f === 'due' && r.d === 8 && r.p === 'lic:') && cl3.some((r) => r.id === 't62b' && r.f === 'del' && r.to === '1')
+    && cl3.some((r) => r.id === 't62a' && r.f === 'who_id' && r.why === 'edit' && r.from === '' && r.to === 'set' && r.px === 'veh:' && r.by === 'uadmin')
+    && cl3.some((r) => r.id === 't62o' && r.f === 'due' && r.d === 8 && r.px === 'lic:') && cl3.some((r) => r.id === 't62b' && r.f === 'del' && r.to === '1')
     && LA3.prefixes['veh:'].who_edit === 1 && LA3.prefixes['veh:'].del === 1 && LA3.prefixes['lic:'].due_edit === 1 && LA3.prefixes['lic:'].due_med === 8 && JSON.stringify(mem.gw_data['clog:appr:' + ym62]).indexOf('2026-12-08') < 0;
   T('62 save 보호·신호: 낡은 사본 재배정 → 비운 채(clog 행 없음·배정표 같은 사람 되채움 없음) · 배정표가 다른 사람이면 채움 · 관리자 edit 재지정 통과+clog who_id edit · 기한 변경 d=8(날짜 값 미기록) · 삭제 del 행 · lessons 재집계', s1 && s2, JSON.stringify([s1, s2, r62.code, cl3, ta3.who_by, tc3 && tc3.who_id]));
+  { // C273: 사람 손 줄(내 것 아님 3 + 관리자 손 3)이 든 그 달 기록의 해시 체인이 온전(첫 줄 p '' · 줄마다 p = 앞 줄 h · h = sha256(p | h·p 뺀 본문) · head = 끝 줄 h) — 종전엔 접두어 칸 p가 체인 p를 덮었다
+    const cr62 = require('crypto'), ch62 = mem.gw_data['clog:appr:' + ym62]; let pv62 = '', ok62 = !!ch62 && ch62.items.length === 6;
+    for (const it of (ch62 ? ch62.items : [])) { const e = Object.assign({}, it); delete e.h; delete e.p; if (it.p !== pv62 || cr62.createHash('sha256').update(pv62 + '|' + JSON.stringify(e)).digest('hex').slice(0, 16) !== it.h) ok62 = false; pv62 = it.h; }
+    T('62 C273 clog:appr 체인 온전(사람 손 줄 6 · p = 앞 줄 h · 해시 맞음 · head)', ok62 && ch62.head === pv62, JSON.stringify(ch62 && ch62.items.map((x) => [x.p, x.px, x.h])).slice(0, 300));
+  }
   delete mem.gw_data['col:tasks']; delete mem.gw_data['clog:appr:' + ym62]; delete mem.gw_data['lessons:appr']; delete mem.gw_users['member:uwork2']; delete mem.gw_data['settings:assign'];
 }
 
@@ -16229,6 +16234,84 @@ function J91a(x) { return JSON.stringify(x); }
     T('66 급여 백업 암호화 ② 결함 사본 ' + MK.length + '개(봉하지 않음 · 열쇠 없이 반출 · 목록에서 안 뺌 · 위조를 그대로 씀) = 모두 ✗', killK.length === 0, killK.join(' | '));
   } catch (e) { T('66 급여 백업 암호화 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
   finally { const s = JSON.parse(snapK); mem.gw_users = s.u; mem.gw_data = s.d; if (envK === undefined) delete process.env.PAY_BACKUP_KEY; else process.env.PAY_BACKUP_KEY = envK; }
+}
+
+{ // ---- C273(11/24) 결재 학습 기록 clog:appr 해시 체인 — 원천: clogAppend가 체인 칸(h·p)을 마지막에 쓰고 해시 본문에서 뺌(+ 접두어 칸 px, 절 62) ·
+  //   덧대기: 재해 복원(backup_put)이 clog:appr:* 키에서만 C273 전 '옛 꼴 줄'(사람 손 줄의 접두어 p가 체인 p를 덮음 — 해시 = 앞 고리 | why 뒤에 p가 든 본문)을 그 식이 맞을 때 그대로 받음.
+  //   새 줄(px 있음)·다른 키(clog:stmt·clog:contract)·식이 틀린 줄은 거절. 결함 사본(gw-data·doneif 한 곳씩)에서는 실패해야 한다.
+  const fsC = require('fs'), ModC = require('module'), crC = require('crypto');
+  const FILEC = join(FN, 'gw-data.js'), SRCC = fsC.readFileSync(FILEC, 'utf8').replace(/\r\n/g, '\n');
+  const DFILEC = join(FN, '_lib', 'doneif.js'), DSRCC = fsC.readFileSync(DFILEC, 'utf8').replace(/\r\n/g, '\n');
+  const compileC = (file, src, from, to) => { if (from && src.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); const m = new ModC(file); m.filename = file; m.paths = ModC._nodeModulePaths(dirname(file)); m._compile(from ? src.replace(from, () => to) : src, file); return m.exports; };
+  const callC = (mod) => async (body) => { const r = await mod.handler({ httpMethod: 'POST', headers: {}, body: JSON.stringify(body) }); let b = {}; try { b = JSON.parse(r.body || '{}'); } catch (e) {} return { code: r.statusCode, body: b }; };
+  const ALC = require(join(FN, '_lib', 'apprlearn.js'));
+  const hC = (prev, e) => crC.createHash('sha256').update(prev + '|' + JSON.stringify(e)).digest('hex').slice(0, 16);
+  const oldAppend = (doc, entry) => { const d = doc || { schema: 1, items: [], head: '' }; const prev = d.head || ''; const h = hC(prev, entry); d.items.push(Object.assign({ h: h, p: prev }, entry)); d.head = h; return d; };   // C273 전 clogAppend 그대로(시험 재료)
+  const snapC = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  const chkC = async (c, D) => {
+    const P = {}, I = {};
+    // ① 원천(순수): 줄에 p·h가 있어도 체인 칸은 체인 값 · 해시 본문에 p·h 없음 · 접두어 px는 그대로
+    const n = D.clogAppend(D.clogAppend(null, { ts: 1, id: 'a', f: 'who_id', why: 'notmine', px: 'veh:', p: 'veh:', by: 'u1' }), { ts: 2, id: 'b', f: 'status', why: 'data:x', by: '앱 기준', h: 'zz' });
+    const s0 = Object.assign({}, n.items[0]); delete s0.h; delete s0.p; const s1 = Object.assign({}, n.items[1]); delete s1.h; delete s1.p;
+    P.src = n.items[0].p === '' && n.items[0].px === 'veh:' && n.items[0].h === hC('', s0) && n.items[1].p === n.items[0].h && n.items[1].h === hC(n.items[0].h, s1) && n.head === n.items[1].h && Object.keys(n.items[0]).slice(0, 2).join() === 'h,p';
+    I.src = [n.items[0].p, n.items[1].p === n.items[0].h];
+    // 옛 꼴 재료: 사람 손 줄(내 것 아님) → 크론 줄 → 사람 손 줄(기한 변경 d) — 지금 백업의 꼴(사람 손 줄 0번 + 크론 줄)을 넓힌 것
+    const OLD = oldAppend(oldAppend(oldAppend(null, { ts: 10, id: 't1', f: 'who_id', from: 'set', to: '', why: 'notmine', p: 'veh:', by: 'u1' }),
+      { ts: 11, id: 't2', f: 'status', from: 'open', to: 'review', why: 'data:x', by: '앱 기준' }), { ts: 12, id: 't3', f: 'due', from: 'set', to: 'set', why: 'edit', p: 'lic:', by: 'u2', d: 7 });
+    const put = (key, data) => c({ action: 'backup_put', secret: 'test-ingest-key', restore: true, store: 'gw_data', key: key, data: data, confirm: true });
+    // ② 덧대기: clog:appr:* 빈 자리 복원 = 200 · 줄은 고쳐 쓰지 않고 그대로(h·p·head 같음)
+    delete mem.gw_data['clog:appr:2026-10'];
+    const r1 = await put('clog:appr:2026-10', JSON.parse(JSON.stringify(OLD)));
+    const got = mem.gw_data['clog:appr:2026-10'] || {};
+    P.old = r1.code === 200 && JSON.stringify(got.items) === JSON.stringify(OLD.items) && got.head === OLD.head;
+    I.old = [r1.code, r1.body.error_code];
+    // ②' 옛 꼴 줄 뒤를 지금 앱이 잇고(새 꼴) 다시 백업 → 지금 체인 뒤를 잇는 복원(extend) 200
+    const ext = D.clogAppend(JSON.parse(JSON.stringify(OLD)), { ts: 13, id: 't4', f: 'del', from: '', to: '1', why: 'edit', px: 'bid:', by: 'u2' });
+    const r1b = await put('clog:appr:2026-10', ext);
+    P.extend = r1b.code === 200 && (mem.gw_data['clog:appr:2026-10'].items || []).length === 4 && r1b.body.preview.merge.mode === 'extend';
+    I.extend = [r1b.code, r1b.body.error_code];
+    // ③ 다른 키에는 열리지 않음
+    const r2 = await put('clog:stmt:2026-10', JSON.parse(JSON.stringify(OLD))), r3 = await put('clog:contract:2026-09', JSON.parse(JSON.stringify(OLD)));
+    P.keys = r2.code === 400 && r2.body.error_code === 'CLOG_CHAIN_BAD' && r3.code === 400 && r3.body.error_code === 'CLOG_CHAIN_BAD' && !mem.gw_data['clog:stmt:2026-10'];
+    I.keys = [r2.code, r2.body.error_code, r3.code, r3.body.error_code];
+    // ④ 새 꼴 줄(px 있음)은 옛 식으로 해시를 맞춰도 거절
+    const forge = { ts: 20, id: 't9', f: 'who_id', from: 'set', to: '', why: 'notmine', p: 'veh:', by: 'u9', px: 'veh:' };   // px를 끝에 — 옛 식(why 뒤 p)으로 해시가 정확히 맞게 만든 위조
+    const FN1 = oldAppend(null, forge);
+    const r4 = await put('clog:appr:2026-08', FN1);
+    // ⑤ 옛 꼴이어도 식이 안 맞으면(본문 변조·접두어 아닌 p·사유가 사람 손 아님) 거절
+    const T1 = JSON.parse(JSON.stringify(OLD)); T1.items[2].by = 'evil';
+    const T2 = oldAppend(null, { ts: 30, id: 'x', f: 'who_id', from: 'set', to: '', why: 'notmine', p: 'abc', by: 'u1' });
+    const T3 = oldAppend(null, { ts: 31, id: 'x', f: 'status', from: 'open', to: 'review', why: 'data:x', p: 'veh:', by: 'u1' });
+    const r5 = await put('clog:appr:2026-07', T1), r6 = await put('clog:appr:2026-06', T2), r7 = await put('clog:appr:2026-05', T3);
+    P.forge = [r4, r5, r6, r7].every((r) => r.code === 400 && r.body.error_code === 'CLOG_CHAIN_BAD') && !mem.gw_data['clog:appr:2026-08'] && !mem.gw_data['clog:appr:2026-07'];
+    I.forge = [r4, r5, r6, r7].map((r) => r.code + ':' + r.body.error_code);
+    // ⑥ 집계: 새 줄 px · 옛 줄 p(접두어 꼴만) · 크론 줄의 해시 p는 접두어로 안 셈
+    const L = ALC.tally(ext.items, '2026-10');
+    P.tally = L.prefixes['veh:'].notmine === 1 && L.prefixes['lic:'].due_edit === 1 && L.prefixes['bid:'].del === 1 && Object.keys(L.prefixes).length === 3;
+    I.tally = Object.keys(L.prefixes);
+    return { ok: Object.values(P).every((v) => v === true), info: '✗ ' + Object.keys(P).filter((k) => P[k] !== true).join(',') + ' ' + JSON.stringify(I) };
+  };
+  try {
+    const DC = require(DFILEC);
+    const RC = await chkC(callC(require(FILEC)), DC);
+    T('C273 결재 학습 기록 체인 ① 원천: clogAppend 체인 칸 마지막·해시 본문에서 뺌(접두어 px 그대로) · 덧대기: clog:appr:* 옛 꼴 줄(사람 손 · 접두어 p · 옛 식 해시 맞음) 복원 200·줄 그대로·뒤 잇기 extend · clog:stmt·clog:contract 400 · 새 꼴(px) 위조·본문 변조·접두어 아닌 p·사람 손 아닌 사유 400 · 집계 px/옛 p/크론 해시 제외', RC.ok, RC.info);
+    const MC = [
+      [FILEC, SRCC, "now, key.indexOf('clog:appr:') === 0);", 'now);'],
+      [FILEC, SRCC, "if (doc.apprOld !== true || Object.prototype", 'if (Object.prototype'],
+      [FILEC, SRCC, "Object.prototype.hasOwnProperty.call(it, 'px') || (it.why", '(it.why'],
+      [FILEC, SRCC, "if (k === 'why') e.p = it.p;", ''],
+      [DFILEC, DSRCC, "d.items.push(Object.assign({ h: h, p: prev }, e, { h: h, p: prev }));", 'd.items.push(Object.assign({ h: h, p: prev }, entry));'],
+      [DFILEC, DSRCC, "const e = Object.assign({}, entry); delete e.h; delete e.p;", 'const e = entry;']
+    ];
+    const killC = [];
+    for (const [f, src, a, b] of MC) {
+      let k;
+      try { const m = compileC(f, src, a, b); k = !(await chkC(callC(f === FILEC ? m : require(FILEC)), f === DFILEC ? m : DC)).ok; } catch (e) { k = 'err ' + e.message; }
+      if (k !== true) killC.push(a.trim().slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k));
+    }
+    T('C273 결재 학습 기록 체인 ② 결함 사본 ' + MC.length + '개(키 표식 안 넘김 · 모든 키에 열기 · px 줄도 받기 · 옛 식에서 p 빼기 · 종전 덧붙이기 · 해시 본문에 p 남김) = 모두 ✗', killC.length === 0, killC.join(' | '));
+  } catch (e) { T('C273 결재 학습 기록 체인 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+  finally { const s = JSON.parse(snapC); mem.gw_users = s.u; mem.gw_data = s.d; }
 }
 
 { // ---- P1 판38(원장 C166 · 착수 ㄱ C191 — PM 11/19) 지시 완료 창의 새 칸(이번 수검일·검사 신청일·연장(유예) 만료일) — veh_due_set 기록·검증 + 차량 저장 기록 합치기(vehLogUnion·vehLogKeep)

@@ -215,11 +215,15 @@ function apply(tasks, candidates, today) {
 // 변경 기록 clog:appr:<YYYY-MM> — append-only·해시 체인(규약 clog:<domain>:<YYYY-MM>). 값은 필드·사유만(PII 없음)
 // 상한 CLOG_MAX줄 — 넘으면 앞을 잘라 첫 줄 p가 ''가 아닐 수 있다(gw-data backup_put 재해 복원 병합이 같은 상한·느슨한 시작 검사를 쓴다 — v453 검토)
 const CLOG_MAX = 5000;
+// C273(11/24): 체인 칸(h·p)은 이 함수만 쓴다 — 넣는 줄에 같은 이름 칸이 있어도 해시 본문에서 빼고, 체인 값을 마지막에 덮는다.
+//   종전엔 Object.assign({h, p: prev}, entry)라 결재 학습 줄의 접두어 칸 p가 체인 p를 덮고 해시에도 들어가 체인이 깨졌다(그 달 키 재해 복원 400 CLOG_CHAIN_BAD).
+//   줄 칸 순서(h, p, 나머지)는 종전 그대로라 체인 칸이 없는 줄의 해시·저장 꼴은 바뀌지 않는다.
 function clogAppend(doc, entry) {
   const d = (doc && Array.isArray(doc.items)) ? doc : { schema: 1, items: [], head: '' };
   const prev = d.head || '';
-  const h = crypto.createHash('sha256').update(prev + '|' + JSON.stringify(entry)).digest('hex').slice(0, 16);
-  d.items.push(Object.assign({ h: h, p: prev }, entry));
+  const e = Object.assign({}, entry); delete e.h; delete e.p;
+  const h = crypto.createHash('sha256').update(prev + '|' + JSON.stringify(e)).digest('hex').slice(0, 16);
+  d.items.push(Object.assign({ h: h, p: prev }, e, { h: h, p: prev }));
   d.head = h;
   if (d.items.length > CLOG_MAX) d.items = d.items.slice(-CLOG_MAX);
   return d;

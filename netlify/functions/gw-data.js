@@ -511,9 +511,10 @@ async function handleSave(event, d, R) {
       if (!t || !t.auto_key) return; const o = oldByA[t.id]; if (!o) return;
       if (o.who_by === 'notmine' && t.who_id && t.who_by !== 'edit' && o.notmine && t.who_id === o.notmine.prev) { t.who_id = ''; t.who = ''; t.who_by = 'notmine'; t.notmine = o.notmine; }
       const p = AL.prefixOf(t.auto_key); if (!p) return;
-      if ((o.who_id || '') !== (t.who_id || '') && t.who_by !== 'notmine') clogRows.push({ id: t.id, f: 'who_id', from: o.who_id ? 'set' : '', to: t.who_id ? 'set' : '', why: 'edit', p: p, by: c.member.id });
-      if ((o.due || '') !== (t.due || '')) { const row = { id: t.id, f: 'due', from: o.due ? 'set' : '', to: t.due ? 'set' : '', why: 'edit', p: p, by: c.member.id }; const dd = AL.dayDiff(o.due, t.due); if (dd !== null) row.d = dd; clogRows.push(row); }
-      if (t.del === 1 && o.del !== 1) clogRows.push({ id: t.id, f: 'del', from: '', to: '1', why: 'edit', p: p, by: c.member.id });
+      // C273: 접두어 칸은 px(체인 칸 p와 다른 이름 — 종전 p는 clogAppend의 체인 p를 덮어 그 달 체인이 깨졌다)
+      if ((o.who_id || '') !== (t.who_id || '') && t.who_by !== 'notmine') clogRows.push({ id: t.id, f: 'who_id', from: o.who_id ? 'set' : '', to: t.who_id ? 'set' : '', why: 'edit', px: p, by: c.member.id });
+      if ((o.due || '') !== (t.due || '')) { const row = { id: t.id, f: 'due', from: o.due ? 'set' : '', to: t.due ? 'set' : '', why: 'edit', px: p, by: c.member.id }; const dd = AL.dayDiff(o.due, t.due); if (dd !== null) row.d = dd; clogRows.push(row); }
+      if (t.del === 1 && o.del !== 1) clogRows.push({ id: t.id, f: 'del', from: '', to: '1', why: 'edit', px: p, by: c.member.id });
     });
     if (clogRows.length) { try { await apprClogAppend(store(DATA), clogRows, Date.now()); } catch (e) {} }
     const blankBeforeS = {}; doc.items.forEach(function (t) { if (t && t.auto_key && !t.who_id) blankBeforeS[t.id] = 1; });
@@ -2147,7 +2148,7 @@ async function handleTaskNotmine(event, d, R) {
   const w = await blobSet(st, colKey('tasks'), doc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   const p = AL.prefixOf(t.auto_key); let L = null;
-  try { const cl = await apprClogAppend(st, [{ id: t.id, f: 'who_id', from: 'set', to: '', why: 'notmine', p: p, by: c.member.id }], now); if (cl.ok) L = cl.lessons; } catch (e) {}
+  try { const cl = await apprClogAppend(st, [{ id: t.id, f: 'who_id', from: 'set', to: '', why: 'notmine', px: p, by: c.member.id }], now); if (cl.ok) L = cl.lessons; } catch (e) {}   // C273 접두어 칸 px
   try { await appendAudit({ ts: now, by: c.member.name, bid: c.member.id, col: 'tasks', ev: [{ op: '내것아님', id: t.id, t: String(t.title || '').slice(0, 80) }] }); } catch (e) {}
   const px = (L && L.prefixes && L.prefixes[p]) ? L.prefixes[p] : null;
   return jr(200, { status: 'OK', updated_at: doc.updated_at, task: { id: t.id, who_id: '', who: '', who_by: 'notmine', notmine: t.notmine, updated: today }, signal: px ? { prefix: p, notmine: px.notmine, who_n: px.notmine_who_n, recard: px.recard } : null, request_id: R });
@@ -5437,7 +5438,23 @@ function backupClogChainOk(doc, strict) {
   const its = doc.items || [];
   if (strict) return conClogChainOk(doc);
   let prev = its.length ? String(its[0].p == null ? '' : its[0].p) : '';
-  for (const it of its) { const e = Object.assign({}, it); delete e.h; delete e.p; if (it.p !== prev || conClogHash(prev, e) !== it.h) return false; prev = it.h; }
+  // C273 덧대기: clog:appr:* 키(doc.apprOld — backupClogMerge가 키를 보고 붙임)에서만, C273 전 앱이 쓴 '옛 꼴 줄'을 받는다.
+  //   옛 꼴 = 사람 손 줄(why edit·notmine)의 접두어 칸 p(':'로 끝남)가 체인 p를 덮은 줄 — 해시는 '앞 고리 | why 바로 뒤에 p가 든 본문'으로 계산돼 있어 그 식으로 h가 맞을 때만(무결성은 그대로 검증).
+  //   새 줄(접두어 칸 px가 있음)·다른 키(clog:contract*·clog:stmt:* 등)·식이 안 맞는 줄은 이 갈래를 타지 않는다. 줄은 고쳐 쓰지 않고 그대로 받는다.
+  const oldOk = function (it, pv) {
+    if (doc.apprOld !== true || Object.prototype.hasOwnProperty.call(it, 'px') || (it.why !== 'edit' && it.why !== 'notmine') || typeof it.p !== 'string' || !/^[^:]+:$/.test(it.p)) return false;
+    const e = {}; Object.keys(it).forEach(function (k) { if (k === 'h' || k === 'p') return; e[k] = it[k]; if (k === 'why') e.p = it.p; });
+    return conClogHash(pv, e) === it.h;
+  };
+  for (let i = 0; i < its.length; i++) {
+    const it = its[i];
+    const e = Object.assign({}, it); delete e.h; delete e.p;
+    if (it.p !== prev || conClogHash(prev, e) !== it.h) {
+      const pv = i === 0 ? '' : prev;   // 옛 꼴 줄이 첫 줄이면 앞 고리 = 그 달 시작('') — 상한에서 잘린 체인 앞머리의 옛 꼴 줄은 검증할 수 없어 받지 않음
+      if (!oldOk(it, pv)) return false;
+    }
+    prev = it.h;
+  }
   return prev === (doc.head || '');
 }
 function backupLogMax(cls) { return cls === 'audit' ? AUDIT_MAX_PER_MONTH : (cls === 'doclog' ? DOCLOG_MAX : RECLOG_MAX); }
@@ -5470,15 +5487,15 @@ function backupLogMerge(curDoc, bkDoc, max, reserve, now) {
 //      지금 순서대로 붙이고 p·h를 백업 head부터 다시 계산 — 다시 이은 줄에는 rechained:<복원 시각>(해시에 들어감), 되돌리기 줄(revert)의 of는 옛 h → 새 h로 고친다.
 //      키 없는 sha256 체인이라 서버가 다시 이어도 신뢰 수준은 같다(줄 위조는 봇 키 + 재해 복원 모드에서만 가능 — 아래 restored 범위·감사 from/to로 대조).
 //   문서에는 restored[{ts, from(지금 head), to(새 head), bk(백업 head), added, rechained}](최근 20) — 다음 기록 쓰기도 남긴다(conClogDoc·DONEIF.clogAppend).
-function backupClogMerge(curDoc, bkDoc, max, strict, now) {
+function backupClogMerge(curDoc, bkDoc, max, strict, now, apprOld) {
   const isObj = function (e) { return !!e && typeof e === 'object' && !Array.isArray(e); };
   if (!isObj(bkDoc) || !Array.isArray(bkDoc.items)) return { err: 'BAD_CLOG_DOC' };
-  const bk = { items: bkDoc.items, head: String(bkDoc.head || '') };
+  const bk = { items: bkDoc.items, head: String(bkDoc.head || ''), apprOld: apprOld === true };   // C273 덧대기: clog:appr:* 만 옛 꼴 줄 갈래(backupClogChainOk)
   if (!bk.items.every(isObj) || !backupClogChainOk(bk, strict)) return { err: 'CLOG_CHAIN_BAD' };
   if (bk.items.length > max) return { err: 'CLOG_FULL' };
   const curOk = isObj(curDoc) && Array.isArray(curDoc.items);
   const curItems = curOk ? curDoc.items.filter(isObj) : [];
-  const cur = { items: curItems, head: curOk ? String(curDoc.head || '') : '' };
+  const cur = { items: curItems, head: curOk ? String(curDoc.head || '') : '', apprOld: bk.apprOld };
   const curChain = curOk && curItems.length === curDoc.items.length && backupClogChainOk(cur, strict);
   const base = Object.assign({ schema: 1 }, curOk ? curDoc : {});
   const own = function (o, k) { return Object.prototype.hasOwnProperty.call(o, k); };
@@ -5599,7 +5616,7 @@ async function backupRestorePlan(sn, key, cls, cur, data, preview) {
     payload = mg.doc; preview.merge = { added: mg.added, kept: mg.kept };
     note += ' · 붙임 ' + mg.added + '줄 · 지금 줄 ' + mg.kept + ' 그대로';
   } else if (cls === 'clog') {
-    const mg = backupClogMerge(curData, payload, backupClogMax(key), backupClogStrict(key), now);   // v453 해시 체인 — 잇기 · 갈라짐·깨짐은 다시 잇기(지금 줄 버리지 않음)
+    const mg = backupClogMerge(curData, payload, backupClogMax(key), backupClogStrict(key), now, key.indexOf('clog:appr:') === 0);   // v453 해시 체인 — 잇기 · 갈라짐·깨짐은 다시 잇기(지금 줄 버리지 않음)
     if (mg.err) return { status: 400, body: { status: 'REJECTED', error_code: mg.err } };
     payload = mg.doc; preview.merge = { added: mg.added, kept: mg.kept, rechained: mg.rechained, mode: mg.mode };
     note += ' · 체인 ' + mg.mode + ' · 백업 줄 ' + mg.added + ' · 지금 줄 ' + mg.kept + (mg.rechained ? ' · 다시 이음 ' + mg.rechained + '줄' : '') + ' · from ' + (mg.from || '-') + ' → to ' + (mg.to || '-');

@@ -1,6 +1,6 @@
 'use strict';
 // 결재(appr) 학습 신호 집계(v413, 착수 브리핑 C2-1) — 모델 호출 없음·토큰 0(설계 §3-14 appr 단계 메모: "AI 산출은 카드 기본값 3필드뿐이라 clog:appr 집계→배정표·리드 delta 카드로 충분").
-// 입력 = clog:appr:<YYYY-MM> 행 {ts, id, f(who_id|due|del|status), from/to('set'·'' 표식, 값 없음), why(notmine|edit|data:…), p(접두어), d(기한 변경 일수), by}
+// 입력 = clog:appr:<YYYY-MM> 행 {ts, id, f(who_id|due|del|status), from/to('set'·'' 표식, 값 없음), why(notmine|edit|data:…), px(접두어 — C273 전 줄은 p), d(기한 변경 일수), by} + 체인 칸 h·p(doneif.clogAppend)
 // 출력 = lessons:appr {schema, ym, prefixes{접두어: 집계}, rules[≤25], updated_at}. 규칙 = 사람이 읽는 delta 문구(배정표 R1 재카드·리드 개정 제안) — 사람이 규칙을 쓰지 않는다.
 const MAX_RULES = 25;
 const RECARD_N = 3;      // 접두어별 [내 것 아님] 월 3건 → R1 재카드(브리핑 §6)
@@ -12,11 +12,20 @@ function dayDiff(a, b) {
   const re = /^\d{4}-\d{2}-\d{2}$/; if (!re.test(String(a || '')) || !re.test(String(b || ''))) return null;
   return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86400000);
 }
+// C273(11/24): 접두어 칸 = px(체인 칸 p와 다른 이름). 옛 줄(C273 전 — 접두어가 체인 칸 p를 덮은 줄)은 px가 없고 p가 접두어 꼴(':'로 끝남)일 때만 접두어로 읽는다
+//   — 크론 줄의 p(16자리 체인 해시)를 접두어로 세지 않게.
+function prefixOfRow(r) {
+  if (typeof r.px === 'string') return r.px;
+  if (r.px === undefined && typeof r.p === 'string' && /^[^:]+:$/.test(r.p)) return r.p;
+  return '';
+}
 function tally(rows, ym) {
   const P = {};
   (Array.isArray(rows) ? rows : []).forEach(function (r) {
-    if (!r || !r.p) return;
-    const x = P[r.p] = P[r.p] || { notmine: 0, _who: {}, who_edit: 0, due_edit: 0, _days: [], del: 0, reject: 0 };
+    if (!r) return;
+    const px = prefixOfRow(r);
+    if (!px) return;
+    const x = P[px] = P[px] || { notmine: 0, _who: {}, who_edit: 0, due_edit: 0, _days: [], del: 0, reject: 0 };
     if (r.f === 'who_id' && r.why === 'notmine') { x.notmine++; if (r.by) x._who[String(r.by)] = 1; }
     else if (r.f === 'who_id') x.who_edit++;
     else if (r.f === 'due') { x.due_edit++; if (typeof r.d === 'number') x._days.push(r.d); }
