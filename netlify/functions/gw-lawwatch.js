@@ -4,6 +4,7 @@
 // 인증: 수집봇 공유 시크릿(BIDS_INGEST_KEY, gw-data ingest와 동일 계열) — 헤더 x-ingest-key 또는 body.key.
 // 동작: 전문을 lawwatch:last 에 보관(추후 화면용) + 관리자 전원 푸시(알림함은 sendTo가 자동 기록).
 //   P1 판7: 법령 개정 감지 누적 목록 = 별도 키 lawwatch:changed(_lib/lawchg — 읽기 성공 때만 합쳐 씀). lawwatch:last 꼴·푸시 제목·본문·받는 사람은 종전 그대로.
+const REQSHAPE = require('./_lib/reqshape');   // C240 판 A-1 가르는 칸은 글자만(들머리)
 const push = require('./_lib/push');
 const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { botKeyOk } = require('./_lib/keymatch');
@@ -35,6 +36,7 @@ exports.handler = async (event) => {
   try { setupBlobContext(event); } catch (e) {}
   let d = {};
   try { d = JSON.parse(event.body || '{}'); } catch (e) { return jr(400, { status: 'BAD_JSON' }); }
+  { const bf = REQSHAPE.badField(d, ['key']); if (bf) return jr(400, { status: 'BAD_FIELD', field: bf }); }   // C240 판 A-1 가르는 칸은 글자만(배열·객체·숫자 = 400 — 저장소 읽기 전)
 
   // v456(원장 C108): 상수시간 비교(_lib/keymatch botKeyOk — gw-data와 같은 규칙, 종전 '!==')
   const got = (event.headers && (event.headers['x-ingest-key'] || event.headers['X-Ingest-Key'])) || d.key || '';

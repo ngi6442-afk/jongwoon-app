@@ -9,6 +9,7 @@
 // 권한은 gw-promo-ai와 같은 문(promo 'do'). 원본 첨부는 절대 바꾸지 않는다 — 가린 판은 gw_files 'mask:<att_id>', 상태는 'maskmeta:<att_id>'.
 // 월 호출 상한(promomask:usage) — force 반복으로 과금이 새지 않게(적대 검증 #3).
 const crypto = require('crypto');
+const REQSHAPE = require('./_lib/reqshape');   // C240 판 A-1 가르는 칸은 글자만(들머리)
 const { setupBlobContext, store, blobGet, blobSet, blobDelete } = require('./_lib/blobs');
 const { issueSession, verifyToken, bearer } = require('./_lib/session');
 const { appendAudit } = require('./_lib/audit');
@@ -234,6 +235,7 @@ async function handler(event) {
   setupBlobContext(event);
   let d;
   try { d = JSON.parse(event.body || '{}'); } catch { return jr(400, { ok: false, code: 'INVALID_JSON', request_id: R }); }
+  { const bf = REQSHAPE.badField(d, ['action', 'job', 'promo_id', 'att_id']); if (bf) return jr(400, { ok: false, code: 'BAD_FIELD', field: bf, request_id: R }); }   // C240 판 A-1 가르는 칸은 글자만(배열·객체·숫자 = 400 — 저장소 읽기 전)
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { ok: false, code: c.reason || 'NO_SESSION', request_id: R });
   if (!(await deviceApproved(event, c.member))) return jr(403, { ok: false, code: 'DEVICE_NOT_APPROVED', request_id: R });

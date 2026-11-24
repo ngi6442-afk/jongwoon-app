@@ -50,6 +50,10 @@
 [functions."gw-mchk-cron"]
   schedule = "0 22 * * *"
 
+# C251 감사 줄 열쇠 접기 — UTC 03:10·08:10·18:10 = KST 12:10·17:10·03:10 하루 3번. 그달 + 전달의 쓴 지 20분 넘은 줄 열쇠를 접은 문서로 묶고 지움(_lib/audit.js foldRun).
+[functions."gw-audit-fold-cron"]
+  schedule = "10 3,8,18 * * *"
+
 # 29 판⑦ 메일 에이전트(PM 11/17 'A안 ㄱ') — UTC 22:00 = KST 07:00 매일. 예약은 기동만, 메일 읽기는 gw-stmtmail-run-background(15분).
 # 계정 = 환경변수 STMT_MAIL_USER·STMT_MAIL_PASS(PM이 직접 넣음) — 없으면 워커가 'MAIL_NOT_SET'만 남기고 끝남. 수동 = gw-cron-kick target 'stmtmail'.
 [functions."gw-stmtmail-cron"]

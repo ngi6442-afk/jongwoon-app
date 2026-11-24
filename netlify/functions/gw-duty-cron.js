@@ -93,6 +93,9 @@ function contractBody(items) {
 }
 
 exports.handler = async function (event) {
+  // C240 판 A: netlify.toml에 예약이 없는 함수라 Netlify로 들어오는 실행은 전부 주소로 부른 HTTP 요청(httpMethod·headers가 있음) — 아무것도 하지 않고 끝냄(인증 없는 푸시 1발·duty:sent 표식 선점 막기).
+  //   계약직 2년 알림은 gw-todo-cron 08:00이 이 파일의 contractPlan을 require로 부른다(그 길은 handler를 거치지 않음). 예약으로 되살리려면 netlify.toml 등록과 함께 이 줄을 고칠 것
+  if (event && (event.httpMethod || event.headers)) return { statusCode: 404, body: JSON.stringify({ ok: false, code: 'NOT_SCHEDULED' }) };
   const today = kstToday();
   let st;
   try { setupBlobContext(event); st = store(DATA); } catch (e) { return { statusCode: 500, body: JSON.stringify({ ok: false, code: 'NO_BLOB_CONTEXT' }) }; }

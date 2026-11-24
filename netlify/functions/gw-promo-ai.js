@@ -16,6 +16,7 @@
 //
 // 결과는 promo 레코드에 직접 쓰지 않는다 — job blob에만 담고 UI가 검수 화면에 채운다(사람 승인 전 저장 금지).
 const crypto = require('crypto');
+const REQSHAPE = require('./_lib/reqshape');   // C240 판 A-1 가르는 칸은 글자만(들머리)
 const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { issueSession, verifyToken, bearer } = require('./_lib/session');
 const { appendAudit } = require('./_lib/audit');
@@ -274,6 +275,7 @@ async function handler(event) {
   setupBlobContext(event);
   let d;
   try { d = JSON.parse(event.body || '{}'); } catch { return jr(400, { ok: false, code: 'INVALID_JSON', request_id: R }); }
+  { const bf = REQSHAPE.badField(d, ['action', 'job', 'promo_id']); if (bf) return jr(400, { ok: false, code: 'BAD_FIELD', field: bf, request_id: R }); }   // C240 판 A-1 가르는 칸은 글자만(배열·객체·숫자 = 400 — 저장소 읽기 전)
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { ok: false, code: c.reason || 'NO_SESSION', request_id: R });
   if (!(await deviceApproved(event, c.member))) return jr(403, { ok: false, code: 'DEVICE_NOT_APPROVED', request_id: R });

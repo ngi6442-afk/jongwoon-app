@@ -20,6 +20,7 @@
 //   어긋나면 응답 idx:false·gap:false로 알린다(앱이 stmt_reindex로 색인을 다시 만듦).
 const crypto = require('crypto');
 const zlib = require('zlib');
+const REQSHAPE = require('./_lib/reqshape');   // C240 판 A-1 가르는 칸은 글자만(들머리)
 const { setupBlobContext, store, blobGet, blobSet, blobList, blobDelete } = require('./_lib/blobs');
 const { verifyToken, bearer } = require('./_lib/session');
 const { appendAudit } = require('./_lib/audit');
@@ -781,6 +782,7 @@ async function handler(event) {
   let d;
   try { d = parseBody(event); } catch (e) { return bad('INVALID_JSON', R); }
   if (!d || typeof d !== 'object' || Array.isArray(d)) return bad('INVALID_JSON', R);
+  { const bf = REQSHAPE.badField(d, ['action', 'group', 'via', 'vk', 'ym', 'job']); if (bf) return bad('BAD_FIELD', R); }   // C240 판 A-1 가르는 칸은 글자만(배열·객체·숫자 = 400 — 저장소 읽기 전)
   const act = typeof d.action === 'string' ? d.action : '';
   const isRead = Object.prototype.hasOwnProperty.call(READ, act), isWrite = Object.prototype.hasOwnProperty.call(WRITE, act);
   if (!isRead && !isWrite) return bad('UNKNOWN_ACTION', R);
