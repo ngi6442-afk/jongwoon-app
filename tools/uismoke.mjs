@@ -21966,7 +21966,7 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l));
     const FT = ['`payXlsSheets`', '`pay_base_save`', '`buildSimpleXlsx`', '`tools/pay_ledger_fixture.xls`', '70·292칸'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v528 \(2026-11-24\)\./.test(d.ft) && mF.length === 0 && cb.length === 4 && /SHELL_CACHE = 'jw-shell-v528'/.test(d.sw) && d.cl.indexOf('- **66 급여 판3(v528)**') > 0 && d.man.indexOf('<li><b>급여 대장 불러오기·내려받기·명세서</b> (2026-11 v528)') > 0;
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 528 && mF.length === 0 && cb.length === 4 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 528 && d.cl.indexOf('- **66 급여 판3(v528)**') > 0 && d.man.indexOf('<li><b>급여 대장 불러오기·내려받기·명세서</b> (2026-11 v528)') > 0;
     return { ok, info: { mF, cb: cb.length } };
   };
   const rT = chkT(DT);
@@ -22898,6 +22898,34 @@ try {
   T('P1 판38 8차-e 검사 기록 칸 규칙 둘 + C280(실행 — 지금 코드·실제 수정 창·완료 창): ㉠ 만기 지우며 수검일 = 막음 · 수검일 + 새 만기 뒤 매각 = 넣지 않은 저장과 같음 · ㉡ 수검일 뒤 매각(만기 그대로) = 막지 않음 · 건설기계 신청일(맞는 값·덜 채운 날) 뒤 자동차로 = 막지 않음·안 남음 · 다시 보이면 수검일 빈 칸·연장 칸 차량 줄 값 · 창 두 번 = 앞 창 값 안 섞임 · C280 보이는 수검일·연장 덜 채운 날 = 안내(차량 줄 그대로) · 숨은 덜 채운 날 = 막지 않음 · 갱신 + 수검일 = 기록 줄 · 같은 회차 정정 = 끝 안내 · 완료 창 연장·수검일 덜 채운 날 = 안내 · 차량 줄 연장이 달력에 없는 글·너무 뒤 = 손대지 않으면 막지 않음(ext_was 빈 칸) · 갱신 + 수검일 = law · 새 만기 없이 수검일 = 막음 그대로 · 결함 사본 ' + MUTE.length + '개 = 모두 ✗',
     okE(realE) && killE.length === 0, JSON.stringify({ bad: KE.filter((k) => realE[k] !== true), kill: killE }));
 } catch (e) { console.log('  (P1 판38 8차-e 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v529(판38 — 차량 검사 기록 칸·기록만 · 원장 C166·C191): 실행 검사는 위 'P1 판38' 블록들 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd529 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D529 = { ft: rd529('FEATURES.md'), tl: rd529('TESTLIST.md'), sw: rd529('sw.js'), man: rd529('MANUAL.html'), cl: rd529('CLAUDE.md'), ix: rd529('index.html') };
+  const FIX529 = ["<span class=\"fld-label\">검사 기록 — 만기를 바꿀 때 같이</span>", "<div class=\"veh-hint\">수검일 = 검사를 받은 날(검사 결과표·영수증). 넣은 날짜는 기록으로 남깁니다 — 법정 만기 제안 계산에는 아직 쓰지 않습니다. 신청일은 건설기계만 · 연장 만료일은 있을 때만.</div>", "<div class=\"veh-hint\">수검일 = 검사를 받은 날. 넣은 날짜는 기록으로 남깁니다 — 법정 만기 제안 계산에는 아직 쓰지 않습니다. 신청일은 건설기계만 · 연장 만료일은 있을 때만.</div>", "if (extNow !== null) extGone = extNow === \"\";", "[\"vehInspDone\", \"vehInspApply\", \"vehInspExt\"].forEach(function(id){", "if (!st) return 0;", "if (!rP || !vehLawWinHas(rP)){ cur = null; st = []; continue; }", "if (!e || !vehRealDate(e.prev)) return null;   /" + "/ 8차 지시(7차 ③): 종전 만기가 달력 날짜가 아닌 줄(만기 빈 차의 첫 줄 등)은 어디서도 E를 세지 않음", "if (!r || !vehLawWinHas(r)) return null;", "var vals;", "if (vals.some(function(s){ return !vehRealDate(s) || s > e.confirmed; })) return null;", "if (pk.e < 0) return { rec: true };", "if (!sv) return { rec: true };", "if (!v.insp_due && d < anchor) continue;", "if (!best) return { rec: true };", "holi: \"기간 끝날이 토요일·공휴일이면 그다음 날까지 기간 안일 수 있음(민법 161조)\",", "if (!v || !vehRealDate(prev) || !vehRealDate(conf)) return false;", "if (x.insp_apply && x.insp_apply > today) return \"검사 신청일이 오늘 뒤입니다.\";", "if (!vehLaw38On()) return \"\";", "el = document.getElementById(\"vehCeqHint\"); if (el && !VEH_LAW_CHAIN_ON) el.style.display = \"none\";   /" + "/ 8차-d: 이어 세기 꺼짐이면 건설기계 사업용 여부·연식도 필수(운영 판) — '비워도 됨' 안내를 감춤", "if (inspLog) delete inspLog.extMove;", "AUDIT_FIELD_LABEL.insp_ext = \"연장(유예) 만료일\";   /" + "/ P1 판38 8차-c: 차량 감사 줄의 연장 칸 이름표(표시만 — 없으면 날 열쇠 insp_ext가 보임)"];
+  const chk529 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v529 (11/24)', '\n### '), tlv = cut(d.tl, '\n## v529 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`vehModalInspSync`", "원장 C191"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v529 \(2026-11-24\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 7 && gate.length === 2 && scr.length === 5 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**판38(v529') > 0
+      && FIX529.every((x) => d.ix.split(x).length === 2)
+      && /SHELL_CACHE = 'jw-shell-v529'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX529.map((x) => d.ix.split(x).length - 1) } };
+  };
+  const r529 = chk529(D529);
+  const mu529 = (k, f) => chk529(Object.assign({}, D529, { [k]: f(D529[k]) })).ok;
+  const M529 = [mu529('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v528 (')), mu529('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v528'")),
+    mu529('ft', (s) => s.split('`vehModalInspSync`').join('vehModalInspSync')),
+    mu529('cl', (s) => s.replace('**판38(v529', '판38(')),
+    mu529('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v528 0974b0b 위로 다시 얹은 판) — 결과는 배포 전 전체 게이트 기록 판38_게이트_v529_1124.txt', '\n- (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v528 0974b0b 위로 다시 얹은 판) — 결과는 배포 전 전체 게이트 기록 판38_게이트_v529_1124.txt'))]
+    .concat(FIX529.map((x) => mu529('ix', (s) => s.replace(x, ''))));
+  T('v529 문서·판 번호(정확 검사): FEATURES 기준 v529 (2026-11-24)·v529 절(판38) · TESTLIST v529 칸 7(화면·운영 확인 5 · 게이트 [x] 2) · CLAUDE.md 한 줄 · 고정 글 22줄 한 번씩 · sw jw-shell-v529 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
+    r529.ok && M529.every((v) => v === false), JSON.stringify({ r: r529.info, mut: M529 }));
+} catch (e) { console.log('  (v529 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
