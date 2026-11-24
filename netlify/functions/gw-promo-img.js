@@ -11,8 +11,10 @@
 //   ③ 토큰은 32바이트 난수(추측 불가), ④ 만료 없음(게시글이 영구 참조 — 8/21 개정), ⑤ 인덱스로만 접근(첨부 id 비노출).
 // 애초에 공개 블로그에 실릴 사진이라 성격상 공개 대상이지만, 그래도 기간·범위를 묶어 둔다.
 const crypto = require('crypto');
+const REQSHAPE = require('./_lib/reqshape');   // C240 판 A-1 가르는 칸은 글자만(들머리)
 const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { verifyToken, bearer } = require('./_lib/session');
+const IMG = require('./_lib/imgsniff');   // C265 공개 응답 그림 형식 허용 목록
 
 const DATA = 'gw_data';
 const USERS = 'gw_users';
@@ -88,11 +90,15 @@ async function handleImg(qs, R) {
   if (!fr.ok || !fr.data) return jr(404, { status: 'REJECTED', error_code: 'NO_FILE', request_id: R });
   // 홍보 사진만 — 다른 종류 첨부(계약·석면 등)는 이 통로로 절대 나가지 않는다
   if (String(fr.data.kind || '') !== 'promo') return jr(403, { status: 'FORBIDDEN', error_code: 'NOT_PROMO', request_id: R });
+  // C265: 그림 형식만 — 저장된 type이 허용 목록(jpeg·png·webp) 밖이거나 머리 바이트가 그림이 아니면 거절. Content-Type은 머리 바이트로 정한 값(가린 판도 같은 규칙)
+  const ctype = IMG.publicImageType(fr.data);
+  if (!ctype) return jr(415, { status: 'REJECTED', error_code: 'NOT_IMAGE', request_id: R });
 
   return {
     statusCode: 200,
     headers: Object.assign({
-      'Content-Type': String(fr.data.type || 'image/jpeg'),
+      'Content-Type': ctype,
+      'X-Content-Type-Options': 'nosniff',      // C265: 브라우저가 형식을 추측해 다른 종류로 열지 않게
       'Cache-Control': 'public, max-age=300',   // v353 후속: 가리기 수정이 5분 안에 반영되게(24시간이면 원본이 하루 남는다)
       'X-Robots-Tag': 'noindex'
     }, CORS),
@@ -109,6 +115,7 @@ exports.handler = async function (event) {
     if (event.httpMethod === 'GET') return await handleImg(event.queryStringParameters || {}, R);
     if (event.httpMethod === 'POST') {
       let d = {}; try { d = JSON.parse(event.body || '{}'); } catch (e) { return jr(400, { status: 'REJECTED', error_code: 'BAD_JSON', request_id: R }); }
+      { const bf = REQSHAPE.badField(d, ['action', 'promo_id']); if (bf) return jr(400, { status: 'REJECTED', error_code: 'BAD_FIELD', field: bf, request_id: R }); }   // C240 판 A-1 가르는 칸은 글자만(배열·객체·숫자 = 400 — 저장소 읽기 전)
       if (d.action === 'share_make') return await handleShareMake(event, d, R);
       return jr(400, { status: 'REJECTED', error_code: 'UNKNOWN_ACTION', request_id: R });
     }

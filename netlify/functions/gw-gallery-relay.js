@@ -14,6 +14,7 @@
 // 사진: 대표 3장(기록의 앞 3장). 업로드 시점에 이미 웹용으로 리사이즈돼 있다(1600px·jpeg q0.82).
 // 중복 방지: gallery:pr:<promo_id> blob + gallery.json 내 같은 블로그 주소 존재 검사(재클릭은 기존 PR 안내).
 const crypto = require('crypto');
+const REQSHAPE = require('./_lib/reqshape');   // C240 판 A-1 가르는 칸은 글자만(들머리)
 const { setupBlobContext, store, blobGet, blobSet } = require('./_lib/blobs');
 const { verifyToken, bearer } = require('./_lib/session');
 const { appendAudit } = require('./_lib/audit');
@@ -288,6 +289,7 @@ exports.handler = async function (event) {
     setupBlobContext(event);
     let d;
     try { d = JSON.parse(event.body || '{}'); } catch { return jr(400, { ok: false, code: 'INVALID_JSON', request_id: R }); }
+    { const bf = REQSHAPE.badField(d, ['action', 'promo_id']); if (bf) return jr(400, { ok: false, code: 'BAD_FIELD', field: bf, request_id: R }); }   // C240 판 A-1 가르는 칸은 글자만(배열·객체·숫자 = 400 — 저장소 읽기 전)
     if (d && d.action === 'gallery_publish') return await handlePublish(event, d, R);
     return jr(400, { ok: false, code: 'UNKNOWN_ACTION', request_id: R });
   } catch (e) {

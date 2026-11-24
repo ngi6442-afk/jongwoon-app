@@ -75,7 +75,9 @@ exports.handler = async function (event, context) {
     if (!finalBody) { await finish('fail', 'EMPTY_FINAL', '최종본 본문이 비었습니다'); return; }
 
     const lr = await blobGet(st, PL.LESSONS_KEY);
-    const lessons = PL.normLessons(lr.ok ? lr.data : null);
+    // C225 판 A: 규칙 창고를 못 읽으면(읽기·파싱 실패) 이 회차를 건너뛰고 실패 기록(다음 크론이 다시) — 빈 창고로 보고 덮어 규칙·'자동 학습 끔' 스위치가 지워지던 길(모델 호출 전)
+    if (!lr.ok && lr.code !== 'NOT_FOUND') { await finish('fail', 'LESSONS_READ_FAILED', lr.code); return; }
+    const lessons =PL.normLessons(lr.ok ? lr.data : null);
     const facility = PL.facilityKey(rec);
     const pp = PL.buildLearnPrompt({ draft_title: draft.title, draft_body: draft.body, final_title: finalTitle, final_body: finalBody, rules: lessons.rules, facility: facility });
 

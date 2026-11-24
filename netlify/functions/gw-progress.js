@@ -5,6 +5,7 @@
 // 번들한다(gw-data.js의 bjd.json과 같은 경로). /netlify/* 정적 경로는 netlify.toml의 force 재작성으로 막는다.
 // 갱신: 00_진척도/진척도_빌드.js가 progress.json을 다시 쓰고 커밋·푸시하면 배포된다.
 const crypto = require('crypto');
+const REQSHAPE = require('./_lib/reqshape');   // C240 판 A-1 가르는 칸은 글자만(들머리)
 const { setupBlobContext, store, blobGet } = require('./_lib/blobs');
 const { verifyToken, bearer } = require('./_lib/session');
 const { appendAudit } = require('./_lib/audit');
@@ -33,6 +34,7 @@ exports.handler = async function (event) {
   setupBlobContext(event);
   let d;
   try { d = JSON.parse(event.body || '{}'); } catch (e) { return jr(400, { ok: false, code: 'INVALID_JSON', request_id: R }); }
+  { const bf = REQSHAPE.badField(d, ['action']); if (bf) return jr(400, { ok: false, code: 'BAD_FIELD', field: bf, request_id: R }); }   // C240 판 A-1 가르는 칸은 글자만(배열·객체·숫자 = 400 — 저장소 읽기 전)
   try {
     const c = await currentMember(event);
     if (!c.ok) return jr(401, { ok: false, code: c.reason || 'NO_SESSION', request_id: R });

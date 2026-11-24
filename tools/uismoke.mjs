@@ -12,6 +12,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const html = readFileSync(join(ROOT, 'index.html'), 'utf8');
 const gwd = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8') + '\n' + readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'docscope.js'), 'utf8');   // v424 문서함 판정은 _lib/docscope.js로 옮김
 const auth = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-auth.js'), 'utf8');
+// C280(11/20): 앱 날짜 칸 도우미(index.html @date-field 구간 원문)를 전역에 둔다 — 저장 함수 원문을 떼어 new Function으로 돌리는 옛 시험 틀들이 dateFieldRead를 찾게(틀마다 고치지 않음)
+{ const a = html.indexOf('// @date-field-start'), b = html.indexOf('// @date-field-end'); if (a >= 0 && b > a) (0, eval)(html.slice(a, b)); }
 
 let fails = 0;
 const T = (name, ok, note) => { console.log((ok ? '  ✓ ' : '  ✗ ') + name + (ok ? '' : ' — ' + note)); if (!ok) fails++; };
@@ -1258,8 +1260,8 @@ try {
   {
     const cut = (name) => { const i = html.indexOf('function ' + name + '('); if (i < 0) throw new Error(name + ' 없음'); let dpt = 0, j = html.indexOf('{', i); for (let k = j; k < html.length; k++) { if (html[k] === '{') dpt++; else if (html[k] === '}') { dpt--; if (!dpt) return html.slice(i, k + 1); } } throw new Error(name + ' 끝 없음'); };
     const consts = html.match(/var AB_EXTRA_ROW_MIN = 40, AB_EXTRA_ROW_MAX = 999;/)[0] + html.match(/var AB_XLSX_1P = \d+, AB_XLSX_2P = \d+, AB_XLSX_NEAR = \d+;/)[0];
-    const mk = new Function('LIST', 'CAN', 'var esc = function(s){ return String(s); }; function abRouteList(){ return LIST; } function abCanLearn(){ return CAN; }' + consts
-      + ['abXlsxVisN', 'abXlsxPages', 'abXlsxLeft', 'abXlsxPageText', 'abXlsxNearHtml', 'abXlsxGrowNote', 'abFreeReserve'].map(cut).join('\n')
+    const mk = new Function('LIST', 'CAN', 'var esc = function(s){ return String(s); }; var abDay = { data: {} }, abStatus = { routes: LIST }; function abRouteList(){ return LIST; } function abCanLearn(){ return CAN; }' + consts
+      + ['abXlsxVisN', 'abXlsxPages', 'abXlsxLeft', 'abXlsxPageText', 'abXlsxNearHtml', 'abXlsxGrowNote', 'abRoutesKnown', 'abFreeReserve'].map(cut).join('\n')
       + 'return { vis: abXlsxVisN, pages: abXlsxPages, left: abXlsxLeft, text: abXlsxPageText, near: abXlsxNearHtml, grow: abXlsxGrowNote, free: abFreeReserve };');
     const base = [...html.matchAll(/\{s:"([LR])",r:(\d+),f:"([^"]*)",t:"([^"]*)",i:"([^"]*)"\}/g)].map((m) => ({ s: m[1], r: Number(m[2]), f: m[3], t: m[4], i: m[5], h: false }));
     const prod = base.map((x) => Object.assign({}, x));
@@ -1282,8 +1284,8 @@ try {
     T('abFreeReserve 경계: 빈 표 L40·R41(R40은 기본표) · 왼쪽 40~999 소진이면 L 0(빈 번호 없음)·R 41 · 범위 밖 번호(1000)·모르는 열은 무시',
       (() => { const a = mk(base, true).free(), b = mk(fullL, true).free(), c = mk(base.concat([{ s: 'L', r: 1000, f: 'a', t: 'b', i: '', h: false }, { s: 'X', r: 40, f: 'a', t: 'b', i: '', h: false }]), true).free(); return a.L === 40 && a.R === 41 && b.L === 0 && b.R === 41 && c.L === 40 && c.R === 41; })(), '');
     T('화면 글: 새 노선 폼·확인창·나누기에 "예비 줄/예비 행" 말이 없다(줄 번호·가나다순 자동) · 표 아래 미리 알림이 숨긴 노선 줄 다음에 걸려 있다',
-      /새 노선 — 노선표에 새 줄로 추가하고 이 조합을 바로 지정합니다\. 엑셀·화면 자리는 배출자 가나다순으로 자동이고, 줄 번호는 식별용입니다\./.test(html) && /"\\n→ 줄 번호 " \+ side \+ free\[side\] \+ " \(엑셀 자리는 가나다순 자동\)/.test(html)
-      && />왼쪽\(L\) 번호' \+ \(free\.L \? " — L" \+ free\.L : " — 빈 번호 없음"\)/.test(html) && /에서 떼어 별도 줄로 만듭니다\./.test(html) && !/예비 행에 별도 줄|\(양식 예비 줄\)|빈 줄 없음"/.test(html)
+      /새 노선 — 노선표에 새 줄로 추가하고 이 조합을 바로 지정합니다\. 엑셀·화면 자리는 배출자 가나다순으로 자동이고, 줄 번호는 식별용입니다\./.test(html) && /var numTxt = free\.known \? \("줄 번호 " \+ side \+ free\[side\] \+ " 예정"\) : \("줄 번호는 저장할 때 정해집니다"\);/.test(html) && /"\\n→ " \+ numTxt \+ " \(엑셀 자리는 가나다순 자동\)/.test(html)
+      && />왼쪽\(L\) 번호' \+ num\("L"\) \+ '<\/option>'/.test(html) && /free\[s\] \? " — " \+ s \+ free\[s\] \+ " 예정" : " — 빈 번호 없음"/.test(html) && /에서 떼어 별도 줄로 만듭니다\./.test(html) && !/예비 행에 별도 줄|\(양식 예비 줄\)|빈 줄 없음"/.test(html)
       && /h \+= abHiddenListHtml\(\);[^\n]*\n\s*h \+= abXlsxNearHtml\(\);/.test(html), '');
     { const g0 = html.indexOf('function abRouteAddGo('), g1 = html.indexOf('function abLearnGo(', g0), go = html.slice(g0, g1);
       T('새 노선 길이 한도(상·하차지 60·품목 40 — 서버 cleanExtraRoute와 같은 값)를 보내기 전에 정확한 글로 알린다(확인창·서버 호출보다 앞)',
@@ -1294,8 +1296,67 @@ try {
       const f0 = html.indexOf('function abNewRouteFormHtml('), fm = html.slice(f0, html.indexOf('function abRouteAddGo(', f0));
       const v0 = html.indexOf('function abVariantSplit('), vs = html.slice(v0, html.indexOf('function abFreeReserve(', v0));
       T('배선: 폼 머리글에 쪽수 줄(abXlsxPageText) · 새 노선·[별도 줄로 나누기] 확인창에 쪽 늘어남 덧글(abXlsxGrowNote) · abRouteAddGo·abVariantSplit이 줄 번호 상한을 직접 적어 막지 않는다(빈 번호 없음 = abFreeReserve 0 뿐)',
-        /esc\(abXlsxPageText\(abXlsxVisN\(\)\)\)/.test(fm) && /그 줄로 지정합니다\." \+ abXlsxGrowNote\(\)\)\) return;/.test(go) && /반영됩니다\." \+ abXlsxGrowNote\(\) \+ "\\n\\n진행할까요\?"\)\) return;/.test(vs)
-        && /if \(!free\[side\]\)\{ alert\(AB_CODE_TEXT\.ROWS_FULL\); return; \}/.test(go) && !/free\[side\] *[<>]=? *\d|free\.[LR] *[<>]=? *\d|[<>]=? *49\b/.test(go + vs + fm), ''); }
+        /esc\(free\.known \? abXlsxPageText\(abXlsxVisN\(\)\) : /.test(fm) && /그 줄로 지정합니다\." \+ abXlsxGrowNote\(\)\)\) return;/.test(go) && /반영됩니다\." \+ abXlsxGrowNote\(\) \+ "\\n\\n진행할까요\?"\)\) return;/.test(vs)
+        && /if \(free\.known && !free\[side\]\)\{ alert\(AB_CODE_TEXT\.ROWS_FULL\); return; \}/.test(go) && !/free\[side\] *[<>]=? *\d|free\.[LR] *[<>]=? *\d|[<>]=? *49\b/.test(go + vs + fm), '');
+      // C279(11/20): 줄 번호 = 쓴 번호의 최댓값 + 1 · 서버 노선표를 못 받은 순간엔 번호를 적지 않음 · 겹침 안내(ROUTE_OVERLAP) 확인 뒤에만 force · [별도 줄로 나누기] 실패 글 — 실제 함수를 흐름째 돌린다
+      const gap = base.concat(Array.from({ length: 10 }, (_, i) => ({ s: 'L', r: 40 + i, f: 'a', t: 'b', i: '', h: false })).filter((x) => x.r !== 44));
+      T('C279 abFreeReserve: 가운데 L44가 빠져도 다음 번호는 L50(빠진 번호를 물려받지 않는다) · 소수 번호 무시 · known = 서버 노선표를 받았는가',
+        (() => { const a = mk(gap, true).free(), b = mk(base.concat([{ s: 'L', r: 50.5, f: 'a', t: 'b', i: '', h: false }]), true).free(), c = mk([], true).free(); return a.L === 50 && a.R === 41 && a.known === true && b.L === 40 && c.known === false; })(), '');
+      const flow = (LIST, script, opt) => {
+        const o = opt || {}, log = { confirms: [], alerts: [], calls: [], learn: [], toasts: [] };
+        const code = 'var abLearnBusy = false, abLearnNew = "k", abNrDraft = null, abDay = { data: {}, day: "2026-11-20" }, abStatus = { routes: SRV };' + consts + 'var AB_CODE_TEXT = { ROWS_FULL: "RF", FORBIDDEN: "FB" };'
+          + 'function abRouteList(){ return LIST; } function abCanLearn(){ return true; } function abInt(v){ var n = Math.round(Number(v)); return (isFinite(n) && n > 0) ? n : 0; } function esc(s){ return String(s); }'
+          + 'function renderAbSheet(){} function onSessionInvalid(){} function loadAbStatus(){} function abOpenDay(){} function apprToastShow(m){ LOG.toasts.push(m); } function gwToast(m){ LOG.toasts.push(m); }'
+          + 'function abErrText(res, head){ return head + " — " + ((res.body && res.body.code) || res.status); } function abLearnGo(k, v, nc){ LOG.learn.push([v, nc]); }'
+          + 'function confirm(m){ LOG.confirms.push(String(m)); return ANS.length ? ANS.shift() : true; } function alert(m){ LOG.alerts.push(String(m)); }'
+          + 'function gwCall(fn, body){ LOG.calls.push(JSON.parse(JSON.stringify(body))); var res = SCRIPT.shift() || { status: 500, body: {} }; return { then: function(f){ f(res); return { catch: function(){} }; } }; }'
+          + ['abRouteFind', 'abXlsxVisN', 'abXlsxPages', 'abXlsxLeft', 'abXlsxPageText', 'abXlsxGrowNote', 'abRoutesKnown', 'abFreeReserve', 'abOverlapText', 'abMovedText', 'abNewRouteFormHtml', 'abRouteAddGo', 'abVariantSplit'].map(cut).join('\n')
+          + 'return { form: abNewRouteFormHtml, go: abRouteAddGo, split: abVariantSplit };';
+        const api = new Function('LIST', 'SRV', 'SCRIPT', 'ANS', 'LOG', code)(LIST, o.noSrv ? [] : LIST, script.slice(), (o.ans || []).slice(), log);
+        const vals = Object.assign({ from: '새상차', to: '새하차', item: '분진', side: 'L' }, o.vals || {});
+        const box = { getAttribute: () => 'k', querySelector: (sel) => ({ value: vals[(sel.match(/nr-(\w+)/) || [])[1]] }) };
+        return { api, log, host: { querySelectorAll: () => [box] } };
+      };
+      const OK50 = { status: 200, body: { ok: true, side: 'L', row: 50, existed: false } };
+      const OVL = { status: 409, body: { ok: false, code: 'ROUTE_OVERLAP', side: 'L', row: 50, days_checked: 14, loosened: [{ side: 'L', row: 8, bundles: 1, trips: 3, days: 1 }, { side: 'R', row: 40, bundles: 2, trips: 5, days: 2 }] } };
+      let f1 = flow(prod, [OK50]); const formTxt = f1.api.form({ key: 'k', from: '새상차', to: '새하차', item: '분진' }); f1.api.go('k', f1.host);
+      T('C279 흐름 ①(겹침 없음): 폼 "보이는 노선 81줄"·"왼쪽(L) 번호 — L50 예정" · 확인창 "줄 번호 L50 예정" 1번 · 서버 호출 1번(force 없음) → 응답 번호로 바로 지정 L|50',
+        /보이는 노선 81줄 · 엑셀 인쇄 2쪽/.test(formTxt) && />왼쪽\(L\) 번호 — L50 예정</.test(formTxt) && />오른쪽\(R\) 번호 — R50 예정</.test(formTxt) && f1.log.confirms.length === 1 && /→ 줄 번호 L50 예정 \(엑셀 자리는 가나다순 자동\)/.test(f1.log.confirms[0])
+        && f1.log.calls.length === 1 && f1.log.calls[0].action === 'ab_route_add' && f1.log.calls[0].force === undefined && JSON.stringify(f1.log.learn) === '[["L|50",true]]' && f1.log.alerts.length === 0, JSON.stringify([f1.log.confirms.length, f1.log.calls, f1.log.learn]).slice(0, 300));
+      let f2 = flow(prod, [OVL, OK50], { ans: [true, true] }); f2.api.go('k', f2.host);
+      T('C279 흐름 ②(겹침 → 확인): 409 ROUTE_OVERLAP이면 안내 확인창(풀리는 줄 L8·R40 이름·묶음·회수·본 일수)을 보이고, 확인해야만 force:true로 한 번 더 보내 지정까지',
+        f2.log.confirms.length === 2 && /미배정으로 풀립니다/.test(f2.log.confirms[1]) && /최근 14일치/.test(f2.log.confirms[1]) && / · L8 동국제강 → 베페사 · 지정분진 — 1묶음 3회\(1일\)/.test(f2.log.confirms[1]) && / · R40 한라티씨 → 거성산업 · 분진 — 2묶음 5회\(2일\)/.test(f2.log.confirms[1])
+        && f2.log.calls.length === 2 && f2.log.calls[0].force === undefined && f2.log.calls[1].force === true && JSON.stringify(f2.log.learn) === '[["L|50",true]]' && f2.log.alerts.length === 0, JSON.stringify([f2.log.confirms[1], f2.log.calls]).slice(0, 400));
+      let f3 = flow(prod, [OVL, OK50], { ans: [true, false] }); f3.api.go('k', f3.host);
+      let f4 = flow(prod, [OVL, OVL], { ans: [true, true] }); f4.api.go('k', f4.host);
+      T('C279 흐름 ③: 겹침 안내에서 취소하면 다시 보내지 않고 지정도 없음 · force로 보냈는데 또 409면 되풀이하지 않고 실패 알림 1번',
+        f3.log.calls.length === 1 && f3.log.learn.length === 0 && f3.log.alerts.length === 0 && f4.log.calls.length === 2 && f4.log.confirms.length === 2 && f4.log.learn.length === 0 && f4.log.alerts.length === 1 && /ROUTE_OVERLAP/.test(f4.log.alerts[0]), JSON.stringify([f3.log.calls.length, f4.log.calls.length, f4.log.alerts]));
+      { const fd = flow(prod, [OVL, OK50], { ans: [true, false, true], vals: { from: '고친상차', to: '고친하차', item: '고친품목', side: 'R' } }); fd.api.go('k', fd.host);
+        const again = fd.api.form({ key: 'k', from: '처음상차', to: '처음하차', item: '처음품목' }), other = fd.api.form({ key: 'other', from: '처음상차', to: '처음하차', item: '처음품목' });
+        fd.api.go('k', fd.host); const done = fd.api.form({ key: 'k', from: '처음상차', to: '처음하차', item: '처음품목' });
+        T('C279 흐름 ⑤: 겹침 안내에서 취소해 화면이 다시 그려져도 사람이 고쳐 넣은 이름·열(R)이 폼에 남는다(다른 조합의 폼에는 안 섞임) · 성공하면 비운다 · 날짜 이동·취소 단추·로그아웃에서도 비운다',
+          /value="고친상차"/.test(again) && /value="고친하차"/.test(again) && /value="고친품목"/.test(again) && /<option value="R" selected>/.test(again) && !/처음상차/.test(again) && /value="처음상차"/.test(other)
+          && fd.log.calls.length === 2 && /value="처음상차"/.test(done)
+          // 검토(11/20): 개수만 세면 한 자리를 지워도 통과했다 — 비우는 자리를 함수마다 확인(로그아웃 clearSessionData · 날짜 이동 abOpenDay · 세션 교대 sessViewerSwap · 취소 단추)
+          && ['clearSessionData', 'abOpenDay', 'sessViewerSwap'].every((nm) => { const s = cut(nm); return /abNrDraft = null;/.test(s); })
+          && /addEventListener\("click", function\(\)\{ abLearnOpen = ""; abLearnNew = ""; abNrDraft = null; renderAbSheet\(\); \}\);/.test(html), JSON.stringify([again.slice(0, 260), fd.log.calls.length])); }
+      let f5 = flow(base, [OK50], { noSrv: true }); const form5 = f5.api.form({ key: 'k', from: '새상차', to: '새하차', item: '분진' }); f5.api.go('k', f5.host);
+      T('C279 흐름 ④(서버 노선표를 못 받은 순간): 폼·확인창에 줄 수·줄 번호를 적지 않는다("저장할 때 정해집니다") · 추가는 그대로 되고 지정은 서버가 준 번호 L|50',
+        /노선표를 아직 불러오지 못했습니다 — 줄 수·줄 번호는 저장할 때 정해집니다\./.test(form5) && !/L40|R41|보이는 노선 \d+줄/.test(form5) && />왼쪽\(L\) 번호</.test(form5)
+        && /→ 줄 번호는 저장할 때 정해집니다 \(엑셀 자리는 가나다순 자동\)/.test(f5.log.confirms[0]) && !/L40/.test(f5.log.confirms[0]) && f5.log.calls.length === 1 && JSON.stringify(f5.log.learn) === '[["L|50",true]]', JSON.stringify([form5.slice(0, 200), f5.log.confirms]).slice(0, 400));
+      let f6 = flow(prod, [{ status: 400, body: { ok: false, code: 'STR_TOO_LONG' } }]); f6.api.split('L', 34, '가'.repeat(61));
+      let f7 = flow(prod, [OVL, OK50], { ans: [true, true] }); f7.api.split('L', 34, '에코프로비엠(CAM9)');
+      let f8 = flow(prod, [{ status: 403, body: { ok: false, code: 'FORBIDDEN' } }]); f8.api.split('L', 34, '에코프로비엠(CAM9)');
+      T('C279 [별도 줄로 나누기]: 이름 61자는 보내기 전에 문장으로 알림(서버 호출 0) · 겹침 안내 확인 뒤 force로 한 번 더 · 실패 글은 코드만 띄우지 않고 abErrText를 거친다',
+        f6.log.calls.length === 0 && f6.log.alerts.length === 1 && /이름이 60자를 넘어 별도 줄로 만들 수 없습니다\(지금 61자\)/.test(f6.log.alerts[0]) && f7.log.calls.length === 2 && f7.log.calls[1].force === true && f7.log.calls[1].from === '에코프로비엠(CAM9)' && /새 줄 L50/.test(f7.log.toasts.join('|'))
+        && f8.log.toasts.length === 1 && f8.log.toasts[0] === '줄 추가 실패 — FORBIDDEN' && !/줄 추가 실패: /.test(html), JSON.stringify([f6.log, f7.log.calls.length, f8.log.toasts]).slice(0, 400));
+      // 검토(11/20) 반영: [별도 줄로 나누기]도 401이면 로그인 창으로(onSessionInvalid) · 기존 줄에서 옮겨 온 인계서(moved)를 알림에 한 구절
+      { const f9 = flow(prod, [{ status: 401, body: {} }]); let inval = 0; f9.api.split('L', 34, '에코프로비엠(CAM9)');
+        const s0 = html.indexOf('function abVariantSplit('), sv = html.slice(s0, html.indexOf('function abRoutesKnown(', s0));
+        const fm = flow(prod, [{ status: 200, body: { ok: true, side: 'L', row: 50, existed: false, moved: [{ side: 'R', row: 40, bundles: 2, trips: 5, days: 2 }] } }]); fm.api.go('k', fm.host);
+        T('C279 검토 반영: [별도 줄로 나누기] 401 → onSessionInvalid(토스트 없음) · 새 줄 알림에 "기존 줄 R40에서 옮겨 온 인계서 5회(최근 14일 …)"',
+          /if \(res\.status === 401\)\{ onSessionInvalid\(\); return; \}/.test(sv) && f9.log.toasts.length === 0 && f9.log.calls.length === 1
+          && /^새 노선 L50 추가 · 기존 줄 R40에서 옮겨 온 인계서 5회\(최근 14일 — 더 지난 날짜도 열 때 옮겨짐\)$/.test(fm.log.toasts[0] || ''), JSON.stringify([f9.log.toasts, fm.log.toasts])); } }
   }
 } catch (e) { console.log('  (v351 검사 생략 — ' + e.message + ')'); fails++; }
 
@@ -2103,7 +2164,7 @@ try {
 try {
   const srv24 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8'), ask24 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'ask.js'), 'utf8'), ds24 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'docscope.js'), 'utf8'), dd24 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'docdiff.js'), 'utf8'), pb24 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-parse-background.js'), 'utf8'), lw24 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-learn-background.js'), 'utf8'), sw24 = readFileSync(join(ROOT, 'sw.js'), 'utf8');
   T('v424 물어보기: 문서 도구가 docVisible을 거침 · 판정 한 곳(_lib/docscope.js, gw-data는 가져다 씀) · sw ≥ 424', /DS\.docVisible\(member, d, ds\)/.test(ask24) && /function docVisible\(m, it, settings\)/.test(ds24) && !/function docVisible\(/.test(srv24) && /require\('\.\/_lib\/docscope'\)/.test(srv24) && Number((sw24.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 424);
-  const dl24 = [...html.matchAll(/downloadBlob\(([^\n]{0,60})/g)].map((m) => m[1]).filter((x) => !/^"(?:차량목록|전체백업|실적목록|세무|연구노트_)/.test(x) && !/^r2\.body\.file/.test(x) && !/^res\.body\.name/.test(x) && !/^name, /.test(x) && !/^name\+"_안전 패킷/.test(x) && !/^name, blob\)\{/.test(x));
+  const dl24 = [...html.matchAll(/downloadBlob\(([^\n]{0,60})/g)].map((m) => m[1]).filter((x) => !/^"(?:차량목록|전체백업|실적목록|세무|연구노트_|급여대장_)/.test(x) && !/^r2\.body\.file/.test(x) && !/^res\.body\.name/.test(x) && !/^name, /.test(x) && !/^name\+"_안전 패킷/.test(x) && !/^name, blob\)\{/.test(x));
   T('v424 생성 경로: 양식으로 만든 파일은 전부 xgOut을 거침(직접 내려받기 없음) · 생성 12경로', dl24.length === 0 && (html.match(/xgOut\(|xgHwpxGen\(c, /g) || []).length >= 13 && /function xgHwpxGen\([^)]*\)\{[\s\S]{0,300}?return xgOut\(c, kind, name, blob,/.test(html) && ['"qual_packet"', '"contract_pledge"', '"seal_reg"', '"bond_waiver"', '"labor_exempt"', '"settle_doc"', '"adv_pay"', '"bid_rate"', 'qtKey'].every((k) => html.indexOf('xgOut(c, ' + k) > 0 || html.indexOf('xgHwpxGen(c, ' + k) > 0), JSON.stringify(dl24));   // P1 판16: 한글 양식은 xgHwpxGen(학습 칸 → xgOut) 한 곳을 거침
   T('v426 착공계 주민번호: 창 문구에 "양식 기본값" 없음 · 비우면 확인요망 · 서버가 주민번호 꼴 양식을 거부 · 앱이 쉬운 말로 알림 · 백업 흔적 통로', html.indexOf('양식 기본값 유지') < 0 && html.indexOf('현장대리인 주민등록번호(양식에 넣어 두지 않습니다') > 0 && /BJ\.rrnScan\(Buffer\.from\(b64, 'base64'\)\)/.test(gwd) && html.indexOf('tplCode === "TPL_HAS_RRN"') > 0 && /action === 'backup_stamp'/.test(gwd));
   T('v425 최종본 연결: 넣기가 초안 없으면 xgDraftMake 먼저(내려받기·값 저장·확인창 없음) · 창과 같은 토큰 함수 · 파일이 들어오면 단계 체크 · 사람이 쓰는 창은 안 건드림', /prep = xgDraftMake\(c, tpl\)/.test(html) && /o = \{ noDownload: true, noBack: true, wait: true, late: true \}/.test(html) && /var cdT=xgConTok\(c\)/.test(html) && /var qtT=xgQuoteTok\(\)/.test(html) && /var adT=xgAdvTok\(\)/.test(html) && /dd\.st = "done"; dd\.auto = 1/.test(html) && /back\.classList\.contains\("show"\)\) \|\| xgLateOn/.test(html));
@@ -2149,10 +2210,10 @@ try {
   // ② 사이드바 순서·칸 수
   const nav28 = html.slice(html.indexOf('<nav class="tabbar" id="tabbar">'), html.indexOf('</nav>'));
   const tabs28 = [...nav28.matchAll(/data-tab="([\w-]+)"/g)].map((m) => m[1]);
-  const WANT28 = 'dash,tasks,rec,stmt,cli,hr,workers,progress,pmcon,bid,con,quote,promo,cal,veh,hwakwan,allbaro,safety,lic,doc,ask,check,leave';   // 29 판②: 관리 › 기성·수금 다음 월말명세서(stmt)
+  const WANT28 = 'dash,tasks,rec,stmt,cli,hr,workers,pay,progress,pmcon,bid,con,quote,promo,cal,veh,hwakwan,allbaro,safety,lic,doc,ask,check,leave';   // 29 판②: 관리 › 기성·수금 다음 월말명세서(stmt)
   const ia28 = tabs28.indexOf('allbaro');
   T('v428 사이드바 21칸(관리자 22 → 21, 부동산 빠짐 — 29 판②에 관리 › 기성·수금 다음 월말명세서를 더해 22칸 · P1 판29 진척도 아래 PM 콘솔을 더해 23칸) 순서 그대로 · 업무 묶음 운반일지 → 안전 → 인허가(옛 현장 자리) · 안전 버튼 tabSafetyBtn = 처음엔 숨김(perm-hidden)·글자 "안전"',
-    tabs28.join(',') === WANT28 && tabs28.length === 23 && ia28 > 0 && tabs28[ia28 + 1] === 'safety' && tabs28[ia28 + 2] === 'lic'
+    tabs28.join(',') === WANT28 && tabs28.length === 24 &&   /* 66 급여 판2: 관리 › 인사·일용직 다음 급여(관리자만) — 24칸 */ ia28 > 0 && tabs28[ia28 + 1] === 'safety' && tabs28[ia28 + 2] === 'lic'
     && /<button class="tab-btn perm-hidden" data-tab="safety" id="tabSafetyBtn">안전<\/button>/.test(nav28), tabs28.join(','));
 
   // ③ 칸 구조 — 현장 id 5개가 view-safety의 현장 칸 안 · 교육 칸 · 입찰 칸
@@ -2389,7 +2450,7 @@ try {
   const OLDMAN28 = ['온비드 물건은 부동산 탭에 따로 모입니다', '현장 탭에 <b>미이수</b>', '인사·직원 탭(직원 대상)과 인사·일용직 탭(일용직 대상) 아래에 있습니다', '<h2 id="s12">12. 부동산', '<h2 id="s28">28. 현장', '홍보 / 부동산', '운반일지 / 현장 /', '>부동산 (온비드)</a>', '>현장 — 석면·철거·준설 대장</a>'];
   const oldMan28 = OLDMAN28.filter((s) => man28.indexOf(s) >= 0);
   T('v428 도움말·MANUAL 1절 4묶음 = 사이드바 라벨 그대로(관리 8(29 판② 월말명세서·P1 판29 PM 콘솔 더함 — 지시/기성·수금/월말명세서/…) · 수주 4 · 업무 7 · 개인 3 — 수주 입찰/계약/견적서/홍보 · 업무 …/운반일지/안전/인허가/문서함 · 개인 물어보기/내 업무/휴가) · 탭 안 칸 안내(입찰 = 공고/부동산, 안전 = 현장/교육·검진) · MANUAL 12·28·21-9절 새 자리 · 옛 위치 문장 0 · sw ≥ 428',
-    G4_28.map((g) => (grp28[g] || []).length).join(',') === '8,4,7,3' && grp28['관리'].slice(0, 3).join('/') === '지시/기성·수금/월말명세서' && grp28['수주'].join('/') === '입찰/계약/견적서/홍보' && grp28['업무'].join('/') === '캘린더/차량/화관법/운반일지/안전/인허가/문서함' && grp28['개인'].join('/') === '물어보기/내 업무/휴가'
+    G4_28.map((g) => (grp28[g] || []).length).join(',') === '9,4,7,3'   /* 66 급여 판2: 관리 9(급여) */ && grp28['관리'].slice(0, 3).join('/') === '지시/기성·수금/월말명세서' && grp28['수주'].join('/') === '입찰/계약/견적서/홍보' && grp28['업무'].join('/') === '캘린더/차량/화관법/운반일지/안전/인허가/문서함' && grp28['개인'].join('/') === '물어보기/내 업무/휴가'
     && helpBad28.length === 0 && manBad28.length === 0 && help28.indexOf('<b>입찰</b> = 공고 / 부동산, <b>안전</b> = 현황 / 현장 / 체크') > 0 && man1_28.indexOf('<b>입찰</b> = 공고 / 부동산, <b>안전</b> = 현황 / 현장 / 체크') > 0   // v432 안전 칸에 현황(맨 앞) · v447 칸 이름 교육·검진 → 체크
     && help28.indexOf('홍보 / 부동산') < 0 && help28.indexOf('운반일지 / 현장 /') < 0 && oldMan28.length === 0
     && man28.indexOf('<h2 id="s12">12. 입찰 › 부동산 (온비드)') > 0 && man28.indexOf('<h2 id="s28">28. 안전 › 현장 — 석면·철거·준설 대장') > 0 && man28.indexOf('<h3>21-9. 교육·건강진단 이력 (안전 › 체크)</h3>') > 0
@@ -3996,7 +4057,7 @@ try {
     fld: { id: 'k5', perms: { tasks: 'hide', veh: 'view', rec: 'hide', lic: 'hide', site: 'hide', check: 'do', con: 'hide', cli: 'hide', doc: 'view', wk: 'hide', quote: 'hide', promo: 'hide' } },   // 현장 8명(값 없음 = 기본 숨김)
     dmy: { id: 'k6', perms: { tasks: 'do', veh: 'do', rec: 'view', lic: 'view', site: 'do', check: 'do', con: 'hide', cli: 'view', doc: 'view', wk: 'do', quote: 'hide', promo: 'hide' } },   // 더미(값 없음)
   };
-  const WANT34 = { admin: [23, 23], kja: [15, 15], kmj: [14, 14], kmjS: [15, 15], jjw: [14, 14], kht: [12, 11], fld: [9, 8], dmy: [15, 14] };   // [4-1 흉내(v433), v434] — 29 판②: 관리자는 월말명세서·PM 콘솔(P1 판29 — 관리자만)까지 23(두 판 모두 — 흉내는 hw만 걷음), 그 밖 사람은 stmt 값이 없어 기본 숨김(칸 수 그대로)
+  const WANT34 = { admin: [24, 24],   /* 66 급여 판2: 관리자에 급여 탭 */ kja: [15, 15], kmj: [14, 14], kmjS: [15, 15], jjw: [14, 14], kht: [12, 11], fld: [9, 8], dmy: [15, 14] };   // [4-1 흉내(v433), v434] — 29 판②: 관리자는 월말명세서·PM 콘솔(P1 판29 — 관리자만)까지 23(두 판 모두 — 흉내는 hw만 걷음), 그 밖 사람은 stmt 값이 없어 기본 숨김(칸 수 그대로)
   const R34 = {}; Object.keys(P34).forEach((k) => { R34[k] = { a: runNav34(P34[k], REG41_34, AP41_34), b: runNav34(P34[k], REG42_34, AP42_34) }; });
   const diff34 = (r) => r.a.vis.filter((id) => r.b.vis.indexOf(id) < 0).concat(r.b.vis.filter((id) => r.a.vis.indexOf(id) < 0).map((id) => '+' + id));
   const okN34 = Object.keys(WANT34).every((k) => R34[k].a.vis.length === WANT34[k][0] && R34[k].b.vis.length === WANT34[k][1]);
@@ -4004,7 +4065,7 @@ try {
   const hwVis34 = Object.keys(P34).filter((k) => R34[k].b.vis.indexOf('tabHwakwanBtn') >= 0).join(',');
   const stVis34 = Object.keys(P34).filter((k) => R34[k].b.vis.indexOf('tabStmtBtn') >= 0).join(',');   // 29 판② 월말명세서 — 명부 저장값에 stmt가 없어(배포 직후 전원) 관리자만
   T('v434 ⓑ 사람별 사이드바 칸 수(실제 nav 23칸(29 판② 월말명세서·P1 판29 PM 콘솔 더함)·permOf·applyPerms·applySafetyPerms 실행 — 11/9 명부 권한 + 11/10 hw 저장값): 관리자 23 · 김정아(수행) 15 · 권민지(보기) 14(안전 부여 뒤 15) · 정재욱(보기) 14 · 김호태(숨김) 12 → 11 · 현장 8명형(값 없음) 9 → 8 · 더미(값 없음) 15 → 14 — 4-1 흉내(두 표에 hw 없음·전용 줄 없음)와 비교해 바뀐 칸은 화관법 하나뿐(안전 탭 등 그대로) · 화관법이 보이는 사람 = 관리자·김정아·권민지·정재욱 · 월말명세서가 보이는 사람 = 관리자만(stmt 값 없음 = 기본 숨김) · 4-1 흉내에서도 getElementById(undefined) 0(applyPerms "MODULE_TAB 없는 키 건너뜀" 안전장치가 남아 있음) · 흉내가 실제로 전용 줄·두 표 hw를 지웠는지 · 홈에서 돌린 applyPerms는 홈 이동·화관법 다시 그림 0',
-    navEls34.filter((e) => e.cls.indexOf('tab-btn') >= 0).length === 23 && AP41_34 !== AP42_34 && REG41_34[1] !== REG42_34[1] && REG41_34[2] !== REG42_34[2]
+    navEls34.filter((e) => e.cls.indexOf('tab-btn') >= 0).length === 24 &&   /* 66 급여 판2 */ AP41_34 !== AP42_34 && REG41_34[1] !== REG42_34[1] && REG41_34[2] !== REG42_34[2]
     && okN34 && okD34 && hwVis34 === 'admin,kja,kmj,kmjS,jjw' && stVis34 === 'admin' && Object.keys(R34).every((k) => R34[k].b.log.length === 0 && R34[k].a.undef === 0 && R34[k].b.undef === 0),
     Object.keys(P34).map((k) => k + ' ' + R34[k].a.vis.length + '→' + R34[k].b.vis.length + (diff34(R34[k]).length ? '(' + diff34(R34[k]).join('·') + ')' : '')).join(' · '));
 
@@ -4986,9 +5047,9 @@ try {
   const viewW38 = (win, id) => { const b = body38(win), own = decl38(win, '#view-' + id, 'max-width'), base = decl38(win, '.views>.view', 'max-width'), mx = own != null ? own : base; return (!mx || mx === 'none') ? b : Math.min(b, parseFloat(mx)); };
   //   명세 width_plan.table(창 → 본문, 스크롤바 17 포함): 1024 791 · 1100 867 · 1280 1011 · 1366 1097 · 1440 1171 · 1536 1267 · 1600 1331 · 1920·2560 1428
   const WT38 = { 1024: 791, 1100: 867, 1280: 1011, 1366: 1097, 1440: 1171, 1536: 1267, 1600: 1331, 1920: 1428, 2560: 1428 };
-  const WIDE38 = ['tasks', 'rec', 'cli', 'workers', 'bid', 'con', 'veh', 'safety', 'perm', 'stmt'];   // 명세 reading_width 9개 중 v438은 계약·차량·권한관리 · v439에 지시(#view-tasks) · v440에 기성(#view-rec) · v441에 거래처(#view-cli) · v442에 일용직(#view-workers) · v443에 입찰(#view-bid — 표로 바꾼 판) · v445에 안전(#view-safety — 56 판, 현장 칸 표) — 9개 다 · 29 판② 월말명세서(#view-stmt — 처음부터 표, 명세 9개 밖)
+  const WIDE38 = ['tasks', 'rec', 'cli', 'workers', 'bid', 'con', 'veh', 'safety', 'perm', 'stmt', 'pay'];   /* 66 급여 판2: 급여대장(18칸 표) 넓힘 */   // 명세 reading_width 9개 중 v438은 계약·차량·권한관리 · v439에 지시(#view-tasks) · v440에 기성(#view-rec) · v441에 거래처(#view-cli) · v442에 일용직(#view-workers) · v443에 입찰(#view-bid — 표로 바꾼 판) · v445에 안전(#view-safety — 56 판, 현장 칸 표) — 9개 다 · 29 판② 월말명세서(#view-stmt — 처음부터 표, 명세 9개 밖)
   const views38 = [...html.matchAll(/<(?:section|div) class="view(?: active)?" id="view-([a-z]+)">/g)].map((m) => m[1]);
-  const SECS38 = ['tasks', 'veh', 'hwakwan', 'allbaro', 'rec', 'stmt', 'cal', 'lic', 'bid', 'con', 'cli', 'doc', 'hr', 'progress', 'pmcon', 'ask', 'safety', 'quote', 'promo', 'workers', 'perm', 'fam', 'leave'];   // 29 판②: 기성 화면 뒤 월말명세서 section
+  const SECS38 = ['tasks', 'veh', 'hwakwan', 'allbaro', 'rec', 'stmt', 'cal', 'lic', 'bid', 'con', 'cli', 'doc', 'hr', 'progress', 'pay', 'pmcon', 'ask', 'safety', 'quote', 'promo', 'workers', 'perm', 'fam', 'leave'];   // 29 판②: 기성 화면 뒤 월말명세서 section
   const secs38 = [...html.matchAll(/<section class="view" id="view-([a-z]+)">/g)].map((m) => m[1]);
   const wBad38 = Object.keys(WT38).filter((w) => Math.abs(body38(+w) - WT38[w]) > 2);
   const vBad38 = [1366, 1920].map((w) => views38.filter((id) => viewW38(w, id) !== (WIDE38.indexOf(id) >= 0 ? body38(w) : 808)).join('/')).join('|') + '|' + views38.filter((id) => viewW38(1024, id) !== body38(1024)).join('/');
@@ -4996,7 +5057,7 @@ try {
     && decl38(1366, '#sfPaneNow', 'max-width') === '808px' && decl38(1920, '#sfPaneEdu', 'max-width') == null && decl38(1920, '#eduLead', 'max-width') === '808px' && decl38(1920, '#eduScopeLine', 'max-width') === '808px' && decl38(1920, '#sfPaneSite', 'max-width') == null;   // v447: 체크 칸(#sfPaneEdu)도 사람별 표라 넓힘 — 칸 머리 두 줄만 808   // v445: 안전 탭은 현장 칸(표)만 넓고 현황·교육·검진(옛 목록 — v446 사람별 표 판에서)은 808
   const phone38 = decl38(859, '#app', 'max-width') === '560px' && padLR38(decl38(859, '#app', 'padding')).join() === '16,16' && decl38(859, '.views>.view', 'max-width') == null && decl38(375, '.tabbar', 'width') == null && decl38(859, '.layout', 'gap') == null;
   T('v438 ① 화면 폭(head <style>을 읽어 계산 — 창 폭 − 스크롤바 17): 본문 = 명세 width_plan.table(±2px) 1024 791 · 1100 867 · 1280 1011 · 1366 1097 · 1440 1171 · 1536 1267 · 1600 1331 · 1920·2560 1428 · 넓히는 화면 id 10개(지시·기성·거래처·일용직·입찰·계약·차량·안전·권한관리·월말명세서 — v439에 지시·v440에 기성·v441에 거래처·v442에 일용직·v443에 입찰·v445에 안전·29 판②에 월말명세서를 더함)만 1366·1920에서 본문 폭, 그 밖 화면은 808 · 1024 창은 모두 본문 폭(791 < 808) · 권한관리는 권한 표(#permRoster)만 넓고 그 밖 카드·안전 현황(#sfPaneNow)·교육·검진(#sfPaneEdu — v446 전까지 옛 목록) 808(현장 칸 #sfPaneSite는 본문 폭) · 859px 이하 틀 그대로(#app 최대 560·여백 16, 간격·사이드바 폭·읽기 폭 규칙 없음) · section 태그 22개(29 판② 월말명세서 더함) class="view" 그대로(class 더하지 않음)',
-    wBad38.length === 0 && vBad38 === '||' && views38.length === 25 && perm38 && phone38 && JSON.stringify(secs38) === JSON.stringify(SECS38) && !/<section class="view [^"]*" id=/.test(html),   // 29 판②: 화면 25(월말명세서·PM 콘솔 더함)·넓히는 화면 10
+    wBad38.length === 0 && vBad38 === '||' && views38.length === 26 &&   /* 66 급여 판2 view-pay */ perm38 && phone38 && JSON.stringify(secs38) === JSON.stringify(SECS38) && !/<section class="view [^"]*" id=/.test(html),   // 29 판②: 화면 25(월말명세서·PM 콘솔 더함)·넓히는 화면 10
     JSON.stringify({ body: Object.keys(WT38).map((w) => w + ':' + body38(+w)), viewBad: vBad38, views: views38.length, perm38, phone38, secs: secs38.length }));
 
   // ② 이후 — 부품 하네스
@@ -13668,7 +13729,8 @@ try {
     JSON.stringify({ b1, b2: b2.choice, b3: [b3.choice, b3.def_is_rec], b4: [b4.def_is_rec, b4.args] }));
   // ④ 기존 카드 그대로(함수 해시 — 판29 착수 전 v460 387b98e와 같음) + renderPermMgmt 카드 호출 그대로
   const HASH29 = { renderPermMgmt: '9634640c8096104c', renderAssignCard: '0224820afb855ba0', assignSet: 'c4dd84fd50465303', renderNotifyCard: '732f47e42cc4be01', renderDoneifRow: '2b5840e3d2b0ce80', doneifSet: '154d942b3f411d9f', notifySet: '2bef31b5c054b599',
-    renderBriefCard: '593629d27006f18d', briefSet: 'e495abde62818c48', renderAutoRulesCard: '485ac6738f31e203', autoRulesSet: '52839ac6fbfb1105', renderConLearnCard: '41d94b8e8b5223b5' /* P1 판16: 한글 양식 칸 비교(hwpx_tok) 상태 글·안내 한 문장만 바뀜(v460 '3c2765291ce8e16f') */, renderConProcCard: 'a268c635c59e1787', conProcBgSet: 'd487c1839cb6ce91' };
+    renderBriefCard: '593629d27006f18d', briefSet: 'e495abde62818c48', renderAutoRulesCard: '485ac6738f31e203', autoRulesSet: '9d58c46d488f5df1', renderConLearnCard: '41d94b8e8b5223b5' /* P1 판16: 한글 양식 칸 비교(hwpx_tok) 상태 글·안내 한 문장만 바뀜(v460 '3c2765291ce8e16f') */, renderConProcCard: 'a268c635c59e1787', conProcBgSet: 'd487c1839cb6ce91' };
+  // C185 판3 검토 반영 3(11/20): autoRulesSet 해시 갱신 — 되돌리기 거절(400 ASSIGN_NEEDED)이면 켜기와 같은 글로 알리는 갈래 하나만 더함(실행 시험 'C185 판3 검토 반영 ③')
   const shaP = (s) => createHash('sha256').update(s).digest('hex').slice(0, 16);
   const hBadP = Object.keys(HASH29).filter((n) => shaP(fnP(n).replace(/^function [\w$]+/, '').replace(/\r\n/g, '\n')) !== HASH29[n]);
   T('P1 판29 ④ 기존 카드 그대로: 권한관리 카드 7종 그리기·저장 함수 ' + Object.keys(HASH29).length + '개 해시 = 판29 착수 전(v460) · 권한관리 화면 카드 자리 7개 그대로(assignCard·notifyCard·autoRulesCard·briefCard·conProcCard·conLearnCard + 완료 판정 줄 doneifRow) — 콘솔은 그 위의 목록(설정 편집기 새로 없음)',
@@ -14130,7 +14192,7 @@ try {
       && ['완료+수령 올리기', '기한 정정', '해당 없음', '기준일 입력'].every((b) => m341.indexOf(b) > 0) && d.man.indexOf('이번 달 칸은 아직 할 일을 자동으로 만들지 않고') < 0
       && m2171.indexOf('정하실 분: PM') > 0 && m2171.indexOf('저절로 적용되지 않습니다') > 0
       && CL.every((c) => d.cl.indexOf(c) > 0) && d.html.indexOf('보험사는 표에서 이름만 맞춰 보입니다(저장된 글은 그대로). 📖 사용 안내 16-1절') > 0
-      && /if \(!r\.ok && r\.code !== 'NOT_FOUND'\) return false;/.test(d.au) && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 463;
+      && /blobSet\(store\(DATA\), auditLineKey\(auditKey\(\), Date\.now\(\)\), \{ schema: 1, items: \[entry\] \}\);/.test(d.au) && !/blobSet\(st, auditPartKey\(key, n\), cur\)/.test(d.au) && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 463;
     return { ok, info: { mF, cb: cb.length, scr: scr.length, gate: gate.length, m161: m161.length, m341: m341.length, m2171: m2171.length } };
   };
   const r63 = chk63(D63);
@@ -14143,8 +14205,8 @@ try {
     mu63('man', (s) => s.replace('<h3 id="s34-1">', '<h3>')),
     mu63('cl', (s) => s.replace('**PM 콘솔(v463', '**PM 콘솔(')),
     mu63('html', (s) => s.replace(' 📖 사용 안내 16-1절<br>', '<br>')),
-    mu63('au', (s) => s.replace("if (!r.ok && r.code !== 'NOT_FOUND') return false;", ''))];
-  T('v463 문서·판 번호(정확 검사): FEATURES 기준 v463 (2026-11-13)·v463 절(원장 T476·T451·T165·T179·T478·T666·C130 · 든 것 ①~⑤ · 판26 vehModalSnap · 판27 vehLawCalc·insp_log·veh_bg_get · 판28 lic_month_get·lic_duty_set·LIC_ATT_KEEP·BAD_RANGE·licNarrowGuard·dutyCur · 판29 pmcon_decide·PMCON_MARKS_FULL·status:decide·자동 적용 없음 · appendAudit fail-closed · 승격 전 확인할 것·알려진 한계·정한 값 · servertest P1 판28 8항목 · sw v463) · TESTLIST v463 칸 32(화면 "[ ] (AI 시험 화면 대상" 26 — "PM" 낱말 0 · 게이트 [x] 6 · 사람·PM 몫 칸 0)·게이트 12종·servertest 절 이름 5 · MANUAL 16-1·34-1(단추 4)·21-7-1 PM 콘솔 · 17절 옛 "아직 할 일을 자동으로 만들지 않고" 0 · CLAUDE.md 줄 4 · 도움말 차량 속성 줄 16-1절 · audit.js 읽기 실패 막음 줄 · sw jw-shell-v463 · 결함 사본 ' + M63.length + '개 = 모두 ✗',
+    mu63('au', (s) => s.replace('auditLineKey(auditKey(), Date.now()), { schema: 1, items: [entry] });', 'auditKey(), { schema: 1, items: [entry] });'))];   // C251(11/20): appendAudit가 그달 문서를 읽지도 쓰지도 않게 됨(줄마다 새 열쇠) — 종전 '읽기 실패 막음 줄' 대신 '줄 열쇠에 쓰는 줄'을 본다(결함 사본 = 그달 머리에 씀)
+  T('v463 문서·판 번호(정확 검사): FEATURES 기준 v463 (2026-11-13)·v463 절(원장 T476·T451·T165·T179·T478·T666·C130 · 든 것 ①~⑤ · 판26 vehModalSnap · 판27 vehLawCalc·insp_log·veh_bg_get · 판28 lic_month_get·lic_duty_set·LIC_ATT_KEEP·BAD_RANGE·licNarrowGuard·dutyCur · 판29 pmcon_decide·PMCON_MARKS_FULL·status:decide·자동 적용 없음 · appendAudit fail-closed · 승격 전 확인할 것·알려진 한계·정한 값 · servertest P1 판28 8항목 · sw v463) · TESTLIST v463 칸 32(화면 "[ ] (AI 시험 화면 대상" 26 — "PM" 낱말 0 · 게이트 [x] 6 · 사람·PM 몫 칸 0)·게이트 12종·servertest 절 이름 5 · MANUAL 16-1·34-1(단추 4)·21-7-1 PM 콘솔 · 17절 옛 "아직 할 일을 자동으로 만들지 않고" 0 · CLAUDE.md 줄 4 · 도움말 차량 속성 줄 16-1절 · audit.js 그달 문서를 덮지 않는 줄(C251부터 줄 열쇠에 씀 — 종전 읽기 실패 막음 줄) · sw jw-shell-v463 · 결함 사본 ' + M63.length + '개 = 모두 ✗',
     r63.ok && M63.every((v) => v === false), JSON.stringify({ r: r63.info, mut: M63 }));
 } catch (e) { console.log('  (v463 검사 생략 — ' + e.message + ')'); fails++; }
 
@@ -18964,8 +19026,8 @@ try {
     'mergeContracts', 'doSaveContracts', 'scheduleContractSave', 'loadContracts', 'liveContracts', 'csValEditNote', 'csValEditsApply', 'csValEditsDone', 'csValMerge', 'conIsArr', 'csTitle',
     'csFetchServerContract', 'csEmpty', 'csApprRank', 'csMergeDocs', 'csChgRank', 'csChgMerge', 'csSyncFromServer', 'csApprPending', 'csApprFind', 'csApprSync', 'csApprTake', 'csApprApply', 'csApprRef', 'csApprOnDecided', 'csSaveNow', 'conStatusFix', 'csAlignTasksAll',
     'b64EncodeUnicode', 'b64DecodeUnicode', '_ghResp', 'emptyDoc', '_urlCollection', 'saveConflictStop', 'saveConflictToast', 'apprRefresh', 'conBillToRec'];
-  const NEWH40 = ['csApprHealList', 'csApprHeal', 'csApprHealLoaded', 'csApprMine', 'csApprWho', 'csSaveSettled', 'csApprHealFail', 'csApprHealSeen', 'csApprHealBillAsk', 'csApprGuardAsk'];
-  const STUBH40 = new Set(['genId', 'memberName', 'myName', 'myId', 'saveTasksCache', 'scheduleTasksSave', 'renderTasks', 'renderSummary', 'renderContracts', 'alert', 'conAmtEff', 'fmtAmount', 'saveRecCache', 'renderReceivables', 'scheduleRecSave', 'apprToastShow', 'loadTasks', 'fetch', 'gwCall', 'setTimeout', 'clearTimeout', 'confirm', 'esc', 'csSiteDone', 'conStageDue', 'canSee', 'canDo', 'todayStr', 'findProc', 'csDocsLost', 'csStageDocItems', 'getToken', 'ghHeaders', 'b64EncodeUnicode', 'b64DecodeUnicode', 'runAwardAutoCon', 'conBldgAutoTry', 'renderDashboard', 'curMember', 'isAdmin', 'apprBadgeRender', 'apprOpen', 'apprWaitItems', 'apprHoldItems']);
+  const NEWH40 = ['csApprHealList', 'csApprHeal', 'csApprHealLoaded', 'csApprMine', 'csApprWho', 'csSaveSettled', 'csApprHealFail', 'csApprHealSeen', 'csApprHealBillAsk', 'csApprGuardAsk', 'csApprHealSend', 'csApprHealOnly', 'csApprHealLater', 'csApprSyncMark'];   // C281: 자동 풀기 저장 표식 3함수(없는 판은 hasH40로 빠짐)
+  const STUBH40 = new Set(['genId', 'pushNotify', 'spawnNextRecur', 'memberName', 'myName', 'myId', 'saveTasksCache', 'scheduleTasksSave', 'renderTasks', 'renderSummary', 'renderContracts', 'alert', 'conAmtEff', 'fmtAmount', 'saveRecCache', 'renderReceivables', 'scheduleRecSave', 'apprToastShow', 'loadTasks', 'fetch', 'gwCall', 'setTimeout', 'clearTimeout', 'confirm', 'esc', 'csSiteDone', 'conStageDue', 'canSee', 'canDo', 'todayStr', 'findProc', 'csDocsLost', 'csStageDocItems', 'getToken', 'ghHeaders', 'b64EncodeUnicode', 'b64DecodeUnicode', 'runAwardAutoCon', 'conBldgAutoTry', 'renderDashboard', 'curMember', 'isAdmin', 'apprBadgeRender', 'apprOpen', 'apprWaitItems', 'apprHoldItems']);
   const closeH40 = (H, roots, have) => { const all = new Set([...H.matchAll(/\n  function ([A-Za-z_$][\w$]*)\(/g)].map((m) => m[1])); const got = new Map(); const q = roots.slice(); while (q.length) { const n = q.shift(); if (got.has(n) || STUBH40.has(n) || have.has(n) || !all.has(n)) continue; const b = fnH40(H, n); got.set(n, b); for (const m of b.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g)) q.push(m[1]); } return [...got.keys()]; };
   const varBlockH40 = (H, name) => { const i = H.search(new RegExp('\\n  var ' + name + ' = \\{')); if (i < 0) throw new Error('변수 없음 ' + name); let d = 0; for (let j = H.indexOf('{', i); j < H.length; j++) { if (H[j] === '{') d++; else if (H[j] === '}') { d--; if (d === 0) return H.slice(i + 1, j + 1) + ';'; } } throw new Error('중괄호 ' + name); };
   const srcH40 = new Map();
@@ -18981,16 +19043,20 @@ try {
         if (env.listHold) return new Promise(() => {});
         if (env.listFail > 0) { env.listFail--; return Promise.resolve({ status: 500, body: {} }); }
         let its = cloneH40(env.srv.approvals); if (env.admin === false) its = its.filter((x) => x && x.by && x.by.id === env.uid);
-        return Promise.resolve({ status: 200, body: { items: its, base: 1 } });
+        const la = { status: 200, body: { items: its, base: 1 } };
+        if (env.hold && env.hold('LIST')) return new Promise((res) => env.held.push({ kind: 'LIST', go: () => res(la) }));   // C281: 결재함 목록 응답 붙잡기
+        return Promise.resolve(la);
       }
       let ans;
       if (b.action === 'get') {
+        if (env.getFail > 0) { env.getFail--; env.log.push('GET → 500'); return Promise.resolve({ status: 500, body: {} }); }   // C281: 409 뒤 다시 읽기 실패
         env.log.push('GET ' + env.srv.doc.updated_at); ans = { status: 200, body: { doc: cloneH40(env.srv.doc) } };
         if (env.hold && env.hold('GET')) return new Promise((res) => env.held.push({ kind: 'GET', go: () => res(ans) }));
         return Promise.resolve(ans);
       }
       if (b.action === 'save') {
         const prev = env.srv.doc, oldItems = prev.items, its = cloneH40(b.doc.items || []);
+        if (env.putNet > 0) { env.putNet--; env.log.push('PUT → NET'); return Promise.reject(new Error('net')); }   // C281: 저장 끊김(응답 없음 — 서버에 안 들어감)
         if (env.putFail > 0) { env.putFail--; env.log.push('PUT → 500'); ans = { status: 500, body: { error_code: 'STORAGE_WRITE_FAILED' } }; }
         else if (b.base !== undefined && prev.updated_at && Number(b.base) !== Number(prev.updated_at)) { env.log.push('PUT base ' + b.base + ' → 409'); ans = { status: 409, body: { error_code: 'STALE_BASE' } }; }
         else {
@@ -19007,7 +19073,7 @@ try {
     let src = srcH40.get(H);
     if (!src) {
       const names = FNH40.concat(NEWH40.filter((n) => hasH40(H, n)));
-      const newVars = ['CS_APPR_RETRY_MS', 'CS_APPR_HEAL_MAX', 'CS_APPR_GUARD_MS'].filter((v) => new RegExp('\\n  var ' + v + ' ?=').test(H)).map((v) => varH40(H, v)).join('\n');
+      const newVars = ['CS_APPR_RETRY_MS', 'CS_APPR_HEAL_MAX', 'CS_APPR_GUARD_MS', 'csApprHealNext'].filter((v) => new RegExp('\\n  var ' + v + ' ?=').test(H)).map((v) => varH40(H, v)).join('\n');
       src = ['var window = {}; var _colBase = {}, _col409 = {}, _col409t = {}, _COL409_MS = 30000, _colRead403 = {};',
         'function _rawFetch(){ throw new Error("raw"); } function onSessionInvalid(){} function gwToast(m){ ENV.toasts.push(String(m)); } function imColOn(){ return false; }',
         ['CON_APPR_REJECT_MSG', 'CON_APPR_REVOKED_MSG', 'CON_SAVE_FAIL_MSG', 'CON_DUP_ID_MSG', 'CON_APPR_OLD_MSG', 'csApprSyncAt', 'csValEdits', 'csSaveDoneSeq', 'conBase', 'CON_W3_SKIP', 'CON_W3_LBL', 'CON_W3_CI'].map((v) => varH40(H, v)).join('\n'), newVars,
@@ -19020,16 +19086,20 @@ try {
         'var receivables = []; function conAmtEff(){ return 1000; } function fmtAmount(n){ return String(n); } function saveRecCache(){} function renderReceivables(){} function scheduleRecSave(){} function confirm(m){ ENV.bills++; ENV.confirms.push(String(m)); ENV.log.push("CONFIRM"); return ENV.confirmAns === true; }',
         // 지시 읽기 대역 — 서버 지시 목록을 응답처럼 늦게 들이고(이 기기에 없는 것만) 실제 csAlignTasksAll을 돌림(실제 loadTasks 성공 뒤와 같은 순서)
         'function loadTasks(){ ENV.loadTasksN++; Promise.resolve().then(function(){ ENV.srvTasks.forEach(function(t){ if (!findTask(t.id)) tasks.push(JSON.parse(JSON.stringify(t))); }); csAlignTasksAll(); }); }',
-        'var tasks = [], genN = 0;', 'function genId(p){ return p + "A" + (++genN); } function memberName(){ return ""; } function csSiteDone(){ return false; } function conStageDue(){ return null; } function canSee(){ return true; } function canDo(){ return true; }',
+        // C222: 무작위 번호 대역은 기기마다 다른 꼴(ENV.gidp — 안 주면 종전 "A") · 승인 알림은 수만 셈(ENV.pushes)
+        'var tasks = [], genN = 0;', 'function genId(p){ return p + (ENV.gidp || "A") + (++genN); } function pushNotify(){ ENV.pushes = (ENV.pushes || 0) + 1; } function spawnNextRecur(){} function memberName(){ return ""; } function csSiteDone(){ return false; } function conStageDue(){ return null; } function canSee(){ return true; } function canDo(){ return true; }',
         ['CON_PROC_SRC', 'CON_MAP', 'CON_ADDED', 'SITE_KIND', 'CON_APPR_KINDS', 'STAGE_DOC_MAP'].map((v) => varH40(H, v)).join('\n'), varBlockH40(H, 'STAGE_DOCS'),
-        closeH40(H, ['materializeStage', 'advanceProc', 'findTask', 'csApprApply', 'csChgOpenAt', 'conDueOn', 'csOnDone', 'csApprKindOf'], new Set(names)).map((n) => fnH40(H, n)).join('\n'),
+        closeH40(H, ['materializeStage', 'advanceProc', 'findTask', 'csApprApply', 'csChgOpenAt', 'conDueOn', 'csOnDone', 'csApprKindOf', 'approveTask', 'csSkipStage', 'csJumpStage', 'mergeTasks', 'mergeRec'], new Set(names)).map((n) => fnH40(H, n)).join('\n'),   // C222: 지시 탭 [승인]·단계 카드 [건너뜀]·[이 단계부터]·지시·기성 병합도 실제 함수
         'function csDocsLost(){ return false; } function csStageDocItems(s){ if (conIsArr(s.docs)) return s.docs; return (s.dk || []).map(function(k, i){ return { k: k + ":" + i, t: k, n: "", st: "todo" }; }); }',
         'function findProc(id){ return contracts.filter(function(c){ return c && c.id === id; })[0] || null; }',
         'function renderContracts(){ ENV.renders++; }',
         'var console = { warn: function(){ ENV.warns++; }, log: function(){} };',
         names.map((n) => fnH40(H, n)).join('\n'), wrapH40(H), 'var fetch = window.fetch;',
         'return { get: function(){ return contracts; }, find: findProc, load: loadContracts, sched: scheduleContractSave, decided: csApprOnDecided, advance: advanceProc, refresh: apprRefresh, tasks: function(){ return tasks; }, setTasks: function(v){ tasks = v; }, base: function(){ return conBase; },',
-        '  heal: (typeof csApprHeal === "function") ? csApprHeal : null, healList: (typeof csApprHealList === "function") ? csApprHealList : null, healN: function(){ return (typeof csApprHealN !== "undefined") ? csApprHealN : {}; }, setAppr: function(v){ apprItems = v; }, sync: csApprSync, recs: function(){ return receivables; } };'].join('\n');
+        '  heal: (typeof csApprHeal === "function") ? csApprHeal : null, healList: (typeof csApprHealList === "function") ? csApprHealList : null, healN: function(){ return (typeof csApprHealN !== "undefined") ? csApprHealN : {}; }, setAppr: function(v){ apprItems = v; }, sync: csApprSync, recs: function(){ return receivables; },',
+        // C222: 지시 탭 [승인]·단계 카드 [건너뜀]·[이 단계부터]·다음 단계 지시 만들기·종결 훅·기성 연동 + 지시·기성 저장 409 뒤 병합(실제 mergeTasks·mergeRec — 서버 목록을 이 기기 목록에 합침)
+        '  approve: approveTask, skip: csSkipStage, jump: csJumpStage, mat: materializeStage, onDone: csOnDone, bill: conBillToRec, setRecs: function(v){ receivables = v; },',
+        '  mergeT: function(r){ tasks = mergeTasks(tasks, r); return tasks; }, mergeR: function(r){ receivables = mergeRec(receivables, r); return receivables; } };'].join('\n');
       srcH40.set(H, src);
     }
     const fakeDate = { now: () => env.now, parse: (s) => Date.parse(s) };
@@ -19354,7 +19424,7 @@ try {
     // N1·기성 확인 창: 409 뒤 서버 사본에서 이미 끝난 단계를 안 봄(두 기기가 다 물음) · 넘기는 순간에 바로 물음 · 저장을 바로 안 보냄 · 서버 기성 연결 안 봄
     [' if (typeof csApprHealSeen === "function"){ try { csApprHealSeen(up.items||[]); } catch(e){} }', ''],
     ['    if (hw && Date.now() - (hw.at || 0) < 120000){ if (hw.bill === "wait") hw.bill = "due"; return; }\n', ''],
-    ['if (contractsPending && !pend0){ csApprHealOutAt = Date.now(); csSaveNow(); }', 'if (contractsPending && !pend0){ csApprHealOutAt = Date.now(); }'],
+    ['if (contractsPending && !pend0){ if (hum0 || csApprSchedN !== n0) csSaveNow(); else csApprHealSend(csSaveNow); }', 'if (contractsPending && !pend0){ }'],   // C281: 줄 꼴이 바뀜(30초 시각 → 저장 표식) — 같은 결함(저장을 바로 안 보냄)
     [' || (sc && !sc.gwReadFail && sc.rec_id)) return;', ') return;'],
     ['conBillToRec(c, "결재함에서 승인된 청구 검수를 계약에 반영했습니다(자동 반영).\\n");', 'conBillToRec(c);'],
     // N2: 거절 뒤 처리 걷음(알림 되풀이) · 거절된 상신을 다음 폴에 또 풂 · 실패 뒤 다시 읽기가 또 풂 · 실패한 회차에 한 번 더 · 5xx 알림 창 · 사람 저장 5xx도 조용히 · 5xx가 횟수 상한을 씀
@@ -19362,8 +19432,8 @@ try {
     ['if (status === 400) csApprHealN[cid] = CS_APPR_HEAL_MAX; else if (csApprHealN[cid] > 0) csApprHealN[cid]--;', 'if (status !== 400 && csApprHealN[cid] > 0) csApprHealN[cid]--;'],
     ['    if (csApprHealHold){ csApprHealHold = false; return; }\n', ''],
     ['if (pn < 2 && !csApprHealStop && csApprHealList(items).length)', 'if (pn < 2 && csApprHealList(items).length)'],
-    ['var quiet = status !== 400 && Date.now() - csApprHealOutAt < 30000;', 'var quiet = false;'],
-    ['var quiet = status !== 400 && Date.now() - csApprHealOutAt < 30000;', 'var quiet = status !== 400;'],
+    ['var quiet = status !== 400 && mine === true;', 'var quiet = false;'],   // C281: 줄 꼴이 바뀜(30초 시각 → 그 저장 표식 mine) — 같은 결함 둘
+    ['var quiet = status !== 400 && mine === true;', 'var quiet = status !== 400;'],
     ['if (status === 400) csApprHealN[cid] = CS_APPR_HEAL_MAX; else if (csApprHealN[cid] > 0) csApprHealN[cid]--;', 'if (status === 400) csApprHealN[cid] = CS_APPR_HEAL_MAX;'],
     // 지운 계약도 대조
     ['      if (!c || c.del === 1 || !c.scen) return;\n      (c.pipes || []).forEach(function(p){ (p.stages || []).forEach(function(s, i){\n        var x = (s && s.appr', '      if (!c || !c.scen) return;\n      (c.pipes || []).forEach(function(p){ (p.stages || []).forEach(function(s, i){\n        var x = (s && s.appr'],
@@ -19389,6 +19459,283 @@ try {
     okH40(/^[bn]/).length >= 12 && okH40(/^[bn]/).every((k) => RH40[k]), JSON.stringify(okH40(/^[bn]/).map((k) => k.slice(0, -2) + '=' + RH40[k.slice(0, -2)])));
   T('P1 판40 결함 사본 ' + KGH40.length + '개(첫 수리: 없는 계약 들이기·기준 사본·지시 다시 읽기·다시 하기·다시 하기 상한·저장 겹쳐 보내기·결재함 목록 대조·계약 읽은 뒤 대조·차례로 돌리기·20초 규칙·대상 짝·횟수 상한·반려 대조·결정된 단계 대조·남은 것 한 번 더·도는 중 표시 2분 / 검토 반영: 가드 결재함 먼저 확인·관리자 아닌 남의 상신 가름·5초 타이머·승인 뒤 20초 기다림·미전송 가름·넘기기 다시 하기·지운 계약 거름 ·결재 동기화의 남의 상신 대조·내 상신 없을 때 목록 읽기·올린 사람 가름·관리자 가름 · 409 뒤 이미 끝난 단계 보기·넘기는 순간 묻지 않기·저장 바로·서버 기성 연결 보기·자동 반영 글 · 거절 뒤 처리·거절된 상신 다시 안 풀기·실패 뒤 다시 읽기 건너뜀·실패한 회차 멈춤·5xx 조용히·사람 저장 5xx는 알림·5xx 횟수 되돌림 · 다른 사람 세션 타이머) = 모두 ✗',
     KGH40.length === 40 && KH40r.every((x) => x), JSON.stringify(KH40r));
+  // ── C222(원장 C222 — 판40이 남긴 것의 뿌리 수리 · 미루기 설계 8f5eedd 폐기 뒤 줄인 판): 두 관리자 화면이 같은 계약 단계를 같이 넘기면 다음 단계 지시·종결 할 일 '실적신고'·기성 줄이 두 건씩 생기던 길
+  //   「원천」 넘김이 만드는 것의 번호를 무작위(genId)가 아니라 계약 번호·줄·단계에서 정해지는 꼴(csDetId)로 — 두 화면이 같은 번호를 지어 지시·기성 병합(id 단위)에서 한 건 · 계약에 적는 지시 번호·기성 번호도 같은 값(단계 진행 충돌 없음)
+  //   만드는 때·글·저장 예약은 종전 그대로(미루지 않음 — 한 화면 흐름은 번호 꼴만 다름)
+  //   (실행 — 판40 틀: 실제 approveTask·advanceProc·materializeStage·csOnDone·conBillToRec·csSkipStage·csJumpStage·csApprHeal·doSaveContracts·mergeContracts + 실제 mergeTasks·mergeRec · 두 기기 한 서버 · 무작위 번호 대역은 기기마다 다른 꼴)
+  const tk222 = (id, cid, i, name, st) => ({ id, proc_id: cid, pipe: 'main', stage_i: i, stage_name: name, stage_total: 3, title: 'J' + id, status: st || 'review', done_at: '2026-11-18', done_by: '직원', from: '지시', from_id: 'uS', by: '지시', who_id: '', created: '2026-11-18', updated: '2026-11-18' });
+  const kN222 = (id, names, scen) => Object.assign({ id, type: 'dredge', label: '준설', status: 'active', updated: '2026-11-18', title: 'T' + id, client: 'C' + id, who_id: '', contract_info: { amount: 1000 },
+    pipes: [{ key: 'main', cur: 0, stages: names.map((n, j) => Object.assign({ name: n, due: 'manual', status: j === 0 ? 'open' : 'pending', task_id: j === 0 ? 't' + id : null, done_at: null }, /^\(.+\)$/.test(n) ? { opt: 1 } : {})) }] }, scen === false ? {} : { scen: { type: 'dredge', pub: false, ver: 1 } });
+  const drain222 = async (Es) => { for (let n = 0; n < 60; n++) { let any = false; for (const E of Es) { const i = E.timers.findIndex((x) => x); if (i >= 0) { any = true; const f = E.timers[i]; E.timers[i] = null; f(); await E.flush(); } } if (!any) break; } };
+  // 지시·기성 저장 겹침: 먼저 들어간 기기(A)의 목록이 서버 사본 → 늦은 기기(B)는 409 → 다시 읽어 실제 병합 → 그 결과가 서버 사본(실제 doSaveTasks·doSaveRec의 409 길과 같은 순서)
+  const srvT222 = (A, B) => cloneH40(B.api.mergeT(cloneH40(A.api.tasks())));
+  const srvR222 = (A, B) => cloneH40(B.api.mergeR(cloneH40(A.api.recs())));
+  const live222 = (xs) => xs.filter((x) => x && x.del !== 1);
+  const run222 = async (H) => {
+    const R = {};
+    const mk2 = (items, tasks0, appr) => {
+      const A = mkH40(H, items, appr || [], tasks0); A.confirmAns = true; A.gidp = 'A';
+      const B = mkH40(H, items, [], tasks0).share(A); B.confirmAns = true; B.gidp = 'B'; B.uid = 'uB'; B.uname = '시험B';
+      return [A, B];
+    };
+    const prog = (Es) => Es.reduce((n, E) => n + E.toasts.filter((x) => /단계 진행/.test(String(x))).length, 0);
+    const stageT = (ts, cid, i) => live222(ts).filter((t) => t.proc_id === cid && t.stage_i === i);
+    // X1 지시 탭 [승인] × [승인] — 다음 단계 있음: 다음 단계 지시 1 · 두 기기·서버 단계의 지시 번호가 그 지시 · '단계 진행' 충돌 알림 0 · 승인 알림 수 그대로(기기마다 1)
+    { const [A, B] = mk2([kN222('k1', ['작업 수행', '준공서류 작성', '현장 정리'])], [tk222('tk1', 'k1', 0, '작업 수행')]);
+      A.api.load(); B.api.load(); await A.flush(); await B.flush();
+      A.api.approve('tk1'); B.api.approve('tk1'); await drain222([A, B]);
+      const S = srvT222(A, B), n = stageT(S, 'k1', 1), sp = A.sv('k1').pipes[0];
+      R.x1 = '지시 ' + n.length + '|가리킴 ' + (n.length === 1 && sp.stages[1].task_id === n[0].id && A.api.find('k1').pipes[0].stages[1].task_id === n[0].id && B.api.find('k1').pipes[0].stages[1].task_id === n[0].id ? '같음' : '다름') + '|서버 cur ' + sp.cur + '|충돌 알림 ' + prog([A, B]) + '|저장 ' + A.puts() + ' · ' + B.puts() + '|승인 알림 ' + (A.pushes || 0) + '/' + (B.pushes || 0);
+      R.x1ok = R.x1 === '지시 1|가리킴 같음|서버 cur 1|충돌 알림 0|저장 200 · 409,200|승인 알림 0/0'; }
+    // X2 [승인] × [승인] — 마지막 단계: 종결 할 일 '실적신고(2/15)' 1 · 계약 종결
+    { const [A, B] = mk2([kN222('k2', ['작업 수행'])], [tk222('tk2', 'k2', 0, '작업 수행')]);
+      A.api.load(); B.api.load(); await A.flush(); await B.flush();
+      A.api.approve('tk2'); B.api.approve('tk2'); await drain222([A, B]);
+      const S = srvT222(A, B), hk = live222(S).filter((t) => /^실적신고\(2\/15\)/.test(t.title || ''));
+      R.x2 = '실적신고 ' + hk.length + '|' + A.sv('k2').status + '|' + (A.sv('k2').task_hook ? '표식' : '-') + '|충돌 알림 ' + prog([A, B]);
+      R.x2ok = R.x2 === '실적신고 1|done|표식|충돌 알림 0'; }
+    // X3 [승인] × [승인] — 청구 단계(옛 꼴 계약): 기성 확인 창은 기기마다(종전 그대로) · 기성 줄 1 · 계약의 기성 번호가 그 줄 · 다음 단계(수금확인) 지시 1
+    { const [A, B] = mk2([kN222('k3', ['청구', '수금확인'], false)], [tk222('tk3', 'k3', 0, '청구')]);
+      A.api.load(); B.api.load(); await A.flush(); await B.flush();
+      A.api.approve('tk3'); B.api.approve('tk3'); await drain222([A, B]);
+      const SR = srvR222(A, B), rs = live222(SR).filter((r) => r.con_id === 'k3'), S = srvT222(A, B);
+      R.x3 = '기성 줄 ' + rs.length + '|확인 창 ' + A.bills + '/' + B.bills + '|기성 번호 ' + (rs.length === 1 && A.sv('k3').rec_id === rs[0].id && A.api.find('k3').rec_id === rs[0].id && B.api.find('k3').rec_id === rs[0].id ? '같음' : '다름') + '|지시 ' + stageT(S, 'k3', 1).length + '|충돌 알림 ' + (A.toasts.length + B.toasts.length);
+      R.x3ok = R.x3 === '기성 줄 1|확인 창 1/1|기성 번호 같음|지시 1|충돌 알림 0'; }
+    // X4 [승인] × 단계 카드 [건너뜀] — 같은 현재 단계(선택 단계): 다음 단계 지시 1(단계 0의 끝남·건너뜀 겹침은 종전대로 뒤에 저장한 쪽 + 알림)
+    { const [A, B] = mk2([kN222('k4', ['(선택 작업)', '준공서류 작성', '현장 정리'])], [tk222('tk4', 'k4', 0, '(선택 작업)')]);
+      A.api.load(); B.api.load(); await A.flush(); await B.flush();
+      A.api.approve('tk4'); { const c = B.api.find('k4'); B.api.skip(c, c.pipes[0], 0); } await drain222([A, B]);
+      const S = srvT222(A, B), n = stageT(S, 'k4', 1);
+      R.x4 = '지시 ' + n.length + '|가리킴 ' + (n.length === 1 && A.sv('k4').pipes[0].stages[1].task_id === n[0].id ? '같음' : '다름') + '|서버 cur ' + A.sv('k4').pipes[0].cur;
+      R.x4ok = R.x4 === '지시 1|가리킴 같음|서버 cur 1'; }
+    // X5 [이 단계부터] × [이 단계부터] — 같은 단계로: 그 단계 지시 1 · 충돌 알림 0
+    { const [A, B] = mk2([kN222('k5', ['작업 수행', '준공서류 작성', '현장 정리'])], [tk222('tk5', 'k5', 0, '작업 수행')]);
+      A.api.load(); B.api.load(); await A.flush(); await B.flush();
+      for (const E of [A, B]) { const c = E.api.find('k5'); E.api.jump(c, c.pipes[0], 2); } await drain222([A, B]);
+      const S = srvT222(A, B), n = stageT(S, 'k5', 2);
+      R.x5 = '지시 ' + n.length + '|가리킴 ' + (n.length === 1 && A.sv('k5').pipes[0].stages[2].task_id === n[0].id ? '같음' : '다름') + '|충돌 알림 ' + prog([A, B]);
+      R.x5ok = R.x5 === '지시 1|가리킴 같음|충돌 알림 0'; }
+    // X6 자동 풀기 × 자동 풀기(관리자 기기 둘 — 결재함은 승인·단계 상신 기록은 대기 · 다음 단계 있음): 다음 단계 지시 1 · 단계 완료
+    { const k = kCH40('k6', 6); k.pipes[0].stages.push({ name: '실적신고·대장 종결', due: 'manual', status: 'pending', task_id: null, done_at: null });
+      const A = mkH40(H, [k, kOH40()], [apH40(6, 'k6', '승인')], [tkH40(6, 'k6')]); A.confirmAns = true; A.gidp = 'A';
+      const B = mkH40(H, [k, kOH40()], [], [tkH40(6, 'k6')]).share(A); B.confirmAns = true; B.gidp = 'B'; B.uid = 'uB'; B.uname = '시험B';
+      A.api.load(); B.api.load(); await A.flush(); A.api.refresh(); B.api.refresh(); await A.flush(); await B.flush(); await drain222([A, B]);
+      const S = srvT222(A, B), n = stageT(S, 'k6', 2);
+      R.x6 = A.st('k6') + '|지시 ' + n.length + '|가리킴 ' + (n.length === 1 && A.sv('k6').pipes[0].stages[2].task_id === n[0].id ? '같음' : '다름');
+      R.x6ok = R.x6 === 'done/승인|지시 1|가리킴 같음'; }
+    // R1 되돌렸다 다시 넘김(한 기기): 그 단계의 열린 지시가 남아 있으면 그것을 가리킴(새로 만들지 않음 — 저장이 거절돼 되돌아간 넘김을 다시 할 때 고아 지시가 한 건 더 생기던 길) ·
+    //   끝난 지시·지운 지시는 되살리지 않고 다음 회차 번호(…r1·…r2) · 번호가 겹친 줄 0
+    { const A = mkH40(H, [kN222('k7', ['작업 수행', '준공서류 작성', '현장 정리'])], [], [tk222('tk7', 'k7', 0, '작업 수행')]); A.gidp = 'A';
+      A.api.load(); await A.flush();
+      const back = () => { const c = A.api.find('k7'), p = c.pipes[0]; p.cur = 0; p.stages[0].status = 'open'; p.stages[0].done_at = null; p.stages[1].status = 'pending'; p.stages[1].task_id = null; const t = A.api.tasks().filter((x) => x.id === 'tk7')[0]; t.status = 'review'; };
+      const cur1 = () => A.api.find('k7').pipes[0].stages[1].task_id, st1 = () => stageT(A.api.tasks(), 'k7', 1), open1 = () => st1().filter((t) => t.status !== 'done').length;
+      A.api.approve('tk7'); const id0 = cur1();
+      back(); A.api.approve('tk7'); const a = (cur1() === id0 ? '같은 지시' : '새 지시') + ' ' + st1().length;
+      st1()[0].status = 'done'; back(); A.api.approve('tk7'); const id1 = cur1(), b = (id1 === id0 + 'r1' ? 'r1' : '?') + ' ' + st1().length + '/열림 ' + open1();
+      A.api.tasks().filter((t) => t.id === id1)[0].del = 1; back(); A.api.approve('tk7'); const id2 = cur1(), c2 = (id2 === id0 + 'r2' ? 'r2' : '?') + ' 열림 ' + open1();
+      const ids = A.api.tasks().map((t) => t.id);
+      R.r1 = a + '|' + b + '|' + c2 + '|겹친 번호 ' + (ids.length - new Set(ids).size);
+      R.r1ok = R.r1 === '같은 지시 1|r1 2/열림 1|r2 열림 1|겹친 번호 0'; await A.fire(); }
+    // R2 기성 줄: 계약의 기성 번호가 빠졌는데(저장 거절 뒤 다시 읽기 등) 그 계약의 기성 줄이 있으면 새 줄 없이 다시 이음 · 지운 줄은 되살리지 않고 다음 회차
+    { const A = mkH40(H, [kN222('k8', ['청구', '수금확인'], false)], [], [tk222('tk8', 'k8', 0, '청구')]); A.confirmAns = true; A.gidp = 'A';
+      A.api.load(); await A.flush(); A.api.approve('tk8'); await A.fire();
+      const c = A.api.find('k8'), id0 = c.rec_id;
+      delete c.rec_id; A.api.bill(c); const a = (c.rec_id === id0 ? '다시 이음' : '새 줄') + ' ' + live222(A.api.recs()).length;
+      A.api.recs()[0].del = 1; A.api.bill(c); const b = (c.rec_id === id0 + 'r1' ? 'r1' : '?') + ' ' + live222(A.api.recs()).length + '/' + A.api.recs().length;
+      R.r2 = a + '|' + b; R.r2ok = R.r2 === '다시 이음 1|r1 1/2'; await A.fire(); }
+    // R3 계약 번호가 영숫자 꼴이 아니면 종전 무작위 번호(지시 저장·상신 ref가 받는 꼴 밖으로 나가지 않게)
+    { const A = mkH40(H, [kN222('k-9', ['작업 수행', '준공서류 작성'])], [], [tk222('tk9', 'k-9', 0, '작업 수행')]); A.gidp = 'A';
+      A.api.load(); await A.flush(); A.api.approve('tk9');
+      const id = A.api.find('k-9').pipes[0].stages[1].task_id;
+      R.r3 = /^tA\d+$/.test(String(id)) ? '무작위' : '정해진 꼴'; R.r3ok = R.r3 === '무작위'; await A.fire(); }
+    // P 한 기기 보통 흐름(운영 판과 같음 견줌용 — 번호만 지운 사본): 지시 탭 [승인](다음 단계·마지막·청구) · [건너뜀] · [이 단계부터] — 만든 지시·할 일·기성 줄·계약·확인 창 글·알림·저장
+    { const A = mkH40(H, [kN222('p1', ['작업 수행', '준공서류 작성', '현장 정리']), kN222('p2', ['작업 수행']), kN222('p3', ['청구', '수금확인'], false), kN222('p4', ['(선택 작업)', '준공서류 작성']), kN222('p5', ['작업 수행', '준공서류 작성', '현장 정리'])],
+        [], ['p1', 'p2', 'p3', 'p4', 'p5'].map((id, j) => tk222('t' + id, id, 0, ['작업 수행', '작업 수행', '청구', '(선택 작업)', '작업 수행'][j]))); A.confirmAns = true; A.gidp = 'A';
+      A.api.load(); await A.flush();
+      A.api.approve('tp1'); A.api.approve('tp2'); A.api.approve('tp3'); { const c = A.api.find('p4'); A.api.skip(c, c.pipes[0], 0); } { const c = A.api.find('p5'); A.api.jump(c, c.pipes[0], 2); }
+      await A.fire(); await A.fire();
+      let s = JSON.stringify({ tasks: A.api.tasks(), recs: A.api.recs(), cons: A.srv.doc.items, confirms: A.confirms, alerts: A.alertTexts, toasts: A.toasts, puts: A.puts(), pushes: A.pushes || 0 });
+      A.api.tasks().forEach((t, i) => { s = s.split(JSON.stringify(t.id)).join('"#T' + i + '"'); }); A.api.recs().forEach((r, i) => { s = s.split(JSON.stringify(r.id)).join('"#R' + i + '"'); });
+      R.p = s; R.pn = A.api.tasks().length + '/' + A.api.recs().length; R.pnok = R.pn === '10/1'; }
+    // X7 낡은 화면(C222 검토 확정 1): A가 넘겨 지은 다음 단계 지시·기성 줄을 A가 그 뒤 고침(완료 요청·기한·담당 / 발행·입금) → 그 항목을 아직 받지 않은 B가 같은 단계를 넘겨 같은 번호로 새로 지음 →
+    //   B의 409 병합(실제 mergeTasks·mergeRec · B엔 그 번호의 받은 사본 없음) = A가 고친 칸이 남음 · 1건 · 알림 0 · B가 지은 뒤 고친 칸(상세)은 B 값
+    { const [A, B] = mk2([kN222('k9', ['작업 수행', '준공서류 작성', '현장 정리']), kN222('k10', ['청구', '수금확인'], false)], [tk222('tk9', 'k9', 0, '작업 수행'), tk222('tk10', 'k10', 0, '청구')]);
+      A.api.load(); B.api.load(); await A.flush(); await B.flush();
+      A.api.approve('tk9'); A.api.approve('tk10'); await A.fire();
+      const xid = A.api.find('k9').pipes[0].stages[1].task_id, ax = A.api.tasks().filter((t) => t.id === xid)[0];
+      Object.assign(ax, { status: 'review', done_at: '2026-11-19', done_by: '직원', due: '2026-11-30', who_id: 'uA' });
+      const ar = A.api.recs().filter((r) => r.con_id === 'k10')[0] || {}; Object.assign(ar, { invoice: true, paid: '2026-11-19' });
+      const t0 = B.toasts.length;
+      B.api.approve('tk9'); B.api.approve('tk10'); await B.fire();
+      const bx = B.api.tasks().filter((t) => t.id === xid)[0]; if (bx) bx.detail = 'B 메모';
+      const mt = B.api.mergeT(cloneH40(A.api.tasks())).filter((t) => t.id === xid), mr = B.api.mergeR(cloneH40(A.api.recs())).filter((r) => r.con_id === 'k10');
+      R.x7 = '지시 ' + mt.length + '|' + (mt[0] ? [mt[0].status, mt[0].due, mt[0].who_id, mt[0].detail].join(',') : '-') + '|기성 ' + mr.length + '|' + (mr[0] ? [mr[0].invoice, mr[0].paid, mr[0].id === ar.id ? '같은 번호' : '다른 번호'].join(',') : '-') + '|알림 ' + (B.toasts.length - t0);
+      R.x7ok = R.x7 === '지시 1|review,2026-11-30,uA,B 메모|기성 1|true,2026-11-19,같은 번호|알림 0'; await drain222([A, B]); }
+    R.ok = Object.keys(R).filter((k) => /ok$/.test(k)).every((k) => R[k]);
+    return R;
+  };
+  // 운영 판 꼴(번호 세 자리를 무작위로 되돌린 사본) — 한 기기 흐름의 견줌 기준 · 두 기기 겹침은 이 사본에서 두 건(고치기 전 결함이 이 검사에 잡힘)
+  const DET222 = [
+    ['var k = csDetId("t", c, "p" + String(pipe.key || "").replace(/[^0-9a-zA-Z]/g, "") + (pipe.cur < 10 ? "0" : "") + pipe.cur, tasks, function(x){ return x.del !== 1 && x.status !== "done"; });', 'var k = { id: genId("t"), hit: null };'],
+    ['tasks.push({ id: csDetId("t", c, "zhook", tasks).id, title: title,', 'tasks.push({ id: genId("t"), title: title,'],
+    ['var k=csDetId("r", c, "bill", receivables, function(x){ return x.del!==1; });', 'var k={ id: genId("r"), hit: null };'],
+  ];
+  const R222 = await run222(html);
+  const OLD222 = await run222(DET222.reduce((s, [a, b]) => onceH40(s, a, b), html));
+  const KG222 = DET222.concat([
+    ['    if (!k.hit){ tasks.push(t); csDetKeep("tasks", t); }\n', '    tasks.push(t); csDetKeep("tasks", t);\n'],
+    ['    if(!k.hit){ receivables.push(r); csDetKeep("receivables", r); }\n', '    receivables.push(r); csDetKeep("receivables", r);\n'],
+    // C222 검토 확정 1: 지은 때 사본 기준 병합 걷음(imMerge) · 지시·기성 사본 두기 걷음
+    ['var b = st.base[r.id] || (st.det && st.det[r.id]) || undefined, c0', 'var b = st.base[r.id], c0'],
+    ['    if (!k.hit){ tasks.push(t); csDetKeep("tasks", t); }\n', '    if (!k.hit){ tasks.push(t); }\n'],
+    ['    if(!k.hit){ receivables.push(r); csDetKeep("receivables", r); }\n', '    if(!k.hit){ receivables.push(r); }\n'],
+    ['function(x){ return x.del !== 1 && x.status !== "done"; });', 'function(x){ return x.del !== 1; });'],
+    ['function(x){ return x.del !== 1 && x.status !== "done"; });', 'function(x){ return x.status !== "done"; });'],
+    ['function(x){ return x.del !== 1 && x.status !== "done"; });', 'function(x){ return false; });'],
+    ['function(x){ return x.del!==1; });', 'function(x){ return true; });'],
+    ['function(x){ return x.del!==1; });', 'function(x){ return false; });'],
+    ['      if (reuse && reuse(x)) return { id: id, hit: x };\n', ''],
+    ['    if (!/^[0-9a-zA-Z]+$/.test(cid)) return { id: genId(pre), hit: null };\n', ''],
+    ['      id = pre + cid + kind + (n ? "r" + n : ""); x = null;', '      id = pre + cid + (n ? "r" + n : ""); x = null;'],
+  ]);
+  const KR222 = [];
+  for (const [a, b] of KG222) { let r; try { r = await run222(onceH40(html, a, b)); } catch (e) { r = { ok: false, threw: e.message }; } KR222.push(!r.ok); }
+  T('C222 두 관리자 화면이 같은 계약 단계를 같이 넘김 = 한 건(실행 — 판40 틀 · 두 기기 한 서버 · 실제 approveTask·advanceProc·materializeStage·csOnDone·conBillToRec·csSkipStage·csJumpStage·csApprHeal·mergeContracts·mergeTasks·mergeRec): X1 지시 탭 [승인] 같이 = 다음 단계 지시 1·두 기기와 서버 단계의 지시 번호가 그 지시·단계 진행 충돌 알림 0(운영 판 꼴 사본: 지시 2) · X2 마지막 단계 = 실적신고 할 일 1(사본 2) · X3 청구 = 기성 줄 1·계약의 기성 번호가 그 줄·확인 창은 기기마다 1(사본 줄 2) · X4 [승인] × [건너뜀] = 다음 단계 지시 1 · X5 [이 단계부터] 같이 = 1 · X6 자동 풀기 두 기기 = 1',
+    ['x1', 'x2', 'x3', 'x4', 'x5', 'x6'].every((k) => R222[k + 'ok']) && ['x1', 'x2', 'x3', 'x4', 'x5', 'x6'].every((k) => !OLD222[k + 'ok']) && /^지시 2\|/.test(OLD222.x1) && /^실적신고 2\|/.test(OLD222.x2) && /^기성 줄 2\|/.test(OLD222.x3),
+    JSON.stringify(['x1', 'x2', 'x3', 'x4', 'x5', 'x6'].map((k) => k + ' ' + R222[k] + ' ↔ 사본 ' + OLD222[k])));
+  T('C222 되돌렸다 다시 넘김·옛 번호(실행): 그 단계의 열린 지시가 남아 있으면 그것을 가리킴(지시 1 — 운영 판 꼴 사본: 2) · 끝난 지시·지운 지시는 되살리지 않고 다음 회차 번호(r1·r2)·겹친 번호 0 · 기성 번호가 빠진 계약은 있는 줄에 다시 이음(줄 1)·지운 줄은 다음 회차 · 계약 번호가 영숫자 꼴이 아니면 종전 무작위 번호',
+    R222.r1ok && R222.r2ok && R222.r3ok && !OLD222.r1ok && !OLD222.r2ok, JSON.stringify([R222.r1, R222.r2, R222.r3, OLD222.r1, OLD222.r2]));
+  T('C222 한 기기 보통 흐름은 운영 판 꼴 사본과 같음(실행 — 지시 탭 [승인] 다음 단계·마지막·청구 · [건너뜀] · [이 단계부터]): 만든 지시·할 일·기성 줄의 모든 칸·계약 단계·확인 창 글·알림·저장 순서가 번호만 빼고 글자째 같음',
+    R222.pnok && typeof R222.p === 'string' && R222.p.length > 2000 && R222.p === OLD222.p, R222.pn + ' · ' + String(R222.p).length + '/' + String(OLD222.p).length);
+  T('C222 낡은 화면이 같은 번호로 새로 지음(실행 — 검토 확정 1 · 실제 approveTask·materializeStage·conBillToRec·mergeTasks·mergeRec): A가 지은 뒤 고친 다음 단계 지시(완료 요청·기한·담당)·기성 줄(발행·입금)을 그 항목을 받지 않은 B가 같은 번호로 새로 지어도 B의 병합 뒤 A 값이 남음 · 1건 · 알림 0 · B가 지은 뒤 고친 칸(상세)은 B 값',
+    R222.x7ok, R222.x7);
+  T('C222 결함 사본 ' + KG222.length + '개(번호 세 자리 무작위로 되돌림 — 단계 지시·종결 할 일·기성 줄 · 있는 지시를 또 넣음 · 있는 기성 줄을 또 넣음 · 끝난 지시 되살림 · 지운 지시 되살림 · 열린 지시 안 씀 · 지운 기성 줄 되살림 · 있는 기성 줄 안 씀 · 다시 쓰기 걷음 · 영숫자 가름 걷음 · 번호에서 종류 뺌 · 지은 때 사본 기준 병합 걷음 · 지시·기성 사본 두기 걷음) = 모두 ✗',
+    KG222.length === 16 && KR222.every((x) => x), JSON.stringify(KR222));
+  // ── C281(원장 C281 — v498 판40 N2가 남긴 것): 자동 풀기 저장의 5xx 알림 창 가름이 '자동 풀기가 저장을 보낸 뒤 30초'(시각)여서
+  //   그 30초 안에 사람이 고친 저장(단계 넘김·결재 반영 포함)이 5xx면 알림 창이 빠지고 · 자동 풀기 저장이 나가 있는 사이 사람이 고친 것이 5xx 뒤 다시 읽기로 알림 없이 사라짐
+  //   「원천」 가름 = 그 저장에 단 표식(csApprHealSend — 자동 풀기가 바로 보낸 저장 · 409로 다시 보낼 때는 사람 고침 저장 예약·나가 있는 다른 저장이 없을 때만 이어 받음) · 5xx 때 사람 고침이 걸려 있으면 종전 알림 창
+  //   (실행 — 판40 틀: 실제 csApprHeal·csApprSync·doSaveContracts·loadContracts·mergeContracts·approveTask·csApprOnDecided · 가짜 서버 5xx·409·다시 읽기 실패)
+  const run281 = async (H) => {
+    const R = {};
+    const mk = (extra, appr, tks) => mkH40(H, [kCH40('k1', 1), kOH40()].concat(extra || []), [apH40(1, 'k1', '승인')].concat(appr || []), [tkH40(1, 'k1')].concat(tks || []));
+    const human = (E) => { E.api.find('kO').title = 'O-A'; E.api.sched(); };
+    const out = (E) => '알림 ' + E.alerts + '|저장 ' + E.puts() + '|서버 kO ' + E.sv('kO').title + '|k1 ' + E.st('k1');
+    // c1: 자동 풀기 저장 200 → 5초 뒤 사람이 다른 계약을 고친 저장이 5xx = 알림 창 1(운영 판: 30초 안이라 0)
+    { const E = mk(); E.api.load(); await E.flush(); E.api.refresh(); await E.flush(); await E.fire(); await E.fire();
+      E.now += 5000; E.putFail = 1; human(E); await E.fire(); await E.fire();
+      R.c1 = out(E); R.c1ok = R.c1 === '알림 1|저장 200,500|서버 kO O0|k1 done/승인'; }
+    // c2: 자동 풀기 저장이 나가 있는 사이 사람이 고침(저장 예약) → 자동 풀기 저장 5xx = 알림 창 1(운영 판: 0 — 다시 읽기가 고친 것을 알림 없이 덮음)
+    { const E = mk(); E.putFail = 1; E.api.load(); await E.flush();
+      E.hold = (k, st) => k === 'PUT' && st === 500; E.api.refresh(); await E.flush(); E.hold = null;
+      human(E); await E.release('PUT500'); await E.fire(); await E.fire();
+      R.c2 = out(E); R.c2ok = R.c2 === '알림 1|저장 500,200|서버 kO O0|k1 open/대기'; }
+    // c3: 자동 풀기 저장 409 → 다시 보낸 저장 5xx(사람 고침 없음) = 알림 창 0(자동 풀기 자기 실패 — 표식을 이어 받음)
+    { const E = mk(); E.api.load(); await E.flush(); E.other('kO', (x) => { x.client = 'P1'; });
+      E.hold = (k, st) => { if (k === 'PUT' && st === 409) E.putFail = 1; return false; };
+      E.api.refresh(); await E.flush(); await E.fire(); await E.fire(); E.hold = null;
+      R.c3 = out(E); R.c3ok = R.c3 === '알림 0|저장 409,500|서버 kO O0|k1 open/대기'; }
+    // c4: 자동 풀기 저장이 나가 있는 사이 사람이 고침 → 409 → 다시 보낸 저장(사람 고침이 실림) 5xx = 알림 창 1(운영 판: 0 — 고친 것이 알림 없이 사라짐)
+    { const E = mk(); E.api.load(); await E.flush(); E.other('kO', (x) => { x.client = 'P1'; });
+      E.hold = (k, st) => k === 'PUT' && st === 409; E.api.refresh(); await E.flush(); E.hold = null;
+      human(E); E.putFail = 1; await E.release('PUT409'); await E.fire(); await E.fire();
+      R.c4 = out(E); R.c4ok = R.c4 === '알림 1|저장 409,500,200|서버 kO O0|k1 open/대기'; }
+    // c5: 자동 풀기 저장 409 → 다시 읽기 실패 → 1.4초 뒤 다시 보냄(409 → 다시 읽음 → 다시 보냄) 5xx(사람 고침 없음) = 알림 창 0
+    { const E = mk(); E.api.load(); await E.flush(); E.other('kO', (x) => { x.client = 'P1'; });
+      let n409 = 0; E.hold = (k, st) => { if (k === 'PUT' && st === 409 && ++n409 === 1) E.getFail = 1; else if (k === 'PUT' && st === 409) E.putFail = 1; return false; };
+      E.api.refresh(); await E.flush(); await E.fire(); await E.fire(); E.hold = null;
+      R.c5 = out(E) + '|읽기 실패 ' + E.log.filter((l) => l === 'GET → 500').length; R.c5ok = R.c5 === '알림 0|저장 409,409,500|서버 kO O0|k1 open/대기|읽기 실패 1'; }
+    // c5b: 같은 길에서 그 1.4초 안에 사람이 고침 → 그 저장(사람 고침이 실림)이 5xx = 알림 창 1(운영 판: 0)
+    { const E = mk(); E.api.load(); await E.flush(); E.other('kO', (x) => { x.client = 'P1'; });
+      E.hold = (k, st) => k === 'PUT' && st === 409; E.api.refresh(); await E.flush(); E.hold = null;
+      E.getFail = 1; await E.release('PUT409');
+      E.hold = (k, st) => { if (k === 'PUT' && st === 409) E.putFail = 1; return false; };
+      human(E); await E.fire(); await E.fire(); E.hold = null;
+      R.c5b = out(E); R.c5bok = R.c5b === '알림 1|저장 409,409,500|서버 kO O0|k1 open/대기'; }   // 저장이 하나 더 나가면(그 예약을 사람 고침이 못 지움) ✗
+    // c5c: 자동 풀기 저장이 나가 있는 사이 사람이 고침 → 409 → 다시 읽기 실패 → 다시 보낸 저장 5xx = 알림 창 1(표식을 이어 받지 않음)
+    { const E = mk(); E.api.load(); await E.flush(); E.other('kO', (x) => { x.client = 'P1'; });
+      E.hold = (k, st) => k === 'PUT' && st === 409; E.api.refresh(); await E.flush(); E.hold = null;
+      human(E); E.getFail = 1; await E.release('PUT409');
+      E.hold = (k, st) => { if (k === 'PUT' && st === 409) E.putFail = 1; return false; };
+      await E.fire(); await E.fire(); E.hold = null;
+      R.c5c = out(E); R.c5cok = R.c5c === '알림 1|저장 409,409,500|서버 kO O0|k1 open/대기'; }   // 사람 고침 저장 예약 위에 이어 받기 예약을 덮어 두 저장이 나가면 ✗
+    // c6: 자동 풀기 저장 200 → 5초 뒤 지시 탭 [승인](단계 넘김)의 저장이 5xx = 알림 창 1(운영 판: 0)
+    { const E = mk([kN222('k2', ['작업 수행', '준공서류 작성'])], [], [tk222('tk2', 'k2', 0, '작업 수행')]); E.api.load(); await E.flush(); E.api.refresh(); await E.flush(); await E.fire(); await E.fire();
+      E.now += 5000; E.putFail = 1; E.api.approve('tk2'); await E.fire(); await E.fire();
+      R.c6 = out(E) + '|k2 cur ' + E.sv('k2').pipes[0].cur; R.c6ok = R.c6 === '알림 1|저장 200,500|서버 kO O0|k1 done/승인|k2 cur 0'; }
+    // c7: 자동 풀기 저장 200 → 5초 뒤 이 기기가 결재함에서 다른 계약 청구 검수를 승인(결재 반영 저장 바로)이 5xx = 알림 창 1(운영 판: 0)
+    { const E = mk([kCH40('k2', 2)], [apH40(2, 'k2')], [tkH40(2, 'k2')]); E.api.load(); await E.flush(); E.api.refresh(); await E.flush(); await E.fire(); await E.fire();
+      E.now += 5000; E.putFail = 1; E.decide('c2', '승인'); await E.flush(); await E.fire(); await E.fire();
+      R.c7 = out(E) + '|k2 ' + E.st('k2'); R.c7ok = R.c7 === '알림 1|저장 200,500|서버 kO O0|k1 done/승인|k2 open/대기'; }
+    // c8: 자동 풀기 저장 5xx(사람 고침 없음 — 판40 n2b와 같은 길) = 알림 창 0 · 다음 결재함 목록 때 다시 풀어 완료
+    { const E = mk(); E.putFail = 1; E.api.load(); await E.flush(); E.api.refresh(); await E.flush(); await E.fire(); await E.fire();
+      const a = out(E); E.now += 300000; E.api.refresh(); await E.flush(); await E.fire(); await E.fire();
+      R.c8 = a + ' → ' + out(E); R.c8ok = R.c8 === '알림 0|저장 500|서버 kO O0|k1 open/대기 → 알림 0|저장 500,200|서버 kO O0|k1 done/승인'; }
+    // a1·a1l(독립 확인 A1): 자동 풀기의 결재 동기화가 서버 사본(GET)·결재함 목록(LIST)을 기다리는 사이 사람이 다른 계약을 고침 → 동기화 뒤 나간 저장(그 고침이 실림) 5xx = 알림 1(6578be0: 0 — 표식 저장이 사람 예약을 지우고 나감)
+    for (const [key, kind] of [['a1', 'GET'], ['a1l', 'LIST']]) {
+      const E = mk(); E.api.load(); await E.flush();
+      let nL = 0; E.hold = (k) => k === kind && (kind === 'GET' || ++nL === 2);   // LIST는 apprRefresh 첫 목록은 보내고 동기화 안의 둘째만
+      E.api.refresh(); await E.flush(); E.hold = null;
+      const h0 = E.held.map((h) => h.kind).join(',');
+      human(E); E.putFail = 1; await E.release(kind); await E.fire(); await E.fire();
+      R[key] = '붙잡음 ' + h0 + '|' + out(E); R[key + 'ok'] = R[key] === '붙잡음 ' + kind + '|알림 1|저장 500|서버 kO O0|k1 open/대기'; }
+    // a1b(독립 확인 A1b): 자동 풀기가 k1·k2를 차례로 풂 — k1 저장이 나가 있는 사이 사람이 고침 → k1 200이 저장 대기 표시를 내림 → k2 차례의 저장(사람 고침이 실림) 5xx = 알림 1(6578be0: 0)
+    { const E = mkH40(H, [kCH40('k1', 1), kCH40('k2', 2), kOH40()], [apH40(1, 'k1', '승인'), apH40(2, 'k2', '승인')], [tkH40(1, 'k1'), tkH40(2, 'k2')]);
+      E.api.load(); await E.flush();
+      E.hold = (k, st) => k === 'PUT' && st === 200; E.api.refresh(); await E.flush(); E.hold = null;
+      human(E); await E.release('PUT200'); E.putFail = 1; await E.fire(); await E.fire(); await E.fire();
+      R.a1b = out(E) + '|k2 ' + E.st('k2'); R.a1bok = R.a1b === '알림 1|저장 200,500|서버 kO O0|k1 done/승인|k2 open/대기'; }
+    // a2: 자동 풀기 두 회차가 겹침(첫 회차가 서버 사본을 기다리는 사이 2분 넘어 둘째 회차) · 사람 고침 없음 — 첫 회차 표식 저장 끊김 → 둘째 회차 저장 5xx = 알림 0(자동 풀기 자기 저장의 예약을 사람 것으로 세면 1)
+    { const E = mkH40(H, [kCH40('k1', 1), kCH40('k2', 2), kCH40('k3', 3), kOH40()], [apH40(1, 'k1', '승인'), apH40(2, 'k2', '승인'), apH40(3, 'k3')], [tkH40(1, 'k1'), tkH40(2, 'k2'), tkH40(3, 'k3')]);
+      E.api.load(); await E.flush();
+      E.hold = (k) => k === 'GET'; E.now += 400000; E.api.refresh(); await E.flush();
+      E.putNet = 1; E.putFail = 1; E.now += 200000; E.api.refresh(); await E.flush(); E.hold = null;
+      for (let k = 0; k < 30 && (E.held.length || E.left()); k++) { while (E.held.length) await E.release(E.held[0].kind); await E.fire(); }
+      R.a2 = '알림 ' + E.alerts + '|저장 ' + E.log.filter((l) => l.indexOf('PUT') === 0).map((l) => l.split('→ ')[1].split(' ')[0]).join(','); R.a2ok = R.a2 === '알림 0|저장 NET,500,200'; }
+    R.ok =Object.keys(R).filter((k) => /ok$/.test(k)).every((k) => R[k]);
+    return R;
+  };
+  // 운영 판 꼴 사본(이번 고침 다섯 자리를 종전 글로) — 고치기 전 값
+  const OLD281 = [
+    ['csApprHealFail(resp.status, healS && typeof csApprHealOnly === "function" && csApprHealOnly())', 'csApprHealFail(resp.status)'],
+    ['    var quiet = status !== 400 && mine === true;', '    var quiet = status !== 400 && Date.now() - csApprHealOutAt < 30000;'],
+    ['if (contractsPending && !pend0){ if (hum0 || csApprSchedN !== n0) csSaveNow(); else csApprHealSend(csSaveNow); }', 'if (contractsPending && !pend0){ csApprHealOutAt = Date.now(); csSaveNow(); }'],
+    ['if (healS && typeof csApprHealOnly === "function" && csApprHealOnly()){ csApprHealSend(doSaveContracts); return; } ', ''],
+    ['if(j&&j.gwReadFail&&healS&&typeof csApprHealLater === "function"&&csApprHealLater()) return; ', ''],
+  ];
+  const R281 = await run281(html);
+  const O281 = await run281(OLD281.reduce((s, [a, b]) => onceH40(s, a, b), html));
+  const C281K = ['c1', 'c2', 'c3', 'c4', 'c5', 'c5b', 'c5c', 'c6', 'c7', 'c8', 'a1', 'a1l', 'a1b', 'a2'];
+  T('C281 자동 풀기 저장의 5xx 알림 창 가름 = 그 저장 표식(실행 — 판40 틀 · 실제 csApprHeal·doSaveContracts·loadContracts·approveTask·csApprOnDecided): c1 자동 풀기 저장 200 → 5초 뒤 사람이 고친 저장 5xx = 알림 1(운영 판 꼴: 0) · c2 자동 풀기 저장이 나가 있는 사이 사람이 고침 → 그 저장 5xx = 알림 1(0) · c4 같은 꼴 409 뒤 다시 보낸 저장 5xx = 알림 1(0) · c5b·c5c 409 뒤 다시 읽기 실패 길에서 사람 고침 = 알림 1(0) · c6 지시 탭 [승인] 저장 5xx = 알림 1(0) · c7 결재함 승인 반영 저장 5xx = 알림 1(0) / 자동 풀기 자기 실패는 그대로 알림 0: c3 409 뒤 다시 보낸 저장 5xx · c5 다시 읽기 실패 뒤 다시 보낸 저장 5xx · c8 첫 저장 5xx(다음 목록 때 완료)',
+    C281K.every((k) => R281[k + 'ok']) && ['c1', 'c2', 'c4', 'c5b', 'c5c', 'c6', 'c7', 'a1', 'a1l', 'a1b'].every((k) => /(^|\|)알림 0\|/.test(O281[k])) && ['c3', 'c5', 'c8'].every((k) => O281[k] === R281[k]),
+    JSON.stringify(C281K.map((k) => k + ' ' + R281[k] + ' ↔ 운영 꼴 ' + O281[k])));
+  // 결함 사본 — 고친 줄마다(빼거나 되돌리면 위 길 가운데 하나가 ✗)
+  const KG281 = [
+    ['    var healS = (typeof csApprHealNext !== "undefined" && csApprHealNext === true);', '    var healS = false;'],
+    ['csApprHealFail(resp.status, healS && typeof csApprHealOnly === "function" && csApprHealOnly())', 'csApprHealFail(resp.status, healS)'],
+    ['    var quiet = status !== 400 && mine === true;', '    var quiet = status !== 400 && Date.now() - csApprHealOutAt < 30000;'],
+    ['if (healS && typeof csApprHealOnly === "function" && csApprHealOnly()){ csApprHealSend(doSaveContracts); return; } ', ''],
+    ['if(j&&j.gwReadFail&&healS&&typeof csApprHealLater === "function"&&csApprHealLater()) return; ', ''],
+    ['  function csApprHealOnly(){ return !contractSaveTimer && (typeof conSaveOut === "undefined" || conSaveOut === 0); }', '  function csApprHealOnly(){ return true; }'],
+    ['    if (!csApprHealOnly()) return false;\n    contractsPending = true;', '    contractsPending = true;'],
+    ['contractsPending = true; contractSaveTimer = setTimeout(function(){ contractSaveTimer = null; csApprHealSend(doSaveContracts); }, 1400);', 'contractsPending = true; setTimeout(function(){ csApprHealSend(doSaveContracts); }, 1400);'],
+    ['  function csApprHealSend(fn){ csApprHealNext = true; try { fn(); } finally { csApprHealNext = false; } }', '  function csApprHealSend(fn){ csApprHealNext = true; try { fn(); } finally {} }'],
+    ['else csApprHealSend(csSaveNow); }', 'else csSaveNow(); }'],
+    // 독립 확인 A1·A1b 반영: 기다리는 사이 사람 저장 예약 보기 걷음 · 동기화 안 예약도 사람 것으로 셈 · 둘째 응답 구간 표시 걷음 · 앞 저장 200 뒤 걸린 사람 예약 안 봄 · 구간 표시를 안 내림
+    ['{ if (hum0 || csApprSchedN !== n0) csSaveNow(); else csApprHealSend(csSaveNow); }', '{ csApprHealSend(csSaveNow); }'],
+    ['if (hum0 || csApprSchedN !== n0) csSaveNow();', 'if (hum0) csSaveNow();'],
+    ['if (typeof csApprSchedN !== "undefined" && !csApprSyncIn && !csApprHealNext) csApprSchedN++;', 'if (typeof csApprSchedN !== "undefined" && !csApprHealNext) csApprSchedN++;'],
+    ['if (typeof csApprSchedN !== "undefined" && !csApprSyncIn && !csApprHealNext) csApprSchedN++;', 'if (typeof csApprSchedN !== "undefined" && !csApprSyncIn) csApprSchedN++;'],
+    ['      c = findProc(id) || c;\n      if (typeof csApprSyncMark === "function") csApprSyncMark();   // C281: 위와 같음\n', '      c = findProc(id) || c;\n'],
+    ['if (hum0 || csApprSchedN !== n0) csSaveNow();', 'if (csApprSchedN !== n0) csSaveNow();'],
+    ['Promise.resolve().then(function(){ csApprSyncIn = false; });', ''],
+  ];
+  const KR281 = [];
+  for (const [a, b] of KG281) { let r; try { r = await run281(onceH40(html, a, b)); } catch (e) { r = { ok: false, threw: e.message }; } KR281.push(!r.ok); }
+  T('C281 결함 사본 ' + KG281.length + '개(표식 읽기 걷음 · 5xx 가름에서 사람 고침 보기 걷음 · 30초 시각 가름으로 되돌림 · 409 다시 보냄 이어 받기 걷음 · 다시 읽기 실패 이어 받기 걷음 · 사람 고침 보기 늘 참 · 다시 읽기 실패 때 사람 고침 보기 걷음 · 그 예약을 사람 고침이 못 지우게 · 표식 안 내림 · 자동 풀기 저장에 표식 안 닮) = 모두 ✗',
+    KG281.length === 17 && KR281.every((x) => x), JSON.stringify(KR281));
+  // 고정 글 — 첫 응답(서버 사본 접목) 구간 표시: 접목이 저장을 예약하는 꼴(변경계약 차수 병합 chgPush)은 이 틀에서 짓지 않아 실행으로 못 잡음 → 정확히 한 번
+  const FIX281 = '      c = findProc(id) || c;   // 응답 대기 중 409 병합이 객체를 바꿨을 수 있다(F6)\n      if (typeof csApprSyncMark === "function") csApprSyncMark();   // C281: 이 응답 처리(동기 구간) 안의 저장 예약은 동기화 자신의 것\n';
+  T('C281 고정 글 1줄(결재 동기화 첫 응답 구간 표시) 정확히 한 번 · 빼면 ✗', html.split(FIX281).length === 2 && html.replace(FIX281, '      c = findProc(id) || c;   // 응답 대기 중 409 병합이 객체를 바꿨을 수 있다(F6)\n').split(FIX281).length === 1, String(html.split(FIX281).length - 1));
 } catch (e) { console.log('  (P1 판40 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ── v489(판24f — 계약 저장 충돌 병합을 칸 단위로 · 원장 C196): 실행 검사는 위 'P1 판24f' 블록 · 여기는 문서·판 번호 정확 검사 + 칸 단위 병합을 부르는 줄·기준 사본을 세우는 줄 등 고정 글 12줄이 그대로 한 번씩 있는지 — 다음 판은 기준 줄·sw를 '489 이상'으로 풀 것
@@ -19645,7 +19992,7 @@ try {
   const M493 = [mu493('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v492 (')), mu493('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v492'")),
     mu493('ft', (s) => s.split('`SECRETS_SCAN_OMIT_KEYS=STMT_MAIL_USER`').join('SECRETS_SCAN_OMIT_KEYS')),
     mu493('cl', (s) => s.replace('**v493**: 멈춤 감시 켬', 'v493: 감시')),
-    mu493('ix', (s) => s.replace(',"gw-stmtmail-cron"]', ']')),
+    mu493('ix', (s) => s.replace(',"gw-stmtmail-cron"', '')),   // C251(11/23): 감시 목록 끝이 gw-audit-fold-cron으로 바뀜 — 결함 사본은 '목록에서 gw-stmtmail-cron을 뺌'(자리 무관)
     mu493('tl', (s) => s.replace('\n- [x] (AI) `uismoke` v399', '\n- (AI) `uismoke` v399'))];
   T('v493 문서·판 번호(정확 검사): FEATURES 기준 v493 (2026-11-17)·v493 절 · TESTLIST v493 칸 3(운영 확인 1 · 게이트 [x] 2) · CLAUDE.md 한 줄 · 감시 목록 gw-stmtmail-cron 한 번 · sw jw-shell-v493 · 결함 사본 ' + M493.length + '개 = 모두 ✗',
     r493.ok && M493.every((v) => v === false), JSON.stringify({ r: r493.info, mut: M493 }));
@@ -20040,7 +20387,7 @@ try {
 try {
   const rd498 = (p) => readFileSync(join(ROOT, p), 'utf8');
   const D498 = { ft: rd498('FEATURES.md'), tl: rd498('TESTLIST.md'), sw: rd498('sw.js'), man: rd498('MANUAL.html'), cl: rd498('CLAUDE.md'), ix: rd498('index.html') };
-  const FIX498 = ["  var CS_APPR_RETRY_MS = 4000, CS_APPR_RETRY_MAX = 5;", "tn = Number(tryN) || 0;\n    if (!id) return;", "    if (who === undefined){ who = me; if (it && !it.decided_by) it = Object.assign({}, it, { decided_by: { name: myName() } }); }", "      if (who !== ((typeof myId === \"function\") ? (myId() || \"\") : \"\")) return;", "        c = JSON.parse(JSON.stringify(sc)); contracts.push(c);", "        if (typeof apprToastShow === \"function\") apprToastShow(\"결재 결과를 계약 단계에 아직 옮기지 못했습니다 — 앱을 새로 고치면 자동으로 반영됩니다(또는 계약 탭에서 그 계약의 단계·서류 탭)\");", "    return !!a.by && typeof myName === \"function\" && a.by === myName();", "  var CS_APPR_HEAL_MAX = 6, csApprHealN = {}, csApprHealBusy = false, csApprHealAt = 0, csApprHealSt = {}, csApprHealHold = false, csApprHealStop = false, csApprHealOutAt = 0;", "        else if (++n > 100) res(false);", "    items.forEach(function(x){ if (x && x.cid && String(x.ref || \"\").indexOf(\"con:\") === 0 && (x.status === \"승인\" || x.status === \"반려\")) by[x.cid] = x; });", "    if (who === undefined) who = csApprWho(); else if (who !== csApprWho()) return 0;", "    csApprHealBusy = true; csApprHealAt = Date.now(); if (!pn) csApprHealStop = false;", "    hits.forEach(function(h){ csApprHealN[h.cid] = (csApprHealN[h.cid] || 0) + 1; if (ids.indexOf(h.id) < 0){ ids.push(h.id); cids[h.id] = []; } cids[h.id].push(h.cid); });", "        if (!c || who !== csApprWho()) return false;", "    if (!h || h.bill !== \"due\" || !ok || who !== csApprWho()) return null;", "      if (!c || who !== csApprWho() || (sc && !sc.gwReadFail && sc.rec_id)) return;", "      if (!h || h.bill === \"skip\") return;", "  var CS_APPR_GUARD_MS = 5000;", "      if (done) return; done = true; if (timer) clearTimeout(timer);\n      if (who !== csApprWho()) return;", "res.body.items.forEach(function(x){ if (x && x.cid && x.cid === cid && x.ref === ref) it = x; });", "      if(resp.status>=500 && typeof csApprHealFail === \"function\" && csApprHealFail(resp.status)){ contractsPending=false; if (typeof csValEditsDone === \"function\") csValEditsDone(sentSeq); loadContracts(); return; }"];
+  const FIX498 = ["  var CS_APPR_RETRY_MS = 4000, CS_APPR_RETRY_MAX = 5;", "tn = Number(tryN) || 0;\n    if (!id) return;", "    if (who === undefined){ who = me; if (it && !it.decided_by) it = Object.assign({}, it, { decided_by: { name: myName() } }); }", "      if (who !== ((typeof myId === \"function\") ? (myId() || \"\") : \"\")) return;", "        c = JSON.parse(JSON.stringify(sc)); contracts.push(c);", "        if (typeof apprToastShow === \"function\") apprToastShow(\"결재 결과를 계약 단계에 아직 옮기지 못했습니다 — 앱을 새로 고치면 자동으로 반영됩니다(또는 계약 탭에서 그 계약의 단계·서류 탭)\");", "    return !!a.by && typeof myName === \"function\" && a.by === myName();", "  var CS_APPR_HEAL_MAX = 6, csApprHealN = {}, csApprHealBusy = false, csApprHealAt = 0, csApprHealSt = {}, csApprHealHold = false, csApprHealStop = false, csApprHealOutAt = 0;", "        else if (++n > 100) res(false);", "    items.forEach(function(x){ if (x && x.cid && String(x.ref || \"\").indexOf(\"con:\") === 0 && (x.status === \"승인\" || x.status === \"반려\")) by[x.cid] = x; });", "    if (who === undefined) who = csApprWho(); else if (who !== csApprWho()) return 0;", "    csApprHealBusy = true; csApprHealAt = Date.now(); if (!pn) csApprHealStop = false;", "    hits.forEach(function(h){ csApprHealN[h.cid] = (csApprHealN[h.cid] || 0) + 1; if (ids.indexOf(h.id) < 0){ ids.push(h.id); cids[h.id] = []; } cids[h.id].push(h.cid); });", "        if (!c || who !== csApprWho()) return false;", "    if (!h || h.bill !== \"due\" || !ok || who !== csApprWho()) return null;", "      if (!c || who !== csApprWho() || (sc && !sc.gwReadFail && sc.rec_id)) return;", "      if (!h || h.bill === \"skip\") return;", "  var CS_APPR_GUARD_MS = 5000;", "      if (done) return; done = true; if (timer) clearTimeout(timer);\n      if (who !== csApprWho()) return;", "res.body.items.forEach(function(x){ if (x && x.cid && x.cid === cid && x.ref === ref) it = x; });", "      if(resp.status>=500 && typeof csApprHealFail === \"function\" && csApprHealFail(resp.status, healS && typeof csApprHealOnly === \"function\" && csApprHealOnly())){ contractsPending=false; if (typeof csValEditsDone === \"function\") csValEditsDone(sentSeq); loadContracts(); return; }"];   // C281: 마지막 줄 = 5xx 갈래에 그 저장 표식 인자
   const chk498 = (d) => {
     const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
     const ftv = cut(d.ft, '\n### v498 (11/19)', '\n### '), tlv = cut(d.tl, '\n## v498 ', '\n## ');
@@ -20811,6 +21158,97 @@ try {
   T('v514 문서·판 번호(정확 검사): FEATURES 기준 v514 (2026-11-20)·v514 절(운반일지 줄 번호) · TESTLIST v514 칸 4(화면·운영 확인 2 · 게이트 [x] 2) · MANUAL 새 노선 폼 문장(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 3줄 한 번씩 · sw jw-shell-v514 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
     r514.ok && M514.every((v) => v === false), JSON.stringify({ r: r514.info, mut: M514 }));
 } catch (e) { console.log('  (v514 검사 생략 — ' + e.message + ')'); fails++; }
+// ── C244(계산 검산 11/20 — 운반일지·수량 집계): 실제 함수를 떼어 실행(index.html abSheetTableHtml·abSheetMerge·abPendList·abUnmatchedList·abTotals + 워커 abSummary)
+//   ① 같은 양식 줄로 가는 묶음 둘 이상 = 회수·잠정·단위미상을 더함(엑셀 generate.py cnt[k] += n과 같게) ② 미매칭 목록은 같은 상·하차지·품목 묶음(차량 분리분)을 더함 = 합계줄 '미배정 n회'
+//   ③ 자동 상신 본문 '합계 n회·톤' = 배정분만(화면 abTotals와 같은 규칙) · '오늘'은 인자(todayStr 대역) · 무작위 2만 건 불변식 · 결함 사본 11개
+try {
+  const vm244 = createRequire(import.meta.url)('vm');
+  const W244 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-allbaro-run-background.js'), 'utf8');
+  const fn244 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음 ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('끝 없음 ' + name); };
+  const vl244 = (src, nm) => { const m = src.match(new RegExp('\\n\\s*var ' + nm + ' = [^\\n]*;')); if (!m) throw new Error('var 없음 ' + nm); return m[0]; };
+  const AFN244 = ['esc', 'abInt', 'abNum', 'abTonTxt', 'abRowEmpty', 'abPendList', 'abPendAge', 'abPendInfo', 'abTotals', 'abTotalsText', 'abUnmKey', 'abUnmatchedList', 'abAutoRows', 'abVariantHtml', 'abSheetMerge', 'abSheetTableHtml', 'abSortKey'];
+  const load244 = (H, W, today) => {
+    let code = vl244(H, 'AB_PEND_STALE_DAYS') + vl244(H, 'AB_PEND_HINT') + '\n';
+    AFN244.forEach((n) => { code += fn244(H, n) + '\n'; });
+    code += fn244(W, 'unmatchedCount') + '\n' + fn244(W, 'abSummary') + '\n';
+    const ctx = { abDay: { data: null, loading: false }, abManual: { items: [] }, abHideEmpty: false, abCanLearn: () => false, todayStr: () => today };
+    vm244.createContext(ctx); vm244.runInContext(code, ctx); return ctx;
+  };
+  const RL244 = [{ s: 'L', r: 5, f: '가상상사', t: '가상처리', i: '분진' }, { s: 'L', r: 6, f: '나라공업', t: '가상처리', i: '슬러지' }, { s: 'R', r: 5, f: '다온산업', t: '가상매립', i: '광재' }];
+  const RT244 = { 'L|5': { side: 'L', row: 5, count_col: 5, item: '분진' }, 'L|6': { side: 'L', row: 6, count_col: 5, item: '슬러지' }, 'R|5': { side: 'R', row: 5, count_col: 11, item: '광재' } };
+  const cells244 = (h) => { const out = {}; const re = /<tr[^>]*><td>([^<]*)<\/td><td>([^<]*)<\/td><td>([^<]*)([\s\S]*?)<\/td><td class="n">([\s\S]*?)<\/td><\/tr>/g; let m;
+    while ((m = re.exec(h))) { const v = m[5].replace(/<button[\s\S]*?<\/button>/g, ''); const num = (v.match(/^(?:<span class="ab-n-pend"[^>]*>)?(\d+)(\?)?/) || []);
+      out[m[1]] = { n: num[1] ? Number(num[1]) : 0, q: !!num[2], sub: (v.match(/<span class="sub[^"]*">([^<]*)<\/span>/) || [])[1] || '', item: m[4], raw: v }; } return out; };
+  const B244 = (from, item, n, rt, x) => Object.assign({ from: from, to: '가상처리', item: item, n: n, qty_ton: n, qty_unknown: 0, n_pending: 0, route: rt ? RT244[rt] : null, weak: false }, x || {});
+  const doc244 = (counts, pending) => ({ counts: counts, pending: pending || [], qty_unknown: counts.reduce((s, c) => s + (c.qty_unknown || 0), 0), total: counts.reduce((s, c) => s + c.n, 0),
+    total_qty_ton: counts.reduce((s, c) => s + c.qty_ton, 0), unmatched: counts.filter((c) => !c.route).map((c) => Object.assign({ from: c.from, to: c.to, item: c.item, n: c.n, reason: c.reason || 'NO_ROUTE' }, c.vehicle_type ? { vehicle_type: c.vehicle_type } : {})) });
+  const run244 = (X, d) => { X.abDay.data = d; const t = X.abTotals(); const u = X.abUnmatchedList(); return { c: cells244(X.abSheetTableHtml(RL244, X.abAutoRows()).html), t: t, txt: X.abTotalsText(), u: u, us: u.reduce((s, v) => s + v.n, 0), w: X.abSummary(d) }; };
+  const head244 = (s) => (String(s).match(/^합계 \d+회 · (?:[\d.]+톤|톤 미집계)(?: · 미배정 \d+회)?/) || [''])[0];
+  const chk244 = (H, W) => {
+    const X = load244(H, W, '2026-11-20'), bad = [];
+    const eq = (nm, a, b) => { if (JSON.stringify(a) !== JSON.stringify(b)) bad.push(nm + ' ' + JSON.stringify(a) + '≠' + JSON.stringify(b)); };
+    // A 표기만 다른 두 묶음 1+1(검토자 최소 입력) — 표 L5 2 = 합계 2 · 표기 변형 칩은 합친 줄에 남음
+    let r = run244(X, doc244([B244('가상상사', '분진', 1, 'L|5'), B244('(주)가상상사', '분진', 1, 'L|5', { variants: ['(주)가상상사'] })]));
+    eq('A 칸', r.c['가상상사'].n, 2); eq('A 합계', r.txt, '합계 2회 · 2톤'); eq('A 칩', r.c['가상상사'].item.indexOf('표기 변형 (주)가상상사') > 0, true);
+    // B 3+1 — 정렬 순서와 무관하게 4
+    r = run244(X, doc244([B244('가상상사', '분진', 3, 'L|5'), B244('(주)가상상사', '분진', 1, 'L|5')])); eq('B 칸', r.c['가상상사'].n, 4);
+    // C 확정 2 + 잠정·단위미상 1 = 검은 3(전부 잠정 아님) + 잠정 1·단위미상 작은 글씨
+    r = run244(X, doc244([B244('가상상사', '분진', 2, 'L|5'), B244('가상상사', '분진(고상)', 1, 'L|5', { qty_ton: 0, qty_unknown: 1, n_pending: 1, weak: true })], [{ manf: 'M1', from: '가상상사', to: '가상처리', item: '분진(고상)', state: '운반중', date: '20261117' }]));
+    eq('C 칸', [r.c['가상상사'].n, r.c['가상상사'].q, /^잠정 1\(예약 미실행 가능 · 미확정 · 3일\+ 1\) · 품목확인 · 단위미상$/.test(r.c['가상상사'].sub)], [3, false, true]);
+    // D 두 묶음 다 잠정 = 붉은 '2?' · 인계번호 둘 다 안내 · 앞 묶음의 단위미상·품목확인도 남음
+    r = run244(X, doc244([B244('가상상사', '분진', 1, 'L|5', { n_pending: 1, qty_unknown: 1, weak: true }), B244('나가상상사', '분진', 1, 'L|5', { n_pending: 1 })],
+      [{ manf: 'M1', from: '가상상사', to: '가상처리', item: '분진', date: '20261119' }, { manf: 'M2', from: '나가상상사', to: '가상처리', item: '분진', date: '20261119' }]));
+    eq('D 칸', [r.c['가상상사'].n, r.c['가상상사'].q, r.c['가상상사'].sub, r.c['가상상사'].raw.indexOf('인계번호 M1') > 0 && r.c['가상상사'].raw.indexOf('인계번호 M2') > 0], [2, true, '잠정 2(예약 미실행 가능 · 미확정) · 품목확인 · 단위미상', true]);
+    // E 다른 줄은 그대로
+    r = run244(X, doc244([B244('가상상사', '분진', 1, 'L|5'), B244('나라공업', '슬러지', 2, 'L|6')])); eq('E 칸', [r.c['가상상사'].n, r.c['나라공업'].n, r.c['다온산업'].n], [1, 2, 0]);
+    // F 미매칭 차량 분리 2묶음(n=2 차량 미상 · n=1 카고) = 목록 1종 3회 = 합계줄 미배정 3회 · 지정 키 from|to|item
+    r = run244(X, doc244([B244('가상제강', '분진', 2, null, { reason: 'AMBIGUOUS' }), B244('가상제강', '분진', 1, null, { reason: 'AMBIGUOUS', vehicle_type: '카고' })]));
+    eq('F 목록', [r.u.length, r.us, r.t.unmN, r.u[0].key, r.u[0].reason], [1, 3, 3, '가상제강|가상처리|분진', 'AMBIGUOUS']);
+    // G counts에 없는 unmatched[]끼리 같은 조합 = 더함 · H counts와 같은 조합의 unmatched[] = 두 번 안 셈
+    X.abDay.data = { counts: [], unmatched: [{ from: '가', to: '나', item: '다', n: 1 }, { from: '가', to: '나', item: '다', n: 2 }] }; eq('G 목록', X.abUnmatchedList().map((u) => u.n), [3]);
+    X.abDay.data = { counts: [B244('가', '다', 2, null)], unmatched: [{ from: '가', to: '가상처리', item: '다', n: 2 }] }; eq('H 목록', X.abUnmatchedList().map((u) => u.n), [2]);
+    // I 배정 2(2톤) + 미매칭 1(1톤) — 결재 본문 = 화면 / J 미매칭만 / K counts 없는 옛 문서 = 종전 total / L 배정 톤 0 = '0톤'
+    r = run244(X, doc244([B244('가상상사', '분진', 2, 'L|5'), B244('없는곳', '분진', 1, null)])); eq('I 본문', [r.w, head244(r.txt)], ['합계 2회 · 2톤 · 미배정 1회', '합계 2회 · 2톤 · 미배정 1회']);
+    r = run244(X, doc244([B244('없는곳', '분진', 1, null)])); eq('J 본문', [r.w, head244(r.txt)], ['합계 0회 · 톤 미집계 · 미배정 1회', '합계 0회 · 톤 미집계 · 미배정 1회']);
+    eq('K 옛 문서', X.abSummary({ total: 3, total_qty_ton: 1.5 }), '합계 3회 · 1.5톤');
+    r = run244(X, doc244([B244('가상상사', '분진', 1, 'L|5', { qty_ton: 0, qty_unknown: 1 })])); eq('L 톤 0', [r.w, head244(r.txt)], ['합계 1회 · 0톤 · 단위미상 1건', '합계 1회 · 0톤']);
+    // 무작위 2만 건(씨앗 고정): 표 칸 = 그 줄 묶음 n 합 · 표 칸 합 = 자동분 · 목록 합 = 미배정 · 결재 본문 머리 = 화면 머리
+    let seed = 2441120; const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; }; const pk = (a) => a[Math.floor(rnd() * a.length)];
+    let rb = 0; const ex = [];
+    for (let k = 0; k < 20000; k++) {
+      const cs = [], L = 1 + Math.floor(rnd() * 6);
+      for (let j = 0; j < L; j++) { const n = 1 + Math.floor(rnd() * 4), np = Math.floor(rnd() * (n + 1)) * (rnd() < 0.4 ? 1 : 0), un = rnd() < 0.2 ? 1 : 0;
+        const c = B244(pk(['가상상사', '(주)가상상사', '나라공업', '가상제강']), pk(['분진', '분진(고상)', '슬러지']), n, pk(['L|5', 'L|5', 'L|6', 'R|5', null]), { qty_ton: Math.round(rnd() * 30000) / 1000, qty_unknown: un, n_pending: np });
+        if (rnd() < 0.3) c.vehicle_type = pk(['카고', '덤프']); cs.push(c); }
+      const d = doc244(cs); const q = run244(X, d), e = [];
+      ['L|5', 'L|6', 'R|5'].forEach((rk, ri) => { const want = cs.filter((c) => c.route && c.route.side + '|' + c.route.row === rk).reduce((s, c) => s + c.n, 0); const got = (q.c[RL244[ri].f] || {}).n || 0; if (got !== want) e.push(rk + ' ' + got + '≠' + want); });
+      const sumC = Object.keys(q.c).reduce((s, x) => s + q.c[x].n, 0); if (sumC !== q.t.autoN) e.push('칸합 ' + sumC + '≠' + q.t.autoN);
+      if (q.us !== q.t.unmN) e.push('목록 ' + q.us + '≠' + q.t.unmN);
+      if (head244(q.w) !== head244(q.txt)) e.push('본문 ' + head244(q.w) + '≠' + head244(q.txt));
+      if (e.length) { rb++; if (ex.length < 2) ex.push(e.join('/')); }
+    }
+    if (rb) bad.push('무작위 ' + rb + ' ' + ex.join(' | '));
+    return { ok: bad.length === 0, info: bad.slice(0, 6) };
+  };
+  const r244 = chk244(html, W244);
+  T('C244 ① 운반내역 표·미매칭 목록·자동 상신 본문(실행 — 실제 abSheetTableHtml·abSheetMerge·abPendList·abUnmatchedList·abTotals·워커 abSummary): 같은 줄 묶음 1+1 = 2·3+1 = 4(엑셀과 같게)·확정 2+잠정 1 = 검은 3·둘 다 잠정 = 붉은 2?·인계번호 둘 다·표기 변형 칩 유지 · 미매칭 차량 분리 2+1 = 1종 3회 = 합계줄 미배정 3회 · 결재 본문 = 화면(배정 2·미배정 1 → 합계 2회 · 미배정만 → 합계 0회 · 옛 문서 = 종전) · 무작위 2만 건 불변식(칸 = 줄 묶음 합·칸 합 = 자동분·목록 합 = 미배정·본문 머리 = 화면 머리)', r244.ok, JSON.stringify(r244.info));
+  const MU244 = [
+    ['H', 'byKey[k] = byKey[k] ? abSheetMerge(byKey[k], c) : c;', 'byKey[k] = c;', '덮어쓰기(고치기 전)'],
+    ['H', 'n: abInt(a.n) + abInt(b.n)', 'n: abInt(b.n)', '회수 안 더함'],
+    ['H', 'n_pending: abInt(a.n_pending) + abInt(b.n_pending)', 'n_pending: abInt(b.n_pending)', '잠정 안 더함'],
+    ['H', 'qty_unknown: abInt(a.qty_unknown) + abInt(b.qty_unknown)', 'qty_unknown: abInt(b.qty_unknown)', '단위미상 안 더함'],
+    ['H', 'weak: !!(a.weak || b.weak)', 'weak: !!b.weak', '품목확인 앞 묶음 버림'],
+    ['H', '    if (vs.length) m.variants = vs;\n', '', '표기 변형 버림'],
+    ['H', 'if (c && c._parts){', 'if (false){', '잠정 인계번호 한 묶음만'],
+    ['H', 'if (at[k] !== undefined){ out[at[k]].n += abInt(c.n); continue; }', 'if (at[k] !== undefined){ continue; }', '미매칭 둘째 묶음 버림(고치기 전)'],
+    ['H', 'if (at[k] !== undefined){ if (src[k] === "u") out[at[k]].n += abInt(u.n); continue; }', 'if (at[k] !== undefined){ out[at[k]].n += abInt(u.n); continue; }', 'unmatched[] 두 번 셈'],
+    ['H', 'if (at[k] !== undefined){ if (src[k] === "u") out[at[k]].n += abInt(u.n); continue; }', 'if (at[k] !== undefined){ continue; }', 'unmatched[]끼리 안 더함'],
+    ['W', '      if (!c || !c.route) continue;\n      const v = Math.round(Number(c.n));', '      if (!c) continue;\n      const v = Math.round(Number(c.n));', '본문에 미배정 포함(고치기 전)'],
+    ['W', 'ton += c.qty_ton; tonSeen = true;', 'ton += c.qty_ton;', '본문 톤 미집계로'],
+  ];
+  const kill244 = MU244.map(([w, a, b, nm]) => { const S = w === 'H' ? html : W244; if (S.split(a).length !== 2) return 'err 자리 ' + nm; const M = S.replace(a, () => b); try { return !(w === 'H' ? chk244(M, W244) : chk244(html, M)).ok; } catch (e) { return true; } });
+  T('C244 ② 결함 사본 ' + MU244.length + '개(' + MU244.map((x) => x[3]).join('·') + ') = 모두 ✗', kill244.every((v) => v === true), JSON.stringify(kill244.map((v, i) => v === true ? '' : MU244[i][3] + ':' + v).filter(Boolean)));
+} catch (e) { console.log('  (C244 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ── v515(29 판⑪ — 폰에서 닫음): 실행 검사는 위 '29 판⑪ ③-11' · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '515 이상'으로 풀 것
 try {
@@ -20823,9 +21261,9 @@ try {
     const FT = ['`vsStage`', '`stmtPhone`', '`stmtBoardActed`', '`stmtMailLoad`', '`stmtBoardCards`', '메뉴는 그대로'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = '<li><b>폰에서는 상태만</b> (2026-11 v515) — ';
-    const ok = /기준: v515 \(2026-11-20\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 1 && op.length === 1
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 515 && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 1 && op.length === 1
       && d.man.indexOf(MAN) > 0 && !/stmtPhone|vsStage|renderStmt/.test(cut(d.man, MAN, '\n'))
-      && d.cl.indexOf('**월말명세서 판⑪(v515)**') > 0 && /SHELL_CACHE = 'jw-shell-v515'/.test(d.sw);
+      && d.cl.indexOf('**월말명세서 판⑪(v515)**') > 0 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 515;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, op: op.length } };
   };
   const rS = chkS(DS);
@@ -20836,6 +21274,1943 @@ try {
   T('v515 문서·판 번호(정확 검사): FEATURES 기준 v515 (2026-11-20)·v515 절(29 판⑪) · TESTLIST v515 칸 4(운영 확인 1 · 시험 화면 [x] 1 · 게이트 [x] 2) · MANUAL 폰 줄(내부 이름 0) · CLAUDE.md 한 줄 · sw jw-shell-v515 · 결함 사본(기준 줄·sw·FEATURES 글·MANUAL 판 표시·CLAUDE 줄·TESTLIST 칸) ✗',
     rS.ok && MS.every((v) => v === false), JSON.stringify({ r: rS.info, mut: MS }));
 } catch (e) { console.log('  (v515 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v516(C265 사진 형식 확인 · C257 버린 사진 지우기): 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '504 이상'으로 풀 것
+try {
+  const rdQ = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DQ = { ft: rdQ('FEATURES.md'), tl: rdQ('TESTLIST.md'), sw: rdQ('sw.js') };
+  const chkQ = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v516 (11/20)', '\n### '), tlv = cut(d.tl, '\n## v516 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), op = cb.filter((l) => /^- \[ \] \(운영 확인\)/.test(l));
+    const FT = ['`_lib/imgsniff.js`', '`X-Content-Type-Options: nosniff`', '`promoUploadDiscard`', '`promoUploadReset`', '`promoOrphanDelCheck`', '`bid`', '441장', '63건'];
+    const GATE = ['uismoke', 'servertest', 'consheet_check', 'proctpl_check', 'settletest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check', 'paycalc_check', 'stmtread_a_check', 'stmtread_b_check', 'stmtread_c_check', 'stmtread_d_check', 'stmtmail_check'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0), last = gate[gate.length - 1] || '';
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 516 && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => last.indexOf('`' + g + '`') > 0) && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 516;
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
+  };
+  const rQ = chkQ(DQ);
+  const muQ = (k, f) => chkQ(Object.assign({}, DQ, { [k]: f(DQ[k]) })).ok;
+  const MQ = [muQ('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v515 (')), muQ('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v515'")),
+    muQ('ft', (s) => s.split('`promoOrphanDelCheck`').join('promoOrphanDelCheck')), muQ('tl', (s) => s.split('\n## v516 ').join('\n## vX '))];
+  const ixC = readFileSync(join(ROOT, 'index.html'), 'utf8');
+  T('v516 C257 앱 배선: [+ 현장 기록]은 저장 안 된 사진(올리는 중 포함)이 있으면 창을 이어 씀(promoUploadReset 안 부름) · [취소]는 사진이 있고 올리는 중이 아니면 "버릴까요?" 확인 → promoUploadDiscard가 att_del · 저장 뒤 promoUploadReset',
+    /if\(promoUpload\.busy \|\| promoUpload\.photos\.length\)\{[\s\S]{0,300}?classList\.add\("show"\);\s*return;\s*\}\s*promoUploadReset\(\);/.test(ixC)
+    && /if\(n && !promoUpload\.busy && confirm\("올린 사진 "\+n\+"장을 버릴까요\?/.test(ixC) && /promoUploadDiscard\(\)\.then\(/.test(ixC) && /gwCall\("gw-data",\{action:"att_del",id:id\}\)/.test(ixC)
+    && /schedulePromoSave\(\); renderPromo\(\);\n    promoUploadReset\(\);/.test(ixC));
+  T('v516 문서·판 번호(정확 검사): FEATURES 기준 v516 (2026-11-20)·v516 절(imgsniff·nosniff·promoUploadDiscard·promoUploadReset·promoOrphanDelCheck·bid) · TESTLIST v516 칸 3(운영 확인 1 · AI [x] 2 · 게이트 18종) · sw jw-shell-v516 · 결함 사본 ' + MQ.length + '개 = 모두 ✗',
+    rQ.ok && MQ.every((v) => v === false), JSON.stringify({ r: rQ.info, mut: MQ }));
+} catch (e) { console.log('  (v516 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v517(C225 판A — 서버 읽기 실패 · 원장 C225): 실행 검사는 servertest 'C225' 블록 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd517 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D517 = { ft: rd517('FEATURES.md'), tl: rd517('TESTLIST.md'), sw: rd517('sw.js'), man: rd517('MANUAL.html'), cl: rd517('CLAUDE.md') };
+  const chk517 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v517 (11/20)', '\n### '), tlv = cut(d.tl, '\n## v517 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`STORAGE_WRITE_BLOCKED`", "원장 C225"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 517 && ftv.length > 0 && mF.length === 0 && cb.length === 8 && gate.length === 2 && scr.length === 6 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C225 판A(v517') > 0
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 517;
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r517 = chk517(D517);
+  const mu517 = (k, f) => chk517(Object.assign({}, D517, { [k]: f(D517[k]) })).ok;
+  const M517 = [mu517('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v516 (')), mu517('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v516'")),
+    mu517('ft', (s) => s.split('`STORAGE_WRITE_BLOCKED`').join('STORAGE_WRITE_BLOCKED')),
+    mu517('cl', (s) => s.replace('**C225 판A(v517', 'C225 판A(')),
+    mu517('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v516 e95471d 위 · d697e82 · 자기 clone + 자료 저장소 옆) uismoke ✓ 905 · servertest 1415(운영 1396 + C225 19) · 14종 0 · node --check 101 · 인라인 파싱 오류 0 · paycalc_check 10 · autorulestest 8 · stmtmail_check 54 · CR 0(바꾼 11파일 바이트로 셈) — ✓ AI 11/20', '\n- (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v516 e95471d 위 · d697e82 · 자기 clone + 자료 저장소 옆) uismoke ✓ 905 · servertest 1415(운영 1396 + C225 19) · 14종 0 · node --check 101 · 인라인 파싱 오류 0 · paycalc_check 10 · autorulestest 8 · stmtmail_check 54 · CR 0(바꾼 11파일 바이트로 셈) — ✓ AI 11/20'))];
+  T('v517 문서·판 번호(정확 검사): FEATURES 기준 v517 (2026-11-20)·v517 절(C225 판A) · TESTLIST v517 칸 8(화면·운영 확인 6 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v517 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
+    r517.ok && M517.every((v) => v === false), JSON.stringify({ r: r517.info, mut: M517 }));
+} catch (e) { console.log('  (v517 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v518(운반일지 집계·새 노선 — 원장 C244·C279): 실행 검사는 위 'C244' 블록·v351 블록의 'C279' 묶음·servertest 'C279' · 여기는 문서·판 번호 정확 검사 + 고정 글 3줄(빼면 ✗)
+try {
+  const rd518 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D518 = { ft: rd518('FEATURES.md'), tl: rd518('TESTLIST.md'), sw: rd518('sw.js'), man: rd518('MANUAL.html'), cl: rd518('CLAUDE.md'), ix: rd518('index.html') };
+  const FIX518 = ["byKey[k] = byKey[k] ? abSheetMerge(byKey[k], c) : c;", "if (max[side] < AB_EXTRA_ROW_MAX){ out[side] = max[side] + 1; return; }", "abNrDraft = { key: key, from: from, to: to, item: item, side: side };"];
+  const MANA518 = "(2026-11 v518) 새 줄의 하차지·품목 이름이 기존 줄과 겹쳐 ";
+  const chk518 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v518 (11/20)', '\n### '), tlv = cut(d.tl, '\n## v518 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`abSheetMerge`", "`abSummary`", "`routeAddImpact`", "`ROUTE_OVERLAP`", "`ROUTE_ADD_BUSY`", "`abNrDraft`", "원장 C244", "원장 C279"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = "(2026-11 v518) 새 줄의 하차지·품목 이름이 기존 줄과 겹쳐 ";
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 518 && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf(MAN) > 0
+      && d.cl.indexOf('**운반일지 집계·새 노선(v518') > 0
+      && FIX518.every((x) => d.ix.split(x).length === 2)
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 518;   // v519(66 급여 판2)에서 '518 이상'으로 풂
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX518.map((x) => d.ix.split(x).length - 1) } };
+  };
+  const r518 = chk518(D518);
+  const mu518 = (k, f) => chk518(Object.assign({}, D518, { [k]: f(D518[k]) })).ok;
+  const M518 = [mu518('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v517 (')), mu518('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v517'")),
+    mu518('ft', (s) => s.split('`abSheetMerge`').join('abSheetMerge')),
+    mu518('man', (s) => s.replace(MANA518, '')), mu518('cl', (s) => s.replace('**운반일지 집계·새 노선(v518', '운반일지 집계·새 노선(')),
+    mu518('tl', (s) => s.replace('\n- [x] (AI) `servertest` \'C279 ①②③\'', '\n- (AI) `servertest` \'C279 ①②③\''))]
+    .concat(FIX518.map((x) => mu518('ix', (s) => s.replace(x, ''))));
+  T('v518 문서·판 번호(정확 검사): FEATURES 기준 v518 (2026-11-20)·v518 절(운반일지 집계·새 노선) · TESTLIST v518 칸 5(화면·운영 확인 3 · 게이트 [x] 2) · MANUAL 겹침 알림 문장(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 3줄 한 번씩 · sw jw-shell-v518 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
+    r518.ok && M518.every((v) => v === false), JSON.stringify({ r: r518.info, mut: M518 }));
+} catch (e) { console.log('  (v518 검사 생략 — ' + e.message + ')'); fails++; }
+// ── 66 급여 판2(원장 C236 · PM 11/20 16:04 'ㄱ' — 시안 3판: 회계사무소 급여대장 꼴 + 하수준설 수당 내역) 급여 탭 배선·글 함수. 서버 동작은 servertest '66 판2' · 여기는 화면 배선과 순수 글 함수.
+try {
+  const fnQ = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) return ''; let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } return ''; };
+  const gpQ = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-pay.js'), 'utf8');
+  const actsQ = ((gpQ.match(/\nconst ACTS = \{([\s\S]*?)\};/) || [0, ''])[1].match(/pay_[a-z_]+(?=:)/g) || []).concat(((gpQ.match(/\nconst SELF_ACTS = \{([^}]*)\};/) || [0, ''])[1].match(/pay_[a-z_]+(?=:)/g) || []));   // 66 판4 자기 것만 동작(pay_my_slips)
+  const segQ = (H) => { const a = H.indexOf('\n  // @pay-start\n'), b = H.indexOf('\n  // @pay-end\n'); return a > 0 && b > a ? H.slice(a, b) : ''; };
+  const chkQ = (H) => {
+    const I = {}, seg = segQ(H);
+    const used = (seg.match(/gwCall\("gw-pay", \{ action: "(pay_[a-z_]+)"/g) || []).map((x) => x.replace(/^.*action: "/, '').slice(0, -1));
+    I.wire = H.indexOf('<button class="tab-btn perm-hidden" data-tab="workers" id="tabWkBtn">인사·일용직</button>\n    <button class="tab-btn perm-hidden" data-tab="pay" id="tabPayBtn">급여</button>') > 0
+      && H.indexOf('<section class="view" id="view-pay">') > 0 && H.indexOf('<div id="payHost">') > 0
+      && /document\.getElementById\("view-pay"\)\.classList\.toggle\("active", name === "pay"\);/.test(H) && /\n    if \(name === "pay"\) payOpen\(\);/.test(H)
+      && /if \(payBtn\) payBtn\.classList\.toggle\("perm-hidden", !adminUser\);[^\n]*\n    if \(currentTab === "pay" && !adminUser\) switchTab\("dash"\);/.test(H)
+      && /function payOpen\(\)\{ if \(!isAdmin\(\)\) return;/.test(seg);
+    I.acts = used.length >= 10 && used.every((a) => actsQ.indexOf(a) >= 0) && actsQ.every((a) => used.indexOf(a) >= 0) && (seg.match(/gwCall\("gw-data", \{ action: "([a-z_]+)"/g) || []).every((x) => /pay_bg_(get|set)"$/.test(x));   // 66 판4: gw-data 는 승격 읽기·해제만
+    // 금액·요율 숫자를 화면 코드에 적지 않음(다섯 자리 넘는 숫자 없음) · 직원 수정 창·회원 저장 호출 없음
+    I.nonum = !/[^\w.]\d{5,}(?![\w])/.test(seg.replace(/\/\/[^\n]*/g, '')) && !/gw-auth|meSave|member_upsert/.test(seg);
+    // 사람 이름·글은 esc 를 거쳐 그림(이름 칸·비고 꼬리표·기준 창 제목은 textContent)
+    I.esc = /esc\(m\.name \|\| "\(지운 직원\)"\)/.test(seg) && /'<span class="pay-tag">' \+ esc\(t\) \+ '<\/span>'/.test(seg) && /document\.getElementById\("payDlgTitle"\)\.textContent = title;/.test(seg) && !/innerHTML = [^;]*\btitle\b/.test(seg);
+    // 글 함수: 요율 줄(근거 표 값으로만) · 금액 쉼표 · 달 넘기기
+    const f = new Function('esc', 'PAY_WHY', fnQ(H, 'payWon') + '\n' + fnQ(H, 'payYmAdd') + '\n' + fnQ(H, 'payLawTxt') + '\nreturn { payWon: payWon, payYmAdd: payYmAdd, payLawTxt: payLawTxt };')((s) => String(s).replace(/</g, '&lt;'), { NOT_PROMOTED: '요율 표 승격 전' });
+    const lt = f.payLawTxt({ on: true, ver: 'v1-x', rates: { pension: 0.0475, health: 0.03595, care_ratio: 0.1314, emp: 0.009, local: 0.1, cut: 10 } });
+    I.text = lt.indexOf('국민연금 4.75% · 건강보험 3.595% · 장기요양 건강보험료의 13.14% · 고용보험 0.9%') > 0 && lt.indexOf('지방소득세 10% · 공제는 10원 미만 버림') > 0
+      && f.payLawTxt({ on: false, why: 'NOT_PROMOTED' }).indexOf('요율 표 승격 전') > 0 && f.payWon(1234567) === '1,234,567' && f.payWon(null) === '' && f.payYmAdd('2026-12', 1) === '2027-01' && f.payYmAdd('2026-01', -1) === '2025-12';
+    // 대장 칸 = 회계사무소 대장 머리 그대로(묶음 셋 · 두 줄 머리 · 18칸)
+    I.cols = seg.indexOf('<th class="g" colspan="2">인적사항</th><th class="g" colspan="7">지급내역</th><th class="g" colspan="8">공제내역 및 차인지급액</th><th class="g" rowspan="3">비고</th>') > 0
+      && seg.indexOf('<th>사원번호</th><th>성명</th><th rowspan="2">기본급</th><th rowspan="2">수당</th><th rowspan="2">초과/차감<br>수당</th><th rowspan="2">상여금</th><th rowspan="2">식대</th><th rowspan="2">자가운전<br>보조금</th><th>4대보험<br>적용총액</th>') > 0
+      && seg.indexOf('<tr><th>입사일</th><th>직위</th><th>지급총액</th></tr>') > 0;
+    // 확정한 달은 넣는 칸을 열지 않음 · 확정·풀기는 확인 창
+    I.closed = /\(closed \? '' : ' data-pay-row="' \+ mid \+ '"'\)/.test(seg) && /dredgeOn && !closed \?/.test(seg) && /function payClose\(\)\{[\s\S]{0,120}if \(!confirm\(/.test(seg) && /function payReopen\(\)\{[\s\S]{0,120}if \(!confirm\(/.test(seg);
+    return { ok: Object.values(I).every((v) => v === true), info: I };
+  };
+  // 그리기 실제 실행(가짜 자료) — payRender 를 문서 흉내 위에서 돌려 칸·합계·확정 달 닫힘·빼낸 줄·이름 이스케이프를 본다
+  const runQ = (H) => {
+    const seg = segQ(H), v = (n) => { const m = new RegExp('\\n  var ' + n + ' = [^\\n]*').exec(seg); return m ? m[0] : ''; };
+    const host = { innerHTML: '', querySelectorAll: () => [] };
+    const doc = { getElementById: (id) => (id === 'payHost' ? host : null) };
+    const escF = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const f = new Function('document', 'esc', v('payS') + v('PAY_CORP') + v('PAY_WHY') + '\n' + fnQ(H, 'payWon') + fnQ(H, 'payLawTxt') + fnQ(H, 'payRender') + '\nreturn function(d){ payS.data = d; payS.corp = d.corp; payRender(); return document.getElementById("payHost").innerHTML; };')(doc, escF);
+    const C = (o) => Object.assign({ cols: { base: 2600000, allow: 595000, adj: 0, bonus: 0, meal: 200000, car: 0 }, taxable: 3195000, gross: 3395000, ded: { pension: 151760, health: 114860, care: 15090, emp: 28750, income: 89750, local: 8970 }, ded_total: 409180, net: 2985820, lines: [], notes: [], dredge: { days: 13.5, total: 595000 } }, o || {});
+    const M = (id, nm) => ({ id: id, name: nm, rank: '반장', emp_no: '12', hire_date: '2022-01-17' });
+    const D = (state) => ({ corp: 'env', ym: '2026-11', period: { from: '2026-10-15', to: '2026-11-14' }, pay_day: 15, state: state, rev: '', calc_sig: 'x', frozen_law: state === 'closed' ? { ver: 'v1' } : null, law: { on: true, ver: 'v1', rates: { pension: 0.0475, health: 0.03595, care_ratio: 0.1314, emp: 0.009, local: 0.1, cut: 10 } }, loose: [{ mid: 'k', name: '<b>회사없음</b>' }],
+      rows: [{ mid: 'a', member: M('a', '<img src=x>가'), state: 'ok', calc: C(), ver: { from: '2026-10', dredge: true }, row: { dredge: [] } }, { mid: 'b', member: M('b', '나'), state: 'ok', calc: C({ ded: { pension: null, health: 1, care: 1, emp: null, income: 1, local: 1 }, net: 100 }), ver: { from: '2026-10' } },
+        { mid: 'c', member: M('c', '다'), state: 'excluded', row: { off: true } }, { mid: 'e', member: M('e', '라'), state: 'no_base' }] });
+    const o = f(D('open')), cz = f(D('closed'));
+    return { open: o, closed: cz,
+      ok: o.indexOf('2,985,820') > 0 && o.indexOf('합계 2명') > 0 && o.indexOf('&lt;img src=x&gt;가') > 0 && o.indexOf('<img src=x>') < 0 && o.indexOf('&lt;b&gt;회사없음') > 0 && (o.match(/<td class="none" rowspan="2">—<\/td>/g) || []).length === 2
+        && o.indexOf('이 달 이 대장에서 뺌') > 0 && o.indexOf('data-pay-out="e"') > 0 && o.indexOf('data-pay-dredge="a"') > 0 && o.indexOf('data-pay-row="b"') > 0 && o.indexOf('id="payCloseBtn"') > 0 && o.indexOf('2,985,920') > 0
+        && cz.indexOf('data-pay-row=') < 0 && cz.indexOf('data-pay-dredge=') < 0 && cz.indexOf('data-pay-out=') < 0 && cz.indexOf('id="payReopenBtn"') > 0 && cz.indexOf('id="payCloseBtn"') < 0 && cz.indexOf('회사 표시가 비어') < 0 };
+  };
+  const rQ = chkQ(html), gQ = (() => { try { return runQ(html); } catch (e) { return { ok: false, err: String(e.message) }; } })();
+  const muG = (a, b) => { if (html.split(a).length !== 2) return 'no-site:' + a.slice(0, 40); try { return runQ(html.replace(a, () => b)).ok; } catch (e) { return false; } };
+  const muQ = (a, b) => { if (html.split(a).length !== 2) return 'no-site:' + a.slice(0, 40); return chkQ(html.replace(a, () => b)).ok; };
+  const MQ = [
+    muQ('    if (payBtn) payBtn.classList.toggle("perm-hidden", !adminUser);', '    if (payBtn) payBtn.classList.toggle("perm-hidden", false);'),
+    muQ('function payOpen(){ if (!isAdmin()) return;', 'function payOpen(){'),
+    muQ('esc(m.name || "(지운 직원)")', 'String(m.name || "(지운 직원)")'),
+    muQ('document.getElementById("payDlgTitle").textContent = title;', 'document.getElementById("payDlgTitle").innerHTML = title;'),
+    muQ('gwCall("gw-pay", { action: "pay_conf_get" })', 'gwCall("gw-pay", { action: "pay_conf_read" })'),
+    muQ('<th class="g" colspan="7">지급내역</th>', '<th class="g" colspan="6">지급내역</th>'),
+    muQ('(closed ? \'\' : \' data-pay-row="\' + mid + \'"\')', '(\' data-pay-row="\' + mid + \'"\')'),
+    muQ('return String(+(x * 100).toFixed(4)) + "%";', 'return String(+(x * 100).toFixed(1)) + "%";')
+  ];
+  T('66 판2 ① 급여 탭 배선·글 함수: 단추(인사·일용직 다음 · 관리자만 보임 · 아니면 홈으로) · 화면 구역·탭 바꾸기·payOpen 관리자 확인 · 서버 gw-pay 동작 10개와 화면 호출이 서로 같음 · 화면 코드에 금액·요율 숫자 없음 · 이름·꼬리표 esc · 창 제목 textContent · 요율 줄 글·금액 쉼표·달 넘기기 · 대장 머리 = 회계사무소 대장 꼴 · 확정 달은 넣는 칸 닫힘·확정/풀기 확인 창',
+    rQ.ok, JSON.stringify(rQ.info));
+  const MG = [muG('T.taxable += c.taxable; T.gross += c.gross; T.ded += c.ded_total; T.net += c.net;', 'T.taxable += c.taxable; T.gross += c.gross; T.ded += c.ded_total;'),
+    muG("var cell = function(x, sub){ return '<td class=\"num' + ed + '\" rowspan=\"2\"' + (closed ? '' :", "var cell = function(x, sub){ return '<td class=\"num' + ed + '\" rowspan=\"2\"' + (false ? '' :"),
+    muG('var why = r.state === "excluded" ?', 'var why = r.state === "excluded_" ?')];
+  T('66 판2 ③ 그리기 실제 실행(가짜 자료 · 문서 흉내): 차인 2,985,820 · 합계 2명(빼낸·기준 없는 줄 제외) · 차인 합계 · 가입 제외 — 2칸 · 이름·회사 없는 직원 이스케이프 · 빼기·하수준설·그 달 값 단추 · 확정 달은 넣는 단추 없음·풀기 단추 · 결함 사본 ' + MG.length + '개(합계 줄 · 확정 달 칸 열림 · 빼낸 줄) = 모두 ✗',
+    gQ.ok && MG.every((x) => x === false), JSON.stringify({ err: gQ.err, mut: MG, o: String(gQ.open || '').slice(0, 300) }));
+  T('66 판2 ② 결함 사본 ' + MQ.length + '개(단추 늘 보임 · payOpen 관리자 확인 걷음 · 이름 esc 걷음 · 창 제목 innerHTML · 서버에 없는 동작 · 머리 칸 수 · 확정 달 칸 열림 · 요율 % 자리) = 모두 ✗', MQ.every((v) => v === false), JSON.stringify(MQ));
+} catch (e) { console.log('  (66 판2 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v519(66 급여 판2 — PM 11/20 16:04 'ㄱ'): 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '519 이상'으로 풀 것
+try {
+  const rdR = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DR = { ft: rdR('FEATURES.md'), tl: rdR('TESTLIST.md'), sw: rdR('sw.js'), man: rdR('MANUAL.html'), cl: rdR('CLAUDE.md') };
+  const chkR = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v519 (11/20)', '\n### '), tlv = cut(d.tl, '\n## v519 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), pm = cb.filter((l) => /^- \[ \] \(PM\)/.test(l)), op = cb.filter((l) => /^- \[ \] \(운영 확인\)/.test(l));
+    const FT = ['`gw-pay`', '`_lib/payledger.js`', '`pay:base:<회사>:<회원>`', '`pay:month:<회사>:<달>`', '`pay:conf`', '`KIND_MISMATCH`', '`ROWS_NOT_READY`', '`OVERWRITTEN`', '`BAD_PAY_DOC`', '`lawPick`', '`minus_hours`', '`CALC_CHANGED`', '`ord_month`', '43줄'];
+    const GATE = ['uismoke', 'servertest', 'consheet_check', 'proctpl_check', 'settletest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check', 'paycalc_check', 'stmtread_a_check', 'stmtread_b_check', 'stmtread_c_check', 'stmtread_d_check', 'stmtmail_check'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0), last = gate[gate.length - 1] || '';
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 519 && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && pm.length === 1 && op.length === 1
+      && GATE.every((g) => last.indexOf('`' + g + '`') > 0) && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 519 && d.man.indexOf('<li><b>급여 탭</b> (2026-11 v519) — 관리자만 보입니다.') > 0 && d.cl.indexOf('- **66 급여 판2(v519 — 급여 탭') > 0;
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, pm: pm.length, op: op.length } };
+  };
+  const rR = chkR(DR);
+  const muR = (k, f) => chkR(Object.assign({}, DR, { [k]: f(DR[k]) })).ok;
+  const MR = [muR('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v518 (')), muR('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v518'")),
+    muR('ft', (s) => s.split('`KIND_MISMATCH`').join('KIND_MISMATCH')), muR('tl', (s) => s.split('\n## v519 ').join('\n## vX ')), muR('man', (s) => s.replace('<li><b>급여 탭</b>', '<li>급여 탭')), muR('cl', (s) => s.replace('- **66 급여 판2(', '- 66 급여 판2('))];
+  T('v519 문서·판 번호(정확 검사): FEATURES 기준 v519 (2026-11-20)·v519 절(gw-pay·payledger·키 셋·KIND_MISMATCH·ROWS_NOT_READY·OVERWRITTEN·BAD_PAY_DOC·lawPick·minus_hours·43줄) · TESTLIST v519 칸 4(PM 1 · 운영 확인 1 · AI [x] 2 · 게이트 18) · sw v519 · MANUAL 급여 탭 한 줄 · CLAUDE.md 판2 줄 · 결함 사본 ' + MR.length + '개 = 모두 ✗',
+    rR.ok && MR.every((v) => v === false), JSON.stringify({ r: rR.info, mut: MR }));
+} catch (e) { console.log('  (v519 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v520(C240 판A-1 — 가르는 칸 글자만 · 원장 C240): 실행 검사는 servertest 'C240 판 A-1' 블록 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd520 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D520 = { ft: rd520('FEATURES.md'), tl: rd520('TESTLIST.md'), sw: rd520('sw.js'), man: rd520('MANUAL.html'), cl: rd520('CLAUDE.md') };
+  const chk520 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v520 (11/20)', '\n### '), tlv = cut(d.tl, '\n## v520 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`BAD_FIELD`", "원장 C240"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 520 && ftv.length > 0 && mF.length === 0 && cb.length === 7 && gate.length === 2 && scr.length === 5 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C240 판A-1(v520') > 0
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 520;
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r520 = chk520(D520);
+  const mu520 = (k, f) => chk520(Object.assign({}, D520, { [k]: f(D520[k]) })).ok;
+  const M520 = [mu520('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v519 (')), mu520('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v519'")),
+    mu520('ft', (s) => s.split('`BAD_FIELD`').join('BAD_FIELD')),
+    mu520('cl', (s) => s.replace('**C240 판A-1(v520', 'C240 판A-1(')),
+    mu520('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v519 9e66df7 위로 옮긴 0b88eb7) uismoke ✓ 921 · servertest 1450(운영 1442 + C240 판 A-1 8) · 14종 0 · node --check 104 · 인라인 파싱 오류 0 · paycalc_check 10 · autorulestest 8 · CR 0 — ✓ AI 11/20', '\n- (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v519 9e66df7 위로 옮긴 0b88eb7) uismoke ✓ 921 · servertest 1450(운영 1442 + C240 판 A-1 8) · 14종 0 · node --check 104 · 인라인 파싱 오류 0 · paycalc_check 10 · autorulestest 8 · CR 0 — ✓ AI 11/20'))];
+  T('v520 문서·판 번호(정확 검사): FEATURES 기준 v520 (2026-11-20)·v520 절(C240 판A-1) · TESTLIST v520 칸 7(화면·운영 확인 5 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v520 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
+    r520.ok && M520.every((v) => v === false), JSON.stringify({ r: r520.info, mut: M520 }));
+} catch (e) { console.log('  (v520 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── C280(날짜 칸 읽기 도우미 — 「원천」): 덜 채운 날·없는 날(값 빈 글자 + validity.badInput)·연도 6자리를 '비움'으로 읽어 기존 날짜를 지우던 저장 자리 전부가 dateFieldRead로 읽는지 실행 검사
+//   자리마다 실제 함수 원문을 떼어 가짜 DOM(값 빈 글자 + badInput)으로 돌림 → 저장 요청 0 · 안내 1 · 창 그대로 · 결함 사본(그 함수 안의 dateFieldRead( 를 옛 `.value` 읽기로 되돌림)은 저장까지 가서 잡힘
+try {
+  const fnC = (name) => { const i = html.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < html.length; j++) { const ch = html[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html.slice(i, j + 1); } } throw new Error('중괄호 짝: ' + name); };
+  const helper = (() => { const a = html.indexOf('// @date-field-start'), b = html.indexOf('// @date-field-end'); if (a < 0 || b < a) throw new Error('@date-field 구간 없음'); return html.slice(a, b); })();
+  const run = (fns, call, cfg, defect) => {
+    const calls = [], alerts = [];
+    const mkCL = () => { const s = new Set(); return { add: (c) => s.add(c), remove: (c) => s.delete(c), contains: (c) => s.has(c), toggle: (c, f) => { const on = f === undefined ? !s.has(c) : !!f; if (on) s.add(c); else s.delete(c); return on; } }; };
+    const mkEl = (id, o) => Object.assign({ id, value: '', defaultValue: '', checked: false, type: 'text', validity: { badInput: false }, style: {}, textContent: '', files: null, disabled: false, parentNode: null, tagName: 'INPUT',
+      classList: mkCL(), focus() {}, getAttribute(k) { return (this.attrs && Object.prototype.hasOwnProperty.call(this.attrs, k)) ? this.attrs[k] : null; }, querySelector() { return null; }, querySelectorAll() { return []; }, addEventListener(t, f) { (this.L = this.L || {})[t] = f; } }, o || {});
+    const E = {}; Object.keys(cfg.els || {}).forEach((id) => { E[id] = mkEl(id, cfg.els[id]); });
+    const document = { getElementById: (id) => E[id] || (E[id] = mkEl(id)), querySelector: (s) => (cfg.qs ? cfg.qs(s, E, mkEl) : null), querySelectorAll: (s) => (cfg.qsa ? cfg.qsa(s, E, mkEl) : []) };
+    const rec = (k) => (...a) => { calls.push(k); return undefined; };
+    const thenable = { then() { return thenable; }, catch() { return thenable; } };
+    const store = Object.assign({ document, alert: (m) => { alerts.push(String(m)); }, confirm: () => true, todayStr: () => '2026-11-20', setTimeout: () => 0,
+      __oldRead: (el) => ({ ok: true, v: el ? String(el.value || '') : '' }), gwCall: (...a) => { calls.push('gwCall'); return thenable; }, gwToast: (m) => { calls.push('gwToast'); alerts.push(String(m)); } }, cfg.stubs ? cfg.stubs(E, mkEl, calls) : {});
+    const P = new Proxy(store, { has: (t, k) => typeof k === 'string' && (k in t || !(k in globalThis)), get: (t, k) => (k === Symbol.unscopables ? undefined : (k in t ? t[k] : rec(k))), set: (t, k, v) => { t[k] = v; return true; } });
+    let src = fns.map((n) => { let s = fnC(n); if (defect && defect.indexOf(n) >= 0) s = s.split('dateFieldRead(').join('__oldRead('); if (cfg.mut && cfg.mut[n]) s = cfg.mut[n](s); return s; }).join('\n');   // cfg.mut = 결함 사본(함수별 글 바꾸기)
+    let out, err = '';
+    try { const api = new Function('P', 'with (P) {\n' + (cfg.mutHelper ? cfg.mutHelper(helper) : helper) + '\n' + src + '\nreturn { ' + fns.map((n) => n + ': ' + n).join(', ') + ' };\n}')(P); out = call(api, E, store); } catch (e) { err = String(e && e.message || e); }
+    return { calls, alerts, E, out, err, store };
+  };
+  const BAD = { type: 'date', value: '', validity: { badInput: true } }, Y6 = { type: 'date', value: '202612-02-01', validity: { badInput: false } };
+  const D = (v) => ({ type: 'date', value: v, defaultValue: v, validity: { badInput: false } });
+  // ① 도우미 단위
+  const H = run(['dateFieldRead'], (a) => [
+    a.dateFieldRead({ value: '', validity: { badInput: true } }), a.dateFieldRead({ value: '2026-02-31', validity: { badInput: false } }), a.dateFieldRead({ value: '202612-02-01', validity: { badInput: false } }),
+    a.dateFieldRead({ value: '', validity: { badInput: false } }), a.dateFieldRead({ value: '2026-11-20', validity: { badInput: false } }), a.dateFieldRead({ value: '0999-12-31' }), a.dateFieldRead({ value: '2999-12-31' }),
+    a.dateFieldRead(null), a.dateFieldRead({ value: '2028-02-29' }), a.dateFieldRead({ value: '2027-02-29' }), a.dateFieldRead({ value: '2026-1-5' })], {});
+  const hr = H.out || [];
+  const hOk = !H.err && hr[0].ok === false && hr[0].bad === 'input' && hr[0].why === '날짜를 끝까지, 달력에 있는 날로 넣어 주세요' && hr[1].ok === false && hr[1].bad === 'cal' && hr[2].ok === false && hr[2].bad === 'year'
+    && hr[3].ok === true && hr[3].v === '' && hr[4].ok === true && hr[4].v === '2026-11-20' && hr[5].bad === 'year' && hr[5].why === '연도는 네 자리로 넣어 주세요' && hr[6].ok === true && hr[6].v === '2999-12-31' && hr[7].ok === true && hr[7].v === ''
+    && hr[8].ok === true && hr[9].bad === 'cal' && hr[10].bad === 'form';
+  T('C280 ① 날짜 칸 도우미 dateFieldRead(실행): badInput(값 빈 글자) = 틀린 입력 "날짜를 끝까지, 달력에 있는 날로 넣어 주세요" · 2026-02-31 = 달력 · 202612-02-01(숫자 8자 이어 치기) = 연도 · 0999 = 연도("연도는 네 자리로 넣어 주세요") · 2999-12-31(먼 퇴사 예정) = 통과 · 진짜 빈칸 = 빈 값(지움) · 정상·윤일 2028-02-29 = 그대로 · 2027-02-29 = 달력 · 2026-1-5 = 꼴 · 요소 없음 = 빈 값',
+    hOk, H.err || JSON.stringify(hr));
+  // ② 자리마다(값 빈 글자 + badInput) — 저장 0 · 안내 · 창 그대로 / 결함 사본 = 저장됨
+  const SAVE = /^(schedule\w*Save|save\w*Cache|gwCall|saveMyTasks|saveDocuments|setMyTodoDue|startProcess|cbxStart|cbxContractInto|vehDueFinish|scheduleContractSave)$/;
+  const CLOSE = /^close\w*$|^vehDueClose$|Close$/;
+  const task = { id: 't1', title: 'x', due: '2026-12-15', who_id: '', status: 'open' };
+  const S = [];
+  const add = (name, fns, callName, cfg, judge) => S.push({ name, fns, callName, cfg, judge });
+  const callOf = (n, args) => (a, E, st) => a[n].apply(null, typeof args === 'function' ? args(E, st) : (args || []));
+  // 지시 수정
+  add('지시 수정 기한(saveTaskModal)', ['saveTaskModal'], callOf('saveTaskModal'), { els: { teTitle: { value: 'x' }, teDue: BAD }, stubs: () => ({ canDo: () => true, editingTaskId: 't1', findTask: () => task, getCheckedMembers: () => [], memberName: () => '' }) }, () => task.due === '2026-12-15');
+  add('지시 수정 기한 연도 6자리(saveTaskModal)', ['saveTaskModal'], callOf('saveTaskModal'), { els: { teTitle: { value: 'x' }, teDue: Y6 }, stubs: () => ({ canDo: () => true, editingTaskId: 't1', findTask: () => task, getCheckedMembers: () => [], memberName: () => '' }) }, () => task.due === '2026-12-15');
+  // 인허가
+  const lic = { id: 'l1', expiry: '2027-03-31', edu_due: '2027-01-31' };
+  const licStub = () => ({ editingLicId: 'l1', findLic: () => lic, getCheckedMembers: () => [], licenses: [] });
+  add('인허가 만료일(saveLicFromModal)', ['saveLicFromModal'], callOf('saveLicFromModal'), { els: { licName: { value: 'x' }, licExpiry: BAD, licEdu: D('2027-01-31') }, stubs: licStub }, () => lic.expiry === '2027-03-31');
+  add('인허가 교육 예정일(saveLicFromModal)', ['saveLicFromModal'], callOf('saveLicFromModal'), { els: { licName: { value: 'x' }, licExpiry: D('2027-03-31'), licEdu: BAD }, stubs: licStub }, () => lic.edu_due === '2027-01-31');
+  // 문서함
+  const doc = { id: 'd1', title: 'x', revised: '2026-05-01', cat: '05-01' };
+  add('문서 개정일(saveDocModal)', ['saveDocModal'], callOf('saveDocModal'), { els: { docTitle: { value: 'x' }, docRevised: BAD, docScope: { value: '' } }, stubs: () => ({ canDo: () => true, editingDocId: 'd1', findDoc: () => doc, isAdmin: () => true, curMember: () => ({ id: 'm1', name: 'n' }), docCatSelectGet: () => '05-01', docMajorOf: () => '05', docStatusOf: () => '등재', documents: [] }) }, () => doc.revised === '2026-05-01');
+  // 현장(석면 작업)
+  const asb = { id: 'a1', title: 'x', start: '2026-12-31', end: '2027-01-31', kind: 'asbestos' };
+  const asbStub = () => ({ asbSaveBusy: false, asbLoaded: true, asbEditId: 'a1', findAsb: () => asb, asbKindOf: () => 'asbestos', siteKind: () => 'asbestos', getCheckedMembers: () => [], asbGetCheckedWorkers: () => [], asb: [] });
+  add('현장 착공일(saveAsb)', ['saveAsb'], callOf('saveAsb'), { els: { asbTitle: { value: 'x' }, asbStart: BAD, asbEnd: D('2027-01-31') }, stubs: asbStub }, () => asb.start === '2026-12-31');
+  add('현장 종료일(saveAsb)', ['saveAsb'], callOf('saveAsb'), { els: { asbTitle: { value: 'x' }, asbStart: D('2026-12-31'), asbEnd: BAD }, stubs: asbStub }, () => asb.end === '2027-01-31');
+  // 의무 기준일
+  const duty = { no: 3, base_date: '2026-03-01', confirm: '조건부' };
+  add('의무 기준일(saveDutyFromModal — 확정 체크 아님)', ['saveDutyFromModal'], callOf('saveDutyFromModal'), { els: { dutyPreAns: { value: 'a' }, dutyBaseDate: BAD, dutyConfirmChk: { checked: false } }, stubs: () => ({ editingDutyNo: 3, findDuty: () => duty, editingDutyRk: false }) }, () => duty.base_date === '2026-03-01');
+  // 교육 이력
+  const eduStub = (ra) => () => ({ canDo: () => true, eduLoaded: true, eduBulkIds: null, isDate: (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v), eduHoursIn: () => '', eduIsRa: () => ra, eduOrgIn: () => '', eduRaTypeOk: () => true, eduNextAuto: '', edu: [], findEdu: () => null, eduEditId: null, genId: () => 'e1', eduNextFor: () => '', eduRenext: () => 0 });
+  add('교육 다음 예정(saveEdu)', ['saveEdu', 'eduRaIn'], callOf('saveEdu'), { els: { eduPerson: { value: 'member:m1' }, eduDate: D('2026-11-01'), eduKind: { value: 'regular' }, eduNext: BAD, eduNote: { value: '' } }, stubs: eduStub(false) }, () => true);
+  add('교육 평가일(saveEdu — 위험성평가 회차)', ['saveEdu', 'eduRaIn'], callOf('saveEdu'), { els: { eduPerson: { value: 'member:m1' }, eduDate: D('2026-11-01'), eduKind: { value: 'ra_join' }, eduNext: D(''), eduRaOn: BAD, eduRaType: { value: 'regular' }, eduRaUnit: { value: '' }, eduNote: { value: '' } }, stubs: eduStub(true) }, () => true);
+  // 견적
+  add('견적일(qtSaveRec·qtCollect)', ['qtSaveRec', 'qtCollect'], callOf('qtSaveRec'), { els: { qtNo: { value: 'Q-1' }, qtDate: BAD, qtTitle: { value: 'x' } }, stubs: () => ({ liveQuotes: () => [{ id: 'q1', no: 'Q-1', date: '2026-10-01' }], qtEditId: 'q1', quotes: [], renderQuotes: () => {} }) }, (r) => r.out === null);
+  // 안전 설정
+  add('안전 인정 만료일(sfSetRead → sfSetSave)', ['sfSetSave', 'sfSetRead', 'sfSetDateOk'], callOf('sfSetSave'), { els: { sfSetStage: { value: 'certified' }, sfSetExpires: BAD, sfSetChecks: { value: '' } }, stubs: () => ({ isAdmin: () => true, sfSetSaving: false, SF_SET_STAGES: ['none', 'applied', 'review', 'certified'], isDate: (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v), fmtDate: (d) => d.toISOString().slice(0, 10), sfSetBase: 1 }) }, () => true);
+  // 법인 등기
+  const crEls = (k) => { const o = { corpRegGate: { checked: true } }; ['reg_on', 'biz_fix_on', 'g2b_on'].forEach((f) => { o['corpRegIn_' + f] = f === k ? BAD : D('2026-10-01'); }); return o; };
+  const crStub = () => ({ isAdmin: () => true, corpRegSaving: false, corpRegBase: 1, CORP_REG_F: [['reg_on', '등기 접수일'], ['biz_fix_on', '사업자등록 정정일'], ['g2b_on', '나라장터 변경등록 완료일']], bidCorpGateBlocks: () => false });
+  add('법인 등기 접수일(corpRegSave)', ['corpRegSave', 'corpRegDateWhy'], callOf('corpRegSave'), { els: crEls('reg_on'), stubs: crStub }, () => true);
+  add('법인 등기 변경등록 완료일(corpRegSave)', ['corpRegSave', 'corpRegDateWhy'], callOf('corpRegSave'), { els: crEls('g2b_on'), stubs: crStub }, () => true);
+  // 직원 수정
+  const meEls = (k) => { const o = { meName: { value: '가' }, mePin: { value: '' }, meRole: { value: 'staff' }, meUid: { value: '' }, meErr: {}, meAnnual: { value: '' }, meAnnualBase: { value: '' }, meSeq: { value: '' }, meLoa: { value: '' }, meLoaChild: { value: '' } };
+    ['meBirth', 'meHire', 'meLeave'].forEach((f) => { o[f] = f === k ? BAD : D(f === 'meLeave' ? '' : '2021-08-31'); }); return o; };
+  const meStub = () => ({ editingMemberId: 'm1', ROLE_PRESET: {}, eduPersonFrom: '', cleanIdent: (s) => String(s || ''), isDev: () => false, isAdmin: () => false, EDU_QUAL: [], findMember: () => ({ id: 'm1' }), hrStarted: () => false });
+  ['meBirth', 'meHire', 'meLeave'].forEach((k) => add('직원 ' + ({ meBirth: '생년월일', meHire: '입사일', meLeave: '퇴사일' })[k] + '(saveMemberEdit)', ['saveMemberEdit'], callOf('saveMemberEdit'), { els: meEls(k), stubs: meStub }, (r) => /— 날짜를 끝까지/.test(r.E.meErr.textContent) && r.E.meErr.classList.contains('show')));
+  // 차량 수정
+  const veh = { id: 'v1', no: '12가3456', insp_due: '2027-03-31', ins_due: '2027-02-28', reg_date: '2015-05-05' };
+  const VIDS = ['vehNo', 'vehKind', 'vehInsp', 'vehIns', 'vehState', 'vehInsurer', 'vehNote', 'vehAcq', 'vehNodoc', 'vehType', 'vehOwn', 'vehPermit', 'vehDriver', 'vehCo', 'vehBiz', 'vehSize', 'vehRegDate', 'vehCeqKind', 'vehCeqYear'];
+  const vehEls = (k) => { const o = { vehNo: { value: '12가3456' }, vehInsp: D('2027-03-31'), vehIns: D('2027-02-28'), vehRegDate: D('2015-05-05') }; o[k] = BAD; return o; };
+  const vehStub = () => { const snap = {}; VIDS.forEach((id) => { snap[id] = ''; }); snap.vehNo = '12가3456'; snap.vehInsp = '2027-03-31'; snap.vehIns = '2027-02-28'; snap.vehRegDate = '2015-05-05';
+    return { canDo: () => true, vehicles: [veh], editingVehId: 'v1', findVeh: () => veh, VEH_MODAL_IDS: VIDS, vehModalSnap: snap, isAdmin: () => false, isDate: (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v), vehLawLogPush: () => {}, vehLawLogEntry: () => null }; };
+  const vehF = ['saveVehFromModal', 'vehModalVal', 'vehModalChanged', 'vehModalDateWhy', 'vehRealDate', 'vehModalAttrSave', 'vehSetOpt'];
+  add('차량 검사 만기(saveVehFromModal)', vehF, callOf('saveVehFromModal'), { els: vehEls('vehInsp'), stubs: vehStub }, () => veh.insp_due === '2027-03-31');
+  add('차량 보험 만기(saveVehFromModal)', vehF, callOf('saveVehFromModal'), { els: vehEls('vehIns'), stubs: vehStub }, () => veh.ins_due === '2027-02-28');
+  add('차량 최초등록일(saveVehFromModal)', vehF, callOf('saveVehFromModal'), { els: vehEls('vehRegDate'), stubs: vehStub }, () => veh.reg_date === '2015-05-05');
+  // 계약 단계 칸
+  const csStage = { name: '착공', vals: { st_date: '2026-12-01' } };
+  add('계약 단계 날짜 칸(csSaveFields)', ['csSaveFields'], (a, E, st) => a.csSaveFields(st.__c, { stages: [csStage], key: 'k' }, 0, st.__panel), { stubs: (E, mkEl) => {
+    const lab = { textContent: '착공(착수)일' }; const el = mkEl('f1', { type: 'date', value: '', defaultValue: '2026-12-01', validity: { badInput: true }, parentNode: lab, attrs: { 'data-cs-fld': 'st_date' } });
+    return { __c: { id: 'c1', pipes: [] }, __panel: { querySelectorAll: () => [el] }, conDueOn: () => false }; } }, (r) => r.out === false && csStage.vals.st_date === '2026-12-01');
+  add('계약 작업현황 날짜(csWlAdd)', ['csWlAdd'], (a, E, st) => a.csWlAdd(st.__c, st.__row), { stubs: (E, mkEl) => {
+    const de = mkEl('w1', { type: 'date', value: '', validity: { badInput: true }, attrs: { 'data-cs-wl': 'date' } }), ke = mkEl('w2', { type: 'number', value: '5', attrs: { 'data-cs-wl': 'kg' } });
+    return { __c: { id: 'c1', work_log: [] }, __row: { querySelector: () => de, querySelectorAll: () => [de, ke] }, genId: () => 'w9' }; } }, (r) => r.store.__c.work_log.length === 0);
+  // 내 할 일
+  add('내 할 일 기한 칸 change·blur(bindTodoDueInputs → todoDueFrom → setMyTodoDue)', ['bindTodoDueInputs', 'todoDueFrom', 'setMyTodoDue'], (a, E, st) => { a.bindTodoDueInputs(st.__host); st.__inp.L.change({ stopPropagation() {} }); st.__inp.L.blur({}); }, { stubs: (E, mkEl) => {
+    const inp = mkEl('td', { type: 'date', value: '', validity: { badInput: true }, attrs: { 'data-todo-due': 'td1' } }); return { __inp: inp, __host: { querySelectorAll: () => [inp] }, myTodos: [{ id: 'td1', due: '2026-12-15' }], isDate: (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) }; } }, (r) => r.store.myTodos[0].due === '2026-12-15');
+  add('내 할 일 더하기 기한(addMyTodo)', ['addMyTodo'], callOf('addMyTodo'), { els: { myTodoInput: { value: 'x' }, myTodoDue: BAD }, stubs: () => ({ myTodoUnread: () => false, myTodos: [], isDate: (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) }) }, (r) => r.store.myTodos.length === 0 && r.E.myTodoInput.value === 'x');
+  // 명세서 계산서 작성일
+  add('명세서 계산서 작성일(stmtInvIn)', ['stmtInvIn', 'stmtAllEmpty'], (a, E, st) => a.stmtInvIn({ date: '', supply: '1000', vat: '100', total: '1100' }, st.__el), { stubs: (E, mkEl) => ({ __el: mkEl('iv', BAD), stmtMoney: (s) => Number(s), isDate: (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) }) }, (r) => r.out === undefined, (r) => r.out !== undefined && r.out !== null);
+  // 지시 더하기
+  add('지시 더하기 기한(addTask)', ['addTask'], callOf('addTask'), { els: { taskTitle: { value: 'x' }, taskWho: { value: '' }, taskDue: BAD }, stubs: () => ({ canDo: () => true, tasks: [], getCheckedMembers: () => [], genId: () => 't9', memberName: () => '' }) }, (r) => r.store.tasks.length === 0 && r.E.taskTitle.value === 'x');
+  // 기성
+  add('기성 더하기 청구일(addReceivable)', ['addReceivable'], callOf('addReceivable'), { els: { recClient: { value: 'x' }, recDesc: { value: '' }, recAmount: { value: '1' }, recBilled: BAD, recCo: { value: '' } }, stubs: () => ({ canDo: () => true, receivables: [], genId: () => 'r9' }) }, (r) => r.store.receivables.length === 0);
+  const recR = { id: 'r1', client: 'x', billed: '2026-10-31' };
+  add('기성 수정 청구일 연도 6자리(saveRecModal)', ['saveRecModal'], callOf('saveRecModal'), { els: { reClient: { value: 'x' }, reCo: { value: '' }, reDesc: { value: '' }, reAmount: { value: '1' }, reBilled: Y6, reAssignee: { value: '' } }, stubs: () => ({ canDo: () => true, editingRecId: 'r1', findRec: () => recR, getCheckedMembers: () => [], findRecTask: () => null }) }, () => recR.billed === '2026-10-31');
+  // 입찰 수동 등록
+  add('입찰 수동 등록 마감일(saveBidAdd)', ['saveBidAdd'], callOf('saveBidAdd'), { els: { baTitle: { value: 'x' }, baOrg: { value: '' }, baDue: BAD, baUrl: { value: '' } }, stubs: () => ({ bidsLoaded: true, bids: [], genId: () => 'b9' }) }, (r) => r.store.bids.length === 0);
+  // 휴직·휴가
+  add('휴직 종료 예정일(saveLoa)', ['saveLoa'], callOf('saveLoa'), { els: { loaKind: { value: 'personal' }, loaStart: D('2026-12-01'), loaEnd: BAD, loaReason: { value: '' } }, stubs: () => ({ getMemberId: () => 'm1', LOA_KIND: { personal: '개인' }, isDate: (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v), leaves: [], genId: () => 'lv9', myName: () => '' }) }, (r) => r.store.leaves.length === 0);
+  add('휴가 종료일(saveLeaveApply)', ['saveLeaveApply'], callOf('saveLeaveApply'), { els: { lvType: { value: 'annual' }, lvStart: D('2026-12-01'), lvEnd: BAD, lvReason: { value: '사유' } }, stubs: () => ({ getMemberId: () => 'm1', isPartialLeave: () => false, isDate: (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v), leaves: [], genId: () => 'lv9', myName: () => '', leaveDays: () => 1 }) }, (r) => r.store.leaves.length === 0);
+  // 계약 시작
+  add('계약 시작일(saveConStart)', ['saveConStart'], callOf('saveConStart'), { els: { conType: { value: 'dredge' }, conClient: { value: 'x' }, conSite: { value: '' }, conStart: BAD, conWho: { value: '' }, conDoc: { value: 'private' }, conAmount: { value: '100' } }, stubs: () => ({ canDo: () => true, conModalCombo: () => false, conModalElems: () => ({}), conScenStages: () => [], conScenTag: () => '', lastBidForCon: null }) }, () => true);
+  // 차량 이력
+  const vh = { id: 'v1', history: [] };
+  add('차량 이력 날짜(addVehHistory)', ['addVehHistory'], callOf('addVehHistory'), { els: { vhContent: { value: 'x' }, vhDate: BAD, vhCost: { value: '' }, vhKind: { value: '' }, vhVendor: { value: '' } }, stubs: () => ({ canDo: () => true, histVehId: 'v1', findVeh: () => vh, genId: () => 'h9' }) }, () => vh.history.length === 0);
+  // 차량 만기 지시 완료 창
+  add('차량 만기 지시 새 만기일(vehDueOk)', ['vehDueOk', 'vehDueWhy'], callOf('vehDueOk'), { els: { vehDueDate: BAD }, stubs: () => ({ vehDueTask: { id: 't1', cur: '2027-01-31', vid: 'v1', f: 'insp_due' }, vehDueBusy: false, findTask: () => ({ status: 'open' }), isDate: (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) }) }, (r) => r.calls.indexOf('vehDueErr') >= 0);
+  // 넣기 박스 카드
+  add('넣기 박스 카드 계약일(cbxAct 시작)', ['cbxAct', 'cbxDateWhy'], (a, E, st) => a.cbxAct(st.__it, 'start'), { qsa: (s, E, mkEl) => (s.indexOf('[data-cbx-f^="7|"]') === 0 ? [mkEl('c1', { type: 'date', value: '', validity: { badInput: true }, attrs: { 'data-cbx-f': '7|d1' } })] : []), stubs: () => ({ __it: { id: 7, form: { d1: '2026-10-01' } }, findProc: () => null }) }, () => true);
+  // 서류출력(계약서 작성 = 계약 정보에 저장)
+  add('서류출력 계약서 착공일(generateDocs)', ['generateDocs'], callOf('generateDocs'), { els: { dgDocType: { value: 'demo' }, dgDate: D('2026-11-01'), dgStartDate: BAD, dgEndDate: D('') },
+    stubs: () => ({ dgDemoData: () => ({ simple: false, work: 'x', owner: '', site: '', amount: '1', date: '2026-11-01', startDate: '', endDate: '' }), dgConId: 'c1', findProc: () => ({ id: 'c1', elems: {} }), docDemoContract: () => '<p></p>' }) }, () => true);
+  // 서류 생성 창 → 계약 정보 빈 칸 채우기(연도 6자리)
+  let xgV = null;
+  add('서류 생성 창 계약일 연도 6자리(xgSaveBack)', ['xgSaveBack'], (a, E, st) => a.xgSaveBack({ id: 'c1' }), { els: { xgKind: { value: 'work_start' }, xgD1: Y6, xgTitle: { value: '' }, xgSite: { value: '' }, xgClient: { value: '' }, xgD2: { value: '' }, xgD3: { value: '' }, xgAmount: { value: '' } },
+    stubs: (E, mkEl, calls) => ({ cbxFillBlanks: (c, v) => { xgV = v; if (v.d1) calls.push('scheduleContractSave'); return { filled: [] }; }, xgCtx: { id: 'c1' }, xgSnap: {} }) }, () => xgV && !('d1' in xgV));
+  const bad = [], defOk = [];
+  const FIX = [[task, { due: '2026-12-15' }], [lic, { expiry: '2027-03-31', edu_due: '2027-01-31' }], [doc, { revised: '2026-05-01' }], [asb, { start: '2026-12-31', end: '2027-01-31' }], [duty, { base_date: '2026-03-01' }],
+    [veh, { insp_due: '2027-03-31', ins_due: '2027-02-28', reg_date: '2015-05-05' }], [csStage, { vals: { st_date: '2026-12-01' } }], [recR, { billed: '2026-10-31' }], [vh, { history: [] }]];
+  const reset = () => { FIX.forEach((f) => Object.assign(f[0], JSON.parse(JSON.stringify(f[1])))); xgV = null; };   // 결함 사본이 바꾼 고정 자료를 다음 사례 전에 되돌림
+  S.forEach((s) => {
+    reset();
+    const r = run(s.fns, s.callName, s.cfg, null);
+    const saved = r.calls.filter((c) => SAVE.test(c)), closed = r.calls.filter((c) => CLOSE.test(c));
+    const notice = r.alerts.length > 0 || r.calls.indexOf('vehDueErr') >= 0 || /날짜를 끝까지|연도는 네 자리/.test(String((r.out && r.out.err) || '')) || (r.E.meErr && /날짜를 끝까지/.test(r.E.meErr.textContent || ''));
+    const isUnit = s.name.indexOf('stmtInvIn') >= 0 || s.name.indexOf('xgSaveBack') >= 0;   // 단위(명세서 — 저장 막음은 errs) · 서류 생성 창(서류는 이미 만든 뒤 — 빈 칸 채우기만 건너뜀)
+    if (r.err || saved.length || closed.length || !(notice || isUnit) || !s.judge(r)) bad.push(s.name + ' ' + JSON.stringify({ err: r.err, saved, closed, alerts: r.alerts.slice(0, 2) }));
+    // 결함 사본 — 이 자리 함수 안의 dateFieldRead( 를 옛 읽기로
+    const own = s.fns.filter((n) => fnC(n).indexOf('dateFieldRead(') >= 0);
+    reset();
+    const d = run(s.fns, s.callName, s.cfg, own);
+    const dsaved = d.calls.filter((c) => SAVE.test(c)).length > 0 || (isUnit && d.out !== undefined);
+    defOk.push(dsaved && !d.err ? 1 : (s.name + ' 결함 사본 저장 안 됨 ' + JSON.stringify({ err: d.err, calls: d.calls.slice(0, 8), alerts: d.alerts.slice(0, 2) })));
+  });
+  const defBad = defOk.filter((x) => x !== 1);
+  T('C280 ② 저장 자리 ' + S.length + '곳(실행 — 실제 함수 원문 · 가짜 날짜 칸 값 빈 글자 + badInput, 연도 6자리 3곳): 지시 수정·인허가 2칸·문서 개정일·현장 2칸·의무 기준일·교육 다음 예정·평가일·견적일·안전 인정 만료일·법인 등기 2칸·직원 3칸·차량 3칸·계약 단계 칸·작업현황·내 할 일 2곳·명세서 계산서 작성일·지시 더하기·기성 2곳·입찰 수동 등록·휴직·휴가·계약 시작·차량 이력·차량 만기 완료 창·넣기 박스·서류출력(계약서 작성)·서류 생성 창 = 저장 요청 0 · 안내 1 · 창 그대로 · 기존 날짜 그대로',
+    bad.length === 0, bad.join(' | '));
+  T('C280 ③ 결함 사본 ' + S.length + '개(자리마다 그 함수 안의 dateFieldRead( 를 옛 `.value` 읽기로 되돌림) = 모두 저장까지 감(위 검사가 잡음)', defBad.length === 0, defBad.join(' | '));
+  // ④ 손대지 않은 자리 — 남은 `.value` 날짜 읽기가 표의 '저장 안 함·이미 막힘' 목록 밖으로 늘지 않음
+  const dateIds = [...html.matchAll(/<input type="date" id="([A-Za-z]\w*)"/g)].map((m) => m[1]);
+  const rawRead = dateIds.filter((id) => new RegExp('getElementById\\("' + id + '"\\)\\.value(?!\\s*=[^=])').test(html) || new RegExp('[$g]\\("' + id + '"\\)\\.value(?!\\s*=[^=])').test(html));
+  const KEEP = ['xgD1', 'xgD2', 'xgD3', 'xqDate',   // 서류 생성 창(값은 만든 서류에만 — 저장 안 함 · 계약 정보 빈 칸 채우기 xgSaveBack은 도우미)
+    'qtDate', 'asbStart', 'asbEnd', 'vehInsp', 'vehIns',   // 번호 제안·안내 글·[+1년] 단추(저장 안 함 — 저장은 도우미)
+    'famDate', 'eduDate', 'lvStart', 'rsDate', 'loaStart', 'lmDoneAt', 'lmFixTo', 'lmBaseDate', 'drNewD',   // 이미 막힘(isDate·lmDateWhy·빈 값 거절 — 안내 있음)
+    'lvEnd', 'loaEnd', 'vehDueDate', 'dgDate', 'dgStartDate', 'dgEndDate'];   // 도우미 검사 뒤·앞에서 읽음(틀리면 도우미가 먼저 막음 — 서류출력은 generateDocs 들머리)
+  const extra = rawRead.filter((id) => KEEP.indexOf(id) < 0);
+  // ⑤ 확인 반영(11/20): 키보드로 세 칸을 끝까지 지움 = 값 빈 글자 · badInput 거짓 · input·change 신호 없음(첫 칸 지울 때만 남) — 진짜 빈칸은 저장돼야 함 · 연도는 네 자리만
+  const tdRun = (seq, mut) => {
+    let saves = 0;
+    const r = run(['bindTodoDueInputs', 'todoDueFrom', 'setMyTodoDue'], (a, E, st) => { a.bindTodoDueInputs(st.__host); seq(st.__inp); }, { mut, stubs: (E, mkEl) => {
+      const inp = mkEl('td', { type: 'date', value: '', validity: { badInput: false }, attrs: { 'data-todo-due': 'td1' } });
+      return { __inp: inp, __host: { querySelectorAll: () => [inp] }, myTodos: [{ id: 'td1', due: '2026-12-15' }], saveMyTasks: () => { saves++; }, isDate: (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) }; } }, null);
+    return { saves, due: r.store.myTodos ? r.store.myTodos[0].due : '?', toast: r.alerts.length, err: r.err };
+  };
+  const ev = { stopPropagation() {} };
+  const clr = (inp) => { inp.value = ''; inp.validity = { badInput: false }; inp.L.blur(ev); };   // 끝까지 지움 — 신호 없이 칸을 떠남
+  const nw = (inp) => { inp.value = '2027-01-05'; inp.L.change(ev); inp.L.blur(ev); };   // 맞는 새 날짜 — change 뒤 blur
+  const typ = (inp) => { ['0002', '0020', '0202'].forEach((y) => { inp.value = y + '-01-05'; inp.L.change(ev); }); inp.value = '2028-01-05'; inp.L.change(ev); inp.L.blur(ev); };   // 연도를 치는 도중(범위 밖) → 끝값
+  const half = (inp) => { inp.value = ''; inp.validity = { badInput: true }; inp.L.change(ev); inp.L.blur(ev); };
+  const t1 = tdRun(clr), t2 = tdRun(nw), t3 = tdRun(typ), t4 = tdRun(half);
+  const tdOk = (x) => !x.err;
+  const k5 = tdOk(t1) && t1.saves === 1 && t1.due === '' && t1.toast === 0 && tdOk(t2) && t2.saves === 1 && t2.due === '2027-01-05' && tdOk(t3) && t3.saves === 1 && t3.due === '2028-01-05' && t3.toast === 0 && tdOk(t4) && t4.saves === 0 && t4.due === '2026-12-15' && t4.toast === 1;
+  const M1 = tdRun(clr, { bindTodoDueInputs: (s) => s.replace('todoDueFrom(inp, true); renderMyTodos();', 'renderMyTodos();') });   // 옛 blur(다시 그리기만) = 진짜 빈칸 저장 안 됨
+  const M2 = tdRun(nw, { todoDueFrom: (s) => s.replace('if (!t || String(t.due || "") === r.v) return;', 'if (!t) return;') });   // 같은 값 거름 걷음 = 두 번 보냄
+  const M3 = tdRun(typ, { todoDueFrom: (s) => s.replace('if (warn) gwToast(', 'gwToast(') });   // change에서도 안내 = 치는 도중 토스트
+  const tdDef = [M1.saves === 1 && M1.due === '', M2.saves === 1, M3.toast === 0];
+  // 넣기 박스 카드: 화면 칸을 끝까지 지우고 [시작] → 카드 값도 빈칸
+  const cbRun = (mut) => { const it = { id: 7, form: { d1: '2026-10-01', d2: '2026-10-05' } }; const r = run(['cbxDateWhy'], (a) => a.cbxDateWhy(it), { mut, qsa: (s, E, mkEl) => (s.indexOf('[data-cbx-f^="7|"]') === 0 ? [mkEl('c1', { type: 'date', value: '', validity: { badInput: false }, attrs: { 'data-cbx-f': '7|d1' } }), mkEl('c2', { type: 'date', value: '2026-10-09', attrs: { 'data-cbx-f': '7|d2' } })] : []) }, null); return { why: r.out, form: it.form, err: r.err }; };
+  const c1 = cbRun(), cM = cbRun({ cbxDateWhy: (s) => s.replace(' else if (it.form && k) it.form[k] = r.v;', '') });
+  const k5c = !c1.err && c1.why === '' && c1.form.d1 === '' && c1.form.d2 === '2026-10-09' && cM.form.d1 === '2026-10-01';
+  // 연도: 직원 퇴사 예정 2999-12-31 = 저장 요청 · 202612-02-01 = 막힘 / 결함 사본(옛 1900~2099)
+  const meY = (v, mutHelper) => { const els = meEls('meLeave'); els.meLeave = D(v); const r = run(['saveMemberEdit'], callOf('saveMemberEdit'), { els, stubs: meStub, mutHelper }, null); return r.calls.indexOf('gwCall') >= 0; };
+  const OLDY = (h) => h.replace('if (m[1].length !== 4 || y < 1000)', 'if (m[1].length !== 4 || y < 1900 || y > 2099)');
+  const k5y = meY('2999-12-31') === true && meY('202612-02-01') === false && meY('2026-12-31') === true;
+  const yDef = meY('2999-12-31', OLDY) === false;
+  T('C280 ⑤ 키보드로 끝까지 지움·연도(실행 — 확인 반영): 내 할 일 기한 칸 세 칸 다 지우고 떠남(값 빈 글자 · badInput 거짓 · change 없음) = blur에서 빈 값 저장 1번·안내 0 · 새 날짜 change 뒤 blur = 저장 1번(두 번 아님) · 연도 치는 도중(0002→0020→0202→2028) = 토스트 0·끝값 저장 1번 · 덜 채움 = 저장 0·blur 안내 1 · 넣기 박스 카드 칸 다 지움 = 카드 값 빈칸(맞는 칸은 화면 값) · 직원 퇴사 예정 2999-12-31 = 저장 요청 · 202612-02-01 = 막힘 · 결함 사본 5개(blur 저장 걷음·같은 값 거름 걷음·change 안내·카드 옮겨 적기 걷음·옛 1900~2099) = 모두 잡힘',
+    k5 && k5c && k5y && tdDef.every((x) => x === false) && cM.form.d1 === '2026-10-01' && yDef, JSON.stringify({ t1, t2, t3, t4, c1, k5y, tdDef, cMd1: cM.form.d1, yDef }));
+  T('C280 ④ 남은 날짜 칸 `.value` 직접 읽기 = 전수 표의 저장 안 함·이미 막힘·검사 앞 읽기 자리뿐(새 저장 자리가 옛 꼴로 생기면 잡힘 — 표 밖 ' + extra.length + ')', extra.length === 0, '표 밖: ' + extra.join(', '));
+} catch (e) { console.log('  (C280 검사 생략 — ' + e.message + ')'); fails++; }
+// ── v521(C280 — 날짜 칸 읽기 도우미 · 원장 C280): 실행 검사는 uismoke 'C280' 블록 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd521 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D521 = { ft: rd521('FEATURES.md'), tl: rd521('TESTLIST.md'), sw: rd521('sw.js'), man: rd521('MANUAL.html'), cl: rd521('CLAUDE.md') };
+  const chk521 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v521 (11/20)', '\n### '), tlv = cut(d.tl, '\n## v521 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`dateFieldRead", "원장 C280"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 521 && ftv.length > 0 && mF.length === 0 && cb.length === 10 && gate.length === 2 && scr.length === 8 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C280(v521') > 0
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 521;
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r521 = chk521(D521);
+  const mu521 = (k, f) => chk521(Object.assign({}, D521, { [k]: f(D521[k]) })).ok;
+  const M521 = [mu521('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v520 (')), mu521('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v520'")),
+    mu521('ft', (s) => s.split('`dateFieldRead').join('dateFieldRead')),
+    mu521('cl', (s) => s.replace('**C280(v521', 'C280(')),
+    mu521('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v520 b54228c 위 · 260da2c + 2ae52ed) uismoke ✓ 926(판 번호 넣기 전 \'sw.js 버전업\' 칸만 남음) · servertest 1450 · 14종 0 · node --check 104 · 인라인 파싱 오류 0 · paycalc_check 10 · autorulestest 8 · CR 0 — ✓ AI 11/20', '\n- (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v520 b54228c 위 · 260da2c + 2ae52ed) uismoke ✓ 926(판 번호 넣기 전 \'sw.js 버전업\' 칸만 남음) · servertest 1450 · 14종 0 · node --check 104 · 인라인 파싱 오류 0 · paycalc_check 10 · autorulestest 8 · CR 0 — ✓ AI 11/20'))];
+  T('v521 문서·판 번호(정확 검사): FEATURES 기준 v521 (2026-11-20)·v521 절(C280) · TESTLIST v521 칸 10(화면·운영 확인 8 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v521 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
+    r521.ok && M521.every((v) => v === false), JSON.stringify({ r: r521.info, mut: M521 }));
+} catch (e) { console.log('  (v521 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v522(C251 — 감사 줄 줄마다 새 열쇠 + 접기 · 원장 C251): 실행 검사는 servertest 'C251' 블록 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd522 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D522 = { ft: rd522('FEATURES.md'), tl: rd522('TESTLIST.md'), sw: rd522('sw.js'), man: rd522('MANUAL.html'), cl: rd522('CLAUDE.md') };
+  const chk522 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v522 (11/23)', '\n### '), tlv = cut(d.tl, '\n## v522 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`gw-audit-fold-cron`", "원장 C251"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 522 && ftv.length > 0 && mF.length === 0 && cb.length === 11 && gate.length === 2 && scr.length === 9 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C251(v522') > 0
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 522;
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r522 = chk522(D522);
+  const mu522 = (k, f) => chk522(Object.assign({}, D522, { [k]: f(D522[k]) })).ok;
+  const M522 = [mu522('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v521 (')), mu522('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v521'")),
+    mu522('ft', (s) => s.split('`gw-audit-fold-cron`').join('gw-audit-fold-cron')),
+    mu522('cl', (s) => s.replace('**C251(v522', 'C251(')),
+    mu522('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v521 39c031a 위 · e1954ca + 722f653 + 19adfb1) uismoke ✓ 927(판 번호 넣기 전 \'sw.js 버전업\' 칸만 남음) · servertest 1465 · 14종 0 · node --check 105 · 인라인 파싱 오류 0 · paycalc_check 10 · autorulestest 8 · CR 0 — ✓ AI 11/23', '\n- (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v521 39c031a 위 · e1954ca + 722f653 + 19adfb1) uismoke ✓ 927(판 번호 넣기 전 \'sw.js 버전업\' 칸만 남음) · servertest 1465 · 14종 0 · node --check 105 · 인라인 파싱 오류 0 · paycalc_check 10 · autorulestest 8 · CR 0 — ✓ AI 11/23'))];
+  T('v522 문서·판 번호(정확 검사): FEATURES 기준 v522 (2026-11-23)·v522 절(C251) · TESTLIST v522 칸 11(화면·운영 확인 9 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v522 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
+    r522.ok && M522.every((v) => v === false), JSON.stringify({ r: r522.info, mut: M522 }));
+} catch (e) { console.log('  (v522 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ---- C185 판3 ② 퇴사 — 화면(실행): 켜기 거절 ASSIGN_NEEDED 알림 두 길(콘솔 [ㄱ] pmconAct · 카드 단추 evrCardSet — 판2 검토에서 넘어온 실행 시험) · 퇴사 요약 참고 수 글
+try {
+  const fnL3 = (name, src) => { src = src || html; const i = src.indexOf('function ' + name + '('); if (i < 0 || src.indexOf('function ' + name + '(', i + 1) >= 0) throw new Error('함수 없음·둘: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('함수 끝 없음: ' + name); };
+  const stL3 = (re, src) => { const m = (src || html).match(re); if (!m) throw new Error('문장 없음: ' + re); return m[0]; };
+  const ASSIGN_TXT = '배정표 담당을 먼저 정해 주세요 — 이 규칙이 쓰는 배정표 줄의 담당이 비었거나 재직자가 아닙니다.';
+  const boxA3 = (src) => new Function('RES', [
+    'var pmconBusy = false, evrCardBusy = false, pmconState = { canWrite: true, base: 555, byId: {} }, calls = [], toasts = [], renders = 0;',
+    'var PMCON_CHOICE_TXT = { ok: "적용" };',
+    'function confirm(){ return true; } function prompt(){ return ""; } function alert(m){ toasts.push("alert:" + m); } function apprToastShow(m){ toasts.push(m); } function renderPmcon(){ renders++; }',
+    'function gwCall(fn, b){ calls.push(b); return Promise.resolve(RES); }',
+    fnL3('pmconAct', src), fnL3('evrCardSet', src),
+    'return { act: pmconAct, set: evrCardSet, st: pmconState, calls: calls, toasts: toasts, renders: function(){ return renders; } };'].join('\n'));
+  const chkA3 = async (src) => {
+    const o = {}, tick = () => new Promise((r) => setTimeout(r, 0));
+    const ROW = { id: 'autotask:hr_leave:live', kind: 'autotask', grade: 'R1', q: '퇴사 체크리스트 지시 — 켤까요?', recTxt: '켬(실제 발행)', args: { rule: 'hr_leave', mode: 'live' }, setBase: 44, k: { revert: '연습으로' } };
+    const B = { meta_srv: { hr_leave: { label: '퇴사 체크리스트 지시', ready: true, uses: ['hr:', 'acct:'] } }, updated_at: 44 };
+    const a = boxA3(src)({ status: 400, body: { error_code: 'ASSIGN_NEEDED' } }); a.st.byId[ROW.id] = ROW; a.act('ok', ROW.id); await tick();
+    o.console = a.calls.length === 1 && a.calls[0].kind === 'autotask' && JSON.stringify(a.calls[0].args) === '{"rule":"hr_leave","mode":"live"}' && JSON.stringify(a.toasts) === JSON.stringify(['alert:' + ASSIGN_TXT]) && a.renders() === 1;
+    const c = boxA3(src)({ status: 400, body: { error_code: 'ASSIGN_NEEDED' } }); c.set(B, 'hr_leave', 'dry'); await tick();
+    o.card = c.calls.length === 1 && c.calls[0].row === 'autotask:hr_leave:dry' && JSON.stringify(c.toasts) === JSON.stringify(['alert:' + ASSIGN_TXT]) && c.renders() === 1;
+    const n = boxA3(src)({ status: 400, body: { error_code: 'RULE_NOT_READY' } }); n.st.byId[ROW.id] = ROW; n.act('ok', ROW.id); await tick();
+    const n2 = boxA3(src)({ status: 400, body: { error_code: 'RULE_NOT_READY' } }); n2.set(B, 'hr_leave', 'dry'); await tick();
+    o.others = n.toasts.join().indexOf('배정표') < 0 && /준비 중인 규칙/.test(n.toasts.join()) && n2.toasts.join().indexOf('배정표') < 0 && /준비 중인 규칙/.test(n2.toasts.join());
+    o.ok = Object.values(o).every((v) => v === true); return o;
+  };
+  const boxS3 = (src) => new Function([
+    'function memberName(id){ return id === "u1" ? "담당가" : ""; }',
+    [/var EVR_STOP = \{[^}]+\};/, /EVR_STOP\.TEXT_LONG = "[^"]+";/, /var EVR_SKIP = \{[^}]+\};/].map((re) => stL3(re, src)).join('\n'),
+    fnL3('evrSumTxt', src), 'return evrSumTxt;'].join('\n'))();
+  const chkS3 = (src) => {
+    const f = boxS3(src), base = { mode: 'dry', ready: true, win: 30, events: 1, found: 1, tasks: 7, who: [{ id: 'u1', n: 6 }, { id: 'u2', n: 1 }], no_who: 0, no_due: 0, old: 1, gone: 0, marked: 0, no_row: [], skip: '' };
+    const lv = f(Object.assign({}, base, { ref: { new: 2, no_date: 0, jiip: 0, test: 0, del: 0, rejoin_mark: 2, past12_leave: 3, bg_off: 0 } }));
+    const jn = f(Object.assign({}, base, { tasks: 8, ref: { new: 1, no_hire: 0, rejoin: 0, past12: 4, bg_off: 0 } }));
+    return /최근 30일 기준으로 켰다면 지시 7건\(사건 1\)/.test(lv) && lv.indexOf('재입사 표식이 찍힌 2명(입사 쪽에서 셈)') >= 0 && lv.indexOf('참고: 지난 12개월 퇴사 3명(지시는 켠 뒤 퇴사일을 새로 저장한 일만 — 소급 없음)') >= 0
+      && lv.indexOf('지난 12개월 입사') < 0 && /켠 날보다 앞선 일이라 뺀 1명/.test(lv) && f(Object.assign({}, base, { ref: { rejoin_mark: 0, past12_leave: 0 } })).indexOf('재입사 표식') < 0 && !/rejoin_mark|past12_leave|no_date|uLv|u2/.test(lv)
+      && jn.indexOf('참고: 지난 12개월 입사 4명') >= 0 && jn.indexOf('퇴사') < 0 && jn.indexOf('재입사 표식') < 0;
+  };
+  const A3 = await chkA3();
+  T('C185 판3 ① 켜기 거절 ASSIGN_NEEDED 화면 알림(실행 — 실제 pmconAct·evrCardSet · 가짜 gwCall): PM 콘솔 [ㄱ](퇴사 켬) 400 ASSIGN_NEEDED = "배정표 담당을 먼저 정해 주세요 — …" 알림 1·다시 그림 · 카드 단추도 같은 글 · RULE_NOT_READY는 종전 글(배정표 글 없음)', A3.ok, JSON.stringify(A3));
+  const S3 = chkS3();
+  T('C185 판3 ② 퇴사 요약 글(실행 — 실제 evrSumTxt): 재입사 표식 수 · 지난 12개월 퇴사(옛 퇴사자 소급 없음) · 켠 날보다 앞 · 내부 칸 이름·회원 id 0 · 입사 요약엔 퇴사 글 없음', S3);
+  const mutL3 = (from, to) => { if (html.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); return html.replace(from, () => to); };
+  const MA3 = [['        else if (res.body && res.body.error_code === "ASSIGN_NEEDED") alert(', '        else if (false) alert('],
+    ['      if (res.status !== 200 && res.body && res.body.error_code === "ASSIGN_NEEDED"){ alert(', '      if (false){ alert(']];
+  const kA3 = [];
+  for (const [a, b] of MA3) { let v; try { v = (await chkA3(mutL3(a, b))).ok; } catch (e) { v = 'err ' + e.message; } kA3.push(v); }
+  const MS3 = [['    if (Number(rf.rejoin_mark)) p.push(', '    if (false) p.push('], ['    if (rf.past12_leave !== undefined) p.push(', '    if (false) p.push(']];
+  const kS3 = MS3.map(([a, b]) => { try { return chkS3(mutL3(a, b)); } catch (e) { return 'err ' + e.message; } });
+  T('C185 판3 ①② 결함 사본 ' + (kA3.length + kS3.length) + '개(콘솔 거절 글 걷음 · 카드 거절 글 걷음 · 재입사 표식 수 글 걷음 · 지난 12개월 퇴사 글 걷음) = 모두 ✗', kA3.concat(kS3).every((v) => v === false), JSON.stringify({ kA3, kS3 }));
+} catch (e) { console.log('  (C185 판3 검사 생략 — ' + e.message + ')'); fails++; }
+
+
+// ---- C185 판3 검토 반영(11/20) — 화면(실행): ① [인사 카드] 대상이 퇴사자·시험 계정이면 그 묶음을 이 화면에서만 펼쳐 카드를 엶 · ③ 규칙 카드 되돌리기 거절 글 · ⑤ 준비된 규칙의 옛 '준비 중' 요약
+try {
+  const fnR3 = (name, src) => { src = src || html; const i = src.indexOf('function ' + name + '('); if (i < 0 || src.indexOf('function ' + name + '(', i + 1) >= 0) throw new Error('함수 없음·둘: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('함수 끝 없음: ' + name); };
+  const segR3 = (src, a, b) => { src = src || html; const i = src.indexOf(a), j = src.indexOf(b, i + 1); if (i < 0 || j < 0) throw new Error('구간 없음: ' + a); return src.slice(i, j); };
+  const stR3 = (re, src) => { const m = (src || html).match(re); if (!m) throw new Error('문장 없음: ' + re); return m[0]; };
+  const ASSIGN_R3 = '배정표 담당을 먼저 정해 주세요 — 이 규칙이 쓰는 배정표 줄의 담당이 비었거나 재직자가 아닙니다.';
+  const TD_R3 = '2026-11-20';
+  // ① 실제 taskHrCardOpen·renderHrRoster·hrOpenPending·drawHrRoster·hrToggle·hrCollapse + **실제 타이머·늦은 명부 응답**(좁은 재확인 — 0·300·500·1500ms × 대상 재직·퇴사자·시험 계정 × 다른 카드 편집 중)
+  //   작은 DOM 흉내: 명부 innerHTML을 갈면 그 안 패널이 새로 생기고 패널 안에 있던 편집 폼(앱에 하나)은 지워짐 — 그 뒤에도 폼이 남고 대상 카드에 붙어 열리는지
+  const MEM_R3 = () => [{ id: 'a0', name: '관리자', role: '관리자', dept: '관리부', admin: true, seq: 1 }, { id: 'e1', name: '직원하나', role: '직원', dept: '운영부', seq: 2 },
+    { id: 'e2', name: '직원둘', role: '직원', dept: '운영부', seq: 3 }, { id: 'r1', name: '퇴사자', role: '직원', dept: '운영부', leave_date: '2026-11-19', seq: 4 }, { id: 't1', name: '시험사본', role: '직원', dept: '운영부', test_acct: true, seq: 5 }];
+  const boxH3 = (src, delay, fail) => new Function('MEMBERS', 'DELAY', 'FAIL', [
+    'var members = MEMBERS, leaves = [], log = [], els = {}, rosterHtml = "", callN = 0;',
+    'var backdrop = { id: "memberEditBackdrop", appendChild: function(f){ f.parent = backdrop; } };',
+    'var form = { id: "memberEditForm", parent: backdrop, removed: false, classList: { add: function(){}, remove: function(){} } };',
+    'function mkPanel(id, disp){ var p = { id: id, style: { display: disp }, appendChild: function(f){ f.parent = p; }, scrollIntoView: function(){} }; return p; }',
+    'function setRoster(h){ Object.keys(els).forEach(function(k){ if (k.indexOf("hrpanel-") === 0){ if (form.parent === els[k]) form.removed = true; delete els[k]; } }); rosterHtml = String(h); var re = /id="(hrpanel-[^"]+)"( style="display:none")?/g, m; while ((m = re.exec(rosterHtml))) els[m[1]] = mkPanel(m[1], m[2] ? "none" : ""); }',
+    'var host = { id: "hrRoster", querySelectorAll: function(){ return []; }, addEventListener: function(){} }; Object.defineProperty(host, "innerHTML", { get: function(){ return rosterHtml; }, set: setRoster });',
+    'function el(id){ if (id === "hrRoster") return host; if (id === "memberEditForm") return form.removed ? null : form; if (id === "memberEditBackdrop") return backdrop; if (id.indexOf("hrpanel-") === 0) return els[id] || null; return els["x:" + id] || (els["x:" + id] = { id: id, textContent: "", style: {}, addEventListener: function(){} }); }',
+    'var document = { getElementById: el, querySelector: function(sel){ var m = /data-hr-toggle="([^"]*)"/.exec(sel); if (!m || rosterHtml.indexOf(\'data-hr-toggle="\' + m[1] + \'"\') < 0) return null; return { classList: { add: function(){}, remove: function(){} }, scrollIntoView: function(){ log.push("scroll:" + m[1]); } }; } };',
+    'function switchTab(t){ log.push("tab:" + t); if (t === "hr") renderHrRoster(); }',
+    'function gwCall(fn, b){ var d = Array.isArray(DELAY) ? (DELAY[callN++] || 0) : DELAY; log.push("call:" + b.action); return new Promise(function(res, rej){ setTimeout(function(){ if (FAIL) rej(new Error("net")); else res({ status: 200, body: { members: MEMBERS } }); }, d); }); }',   // 독립 확인: DELAY 배열 = 요청마다 지연 따로(요청 두 개 겹침)
+    fnR3('liveMembers', src), segR3(src, '// @hr-test-start', '// @hr-test-end'), fnR3('findMember', src),
+    'function memberRetired(m){ return !!(m && m.leave_date && m.leave_date < "' + TD_R3 + '"); } function esc(x){ return String(x); } function todayStr(){ return "' + TD_R3 + '"; }',
+    'var hrOpenId = null, hrRetOpen = false, hrTestOpen = false, DEPT_LIST = ["관리부","운영부"], ROLE_ORDER = ["대표","관리자","팀장","직원"];',
+    'function isAdmin(){ return true; } function hrStarted(){ return true; } function hrRetToggle(){} function hrTestToggle(){} function hrCloseNew(){} function openMemberEdit(id){ log.push("edit:" + id); }',
+    'function hrRowHtml(m, isRet){ return \'<div data-hr-toggle="\' + m.id + \'"></div><div id="hrpanel-\' + m.id + \'" style="display:none"></div>\'; }',
+    stR3(/var hrPendOpen = null;/, src), stR3(/var hrRosterSeq = 0;/, src), fnR3('hrOpenPending', src), fnR3('renderHrRoster', src), fnR3('drawHrRoster', src), fnR3('hrToggle', src), fnR3('hrCollapse', src), fnR3('taskHrCardOpen', src),
+    'return { first: function(){ drawHrRoster(); }, open: function(id){ hrToggle(id); }, click: function(mid){ taskHrCardOpen(mid); }, tab: function(){ switchTab("hr"); },',
+    '  state: function(){ var p = form.removed ? null : form.parent; return { formAlive: !form.removed, formIn: p && p.id ? p.id : "", panelShown: !!(p && p.style && p.style.display === ""), hrOpenId: hrOpenId, retShown: /id="hrRetBody">/.test(rosterHtml), testShown: /id="hrTestBody">/.test(rosterHtml), retOpen: hrRetOpen, testOpen: hrTestOpen, log: log.slice() }; } };'].join('\n'))(MEM_R3(), delay, !!fail);
+  const sleepR3 = (ms) => new Promise((r) => setTimeout(r, ms));
+  const chkH3 = async (src) => {
+    const cases = [];
+    for (const d of [0, 300, 500, 1500]) for (const t of ['e1', 'r1', 't1']) for (const other of [false, true]) cases.push({ d, t, other });
+    cases.push({ d: 500, t: 'r1', other: true, fail: true });   // 명부 통신 실패 = 지금 명부로 엶(폼 남음)
+    const swallow = () => {}; process.on('unhandledRejection', swallow);   // 결함 사본(통신 실패 갈래 걷음)의 처리 안 된 거절이 시험 전체를 멈추지 않게 — 이 시험 동안만
+    const res = await Promise.all(cases.map(async (c) => {
+      const b = boxH3(src, c.d, c.fail); b.first(); if (c.other) b.open('e2');
+      b.click(c.t); await sleepR3(c.d + 450);
+      const s = b.state();
+      const ok = s.formAlive && s.formIn === 'hrpanel-' + c.t && s.panelShown && s.hrOpenId === c.t && s.log.indexOf('scroll:' + c.t) >= 0
+        && (c.t === 'r1' ? s.retShown && !s.retOpen : !s.retShown) && (c.t === 't1' ? s.testShown && !s.testOpen : !s.testShown);
+      return { k: c.d + '/' + c.t + (c.other ? '/편집중' : '') + (c.fail ? '/실패' : ''), ok, s: ok ? null : { alive: s.formAlive, in: s.formIn, open: s.hrOpenId } };
+    }));
+    await sleepR3(50); process.off('unhandledRejection', swallow);
+    const bad = res.filter((x) => !x.ok);
+    return { ok: bad.length === 0, n: res.length, bad: bad.slice(0, 6) };
+  };
+  const H3 = await chkH3();
+  T('C185 판3 검토 반영 ① [인사 카드](실행 — 실제 taskHrCardOpen·renderHrRoster·hrOpenPending·drawHrRoster·hrToggle·hrCollapse · 실제 타이머 · 늦은 명부 응답 0·300·500·1500ms × 대상 재직·퇴사자·시험 계정 × 다른 카드 편집 중 + 통신 실패 ' + H3.n + '꼴): 명부 읽기 뒤에 그 카드를 엶 · 편집 폼이 지워지지 않고 대상 카드에 붙어 보임 · 퇴사자·시험 계정 묶음은 이 화면에서만 펼침(기억값 그대로) · 그 머리로 스크롤',
+    H3.ok, JSON.stringify(H3));
+  // ① 독립 확인(11/23): 명부 요청 두 개 겹침 — 먼저 온 응답이 카드를 열고 뒤 응답의 다시 그리기가 편집 폼을 지우던 길(요청 번호 = 마지막 요청의 응답만 그림)
+  //   세 꼴: [인사 카드] 뒤 응답 기다리며 인사 탭 한 번 더(700/1200ms) · 인사 탭 명부가 늦는 사이 [인사 카드](1200/700ms) · 같은 것 차례로 답(700/700ms)
+  const chkO3 = async (src) => {
+    const C = [{ k: '[인사 카드] 뒤 인사 탭 다시(700/1200ms)', d: [700, 1200], first: 'click', gap: 200, wait: 1500 },
+      { k: '인사 탭 늦는 중 [인사 카드](1200/700ms)', d: [1200, 700], first: 'tab', gap: 200, wait: 1500 },
+      { k: '인사 탭 늦는 중 [인사 카드](700/700ms · 차례대로 답)', d: [700, 700], first: 'tab', gap: 100, wait: 1200 }];
+    const res = await Promise.all(C.map(async (c) => {
+      const b = boxH3(src, c.d); b.first();
+      if (c.first === 'click') { b.click('e1'); await sleepR3(c.gap); b.tab(); } else { b.tab(); await sleepR3(c.gap); b.click('e1'); }
+      await sleepR3(c.wait); const s = b.state();
+      const calls = s.log.filter((x) => x === 'call:member_list').length;
+      const ok = calls === 2 && s.formAlive && s.formIn === 'hrpanel-e1' && s.panelShown && s.hrOpenId === 'e1' && s.log.indexOf('scroll:e1') >= 0;
+      return { k: c.k, ok, s: ok ? null : { calls, alive: s.formAlive, in: s.formIn, open: s.hrOpenId } };
+    }));
+    const bad = res.filter((x) => !x.ok);
+    return { ok: bad.length === 0, n: res.length, bad };
+  };
+  const O3 = await chkO3();
+  T('C185 판3 독립 확인 ① 명부 요청 두 개 겹침(실행 — 같은 실제 함수 · 실제 타이머 · 요청마다 지연 따로 ' + O3.n + '꼴: [인사 카드] 뒤 인사 탭 다시 700/1200ms · 인사 탭 늦는 중 [인사 카드] 1200/700ms · 차례대로 답 700/700ms): 마지막 요청의 응답만 그림 · 편집 폼이 지워지지 않고 대상 카드에 붙어 열림 · 그 머리로 스크롤',
+    O3.ok, JSON.stringify(O3));
+  // ③ 실제 autoRulesSet — 되돌리기 400 ASSIGN_NEEDED = 켜기와 같은 글 · 다른 실패 = 종전 글
+  const boxR3 = (src) => new Function('RES', [
+    'var autoRulesSaving = false, autoRulesTbl = { hr_leave: "dry" }, autoRulesBase = 7, calls = [], toasts = [], renders = 0;',
+    'function confirm(){ return true; } function alert(m){ toasts.push("alert:" + m); } function apprToastShow(m){ toasts.push(m); } function renderAutoRulesCard(){ renders++; }',
+    'function gwCall(fn, b){ calls.push(b); return Promise.resolve(RES); }', fnR3('autoRulesSet', src),
+    'return { set: autoRulesSet, calls: calls, toasts: toasts, renders: function(){ return renders; } };'].join('\n'));
+  const chkR3 = async (src) => {
+    const tick = () => new Promise((r) => setTimeout(r, 0)), o = {};
+    const a = boxR3(src)({ status: 400, body: { error_code: 'ASSIGN_NEEDED' } }); a.set({ revert: true }); await tick();
+    o.revert = a.calls.length === 1 && a.calls[0].action === 'autotask_revert' && JSON.stringify(a.toasts) === JSON.stringify(['alert:' + ASSIGN_R3]) && a.renders() === 1;
+    const b = boxR3(src)({ status: 400, body: { error_code: 'NO_PREV' } }); b.set({ revert: true }); await tick();
+    o.other = JSON.stringify(b.toasts) === JSON.stringify(['alert:규칙 스위치 저장 실패 (NO_PREV)']);
+    o.ok = Object.values(o).every((v) => v === true); return o;
+  };
+  const R3r = await chkR3();
+  T('C185 판3 검토 반영 ③ 규칙 카드 되돌리기 거절 글(실행 — 실제 autoRulesSet): 400 ASSIGN_NEEDED = "' + ASSIGN_R3 + '"(영문 코드 아님) · 다른 실패 = 종전 "규칙 스위치 저장 실패 (코드)"', R3r.ok, JSON.stringify(R3r));
+  // ⑤ 실제 evrCardRender — 준비된 규칙인데 남아 있는 요약이 준비 중(ready:false) = '아직 연습 집계가 없습니다(…)' · 준비 중 규칙 = 종전
+  const FN5 = ['esc', 'pmconPlan', 'pmconRowsAutotask', 'pmconLicWhy', 'evrSeen', 'evrIds', 'evrMd', 'evrSumTxt', 'evrLiveRow', 'evrRows', 'evrCardRender', 'evrCardSet'];
+  const box5 = (src) => new Function([
+    'var pmconSeq = 1, pmconState = { canWrite: true, base: 555 }, calls = [], toasts = [];',
+    'function todayStr(){ return "2026-11-20"; } function memberName(id){ return ""; } function apprToastShow(m){ toasts.push(m); } function renderPmcon(){}',
+    'var confirm = function(){ return true; }, alert = function(m){ toasts.push("alert:" + m); }; function gwCall(fn, b){ calls.push(b); return Promise.resolve({ status: 200, body: {} }); }',
+    [/var EVR_STOP = \{[^}]+\};/, /EVR_STOP\.TEXT_LONG = "[^"]+";/, /var EVR_SKIP = \{[^}]+\};/, /var evrLast = null, evrCardBusy = false;/, /var AUTO_RULE_ORDER = \[[^\]]+\];/, /var PMCON_PLAN = \{[^\n]+\};/].map((re) => stR3(re, src)).join('\n'),
+    FN5.map((n) => fnR3(n, src)).join('\n'),
+    'return { rows: pmconRowsAutotask, card: evrCardRender };'].join('\n'))();
+  const chk5 = (src) => {
+    const b = box5(src), ms = { lic_duty: { label: '인허가' }, hr_leave: { label: '퇴사 체크리스트 지시', ready: true, uses: ['hr:', 'acct:'] }, veh_ceq31: { label: '건설기계', ready: false } };
+    const B = { rules: { lic_duty: 'live', hr_leave: 'dry', veh_ceq31: 'dry' }, since: {}, meta: {}, meta_srv: ms, updated_at: 44, assign_state: { 'hr:': 'ok', 'acct:': 'ok' }, dry: { rules: { hr_leave: { mode: 'dry', ready: false }, veh_ceq31: { mode: 'dry', ready: false } } } };
+    const rows = b.rows(B); const e = { innerHTML: '', querySelectorAll: () => [] }; b.card(e);
+    const t = e.innerHTML.replace(/<[^>]+>/g, ' ');
+    const iL = t.indexOf('퇴사 체크리스트 지시'), iV = t.indexOf('건설기계');
+    return iL >= 0 && t.slice(iL, iV).indexOf('아직 연습 집계가 없습니다(다음 평일 08:10 정기업무 봇 뒤에 보입니다).') >= 0 && t.slice(iL, iV).indexOf('준비 중 — 계산') < 0 && t.slice(iV).indexOf('준비 중') >= 0
+      && !rows.some((r) => r.id === 'autotask:hr_leave:live');   // 낡은 요약으로는 켜기 줄도 안 띄움(종전 그대로)
+  };
+  const chk5L = (src) => {   // 좁은 재확인 ㉠: 켜진 규칙인데 남은 요약이 옛 '준비 중' = 종전 글 '켠 뒤 첫 집계 전(…)' · 연습일 때만 '아직 연습 집계가 없습니다'
+    const b = box5(src), ms = { lic_duty: { label: '인허가' }, hr_leave: { label: '퇴사 체크리스트 지시', ready: true, uses: ['hr:', 'acct:'] } };
+    b.rows({ rules: { lic_duty: 'live', hr_leave: 'live' }, since: { hr_leave: 1 }, meta: {}, meta_srv: ms, updated_at: 44, assign_state: { 'hr:': 'ok', 'acct:': 'ok' }, dry: { rules: { hr_leave: { mode: 'dry', ready: false } } } });
+    const e = { innerHTML: '', querySelectorAll: () => [] }; b.card(e); const t = e.innerHTML.replace(/<[^>]+>/g, ' '), i = t.indexOf('퇴사 체크리스트 지시');
+    return i >= 0 && t.slice(i).indexOf('켠 뒤 첫 집계 전(다음 평일 08:10 정기업무 봇 뒤에 보입니다).') > 0 && t.slice(i).indexOf('아직 연습 집계가 없습니다') < 0 && t.slice(i).indexOf('준비 중 — 계산') < 0;
+  };
+  const C5 = chk5() && chk5L();
+  T('C185 판3 검토 반영 ⑤ 점검 카드(실행 — 실제 evrCardRender): 준비된 규칙인데 요약이 옛 "준비 중"(배포 날 ~ 다음 집계 전) = "아직 연습 집계가 없습니다(다음 평일 08:10 정기업무 봇 뒤에 보입니다)." · 준비 중 규칙은 종전 · 켜기 줄 없음', C5);
+  const mutR3 = (from, to) => { if (html.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); return html.replace(from, () => to); };
+  const k = [];
+  try { k.push((await chkH3(mutR3('      hrOpenPending();   // C185 판3 좁은 재확인: 맡긴', '      drawHrRoster();   // C185 판3 좁은 재확인: 맡긴'))).ok); } catch (e) { k.push('err ' + e.message); }
+  try { k.push((await chkH3(mutR3('    hrPendOpen = String(mid);\n    switchTab("hr");', '    switchTab("hr");\n    setTimeout(function(){ hrCollapse(); drawHrRoster(mid); }, 300);'))).ok); } catch (e) { k.push('err ' + e.message); }
+  try { k.push((await chkH3(mutR3('    }).catch(function(){ if (my !== hrRosterSeq) return; if (hrPendOpen != null) hrOpenPending(); });', '    });'))).ok); } catch (e) { k.push('err ' + e.message); }
+  try { k.push((await chkR3(mutR3('alert(res.body && res.body.error_code === "ASSIGN_NEEDED" ? "' + ASSIGN_R3 + '" : "규칙 스위치 저장 실패 ("', 'alert(false ? "" : "규칙 스위치 저장 실패 ("'))).ok); } catch (e) { k.push('err ' + e.message); }
+  try { k.push(chk5(mutR3('      if (m.ready === true && cur !== "off" && s && s.ready === false) line =', '      if (false) line ='))); } catch (e) { k.push('err ' + e.message); }
+  try { k.push(chk5L(mutR3('(cur === "live" ? "켠 뒤 첫 집계 전(다음 평일 08:10 정기업무 봇 뒤에 보입니다)." : "아직 연습 집계가', '(false ? "" : "아직 연습 집계가'))); } catch (e) { k.push('err ' + e.message); }
+  T('C185 판3 검토 반영 ①③⑤ 결함 사본 ' + k.length + '개(명부 응답 뒤에 안 엶 · 종전 300ms 타이머 길 · 통신 실패 갈래 걷음 · 되돌리기 거절 글 걷음 · 낡은 요약 갈래 걷음) = 모두 ✗', k.every((v) => v === false), JSON.stringify(k));
+  // 독립 확인 결함 사본: 요청 번호 걷음(응답·실패 두 자리의 '앞 요청 버림' 줄을 빼면 겹침 세 꼴이 다시 폼을 지움)
+  let kO;
+  try { const G = 'if (my !== hrRosterSeq) return;'; if (html.split(G).length !== 3) throw new Error('요청 번호 자리가 두 곳이 아님'); kO = (await chkO3(html.split(G).join(''))).ok; } catch (e) { kO = 'err ' + e.message; }
+  T('C185 판3 독립 확인 ① 결함 사본(요청 번호 걷음 — 앞 요청의 응답도 그림) = ✗', kO === false, JSON.stringify(kO));
+} catch (e) { console.log('  (C185 판3 검토 반영 검사 생략 — ' + e.message + ')'); fails++; }
+
+
+// ---- C185 판4 ⑦ 건설기계 31일 전 — 화면: 앱 runAutoTaskGen에 31·규모 판정 없음(ⓓ 2) · 앱 규모 목록 끝 값 = 서버 상수(ⓓ 3) · 콘솔 글(참고 수·건너뜀 글·켜기 줄 규칙별 글 ⓙ 4·준비된 규칙의 낡은 요약)
+try {
+  const fnV4 = (name, src) => { src = src || html; const i = src.indexOf('function ' + name + '('); if (i < 0 || src.indexOf('function ' + name + '(', i + 1) >= 0) throw new Error('함수 없음·둘: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('함수 끝 없음: ' + name); };
+  const stV4 = (re, src) => { const m = (src || html).match(re); if (!m) throw new Error('문장 없음: ' + re); return m[0]; };
+  const reqV4 = createRequire(import.meta.url), ARV4 = reqV4(join(ROOT, 'netlify', 'functions', '_lib', 'autorules.js'));
+  const gen = fnV4('runAutoTaskGen');
+  const sizeDef = JSON.parse(stV4(/var VEH_SIZE_DEF = (\[[^\]]+\]);/).replace(/^var VEH_SIZE_DEF = /, '').replace(/;$/, ''));
+  T('C185 판4 ① 세 곳 같은 값(정적): 앱 runAutoTaskGen에 31·규모·건설기계 판정 없음(앱은 30일 전 지시만 — 31일은 서버 스위치) · 앱 규모 목록 VEH_SIZE_DEF 끝 값 = 서버 CEQ_SIZE("' + ARV4.CEQ_SIZE + '") · 서버 CEQ31 = 31',
+    !/\b31\b|\.size\b|건설기계|CEQ/.test(gen) && sizeDef[sizeDef.length - 1] === ARV4.CEQ_SIZE && ARV4.CEQ31 === 31, JSON.stringify({ last: sizeDef[sizeDef.length - 1] }));
+  const FN4 = ['esc', 'pmconPlan', 'pmconRowsAutotask', 'pmconLicWhy', 'evrSeen', 'evrIds', 'evrMd', 'evrSumTxt', 'evrLiveRow', 'evrRows', 'evrCardRender', 'evrCardSet'];
+  const box4 = (src) => new Function([
+    'var pmconSeq = 1, pmconState = { canWrite: true, base: 555 }, calls = [], toasts = [];',
+    'function todayStr(){ return "2026-11-20"; } function memberName(id){ return id === "uV" ? "차량담당" : ""; } function apprToastShow(m){ toasts.push(m); } function renderPmcon(){}',
+    'var confirm = function(){ return true; }, alert = function(m){ toasts.push("alert:" + m); }; function gwCall(fn, b){ calls.push(b); return Promise.resolve({ status: 200, body: {} }); }',
+    [/var EVR_STOP = \{[^}]+\};/, /EVR_STOP\.TEXT_LONG = "[^"]+";/, /var EVR_SKIP = \{[^}]+\};/, /var evrLast = null, evrCardBusy = false;/, /var AUTO_RULE_ORDER = \[[^\]]+\];/, /var PMCON_PLAN = \{[^\n]+\};/].map((re) => stV4(re, src)).join('\n'),
+    FN4.map((n) => fnV4(n, src)).join('\n'),
+    'return { rows: pmconRowsAutotask, card: evrCardRender, sum: evrSumTxt };'].join('\n'))();
+  const SV = (x) => Object.assign({ mode: 'dry', ready: true, win: 30, events: 1, found: 1, tasks: 1, who: [{ id: 'uV', n: 1 }], no_who: 0, no_due: 0, old: 0, gone: 0, marked: 0, no_row: [], skip: '', ref: { ceq_total: 12, ceq: 3, ceq_d31: 1 } }, x || {});
+  const BV = (o) => { o = o || {}; const ms = { lic_duty: { label: '인허가' }, hr_join: { label: '입사 체크리스트 지시', ready: true, uses: ['hr:', 'acct:'] }, veh_ceq31: { label: '건설기계 정기검사 지시 31일 전', ready: true } };
+    return { rules: Object.assign({ lic_duty: 'live', hr_join: 'dry', veh_ceq31: 'dry' }, o.rules || {}), since: {}, meta: {}, meta_srv: ms, updated_at: 44, assign_state: { 'hr:': 'ok', 'acct:': 'ok' }, dry: { rules: Object.assign({}, o.dry || {}) } }; };
+  const chkV4 = (src) => {
+    const b = box4(src), o = {};
+    const t1 = b.sum(SV()), t2 = b.sum(SV({ skip: 'NOT_PROMOTED', tasks: 0 })), t3 = b.sum(SV({ skip: 'NO_ROW', tasks: 0 }));
+    o.sum = /최근 30일 기준으로 켰다면 지시 1건\(사건 1\)/.test(t1) && t1.indexOf('규모 건설기계 3대(전체 12대) · 오늘 31일 남은 건설기계 1대') > 0 && t1.indexOf('인사 근거') < 0
+      && t2 === '차량 근거가 승격 전이라 쉬는 중입니다(그동안 30일 전 지시가 그대로 나갑니다) · 규모 건설기계 3대(전체 12대) · 오늘 31일 남은 건설기계 1대.'
+      && t3.indexOf('승격된 차량 근거에 31일 전 기준 행이 없어 쉬는 중') === 0 && !/ceq|NOT_PROMOTED|NO_ROW|ref\./.test(t1 + t2 + t3);
+    // 검토 시험 2: 운영 꼴 = 규모 채운 차 0대(전체 52대) — '0대'가 숨지 않음 · 검토 권고 4: 요약 win 0 = '오늘 실행에 지시 n건'
+    const t0 = b.sum(SV({ win: 0, tasks: 0, found: 0, events: 0, who: [], ref: { ceq_total: 52, ceq: 0, ceq_d31: 0 } })), t02 = b.sum(SV({ skip: 'NOT_PROMOTED', tasks: 0, ref: { ceq_total: 52, ceq: 0, ceq_d31: 0 } }));
+    o.zero = t0.indexOf('오늘 실행에 지시 0건(사건 0)') === 0 && t0.indexOf('규모 건설기계 0대(전체 52대) · 오늘 31일 남은 건설기계 0대') > 0 && t0.indexOf('최근 30일') < 0 && t02.indexOf('규모 건설기계 0대(전체 52대)') > 0;
+    const rows = b.rows(BV({ dry: { veh_ceq31: SV(), hr_join: SV({ ref: {} }) } }));
+    const rv = rows.find((r) => r.id === 'autotask:veh_ceq31:live'), rh = rows.find((r) => r.id === 'autotask:hr_join:live');
+    o.live = !!rv && !rv.block && rv.why.indexOf('(켠 날부터 평일마다 그날 31일 남은 건설기계마다 — 31일째가 주말이면 30일 전 지시로 · 관리자 접속 때 만드는 30일 전 지시는 그대로)') > 0 && rv.why.indexOf('매일') < 0 && rv.why.indexOf('켠 뒤에 생긴 일만') < 0 && rv.why.indexOf('[ㄱ]을 누르면 바로 켜지고') >= 0
+      && !!rh && rh.why.indexOf('(켠 뒤에 생긴 일만 — 지난 일 소급 없음)') > 0;
+    // 검토 권고 5: 미승격·행 없음 = 계획대로 쉬는 중 — 막힘 글·추천이 까닭별(다음 집계로 안 풀림) · 다른 건너뜀은 종전 글
+    const rowOf = (sk) => box4(src).rows(BV({ dry: { veh_ceq31: SV({ skip: sk, tasks: 0 }) } })).find((r) => r.id === 'autotask:veh_ceq31:live') || {};
+    const rNP = rowOf('NOT_PROMOTED'), rNR = rowOf('NO_ROW'), rER = rowOf('ERROR');
+    o.skipRow = rNP.block === '차량 근거 승격 뒤에 정해 주세요' && rNP.recTxt === '그대로(근거 승격 뒤)' && rNR.block === '차량 근거에 31일 전 기준 행이 들어간 뒤 정해 주세요' && rNR.recTxt === '그대로(근거 행 뒤)'
+      && rER.block === '이번 연습 집계를 하지 못했습니다 — 다음 집계 뒤에 정해 주세요' && rER.recTxt === '그대로(다음 집계 뒤)' && !/NOT_PROMOTED|NO_ROW/.test(JSON.stringify([rNP.block, rNP.recTxt, rNR.block, rNR.recTxt]));
+    const b2 = box4(src); b2.rows(BV({ dry: { veh_ceq31: { mode: 'dry', ready: false } } })); const e = { innerHTML: '', querySelectorAll: () => [] }; b2.card(e);
+    const tx = e.innerHTML.replace(/<[^>]+>/g, ' '); const iV = tx.indexOf('건설기계 정기검사 지시 31일 전');
+    o.stale = iV >= 0 && tx.slice(iV).indexOf('아직 연습 집계가 없습니다(다음 평일 08:10 정기업무 봇 뒤에 보입니다).') > 0 && tx.slice(iV).indexOf('준비 중 — 계산') < 0;
+    o.ok = Object.values(o).every((v) => v === true); return o;
+  };
+  const RV4 = chkV4();
+  T('C185 판4 ② 콘솔 글(실행 — 실제 evrSumTxt·evrLiveRow·evrCardRender · 검토 반영: 0대(전체 52대) 글 · win 0 = 오늘 실행에 · 켜기 줄 평일마다 · 미승격·행 없음 막힘 글·추천 까닭별): 연습 요약 = 지시 n건 + "규모 건설기계 n대(전체 n대) · 오늘 31일 남은 건설기계 n대"(인사 근거 글 없음) · 미승격·행 없음 = 쉬는 까닭 + 같은 참고 수(내부 이름 0) · 켜기 줄 = "(켠 날부터 평일마다 그날 31일 남은 건설기계마다 — 31일째가 주말이면 30일 전 지시로 · 관리자 접속 때 만드는 30일 전 지시는 그대로)"(입사 줄은 종전 글) · 준비된 규칙의 낡은 요약 = "아직 연습 집계가 없습니다(…)"',
+    RV4.ok, JSON.stringify(RV4));
+  const mutV4 = (from, to) => { if (html.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); return html.replace(from, () => to); };
+  const MV4 = [['    if (s.skip && ceqTxt) return', '    if (false) return'], ['    if (ceqTxt) p.push(ceqTxt);', ''], ['    if (EVR_LIVE_NOTE[k]) row.why = row.why.replace(', '    if (false) row.why = row.why.replace('],
+    ['NOT_PROMOTED: "차량 근거가 승격 전이라 쉬는 중입니다(그동안 30일 전 지시가 그대로 나갑니다)", ', ''],
+    ['var ceqTxt = (s.ref && s.ref.ceq_total !== undefined) ?', 'var ceqTxt = (s.ref && s.ref.ceq) ?'],   // 검토 h5: 0대가 숨음
+    ['    else if (!row.block && skipped && EVR_SKIP_BLOCK[s.skip]) row.block = EVR_SKIP_BLOCK[s.skip];', ''], ['(skipped ? (EVR_SKIP_REC[s.skip] || "그대로(다음 집계 뒤)")', '(skipped ? ("그대로(다음 집계 뒤)")']];
+  const kV4 = MV4.map(([a, b]) => { try { return chkV4(mutV4(a, b)).ok; } catch (e) { return 'err ' + e.message; } });
+  T('C185 판4 ② 결함 사본 ' + kV4.length + '개(건너뛸 때 참고 수 걷음 · 연습 참고 수 걷음 · 켜기 줄 규칙별 글 걷음 · 미승격 글 걷음 · 0대 숨김 · 까닭별 막힘 글 걷음 · 까닭별 추천 걷음) = 모두 ✗', kV4.every((v) => v === false), JSON.stringify(kV4));
+} catch (e) { console.log('  (C185 판4 검사 생략 — ' + e.message + ')'); fails++; }
+
+
+// ---- C185 판5 ⑤ 현장 실적 신고 — 화면: 앱 csOnDone이 만드는 실적신고 할 일에 con_ref(서버 제외 판정이 읽는 칸 — ⓓ 11 · 검토 8) · 콘솔 글(참고 수·켜기 줄 규칙별 글·낡은 요약)
+try {
+  const fnK5 = (name, src) => { src = src || html; const i = src.indexOf('function ' + name + '('); if (i < 0 || src.indexOf('function ' + name + '(', i + 1) >= 0) throw new Error('함수 없음·둘: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('함수 끝 없음: ' + name); };
+  const stK5 = (re, src) => { const m = (src || html).match(re); if (!m) throw new Error('문장 없음: ' + re); return m[0]; };
+  // ① 실제 csOnDone(+ csNextFeb15) — 계약 종결 = 할 일 1건 · con_ref = 계약 id · 기한 = 다음 2/15 · 같은 제목 열림이면 안 만듦
+  const boxC5 = () => new Function([
+    'var tasks = [], saved = 0; function todayStr(){ return "2026-11-20"; } function genId(){ return "tX"; } function csSiteDone(){} function csSiteKindOf(){ return "asbestos"; } function csTitle(c){ return c.label; }',
+    'function saveTasksCache(){} function scheduleTasksSave(){ saved++; } function scheduleContractSave(){}',
+    'function memberName(){ return ""; } function myName(){ return ""; } function myId(){ return ""; }',   // 운영 v508 뒤 csOnDone이 담당·보낸 사람 칸을 채움 — 이 시험은 con_ref·기한만 봄
+    fnK5('csNextFeb15'), fnK5('csOnDone'), fnK5('csDetId'), fnK5('csDetKeep'), 'return { run: function(c){ csOnDone(c); return tasks; } };'].join('\n'))();   // C222: csOnDone이 할 일 번호를 csDetId로 지음
+  const cTask = boxC5().run({ id: 'cK1', scen: 'x', status: 'done', label: '가짜 계약' });
+  const conRefOk = cTask.length === 1 && cTask[0].con_ref === 'cK1' && cTask[0].due === '2027-02-15' && /^실적신고\(2\/15\)/.test(cTask[0].title);
+  T('C185 판5 ① 앱 csOnDone(실행 — 실제 함수): 계약 종결 = 실적신고(2/15) 할 일 1건 · con_ref = 계약 id(서버 실적 신고 지시가 이 칸으로 그 현장을 뺌) · 기한 = 다음 2/15 — 이 판은 csOnDone을 고치지 않음', conRefOk, JSON.stringify(cTask.map((t) => [t.con_ref, t.due])));
+  // ② 콘솔 글
+  const FN5k = ['esc', 'pmconPlan', 'pmconRowsAutotask', 'pmconLicWhy', 'evrSeen', 'evrIds', 'evrMd', 'evrSumTxt', 'evrLiveRow', 'evrRows', 'evrCardRender', 'evrCardSet'];
+  const boxK5 = (src) => new Function([
+    'var pmconSeq = 1, pmconState = { canWrite: true, base: 555 }, calls = [], toasts = [];',
+    'function todayStr(){ return "2026-11-20"; } function memberName(id){ return ""; } function apprToastShow(m){ toasts.push(m); } function renderPmcon(){}',
+    'var confirm = function(){ return true; }, alert = function(m){ toasts.push("alert:" + m); }; function gwCall(fn, b){ calls.push(b); return Promise.resolve({ status: 200, body: {} }); }',
+    [/var EVR_STOP = \{[^}]+\};/, /EVR_STOP\.TEXT_LONG = "[^"]+";/, /var EVR_SKIP = \{[^}]+\};/, /var evrLast = null, evrCardBusy = false;/, /var AUTO_RULE_ORDER = \[[^\]]+\];/, /var PMCON_PLAN = \{[^\n]+\};/].map((re) => stK5(re, src)).join('\n'),
+    FN5k.map((n) => fnK5(n, src)).join('\n'),
+    'return { rows: pmconRowsAutotask, card: evrCardRender, sum: evrSumTxt };'].join('\n'))();
+  const SK = (x, r) => Object.assign({ mode: 'dry', ready: true, win: 0, events: 0, found: 0, tasks: 0, who: [], no_who: 0, no_due: 0, old: 0, gone: 0, marked: 0, no_row: [], skip: '', ref: Object.assign({ ks_win: 0, ks_done: 7, ks_numbered: 2, ks_task: 2, ks_target: 3, ks_no_end: 1, ks_preview: 4 }, r || {}) }, x || {});
+  const BK5 = (o) => { o = o || {}; const ms = { lic_duty: { label: '인허가' }, ks_report: { label: '현장 실적 신고 지시', ready: true, uses: ['ks:'] } };
+    return { rules: Object.assign({ lic_duty: 'live', ks_report: 'dry' }, o.rules || {}), since: {}, meta: {}, meta_srv: ms, updated_at: 44, assign_state: o.ast || { 'ks:': 'ok' }, dry: { rules: Object.assign({}, o.dry || {}) } }; };
+  const chkK5 = (src) => {
+    const b = boxK5(src), o = {};
+    const t1 = b.sum(SK()), t2 = b.sum(SK({ tasks: 1, events: 1, found: 1, who: [{ id: 'u1', n: 1 }] }, { ks_win: 1, ks_no_end: 0 }));
+    o.sum = t1.indexOf('기간 전(1/15~2/15) · 지난해 끝난 현장 7곳(번호 있음 2 · 계약별 할 일 있음 2) → 지금 세면 대상 3곳 · 끝난 날이 빈 종결 1곳(세지 않음) · 미리 보기: 올해 끝난 현장으로 세면 4곳') > 0
+      && t2.indexOf('기간 안 · 지난해 끝난 현장 7곳') > 0 && t2.indexOf('끝난 날이 빈') < 0 && !/ks_|ks:|con_ref/.test(t1 + t2)
+      && t1.indexOf('오늘 실행에 지시 0건(사건 0)') === 0 && t1.indexOf('최근 30일') < 0;   // 서버 요약 win 0(날짜 상태 규칙 — 판4 검토 권고 4와 같은 갈래)
+    const rv = b.rows(BK5({ dry: { ks_report: SK({ tasks: 1, events: 1, found: 1, who: [{ id: 'u1', n: 1 }] }) } })).find((r) => r.id === 'autotask:ks_report:live');
+    const rb = b.rows(BK5({ ast: { 'ks:': 'empty' }, dry: { ks_report: SK() } })).find((r) => r.id === 'autotask:ks_report:live');
+    o.live = !!rv && !rv.block && rv.why.indexOf('(기간 1/15~2/15 안이면 켠 다음 실행에 지난해 끝난 현장 묶음 1건 — 켠 시각과 견주지 않음 · 계약별 실적신고 할 일이 있는 현장은 뺌)') > 0 && rv.why.indexOf('켠 뒤에 생긴 일만') < 0
+      && !!rb && rb.block === '배정표 담당을 먼저 정해 주세요' && rb.nocount === true && rb.card === 'assignCard';   // 배정표 가드(uses ks:) — 입·퇴사와 같은 줄
+    const b2 = boxK5(src); b2.rows(BK5({ dry: { ks_report: { mode: 'dry', ready: false } } })); const e = { innerHTML: '', querySelectorAll: () => [] }; b2.card(e);
+    const tx = e.innerHTML.replace(/<[^>]+>/g, ' '), iK = tx.indexOf('현장 실적 신고 지시');
+    o.stale = iK >= 0 && tx.slice(iK).indexOf('아직 연습 집계가 없습니다(다음 평일 08:10 정기업무 봇 뒤에 보입니다).') > 0;
+    // 켜진 뒤 남은 옛 '준비 중' 요약 = 판3 좁은 재확인 글('켠 뒤 첫 집계 전')
+    const b3 = boxK5(src); b3.rows(BK5({ rules: { ks_report: 'live' }, dry: { ks_report: { mode: 'dry', ready: false } } })); const e3 = { innerHTML: '', querySelectorAll: () => [] }; b3.card(e3);
+    const tx3 = e3.innerHTML.replace(/<[^>]+>/g, ' '), iK3 = tx3.indexOf('현장 실적 신고 지시');
+    o.staleLive = iK3 >= 0 && tx3.slice(iK3).indexOf('켠 뒤 첫 집계 전(') > 0 && tx3.slice(iK3).indexOf('아직 연습 집계가 없습니다') < 0;
+    o.ok = Object.values(o).every((v) => v === true); return o;
+  };
+  const RK5 = chkK5();
+  T('C185 판5 ② 콘솔 글(실행 — 실제 evrSumTxt·evrLiveRow·evrCardRender): 기간 전·안 · 지난해 끝난 현장 n곳(번호 있음 · 계약별 할 일 있음) → 지금 세면 대상 n곳 · 끝난 날 빈 종결 수 · 미리 보기(올해 끝난 현장) · 켜기 줄 규칙별 글 · 배정표 "현장 실적 신고" 빈칸 = 막힘(담당 먼저 · 셈 빠짐) · 낡은 요약 = "아직 연습 집계가 없습니다(…)" · 내부 칸 이름 0',
+    RK5.ok, JSON.stringify(RK5));
+  const mutK5u = (from, to) => { if (html.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); return html.replace(from, () => to); };
+  const MK5 = [['    if (rf.ks_win !== undefined) p.push(', '    if (false) p.push('], ['    EVR_LIVE_NOTE.ks_report = "', '    EVR_LIVE_NOTE.ks_report_x = "']];
+  const kK5 = MK5.map(([a, b]) => { try { return chkK5(mutK5u(a, b)).ok; } catch (e) { return 'err ' + e.message; } });
+  T('C185 판5 ② 결함 사본 ' + kK5.length + '개(참고 수 글 걷음 · 켜기 줄 규칙별 글 걷음) = 모두 ✗', kK5.every((v) => v === false), JSON.stringify(kK5));
+} catch (e) { console.log('  (C185 판5 검사 생략 — ' + e.message + ')'); fails++; }
+
+
+// ── v523(C185 판3 — 퇴사 자동 지시 · 원장 C185): 실행 검사는 위 'C185 판3' 블록 · 여기는 문서·판 번호 정확 검사 + 고정 글 14줄(실행 검사가 못 지키는 고침 줄 — 빼면 ✗)
+try {
+  const rd523 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D523 = { ft: rd523('FEATURES.md'), tl: rd523('TESTLIST.md'), sw: rd523('sw.js'), man: rd523('MANUAL.html'), cl: rd523('CLAUDE.md'), ix: rd523('index.html') };
+  const FIX523 = ["    if (Number(rf.rejoin_mark)) p.push(\"재입사 표식이 찍힌 \" + Number(rf.rejoin_mark) + \"명(입사 쪽에서 셈)\");", "    if (rf.past12_leave !== undefined) p.push(\"참고: 지난 12개월 퇴사 \" + (Number(rf.past12_leave) || 0) + \"명(지시는 켠 뒤 퇴사일을 새로 저장한 일만 — 소급 없음)\");", "    var leaveSum = !!(s.ref && s.ref.past12_leave !== undefined);", "    if (s.old) p.push(\"켠 날보다 앞선 일이라 뺀 \" + s.old + (leaveSum ? \"명\" : \"건\"));", "      if (m.ready === true && cur !== \"off\" && s && s.ready === false) line = '<br><span style=\"color:var(--sub);\">' + (cur === \"live\" ? \"켠 뒤 첫 집계 전(다음 평일 08:10 정기업무 봇 뒤에 보입니다).\" : \"아직 연습 집계가 없습니다(다음 평일 08:10 정기업무 봇 뒤에 보입니다).\") + '</span>';", "  var hrPendOpen = null;", "    if (po == null){ drawHrRoster(); return; }", "    drawHrRoster(po);", "      hrOpenPending();", "    }).catch(function(){ if (my !== hrRosterSeq) return; if (hrPendOpen != null) hrOpenPending(); });", "    hrPendOpen = String(mid);", "alert(res.body && res.body.error_code === \"ASSIGN_NEEDED\" ? \"배정표 담당을 먼저 정해 주세요 — 이 규칙이 쓰는 배정표 줄의 담당이 비었거나 재직자가 아닙니다.\" : \"규칙 스위치 저장 실패 (\" + ((res.body && res.body.error_code) || res.status) + \")\");", "else if (res.body && res.body.error_code === \"ASSIGN_NEEDED\") alert(\"배정표 담당을 먼저 정해 주세요 — 이 규칙이 쓰는 배정표 줄의 담당이 비었거나 재직자가 아닙니다.\");", "if (res.status !== 200 && res.body && res.body.error_code === \"ASSIGN_NEEDED\"){ alert(\"배정표 담당을 먼저 정해 주세요 — 이 규칙이 쓰는 배정표 줄의 담당이 비었거나 재직자가 아닙니다.\"); renderPmcon(); return; }"];
+  const MANA523 = "(2026-11 v523) '입사·퇴사 체크리스트(인사)'·'입사·퇴사 ";
+  const chk523 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v523 (11/23)', '\n### '), tlv = cut(d.tl, '\n## v523 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`hr_leave`", "원장 C185"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = "<li><b>범위 밖 자동 지시 — 퇴사 체크리스트</b> (2026-11 v523) — 퇴사 체크리스트 지", MAN2 = "(2026-11 v523) '입사·퇴사 체크리스트(인사)'·'입사·퇴사 ";
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 523 && ftv.length > 0 && mF.length === 0 && cb.length === 9 && gate.length === 2 && scr.length === 7 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf(MAN) > 0 && !/hr_join|hr_leave|veh_ceq31|ks_report|veh_event|evrules|AUTOTASK|RULE_NOT_READY|pmcon_|handleAutotask|gwCall|ASSIGN_NEEDED|HRBG_READ|planHr|HR_JOIN|HR_LEAVE|taskHr|hrScope|assign_state|meta_srv|leave_ev|join_ev|ceq31|ksTargets|ksWindow|veh_unread|srv/.test(cut(d.man, MAN, '\n')) && d.man.indexOf(MAN2) > 0
+      && d.cl.indexOf('**C185 판3(v523') > 0
+      && FIX523.every((x) => d.ix.split(x).length === 2)
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 523;
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX523.map((x) => d.ix.split(x).length - 1) } };
+  };
+  const r523 = chk523(D523);
+  const mu523 = (k, f) => chk523(Object.assign({}, D523, { [k]: f(D523[k]) })).ok;
+  const M523 = [mu523('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v522 (')), mu523('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v522'")),
+    mu523('ft', (s) => s.split('`hr_leave`').join('hr_leave')),
+    mu523('man', (s) => s.replace('체크리스트</b> (2026-11 v523) ', '체크리스트</b> ')), mu523('man', (s) => s.replace(MANA523, '')), mu523('cl', (s) => s.replace('**C185 판3(v523', 'C185 판3(')),
+    mu523('tl', (s) => s.replace('\n- [x] (AI) `uismoke` \'C185 판3\'', '\n- (AI) `uismoke` \'C185 판3\''))]
+    .concat(FIX523.map((x) => mu523('ix', (s) => s.replace(x, ''))));
+  T('v523 문서·판 번호(정확 검사): FEATURES 기준 v523 (2026-11-23)·v523 절(C185 판3) · TESTLIST v523 칸 9(화면·운영 확인 7 · 게이트 [x] 2) · MANUAL 점검 카드 줄·배정표 문장(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 14줄 한 번씩 · sw jw-shell-v523 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL 둘·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
+    r523.ok && M523.every((v) => v === false), JSON.stringify({ r: r523.info, mut: M523 }));
+} catch (e) { console.log('  (v523 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v524(C185 판4 — 건설기계 31일 전 · 원장 C185): 실행 검사는 위 'C185 판4' 블록 · 여기는 문서·판 번호 정확 검사 + 고정 글 8줄(실행 검사가 못 지키는 고침 줄 — 빼면 ✗)
+try {
+  const rd524 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D524 = { ft: rd524('FEATURES.md'), tl: rd524('TESTLIST.md'), sw: rd524('sw.js'), man: rd524('MANUAL.html'), cl: rd524('CLAUDE.md'), ix: rd524('index.html') };
+  const FIX524 = ["NOT_PROMOTED: \"차량 근거가 승격 전이라 쉬는 중입니다(그동안 30일 전 지시가 그대로 나갑니다)\", NO_ROW: \"승격된 차량 근거에 31일 전 기준 행이 없어 쉬는 중입니다(그동안 30일 전 지시가 그대로 나갑니다)\",", "    var ceqTxt = (s.ref && s.ref.ceq_total !== undefined) ? \"규모 건설기계 \" + (Number(s.ref.ceq) || 0) + \"대(전체 \" + (Number(s.ref.ceq_total) || 0) + \"대) · 오늘 31일 남은 건설기계 \" + (Number(s.ref.ceq_d31) || 0) + \"대\" : \"\";", "    if (s.skip && ceqTxt) return (EVR_STOP[s.skip] || EVR_SKIP[s.skip] || \"이번에는 세지 못했습니다\") + \" · \" + ceqTxt + \".\";", "    if (ceqTxt) p.push(ceqTxt);", "    if (EVR_LIVE_NOTE[k]) row.why = row.why.replace(\"(켠 뒤에 생긴 일만 — 지난 일 소급 없음)\", EVR_LIVE_NOTE[k]);", "    var EVR_LIVE_NOTE = { veh_ceq31: \"(켠 날부터 평일마다 그날 31일 남은 건설기계마다 — 31일째가 주말이면 30일 전 지시로 · 관리자 접속 때 만드는 30일 전 지시는 그대로)\" };", "    var EVR_SKIP_BLOCK = { NOT_PROMOTED: \"차량 근거 승격 뒤에 정해 주세요\", NO_ROW: \"차량 근거에 31일 전 기준 행이 들어간 뒤 정해 주세요\" }, EVR_SKIP_REC = { NOT_PROMOTED: \"그대로(근거 승격 뒤)\", NO_ROW: \"그대로(근거 행 뒤)\" };", "    else if (!row.block && skipped && EVR_SKIP_BLOCK[s.skip]) row.block = EVR_SKIP_BLOCK[s.skip];"];
+  const MANA524 = "(2026-11 v524) 건설기계 31일 전 지시의 담당은 '차량 만기";
+  const chk524 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v524 (11/23)', '\n### '), tlv = cut(d.tl, '\n## v524 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`veh_ceq31`", "원장 C185"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = "<li><b>범위 밖 자동 지시 — 건설기계 정기검사 31일 전</b> (2026-11 v524) — 건설기", MAN2 = "(2026-11 v524) 건설기계 31일 전 지시의 담당은 '차량 만기";
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 524 && ftv.length > 0 && mF.length === 0 && cb.length === 9 && gate.length === 2 && scr.length === 7 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf(MAN) > 0 && !/hr_join|hr_leave|veh_ceq31|ks_report|veh_event|evrules|AUTOTASK|RULE_NOT_READY|pmcon_|handleAutotask|gwCall|ASSIGN_NEEDED|HRBG_READ|planHr|HR_JOIN|HR_LEAVE|taskHr|hrScope|assign_state|meta_srv|leave_ev|join_ev|ceq31|ksTargets|ksWindow|veh_unread|srv/.test(cut(d.man, MAN, '\n')) && d.man.indexOf(MAN2) > 0
+      && d.cl.indexOf('**C185 판4(v524') > 0
+      && FIX524.every((x) => d.ix.split(x).length === 2)
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 524;
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX524.map((x) => d.ix.split(x).length - 1) } };
+  };
+  const r524 = chk524(D524);
+  const mu524 = (k, f) => chk524(Object.assign({}, D524, { [k]: f(D524[k]) })).ok;
+  const M524 = [mu524('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v523 (')), mu524('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v523'")),
+    mu524('ft', (s) => s.split('`veh_ceq31`').join('veh_ceq31')),
+    mu524('man', (s) => s.replace('전</b> (2026-11 v524) ', '전</b> ')), mu524('man', (s) => s.replace(MANA524, '')), mu524('cl', (s) => s.replace('**C185 판4(v524', 'C185 판4(')),
+    mu524('tl', (s) => s.replace('\n- [x] (AI) `uismoke` \'C185 판4\'', '\n- (AI) `uismoke` \'C185 판4\''))]
+    .concat(FIX524.map((x) => mu524('ix', (s) => s.replace(x, ''))));
+  T('v524 문서·판 번호(정확 검사): FEATURES 기준 v524 (2026-11-23)·v524 절(C185 판4) · TESTLIST v524 칸 9(화면·운영 확인 7 · 게이트 [x] 2) · MANUAL 점검 카드 줄·배정표 문장(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 8줄 한 번씩 · sw jw-shell-v524 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL 둘·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
+    r524.ok && M524.every((v) => v === false), JSON.stringify({ r: r524.info, mut: M524 }));
+} catch (e) { console.log('  (v524 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v525(C185 판5 — 현장 실적 신고 · 원장 C185): 실행 검사는 위 'C185 판5' 블록 · 여기는 문서·판 번호 정확 검사 + 고정 글 2줄(실행 검사가 못 지키는 고침 줄 — 빼면 ✗)
+try {
+  const rd525 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D525 = { ft: rd525('FEATURES.md'), tl: rd525('TESTLIST.md'), sw: rd525('sw.js'), man: rd525('MANUAL.html'), cl: rd525('CLAUDE.md'), ix: rd525('index.html') };
+  const FIX525 = ["    if (rf.ks_win !== undefined) p.push((Number(rf.ks_win) ? \"기간 안\" : \"기간 전(1/15~2/15)\") + \" · 지난해 끝난 현장 \" + (Number(rf.ks_done) || 0) + \"곳(번호 있음 \" + (Number(rf.ks_numbered) || 0) + \" · 계약별 할 일 있음 \" + (Number(rf.ks_task) || 0) + \") → 지금 세면 대상 \" + (Number(rf.ks_target) || 0) + \"곳\" + (Number(rf.ks_no_end) ? \" · 끝난 날이 빈 종결 \" + Number(rf.ks_no_end) + \"곳(세지 않음)\" : \"\") + \" · 미리 보기: 올해 끝난 현장으로 세면 \" + (Number(rf.ks_preview) || 0) + \"곳\");", "    EVR_LIVE_NOTE.ks_report = \"(기간 1/15~2/15 안이면 켠 다음 실행에 지난해 끝난 현장 묶음 1건 — 켠 시각과 견주지 않음 · 계약별 실적신고 할 일이 있는 현장은 뺌)\";"];
+  const MANA525 = "(2026-11 v525) 현장 실적 신고 지시의 담당은 '현장 실적 신";
+  const chk525 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v525 (11/23)', '\n### '), tlv = cut(d.tl, '\n## v525 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`ks_report`", "원장 C185"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = "<li><b>범위 밖 자동 지시 — 현장 실적 신고</b> (2026-11 v525) — 현장 실적 신고 지", MAN2 = "(2026-11 v525) 현장 실적 신고 지시의 담당은 '현장 실적 신";
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 525 && ftv.length > 0 && mF.length === 0 && cb.length === 9 && gate.length === 2 && scr.length === 7 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf(MAN) > 0 && !/hr_join|hr_leave|veh_ceq31|ks_report|veh_event|evrules|AUTOTASK|RULE_NOT_READY|pmcon_|handleAutotask|gwCall|ASSIGN_NEEDED|HRBG_READ|planHr|HR_JOIN|HR_LEAVE|taskHr|hrScope|assign_state|meta_srv|leave_ev|join_ev|ceq31|ksTargets|ksWindow|veh_unread|srv/.test(cut(d.man, MAN, '\n')) && d.man.indexOf(MAN2) > 0
+      && d.cl.indexOf('**C185 판5(v525') > 0
+      && FIX525.every((x) => d.ix.split(x).length === 2)
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 525;
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX525.map((x) => d.ix.split(x).length - 1) } };
+  };
+  const r525 = chk525(D525);
+  const mu525 = (k, f) => chk525(Object.assign({}, D525, { [k]: f(D525[k]) })).ok;
+  const M525 = [mu525('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v524 (')), mu525('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v524'")),
+    mu525('ft', (s) => s.split('`ks_report`').join('ks_report')),
+    mu525('man', (s) => s.replace('신고</b> (2026-11 v525) ', '신고</b> ')), mu525('man', (s) => s.replace(MANA525, '')), mu525('cl', (s) => s.replace('**C185 판5(v525', 'C185 판5(')),
+    mu525('tl', (s) => s.replace('\n- [x] (AI) `uismoke` \'C185 판5\'', '\n- (AI) `uismoke` \'C185 판5\''))]
+    .concat(FIX525.map((x) => mu525('ix', (s) => s.replace(x, ''))));
+  T('v525 문서·판 번호(정확 검사): FEATURES 기준 v525 (2026-11-23)·v525 절(C185 판5) · TESTLIST v525 칸 9(화면·운영 확인 7 · 게이트 [x] 2) · MANUAL 점검 카드 줄·배정표 문장(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 2줄 한 번씩 · sw jw-shell-v525 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL 둘·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
+    r525.ok && M525.every((v) => v === false), JSON.stringify({ r: r525.info, mut: M525 }));
+} catch (e) { console.log('  (v525 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v526(C222 — 넘김이 만드는 지시·할 일·기성 줄 번호를 정해진 꼴로 · 원장 C222): 실행 검사는 위 'C222' 블록 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd526 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D526 = { ft: rd526('FEATURES.md'), tl: rd526('TESTLIST.md'), sw: rd526('sw.js'), man: rd526('MANUAL.html'), cl: rd526('CLAUDE.md') };
+  const chk526 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v526 (11/23)', '\n### '), tlv = cut(d.tl, '\n## v526 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`csDetId`", "원장 C222"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 526 && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 2 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C222(v526') > 0
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 526;   // v527(급여 백업 암호화)에서 '526 이상'으로 풂
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r526 = chk526(D526);
+  const mu526 = (k, f) => chk526(Object.assign({}, D526, { [k]: f(D526[k]) })).ok;
+  const M526 = [mu526('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v525 (')), mu526('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v525'")),
+    mu526('ft', (s) => s.split('`csDetId`').join('csDetId')),
+    mu526('cl', (s) => s.replace('**C222(v526', 'C222(')),
+    mu526('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v525 0227e3b 위 · ffdfaad + a499e58) uismoke ✓ 952 · servertest 1489 · 14종 0(consheet 포함) · node --check 105 · 인라인 파싱 오류 0 · paycalc_check 10 · autorulestest 9 · 바꾼 3파일 CR 0 — ✓ AI 11/23', '\n- (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v525 0227e3b 위 · ffdfaad + a499e58) uismoke ✓ 952 · servertest 1489 · 14종 0(consheet 포함) · node --check 105 · 인라인 파싱 오류 0 · paycalc_check 10 · autorulestest 9 · 바꾼 3파일 CR 0 — ✓ AI 11/23'))];
+  T('v526 문서·판 번호(정확 검사): FEATURES 기준 v526 (2026-11-23)·v526 절(C222) · TESTLIST v526 칸 6(화면·운영 확인 4 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v526 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
+    r526.ok && M526.every((v) => v === false), JSON.stringify({ r: r526.info, mut: M526 }));
+} catch (e) { console.log('  (v526 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v527(66 급여 백업 암호화 — PM 11/24 'ㄱ'): 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '527 이상'으로 풀 것
+try {
+  const rdS = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DS = { ft: rdS('FEATURES.md'), tl: rdS('TESTLIST.md'), sw: rdS('sw.js'), cl: rdS('CLAUDE.md') };
+  const chkS = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v527 (11/24)', '\n### '), tlv = cut(d.tl, '\n## v527 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l));
+    const FT = ['`_lib/sealbox.js`', '`PAY_BACKUP_KEY`', '`pay_held`', '`PAY_BACKUP_KEY_MISSING`', '`PAY_BAD_SEAL`', '`PAY_KID_MISMATCH`'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 527 && mF.length === 0 && cb.length === 4 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 527 && d.cl.indexOf('- **66 급여 백업 암호화(v527)**') > 0;
+    return { ok, info: { mF, cb: cb.length } };
+  };
+  const rS = chkS(DS);
+  const muS = (k, f) => chkS(Object.assign({}, DS, { [k]: f(DS[k]) })).ok;
+  const MS = [muS('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v526 (')), muS('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v526'")), muS('ft', (s) => s.split('`PAY_BAD_SEAL`').join('PAY_BAD_SEAL')), muS('cl', (s) => s.replace('- **66 급여 백업 암호화(', '- 66 급여 백업 암호화('))];
+  T('v527 문서·판 번호(정확 검사): FEATURES 기준 v527 (2026-11-24)·v527 절(sealbox·PAY_BACKUP_KEY·pay_held·오류 코드 3) · TESTLIST v527 칸 4 · sw v527 · CLAUDE.md 한 줄 · 결함 사본 ' + MS.length + '개 = 모두 ✗', rS.ok && MS.every((v) => v === false), JSON.stringify({ r: rS.info, mut: MS }));
+} catch (e) { console.log('  (v527 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── 66 급여 판3(PM 11/24 'ㄱ'): 회계사무소 대장(.xls·.xlsx) 읽기·대조·기준 채우기·엑셀 내려받기·명세서 — 가짜 대장 tools/pay_ledger_fixture.xls(Excel 로 만든 BIFF8 · 가짜 이름·금액)
+try {
+  const fnR = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) return ''; let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } return ''; };
+  const segR = (H) => { const a = H.indexOf('\n  // @pay-start\n'), b = H.indexOf('\n  // @pay-end\n'); return a > 0 && b > a ? H.slice(a, b) : ''; };
+  const escR = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const XLS = readFileSync(join(ROOT, 'tools', 'pay_ledger_fixture.xls'));
+  const runR = (H) => {
+    const seg = segR(H), v = (n) => { const m = new RegExp('\\n  var ' + n + ' = [^\\n]*').exec(seg); return m ? m[0] : ''; };
+    const cap = {};
+    const f = new Function('esc', 'gwCall', 'alert', 'confirm', 'downloadBlob', 'buildSimpleXlsx', 'payLoad', 'payDlgClose',
+      'var cap = {};' + v('payS') + v('PAY_CORP') + v('PAY_LEDGER_COLS') + '\n' + ['payXlsSheets', 'payLedgerParse', 'payImportShow', 'payExportXlsx', 'paySlipHtml', 'payWon', 'payFld', 'payNum'].map((n) => fnR(H, n)).join('\n')
+      + '\nfunction payDlg(t, h, onSave){ cap.title = t; cap.html = h; cap.save = onSave; return {}; }\nreturn { payXlsSheets: payXlsSheets, payLedgerParse: payLedgerParse, payImportShow: payImportShow, payExportXlsx: payExportXlsx, paySlipHtml: paySlipHtml, set: function(d, c){ payS.data = d; payS.corp = c; }, cap: cap };'
+    )(escR, () => Promise.resolve({ status: 200, body: {} }), () => {}, () => true, (name, rows) => { cap.dl = { name: name, rows: rows }; }, (sn, rows) => rows, () => {}, () => {});
+    // f 안의 cap 은 바깥 cap 과 같은 객체가 아니므로(Function 범위) 반환값의 cap 을 쓴다
+    const I = {};
+    const books = f.payLedgerParse(f.payXlsSheets(XLS.buffer.slice(XLS.byteOffset, XLS.byteOffset + XLS.byteLength)));
+    const con = books.filter((b) => b.corp === 'con')[0], env = books.filter((b) => b.corp === 'env')[0];
+    const p1 = con && con.people[0], p2 = env && env.people[0], p3 = env && env.people[1];
+    I.read = books.length === 2 && con.people.length === 1 && env.people.length === 2 && p1.name === '가짜일' && p1.v.taxable === 3100000 && p1.v.gross === 3300000 && p1.v.net === 2905440 && p1.v.ded_total === 394560 && !('adj' in p1.v)
+      && p2.v.adj === 150728 && p2.v.taxable === 2750728 && p2.v.net === 2626258 && p3.name === '가짜삼' && p3.no === '신규입사' && p3.v.meal === 140000;
+    // 대조: 가짜이는 국민연금만 10원 다름 · 가짜삼은 기준 없음(채우기 대상) · 앱에만 있는 사람 1
+    const C = (o) => Object.assign({ cols: { base: 2600000, allow: 0, adj: 150728, bonus: 0, meal: 200000, car: 0 }, taxable: 2750728, gross: 2950728, ded: { pension: 130300, health: 98880, care: 12990, emp: 24750, income: 52310, local: 5230 }, ded_total: 324460, net: 2626268, lines: [], notes: [] }, o || {});
+    const D = { corp: 'env', ym: '2026-11', state: 'open', period: { from: '2026-10-15', to: '2026-11-14' }, pay_day: 15, rows: [
+      { mid: 'a', member: { name: '가짜 이', rank: '반장' }, state: 'ok', calc: C() }, { mid: 'b', member: { name: '가짜삼' }, state: 'no_base', base_rev: '' }, { mid: 'c', member: { name: '<b>앱만</b>' }, state: 'no_base' }] };
+    f.set(D, 'env'); f.payImportShow('가짜.xls', books);
+    const h = f.cap.html || '';
+    I.cmp = /같음 13칸 · 다름 3칸/.test(h) && h.indexOf('가짜이 · 국민연금') > 0 && h.indexOf('기준이 없는 1명') > 0 && h.indexOf('&lt;b&gt;앱만') > 0 && h.indexOf('<b>앱만') < 0 && typeof f.cap.save === 'function';
+    // 엑셀: 머리 두 줄 + 사람 두 줄 + 합계 두 줄 · 칸 순서 = 대장
+    f.payExportXlsx(); const R = (cap.dl || {}).rows || [];
+    I.xls = R.length === 8 && R[2].join('|').indexOf('사원번호|성명|기본급|수당|초과/차감 수당|상여금|식대|자가운전보조금|4대보험적용총액|국민연금') === 0 && R[3][8] === '지급총액' && R[4][1] === '가짜 이' && R[4][16] === 2626268 && R[5][8] === 2950728 && R[6][0] === '합계' && /급여대장_종운환경_2026-11\.xlsx/.test(cap.dl.name);
+    const sl = f.paySlipHtml({ member: { name: '<i>x</i>', rank: '반장' }, calc: C({ dredge: { days: 11, paid_days: 1, ot: 2, total: 190000 } }) }, D);
+    I.slip = sl.indexOf('2,626,268원') > 0 && sl.indexOf('&lt;i&gt;x') > 0 && sl.indexOf('<i>x') < 0 && sl.indexOf('하수준설 수당: 2026-10-15 ~ 2026-11-14 근무 11일 중 추가 지급 1일') > 0;
+    return { ok: Object.values(I).every((x) => x === true), info: I };
+  };
+  const rR = (() => { try { return runR(html); } catch (e) { return { ok: false, info: String(e.message) }; } })();
+  const muR = (a, b) => { if (html.split(a).length !== 2) return 'no-site:' + a.slice(0, 40); try { return runR(html.replace(a, () => b)).ok; } catch (e) { return false; } };
+  const MR = [
+    muR('var corp = /건설/.test(above) ? "con" : "env", people = [];', 'var corp = "env", people = [];'),
+    muR('v.gross = col.taxable != null ? (num(b[col.taxable]) || 0) : 0;', 'v.gross = 0;'),
+    muR('var a = Math.round(p.v[l[0]] || 0), b = Math.round(appV(r.calc, l[0]) || 0);', 'var a = 0, b = 0;'),
+    muR('if (!r.calc){ if (r.state === "no_base") noBase.push({ p: p, r: r }); return; }', 'if (!r.calc) return;'),
+    muR("if (c.type === 0x0006){", "if (c.type === 0x9999){")
+  ];
+  T('66 판3 ① 대장 읽기·대조·내려받기·명세서(가짜 .xls — Excel 로 만든 BIFF8 · 수식 칸은 저장된 결과값): 두 시트 회사 가름(건설·환경) · 사람 두 줄·지급총액 아랫줄·초과/차감 칸 없는 시트 · 띄어 쓴 이름 붙임 · 대조 같음 13·다름 3 · 기준 없는 사람 채우기 · 앱에만 있는 이름 이스케이프 · 엑셀 칸 순서 = 대장·한 사람 두 줄·합계 · 명세서 이스케이프·하수준설 설명 · 결함 사본 ' + MR.length + '개 = 모두 ✗',
+    rR.ok && MR.every((x) => x === false), JSON.stringify({ r: rR.info, mut: MR }));
+} catch (e) { console.log('  (66 판3 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v528(66 급여 판3 — PM 11/24 'ㄱ'): 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '528 이상'으로 풀 것
+try {
+  const rdT = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DT = { ft: rdT('FEATURES.md'), tl: rdT('TESTLIST.md'), sw: rdT('sw.js'), cl: rdT('CLAUDE.md'), man: rdT('MANUAL.html') };
+  const chkT = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v528 (11/24)', '\n### '), tlv = cut(d.tl, '\n## v528 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l));
+    const FT = ['`payXlsSheets`', '`pay_base_save`', '`buildSimpleXlsx`', '`tools/pay_ledger_fixture.xls`', '70·292칸'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 528 && mF.length === 0 && cb.length === 4 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 528 && d.cl.indexOf('- **66 급여 판3(v528)**') > 0 && d.man.indexOf('<li><b>급여 대장 불러오기·내려받기·명세서</b> (2026-11 v528)') > 0;
+    return { ok, info: { mF, cb: cb.length } };
+  };
+  const rT = chkT(DT);
+  const muT = (k, f) => chkT(Object.assign({}, DT, { [k]: f(DT[k]) })).ok;
+  const MT = [muT('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v527 (')), muT('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v527'")), muT('ft', (s) => s.split('`payXlsSheets`').join('payXlsSheets')), muT('cl', (s) => s.replace('- **66 급여 판3(', '- 66 급여 판3(')), muT('man', (s) => s.replace('<li><b>급여 대장 불러오기', '<li>급여 대장 불러오기'))];
+  T('v528 문서·판 번호(정확 검사): FEATURES 기준 v528 (2026-11-24)·v528 절 · TESTLIST v528 칸 4 · sw v528 · CLAUDE.md·MANUAL 한 줄 · 결함 사본 ' + MT.length + '개 = 모두 ✗', rT.ok && MT.every((v) => v === false), JSON.stringify({ r: rT.info, mut: MT }));
+} catch (e) { console.log('  (v528 검사 생략 — ' + e.message + ')'); fails++; }
+// ── P1 판38(원장 C166 · 착수 ㄱ C191 — PM 11/19 · 착수 브리핑 '건 1') 차량 법정 검사 만기 제안의 기산 — 직전 확정 회차에서 한 회씩 이어 세기 + 수검일·검사 신청일·연장(유예) 만료일 칸
+//   실행: 실제 @veh-law 구간 + 실제 openVehModal·saveVehFromModal + 실제 @veh-due 구간(toggleTaskDone·vehDueAsk·vehDueOk) + 실제 mergeVeh(imMerge 부품째)를 가짜 document 위에서(그리기·저장을 빈 함수로 바꾸지 않음 — 저장 뒤 차량 줄을 그대로 읽어 봄)
+//   기대값 = 원문 대조 보고 09_조사_문서/차량검사기산_자료_20261114/기산_대조_20261115.md 4절 사례 1~5(주기는 그 보고의 가정값 = 시험 근거 행 · 가짜) · 기간 일수 = 시험 근거 행 칸(시행규칙 77조② 전 90·후 31 · 건설기계관리법 시행규칙 23조① 전후 31과 같은 수)
+//   '수검일 기록 없는 차 = 종전 결과': 운영 v497(624fa1c)의 @veh-law 구간으로 같은 표본·같은 근거 행을 계산한 결과(제안 글 + 칸·펼침 칩 HTML)의 sha256 앞 16자와 같아야 함
+try {
+  const f38 = (src, name) => { const i = src.search(new RegExp('\\n  function ' + name + '\\(')); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i + 1; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i + 1, j + 1); } } throw new Error('중괄호 짝: ' + name); };
+  const b38 = (src, a, z) => { const i = src.indexOf(a), j = src.indexOf(z); if (i < 0 || j < i || src.indexOf(a, i + 1) >= 0) throw new Error('구간 없음·둘: ' + a); return src.slice(i, j); };
+  const clo38 = (src, roots, own) => {   // 뿌리 함수에서 부르는 최상위 함수를 모두(병합 부품 — own 은 이 검사가 대신 둠)
+    const all = new Set([...src.matchAll(/\n  function ([A-Za-z_$][\w$]*)\(/g)].map((m) => m[1])), got = new Map(), q = roots.slice();
+    while (q.length) { const n = q.shift(); if (got.has(n) || own[n] || !all.has(n)) continue; const b = f38(src, n); got.set(n, b); for (const m of b.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g)) if (!got.has(m[1])) q.push(m[1]); }
+    return [...got.values()].join('\n');
+  };
+  const WP38 = { win_before: 90, win_after: 31, win_basis: 'pass' }, WA38 = { win_before: 31, win_after: 31, win_basis: 'apply' }, C38 = [{ law: '시험법', art: '별표' }];
+  const RW38 = [
+    Object.assign({ id: 't38.m24', grade: '실측', cites: C38, cls: 'car', size: ['중형 화물'], every_m: 24, first_adj_days: -1, day_max: 28 }, WP38),
+    Object.assign({ id: 't38.m12', grade: '실측', cites: C38, cls: 'car', size: ['대형 화물'], every_m: 12, first_adj_days: -1, day_max: 28, age_max: 5, interp: '차령' }, WP38),
+    Object.assign({ id: 't38.m12b', grade: '실측', cites: C38, cls: 'car', size: ['대형 화물'], every_m: 6, first_adj_days: -1, day_max: 28, age_min: 5, interp: '차령' }, WP38),
+    Object.assign({ id: 't38.m6', grade: '실측', cites: C38, cls: 'car', size: ['소형 화물'], every_m: 6, first_adj_days: -1, day_max: 28 }, WP38),
+    Object.assign({ id: 't38.c12', grade: '실측', cites: C38, cls: 'ceq', ceq_kind: ['덤프트럭'], every_m: 12, first_adj_days: -1, day_max: 28 }, WA38)];
+  // 근거 표 옛 판(기간 칸 없음) · 시안 ① 예(예시 주기 1년) · 표본 g8·g9 = 운영 52대 꼴(속성 빔) · g10 = 판27 기록(수검일 칸 없음)
+  const OLD38 = RW38.map((r) => { const x = Object.assign({}, r); delete x.win_before; delete x.win_after; delete x.win_basis; return x; });
+  const RMK38 = [Object.assign({ id: 't38.y1', grade: '실측', cites: C38, cls: 'car', size: ['대형 화물'], every_m: 12, first_adj_days: -1, day_max: 28 }, WP38)];
+  const SMP38 = [
+    { id: 'g1', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2020-03-10', insp_due: '2026-09-09' }, { id: 'g2', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2020-03-10', insp_due: '2026-10-22' },
+    { id: 'g3', state: '운행', biz: '비사업용', size: '중형 화물', reg_date: '2022-05-10', insp_due: '2026-01-05' }, { id: 'g4', state: '운행', biz: '사업용', size: '소형 화물', reg_date: '2019-01-28', insp_due: '2026-07-27' },
+    { id: 'g5', state: '운행', biz: '사업용', size: '소형 화물', reg_date: '2024-08-31', insp_due: '2026-02-28' }, { id: 'g6', state: '운행', biz: '사업용', size: '건설기계', ceq_kind: '덤프트럭', ceq_year: '2016', reg_date: '2016-07-01', insp_due: '2026-06-30' },
+    { id: 'g7', state: '매각', biz: '사업용', size: '대형 화물', reg_date: '2020-03-10', insp_due: '2026-09-09' },
+    { id: 'g8', no: '00가0008', kind: '', driver: '', insp_due: '2026-09-28', ins_due: '2026-09-24', state: '운행', insurer: '시험보험', note: '', updated: '2026-10-01' },
+    { id: 'g9', no: '00가0009', driver: '', insp_due: '2027-01-15', state: '정비', insurer: '', note: '' },
+    { id: 'g10', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2021-03-02', insp_due: '2027-04-23', insp_log: [{ at: '2026-11-13', prev: '2026-03-01', confirmed: '2027-04-23', proposed: '2027-03-01', rule: 't38.m12', diff: 53, by: 'u1', src: 'edit' }] },
+    { id: 'g11', state: '운행', biz: '사업용', size: '건설기계', ceq_kind: '덤프트럭', ceq_year: '2014', reg_date: '2014-06-10', insp_due: '2027-02-01' }, { id: 'g12', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2018-03-10', insp_due: '2026-10-20' }];
+  const GOLD38 = { sh: 'ok/2026-09-09/0/t38.m12b,ok/2026-09-09/43/t38.m12b,ok/2026-05-09/-124/t38.m24,ok/2026-07-27/0/t38.m6,none///day,ok/2026-06-30/0/t38.c12,na///,none///사업용 여부·규모·최초등록일,none///사업용 여부·규모·최초등록일,ok/2027-03-01/53/t38.m12,ok/2027-06-09/-128/t38.c12,ok/2026-09-09/41/t38.m12b', hash: 'fe96f1bc3c171b51' };
+  const sh38 = (r) => r ? [r.st, r.date || '', r.diff === undefined ? '' : String(r.diff), r.rule || (r.miss || []).join('·') || r.why || (r.bad || []).join('·') || ''].join('/') : 'null';
+  const T38 = '2026-11-19';
+  // ⑰ 불변식 표본 수(실제 코드·결함 사본 모두 3000 — 결과 수를 고정해 비교)
+  let INV38 = 3000;
+  const run38 = (src, gsrc) => {
+    const R = {}, els = {};
+    const el = (id) => { if (!els[id]) { const cls = new Set(); els[id] = { id, value: '', textContent: '', innerHTML: '', disabled: false, placeholder: '', style: {}, classList: { add: (c) => cls.add(c), remove: (c) => cls.delete(c), contains: (c) => cls.has(c) }, addEventListener() {}, focus() {} }; } return els[id]; };
+    const E = { vehicles: [], tasks: [], sent: [], calls: [], gw: null };
+    const cols = (src.match(/var VEH_COLS = \[[\s\S]*?\n  \];/) || [''])[0];
+    if (!cols) throw new Error('VEH_COLS 없음');
+    const pre = [f38(src, 'esc'), f38(src, 'isDate'), f38(src, 'isGreyState'), cols, f38(src, 'openVehModal'), f38(src, 'closeVehModal'), f38(src, 'saveVehFromModal'), f38(src, 'toggleTaskDone'),
+      f38(src, 'imSt'), f38(src, 'imBaseSet'), f38(src, 'imBaseAdvance'), f38(src, 'mgCopy'), f38(src, 'vehLogUnion'), f38(src, 'vehLogClash'),
+      'var vehicles = E.vehicles, tasks = E.tasks, editingVehId = null, vehDetTab = "ov";',
+      'function todayStr(){ return "' + T38 + '"; } function myId(){ return "u1"; } function myName(){ return "시험"; } function canDo(m){ return true; } function canSee(m){ return m !== "stmt"; } function isAdmin(){ return false; } function canActTask(t){ return true; }',
+      'function findVeh(id){ for (var i = 0; i < vehicles.length; i++){ if (vehicles[i].id === id) return vehicles[i]; } return null; } function liveVehicles(){ return vehicles.filter(function(v){ return v && v.del !== 1; }); }',
+      'function findTask(id){ for (var i = 0; i < tasks.length; i++){ if (tasks[i].id === id) return tasks[i]; } return null; }',
+      'function genId(p){ return p + "new"; } function alert(m){ E.calls.push("alert:" + m); } function confirm(m){ return true; } function saveVehiclesCache(){} function renderVehicles(){} function renderDashboard(){} function scheduleVehSave(){}',
+      'function apprToastShow(m){ (E.toasts = E.toasts || []).push(m); } function pushNotify(){} function saveTasksCache(){} function renderTasks(){} function renderSummary(){} function scheduleTasksSave(){}',
+      'function syncP(v){ return { then: function(f){ return syncP(f ? f(v) : v); }, catch: function(){ return syncP(v); } }; }',
+      'function gwCall(fn, body){ E.sent.push(JSON.parse(JSON.stringify(body))); return syncP(typeof E.gw === "function" ? E.gw(body) : { status: 500, body: {} }); }'].join('\n');
+    const api = new Function('E', 'document', pre + '\n' + b38(src, '// @veh-law-start', '// @veh-law-end') + '\n' + b38(src, '// @veh-due-start', '// @veh-due-end')
+      + '\nreturn { VEH_LAW: VEH_LAW, calc: vehLawCalc, end: vehLawEnd, badge: vehLawBadge, rowOk: vehLawRowOk, logE: vehLawLogEntry, arg: vehLawArg, open: openVehModal, save: saveVehFromModal, veh: findVeh, refresh: vehModalLawRefresh, toggle: toggleTaskDone, dueOk: vehDueOk, imSt: imSt, imBaseSet: imBaseSet, pick: vehLawPick, union: vehLogUnion, clean: vehLawClean, track: vehLawTrack, tpick: vehLawTrackPick, on38: vehLaw38On, same: vehLawSame, renew: vehLawRenewOk };')(E, { getElementById: el });
+    const V = (o) => Object.assign({ state: '운행', biz: '사업용' }, o);
+    const L = (o) => Object.assign({ at: '2026-01-01', confirmed: '', proposed: '', rule: '', diff: null, by: 'u1', src: 'edit' }, o);
+    const C = (v, rows) => sh38(api.calc(v, rows || RW38, T38));
+    // ① 사례 1 — 자동차 기간 전 수검(74조② 후단 · 77조② 전 90일 · 종전 만기 2024-05-09 → 기간 시작 2024-02-09)
+    const v1 = { size: '중형 화물', reg_date: '2022-05-10' };
+    R.case1 = [C(V(Object.assign({ insp_due: '2026-01-05' }, v1))), C(V(Object.assign({ insp_due: '2026-01-05', insp_log: [L({ prev: '2024-05-09', confirmed: '2026-01-05', insp_done: '2024-01-05' })] }, v1))),
+      C(V(Object.assign({ insp_due: '2026-05-09', insp_log: [L({ prev: '2024-05-09', confirmed: '2026-05-09', insp_done: '2024-02-09' })] }, v1))), C(V(Object.assign({ insp_due: '2026-02-08', insp_log: [L({ prev: '2024-05-09', confirmed: '2026-02-08', insp_done: '2024-02-08' })] }, v1)))].join(',');
+    // ② 사례 2 — 기간 뒤 늦은 수검(후 31일 = 2023-04-01까지)
+    const v2 = { size: '중형 화물', reg_date: '2021-03-02' };
+    R.case2 = [C(V(Object.assign({ insp_due: '2025-05-20' }, v2))), C(V(Object.assign({ insp_due: '2025-05-20', insp_log: [L({ prev: '2023-03-01', confirmed: '2025-05-20', insp_done: '2023-05-20' })] }, v2))),
+      C(V(Object.assign({ insp_due: '2025-03-01', insp_log: [L({ prev: '2023-03-01', confirmed: '2025-03-01', insp_done: '2023-04-01' })] }, v2))), C(V(Object.assign({ insp_due: '2025-04-02', insp_log: [L({ prev: '2023-03-01', confirmed: '2025-04-02', insp_done: '2023-04-02' })] }, v2)))].join(',');
+    // ③ 사례 3 — 75조③ 연장(사유 종료 2024-09-30까지) 뒤 기간 안 수검 = 연장 만료일 다음날부터(77조② 괄호 — 결합 해석 확인 필요) · 연장 없으면 기간 밖 · 종전 만기보다 이른 연장 날짜는 쓰지 않음
+    const v3 = { size: '중형 화물', reg_date: '2022-07-15', insp_due: '2026-09-30' };
+    R.case3 = [C(V(v3)), C(V(Object.assign({ insp_log: [L({ prev: '2024-07-14', confirmed: '2026-09-30', insp_done: '2024-10-20', insp_ext: '2024-09-30' })] }, v3))),
+      C(V(Object.assign({ insp_log: [L({ prev: '2024-07-14', confirmed: '2026-09-30', insp_done: '2024-10-20' })] }, v3))), C(V(Object.assign({ insp_log: [L({ prev: '2024-07-14', confirmed: '2026-09-30', insp_done: '2024-10-20', insp_ext: '2024-07-01' })] }, v3)))].join(',');
+    // ④ 사례 4 — 건설기계 신청 시점(23조①⑤ 전후 31일 · 종전 만기 2025-06-30) · 사업용 여부·연식 빔(한계 ②) · 같은 날짜 자동차는 받은 날로 판정(77조②)
+    const v4 = { biz: '', size: '건설기계', ceq_kind: '덤프트럭', reg_date: '2016-07-01' }, LC = (o) => L(Object.assign({ prev: '2025-06-30' }, o));
+    R.case4 = [C(V(Object.assign({ insp_due: '2026-06-30' }, v4))), C(V(Object.assign({ insp_due: '2026-05-15', insp_log: [LC({ confirmed: '2026-05-15', insp_apply: '2025-05-10', insp_done: '2025-05-15' })] }, v4))),
+      C(V(Object.assign({ insp_due: '2026-06-30', insp_log: [LC({ confirmed: '2026-06-30', insp_apply: '2025-07-25', insp_done: '2025-08-10' })] }, v4))), C(V(Object.assign({ insp_due: '2026-06-30', insp_log: [LC({ confirmed: '2026-06-30', insp_done: '2025-08-10' })] }, v4))),
+      C(V(Object.assign({ insp_due: '2026-06-30', insp_log: [LC({ confirmed: '2026-06-30', insp_apply: '2025-05-30', insp_done: '2025-06-02' })] }, v4))), C(V(Object.assign({ insp_due: '2026-06-02', insp_log: [LC({ confirmed: '2026-06-02', insp_apply: '2025-05-29', insp_done: '2025-06-02' })] }, v4))),
+      C(V(Object.assign({ insp_due: '2026-06-30', insp_log: [LC({ confirmed: '2026-06-30', insp_apply: '2025-05-10', insp_done: '' })] }, v4))),
+      C(V({ size: '대형 화물', reg_date: '2021-07-01', insp_due: '2026-08-10', insp_log: [LC({ confirmed: '2026-08-10', insp_apply: '2025-07-25', insp_done: '2025-08-10' })] })), C(V({ biz: '', size: '건설기계', reg_date: '2016-07-01' }))].join(',');
+    // ⑤ 사례 5 — 월말 등록(누적식은 '기준 없음 — 월말') · 이어 세기 = 민법 160조②③(해당일 전날 · 없으면 그 달 말일) · 차령 경계를 넘는 회차는 그때 행으로
+    const v5 = { size: '소형 화물', reg_date: '2024-08-31', insp_due: '2026-02-28' };
+    R.case5 = [C(V(v5)), C(V(Object.assign({ insp_log: [L({ prev: '2025-02-28', confirmed: '2025-08-31', insp_done: '2025-02-20' })] }, v5))),
+      C(V({ size: '대형 화물', reg_date: '2020-03-10', insp_due: '2026-09-09', insp_log: [L({ prev: '2025-03-09', confirmed: '2026-03-09', insp_done: '2025-03-01' })] }))].join(',');
+    R.end = [['2024-08-31', 6], ['2025-03-01', 6], ['2025-09-01', 6], ['2024-03-15', 6], ['2024-02-29', 12], ['2024-01-31', 1], ['2024-01-30', 1], ['2024-01-29', 1], ['2026-04-24', 12]].map((p) => api.end(p[0], p[1])).join(',');
+    // ⑥ 수검일 기록 없는 차(운영 52대 꼴 포함) = 종전 결과 그대로 — 기간 칸 있는 판·옛 판 모두
+    const g1 = SMP38.map((v) => { const r = api.calc(v, RW38, T38); return { s: sh38(r), cell: api.badge(r, 'cell'), det: api.badge(r, 'det') }; });
+    const g2 = SMP38.map((v) => { const r = api.calc(v, OLD38, T38); return { s: sh38(r), cell: api.badge(r, 'cell'), det: api.badge(r, 'det') }; });
+    R.same = g1.map((x) => x.s).join(',') === GOLD38.sh && createHash('sha256').update(JSON.stringify(g1)).digest('hex').slice(0, 16) === GOLD38.hash && JSON.stringify(g1) === JSON.stringify(g2);
+    R.sameInfo = g1.map((x) => x.s).join(',');
+    // ⑦ 검사 만기가 빈 차 = 오늘 이후 첫 만료일(한계 ①) — 시안 ② 셋째 줄(최초등록 2021-10-02 · 예시 주기 1년)
+    R.empty = C(V({ size: '대형 화물', reg_date: '2021-10-02' }), RMK38) + ',' + C(V({ size: '대형 화물', reg_date: '2021-10-02', insp_due: '2026-10-01' }), RMK38);
+    // ⑧ 칩 글 — 이어 센 제안 = 칸 끝 '수검일 기준'·마우스 글·펼침/창 초록 한 줄(지금 안내 문장 없음) · 누적식 = 지금 안내 그대로
+    const rc = api.calc(V(Object.assign({ insp_due: '2026-01-05', insp_log: [L({ prev: '2024-05-09', confirmed: '2026-01-05', insp_done: '2024-01-05' })] }, v1)), RW38, T38);
+    const rb = api.calc(V(Object.assign({ insp_due: '2026-06-30', insp_log: [LC({ confirmed: '2026-06-30', insp_done: '2025-07-10' })] }, v4)), RW38, T38), rd = api.calc(V(v3), RW38, T38);
+    R.chip = [api.badge(rc, 'cell'), api.badge(rc, 'det'), api.badge(rb, 'cell'), api.badge(api.calc(V(Object.assign({ insp_due: '2026-06-30', insp_log: [LC({ confirmed: '2026-06-30', insp_apply: '2025-05-10', insp_done: '' })] }, v4)), RW38, T38), 'modal'), api.badge(rd, 'det'),
+      api.badge(api.calc(V({ size: '대형 화물', reg_date: '2020-03-10', insp_due: '2026-09-20', insp_log: [L({ prev: '2025-03-09', confirmed: '2026-03-09', insp_done: '2025-03-01' })] }), RW38, T38), 'det')].join('\n');
+    // ⑭ 독립 검토 반영(11/19 — 검토자 재현 rev_p38 t4·t5·t6 꼴)
+    //   1 만기 오타 정정(실제 기록 함수 vehLawLogEntry): 세 칸 빈 정정 줄은 출발점이 아님 — 앞의 값 있는 줄(없으면 누적식)
+    Object.assign(api.VEH_LAW, { on: true, ver: 't38r', rows: RW38, attr: null, at: Date.now(), busy: false });
+    const cf = V({ size: '대형 화물', reg_date: '2018-03-10', insp_due: '2026-03-09' }), stp = (o, to, ex) => { const pv = o.insp_due || ''; o.insp_due = to; const e = api.logE(o, pv, to, 'edit', ex); if (e) o.insp_log = (o.insp_log || []).concat([e]); };
+    stp(cf, '2026-09-09', { insp_done: '2026-03-01' }); stp(cf, '2027-03-19', { insp_done: '' }); stp(cf, '2027-03-09', { insp_done: '' });
+    const kf = V({ biz: '', size: '건설기계', ceq_kind: '덤프트럭', reg_date: '2016-07-01', insp_due: '2026-06-30' }); stp(kf, '2026-08-30', { insp_done: '' });
+    const yf = V({ size: '대형 화물', reg_date: '2018-03-10', insp_due: '2026-03-09' }); stp(yf, '2027-03-09', { insp_done: '' }); stp(yf, '2028-03-09', { insp_done: '' }); stp(yf, '2027-03-09', { insp_done: '' });
+    Object.assign(api.VEH_LAW, { on: false, ver: '', rows: [], attr: null, at: Date.now(), busy: false });
+    R.fix = [C(cf), (cf.insp_log || []).length, C(kf), C(yf), C(V({ size: '대형 화물', reg_date: '2018-03-10', insp_due: '2027-03-09' }))].join(',');
+    //   7 마지막 '값 있는' 줄 · 차령 경계 회차 행(직전 만료일 기준) · 2001년 전 승합(reg_min) · 만기 빈 차 오늘 당일 · 같은 거리면 뒤 날 · 기간 판정 행 = 그 회차 행
+    const RBUS = [Object.assign({ id: 't38.bus', grade: '실측', cites: C38, cls: 'car', size: ['중형 승합'], every_m: 12, first_adj_days: -1, day_max: 28, reg_min: '2001-01-01' }, WP38)];
+    const RWIN = [{ id: 'w.a', grade: '실측', cites: C38, cls: 'car', size: ['소형 화물'], every_m: 6, win_before: 10, win_after: 10, win_basis: 'pass' }, Object.assign({ id: 'w.b', grade: '실측', cites: C38, cls: 'car', size: ['대형 화물'], every_m: 12 }, WP38)];
+    R.more = [C(V(Object.assign({ insp_due: '2028-02-01', insp_log: [L({ prev: '2024-05-09', confirmed: '2026-01-05', insp_done: '2024-01-05' }), L({ prev: '2026-01-05', confirmed: '2028-02-01', insp_done: '2026-03-01' }), L({ prev: '2028-02-01', confirmed: '2028-02-01', insp_done: '' })] }, v1))),
+      C(V({ size: '대형 화물', reg_date: '2020-03-10', insp_due: '2026-03-09', insp_log: [L({ prev: '2025-03-09', confirmed: '2026-03-09', insp_done: '2025-03-01' })] })),
+      C(V({ size: '중형 승합', reg_date: '2000-12-20', insp_due: '2026-12-19', insp_log: [L({ prev: '2025-12-19', confirmed: '2026-12-19', insp_done: '2025-12-10' })] }), RBUS), C(V({ size: '중형 승합', reg_date: '2001-01-02', insp_due: '2027-01-01', insp_log: [L({ prev: '2026-01-01', confirmed: '2027-01-01', insp_done: '2025-12-20' })] }), RBUS),
+      C(V({ size: '대형 화물', reg_date: '2021-03-02', insp_log: [L({ prev: '2025-11-19', confirmed: '2026-11-19', insp_done: '2025-11-10' })] }), RMK38),
+      C(V({ size: '소형 화물', reg_date: '2019-01-28', insp_due: '2026-06-01', insp_log: [L({ prev: '2025-09-01', confirmed: '2026-03-01', insp_done: '2025-08-25' })] })),
+      C(V({ size: '대형 화물', reg_date: '2021-03-02', insp_due: '2027-03-01', insp_log: [L({ prev: '2026-03-01', confirmed: '2027-03-01', insp_done: '2026-02-09' })] }), RWIN)].join(',');
+    //   2 건설기계 신청일 비움 + 수검일이 신청 기간 전 = 신청도 기간 전(받은 날 다음날부터) · 3 확인 필요(ⓐ 기간 끝 + 휴일 여유 · ⓑ 건설기계 신청 기간 밖 · ⓒ 종합검사 근거 행 차 기간 밖 · 신청일 모르고 수검일이 신청 기간 뒤)
+    const RCOMP = [Object.assign({}, RW38[0], { cites: [{ law: '자동차종합검사의 시행 등에 관한 규칙', art: '별표 1' }] })];
+    const txt = (v, rows, m) => api.badge(api.calc(v, rows || RW38, T38), m || 'det').replace(/<[^>]+>/g, '|');
+    R.chk = [C(V(Object.assign({ insp_due: '2026-05-15', insp_log: [LC({ confirmed: '2026-05-15', insp_done: '2025-05-15' })] }, v4))),
+      txt(V(Object.assign({ insp_due: '2026-05-15', insp_log: [LC({ confirmed: '2026-05-15', insp_done: '2025-05-15' })] }, v4))),
+      txt(V(Object.assign({ insp_due: '2026-06-11', insp_log: [L({ prev: '2024-05-09', confirmed: '2026-06-11', insp_done: '2024-06-11' })] }, v1)), RW38, 'cell'),
+      txt(V(Object.assign({ insp_due: '2026-06-13', insp_log: [L({ prev: '2024-05-09', confirmed: '2026-06-13', insp_done: '2024-06-13' })] }, v1)), RW38, 'cell'),
+      txt(V(Object.assign({ insp_due: '2026-10-20', insp_log: [L({ prev: '2024-07-14', confirmed: '2026-10-20', insp_done: '2024-10-20' })] }, { size: '중형 화물', reg_date: '2022-07-15' })), RCOMP),
+      txt(V(Object.assign({ insp_due: '2026-06-30', insp_log: [LC({ confirmed: '2026-06-30', insp_done: '2025-08-10' })] }, v4)))].join('\n');
+    // ⑮ 재검토 반영(11/19 — 검토자 재현 rev_p38 t7): 세 칸 빈 줄을 '갱신'(새 만기가 종전 만기 다음날부터 한 주기 뒤 날짜의 검사 기간 폭 안 = 출발점)과 '정정'(같은 회차 안 — 건너뜀)으로 가름
+    Object.assign(api.VEH_LAW, { on: true, ver: 't38r', rows: RW38, attr: null, at: Date.now(), busy: false });
+    const rv = V({ size: '대형 화물', reg_date: '2018-03-10', insp_due: '2025-09-09' });
+    stp(rv, '2026-03-20', { insp_done: '2025-09-01' }); const re0 = C(rv); stp(rv, '2026-09-20', { insp_done: '' }); const re1 = C(rv);
+    const re1cell = api.badge(api.calc(rv, RW38, T38), 'cell').replace(/<[^>]+>/g, '');
+    const nx = (s) => new Date(Date.parse(s + 'T00:00:00Z') + 86400000).toISOString().slice(0, 10);
+    for (let q = 0; q < 12; q++) stp(rv, api.end(nx(rv.insp_due), 6), { insp_done: '' });
+    const re12 = C(rv) + '/' + rv.insp_due;
+    //   기간 밖 수검 줄 뒤 비운 갱신 = 옛 회차의 '수검일 기준'·'확인 필요' 글이 따라오지 않음
+    const ro2 = V({ size: '대형 화물', reg_date: '2018-03-10', insp_due: '2025-09-09' }); stp(ro2, '2026-01-20', { insp_done: '2025-07-20' }); stp(ro2, '2026-07-20', { insp_done: '' });
+    const reOut = C(ro2) + '|' + api.badge(api.calc(ro2, RW38, T38), 'cell').replace(/<[^>]+>/g, '');
+    //   '정정'·'애매'는 건너뜀 — 지난 검토 세 정정 그대로 · 한 주기 절반쯤 어긋난 비운 갱신 = 앞 줄에서 셈 + '확인 필요'
+    const ra = V({ size: '대형 화물', reg_date: '2018-03-10', insp_due: '2025-09-09' }); stp(ra, '2026-03-09', { insp_done: '2025-09-01' }); stp(ra, '2026-06-10', { insp_done: '' });
+    const reAmb = C(ra) + '|' + /확인 필요: 넣은 기록만으로는 이 회차의 법정 만기를 단정할 수 없어 이 제안은 참고만/.test(api.badge(api.calc(ra, RW38, T38), 'det'));
+    // ⑯ 3차 검토(11/19 — 검토자 재현 rev_p38 t11 · 5차 검토로 수검일 정정 길은 뺌): (가) 오타 비운 갱신 → 비운 정정 = 2026-09-09 차이 0 · (나) 값 갱신 만기 오타 → 크게 고친 정정 = 확인 필요 없음
+    //   (다) 실제 늦은 갱신을 수검일 없이 = 앞 줄에서 셈 + '확인 필요'(수검일을 넣으라는 말 없음) · (바) 차령 경계 회차 = 갱신 + '확인 필요'(애매 안내 없음)
+    const ga = V({ size: '대형 화물', reg_date: '2018-03-10', insp_due: '2026-03-09' }); stp(ga, '2026-09-19', { insp_done: '' }); stp(ga, '2026-09-09', { insp_done: '' });
+    const fA = C(ga) + '|' + ga.insp_log.map((x) => x.insp_done).join(',');
+    const gb = V({ size: '대형 화물', reg_date: '2018-03-10', insp_due: '2025-09-09' }); stp(gb, '2027-03-09', { insp_done: '2025-09-01' }); stp(gb, '2026-03-09', { insp_done: '' });
+    const fB = C(gb) + '|' + /확인 필요/.test(api.badge(api.calc(gb, RW38, T38), 'det'));
+    const gc = V({ size: '대형 화물', reg_date: '2018-03-10', insp_due: '2025-09-09' }); stp(gc, '2026-03-09', { insp_done: '2025-09-01' }); stp(gc, '2026-11-20', { insp_done: '' });
+    const gcT = api.badge(api.calc(gc, RW38, T38), 'det');
+    const fC = C(gc) + '|' + /확인 필요: 넣은 기록만으로는 이 회차의 법정 만기를 단정할 수 없어 이 제안은 참고만/.test(gcT) + '|' + /수검일을 넣어/.test(gcT);
+    const ge = V({ size: '대형 화물', reg_date: '2021-06-01', insp_due: '2025-05-31' }); stp(ge, '2026-05-31', { insp_done: '2025-05-20' }); stp(ge, '2026-11-30', { insp_done: '' });
+    const geT = api.badge(api.calc(ge, RW38, T38), 'det');
+    const fE = C(ge) + '|' + /차령이 바뀌는 회차 — 차령을 어느 날로 보느냐에 따라 주기가 12개월 또는 6개월일 수 있음/.test(geT) + '|' + /한 주기 뒤 날짜와 맞지 않아/.test(geT);
+    // ⑰ 5차 검토(11/19 — 검토자 재현 rev_p38 t14): 막는 것 1 = 12개월 차 연도 오타(값 갱신) → 정정 → 이듬해 수검일 비운 갱신(앞에서 거쳐 간 만기와 같은 날) = 정방향 갱신으로 봄(차이 0)
+    //   막는 것 2 = 같은 회차 정정(새 만기가 종전 만기의 기간 폭 안)에 수검일을 다시 넣음 = 기록하지 않음(줄의 수검일 "" · dropped) → 차이 0
+    const y12 = { size: '대형 화물', reg_date: '2023-04-01' };
+    const p1 = V(Object.assign({ insp_due: '2025-04-09' }, y12)); stp(p1, '2027-04-09', { insp_done: '2025-02-10' }); stp(p1, '2026-04-09', { insp_done: '' }); const p1a = C(p1); stp(p1, '2027-04-09', { insp_done: '' });
+    const p2 = V(Object.assign({ insp_due: '2025-04-09' }, y12)); stp(p2, '2026-04-19', { insp_done: '2025-04-01' });
+    const p2e = api.logE(p2, '2026-04-19', '2026-04-09', 'edit', { insp_done: '2025-04-01' }); stp(p2, '2026-04-09', { insp_done: '2025-04-01' });
+    //   이어지지 않는 기록(기록 밖에서 만기가 바뀜 → 다음 줄 종전 만기 ≠ 지금 만기) 뒤 한 주기 갱신 = 그 줄에서 셈 + '확인 필요'(종전 만기를 기록으로 못 믿음)
+    const p3 = V({ size: '대형 화물', reg_date: '2018-03-10', insp_due: '2026-03-09' }); stp(p3, '2026-09-09', { insp_done: '2026-03-01' }); p3.insp_due = '2026-10-01'; stp(p3, '2027-04-01', { insp_done: '' });
+    const p3c = (api.calc(p3, RW38, T38).chain || {}).chk || [];
+    const fP = [p1a, C(p1), p1.insp_log.map((x) => x.insp_done).join(','), C(p2), p2.insp_log.map((x) => x.insp_done).join(','), String(!!(p2e && p2e.dropped)), C(p3), p3c.join(',')].join('|');
+    // ⑱ 8차 지시 불변식(고정 씨앗 무작위 · 세 등급 ㉮㉯㉰ 기준): 진짜 갱신 1~4회(값·비운 · 기간 안·밖 수검 · 값 갱신 넷에 하나는 검사증 만기가 센 날 ±15일 · 미리 넣어 둔 진짜 연장 · 낡은 연장 칸)
+    //   사이사이에 오타·정정(작업자 꼴 ±20일 · 종전 만기 근처 · 애매 꼴 · 연도 · 월 · 한 주기 건너뜀 · 앞에서 거쳐 간 만기 값으로 되돌림 → 다시 · 기간 폭 밖 앞 오타 + 같은 수검일 다시 넣음 · 겹친 오타
+    //   · 연장만 넣은 정정 · 같은 날 같은 새 만기로 두 화면(합치기 vehLogUnion))을 실제 기록 함수(수정 창 저장 꼴 — 연장 칸 미리 채움 · 실린 값과 같을 때만 차량 줄 비움)로 넣음
+    //   ㉠ 조용함(확인 필요 없음) ⇒ 진짜만 기록(오타 기록에 실제로 남은 값으로 만든 기록)과 같은 날짜 ㉡ 조용한 이어 세기 날짜 = E(La) 손 계산
+    //   ㉢ 값 줄 있는 기록: '조용함' ⇔ 검사 쪽에서 따로 짠 ⓐ~ⓖ 판정 ㉣ 값 줄 없는 기록 = 기록을 뺀 차와 결과·칩 글자째 같음(운영 그대로 — 차량 줄 연장 칸이 이 회차에 걸리면 확인 필요)
+    //   ㉤ 오타 없이 매번 수검일을 넣은 현실적인 기록(수검일이 종전 만기에서 반 주기 안)에 기록 사유 '확인 필요' 0
+    const inv = { n: 0, same: 0, sameChk: 0, diffChk: 0, silent: 0, plain: 0, plainDiff: 0, lost: 0, real: 0, realRec: 0, cleanN: 0, handMis: 0, ind: 0, indMis: 0, noVal: 0, noValMis: 0, silentOp: 0, silentPrev: 0, farMis: 0, ex: [], kinds: {} };
+    {
+      let seed = 3806; const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+      const ri = (a, b) => a + Math.floor(rnd() * (b - a + 1));
+      const addD = (s, n) => new Date(Date.parse(s + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+      const addM = (s, m) => { const y = +s.slice(0, 4), mo = +s.slice(5, 7) - 1 + m, yy = y + Math.floor(mo / 12), mm = ((mo % 12) + 12) % 12; return yy + '-' + String(mm + 1).padStart(2, '0') + '-' + String(Math.min(+s.slice(8, 10), 28)).padStart(2, '0'); };
+      //   검사 쪽 달 더하기(말일 맞춤 — 앱 함수를 쓰지 않음)
+      const addMo = (s, m) => { const y = +s.slice(0, 4), mo = +s.slice(5, 7) - 1 + m, yy = y + Math.floor(mo / 12), mm = ((mo % 12) + 12) % 12, last = new Date(Date.UTC(yy, mm + 1, 0)).getUTCDate(); return yy + '-' + String(mm + 1).padStart(2, '0') + '-' + String(Math.min(+s.slice(8, 10), last)).padStart(2, '0'); };
+      const endOf = (S, m) => { const t = addMo(S, m); return +t.slice(8, 10) < +S.slice(8, 10) ? t : addD(t, -1); };
+      const dnn = (s) => Math.round(Date.parse(s + 'T00:00:00Z') / 86400000);
+      const rd = (s) => typeof s === 'string' && /^(19|20)\d{2}-\d{2}-\d{2}$/.test(s) && new Date(s + 'T00:00:00Z').toISOString().slice(0, 10) === s;
+      const KINDS = [{ size: '중형 화물' }, { size: '대형 화물' }, { size: '대형 화물' }, { size: '소형 화물' }, { size: '건설기계', ceq_kind: '덤프트럭', biz: '' }];
+      const TYPO = ['day', 'back', 'amb', 'year', 'month', 'skip', 'prev', 'early'];
+      Object.assign(api.VEH_LAW, { on: true, ver: 't38i', rows: RW38, attr: null, at: Date.now(), busy: false });
+      const recOf = (r) => !!(r && ((r.chain && (r.chain.chk || []).indexOf('rec') >= 0) || r.rec));
+      const hasChk = (r) => !!(r && ((r.chain && Array.isArray(r.chain.chk) && r.chain.chk.length) || r.rec));
+      //   수정 창 저장 꼴: 연장 칸 = 차량 줄 값 또는 새로 넣은 값 · 실린 값과 같으면(또는 새로 넣은 값이 실렸으면) 차량 줄 비움 · 안 실렸으면 새로 넣은 값만 차량 줄에
+      const save = (o, to, done, extNew) => { const pv = o.insp_due, ext = extNew !== undefined ? extNew : (o.insp_ext || ''); o.insp_due = to;
+        const e = api.logE(o, pv, to, 'edit', { insp_done: done, insp_ext: ext }); if (!e) return; const mv = e.extMove ? e.insp_ext : ''; delete e.extMove; delete e.dropped;
+        o.insp_log = (o.insp_log || []).concat([e]); if (mv) { if (o.insp_ext === mv || extNew !== undefined) delete o.insp_ext; } else if (extNew !== undefined) o.insp_ext = extNew; };
+      //   손 계산: 줄 하나(종전 만기·연장·수검일·신청일)로 센 그 회차 만료일과 판정 행(시행규칙 74조②③·77조② · 건설기계 23조①⑤ · 민법 160조) — 차령 경계 회차면 시작일 행으로 센 날도
+      const handFe = (L, okR, base, cls) => { const E = (rd(L.insp_ext) && L.insp_ext > L.prev) ? L.insp_ext : L.prev, r0 = api.pick(okR, base, cls, E); if (!r0 || r0.win_basis == null) return null;
+        const s = rd(L.insp_done) ? L.insp_done : '', ap = (r0.win_basis === 'apply' && rd(L.insp_apply)) ? L.insp_apply : '', early = !!(r0.win_basis === 'apply' && !ap && s && dnn(s) < dnn(E) - r0.win_before), at = r0.win_basis === 'apply' ? (ap || (early ? s : '')) : s;
+        const inWin = !at || (dnn(at) >= dnn(E) - r0.win_before && dnn(at) <= dnn(E) + r0.win_after), S0 = (inWin || !s) ? addD(E, 1) : addD(s, 1), r = api.pick(okR, base, cls, addD(S0, -1)), rS = api.pick(okR, base, cls, S0);
+        if (!r || r.win_basis == null) return null;
+        return { E: endOf(S0, r.every_m), r: r, E2: (rS && rS.win_basis != null && rS.every_m !== r.every_m) ? endOf(S0, rS.every_m) : '', r2: rS, r0: r0 }; };
+      const inFe = (d, f) => rd(d) && [[f.E, f.r], [f.E2, f.r2]].some((p) => p[0] && p[1] && dnn(d) >= dnn(p[0]) - p[1].win_before && dnn(d) <= dnn(p[0]) + p[1].win_after);
+      const isVal = (x) => !!(x && typeof x === 'object' && ((typeof x.insp_done === 'string' && x.insp_done !== '') || (typeof x.insp_apply === 'string' && x.insp_apply !== '')));
+      //   ⓐ~ⓖ를 검사 쪽에서 따로 짬(앱 vehLawClean·vehLawRenewFe를 부르지 않음) → 참 = 조용히 이어 셀 기록
+      const indep = (v, okR, base, cls) => { const log = v.insp_log || [], D = v.insp_due, X = v.insp_ext; let a = -1; log.forEach((x, i) => { if (isVal(x)) a = i; });
+        const La = log[a], vs = [La.insp_done, La.insp_apply].filter((s) => typeof s === 'string' && s !== '');
+        if (!(rd(La.prev) && rd(La.confirmed) && La.confirmed > La.prev && vs.every((s) => rd(s) && s <= La.confirmed))) return false;
+        const f = handFe(La, okR, base, cls); if (!f) return false;
+        for (let j = a + 1; j < log.length; j++) if (log[j].prev !== log[j - 1].confirmed) return false;
+        if (log[log.length - 1].confirmed !== D || Math.abs(dnn(D) - dnn(f.E)) > 10) return false;
+        //   8차-c ⓗ: La 앞 기록 줄(종전·새 만기가 La와 같은 줄은 건너뜀)의 확정 = La 종전 만기
+        { let k = a - 1; while (k >= 0 && log[k].prev === La.prev && log[k].confirmed === La.confirmed) k--; if (k >= 0 && rd(log[k].confirmed) && log[k].confirmed !== La.prev) return false;
+          //   8차-d ⓘ: 그 앞 줄이 값 줄이고 그 줄과 종전 만기가 같은 다른 값 줄(그 줄의 쌍둥이 빼고)이 있으면 아님
+          if (k >= 0 && isVal(log[k])) { const y = log[k]; if (log.some((x, i) => i !== k && i !== a && isVal(x) && x.prev === y.prev && !(x.confirmed === y.confirmed && (x.insp_done || '') === (y.insp_done || '') && (x.insp_apply || '') === (y.insp_apply || '') && (x.insp_ext || '') === (y.insp_ext || '')))) return false; } }
+        const same = (x) => x.prev === La.prev && x.confirmed === La.confirmed && (x.insp_done || '') === (La.insp_done || '') && (x.insp_apply || '') === (La.insp_apply || '') && (x.insp_ext || '') === (La.insp_ext || '');
+        if (log.some((x, k) => k !== a && isVal(x) && x.prev === La.prev && !same(x))) return false;
+        if (log.slice(0, a).some((x) => isVal(x) && !same(x) && vs.some((s) => x.insp_done === s || x.insp_apply === s))) return false;
+        return !(rd(X) && La.prev < X && X <= D && X !== La.insp_ext); };
+      const chip = (r) => [sh38(r), api.badge(r, 'cell'), api.badge(r, 'det'), api.badge(r, 'modal')].join('|');
+      for (let q = 0; q < INV38; q++) {
+        const kd = KINDS[ri(0, KINDS.length - 1)], cls = kd.size === '건설기계' ? 'ceq' : 'car', okR = RW38.filter((x) => x.cls === cls);
+        const base = V(Object.assign({ reg_date: ri(2012, 2022) + '-' + String(ri(1, 12)).padStart(2, '0') + '-' + String(ri(1, 28)).padStart(2, '0') }, kd));
+        const R0 = addD('2021-01-01', ri(0, 900)), nRen = ri(1, 4);
+        const noisy = Object.assign({}, base, { insp_due: R0 }), clean = Object.assign({}, base, { insp_due: R0 });
+        const used = [];
+        let P = R0, real = true, allVal = true, Pprev = R0;
+        //   낡은 연장 칸(종전 만기 이하 — 두 기록 같이)
+        if (rnd() < 0.1) { noisy.insp_ext = clean.insp_ext = addD(R0, -ri(1, 300)); used.push('stale'); }
+        const typo = (P0, Rn, ev, Pp) => { const k = TYPO[ri(0, TYPO.length - 1)]; used.push(k); let t;
+          if (k === 'day') t = addD(Rn, ri(1, 20) * (rnd() < 0.5 ? -1 : 1)); else if (k === 'back') t = addD(P0, ri(-20, 20)); else if (k === 'amb') t = addD(Rn, ri(32, 200));
+          else if (k === 'year') t = addM(Rn, rnd() < 0.5 ? 12 : -12); else if (k === 'month') { const m0 = +Rn.slice(5, 7); let m1 = ri(1, 12); if (m1 === m0) m1 = m0 % 12 + 1; t = Rn.slice(0, 5) + String(m1).padStart(2, '0') + '-' + String(Math.min(+Rn.slice(8, 10), 28)).padStart(2, '0'); }
+          else if (k === 'prev') t = Pp; else if (k === 'early') t = addD(Rn, -ri(32, 90));
+          else t = addM(Rn, ev);
+          return t; };
+        for (let k = 0; k < nRen; k++) {
+          //   미리 넣어 둔 진짜 연장(두 기록 같이 · 오타 기록은 오타 앞 또는 오타와 정정 사이에 — 연장만 넣은 저장)
+          const extTrue = rnd() < 0.15 ? addD(P, ri(10, 60)) : '', extMid = extTrue && rnd() < 0.5;
+          if (extTrue) { clean.insp_ext = extTrue; if (!extMid) noisy.insp_ext = extTrue; used.push(extMid ? 'extMid' : 'extPre'); }
+          const Pe = extTrue || P;
+          const r = api.pick(okR, base, cls, Pe); if (!r) break;
+          const outW = rnd() < 0.3, d = outW ? (rnd() < 0.5 ? addD(Pe, -ri(r.win_before + 1, r.win_before + 40)) : addD(Pe, ri(r.win_after + 1, r.win_after + 150))) : addD(Pe, -ri(0, Math.min(60, r.win_before)));
+          const inW = r.win_basis === 'apply' ? !(dnn(d) < dnn(Pe) - r.win_before) : (dnn(d) >= dnn(Pe) - r.win_before && dnn(d) <= dnn(Pe) + r.win_after);
+          const S = inW ? addD(Pe, 1) : addD(d, 1), rr = api.pick(okR, base, cls, addD(S, -1)); if (!rr) break;
+          const val = rnd() < 0.5, off = val && rnd() < 0.25 ? ri(-15, 15) : 0, Rn = addD(api.end(S, rr.every_m), off), done = val ? d : '';
+          if (Math.abs(off) > 10) real = false;   // 8차-b: 검사증 만기가 센 날과 10일 넘게 다르면 '현실적인 오타 없는 기록'에서 뺌(그때는 확인 필요가 맞음)
+          if (dnn(d) > dnn(T38) || dnn(Rn) <= dnn(P)) break;
+          if (Math.abs(dnn(d) - dnn(Pe)) > Math.floor(rr.every_m / 2) * 28 || (!val && !inW)) real = false;
+          const nt = rnd() < 0.45 ? ri(1, 2) : 0, n0 = (noisy.insp_log || []).length;
+          if (nt) {
+            let t = typo(P, Rn, rr.every_m, Pprev); if (t === Rn || t === P) t = addD(t, 5);
+            save(noisy, t, rnd() < 0.5 ? done : '');
+            if (extMid) { noisy.insp_ext = extTrue; if (rnd() < 0.5) { used.push('extOnly'); } }
+            for (let j = 1; j < nt; j++) { let t2 = typo(noisy.insp_due, Rn, rr.every_m, Pprev); if (t2 === noisy.insp_due || t2 === Rn) t2 = addD(t2, 3); save(noisy, t2, ''); }
+            if (noisy.insp_due !== Rn) save(noisy, Rn, rnd() < 0.3 ? done : '');
+          } else { if (extMid) noisy.insp_ext = extTrue; save(noisy, Rn, done); }
+          //   같은 날 같은 새 만기로 두 화면(다른 수검일) — 합치기(앱 vehLogUnion)
+          if (rnd() < 0.04 && noisy.insp_log && noisy.insp_log.length) { const L0 = noisy.insp_log[noisy.insp_log.length - 1], d2 = addD(d, -ri(5, 120)); if (L0.confirmed === Rn && dnn(d2) <= dnn(T38)) { noisy.insp_log = api.union(noisy.insp_log, [Object.assign({}, L0, { insp_done: d2 })]); used.push('two'); } }
+          //   기준 기록은 오타 기록에 실제로 남은 수검일만(넣지 않았거나 같은 회차 정정이라 빠진 수검일은 기준에도 없음 — lost)
+          const kept = !val || (noisy.insp_log || []).slice(n0).some((x) => x.insp_done === d);
+          if (!kept) inv.lost++;
+          if (!val || !kept) allVal = false;
+          save(clean, Rn, kept ? done : '');
+          if (rnd() < 0.2) { let t = typo(Rn, Rn, rr.every_m, P); if (t === Rn) t = addD(t, 3); save(noisy, t, ''); save(noisy, Rn, ''); }
+          Pprev = P; P = Rn;
+        }
+        if (!clean.insp_log) continue;
+        inv.n++;
+        const plain = noisy.insp_log.length === clean.insp_log.length && !used.some((k) => TYPO.indexOf(k) >= 0 || k === 'two'); if (plain) inv.plain++;
+        const rc = api.calc(clean, RW38, T38), rn = api.calc(noisy, RW38, T38);
+        if (plain && real && allVal) { inv.real++; if (recOf(rn)) inv.realRec++; }
+        if (rn && rn.st === 'ok') {
+          if (noisy.insp_log.some(isVal)) {
+            //   ㉢ 조용함 ⇔ 따로 짠 ⓐ~ⓖ · ㉡ 조용한 이어 세기 날짜 = E(La) 손 계산
+            inv.ind++; const ok7 = indep(noisy, okR, base, cls); if (ok7 === recOf(rn)) inv.indMis++;
+            if (!recOf(rn)) { inv.cleanN++; let a = -1; noisy.insp_log.forEach((x, i) => { if (isVal(x)) a = i; }); const f = handFe(noisy.insp_log[a], okR, base, cls); if (!f || rn.date !== f.E) inv.handMis++; if (Math.abs(dnn(noisy.insp_due) - dnn(rn.date)) > 10) inv.farMis++; }   // 8차-b: 조용하면 |지금 만기 − 제안| ≤ 10일
+          } else {
+            //   ㉣ 값 줄 없음 = 기록을 뺀 차와 글자째 같음(연장이 이 회차에 걸리면 확인 필요만 더함)
+            inv.noVal++; const lastL = noisy.insp_log[noisy.insp_log.length - 1], X = noisy.insp_ext, hit = !!(lastL && rd(lastL.prev) && rd(X) && lastL.prev < X && X <= noisy.insp_due);
+            const r0 = Object.assign({}, noisy); delete r0.insp_log; if (hit ? !recOf(rn) : chip(rn) !== chip(api.calc(r0, RW38, T38))) inv.noValMis++;
+          }
+        }
+        const same = !!(rn && rc && rn.date === rc.date && rn.diff === rc.diff);
+        if (same) { inv.same++; if (hasChk(rn) && !hasChk(rc)) inv.sameChk++; continue; }
+        if (plain) inv.plainDiff++;
+        if (hasChk(rn)) { inv.diffChk++; continue; }
+        //   조용한 다름 가운데 설계로 남는 두 꼴(8차 지시): 값 줄 없음 = 운영 그대로(㉮) · La의 종전 만기가 오타인데 그 앞이 빈 줄뿐 = 같은 저장 꼴의 정당한 이력(정정 뒤 갱신)이 있어 기록만으로 못 가름
+        const lastV = (lg) => { let a = -1; (lg || []).forEach((x, i) => { if (isVal(x)) a = i; }); return a < 0 ? null : lg[a]; }, nLa = lastV(noisy.insp_log), cLa = lastV(clean.insp_log);
+        if (!nLa) { inv.silentOp++; continue; }
+        if (cLa && nLa.insp_done === cLa.insp_done && (nLa.insp_apply || '') === (cLa.insp_apply || '') && nLa.prev !== cLa.prev) { inv.silentPrev++; continue; }
+        inv.silent++; used.forEach((k) => { inv.kinds[k] = (inv.kinds[k] || 0) + 1; });
+        if (inv.ex.length < 4) inv.ex.push({ c: sh38(rc), n: sh38(rn), v: base.size + '/' + base.reg_date, k: used.join(','), log: noisy.insp_log.map((x) => x.prev + '>' + x.confirmed + (x.insp_done ? '*' + x.insp_done : '') + (x.insp_ext ? '+' + x.insp_ext : '')).join(' '), clog: clean.insp_log.map((x) => x.prev + '>' + x.confirmed + (x.insp_done ? '*' + x.insp_done : '') + (x.insp_ext ? '+' + x.insp_ext : '')).join(' ') });
+      }
+    }
+    R.inv = inv.farMis === 0 && inv.silent === 0 && inv.plainDiff === 0 && inv.realRec === 0 && inv.handMis === 0 && inv.indMis === 0 && inv.noValMis === 0 && inv.n > INV38 / 2 && inv.real > 50 && inv.cleanN > 100 && inv.noVal > 100;
+    R.invInfo = inv;
+    // 결과 수 고정(더 엄하거나 느슨한 결함 사본도 잡힘)
+    R.invN = [inv.n, inv.same, inv.sameChk, inv.diffChk, inv.silent, inv.silentOp, inv.silentPrev, inv.plain, inv.real, inv.realRec, inv.cleanN, inv.ind, inv.noVal].join('/');
+    // ⑲ 6차 검토(11/19 — 검토자 재현 rev38_6_*): 실제 수정 창 저장으로
+    //   K1 미리 넣은 연장 → 만기 오타(애매) → 되돌림 → 진짜 갱신(수검일) = 연장이 오타 줄로 안 옮겨지고 진짜 갱신 줄로(차량 줄 연장 칸 그때 비움) · 결과 확인 필요(같은 만기에서 두 번 떠남)
+    //   S1 갱신 오타 → 연장만 저장 → 바로잡는 정정 = 정정 줄에 연장 안 실림·차량 줄 연장 그대로 · 깨끗(차이 0 · 확인 필요 없음)
+    //   S2·K4 기간 폭 밖 앞 오타(수검일) → 같은 수검일 다시 넣으며 정정 = 확인 필요 · K2 기간 밖 수검 갱신 → 앞 만기 값 오타 → 다시 = 확인 필요(누적식으로 떨어져도)
+    //   M1 낡은 연장 칸(종전 만기 이하)이 남은 차의 메모 저장 = 막지 않음 · 상태가 제안 대상 아닌 차 = 검사 기록 칸 숨김 · 1999년 수검일 = 안내 · 연장 + 30개월 = 받음
+    //   M2 같은 날 같은 새 만기 두 화면(다른 수검일) 합치기 = 두 줄 + 확인 필요 · L1 기간 끝 + 7일 수검 = 확인 필요(holi) · 연장만 있는 갱신 줄 = 연장 만료일부터 · 판27 한 주기 갱신 줄만 있는 차 = 누적식 그대로
+    const mv = (id, vals) => { E.calls.length = 0; api.open(id); Object.keys(vals).forEach((k) => { el(k).value = vals[k]; }); api.save(); return E.calls.slice(); };
+    const vq = (id) => api.veh(id), lg = (id) => (vq(id).insp_log || []).map((x) => x.prev + '>' + x.confirmed + (x.insp_done ? '*' + x.insp_done : '') + (x.insp_ext ? '+' + x.insp_ext : '')).join(' ');
+    const rk = (v) => { const r = api.calc(v, RW38, T38); return sh38(r) + (r && ((r.chain && (r.chain.chk || []).indexOf('rec') >= 0) || r.rec) ? '|rec' : ''); };
+    E.vehicles.push({ id: 'Q1', no: '00가0101', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2018-03-10', insp_due: '2026-03-09', updated: '2026-11-01' },
+      { id: 'Q2', no: '00가0102', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2018-03-10', insp_due: '2025-09-09', updated: '2026-11-01' },
+      { id: 'Q3', no: '00가0103', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2023-04-01', insp_due: '2025-04-09', updated: '2026-11-01' },
+      { id: 'Q4', no: '00가0104', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2022-03-10', insp_due: '2024-03-09', updated: '2026-11-01' },
+      { id: 'Q5', no: '00가0105', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2021-03-02', insp_due: '2027-05-30', insp_ext: '2026-06-10', updated: '2026-11-01' },
+      { id: 'Q6', no: '00가0106', state: '검사보류', biz: '사업용', size: '대형 화물', reg_date: '2021-03-02', insp_due: '2027-05-30', updated: '2026-11-01' });
+    mv('Q1', { vehInspExt: '2026-04-30' }); mv('Q1', { vehInsp: '2026-12-09' }); const k1a = vq('Q1').insp_ext; mv('Q1', { vehInsp: '2026-03-09' }); mv('Q1', { vehInsp: '2026-10-31', vehInspDone: '2026-04-20' });
+    const fK1 = [k1a, lg('Q1'), String('insp_ext' in vq('Q1')), rk(vq('Q1'))].join('|');
+    mv('Q2', { vehInsp: '2026-03-19', vehInspDone: '2025-09-01' }); mv('Q2', { vehInspExt: '2026-05-31' }); mv('Q2', { vehInsp: '2026-03-09' });
+    const fS1 = [lg('Q2'), vq('Q2').insp_ext, rk(vq('Q2'))].join('|');
+    mv('Q3', { vehInsp: '2026-02-20', vehInspDone: '2025-04-01' }); mv('Q3', { vehInsp: '2026-04-09', vehInspDone: '2025-04-01' });
+    const fS2 = [lg('Q3'), rk(vq('Q3'))].join('|');
+    mv('Q4', { vehInsp: '2025-05-20', vehInspDone: '2024-05-20' }); mv('Q4', { vehInsp: '2024-03-09' }); mv('Q4', { vehInsp: '2025-05-20' });
+    const q4c = api.badge(api.calc(vq('Q4'), RW38, T38), 'cell').replace(/<[^>]+>/g, ''), q4d = api.badge(api.calc(vq('Q4'), RW38, T38), 'det').replace(/<[^>]+>/g, '|');
+    //   기록 밖에서 만기를 기간 폭 안으로 바꾼 차(마지막 기록 확정 ≠ 지금 만기) = 확인 필요
+    const p4 = V({ size: '대형 화물', reg_date: '2018-03-10', insp_due: '2026-03-09' }); stp(p4, '2026-09-09', { insp_done: '2026-03-01' }); p4.insp_due = '2026-09-12';
+    //   K4 꼴(차령 경계 앞뒤): 갱신 → 앞으로 간 오타(같은 수검일) → 되돌림 = 뒤로 간 줄은 갱신 꼴이 아님 → 확인 필요
+    const k4 = V({ size: '대형 화물', reg_date: '2020-12-01', insp_due: '2026-04-25', insp_log: [L({ prev: '2025-04-28', confirmed: '2026-04-25', insp_done: '2025-01-28' }), L({ prev: '2026-04-25', confirmed: '2025-12-25', insp_done: '2025-01-28' }), L({ prev: '2025-12-25', confirmed: '2026-04-25', insp_done: '' })] });
+    const fK2 = [lg('Q4'), rk(vq('Q4')), q4c, q4d, rk(p4), rk(k4)].join('|');
+    const m1c = mv('Q5', { vehNote: '메모만' }); api.open('Q6'); const greyRec = el('vehInspRec').style.display;
+    E.vehicles.push({ id: 'Q7', no: '00가0107', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2021-03-02', insp_due: '2026-04-23', updated: '2026-11-01' });
+    const y1999 = mv('Q7', { vehInsp: '2027-04-23', vehInspDone: '1999-12-31' }), ext30 = mv('Q7', { vehInspExt: '2028-10-23' });
+    const fM1 = [JSON.stringify(m1c), vq('Q5').note, vq('Q5').insp_ext, greyRec, y1999.join(''), ext30.length, vq('Q7').insp_ext].join('|');
+    //   M1 둘: 낡은 연장 칸(종전 만기 이하)을 둔 채 만기만 E 앞 31~90일로 바꾸는 중 = 창 안 제안도 세 칸 빈 줄로 셈(저장 뒤와 같게 확인 필요)
+    //   · 창이 열린 사이 다른 기기가 만기를 바꿔 손대지 않은 연장 칸이 낡은 값이 된 뒤 갱신 저장 = 막지 않음·기록 줄에 그 연장 안 실림
+    E.vehicles.push({ id: 'Q8', no: '00가0108', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2023-04-01', insp_due: '2026-04-23', insp_ext: '2026-03-30', updated: '2026-11-01' },
+      { id: 'Q9', no: '00가0109', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2023-04-01', insp_due: '2025-04-23', insp_ext: '2025-05-30', updated: '2026-11-01' });
+    api.open('Q8'); el('vehInsp').value = '2027-03-01'; api.refresh(); const q8h = /확인 필요/.test(el('vehLawHint').innerHTML.replace(/ title="[^"]*"/g, ''));
+    api.save(); const q8s = rk(vq('Q8')).split('|').pop();
+    E.calls.length = 0; api.open('Q9'); vq('Q9').insp_due = '2026-04-23'; el('vehInsp').value = '2027-04-23'; el('vehInspDone').value = '2026-04-10'; api.save();
+    const fM3 = [String(q8h), q8s, E.calls.length, lg('Q9')].join('|');
+    const LU = { at: '2026-11-19', prev: '2026-04-23', confirmed: '2027-04-23', proposed: '', rule: '', diff: null, by: 'u1', src: 'edit' };
+    const two = api.union([Object.assign({}, LU, { insp_done: '2026-04-10' })], [Object.assign({}, LU, { insp_done: '2026-01-10' }), Object.assign({}, LU, { insp_done: '2026-04-10' })]);
+    const fM2 = [two.length, two.map((x) => x.insp_done).join(','), rk(V({ size: '대형 화물', reg_date: '2021-03-02', insp_due: '2027-04-23', insp_log: two }))].join('|');
+    const hl = (done) => { const r = api.calc(V({ size: '소형 화물', reg_date: '2019-06-10', insp_due: '2026-08-21', insp_log: [L({ prev: '2026-01-14', confirmed: '2026-08-21', insp_done: done })] }), RW38, T38); return sh38(r) + '/' + ((r.chain || {}).chk || []).join(','); };
+    const fL1 = [hl('2026-02-21'), hl('2026-02-24'), hl('2026-02-25')].join('|');
+    const xo = V({ size: '대형 화물', reg_date: '2022-03-02', insp_due: '2027-07-31', insp_log: [L({ prev: '2026-04-23', confirmed: '2027-07-31', insp_done: '', insp_ext: '2026-07-31' })] });
+    const g27 = V({ size: '대형 화물', reg_date: '2021-03-02', insp_due: '2027-04-23', insp_log: [{ at: '2026-11-13', prev: '2026-04-23', confirmed: '2027-04-23', proposed: '2027-03-01', rule: 't38.m12', diff: 53, by: 'u1', src: 'edit' }] });
+    const fX = [rk(xo), String(sh38(api.calc(g27, RW38, T38)) === sh38(api.calc(V({ size: '대형 화물', reg_date: '2021-03-02', insp_due: '2027-04-23' }), RW38, T38))), sh38(api.calc(g27, RW38, T38))].join('|');
+    R.re6 = [fK1, fS1, fS2, fK2, fM1, fM3, fM2, fL1, fX].join(' # ');
+    Object.assign(api.VEH_LAW, { on: false, ver: '', rows: [], attr: null, at: Date.now(), busy: false });
+    R.re3 = [fA, fB, fC, fE].join(' # ');
+    R.re5 = fP;
+    R.re = [re0, re1, re1cell, re12, reOut, reAmb].join(' # ');
+    // ⑨ 근거 표 옛 판(기간 칸 없음) = 판38 기록이 있어도 누적식 그대로 · 기간 칸 꼴 틀린 행 = 쓰지 않음
+    const vo = V(Object.assign({ insp_due: '2026-01-05', insp_log: [L({ prev: '2024-05-09', confirmed: '2026-01-05', insp_done: '2024-01-05' })] }, v1));
+    const ro = api.calc(vo, OLD38, T38);
+    R.oldBg = sh38(ro) + '|' + ('chain' in ro) + '|' + [api.rowOk(RW38[0]), api.rowOk(OLD38[0]), api.rowOk(Object.assign({}, RW38[0], { win_before: '90' })), api.rowOk(Object.assign({}, OLD38[0], { win_basis: 'pass' })), api.rowOk(Object.assign({}, RW38[0], { win_basis: 'receive' })), api.rowOk(Object.assign({}, RW38[0], { win_after: 31.5 }))].join(',');
+    // ⑩ 승격 전 = 새 칸·건설기계 안내 숨김 · 넣은 칸이 있어도 기록·연장 칸 안 씀(종전 저장) · 완료 창 칸 숨김·law 없음
+    E.vehicles.push({ id: 'M1', no: '00가0001', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2021-03-02', insp_due: '2026-04-23', updated: '2026-11-01' });
+    api.open('M1'); el('vehInsp').value = '2027-04-23'; el('vehInspDone').value = '2026-04-10'; el('vehInspExt').value = '2026-05-30'; api.refresh();
+    const offShow = [el('vehInspRec').style.display, el('vehCeqHint').style.display, el('vehLawHint').style.display].join(',');
+    api.save(); const m0 = JSON.parse(JSON.stringify(api.veh('M1')));
+    R.off = offShow === 'none,none,none' && m0.insp_due === '2027-04-23' && !('insp_log' in m0) && !('insp_ext' in m0) && E.calls.length === 0;
+    m0.insp_due = '2026-04-23'; E.vehicles.splice(0, 1, Object.assign({}, m0, { insp_due: '2026-04-23' }));
+    E.tasks.push({ id: 'tq', title: '지시', auto_key: 'veh:M1:insp:2026-04-23', who_id: 'u1', status: 'open', from: '자동', from_id: '' });
+    E.gw = (b) => ({ status: 200, body: { status: 'OK', vehicle: { id: 'M1', field: 'insp_due', value: b.date, prev: '2026-04-23', updated: T38 }, updated_at: 7 } });
+    api.toggle('tq'); const offDue = el('vehDueRec').style.display; el('vehDueDate').value = '2027-04-23'; el('vehDueDone').value = '2026-04-10'; api.dueOk();
+    R.offDue = offDue === 'none' && E.sent.length === 1 && !('law' in E.sent[0]) && api.veh('M1').insp_due === '2027-04-23';
+    // ⑪ 승격 — 수정 창: 칸 보임 · 신청일은 건설기계만 · 시안 ① 예(종전 만기 2026-04-23 · 수검일 2026-04-10 → 2027-04-23 차이 0 · 초록 줄 글) · 저장 = 기록 줄에 새 칸 · 다시 계산 = 이어 세기
+    Object.assign(api.VEH_LAW, { on: true, ver: 't38', rows: RMK38, attr: null, at: Date.now(), busy: false });
+    E.vehicles.splice(0, E.vehicles.length, { id: 'M1', no: '00가0001', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2021-03-02', insp_due: '2026-04-23', updated: '2026-11-01' },
+      { id: 'M2', no: '00가0002', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2021-03-02', insp_due: '2026-04-23', insp_ext: '2026-06-15', updated: '2026-11-01' },
+      { id: 'M3', no: '00가0003', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2021-03-02', insp_due: '2027-04-23', updated: '2026-11-01' },
+      { id: 'K1', no: '00가0004', state: '운행', size: '건설기계', ceq_kind: '덤프트럭', reg_date: '2016-07-01', insp_due: '2025-06-30', updated: '2026-11-01' });
+    E.calls.length = 0;
+    api.open(); const newHide = el('vehInspRec').style.display + ',' + el('vehCeqHint').style.display; api.open('M1');
+    const onShow = [el('vehInspRec').style.display, el('vehCeqHint').style.display, String(el('vehInspApply').disabled)].join(',');
+    const hint0 = el('vehLawHint').innerHTML.replace(/ title="[^"]*"/g, '');
+    el('vehInsp').value = '2027-04-23'; el('vehInspDone').value = '2026-04-10'; api.refresh();
+    const hint1 = el('vehLawHint').innerHTML.replace(/ title="[^"]*"/g, '');
+    api.save(); const m1 = JSON.parse(JSON.stringify(api.veh('M1'))), e1 = (m1.insp_log || [])[0] || {};
+    const r1 = api.calc(m1, RMK38, T38);
+    R.modal = onShow === ',,true' && newHide === 'none,' && hint0 === '<span class="vl-b am">법정 제안: 2026-03-01 · 차이 +53일</span><span class="vl-n" style="display:block;font-size:11.5px;color:var(--sub);margin-top:2px;">제안은 모든 회차를 검사 기간 안에 받았다고 보고 센 날 — 기간 밖 수검·연장·유예·이전등록이 있었으면 넣은 날짜가 맞을 수 있음</span>'
+      && hint1 === '<span class="vl-b ok">법정 제안: 2027-04-23 · 차이 0일</span><span class="vl-n" style="display:block;font-size:11.5px;color:#1F6B3A;margin-top:2px;">직전 수검일 기준 — 종전 만기 2026-04-23, 수검일 2026-04-10(검사 기간 안) → 2026-04-24부터 셈</span>'
+      && m1.insp_due === '2027-04-23' && (m1.insp_log || []).length === 1 && e1.prev === '2026-04-23' && e1.confirmed === '2027-04-23' && e1.insp_done === '2026-04-10' && e1.proposed === '2027-04-23' && e1.diff === 0 && e1.rule === 't38.y1' && e1.src === 'edit' && !('insp_apply' in e1) && !('insp_ext' in e1) && !('ts' in e1) && !('dropped' in e1)
+      && r1.date === '2027-04-23' && r1.diff === 0 && r1.chain && r1.chain.start === '2026-04-24' && E.calls.length === 0;
+    R.modalInfo = { onShow, hint0, hint1, e1 };
+    // 연장 만료일: 차량 줄 값이 창에 · 만기를 바꾸면 기록 줄로 옮기고 차량 줄은 비움 · 만기 그대로 연장만 = 차량 줄에 · 지움 = 키째
+    api.open('M2'); const extIn = el('vehInspExt').value; el('vehInsp').value = '2027-06-15'; el('vehInspDone').value = '2026-07-01'; api.save();
+    const m2 = api.veh('M2'), e2 = (m2.insp_log || [])[0] || {};
+    api.open('M3'); el('vehInspExt').value = '2027-05-31'; api.save(); const m3a = JSON.parse(JSON.stringify(api.veh('M3')));
+    api.open('M3'); el('vehInspExt').value = ''; api.save(); const m3b = JSON.parse(JSON.stringify(api.veh('M3')));
+    R.extInfo = { extIn, m2: JSON.parse(JSON.stringify(m2)), m3a, m3b, calls: E.calls.slice() };
+    R.ext = extIn === '2026-06-15' && !('insp_ext' in m2) && e2.insp_ext === '2026-06-15' && e2.insp_done === '2026-07-01' && e2.proposed === '2027-06-15' && e2.diff === 0
+      && m3a.insp_ext === '2027-05-31' && !('insp_log' in m3a) && !('insp_ext' in m3b) && E.calls.length === 0;
+    // 5차 검토: 수검일 정정 길 없음 — 창의 수검일·신청일 칸은 늘 빈 칸 · 만기 그대로 수검일만 넣으면 안내(저장 안 함)
+    //   같은 회차 정정(새 만기가 종전 만기의 기간 폭 안)에 수검일을 넣으면 기록 줄 수검일 "" + 저장 뒤 안내 한 줄(토스트) · 창 칩도 수검일을 뺀 줄로 셈
+    E.vehicles.push({ id: 'M5', no: '00가0010', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2021-03-02', insp_due: '2027-04-23', updated: '2026-11-01',
+      insp_log: [{ at: '2026-11-01', prev: '2026-04-23', confirmed: '2027-04-23', proposed: '2027-04-23', rule: 't38.y1', diff: 0, by: 'u1', src: 'edit', insp_done: '2026-04-10' }] });
+    E.calls.length = 0; E.toasts = [];
+    api.open('M5'); const dr0 = el('vehInspDone').value; el('vehInsp').value = '2027-04-30'; el('vehInspDone').value = '2026-04-10'; api.refresh();
+    const drHint = el('vehLawHint').innerHTML.replace(/<[^>]+>/g, '|');
+    api.save(); const dr1 = api.veh('M5').insp_log.map((x) => x.insp_done + '/' + ('dropped' in x)).join(',');
+    R.drop = [dr0, dr1, E.toasts.join('|'), E.calls.length, /2027-04-23 · 차이 \+7일/.test(drHint)].join(',');
+    // 건설기계: 신청일 칸 열림 · 사업용 여부·연식 없이 제안 · 기록 줄에 신청일 · 수검일 비움 = "" 로 남음(판38 줄 표시)
+    api.open('K1'); const kApply = el('vehInspApply').disabled; el('vehInsp').value = '2026-06-30'; el('vehInspApply').value = '2025-07-25'; api.save();
+    const k1 = api.veh('K1'), ek = (k1.insp_log || [])[0] || {};
+    // 시험 근거 표 RMK38 에는 건설기계 행이 없음 = 기준 없음(제안 "" · 차이 null) — 기록 줄은 그대로 남음
+    R.ceq = kApply === false && ek.insp_apply === '2025-07-25' && ek.insp_done === '' && ek.proposed === '' && ek.rule === '' && ek.diff === null && ek.confirmed === '2026-06-30';
+    // 확인 안내(저장 안 함): 오늘 뒤 수검일 · 만기 안 바꾼 수검일 · 종전 만기 앞 연장 · 달력에 없는 날 · 신청일 > 수검일
+    const why = [];
+    const tryW = (id, vals) => { E.calls.length = 0; const before = JSON.stringify(api.veh(id)); api.open(id); Object.keys(vals).forEach((k) => { el(k).value = vals[k]; }); api.save(); why.push((E.calls[0] || '') + (JSON.stringify(api.veh(id)) === before ? '' : ' [저장됨]')); };
+    E.vehicles.push({ id: 'M4', no: '00가0005', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2021-03-02', insp_due: '2026-04-23', updated: '2026-11-01' }, { id: 'K2', no: '00가0006', state: '운행', size: '건설기계', ceq_kind: '덤프트럭', reg_date: '2016-07-01', insp_due: '2025-06-30', updated: '2026-11-01' });
+    tryW('M4', { vehInsp: '2027-04-23', vehInspDone: '2026-11-20' }); tryW('M4', { vehInspDone: '2026-04-10' }); tryW('M4', { vehInspExt: '2026-04-23' }); tryW('M4', { vehInsp: '2027-04-23', vehInspDone: '2026-02-30' });
+    tryW('K2', { vehInsp: '2026-06-30', vehInspApply: '2025-07-25', vehInspDone: '2025-07-20' });
+    tryW('M4', { vehInsp: '2027-04-23', vehInspDone: '2016-04-10' }); tryW('M4', { vehInspExt: '2099-01-01' });
+    // 재검토: 만기가 3년 넘게 묵은 차의 첫 수검일(새 만기 근처) = 막지 않음(범위는 종전 만기 또는 새 만기 앞뒤)
+    E.vehicles.push({ id: 'M6', no: '00가0011', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2015-03-02', insp_due: '2020-01-01', updated: '2026-11-01' });
+    tryW('M6', { vehInsp: '2027-01-01', vehInspDone: '2026-10-01' });
+    R.why = why.join('|');
+    // ⑫ 지시 완료 창(승격): 검사 지시 = 칸 보임(신청일은 건설기계만 · 연장 만료일은 차량 줄 값) · 보낼 law 에 새 칸 · 응답 기록을 로컬 줄에 · 연장 칸 비움 · 받은 사본도 전진 · 확인 안내
+    E.vehicles.splice(0, E.vehicles.length, { id: 'D1', no: '00가0007', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2021-03-02', insp_due: '2026-05-10', insp_ext: '2026-06-20', updated: '2026-11-01' },
+      { id: 'D2', no: '00가0008', state: '운행', size: '건설기계', ceq_kind: '덤프트럭', reg_date: '2016-07-01', insp_due: '2025-06-30', updated: '2026-11-01' });
+    E.tasks.splice(0, E.tasks.length, { id: 'td', title: '지시', auto_key: 'veh:D1:insp:2026-05-10', who_id: 'u1', status: 'open', from: '자동', from_id: '' }, { id: 'tc', title: '지시', auto_key: 'veh:D2:insp:2025-06-30', who_id: 'u1', status: 'open', from: '자동', from_id: '' },
+      { id: 'tb', title: '지시', auto_key: 'veh:D1:ins:2026-12-20', who_id: 'u1', status: 'open', from: '자동', from_id: '' });
+    api.imBaseSet('vehicles', E.vehicles);
+    E.sent.length = 0;
+    E.gw = (b) => ({ status: 200, body: Object.assign({ status: 'OK', vehicle: { id: b.task_id === 'tc' ? 'D2' : 'D1', field: 'insp_due', value: b.date, prev: b.base_due, updated: T38 }, updated_at: 9 },
+      b.law ? { law_log: Object.assign({ at: T38, prev: b.base_due, confirmed: b.date, proposed: b.law.proposed, rule: b.law.rule, diff: 0, by: 'u1', src: 'task' }, 'insp_done' in b.law ? { insp_done: b.law.insp_done } : {}, b.law.insp_apply ? { insp_apply: b.law.insp_apply } : {}, b.law.insp_ext ? { insp_ext: b.law.insp_ext } : {}) } : {}) });
+    api.toggle('td'); const dShow = [el('vehDueRec').style.display, el('vehDueApplyW').style.display, el('vehDueExt').value].join(',');
+    el('vehDueDate').value = '2027-06-20'; el('vehDueDone').value = '2026-11-20'; api.dueOk(); const dErr1 = el('vehDueErr').textContent, n1 = E.sent.length;
+    el('vehDueDone').value = '2026-07-01'; api.dueOk();
+    const d1 = api.veh('D1'), bs = api.imSt('vehicles').base.D1 || {};
+    R.due = dShow === ',none,2026-06-20' && n1 === 0 && /수검일이 오늘 뒤입니다/.test(dErr1) && JSON.stringify(E.sent[0] && E.sent[0].law) === '{"proposed":"2027-06-20","rule":"t38.y1","insp_done":"2026-07-01","insp_ext":"2026-06-20","ext_was":"2026-06-20"}'
+      && d1.insp_due === '2027-06-20' && !('insp_ext' in d1) && (d1.insp_log || []).length === 1 && d1.insp_log[0].insp_ext === '2026-06-20' && !('insp_ext' in bs) && bs.insp_due === '2027-06-20' && (bs.insp_log || []).length === 1
+      && api.calc(d1, RMK38, T38).date === '2027-06-20';
+    E.sent.length = 0; api.toggle('tc'); const cShow = [el('vehDueRec').style.display, el('vehDueApplyW').style.display].join(',');
+    el('vehDueDate').value = '2026-06-30'; el('vehDueApply').value = '2025-07-25'; el('vehDueDone').value = ''; api.dueOk();
+    E.sent.length = 0; api.toggle('tb'); const bShow = el('vehDueRec').style.display; el('vehDueDate').value = '2027-12-20'; api.dueOk();
+    const lD2 = (api.veh('D2').insp_log || [])[0] || {};
+    R.dueCeq = cShow === ',' && lD2.insp_apply === '2025-07-25' && lD2.insp_done === '' && bShow === 'none' && E.sent.length === 1 && !('law' in E.sent[0]);
+    R.dueInfo = { dShow, dErr1, sent: E.sent, cShow, bShow };
+    // 응답 기록 줄에 수검일 칸이 없으면(판38 전 서버) 이 화면 연장 칸을 지우지 않음(extGone 조건)
+    E.vehicles.push({ id: 'D3', no: '00가0009', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2021-03-02', insp_due: '2026-05-10', insp_ext: '2026-06-20', updated: '2026-11-01' });
+    E.tasks.push({ id: 't3', title: '지시', auto_key: 'veh:D3:insp:2026-05-10', who_id: 'u1', status: 'open', from: '자동', from_id: '' });
+    E.gw = (b) => ({ status: 200, body: { status: 'OK', vehicle: { id: 'D3', field: 'insp_due', value: b.date, prev: b.base_due, updated: T38 }, updated_at: 11, law_log: { at: T38, prev: b.base_due, confirmed: b.date, proposed: '', rule: '', diff: null, by: 'u1', src: 'task' } } });
+    api.toggle('t3'); el('vehDueDate').value = '2027-06-20'; el('vehDueDone').value = ''; api.dueOk();
+    R.dueOld = api.veh('D3').insp_ext === '2026-06-20' && (api.veh('D3').insp_log || []).length === 1 && api.veh('D3').insp_due === '2027-06-20';
+    // 5차 검토: 완료 창 같은 회차 정정(2026-05-10 → 2026-05-20 · 기간 폭 안)에 수검일 = 보낼 law 수검일 "" · 끝 안내에 한 줄 · 서버가 뺐다고 하면(insp_dropped) 같은 안내
+    E.vehicles.push({ id: 'D4', no: '00가0014', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2021-03-02', insp_due: '2026-05-10', updated: '2026-11-01' });
+    E.tasks.push({ id: 't4', title: '지시', auto_key: 'veh:D4:insp:2026-05-10', who_id: 'u1', status: 'open', from: '자동', from_id: '' });
+    E.gw = (b) => ({ status: 200, body: { status: 'OK', vehicle: { id: 'D4', field: 'insp_due', value: b.date, prev: b.base_due, updated: T38 }, updated_at: 12 } });
+    E.sent.length = 0; E.toasts = [];
+    api.toggle('t4'); el('vehDueDate').value = '2026-05-20'; el('vehDueDone').value = '2026-05-01'; api.dueOk();
+    R.dueDrop = JSON.stringify(E.sent[0] && E.sent[0].law) + '|' + E.toasts.join('|');
+    // 6차 검토: 완료 창 — 새 만기 없이 수검일만 = 안내·보냄 0 · 낡은 연장 칸(종전 만기 이하)은 미리 채우지 않음 · 서버 ext_now(새 값)을 이 화면 줄에
+    E.vehicles.push({ id: 'D5', no: '00가0015', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2021-03-02', insp_due: '2026-05-10', insp_ext: '2026-01-10', updated: '2026-11-01' });
+    E.tasks.push({ id: 't5', title: '지시', auto_key: 'veh:D5:insp:2026-05-10', who_id: 'u1', status: 'open', from: '자동', from_id: '' });
+    E.gw = (b) => ({ status: 200, body: { status: 'OK', vehicle: { id: 'D5', field: 'insp_due', value: b.date, prev: b.base_due, updated: T38 }, updated_at: 13, ext_now: '2026-06-30', law_log: { at: T38, prev: b.base_due, confirmed: b.date, proposed: '', rule: '', diff: null, by: 'u1', src: 'task', insp_done: '' } } });
+    E.sent.length = 0; api.toggle('t5'); const d5ext = el('vehDueExt').value; el('vehDueDate').value = ''; el('vehDueDone').value = '2026-05-01'; api.dueOk(); const d5err = el('vehDueErr').textContent, d5n = E.sent.length;
+    el('vehDueDate').value = '2026-05-20'; el('vehDueDone').value = ''; el('vehDueExt').value = '2026-06-30'; api.dueOk();
+    R.dueEmpty = [JSON.stringify(d5ext), /새 검사 만기를 넣을 때만 기록됩니다/.test(d5err), d5n, E.sent.length, api.veh('D5').insp_ext].join('|');
+    // ⑳ 8차 지시(7차 검토 재현 꼴 — 실제 수정 창·완료 창·계산 · 세 등급 ㉮㉯㉰)
+    const recR = (r) => !!(r && ((r.chain && (r.chain.chk || []).indexOf('rec') >= 0) || r.rec));
+    const cmpOp = (v) => { const r0 = Object.assign({}, v); delete r0.insp_log; const a = api.calc(v, RW38, T38), b = api.calc(r0, RW38, T38); return [sh38(a), api.badge(a, 'cell'), api.badge(a, 'det')].join('|') === [sh38(b), api.badge(b, 'cell'), api.badge(b, 'det')].join('|'); };
+    //   켜짐 조건(7차 ⑥⑧): 옛 판(기간 칸 0행)이 승격된 채 = 수정 창·완료 창 칸 숨김 · 만기·수검일을 넣고 저장해도 기록 줄에 새 열쇠 없음 · 계산 운영 그대로
+    Object.assign(api.VEH_LAW, { on: true, ver: 't38old', rows: OLD38, attr: null, at: Date.now(), busy: false });
+    E.vehicles.push({ id: 'Z1', no: '00가0201', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2023-04-01', insp_due: '2026-04-23', updated: '2026-11-01' });
+    E.calls.length = 0; api.open('Z1'); const zRec = el('vehInspRec').style.display + ',' + el('vehCeqHint').style.display; el('vehInsp').value = '2027-04-23'; el('vehInspDone').value = '2026-04-10'; api.save();
+    const z1l = (vq('Z1').insp_log || [])[0] || {};
+    E.tasks.push({ id: 'tz1', title: '지시', auto_key: 'veh:Z1:insp:2027-04-23', who_id: 'u1', status: 'open', from: '자동', from_id: '' });
+    E.gw = (b) => ({ status: 200, body: { status: 'OK', vehicle: { id: 'Z1', field: 'insp_due', value: b.date, prev: b.base_due, updated: T38 }, updated_at: 21 } });
+    E.sent.length = 0; api.toggle('tz1'); const zDue = el('vehDueRec').style.display; el('vehDueDate').value = '2028-04-23'; el('vehDueDone').value = '2027-04-01'; api.dueOk();
+    const fOff = [zRec, String(api.on38()), E.calls.length, (vq('Z1').insp_log || []).length, String('insp_done' in z1l), zDue, String(!!(E.sent[0] && E.sent[0].law && 'insp_done' in E.sent[0].law)), String(cmpOp(vq('Z1'))), sh38(api.calc(vq('Z1'), OLD38, T38))].join('|');
+    Object.assign(api.VEH_LAW, { on: true, ver: 't38r', rows: RW38, attr: null, at: Date.now(), busy: false });
+    //   저장 검사(7차 ⓪): 수검일이 새 만기보다 뒤 = 안내·저장 안 함 · 만기 빈 차의 첫 줄(종전 만기 "") 뒤 갱신(7차 ③) = 저장됨·수검일 남음·예외 없음
+    E.vehicles.push({ id: 'Z2', no: '00가0202', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2023-04-01', insp_due: '2026-04-23', updated: '2026-11-01' },
+      { id: 'Z3', no: '00가0203', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2023-04-01', updated: '2026-11-01' });
+    const zAfter = mv('Z2', { vehInsp: '2026-06-01', vehInspDone: '2026-07-01' }).join('');
+    const z3a = mv('Z3', { vehInsp: '2025-09-09', vehInspDone: '2024-09-05' }), z3b = mv('Z3', { vehInsp: '2026-09-09', vehInspDone: '2025-09-01' });
+    const fSave = [zAfter, vq('Z2').insp_due, z3a.concat(z3b).join(''), lg('Z3'), rk(vq('Z3'))].join('|');
+    //   연장 한살이(7차 ①②⑤⑦): 넣은 연장이 갱신 꼴 값 줄이 아니라 못 실리면 차량 줄에 남고 그 회차 확인 필요 · 같은 회차 정정(달 오타)에 연장 = 안 실리고 차량 줄 그대로 → 바로잡는 값 갱신에 실림(차량 줄 비움)
+    //   · 수검일 비운 바로잡음이면 값 줄 없음 + 연장이 이 회차에 걸림 = 확인 필요 · 두 화면(연장 · 갱신)이 겹친 기록 = 확인 필요
+    E.vehicles.push({ id: 'Z4', no: '00가0204', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2023-04-01', insp_due: '2026-04-23', insp_ext: '2026-06-30', updated: '2026-11-01' },
+      { id: 'Z5', no: '00가0205', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2023-04-01', insp_due: '2026-04-23', insp_ext: '2026-05-30', updated: '2026-11-01' },
+      { id: 'Z6', no: '00가0206', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2023-04-01', insp_due: '2026-04-23', insp_ext: '2026-05-30', updated: '2026-11-01' });
+    mv('Z4', { vehInsp: '2027-06-30', vehInspDone: '2026-01-10' });
+    mv('Z5', { vehInsp: '2026-05-23', vehInspDone: '2026-04-10' }); const z5a = lg('Z5') + '/' + vq('Z5').insp_ext; mv('Z5', { vehInsp: '2027-05-30', vehInspDone: '2026-04-10' });
+    mv('Z6', { vehInsp: '2026-05-23' }); mv('Z6', { vehInsp: '2027-05-30' });
+    const z7 = V({ size: '대형 화물', reg_date: '2023-04-01', insp_due: '2027-04-23', insp_ext: '2026-05-30', insp_log: [L({ prev: '2026-04-23', confirmed: '2027-04-23', insp_done: '2026-04-10' })] });
+    const fExt = [lg('Z4'), vq('Z4').insp_ext, rk(vq('Z4')), z5a, lg('Z5'), String('insp_ext' in vq('Z5')), rk(vq('Z5')), lg('Z6'), vq('Z6').insp_ext, rk(vq('Z6')), rk(z7)].join('|');
+    //   과다 경고(7차 권고): 오타 → 정정(빈 줄) → 다음 값 갱신 = 곧바로 조용 · 값 갱신 → 비운 갱신 = 그 회차 확인 필요 → 다음 값 갱신에서 풀림 · 판38 줄 없는 차의 만기 정정 = 운영 그대로
+    const ow = V({ size: '대형 화물', reg_date: '2023-04-01', insp_due: '2025-04-23' }); stp(ow, '2026-05-23', { insp_done: '' }); stp(ow, '2026-04-23', { insp_done: '' }); stp(ow, '2027-04-23', { insp_done: '2026-04-10' });
+    const ob = V({ size: '대형 화물', reg_date: '2023-04-01', insp_due: '2024-04-23' }); stp(ob, '2025-04-23', { insp_done: '2024-04-10' }); stp(ob, '2026-04-23', { insp_done: '' }); const obMid = rk(ob); stp(ob, '2027-04-23', { insp_done: '2026-04-10' });
+    const oc = V({ size: '대형 화물', reg_date: '2023-04-01', insp_due: '2026-04-23' }); stp(oc, '2026-04-30', { insp_done: '' });
+    const fOver = [rk(ow), obMid, rk(ob), rk(oc), String(cmpOp(oc)), String(cmpOp(Object.assign({}, ob, { insp_log: ob.insp_log.map((x) => Object.assign({}, x, { insp_done: '' })) })))].join('|');
+    //   예외 거름(7차 ③): 깨진 기록(빈 글자·꼴 틀린 날짜·순서 뒤바뀜·같은 at·종전 만기 빔·글자 아닌 값) 무작위 3000 = 계산·칩 그리기 예외 0 · 계산이 예외로 삼켜진 차(null) 0
+    let bx = 0, bnull = 0; { let sd = 77; const rr = () => { sd = (sd * 1103515245 + 12345) % 2147483648; return sd / 2147483648; };
+      const pool = ['', '2026-02-30', '2026-04-23', '2025-04-23', '2027-04-23', '2026-13-01', 'x', null, 7, '1999-01-01', '2026-04-10', '2027-04-30', undefined];
+      const pk = () => pool[Math.floor(rr() * pool.length)];
+      for (let q = 0; q < 3000; q++) { const n = Math.floor(rr() * 5), lgx = []; for (let j = 0; j < n; j++) lgx.push(rr() < 0.1 ? (rr() < 0.5 ? null : 'x') : { at: rr() < 0.5 ? '2026-01-01' : pk(), prev: pk(), confirmed: pk(), insp_done: rr() < 0.2 ? pk() : (rr() < 0.5 ? '' : pk()), insp_apply: rr() < 0.3 ? pk() : undefined, insp_ext: rr() < 0.3 ? pk() : undefined });
+        const v = V({ size: rr() < 0.2 ? '건설기계' : '대형 화물', ceq_kind: '덤프트럭', reg_date: '2023-04-01', insp_due: rr() < 0.8 ? '2026-04-23' : pk(), insp_ext: rr() < 0.3 ? pk() : undefined, insp_log: lgx });
+        try { const r = api.calc(v, RW38, T38); if (r === null) bnull++; api.badge(r, 'cell'); api.badge(r, 'det'); api.badge(r, 'modal'); } catch (e) { bx++; } } }
+    const fBreak = bx + '/' + bnull;
+    //   완료 창: 검사보류 차 = 검사 기록 칸 숨김 · 새 만기 없이 연장 칸만 지움 = 그 말로 안내·보냄 0
+    E.vehicles.push({ id: 'Z8', no: '00가0208', state: '검사보류', biz: '사업용', size: '대형 화물', reg_date: '2023-04-01', insp_due: '2026-04-23', updated: '2026-11-01' },
+      { id: 'Z9', no: '00가0209', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2023-04-01', insp_due: '2026-04-23', insp_ext: '2026-05-30', updated: '2026-11-01' });
+    E.tasks.push({ id: 'tz8', title: '지시', auto_key: 'veh:Z8:insp:2026-04-23', who_id: 'u1', status: 'open', from: '자동', from_id: '' }, { id: 'tz9', title: '지시', auto_key: 'veh:Z9:insp:2026-04-23', who_id: 'u1', status: 'open', from: '자동', from_id: '' });
+    api.toggle('tz8'); const z8 = el('vehDueRec').style.display; E.sent.length = 0; api.toggle('tz9'); el('vehDueDate').value = ''; el('vehDueExt').value = ''; api.dueOk();
+    const fDue = [z8, el('vehDueErr').textContent, E.sent.length].join('|');
+    //   앱·서버 같은 행 판정(7차: 차령 2년 경계 177/12만 어긋남): 같은 회차 정정·갱신 꼴 값 저장 — 앱 vehLawSame·vehLawRenewOk vs 서버 vehLawSameS·vehLawRenewS(실제 gw-data.js 함수) 무작위 4000
+    const fS = (src, name) => { const i = src.search(new RegExp('\\nfunction ' + name + '\\(')); if (i < 0) throw new Error('서버 함수 없음: ' + name); let d = 0, st = false; for (let j = i + 1; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i + 1, j + 1); } } throw new Error('짝: ' + name); };
+    const SV = new Function(['vehDueDate', 'vehAddMonthsS', 'vehLawIntS', 'vehLawWinHasS', 'vehRealDateS', 'vehLawRowOkS', 'vehBg38S', 'vehLawHasS', 'vehLawAgeS', 'vehLawPickS', 'vehLawOkOfS', 'vehDayNumS', 'vehAddDaysS', 'vehLawEndS', 'vehLawSameS', 'vehLawRenewS'].map((n) => fS(gsrc || gwd, n)).join('\n') + '\nreturn { same: vehLawSameS, renew: vehLawRenewS, on38: vehBg38S };')();
+    //   근거 표 두 벌(RW38 · 행마다 기간 폭이 다른 RV38) · 차령 경계 고정 꼴(시작일 전날·종전 만기 날 차령 행이 다름 · 기간 밖 이른 수검 · 경계 E2로만 맞는 새 만기)
+    const RV38 = [Object.assign({}, RW38[1], { id: 'v.a', win_before: 60, win_after: 20 }), Object.assign({}, RW38[2], { id: 'v.b', win_before: 30, win_after: 10 }), Object.assign({}, RW38[0], { id: 'v.c', size: ['중형 화물', '소형 화물'] }), RW38[4]];
+    let pn = 0, pMis = 0, pSame = 0, pRen = 0; { let sd = 919; const rr = () => { sd = (sd * 1103515245 + 12345) % 2147483648; return sd / 2147483648; }, ad = (s, n) => new Date(Date.parse(s + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+      const KS = [{ size: '대형 화물' }, { size: '대형 화물' }, { size: '중형 화물' }, { size: '소형 화물' }, { size: '건설기계', ceq_kind: '덤프트럭', biz: '' }];
+      const one = (rows, v, prev, conf, ex) => { api.VEH_LAW.rows = rows; const a1 = api.same(v, prev, conf), b1 = SV.same({ rows: rows }, v, prev, conf), a2 = api.renew(v, prev, conf, ex), b2 = SV.renew({ rows: rows }, v, prev, conf, ex);
+        pn++; if (a1 !== b1 || a2 !== b2) pMis++; if (a1) pSame++; if (a2) pRen++; return a2; };
+      const fx = [one(RW38, V({ size: '대형 화물', reg_date: '2020-06-01' }), '2025-09-30', '2025-11-20', { insp_done: '2025-05-20' }), one(RW38, V({ size: '대형 화물', reg_date: '2020-06-01' }), '2025-05-31', '2025-11-30', { insp_done: '2025-05-20' })];
+      if (fx.join() !== 'false,true') pMis += 100;
+      for (let q = 0; q < 4000; q++) { const v = V(Object.assign({ reg_date: ad('2019-01-01', Math.floor(rr() * 2600)) }, KS[Math.floor(rr() * KS.length)])), prev = ad('2023-01-01', Math.floor(rr() * 1300)), conf = ad(prev, Math.floor(rr() * 520) - 60);
+        const ex = { insp_done: rr() < 0.7 ? ad(prev, Math.floor(rr() * 300) - 200) : '' }; if (v.size === '건설기계' && rr() < 0.5) ex.insp_apply = ad(prev, Math.floor(rr() * 120) - 90); if (rr() < 0.3) ex.insp_ext = ad(prev, Math.floor(rr() * 150) - 30);
+        one(q % 2 ? RV38 : RW38, v, prev, conf, ex); }
+      api.VEH_LAW.rows = RW38; }
+    const fPar = [pn, pMis, pSame, pRen, String(SV.on38({ rows: RW38 })), String(SV.on38({ rows: OLD38 }))].join('/');
+    //   깨끗 조건 하나씩(직접 기록): 차령 경계 회차 = 조용 + age · 경계 E2로만 맞는 새 만기 = 조용 · La 뒤 줄이 끊김(기록 밖에서 만기 바뀜) = 확인 필요 · 건설기계 신청일이 앞 값 줄과 같음 = 확인 필요
+    //   · 옛 판 근거 행 = 기록이 있어도 누적식(확인 필요 없음) · 합치기: 다른 값 줄끼리 빈 칸 안 섞음 · 같은 날 같은 만기라도 src가 다르면 두 줄
+    const cA = api.calc(V({ size: '대형 화물', reg_date: '2020-06-01', insp_due: '2026-05-31', insp_log: [L({ prev: '2025-05-31', confirmed: '2026-05-31', insp_done: '2025-05-20' })] }), RW38, T38);
+    const cB = api.calc(V({ size: '대형 화물', reg_date: '2020-06-01', insp_due: '2025-11-30', insp_log: [L({ prev: '2025-05-31', confirmed: '2025-11-30', insp_done: '2025-05-20' })] }), RW38, T38);
+    const cD = V({ size: '대형 화물', reg_date: '2023-04-01', insp_due: '2026-04-23', insp_log: [L({ prev: '2025-04-23', confirmed: '2026-04-23', insp_done: '2025-04-10' }), L({ prev: '2026-04-25', confirmed: '2026-04-20', insp_done: '' })] }); cD.insp_due = '2026-04-20';
+    const cE = V(Object.assign({ insp_due: '2026-05-11', insp_log: [LC({ confirmed: '2025-05-11', insp_apply: '2025-06-10', insp_done: '2025-06-12' }), L({ prev: '2025-05-11', confirmed: '2026-05-11', insp_apply: '2025-06-10', insp_done: '2025-06-13' })] }, v4));
+    const cF = api.calc(V(Object.assign({ insp_due: '2026-01-05', insp_log: [L({ prev: '2024-05-09', confirmed: '2026-01-05', insp_done: '2024-01-05' })] }, v1)), OLD38, T38);
+    const UB = { at: '2026-11-19', prev: '2026-04-23', confirmed: '2027-04-23', proposed: '', rule: '', diff: null, by: 'u1', src: 'edit' };
+    const u1 = api.union([Object.assign({}, UB, { insp_done: '2026-04-10' })], [Object.assign({}, UB, { insp_done: '2026-01-10', insp_ext: '2026-05-30' })]), u2 = api.union([Object.assign({}, UB, { insp_done: '' })], [Object.assign({}, UB, { src: 'task', insp_done: '' })]),
+      u3 = api.union([Object.assign({}, UB, { insp_done: '2026-04-10' }), Object.assign({}, UB, { src: 'task', insp_done: '2026-04-12' })], [Object.assign({}, UB, { insp_done: '2026-04-12' })]);
+    //   8차-b: ⓓ 서로 맞음 = 지금 만기와 E(La) 차이 10일까지 조용 · 11일 확인 필요 · ⓔ 같은 값을 두 길로 넣은 쌍둥이 줄 = 조용 · 연장 하나만 달라도 확인 필요
+    const LG = (o) => L(Object.assign({ prev: '2025-04-23', insp_done: '2025-04-10' }, o)), VG = (due, lg) => V({ size: '대형 화물', reg_date: '2023-04-01', insp_due: due, insp_log: lg });
+    const fAg = [rk(VG('2026-05-03', [LG({ confirmed: '2026-05-03' })])), rk(VG('2026-05-04', [LG({ confirmed: '2026-05-04' })])), rk(VG('2026-04-13', [LG({ confirmed: '2026-04-13' })])), rk(VG('2026-04-12', [LG({ confirmed: '2026-04-12' })])),
+      rk(VG('2026-04-23', [LG({ confirmed: '2026-04-23', src: 'task' }), LG({ confirmed: '2026-04-23' })])), rk(VG('2026-04-23', [LG({ confirmed: '2026-04-23', src: 'task', insp_ext: '2025-05-01' }), LG({ confirmed: '2026-04-23' })])),
+      rk(VG('2026-04-23', [LG({ confirmed: '2026-04-23', src: 'task', insp_apply: '2025-04-01' }), LG({ confirmed: '2026-04-23' })])), rk(VG('2026-04-23', [LG({ confirmed: '2026-04-30', src: 'task' }), LG({ confirmed: '2026-04-23' })])),
+      rk(VG('2026-04-23', [LG({ confirmed: '2026-04-30', src: 'task' }), L({ prev: '2026-04-30', confirmed: '2025-04-23', insp_done: '' }), LG({ confirmed: '2026-04-23' })]))].join(',');
+    //   ㉰ 출발점 없음(값 줄 없음 + 이 회차 연장 · 한 주기와 어긋난 빈 줄) = 누적식 + 칸 끝 확인 필요·펼침 글 · ㉰ 따라가기 되돌림 길(앞 만기 값 오타 → 다시 + 못 실린 연장)
+    const cNv = VG('2026-04-23', [L({ prev: '2026-01-01', confirmed: '2026-04-23', insp_done: '' })]); cNv.insp_ext = '2026-03-01';
+    const cNr = api.calc(cNv, RW38, T38), cK = V({ size: '대형 화물', reg_date: '2022-03-10', insp_due: '2025-05-20', insp_ext: '2024-04-01', insp_log: [L({ prev: '2024-03-09', confirmed: '2025-05-20', insp_done: '2024-05-20' }), L({ prev: '2025-05-20', confirmed: '2024-03-09', insp_done: '' }), L({ prev: '2024-03-09', confirmed: '2025-05-20', insp_done: '' })] });
+    const fRc = [sh38(cNr) + (cNr.rec ? '|rec' : ''), api.badge(cNr, 'cell').replace(/<[^>]+>/g, ''), api.badge(cNr, 'det').replace(/<[^>]+>/g, '|'), rk(cK)].join('|');
+    //   8차-c: ⓗ 두 화면(같은 회차 정정 뒤 낡은 창이 값 갱신) = 확인 필요 · 순서대로 = 조용 차이 0 · 건설기계 신청일만 있는 값 줄 = 칸 끝 '신청일 기준' · 자동차 신청일만 있는 줄 = 값 줄 아님(운영 그대로)
+    //   · 수정 창 연장 비움: 실린 값이 차량 줄 값과 다르고(다른 기기가 바꿈) 사람이 칸을 안 바꿨으면 차량 줄 그대로(검토 A36)
+    const cR = rk(VG('2027-04-28', [L({ prev: '2026-04-23', confirmed: '2026-04-28', insp_done: '' }), L({ prev: '2026-04-23', confirmed: '2027-04-28', insp_done: '2026-04-10' })]));
+    const cS = rk(VG('2027-04-28', [L({ prev: '2026-04-23', confirmed: '2026-04-28', insp_done: '' }), L({ prev: '2026-04-28', confirmed: '2027-04-28', insp_done: '2026-04-10' })]));
+    const cCq = api.calc(V(Object.assign({ insp_due: '2026-06-30', insp_log: [LC({ confirmed: '2026-06-30', insp_apply: '2025-06-10', insp_done: '' })] }, v4)), RW38, T38);
+    const vCa = V(Object.assign({ insp_due: '2026-05-09', insp_log: [L({ prev: '2024-05-09', confirmed: '2026-05-09', insp_done: '', insp_apply: '2024-05-01' })] }, v1));
+    E.vehicles.push({ id: 'Z10', no: '00가0210', state: '운행', biz: '사업용', size: '대형 화물', reg_date: '2023-04-01', insp_due: '2026-04-23', insp_ext: '2026-05-30', updated: '2026-11-01' });
+    E.calls.length = 0; api.open('Z10'); vq('Z10').insp_ext = '2026-06-15'; el('vehInsp').value = '2027-05-30'; el('vehInspDone').value = '2026-05-20'; api.save();
+    const fH = [cR, cS, sh38(cCq) + '/' + api.badge(cCq, 'cell').replace(/<[^>]+>/g, ''), String(cmpOp(vCa)), lg('Z10'), vq('Z10').insp_ext, rk(vq('Z10'))].join('|');
+    //   8차-d: ⓘ 앞 회차가 두 화면으로 두 갈래(값 다른 두 값 줄) → 다음 회차 갱신 = 확인 필요 · 자동차 기록 줄에 신청일 안 실음
+    const cI = rk(VG('2026-10-18', [L({ prev: '2024-10-18', confirmed: '2025-10-18', insp_done: '2024-08-15' }), L({ prev: '2024-10-18', confirmed: '2025-10-17', insp_done: '2024-08-10' }), L({ prev: '2025-10-17', confirmed: '2026-10-18', insp_done: '2025-08-06' })]));
+    const eCar = api.logE(V({ size: '대형 화물', reg_date: '2023-04-01', insp_due: '2027-04-23' }), '2026-04-23', '2027-04-23', 'edit', { insp_done: '2026-04-10', insp_apply: '2026-04-01' });
+    const fI = [cI, String(!!eCar && !('insp_apply' in eCar)), eCar ? eCar.insp_done : ''].join('|');
+    const fCl = [fI, fH, fAg, fRc, sh38(cA) + '/' + ((cA.chain || {}).chk || []).join(','), String(recR(cA)), sh38(cB), String(recR(cB)), String(recR(api.calc(cD, RW38, T38))), String(recR(api.calc(cE, RW38, T38))), sh38(cF), String(recR(cF)), u1.map((x) => x.insp_done + '+' + (x.insp_ext || '')).join(','), u2.length, u3.map((x) => x.src + ':' + x.insp_done).join(',')].join('|');
+    R.re8 = [fOff, fSave, fExt, fOver, fBreak, fDue, fPar, fCl].join(' # ');
+    return R;
+  };
+  // 병합 — 다른 기기가 수검일을 넣고 만기를 바꾼 뒤(연장 만료일은 기록으로 옮기고 비움) 옛 화면이 다른 칸만 고쳐 저장: 새 칸·기록이 사라지지 않음 · 받은 사본이 전진했으면 다른 기기의 새 연장 만료일이 남음 · 기록 합집합이 새 칸을 채움
+  const runM38 = (src) => {
+    const E2 = { toasts: [] };
+    const code = clo38(src, ['imSt', 'imBaseSet', 'imBaseAdvance', 'mergeVeh', 'vehLogUnion'], { conConflictToast: 1 });
+    const api = new Function('E2', 'function conConflictToast(a){ E2.toasts.push(a.map(function(x){ return x.lbl; }).join(",")); }\n' + code + '\nreturn { mergeVeh: mergeVeh, set: imBaseSet, adv: imBaseAdvance, union: vehLogUnion };')(E2);
+    const R = {};
+    const base = { id: 'V', no: '00가0001', state: '운행', insp_due: '2026-04-23', insp_ext: '2026-05-30', note: '', updated: '2026-11-10' };
+    const ent = { at: '2026-11-19', prev: '2026-04-23', confirmed: '2027-04-23', proposed: '2027-05-30', rule: 't', diff: 0, by: 'a', src: 'edit', insp_done: '2026-04-10', insp_ext: '2026-05-30' };
+    api.set('vehicles', [base]);
+    const local = [Object.assign({}, base, { note: '옛 화면 메모', updated: '2026-11-19' })];
+    const remote = [Object.assign({}, base, { insp_due: '2027-04-23', insp_log: [ent], updated: '2026-11-19' })]; delete remote[0].insp_ext;
+    const m = api.mergeVeh(local, remote)[0];
+    R.merge = m.insp_due === '2027-04-23' && m.note === '옛 화면 메모' && !('insp_ext' in m) && (m.insp_log || []).length === 1 && m.insp_log[0].insp_done === '2026-04-10' && m.insp_log[0].insp_ext === '2026-05-30';
+    api.set('vehicles', [base]); api.adv('vehicles', 'V', { insp_ext: undefined });
+    const loc2 = [Object.assign({}, base, { updated: '2026-11-19' })]; delete loc2[0].insp_ext;
+    const m2 = api.mergeVeh(loc2, [Object.assign({}, base, { insp_ext: '2026-12-01', updated: '2026-11-19' })])[0];
+    R.adv = m2.insp_ext === '2026-12-01';
+    const bare = { at: '2026-11-19', prev: '2026-04-23', confirmed: '2027-04-23', src: 'task' }, full = Object.assign({}, bare, { insp_done: '2026-04-10', insp_apply: '2026-04-01', insp_ext: '2026-05-30' });
+    const u1 = api.union([bare], [full]), u2 = api.union([Object.assign({}, bare, { insp_done: '' })], [full]), u3 = api.union([full], [bare]);
+    // 두 기기가 연장 만료일을 서로 다르게 고침 = 이 화면 값 + 알림 이름 '연장(유예) 만료일'(수정 창 칸 글)
+    api.set('vehicles', [base]); E2.toasts.length = 0;
+    const m4 = api.mergeVeh([Object.assign({}, base, { insp_ext: '2026-06-30', updated: '2026-11-19' })], [Object.assign({}, base, { insp_ext: '2026-07-31', updated: '2026-11-19' })])[0];
+    R.lbl = m4.insp_ext === '2026-06-30' && E2.toasts.join('|') === '연장(유예) 만료일';
+    R.union = u1.length === 1 && u1[0].insp_done === '2026-04-10' && u1[0].insp_apply === '2026-04-01' && u1[0].insp_ext === '2026-05-30' && !('insp_done' in bare) && u2[0].insp_done === '2026-04-10' && u3.length === 1 && u3[0].insp_done === '2026-04-10' && u3[0].insp_apply === '2026-04-01' && u3[0].insp_ext === '2026-05-30';
+    return R;
+  };
+  const EXP38 = {
+    re8: "none,none|false|0|1|false|none|false|true|ok/2028-03-31/23/t38.m12 # alert:수검일이 새 검사 만기(2026-06-01)보다 뒤입니다 — 날짜를 확인해 주세요.|2026-04-23||>2025-09-09*2024-09-05 2025-09-09>2026-09-09*2025-09-01|ok/2026-09-09/0/t38.m12 # 2026-04-23>2027-06-30*2026-01-10|2026-06-30|ok/2027-01-10/171/t38.m12|rec|2026-04-23>2026-05-23/2026-05-30|2026-04-23>2026-05-23 2026-05-23>2027-05-30*2026-04-10+2026-05-30|false|ok/2027-05-30/0/t38.m12|2026-04-23>2026-05-23 2026-05-23>2027-05-30|2026-05-30|ok/2027-05-23/7/t38.m12|rec|ok/2027-04-23/0/t38.m12|rec # ok/2027-04-23/0/t38.m12|ok/2026-04-23/0/t38.m12|rec|ok/2027-04-23/0/t38.m12|ok/2026-03-31/30/t38.m12|true|true # 0/0 # none|이 창은 새 검사 만기 없이 연장(유예) 만료일을 지우지 않습니다 — 연장 칸을 처음 값(2026-05-30)으로 두거나, 연장만 고치려면 차량 수정 창에서 고쳐 주세요.|0 # 4002/0/613/362/true/false # ok/2026-10-17/1/t38.m12|rec|true|2026-04-10|ok/2027-04-23/5/t38.m12|rec|ok/2027-04-28/0/t38.m12|ok/2026-06-30/0/t38.c12/제안 2026-06-30 · 차이 0일 · 신청일 기준|true|2026-04-23>2027-05-30*2026-05-20+2026-05-30|2026-06-15|ok/2027-05-30/0/t38.m12|rec|ok/2026-04-23/10/t38.m12,ok/2026-04-23/11/t38.m12|rec,ok/2026-04-23/-10/t38.m12,ok/2026-04-23/-11/t38.m12|rec,ok/2026-04-23/0/t38.m12,ok/2026-04-23/0/t38.m12|rec,ok/2026-04-23/0/t38.m12|rec,ok/2026-04-23/0/t38.m12|rec,ok/2026-04-23/0/t38.m12|rec|ok/2026-03-31/23/t38.m12|rec|제안 2026-03-31 · 차이 +23일 · 확인 필요||법정 검사 제안 |2026-03-31| · 차이 +23일||최초등록일부터 회차를 센 날 · 확인 필요: 넣은 기록만으로는 이 회차의 법정 만기를 단정할 수 없어 이 제안은 참고만 — 검사증 날짜를 따르세요||ok/2025-03-09/72/t38.m12|rec|ok/2026-05-31/0/t38.m12/age:12:6|false|ok/2026-05-31/-182/t38.m12|true|true|true|ok/2026-05-09/-124/t38.m24|false|2026-04-10+,2026-01-10+2026-05-30|2|edit:2026-04-10,task:2026-04-12,edit:2026-04-12",
+    dueEmpty: "\"\"|true|0|1|2026-06-30",
+    re6: "2026-04-30|2026-03-09>2026-12-09 2026-12-09>2026-03-09 2026-03-09>2026-10-31*2026-04-20+2026-04-30|false|ok/2026-10-31/0/t38.m12b # 2025-09-09>2026-03-19*2025-09-01 2026-03-19>2026-03-09|2026-05-31|ok/2026-03-09/0/t38.m12b # 2025-04-09>2026-02-20*2025-04-01 2026-02-20>2026-04-09*2025-04-01|ok/2026-04-01/8/t38.m12|rec # 2024-03-09>2025-05-20*2024-05-20 2025-05-20>2024-03-09 2024-03-09>2025-05-20|ok/2025-05-20/0/t38.m12|제안 2025-05-20 · 차이 0일 · 수검일 기준||법정 검사 제안 |2025-05-20| · 차이 0일||직전 수검일 기준 — 종전 만기 2024-03-09, 수검일 2024-05-20(검사 기간 밖) → 2024-05-21부터 셈||ok/2026-09-09/3/t38.m12b|rec|ok/2026-06-25/-61/t38.m12b|rec # []|메모만|2026-06-10|none|alert:달력에 없는 날짜입니다: 수검일|0|2028-10-23 # false|ok/2027-03-31/-30/t38.m12|0|2026-04-23>2027-04-23*2026-04-10 # 2|2026-04-10,2026-01-10|ok/2027-07-10/-78/t38.m12b|rec # ok/2026-08-21/0/t38.m6/holi|ok/2026-08-24/-3/t38.m6/holi|ok/2026-08-25/-4/t38.m6/ # ok/2027-03-01/152/t38.m12|true|ok/2027-03-01/53/t38.m12",
+    case1: 'ok/2026-05-09/-124/t38.m24,ok/2026-01-05/0/t38.m24,ok/2026-05-09/0/t38.m24,ok/2026-02-08/0/t38.m24',
+    case2: 'ok/2025-03-01/80/t38.m24,ok/2025-05-20/0/t38.m24,ok/2025-03-01/0/t38.m24,ok/2025-04-02/0/t38.m24',
+    case3: 'ok/2026-07-14/78/t38.m24,ok/2026-09-30/0/t38.m24,ok/2026-10-20/-20/t38.m24,ok/2026-10-20/-20/t38.m24',
+    case4: 'ok/2026-06-30/0/t38.c12,ok/2026-05-15/0/t38.c12,ok/2026-06-30/0/t38.c12,ok/2026-06-30/0/t38.c12,ok/2026-06-30/0/t38.c12,ok/2026-06-02/0/t38.c12,ok/2026-06-30/0/t38.c12,ok/2026-08-10/0/t38.m12,none///기종',
+    case5: 'none///day,ok/2026-02-28/0/t38.m6,ok/2026-09-09/0/t38.m12b',
+    end: '2025-02-28,2025-08-31,2026-02-28,2024-09-14,2025-02-28,2024-02-29,2024-02-29,2024-02-28,2027-04-23',
+    empty: 'ok/2027-10-01/null/t38.y1,ok/2026-10-01/0/t38.y1',
+    chip: "<span class=\"vl-b ok\" title=\"근거 시험법 별표 · 표시만 — 검사 만기는 넣은 날짜 그대로 · 직전 수검일 기준 — 종전 만기 2024-05-09, 수검일 2024-01-05(검사 기간 밖) → 2024-01-06부터 셈\">제안 2026-01-05 · 차이 0일 · 수검일 기준</span>\n<span class=\"vl-b ok\" title=\"근거 시험법 별표 · 표시만 — 검사 만기는 넣은 날짜 그대로 · 직전 수검일 기준 — 종전 만기 2024-05-09, 수검일 2024-01-05(검사 기간 밖) → 2024-01-06부터 셈\">법정 검사 제안 <b>2026-01-05</b> · 차이 0일</span><span class=\"vl-n\" style=\"display:block;font-size:11.5px;color:#1F6B3A;margin-top:2px;\">직전 수검일 기준 — 종전 만기 2024-05-09, 수검일 2024-01-05(검사 기간 밖) → 2024-01-06부터 셈</span>\n<span class=\"vl-b ok\" title=\"근거 시험법 별표 · 표시만 — 검사 만기는 넣은 날짜 그대로 · 직전 수검일 기준 — 종전 만기 2025-06-30, 신청일 비움(신청 기간 안으로 봄), 수검일 2025-07-10 → 2025-07-01부터 셈\">제안 2026-06-30 · 차이 0일 · 수검일 기준</span>\n<span class=\"vl-b ok\" title=\"근거 시험법 별표 · 표시만 — 검사 만기는 넣은 날짜 그대로 · 직전 신청일 기준 — 종전 만기 2025-06-30, 신청일 2025-05-10(신청 기간 밖), 수검일 비움(받은 날을 몰라 종전 만기 다음날로 셈) → 2025-07-01부터 셈 · 확인 필요: 만료 뒤 소유권을 넘겨받은 회차는 이전등록일부터 신청 기간을 세고, 이른 신청도 종전 만기 다음날부터일 수 있음(건설기계관리법 시행규칙 23조①⑤)\">법정 제안: 2026-06-30 · 차이 0일</span><span class=\"vl-n\" style=\"display:block;font-size:11.5px;color:#1F6B3A;margin-top:2px;\">직전 신청일 기준 — 종전 만기 2025-06-30, 신청일 2025-05-10(신청 기간 밖), 수검일 비움(받은 날을 몰라 종전 만기 다음날로 셈) → 2025-07-01부터 셈 · 확인 필요: 만료 뒤 소유권을 넘겨받은 회차는 이전등록일부터 신청 기간을 세고, 이른 신청도 종전 만기 다음날부터일 수 있음(건설기계관리법 시행규칙 23조①⑤)</span>\n<span class=\"vl-b am\" title=\"근거 시험법 별표 · 표시만 — 검사 만기는 넣은 날짜 그대로 · 제안은 모든 회차를 검사 기간 안에 받았다고 보고 센 날 — 기간 밖 수검·연장·유예·이전등록이 있었으면 넣은 날짜가 맞을 수 있음\">법정 검사 제안 <b>2026-07-14</b> · 차이 +78일</span><span class=\"vl-n\" style=\"display:block;font-size:11.5px;color:var(--sub);margin-top:2px;\">제안은 모든 회차를 검사 기간 안에 받았다고 보고 센 날 — 기간 밖 수검·연장·유예·이전등록이 있었으면 넣은 날짜가 맞을 수 있음</span>\n<span class=\"vl-b am\" title=\"근거 시험법 별표 · 표시만 — 검사 만기는 넣은 날짜 그대로 · 직전 수검일 기준 — 종전 만기 2025-03-09, 수검일 2025-03-01(검사 기간 안) → 2025-03-10부터 셈 · 확인 필요: 넣은 기록만으로는 이 회차의 법정 만기를 단정할 수 없어 이 제안은 참고만 — 검사증 날짜를 따르세요 · 제작연도에 등록하지 않은 차(차령 기산일 = 제작연도 말일)는 차령 경계 근처 회차가 다를 수 있음\">법정 검사 제안 <b>2026-09-09</b> · 차이 +11일</span><span class=\"vl-n\" style=\"display:block;font-size:11.5px;color:#1F6B3A;margin-top:2px;\">직전 수검일 기준 — 종전 만기 2025-03-09, 수검일 2025-03-01(검사 기간 안) → 2025-03-10부터 셈 · 확인 필요: 넣은 기록만으로는 이 회차의 법정 만기를 단정할 수 없어 이 제안은 참고만 — 검사증 날짜를 따르세요 · 제작연도에 등록하지 않은 차(차령 기산일 = 제작연도 말일)는 차령 경계 근처 회차가 다를 수 있음</span>",
+    oldBg: 'ok/2026-05-09/-124/t38.m24|false|true,true,false,false,false,false',
+    why: 'alert:수검일이 오늘 뒤입니다 — 검사를 받은 날을 넣어 주세요.|alert:수검일·검사 신청일은 검사 만기를 새 날짜로 바꿀 때 같이 넣습니다.|alert:연장(유예) 만료일은 종전 검사 만기(2026-04-23)보다 뒤여야 합니다.|alert:달력에 없는 날짜입니다: 수검일|alert:검사 신청일이 수검일보다 뒤입니다.|alert:수검일이 종전 검사 만기(2026-04-23)와 새 만기 어느 쪽과도 너무 멀리 떨어져 있습니다 — 날짜를 확인해 주세요.|alert:연장(유예) 만료일이 종전 검사 만기(2026-04-23)보다 너무 뒤입니다 — 날짜를 확인해 주세요.| [저장됨]',
+    re5: "ok/2026-04-09/0/t38.m12|ok/2027-04-09/0/t38.m12|2025-02-10,,|ok/2026-04-09/0/t38.m12|2025-04-01,|true|ok/2027-04-01/0/t38.m12b|rec",
+    invN: "3000/2655/99/342/0/3/0/536/170/0/815/2210/790",
+    dueDrop: '{"proposed":"2026-03-01","rule":"t38.y1","insp_done":"","insp_ext":"","ext_was":""}|차량 만기일을 2026-05-20(으)로 바꾸고 완료 요청했습니다 — 만기 날짜만 바로잡는 저장이라 수검일·검사 신청일은 기록하지 않았습니다.',
+    drop: ',2026-04-10/false,/false,만기 날짜만 바로잡는 저장이라 수검일·검사 신청일은 기록하지 않았습니다.,0,true',
+    re3: "ok/2026-09-09/0/t38.m12b|, # ok/2026-03-09/0/t38.m12b|false # ok/2026-09-09/72/t38.m12b|true|false # ok/2027-05-31/-182/t38.m12|true|false",
+    re: "ok/2026-03-09/11/t38.m12b # ok/2026-09-20/0/t38.m12b # 제안 2026-09-20 · 차이 0일 · 직전 갱신 기준 · 확인 필요 # ok/2032-09-20/0/t38.m12b/2032-09-20 # ok/2026-07-20/0/t38.m12b|제안 2026-07-20 · 차이 0일 · 직전 갱신 기준 · 확인 필요 # ok/2026-09-09/-91/t38.m12b|true",
+    fix: "ok/2027-03-09/0/t38.m12b,3,ok/2026-06-30/61/t38.c12,ok/2027-03-09/0/t38.m12b,ok/2027-03-09/0/t38.m12b",
+    more: "ok/2028-03-01/-29/t38.m24,ok/2026-03-09/0/t38.m12,none///rule,ok/2027-01-01/0/t38.bus,ok/2026-11-19/null/t38.y1,ok/2026-09-01/-92/t38.m6,ok/2027-03-01/0/w.b",
+    chk: "ok/2026-05-15/0/t38.c12\n|법정 검사 제안 |2026-05-15| · 차이 0일||직전 수검일 기준 — 종전 만기 2025-06-30, 신청일 비움(수검일이 신청 기간 전이라 신청도 기간 전), 수검일 2025-05-15 → 2025-05-16부터 셈 · 확인 필요: 만료 뒤 소유권을 넘겨받은 회차는 이전등록일부터 신청 기간을 세고, 이른 신청도 종전 만기 다음날부터일 수 있음(건설기계관리법 시행규칙 23조①⑤)|\n|제안 2026-06-11 · 차이 0일 · 수검일 기준 · 확인 필요|\n|제안 2026-06-13 · 차이 0일 · 수검일 기준 · 확인 필요|\n|법정 검사 제안 |2026-10-20| · 차이 0일||직전 수검일 기준 — 종전 만기 2024-07-14, 수검일 2024-10-20(검사 기간 밖) → 2024-10-21부터 셈 · 확인 필요: 종합검사 대상 차는 기간 안에 신청해 적합 판정을 받았는지로 셈(종합검사 규칙 9조①) — 신청이 기간 안이었으면 종전 만기 다음날부터일 수 있음|\n|법정 검사 제안 |2026-06-30| · 차이 0일||직전 수검일 기준 — 종전 만기 2025-06-30, 신청일 비움(신청 기간 안으로 봄), 수검일 2025-08-10 → 2025-07-01부터 셈 · 확인 필요: 신청일을 몰라 신청 기간 안으로 봤으나 수검일이 신청 기간 뒤 — 신청이 기간 안이었는지|" };
+  const ok38 = (R) => Object.keys(EXP38).every((k) => R[k] === EXP38[k]) && ['same', 'off', 'offDue', 'modal', 'ext', 'ceq', 'due', 'dueCeq', 'dueOld', 'inv'].every((k) => R[k] === true);
+  const okM38 = (R) => R.merge === true && R.adv === true && R.union === true && R.lbl === true;
+  //   8차-d: 판38 이어 세기 시험은 스위치를 켠 시험 전용 사본으로(운영 코드는 꺼짐 — 꺼짐 = 운영 판과 글자째 같음은 아래 'P1 판38 꺼짐' 검사)
+  const on38s = (src) => { if (src.split('var VEH_LAW_CHAIN_ON = false;').length !== 2) throw new Error('스위치 줄 없음'); return src.replace('var VEH_LAW_CHAIN_ON = false;', 'var VEH_LAW_CHAIN_ON = true;'); };
+  const all38 = (src, gsrc) => { src = on38s(src); let a, b; try { a = run38(src, gsrc); } catch (e) { a = { x: String(e && e.stack || e).slice(0, 300) }; } try { b = runM38(src); } catch (e) { b = { x: String(e && e.stack || e).slice(0, 300) }; } return { a, b, ok: ok38(a) && okM38(b) }; };
+  const real38 = all38(html);
+  // 정적: 새 칸 id 한 번씩 · 창 글에 내부 이름 없음 · 이 구간 코드(주석 밖)에 기간 일수·주기 숫자 없음
+  const ID38 = ['vehInspRec', 'vehInspDone', 'vehInspExt', 'vehInspApply', 'vehCeqHint', 'vehDueRec', 'vehDueDone', 'vehDueExt', 'vehDueApply', 'vehDueApplyW'];
+  const recTxt = (b38(html, '<div class="veh-attr" id="vehInspRec"', '<div class="veh-row"><button class="mini-btn" id="vehInspRenew"') + b38(html, '<div id="vehDueRec"', '<div class="err" id="vehDueErr">')).replace(/<!--[\s\S]*?-->/g, ' ').replace(/<[^>]*>/g, ' ');
+  const st38 = ID38.every((id) => (html.match(new RegExp('id="' + id + '"', 'g')) || []).length === 1) && !/\b(insp_done|insp_apply|insp_ext|win_before|win_after|win_basis|pass|apply)\b/.test(recTxt)
+    && /이번 수검일/.test(recTxt) && /연장\(유예\) 만료일/.test(recTxt) && /검사 신청일/.test(recTxt)
+    && !/\b(90|31)\b/.test(b38(html, '  // ── P1 판38(원장 C166', '  // 순수 계산 — { st:"na" }').replace(/\/\/[^\n]*/g, ''));
+  //   8차 지시: 셋째 값 'g' = 서버 gw-data.js 결함 사본(⑳ 앱·서버 같은 행 판정이 잡음)
+  const smG38 = (from, to) => { if (gwd.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); return gwd.replace(from, () => to); };
+  const sm38 = (from, to) => { if (html.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); return html.replace(from, () => to); };
+  const MUT38 = [
+    ['    if (chained && chained.st) return chained;\n', ''],
+    ['      if (VEH_LAW_CHAIN_ON && !v.insp_due && d < anchor){ prev = d; continue; }\n', ''],
+    ['    if ((!ceq || !VEH_LAW_CHAIN_ON) && !v.biz) miss.push("사업용 여부");', '    if (!v.biz) miss.push("사업용 여부");'],
+    ['v.size === "건설기계" && (!VEH_LAW_CHAIN_ON || (v.ceq_year != null && v.ceq_year !== "")) && (', 'v.size === "건설기계" && ('],
+    ['    inWin = !at || (dn(at) >= dn(E) - r0.win_before && dn(at) <= dn(E) + r0.win_after);', '    inWin = !at || (dn(at) > dn(E) - r0.win_before && dn(at) < dn(E) + r0.win_after);'],
+    ['    var at = r0.win_basis === "apply" ? (ap || (early ? s : "")) : s;', '    var at = s;'],
+    ['    var at = r0.win_basis === "apply" ? (ap || (early ? s : "")) : s;', '    var at = r0.win_basis === "apply" ? ap : s;'],
+    ['    var early = !!(r0.win_basis === "apply" && !ap && s && dn(s) < dn(E) - r0.win_before);', '    var early = false;'],
+    ['    if (at && !inWin && dn(at) > dn(E) + r0.win_after && dn(at) <= dn(E) + r0.win_after + VEH_LAW_HOLI) chk.push("holi");\n', ''],
+    ['    if (!inWin && r0.win_basis === "apply") chk.push("ceq");\n', ''],
+    ['    if (!inWin && r0.win_basis === "pass" && vehLawComp(r0)) chk.push("comp");\n', ''],
+    ['    if (r0.win_basis === "apply" && !ap && s && dn(s) > dn(E) + r0.win_after) chk.push("ceqlate");\n', ''],
+    [' + "부터 셈" + vehLawChkTxt(c.chk);', ' + "부터 셈";'],
+    // 6차 검토(11/19): 깨끗하지 않으면 늘 확인 필요(rec)·연장 만료일 한살이·합치기 두 화면·완료 창 빈 만기·상태 숨김·2000년 전 거름
+    ['    if (!cl.clean) chk.push("rec");\n', ''],
+    ['      if (pk.e < 0) return { rec: true };', '      if (pk.e < 0) return null;'],
+    ['recC ? { rec: true } : {});', '{});'],
+    [' + (r.rec && !r.chain && mode === "cell" ? " · 확인 필요" : ""); }', '; }'],
+    ['    if (r && r.st === "ok" && r.rec && !r.chain) return "최초등록일부터 회차를 센 날" + vehLawChkTxt(["rec"]);\n', ''],
+    ['best = cl.fe.E; bestR = cl.fe.r;', 'best = cl.fe.E2 || cl.fe.E; bestR = cl.fe.r;'],
+    ['hitBnd = (cl.fe.r2 && cl.fe.r2.every_m !== bestR.every_m) ? bestR.every_m + ":" + cl.fe.r2.every_m : false;', 'hitBnd = false;'],
+    ['      if (back >= 0){ if (back < st.length){ cur = st[back]; st = st.slice(0, back); } cur.due = C; continue; }', ''],
+    ['      if (vehLawExpOk(P, C, ok, v, cls)){ nc(false, true, exactAlt()); continue; }\n', ''],
+    ['      if (P === cur.due && vehLawExpOk(P, C, ok, v, cls)){ nc(false, true, exactAlt()); continue; }\n', ''],
+    ['    if (pk.base && pk.base !== e.prev) e = Object.assign({}, e, { prev: pk.base });\n', ''],
+    ['dn(conf) >= dn(prev) - r.win_before && dn(conf) <= dn(prev) + r.win_after);\n  }', 'dn(conf) > dn(prev) + r.win_after);\n  }'],
+    ['vehLawExOf(e.dropped ? { insp_ext: x3.insp_ext } : x3)', 'vehLawExOf(x3)'],
+    ['    if (inspDrop && typeof apprToastShow === "function") apprToastShow(VEH_LAW_SAME_MSG);\n', ''],
+    ['((dropL || res.body.insp_dropped) && typeof VEH_LAW_SAME_MSG', '((false) && typeof VEH_LAW_SAME_MSG'],
+    ['    if (inspDrop) delete inspLog.dropped;\n', ''],
+    ['    if (typeof vehModalInspSave === "function") vehModalInspSave(v, ch, extMove);', '    if (typeof vehModalInspSave === "function") vehModalInspSave(v, ch, "");'],
+    ['    if ((x.insp_done || x.insp_apply) && !vehModalInspLine(ch, prev)) return "수검일·검사 신청일은 검사 만기를 새 날짜로 바꿀 때 같이 넣습니다.";\n', ''],   // 8차-e: 규칙 ② 줄(종전 '만기를 안 바꿈' 줄을 넓힘)
+    ['    if (!ch("vehInspExt")) x.insp_ext = "";\n', ''],
+    ['    if (ext0 && typeof vehLawExWhy === "function" && vehLawExWhy({ insp_done: "", insp_ext: ext0 }, (L.v && L.v.insp_due) || "", todayStr(), "")) ext0 = "";\n', ''],   // 8차-e: 6차 M1 줄을 이 줄로 넓힘(종전 만기 이하 포함)
+    ['    if ((!s || s === q.cur) && q.rec){', '    if (false){'],
+    ['      if (extNow){ v.insp_ext = extNow; saveVehiclesCache(); }\n', ''],
+    ['    el = document.getElementById("vehInspRec"); if (el && isGreyState(f)) el.style.display = "none";\n', ''],
+    ['return s && (!vehRealDate(s) || s < "2000"); });', 'return s && !vehRealDate(s); });'],
+    ['if (same.length && same.every(function(o){ return vehLogClash(o, e); })) out.push(e); });', '});'],
+    ['if (typeof x[n] === "string" && (cur === undefined || (cur === "" && x[n] !== ""))){ f = f || Object.assign({}, e); f[n] = x[n]; }', 'if (typeof x[n] === "string" && cur === undefined){ f = f || Object.assign({}, e); f[n] = x[n]; }'],
+    ['[x.at, x.confirmed, x.src].join("|") !== k || vehLogClash(x, e)) return;', '[x.at, x.confirmed, x.src].join("|") !== k) return;'],
+    ['      if (hitBnd) chk.push("age:" + hitBnd);\n      return', '      return'],
+    [', (x3 && typeof x3.ext_was === "string") ? { ext_was: x3.ext_was } : {}, e.dropped', ', {}, e.dropped'],
+    ['return [base].concat(vehRealDate(conf) ? [conf] : []).some(', 'return [base].some('],
+    [' && (x.reg_min == null || !(v.reg_date < x.reg_min)); })[0] || null;', '; })[0] || null;'],
+    ['      if (!v.insp_due && d < anchor) continue;', '      if (!v.insp_due && d <= anchor) continue;'],
+    ['      if (!(n > bestN)){ best = d; bestN = n; bestR = r; hitItp = cItp;', '      if (n < bestN){ best = d; bestN = n; bestR = r; hitItp = cItp;'],
+    ['    r0 = vehLawPick(ok, v, cls, E);', '    r0 = ok[0] || null;'],
+    ['var extGone = !!(v && res.body.law_log && typeof res.body.law_log.insp_done === "string");', 'var extGone = !!(v && res.body.law_log);'],
+    [' insp_ext: "연장(유예) 만료일",', ''],
+    ['    var far = x.insp_done && !near(x.insp_done) ? "수검일"', '    var far = false ? "수검일"'],
+    ['    if (x.insp_ext && x.insp_ext > vehAddMonths(base, VEH_EXT_SPAN_M)) return', '    if (false) return'],
+    ['el = document.getElementById("vehInspRec"); if (el && !editingVehId) el.style.display = "none";', ''],
+    ['    E = (vehRealDate(e.insp_ext) && e.insp_ext > e.prev) ? e.insp_ext : e.prev;', '    E = e.prev;'],
+    ['    S0 = (inWin || !s) ? vehAddDays(E, 1) : vehAddDays(s, 1);\n    return { E: E,', '    S0 = vehAddDays(E, 1);\n    return { E: E,'],
+    ['return +t.slice(8, 10) < +s.slice(8, 10) ? t : vehAddDays(t, -1); }', 'return vehAddDays(t, -1); }'],
+    ['  function vehLawWinOk(r){ return (r.win_before == null && r.win_after == null && r.win_basis == null) || vehLawWinHas(r); }', '  function vehLawWinOk(r){ return true; }'],
+    ['src: src }, ex || {}, dropped ?', 'src: src }, {}, dropped ?'],
+    ['    if (x.insp_done && x.insp_done > today) return "수검일이 오늘 뒤입니다 — 검사를 받은 날을 넣어 주세요.";\n', ''],
+    ['(rec ? vehLawArg(q.vid, s, rec) : vehLawArg(q.vid, s))', 'vehLawArg(q.vid, s)'],
+    ['if (extGone && Object.prototype.hasOwnProperty.call(v, "insp_ext")){ delete v.insp_ext; saveVehiclesCache(); }', ''],
+    ['if (extGone) adv.insp_ext = undefined; ', ''],
+    ['    var note = (r.st === "ok" && r.chain ? vehLawChainTxt(r) : "") + vehLawNote(r);', '    var note = vehLawNote(r);'],
+    ['    return (r.chain ? "" : "제안은 모든 회차를', '    return (false ? "" : "제안은 모든 회차를'],
+    [' + (r.chain && mode === "cell" ? (r.chain.done ? " · 수검일 기준" : (r.chain.apply ? " · 신청일 기준" : " · 직전 갱신 기준")) + (r.chain.chk && r.chain.chk.length ? " · 확인 필요" : "") : "") + (r.rec', ' + (r.rec'],
+    [' + (r.chain.chk && r.chain.chk.length ? " · 확인 필요" : "")', ''],
+    [' && (x.age_max == null || !(age >= x.age_max)) && ', ' && true && '],
+    ['    if (VEH_LAW_CHAIN_ON && r && typeof r === "object" && !vehLawWinOk(r)) return false;', '    if (false) return false;'],
+    ['"vehRegDate", "vehCeqKind", "vehCeqYear", "vehInspDone", "vehInspApply", "vehInspExt"];', '"vehRegDate", "vehCeqKind", "vehCeqYear"];'],
+    ['    if (whyInsp){ alert(whyInsp); return; }\n', ''],
+    ['    if (whyRec){ vehDueErr(whyRec); return; }\n', ''],
+    // 8차 지시(11/19): 값 줄만 출발점(세 등급 ㉮㉯㉰) — 깨끗 조건 ⓐ~ⓖ 하나씩 · ㉮ 연장 걸림 · 판38 켜짐 조건 · 연장 옮김 · 저장 검사 · 예외 거름 · 7차에서 살아남은 꼴(E2·신청일·합치기 열쇠 · 서버 'g')
+    ['  function vehLaw38On(){ return vehLawOn() && VEH_LAW.rows.some(vehLawWinHas); }', '  function vehLaw38On(){ return vehLawOn(); }'],
+    ['if (VEH_LAW_CHAIN_ON && (rows || []).some(function(x){ return vehLawRowOk(x) && vehLawWinHas(x); })){', 'if (VEH_LAW_CHAIN_ON && true){'],
+    ['arguments[4] && vehLaw38On() ? vehLawExOf(arguments[4]) : null', 'arguments[4] ? vehLawExOf(arguments[4]) : null'],
+    ['if (el) el.style.display = vehLaw38On() ? "" : "none"; });', 'if (el) el.style.display = vehLawOn() ? "" : "none"; });'],
+    ['typeof vehLaw38On === "function" && vehLaw38On() && !(L.v', 'typeof vehLawOn === "function" && vehLawOn() && !(L.v'],
+    [' && !(L.v && typeof isGreyState === "function" && isGreyState(L.v))); }', '); }'],
+    ['    if (base && f.insp_due && f.insp_due !== (base.insp_due || "") && vehRealDate(f.insp_due) && vehLaw38On()){\n', '    if (false){\n'],
+    ['    if (!vehLawValLine(e, cls) || !vehRealDate(e.prev) || !vehRealDate(e.confirmed) || !(e.confirmed > e.prev)) return null;', '    if (!vehLawValLine(e, cls) || !vehRealDate(e.prev) || !vehRealDate(e.confirmed)) return null;'],
+    [' || (cls === "ceq" && typeof x.insp_apply === "string" && x.insp_apply !== "")));', '));'],
+    ['return fe && vehLawFeIn(e.confirmed, fe) ? fe : null; }', 'return fe || null; }'],
+    ['    vals = [La.insp_done, cls === "ceq" ? La.insp_apply : ""].filter(vehRealDate);', '    vals = [La.insp_done].filter(vehRealDate);'],
+    ['    if (vehRealDate(X) && La.prev < X && X <= D && X !== La.insp_ext) return { clean: false };\n', ''],
+    ['    if (vehRealDate(X) && La.prev < X && X <= D && X !== La.insp_ext) return { clean: false };', '    if (vehRealDate(X) && La.prev < X && X !== La.insp_ext) return { clean: false };'],
+    ['last.prev < X && X <= D) ? { clean: false } : null;', 'false) ? { clean: false } : null;'],
+    ['    for (a = n - 1; a >= 0 && !vehLawValLine(log[a], cls); a--);', '    for (a = n - 1; a >= 0 && !(log[a] && typeof log[a].insp_done === "string"); a--);'],
+    ['return vehRealDate(d) && (w(fe.E, fe.r) || w(fe.E2, fe.r2)); }', 'return vehRealDate(d) && w(fe.E, fe.r); }'],
+    ['      else if (vehLawRenewOk(v, prev, confirmed, ex)) move = !!ex.insp_ext;\n      else delete ex.insp_ext;', '      else move = !!ex.insp_ext;'],
+    ['      if (ex.insp_ext && !(ex.insp_ext > prev)) delete ex.insp_ext;\n', ''],
+    ['    r = vehLawPick(k.ok, v, k.cls, prev);', '    r = k.ok[0] || null;'],
+    ['    if (logged){ if (v.insp_ext === logged || ch("vehInspExt")) vehSetOpt(v, "insp_ext", ""); return; }', '    if (logged) return;'],
+    ['    if (vehRealDate(conf) && ((x.insp_done && x.insp_done > conf) || (x.insp_apply && x.insp_apply > conf))) return', '    if (false) return'],
+    ['      if (r0 && r0.insp_ext !== r0.ext_was){ vehDueErr(', '      if (false){ vehDueErr('],
+    ['var keyL = function(e){ return [e.at, e.confirmed, e.src].join("|"); };', 'var keyL = function(e){ return [e.at, e.confirmed].join("|"); };'],
+    ["  const r = vehLawPickS(k.ok, v, k.cls, prev);", "  const r = k.ok[0] || null;", 'g'],
+    ["r = vehLawPickS(k.ok, v, k.cls, vehAddDaysS(S0, -1))", "r = r0", 'g'],
+    ["const E = (vehRealDateS(x.insp_ext) && x.insp_ext > prev) ? x.insp_ext : prev", "const E = prev", 'g'],
+    ["  const inWin = !at || (dn(at) >= dn(E) - r0.win_before && dn(at) <= dn(E) + r0.win_after);", "  const inWin = true;", 'g'],
+    [" || (!!(rS && vehLawWinHasS(rS) && rS.every_m !== r.every_m) && w(vehLawEndS(S0, rS.every_m), rS));", ";", 'g'],
+    ["  if (at.slice(5) < base.slice(5)) a--;\n", "", 'g'],
+    ["bg.rows.some(function (r) { return vehLawRowOkS(r) && vehLawWinHasS(r); })", "bg.rows.some(function (r) { return vehLawRowOkS(r); })", 'g'],
+    ["vehDayNumS(conf) >= vehDayNumS(prev) - r.win_before && vehDayNumS(conf) <= vehDayNumS(prev) + r.win_after", "vehDayNumS(conf) >= vehDayNumS(prev) && vehDayNumS(conf) <= vehDayNumS(prev) + r.win_after", 'g'],
+    ["!vals.length || !vehRealDateS(prev) || !vehRealDateS(conf) || !(conf > prev)", "!vehRealDateS(prev) || !vehRealDateS(conf) || !(conf > prev)", 'g'],
+    // 8차-b(11/19): ⓓ 서로 맞음(VEH_LAW_AGREE) · ⓒ 이어짐만 · ⓔ·ⓕ 쌍둥이 줄(같은 값을 두 길로) · 마지막 확정 = 지금 만기
+    ['log[j].prev !== log[j - 1].confirmed) return { clean: false }; }', 'false) return { clean: false }; }'],
+    ['    if (last.confirmed !== D || Math.abs(vehDayNum(D) - vehDayNum(fe.E)) > VEH_LAW_AGREE) return { clean: false };', '    if (last.confirmed !== D) return { clean: false };'],
+    ['    if (last.confirmed !== D || Math.abs(vehDayNum(D) - vehDayNum(fe.E)) > VEH_LAW_AGREE) return { clean: false };', '    if (Math.abs(vehDayNum(D) - vehDayNum(fe.E)) > VEH_LAW_AGREE) return { clean: false };'],
+    ['  var VEH_LAW_AGREE = 10;', '  var VEH_LAW_AGREE = 11;'],
+    ['  var VEH_LAW_AGREE = 10;', '  var VEH_LAW_AGREE = 9;'],
+    ['    if (log.some(function(x, k){ return k !== a && vehLawValLine(x, cls) && x.prev === La.prev && !twin(x); })) return { clean: false };\n', ''],
+    ['return k !== a && vehLawValLine(x, cls) && x.prev === La.prev && !twin(x); })', 'return k !== a && vehLawValLine(x, cls) && x.prev === La.prev; })'],
+    ['return k !== a && vehLawValLine(x, cls) && x.prev === La.prev && !twin(x); })', 'return k !== a && x && typeof x === "object" && x.prev === La.prev && !twin(x); })'],
+    ['    if (log.slice(0, a).some(function(x){ return vehLawValLine(x, cls) && !twin(x) && vals.some(function(s){ return x.insp_done === s || x.insp_apply === s; }); })) return { clean: false };\n', ''],
+    ['return vehLawValLine(x, cls) && !twin(x) && vals.some(', 'return vehLawValLine(x, cls) && vals.some('],
+    ['["insp_done", "insp_apply", "insp_ext"].every(function(k){ return (x[k] || "") === (La[k] || ""); })', '["insp_done"].every(function(k){ return (x[k] || "") === (La[k] || ""); })'],
+    ['x.prev === La.prev && x.confirmed === La.confirmed && [', 'x.prev === La.prev && ['],
+    // 8차-c(11/20): ⓗ La로 이어짐 · 자동차 신청일만 줄 = 값 줄 아님 · 칩 신청일 기준 · 수정 창 연장 비움을 늘 비움으로(검토 A36)
+    ['    if (j >= 0 && log[j] && typeof log[j] === "object" && vehRealDate(log[j].confirmed) && log[j].confirmed !== La.prev) return { clean: false };\n', ''],
+    ['log[j].prev === La.prev && log[j].confirmed === La.confirmed; j--);', 'false; j--);'],
+    ['(cls === "ceq" && typeof x.insp_apply === "string"', '(typeof x.insp_apply === "string"'],
+    ['(c.apply ? "직전 신청일 기준" : "직전 갱신 기준")', '"직전 갱신 기준"'],
+    ['    if (logged){ if (v.insp_ext === logged || ch("vehInspExt")) vehSetOpt(v, "insp_ext", ""); return; }', '    if (logged){ vehSetOpt(v, "insp_ext", ""); return; }'],
+    // 8차-d(11/20): ⓘ 앞 회차 두 갈래(좁은 재확인 full:0) · 자동차 신청일 기록 안 함
+    ['    if (j >= 0 && vehLawValLine(log[j], cls) && log.some(', '    if (false && log.some('],
+    ['    if (ex && v.size !== "건설기계") delete ex.insp_apply;', '    if (false) delete ex.insp_apply;'],
+  ];
+  const kill38 = [];
+  //   8차-e(게이트 시간 — 원장 C191): 결함 사본마다 무작위 INV38 을 다시 돌리던 것이 판38 시간의 대부분 — 기본은 두 단계: ① INV38 = 0 으로 결정적 검사만(무작위 열쇠 inv·invN 뺌) → 잡히면 끝
+  //   ② ①에서 못 잡힌 사본만 INV38 전체로 다시(잡는 집합은 종전과 같음 — ①의 근거: 실제 코드에서 INV38 0/전체의 결정적 결과가 같음을 아래 det38 로 매번 확인) · P38_LONG=1 이면 종전처럼 사본마다 전체
+  const P38_LONG = !!process.env.P38_LONG;
+  const DET38X = { inv: 1, invInfo: 1, invN: 1 };
+  const okNoInv38 = (R) => Object.keys(EXP38).every((k) => DET38X[k] || R[k] === EXP38[k]) && ['same', 'off', 'offDue', 'modal', 'ext', 'ceq', 'due', 'dueCeq', 'dueOld'].every((k) => R[k] === true);
+  const at0_38 = (f) => { const keep = INV38; INV38 = 0; try { return f(); } finally { INV38 = keep; } };
+  const detOf38 = (r) => JSON.stringify([Object.keys(r.a || {}).filter((k) => !DET38X[k]).sort().map((k) => [k, r.a[k]]), r.b]);
+  const real0_38 = P38_LONG ? null : at0_38(() => all38(html)), det38 = P38_LONG || detOf38(real0_38) === detOf38(real38);
+  let st1_38 = 0;
+  for (const [from, to, w] of MUT38) { let r; const one = () => (w === 'g' ? all38(html, smG38(from, to)) : all38(sm38(from, to)));
+    try { if (!P38_LONG) { const r0 = at0_38(one); if (!(okNoInv38(r0.a) && okM38(r0.b))) { r = r0; st1_38++; } } if (!r) r = one(); } catch (e) { r = { ok: false, x: e.message }; }
+    if (r.ok || (r.x && /한 곳이 아님/.test(r.x))) kill38.push(from.trim().slice(0, 60) + (r.x ? ' (' + r.x + ')' : '')); }
+  if (!det38) kill38.push('결정적 검사가 INV38 에 따라 달라짐(두 단계 근거 깨짐 — P38_LONG=1 로 돌려 볼 것)');
+  if (process.env.P38_TIME) console.log('   판38 결함 사본 ' + MUT38.length + '개 · ①에서 잡힘 ' + st1_38 + ' · ②까지 ' + (MUT38.length - st1_38) + (P38_LONG ? ' (P38_LONG)' : ''));
+  T('P1 판38 차량 법정 검사 만기 제안의 기산(실행 — 실제 @veh-law·@veh-due·수정 창·완료 창·mergeVeh): ① 자동차 기간 전 수검(사례 1 · 74조② 후단·77조② 전 90일 경계 2024-02-09 안·02-08 밖) ② 기간 뒤 수검(사례 2 · 후 31일 경계 04-01 안·04-02 밖) ③ 연장·유예(사례 3 · 77조② 괄호·75조③ — 연장 만료일로 기간 · 종전 만기 앞 연장 날짜는 안 씀) ④ 건설기계 신청 시점(사례 4 · 23조①⑤ 전후 31일 경계 · 신청 비움 = 기간 안 · 신청 밖 + 수검 비움 = 종전 만기 다음날 · 같은 날짜 자동차는 받은 날로) ⑤ 월말 등록(사례 5 · 민법 160조②③ — 누적식 기준 없음 → 이어 세기 제안 · 해당일 없음 = 말일) · 차령 경계 넘는 회차 = 그때 행 ⑥ 수검일 기록 없는 차(운영 52대 꼴 포함) = 운영 v497 결과와 글·칩 HTML까지 같음(옛 판 근거 표도) ⑦ 검사 만기 빈 차 = 오늘 이후 첫 만료일(한계 ①) · 건설기계 사업용 여부·연식 없이 제안(한계 ②) ⑧ 칩: 이어 센 제안 = 칸 끝 "수검일 기준"·초록 한 줄 · 누적식 = 지금 안내 그대로 ⑨ 근거 표 옛 판(기간 칸 없음) = 누적식 · 기간 칸 꼴 틀린 행 = 안 씀 ⑩ 승격 전 = 새 칸·안내 숨김·기록·연장 칸 안 씀·완료 창 law 없음 ⑪ 수정 창: 시안 ① 예 그대로(2027-04-23 차이 0 · "직전 수검일 기준 — 종전 만기 2026-04-23, 수검일 2026-04-10(검사 기간 안) → 2026-04-24부터 셈") · 기록 줄 새 칸 · 연장 만료일 옮김·비움·연장만 저장·지움 · 건설기계 신청일 · 안내 5가지(오늘 뒤·만기 안 바꿈·종전 만기 앞 연장·달력·신청일 > 수검일 — 저장 안 함) ⑫ 완료 창: 칸·law 새 칸·응답 기록·연장 칸 비움·받은 사본 전진 · 보험 지시 = 칸 없음 ⑬ 병합: 다른 기기 수검일·만기 뒤 옛 화면 저장 = 새 칸·기록 남음 · 받은 사본 전진 뒤 다른 기기 새 연장 만료일 남음 · 기록 합집합이 빈 칸을 채움 · 새 칸 id 한 번씩·창 글 내부 이름 없음·구간 코드에 기간 일수 숫자 없음 ⑭ 독립 검토 반영: 만기 오타 정정 저장(세 칸 빈 줄)은 이어 세기 출발점이 아님(사업용 대형 화물 정정·건설기계 첫 정정·연도 오타 정정 = 누적식·앞 줄과 같은 날) · 마지막 값 있는 줄 · 차령 경계 회차 행 · 2001년 전 승합 · 만기 빈 차 오늘 당일 · 같은 거리면 뒤 날 · 기간 판정 행 = 그 회차 행 · 건설기계 신청일 비움 + 이른 수검 = 신청도 기간 전 · 확인 필요(기간 끝 + 휴일 여유 · 건설기계 신청 기간 밖 · 종합검사 근거 행 기간 밖 · 신청일 모르고 늦은 수검) · 오기 범위 안내 · 새 차 만들기 = 검사 기록 칸 숨김 · 판38 전 서버 응답 = 연장 칸 그대로 · 병합 알림 이름 ⑮ 재검토(8차로 바뀜 — 빈 줄은 출발점 아님): 값 갱신 뒤 비운 갱신 1회·12회 연속·기간 밖 수검 줄 뒤 = 날짜는 참고·"직전 갱신 기준 · 확인 필요" · 한 주기와 어긋난 비운 갱신 = 앞 줄에서 셈 + 확인 필요 · 묵은 만기 차 첫 수검일 받음 · 완료 창 ext_was ⑯ 3차 검토: 오타 비운 갱신 뒤 정정 = 차이 0 · 값 갱신 만기 크게 고친 정정 = 정정으로 봄·확인 필요 없음 · 실제 늦은 갱신을 수검일 없이 = 앞 줄에서 셈 + 확인 필요(수검일을 넣으라는 말 없음) · 차령 경계 회차 = 갱신 + 확인 필요(애매 안내 없음) ⑰ 5차 검토(수검일 정정 길 뺌 — 창 수검일 칸 늘 빈 칸·기록 줄 ts 없음·합치기는 앞 줄 + 빈 칸 채움): 연도 오타 → 정정 → 이듬해 비운 갱신 = 차이 0 · 같은 회차 정정에 수검일 = 기록 안 함(수정 창·완료 창 안내 한 줄) · 이어지지 않는 기록 = 확인 필요 ⑱ 8차 불변식(세 등급 ㉮ 값 줄 없음 = 운영 그대로 · ㉯ 마지막 값 줄 La가 깨끗 = 조용히 E(La) · ㉰ 그 밖 = 참고 + 확인 필요 · 고정 씨앗 무작위 3000개 — 진짜 갱신 1~4회(값·비운) · 미리 넣은 연장 · 낡은 연장 칸 사이 작업자 꼴·종전 만기 근처·애매·연도·월·한 주기 건너뜀·앞 만기 값 되돌림·폭 밖 앞 오타 + 같은 수검일·겹친 오타·연장만 넣은 정정·두 화면 합치기 → ㉠ 값 줄 있는 조용함이면 진짜만 기록과 같은 날짜(La 종전 만기가 앞 빈 줄 오타인 꼴·값 줄 없는 운영 그대로는 따로 셈) ㉡ 조용한 이어 세기 = E(La) 손 계산 ㉢ 조용함 ⇔ 검사 쪽에서 따로 짠 ⓐ~ⓖ ㉣ 값 줄 없는 기록 = 기록을 뺀 차와 칩 글자째 같음(연장이 이 회차에 걸리면 확인 필요) ㉤ 매번 수검일을 넣은 오타 없는 현실적인 기록 확인 필요 0 · 8차-b: 조용하면 |지금 만기 − 제안| ≤ 10일 · 결과 수 고정) ⑲ 6차 재현(실제 수정 창 — 연장 소실 K1 · 연장만 넣은 정정 S1 · 폭 밖 오타 + 같은 수검일 S2 · 앞 만기 값 되돌림 K2 · 낡은 연장 칸 메모 저장 · 상태 숨김 · 1999년 · 연장 + 30개월 · 두 화면 합치기 · 기간 끝 + 7·10·11일 holi · 연장만 있는 빈 줄 = 누적식 · 판27 줄만 = 누적식) · 완료 창 새 만기 없이 수검일 = 막음 · 낡은 연장 칸 안 채움 · 서버 ext_now ⑳ 8차(옛 판 승격 = 창 칸 숨김·새 열쇠 없음·운영 그대로 · 수검일 > 새 만기 = 막음 · 만기 빈 차 첫 줄 뒤 갱신 저장 · 못 실린 연장 = 차량 줄 + 확인 필요 · 같은 회차 정정 뒤 바로잡는 값 갱신에 연장 실림 · 오타 → 정정 → 값 갱신 = 곧바로 조용 · 값 갱신 → 비운 갱신 = 확인 필요 → 값 갱신에서 풀림 · 깨진 기록 3000 예외 0 · 완료 창 검사보류 숨김·연장만 지움 안내 · 앱·서버 같은 행 판정 4002 · 차령 경계 age·E2 · 끊긴 줄·신청일 겹침 = 확인 필요 · 합치기 빈 칸 안 섞음·src 다르면 두 줄) · 결함 사본 ' + MUT38.length + '개 = 모두 ✗',
+    st38 && real38.ok && kill38.length === 0, JSON.stringify({ st38, a: real38.a, b: real38.b, 안깨짐: kill38 }).slice(0, 6000));
+} catch (e) { console.log('  (P1 판38 검사 생략 — ' + e.message + ')'); fails++; }
+// ── P1 판38 8차-d(11/20 — 오케스트레이터 결정: 이어 세기 끄고 칸·기록 저장만) 꺼짐 불변식
+//   VEH_LAW_CHAIN_ON = false(운영 코드) 인 지금 @veh-law 의 vehLawCalc·vehLawBadge(칸·펼침·수정 창) = 운영 v497(624fa1c)의 같은 함수와 글자째 같음
+//   무작위 12만(값 줄 있음/없음·빈 판38 줄·판27 줄·깨진 줄 · 차량 줄 연장 · 만기 빔 · 속성 빔(건설기계 사업용 여부·연식 포함) · 매각 등 상태 · 근거 판 둘(기간 칸 있음/없음) · 차종 전부) — 다름 0('의도한 두 꼴' 예외 없음)
+//   스위치 줄 결함 사본(true · 꺼짐 분기 빠뜨림 5자리)은 같은 대조 3000에서 다름이 나와야 함
+try {
+  const oldH38 = execSync('git -C "' + ROOT + '" show 624fa1c:index.html', { encoding: 'utf8', maxBuffer: 64 << 20 });
+  const fOff = (src, name) => { const i = src.search(new RegExp('\\n  function ' + name + '\\(')); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i + 1; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i + 1, j + 1); } } throw new Error('짝: ' + name); };
+  const mkOff = (src) => { const blk = src.slice(src.indexOf('// @veh-law-start'), src.indexOf('// @veh-law-end'));
+    const pre = [fOff(src, 'esc'), fOff(src, 'isDate'), fOff(src, 'isGreyState'), 'var VEH_COLS = [];', 'function todayStr(){ return "2026-11-19"; } function myId(){ return "u1"; } function renderVehicles(){} function gwCall(){ return { then: function(){ return { catch: function(){} }; } }; } function findVeh(){ return null; } function liveVehicles(){ return []; }'].join('\n');
+    return new Function('document', pre + '\n' + blk + '\nreturn { calc: vehLawCalc, badge: vehLawBadge };')({ getElementById: () => null }); };
+  const WPo = { win_before: 90, win_after: 31, win_basis: 'pass' }, WAo = { win_before: 31, win_after: 31, win_basis: 'apply' }, Co = [{ law: '시험법', art: '별표' }];
+  const RWo = [Object.assign({ id: 'o.m24', grade: '실측', cites: Co, cls: 'car', size: ['중형 화물', '소형 승용'], every_m: 24, first_m: 48, first_adj_days: -1, day_max: 28 }, WPo),
+    Object.assign({ id: 'o.m12', grade: '실측', cites: Co, cls: 'car', biz: '사업용', size: ['대형 화물'], every_m: 12, first_adj_days: -1, day_max: 28, age_max: 2, interp: '차령' }, WPo),
+    Object.assign({ id: 'o.m6', grade: '실측', cites: Co, cls: 'car', biz: '사업용', size: ['대형 화물'], every_m: 6, first_adj_days: -1, day_max: 28, age_min: 2, interp: '차령' }, WPo),
+    Object.assign({ id: 'o.n12', grade: '실측', cites: Co, cls: 'car', biz: '비사업용', size: ['대형 화물', '소형 화물'], every_m: 12, first_adj_days: -1, day_max: 28 }, WPo),
+    Object.assign({ id: 'o.bus', grade: '실측', cites: Co, cls: 'car', size: ['중형 승합'], every_m: 12, first_adj_days: -1, day_max: 28, reg_min: '2001-01-01' }, WPo),
+    Object.assign({ id: 'o.c12', grade: '실측', cites: Co, cls: 'ceq', ceq_kind: ['덤프트럭'], every_m: 12, first_adj_days: -1, day_max: 28, age_base: 'year', age_max: 20 }, WAo),
+    Object.assign({ id: 'o.c6', grade: '실측', cites: Co, cls: 'ceq', ceq_kind: ['덤프트럭'], every_m: 6, first_adj_days: -1, day_max: 28, age_base: 'year', age_min: 20 }, WAo),
+    Object.assign({ id: 'o.c36', grade: '실측', cites: Co, cls: 'ceq', ceq_kind: ['굴착기(타이어식)'], every_m: 36, first_adj_days: -1, day_max: 28 }, WAo)];
+  const OLo = RWo.map((r) => { const x = Object.assign({}, r); delete x.win_before; delete x.win_after; delete x.win_basis; return x; });
+  const cmpOff = (N, O, n, seed) => { let sd = seed, diff = 0, ex = ''; const rr = () => { sd = (sd * 1103515245 + 12345) % 2147483648; return sd / 2147483648; }, pick = (a) => a[Math.floor(rr() * a.length)];
+    const ad = (s, k) => new Date(Date.parse(s + 'T00:00:00Z') + k * 86400000).toISOString().slice(0, 10), dt = () => ad('2000-01-01', Math.floor(rr() * 11000));
+    const pool = ['', '2026-02-30', 'x', null, 7, '1999-01-01', undefined];
+    for (let q = 0; q < n; q++) {
+      const v = { id: 'x' + q, state: pick(['운행', '운행', '운행', '정비', '매각', '검사보류', '말소예정', '']) };
+      if (rr() < 0.85) v.biz = pick(['사업용', '비사업용', '']); if (rr() < 0.9) v.size = pick(['대형 화물', '대형 화물', '중형 화물', '소형 화물', '소형 승용', '중형 승합', '건설기계', '건설기계', '', '이상한 값']);
+      if (rr() < 0.9) v.reg_date = rr() < 0.05 ? pick(pool) : dt(); if (v.size === '건설기계') { if (rr() < 0.85) v.ceq_kind = pick(['덤프트럭', '굴착기(타이어식)', '없는 기종', '']); if (rr() < 0.6) v.ceq_year = pick(['2010', '2016', '2003', '', '20x', '2030']); }
+      if (rr() < 0.85) v.insp_due = rr() < 0.03 ? pick(pool) : ad('2023-01-01', Math.floor(rr() * 1800));
+      if (rr() < 0.3) v.insp_ext = rr() < 0.2 ? pick(pool) : ad(v.insp_due && typeof v.insp_due === 'string' && v.insp_due.length === 10 ? v.insp_due : '2025-01-01', Math.floor(rr() * 400) - 200);
+      if (rr() < 0.6) { const lg = []; let P = ad('2022-01-01', Math.floor(rr() * 900)); for (let k = 0, m = Math.floor(rr() * 5); k < m; k++) { const C = ad(P, Math.floor(rr() * 500) - 60); const e = { at: ad(P, -10), prev: rr() < 0.05 ? pick(pool) : P, confirmed: C, proposed: '', rule: '', diff: null, by: 'u', src: pick(['edit', 'task']) };
+        const kk = rr(); if (kk < 0.4) e.insp_done = ad(P, Math.floor(rr() * 150) - 100); else if (kk < 0.75) e.insp_done = ''; if (rr() < 0.2) e.insp_apply = ad(P, -Math.floor(rr() * 60)); if (rr() < 0.15) e.insp_ext = ad(P, Math.floor(rr() * 90)); lg.push(rr() < 0.03 ? pick([null, 'x', 3]) : e); P = C; }
+        v.insp_log = lg; if (rr() < 0.7 && lg.length && lg[lg.length - 1] && lg[lg.length - 1].confirmed) v.insp_due = lg[lg.length - 1].confirmed; }
+      const rows = rr() < 0.5 ? RWo : OLo, today = ad('2026-01-01', Math.floor(rr() * 600));
+      let a, b; try { a = N.calc(v, rows, today); a = JSON.stringify(a) + N.badge(a, 'cell') + N.badge(a, 'det') + N.badge(a, 'modal'); } catch (e) { a = 'x:' + e.message; }
+      try { b = O.calc(v, rows, today); b = JSON.stringify(b) + O.badge(b, 'cell') + O.badge(b, 'det') + O.badge(b, 'modal'); } catch (e) { b = 'x:' + e.message; }
+      if (a !== b) { diff++; if (!ex) ex = JSON.stringify(v).slice(0, 300) + ' → ' + a.slice(0, 150) + ' ≠ ' + b.slice(0, 150); }
+    }
+    return { diff, ex }; };
+  const NOff = mkOff(html), OOff = mkOff(oldH38);
+  //   8차-e(게이트 시간): 기본 2,000 · P38_LONG=1 이면 120,000(종전) — 스위치 줄 결함 사본(아래 MUTOFF)은 기본에서도 3,000씩 그대로
+  const NOFF38 = process.env.P38_LONG ? 120000 : 2000;
+  const resOff = cmpOff(NOff, OOff, NOFF38, 20261120);
+  const swLine = '  var VEH_LAW_CHAIN_ON = false;', swOk = html.split(swLine).length === 2;
+  const MUTOFF = [[swLine, '  var VEH_LAW_CHAIN_ON = true;'],
+    ['    if ((!ceq || !VEH_LAW_CHAIN_ON) && !v.biz) miss.push("사업용 여부");', '    if (!ceq && !v.biz) miss.push("사업용 여부");'],
+    ['    if (ceq && !VEH_LAW_CHAIN_ON && !v.ceq_year) miss.push("연식");\n', ''],
+    ['if (VEH_LAW_CHAIN_ON && (rows || []).some(function(x){ return vehLawRowOk(x) && vehLawWinHas(x); })){', 'if ((rows || []).some(function(x){ return vehLawRowOk(x) && vehLawWinHas(x); })){'],
+    ['      if (VEH_LAW_CHAIN_ON && !v.insp_due && d < anchor){ prev = d; continue; }', '      if (!v.insp_due && d < anchor){ prev = d; continue; }']];
+  const killOff = [];
+  for (const [from, to] of MUTOFF) { let k; try { if (html.split(from).length !== 2) throw new Error('자리 한 곳 아님'); k = cmpOff(mkOff(html.replace(from, () => to)), OOff, 3000, 77).diff; } catch (e) { k = 'x ' + e.message; } if (!(typeof k === 'number' && k > 0)) killOff.push(from.trim().slice(0, 50) + ' (' + k + ')'); }
+  T('P1 판38 8차-d 꺼짐(이어 세기 스위치 VEH_LAW_CHAIN_ON = false · 한 줄): 법정 만기 제안 계산·칸 칩·마우스 글·펼침·수정 창 글 = 운영 v497(624fa1c) 실제 함수와 글자째 같음 — 무작위 ' + NOFF38.toLocaleString('en-US') + (process.env.P38_LONG ? '' : '(기본 · P38_LONG=1 이면 120,000)') + '(값 줄 있음/없음·빈 판38 줄·판27 줄·깨진 줄·차량 줄 연장·만기 빔·속성 빔(건설기계 사업용 여부·연식)·상태·근거 판 기간 칸 있음/없음·차종 전부) 다름 0 · 스위치 줄 결함 사본 ' + MUTOFF.length + '개(true · 꺼짐 분기 빠뜨림 4자리 — vehLawBad 연식 빔 거름은 vehLawMiss가 먼저 막아 같은 결과라 뺌) = 모두 다름 나옴',
+    swOk && resOff.diff === 0 && killOff.length === 0, JSON.stringify({ swOk, diff: resOff.diff, ex: resOff.ex, kill: killOff }));
+} catch (e) { console.log('  (P1 판38 꺼짐 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── P1 판38 8차-e(11/24 — 원장 C191 · 재확인 ㉠㉡ · 전수 표 09_조사_문서/45_Phase1_자료_20261113/판38_8차e_전수표_1124) 수정 창·완료 창의 검사 기록 칸 — 규칙 둘 + C280
+//   ① 칸이 숨거나 잠기면(판38 꺼짐·새 차·상태 검사보류·매각·말소예정 · 신청일은 건설기계 아님) 그 칸 값은 없는 것 — 처음 값으로 되돌림(덜 채운 날 포함 · 다시 보이면 수검일·신청일 빈 칸)
+//   ② 보이는 수검일·신청일에 값이 있는데 이 저장이 기록 줄을 남기지 못하면(만기 안 바꿈·지움) 같은 안내로 막음(완료 창과 같게)
+//   + v521 C280 도우미(dateFieldRead)를 새 칸 셋에 — 덜 채운 날·없는 날 = 창 유지·안내(빈 칸으로 열리는 수검일·신청일도) · 완료 창 연장 칸은 그 창 검사(vehLawExWhy)에 걸릴 차량 줄 값을 미리 채우지 않음(재확인 권고 2·3)
+//   실행: 지금 코드 그대로(스위치 꺼짐) + 실제 openVehModal·saveVehFromModal·vehModalLawRefresh·toggleTaskDone·vehDueOk·@date-field · date 칸은 badInput(덜 채운 날)까지 흉내 · 서버 호출만 가짜
+//   고치기 전(09ab8d9 — 46640a0 + 운영 v526)에서는 ㉠·㉡·C280·권고 2·3 항목이 ✗ · 결함 사본 9개 = 모두 ✗
+try {
+  const fE = (src, name) => { const i = src.search(new RegExp('\\n  function ' + name + '\\(')); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i + 1; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i + 1, j + 1); } } throw new Error('짝: ' + name); };
+  const bE = (src, a, z) => { const i = src.indexOf(a), j = src.indexOf(z); if (i < 0 || j < i) throw new Error('구간 없음: ' + a); return src.slice(i, j); };
+  const CE = [{ law: '시험법', art: '별표' }];
+  const ROWSE = [{ id: 'e.m24', grade: '실측', cites: CE, cls: 'car', size: ['중형 화물'], every_m: 24, first_adj_days: -1, day_max: 28, win_before: 90, win_after: 31, win_basis: 'pass' },
+    { id: 'e.c12', grade: '실측', cites: CE, cls: 'ceq', ceq_kind: ['덤프트럭'], every_m: 12, first_adj_days: -1, day_max: 28, win_before: 31, win_after: 31, win_basis: 'apply' }];
+  const DTE = new Set(['vehInsp', 'vehIns', 'vehRegDate', 'vehInspDone', 'vehInspExt', 'vehInspApply', 'vehDueDate', 'vehDueDone', 'vehDueExt', 'vehDueApply']);
+  const okSE = (s) => { const m = /^(\d{4,})-(\d{2})-(\d{2})$/.exec(s); if (!m) return false; const y = +m[1], t = new Date(Date.UTC(2000, +m[2] - 1, +m[3])); t.setUTCFullYear(y); return t.getUTCFullYear() === y && t.getUTCMonth() === +m[2] - 1 && t.getUTCDate() === +m[3]; };
+  const mkE = (src) => {
+    const els = {}, E = { vehicles: [], tasks: [], sent: [], calls: [], toasts: [], gw: null };
+    const mk = (id) => { const cls = new Set(), el = { id, textContent: '', innerHTML: '', disabled: false, placeholder: '', style: {}, classList: { add: (c) => cls.add(c), remove: (c) => cls.delete(c), contains: (c) => cls.has(c) }, addEventListener() {}, focus() {} };
+      if (DTE.has(id)) { let val = '', bad = false; Object.defineProperty(el, 'value', { get: () => val, set: (x) => { const s = String(x == null ? '' : x); val = okSE(s) ? s : ''; bad = false; } }); Object.defineProperty(el, 'validity', { get: () => ({ badInput: bad }) }); el.type_ = (s) => { if (s === '#partial') { val = ''; bad = true; } else { val = s; bad = false; } }; } else el.value = '';
+      return el; };
+    const cols = (src.match(/var VEH_COLS = \[[\s\S]*?\n  \];/) || [''])[0];
+    const pre = [fE(src, 'esc'), fE(src, 'isDate'), fE(src, 'isGreyState'), cols, fE(src, 'openVehModal'), fE(src, 'closeVehModal'), fE(src, 'saveVehFromModal'), fE(src, 'toggleTaskDone'), fE(src, 'imSt'), fE(src, 'imBaseSet'), fE(src, 'imBaseAdvance'), fE(src, 'mgCopy'),
+      bE(src, '// @date-field-start', '// @date-field-end'), 'var vehicles = E.vehicles, tasks = E.tasks, editingVehId = null, vehDetTab = "ov";',
+      'function todayStr(){ return "2026-11-19"; } function myId(){ return "u1"; } function myName(){ return "시험"; } function canDo(m){ return true; } function canSee(m){ return m !== "stmt"; } function isAdmin(){ return false; } function canActTask(t){ return true; }',
+      'function findVeh(id){ for (var i = 0; i < vehicles.length; i++){ if (vehicles[i].id === id) return vehicles[i]; } return null; } function liveVehicles(){ return vehicles.filter(function(v){ return v && v.del !== 1; }); }',
+      'function findTask(id){ for (var i = 0; i < tasks.length; i++){ if (tasks[i].id === id) return tasks[i]; } return null; }',
+      'function genId(p){ return p + "new"; } function alert(m){ E.calls.push(m); } function confirm(m){ return true; } function saveVehiclesCache(){} function renderVehicles(){} function renderDashboard(){} function scheduleVehSave(){}',
+      'function apprToastShow(m){ E.toasts.push(m); } function pushNotify(){} function saveTasksCache(){} function renderTasks(){} function renderSummary(){} function scheduleTasksSave(){}',
+      'function syncP(v){ return { then: function(f){ return syncP(f ? f(v) : v); }, catch: function(){ return syncP(v); } }; }',
+      'function gwCall(fn, body){ E.sent.push(JSON.parse(JSON.stringify(body))); return syncP(typeof E.gw === "function" ? E.gw(body) : { status: 500, body: {} }); }'].join('\n');
+    const api = new Function('E', 'document', pre + '\n' + bE(src, '// @veh-law-start', '// @veh-law-end') + '\n' + bE(src, '// @veh-due-start', '// @veh-due-end')
+      + '\nreturn { VEH_LAW: VEH_LAW, open: openVehModal, save: saveVehFromModal, refresh: vehModalLawRefresh, toggle: toggleTaskDone, dueOk: vehDueOk };')(E, { getElementById: (id) => els[id] || (els[id] = mk(id)) });
+    api.VEH_LAW.on = true; api.VEH_LAW.ver = 't'; api.VEH_LAW.rows = ROWSE;
+    return { api, els, E };
+  };
+  const runE = (src) => {
+    const { api, els, E } = mkE(src), R = {}, WHY = (/var DATE_FIELD_WHY = "([^"]+)"/.exec(src) || [])[1] || '?';
+    const MSG2 = '수검일·검사 신청일은 검사 만기를 새 날짜로 바꿀 때 같이 넣습니다.', PRV = '2026-10-01', DN = '2026-09-20', AP = '2026-09-15', EXV = '2026-12-15';
+    const CAR = () => ({ id: 'v1', no: 'T1', kind: '시험', state: '운행', insp_due: PRV, reg_date: '2020-05-10', size: '중형 화물', biz: '사업용' });
+    const CEQ = () => Object.assign(CAR(), { size: '건설기계', ceq_kind: '덤프트럭', ceq_year: '2015' });
+    const ty = (id, s) => els[id].type_(s), st = (s) => { els.vehState.value = s; api.refresh(); };
+    // 수정 창 한 번: 차량 넣고 열고 steps → 저장 → { al: 알림, v: 저장 뒤 차량 줄(글), ln: 마지막 기록 줄, to: 끝 안내 }
+    const M = (veh, steps) => { E.vehicles.length = 0; [].concat(veh).forEach((x) => E.vehicles.push(x)); E.calls.length = 0; E.toasts.length = 0; api.open('v1'); steps(); api.save(); const v = E.vehicles[0], lg = Array.isArray(v.insp_log) ? v.insp_log : []; return { al: E.calls.slice(), v: JSON.stringify(v), ln: lg.length ? lg[lg.length - 1] : null, to: E.toasts.join('|') }; };
+    const same = (a, b) => JSON.stringify([a.al, a.v, a.to]) === JSON.stringify([b.al, b.v, b.to]);
+    // ㉠ 만기를 지우며 수검일 = 막음(차량 줄 그대로) · 같은 꼴: 수검일 + 새 만기 뒤 매각(칸 숨음) = 수검일 없는 것(넣지 않은 저장과 같음)
+    let a = M(CAR(), () => { ty('vehInsp', ''); api.refresh(); ty('vehInspDone', DN); });
+    R.a1 = a.al.length === 1 && a.al[0] === MSG2 && JSON.parse(a.v).insp_due === PRV;
+    a = M(CAR(), () => { ty('vehInsp', '2028-10-01'); api.refresh(); ty('vehInspDone', DN); st('매각'); });
+    R.a2 = !a.al.length && a.v.indexOf(DN) < 0 && same(a, M(CAR(), () => { ty('vehInsp', '2028-10-01'); api.refresh(); st('매각'); }));
+    // ㉡ 수검일 → 매각(만기 안 바꿈) = 막지 않음 · 건설기계 신청일(맞는 값·덜 채운 날) → 자동차로 바꿈(잠김) = 막지 않음·안 남음
+    a = M(CAR(), () => { ty('vehInspDone', DN); st('매각'); });
+    R.b1 = !a.al.length && JSON.parse(a.v).state === '매각' && same(a, M(CAR(), () => st('매각')));
+    a = M(CEQ(), () => { ty('vehInspApply', AP); els.vehSize.value = '중형 화물'; api.refresh(); });
+    R.b2 = !a.al.length && JSON.parse(a.v).size === '중형 화물' && a.v.indexOf(AP) < 0;
+    a = M(CEQ(), () => { ty('vehInspApply', '#partial'); els.vehSize.value = '중형 화물'; api.refresh(); });
+    R.b3 = !a.al.length && JSON.parse(a.v).size === '중형 화물';
+    // 다시 보이면: 수검일 빈 칸 · 연장 칸 = 차량 줄 값(넣었던 값 아님)
+    E.vehicles.length = 0; E.vehicles.push(Object.assign(CAR(), { insp_ext: EXV })); api.open('v1'); ty('vehInspDone', DN); ty('vehInspExt', '2027-01-20'); st('검사보류'); st('운행');
+    R.re = els.vehInspDone.value === '' && els.vehInspExt.value === EXV;
+    // 창 두 번(앞 창 처음 값이 다음 창 숨은 칸에 들어가지 않음): 연장 있는 차를 연 뒤 매각 차를 열고 운행으로 = 연장 칸 빈 칸
+    E.vehicles.length = 0; E.vehicles.push(Object.assign(CAR(), { insp_ext: EXV }), Object.assign(CAR(), { id: 'v2', no: 'T2', state: '매각' })); api.open('v1'); api.open('v2'); st('운행');
+    R.two = els.vehInspExt.value === '' && els.vehInspDone.value === '';
+    // C280: 보이는 수검일·연장 칸의 덜 채운 날 = 창 유지·안내(차량 줄 그대로) · 숨은 칸의 덜 채운 날 = 막지 않음
+    a = M(CAR(), () => { ty('vehInsp', '2028-10-01'); api.refresh(); ty('vehInspDone', '#partial'); });
+    R.c1 = a.al.length === 1 && a.al[0] === '수검일 — ' + WHY && JSON.parse(a.v).insp_due === PRV;
+    a = M(Object.assign(CAR(), { insp_ext: EXV }), () => { ty('vehInsp', '2028-10-01'); api.refresh(); ty('vehInspExt', '#partial'); });
+    R.c2 = a.al.length === 1 && a.al[0] === '연장(유예) 만료일 — ' + WHY && JSON.parse(a.v).insp_ext === EXV && JSON.parse(a.v).insp_due === PRV;
+    a = M(CAR(), () => { ty('vehInspDone', '#partial'); st('매각'); });
+    R.c3 = !a.al.length && JSON.parse(a.v).state === '매각';
+    // 정상 길은 그대로: 갱신 + 수검일 = 기록 줄 · 같은 회차 정정 + 수검일 = 끝 안내 한 줄(기록 줄 수검일 빈 칸)
+    a = M(CAR(), () => { ty('vehInsp', '2028-10-01'); api.refresh(); ty('vehInspDone', DN); });
+    R.ok1 = !a.al.length && !!a.ln && a.ln.insp_done === DN && a.ln.confirmed === '2028-10-01';
+    a = M(CAR(), () => { ty('vehInsp', '2026-10-06'); api.refresh(); ty('vehInspDone', DN); });
+    R.ok2 = !a.al.length && !!a.ln && a.ln.insp_done === '' && a.to.indexOf('만기 날짜만 바로잡는') >= 0;
+    // 완료 창: 지시 완료 → 창 → 칸 넣기 → [완료]
+    const D = (vehX, s, steps) => { E.vehicles.length = 0; E.vehicles.push(Object.assign(CAR(), vehX || {})); E.tasks.length = 0; E.tasks.push({ id: 't1', title: 'x', auto_key: 'veh:v1:insp:' + PRV, status: 'open', who_id: 'u1' }); E.sent.length = 0; E.toasts.length = 0;
+      E.gw = (b) => ({ status: 200, body: { vehicle: { id: 'v1', field: 'insp_due', value: b.date, updated: 'x', prev: PRV }, updated_at: 5 } });
+      if (els.vehDueErr) { els.vehDueErr.textContent = ''; els.vehDueErr.classList.remove('show'); }
+      api.toggle('t1'); ty('vehDueDate', s); if (steps) steps(); api.dueOk();
+      const sent = E.sent.filter((b) => b.action === 'veh_due_set'); return { err: els.vehDueErr && els.vehDueErr.classList.contains('show') ? els.vehDueErr.textContent : '', law: sent.length ? sent[0].law || null : null, n: sent.length, st: E.tasks[0].status }; };
+    let d = D({ insp_ext: EXV }, '2028-10-01', () => ty('vehDueExt', '#partial'));
+    R.d1 = d.err === '연장(유예) 만료일 — ' + WHY && d.n === 0;
+    d = D(null, '', () => ty('vehDueDone', '#partial'));
+    R.d2 = d.err === '수검일 — ' + WHY && d.st === 'open';
+    d = D({ insp_ext: '2027-02-30' }, '2028-10-01');
+    R.d3 = !d.err && d.n === 1 && !!d.law && d.law.ext_was === '';
+    d = D({ insp_ext: '2037-08-01' }, '2028-10-01');
+    R.d4 = !d.err && d.n === 1;
+    d = D(null, '2028-10-01', () => ty('vehDueDone', DN));
+    R.d5 = !d.err && !!d.law && d.law.insp_done === DN;
+    d = D(null, '', () => ty('vehDueDone', DN));
+    R.d6 = d.err.indexOf('수검일·검사 신청일은 새 검사 만기를 넣을 때만') === 0 && d.st === 'open';
+    return R;
+  };
+  const KE = ['a1', 'a2', 'b1', 'b2', 'b3', 're', 'two', 'c1', 'c2', 'c3', 'ok1', 'ok2', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6'];
+  const okE = (R) => KE.every((k) => R[k] === true);
+  const realE = runE(html);
+  const oneE = (from, to) => (h) => { if (h.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); return h.replace(from, () => to); };
+  const snapE = '    vehModalSnap = {}; VEH_MODAL_IDS.forEach(function(id){ vehModalSnap[id] = vehModalVal(id); });';
+  const MUTE = [
+    oneE('    vehModalInspSync();   // 8차-e 규칙 ①', '    // 결함 사본'),
+    oneE('if (el && (el.value !== was || (el.validity && el.validity.badInput))) el.value = was;', 'if (el && el.value !== was) el.value = was;'),
+    oneE('var hid = !vehLaw38On() || !editingVehId || isGreyState({ state: vehModalVal("vehState").trim() })', 'var hid = !vehLaw38On() || !editingVehId'),
+    oneE('(hid ? ["vehInspDone", "vehInspApply", "vehInspExt"] : (ceq ? [] : ["vehInspApply"]))', '(hid ? ["vehInspDone", "vehInspApply", "vehInspExt"] : [])'),
+    oneE('return (ch(p[0]) || p[2]) && !r.ok && r.bad === "input";', 'return ch(p[0]) && !r.ok && r.bad === "input";'),
+    oneE('if ((x.insp_done || x.insp_apply) && !vehModalInspLine(ch, prev)) return', 'if ((x.insp_done || x.insp_apply) && !ch("vehInsp")) return'),
+    oneE('if (recBad.length){ vehDueErr(', 'if (false){ vehDueErr('),
+    oneE('if (ext0 && typeof vehLawExWhy === "function" && vehLawExWhy({ insp_done: "", insp_ext: ext0 }, (L.v && L.v.insp_due) || "", todayStr(), "")) ext0 = "";', ''),
+    (h) => { const i = h.indexOf(snapE), j = h.indexOf('    vehModalLawRefresh();\n  }\n  // 창을 연 순간', i); if (i < 0 || j < 0 || h.indexOf(snapE, i + 1) >= 0) throw new Error('결함 자리(연 순간 값 순서) 없음'); const ln = h.slice(i, h.indexOf('\n', i) + 1); return h.slice(0, i) + h.slice(i + ln.length, j) + '    vehModalLawRefresh();\n' + ln + h.slice(j + '    vehModalLawRefresh();\n'.length); }];
+  const killE = [];
+  MUTE.forEach((f, k) => { let r; try { r = runE(f(html)); } catch (e) { r = { x: e.message }; } if (okE(r) || (r.x && /결함 자리/.test(r.x))) killE.push('사본 ' + (k + 1) + (r.x ? ' (' + r.x + ')' : '')); });
+  T('P1 판38 8차-e 검사 기록 칸 규칙 둘 + C280(실행 — 지금 코드·실제 수정 창·완료 창): ㉠ 만기 지우며 수검일 = 막음 · 수검일 + 새 만기 뒤 매각 = 넣지 않은 저장과 같음 · ㉡ 수검일 뒤 매각(만기 그대로) = 막지 않음 · 건설기계 신청일(맞는 값·덜 채운 날) 뒤 자동차로 = 막지 않음·안 남음 · 다시 보이면 수검일 빈 칸·연장 칸 차량 줄 값 · 창 두 번 = 앞 창 값 안 섞임 · C280 보이는 수검일·연장 덜 채운 날 = 안내(차량 줄 그대로) · 숨은 덜 채운 날 = 막지 않음 · 갱신 + 수검일 = 기록 줄 · 같은 회차 정정 = 끝 안내 · 완료 창 연장·수검일 덜 채운 날 = 안내 · 차량 줄 연장이 달력에 없는 글·너무 뒤 = 손대지 않으면 막지 않음(ext_was 빈 칸) · 갱신 + 수검일 = law · 새 만기 없이 수검일 = 막음 그대로 · 결함 사본 ' + MUTE.length + '개 = 모두 ✗',
+    okE(realE) && killE.length === 0, JSON.stringify({ bad: KE.filter((k) => realE[k] !== true), kill: killE }));
+} catch (e) { console.log('  (P1 판38 8차-e 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v529(판38 — 차량 검사 기록 칸·기록만 · 원장 C166·C191): 실행 검사는 위 'P1 판38' 블록들 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd529 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D529 = { ft: rd529('FEATURES.md'), tl: rd529('TESTLIST.md'), sw: rd529('sw.js'), man: rd529('MANUAL.html'), cl: rd529('CLAUDE.md'), ix: rd529('index.html') };
+  const FIX529 = ["<span class=\"fld-label\">검사 기록 — 만기를 바꿀 때 같이</span>", "<div class=\"veh-hint\">수검일 = 검사를 받은 날(검사 결과표·영수증). 넣은 날짜는 기록으로 남깁니다 — 법정 만기 제안 계산에는 아직 쓰지 않습니다. 신청일은 건설기계만 · 연장 만료일은 있을 때만.</div>", "<div class=\"veh-hint\">수검일 = 검사를 받은 날. 넣은 날짜는 기록으로 남깁니다 — 법정 만기 제안 계산에는 아직 쓰지 않습니다. 신청일은 건설기계만 · 연장 만료일은 있을 때만.</div>", "if (extNow !== null) extGone = extNow === \"\";", "[\"vehInspDone\", \"vehInspApply\", \"vehInspExt\"].forEach(function(id){", "if (!st) return 0;", "if (!rP || !vehLawWinHas(rP)){ cur = null; st = []; continue; }", "if (!e || !vehRealDate(e.prev)) return null;   /" + "/ 8차 지시(7차 ③): 종전 만기가 달력 날짜가 아닌 줄(만기 빈 차의 첫 줄 등)은 어디서도 E를 세지 않음", "if (!r || !vehLawWinHas(r)) return null;", "var vals;", "if (vals.some(function(s){ return !vehRealDate(s) || s > e.confirmed; })) return null;", "if (pk.e < 0) return { rec: true };", "if (!sv) return { rec: true };", "if (!v.insp_due && d < anchor) continue;", "if (!best) return { rec: true };", "holi: \"기간 끝날이 토요일·공휴일이면 그다음 날까지 기간 안일 수 있음(민법 161조)\",", "if (!v || !vehRealDate(prev) || !vehRealDate(conf)) return false;", "if (x.insp_apply && x.insp_apply > today) return \"검사 신청일이 오늘 뒤입니다.\";", "if (!vehLaw38On()) return \"\";", "el = document.getElementById(\"vehCeqHint\"); if (el && !VEH_LAW_CHAIN_ON) el.style.display = \"none\";   /" + "/ 8차-d: 이어 세기 꺼짐이면 건설기계 사업용 여부·연식도 필수(운영 판) — '비워도 됨' 안내를 감춤", "if (inspLog) delete inspLog.extMove;", "AUDIT_FIELD_LABEL.insp_ext = \"연장(유예) 만료일\";   /" + "/ P1 판38 8차-c: 차량 감사 줄의 연장 칸 이름표(표시만 — 없으면 날 열쇠 insp_ext가 보임)"];
+  const chk529 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v529 (11/24)', '\n### '), tlv = cut(d.tl, '\n## v529 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`vehModalInspSync`", "원장 C191"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 529 && ftv.length > 0 && mF.length === 0 && cb.length === 7 && gate.length === 2 && scr.length === 5 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**판38(v529') > 0
+      && FIX529.every((x) => d.ix.split(x).length === 2)
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 529;   // v530(급여 판4)에서 '529 이상'으로 풂
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX529.map((x) => d.ix.split(x).length - 1) } };
+  };
+  const r529 = chk529(D529);
+  const mu529 = (k, f) => chk529(Object.assign({}, D529, { [k]: f(D529[k]) })).ok;
+  const M529 = [mu529('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v528 (')), mu529('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v528'")),
+    mu529('ft', (s) => s.split('`vehModalInspSync`').join('vehModalInspSync')),
+    mu529('cl', (s) => s.replace('**판38(v529', '판38(')),
+    mu529('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v528 0974b0b 위로 다시 얹은 판) — 결과는 배포 전 전체 게이트 기록 판38_게이트_v529_1124.txt', '\n- (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v528 0974b0b 위로 다시 얹은 판) — 결과는 배포 전 전체 게이트 기록 판38_게이트_v529_1124.txt'))]
+    .concat(FIX529.map((x) => mu529('ix', (s) => s.replace(x, ''))));
+  T('v529 문서·판 번호(정확 검사): FEATURES 기준 v529 (2026-11-24)·v529 절(판38) · TESTLIST v529 칸 7(화면·운영 확인 5 · 게이트 [x] 2) · CLAUDE.md 한 줄 · 고정 글 22줄 한 번씩 · sw jw-shell-v529 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
+    r529.ok && M529.every((v) => v === false), JSON.stringify({ r: r529.info, mut: M529 }));
+} catch (e) { console.log('  (v529 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v530(66 급여 판4 — PM 11/24 'ㄱ'): 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '530 이상'으로 풀 것
+try {
+  const rdU = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DU = { ft: rdU('FEATURES.md'), tl: rdU('TESTLIST.md'), sw: rdU('sw.js'), cl: rdU('CLAUDE.md'), man: rdU('MANUAL.html') };
+  const chkU = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v530 (11/24)', '\n### '), tlv = cut(d.tl, '\n## v530 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l));
+    const FT = ['`pay_my_slips`', '`pay_bg_set`', '최근 24달'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 530 && mF.length === 0 && cb.length === 4 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 530 && d.cl.indexOf('- **66 급여 판4(v530)**') > 0 && d.man.indexOf('<li><b>내 급여명세서</b> (2026-11 v530)') > 0;
+    return { ok, info: { mF, cb: cb.length } };
+  };
+  const rU = chkU(DU);
+  const muU = (k, f) => chkU(Object.assign({}, DU, { [k]: f(DU[k]) })).ok;
+  const MU = [muU('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v529 (')), muU('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v529'")), muU('ft', (s) => s.split('`pay_my_slips`').join('pay_my_slips')), muU('cl', (s) => s.replace('- **66 급여 판4(', '- 66 급여 판4(')), muU('man', (s) => s.replace('<li><b>내 급여명세서</b>', '<li>내 급여명세서'))];
+  T('v530 문서·판 번호(정확 검사): FEATURES 기준 v530 (2026-11-24)·v530 절 · TESTLIST v530 칸 4 · sw v530 · CLAUDE.md·MANUAL 한 줄 · 결함 사본 ' + MU.length + '개 = 모두 ✗', rU.ok && MU.every((v) => v === false), JSON.stringify({ r: rU.info, mut: MU }));
+} catch (e) { console.log('  (v530 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v531(C281 — 자동 풀기 저장 5xx 알림 가름을 그 저장 표식으로 · 원장 C281): 실행 검사는 위 판40·C281 블록 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd531 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D531 = { ft: rd531('FEATURES.md'), tl: rd531('TESTLIST.md'), sw: rd531('sw.js'), man: rd531('MANUAL.html'), cl: rd531('CLAUDE.md') };
+  const chk531 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v531 (11/24)', '\n### '), tlv = cut(d.tl, '\n## v531 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`csApprHealNext`", "원장 C281"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v531 \(2026-11-24\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C281(v531') > 0
+      && /SHELL_CACHE = 'jw-shell-v531'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r531 = chk531(D531);
+  const mu531 = (k, f) => chk531(Object.assign({}, D531, { [k]: f(D531[k]) })).ok;
+  const M531 = [mu531('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v530 (')), mu531('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v530'")),
+    mu531('ft', (s) => s.split('`csApprHealNext`').join('csApprHealNext')),
+    mu531('cl', (s) => s.replace('**C281(v531', 'C281(')),
+    mu531('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v530 d5c1008 위로 다시 얹은 판) — 결과는 배포 전 전체 게이트 기록 C281_게이트_v531_1124.txt', '\n- (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v530 d5c1008 위로 다시 얹은 판) — 결과는 배포 전 전체 게이트 기록 C281_게이트_v531_1124.txt'))];
+  T('v531 문서·판 번호(정확 검사): FEATURES 기준 v531 (2026-11-24)·v531 절(C281) · TESTLIST v531 칸 5(화면·운영 확인 3 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v531 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
+    r531.ok && M531.every((v) => v === false), JSON.stringify({ r: r531.info, mut: M531 }));
+} catch (e) { console.log('  (v531 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
