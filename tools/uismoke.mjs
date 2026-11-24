@@ -23584,9 +23584,9 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ["`fillXlsxTemplate`", "원장 C267"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v538 \(2026-11-24\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 538 && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
       && d.cl.indexOf('**C267(v538') > 0
-      && /SHELL_CACHE = 'jw-shell-v538'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 538;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r538 = chk538(D538);
@@ -23598,6 +23598,31 @@ try {
   T('v538 문서·판 번호(정확 검사): FEATURES 기준 v538 (2026-11-24)·v538 절(C267) · TESTLIST v538 칸 5(화면·운영 확인 3 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v538 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
     r538.ok && M538.every((v) => v === false), JSON.stringify({ r: r538.info, mut: M538 }));
 } catch (e) { console.log('  (v538 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v539(C272·C273 — 재해 복원 안내서 순서 · 결재 학습 기록 체인 · 원장 C272·C273): 실행 검사는 servertest C273·절 62 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd539 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D539 = { ft: rd539('FEATURES.md'), tl: rd539('TESTLIST.md'), sw: rd539('sw.js'), man: rd539('MANUAL.html'), cl: rd539('CLAUDE.md') };
+  const chk539 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v539 (11/24)', '\n### '), tlv = cut(d.tl, '\n## v539 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`_lib/doneif.clogAppend`", "원장 C272"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v539 \(2026-11-24\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 2 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C272(v539') > 0
+      && /SHELL_CACHE = 'jw-shell-v539'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r539 = chk539(D539);
+  const mu539 = (k, f) => chk539(Object.assign({}, D539, { [k]: f(D539[k]) })).ok;
+  const M539 = [mu539('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v538 (')), mu539('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v538'")),
+    mu539('ft', (s) => s.split('`_lib/doneif.clogAppend`').join('_lib/doneif.clogAppend')),
+    mu539('cl', (s) => s.replace('**C272(v539', 'C272(')),
+    mu539('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 배포 전 전체 게이트 기록 C272_게이트_v539_1124.txt', '\n- (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 배포 전 전체 게이트 기록 C272_게이트_v539_1124.txt'))];
+  T('v539 문서·판 번호(정확 검사): FEATURES 기준 v539 (2026-11-24)·v539 절(C272) · TESTLIST v539 칸 6(화면·운영 확인 4 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v539 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
+    r539.ok && M539.every((v) => v === false), JSON.stringify({ r: r539.info, mut: M539 }));
+} catch (e) { console.log('  (v539 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
