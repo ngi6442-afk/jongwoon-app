@@ -23222,9 +23222,9 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ["`LIC_RK_ADM`", "원장 C260"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v532 \(2026-11-24\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 532 && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
       && d.cl.indexOf('**C260(v532') > 0
-      && /SHELL_CACHE = 'jw-shell-v532'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 532;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r532 = chk532(D532);
@@ -23236,6 +23236,35 @@ try {
   T('v532 문서·판 번호(정확 검사): FEATURES 기준 v532 (2026-11-24)·v532 절(C260) · TESTLIST v532 칸 4(화면·운영 확인 2 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v532 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
     r532.ok && M532.every((v) => v === false), JSON.stringify({ r: r532.info, mut: M532 }));
 } catch (e) { console.log('  (v532 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v533(C248 — 물어보기 '내게 온 지시' 늘 0건 · 원장 C248): 실행 검사는 servertest C248 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd533 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D533 = { ft: rd533('FEATURES.md'), tl: rd533('TESTLIST.md'), sw: rd533('sw.js'), man: rd533('MANUAL.html'), cl: rd533('CLAUDE.md') };
+  const MANA533 = "· 내게 온 지시(지시 탭 권한이 있는 분만 — 제목·기한·상태, 끝난 ";
+  const MANA533_2 = "물어보기는 지시를 찾아보기만 하고, 완료·승인 처리는 이 두 화면에서 합";
+  const chk533 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v533 (11/24)', '\n### '), tlv = cut(d.tl, '\n## v533 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`taskHiddenFor`", "원장 C248"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = "· 내게 온 지시(지시 탭 권한이 있는 분만 — 제목·기한·상태, 끝난 ", MAN2 = "물어보기는 지시를 찾아보기만 하고, 완료·승인 처리는 이 두 화면에서 합";
+    const ok = /기준: v533 \(2026-11-24\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf(MAN) > 0 && d.man.indexOf(MAN2) > 0
+      && d.cl.indexOf('**C248(v533') > 0
+      && /SHELL_CACHE = 'jw-shell-v533'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r533 = chk533(D533);
+  const mu533 = (k, f) => chk533(Object.assign({}, D533, { [k]: f(D533[k]) })).ok;
+  const M533 = [mu533('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v532 (')), mu533('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v532'")),
+    mu533('ft', (s) => s.split('`taskHiddenFor`').join('taskHiddenFor')),
+    mu533('man', (s) => s.replace(MANA533, '')), mu533('man', (s) => s.replace(MANA533_2, '')), mu533('cl', (s) => s.replace('**C248(v533', 'C248(')),
+    mu533('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v532 위로 다시 얹은 판) — 결과는 배포 전 전체 게이트 기록 C248_게이트_v533_1124.txt', '\n- (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v532 위로 다시 얹은 판) — 결과는 배포 전 전체 게이트 기록 C248_게이트_v533_1124.txt'))];
+  T('v533 문서·판 번호(정확 검사): FEATURES 기준 v533 (2026-11-24)·v533 절(C248) · TESTLIST v533 칸 4(화면·운영 확인 2 · 게이트 [x] 2) · MANUAL 물어보기 내게 온 지시(내부 이름 0) · CLAUDE.md 한 줄 · sw jw-shell-v533 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL 둘·CLAUDE.md·게이트 칸) 모두 ✗',
+    r533.ok && M533.every((v) => v === false), JSON.stringify({ r: r533.info, mut: M533 }));
+} catch (e) { console.log('  (v533 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
