@@ -22910,10 +22910,10 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ["`vehModalInspSync`", "원장 C191"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v529 \(2026-11-24\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 7 && gate.length === 2 && scr.length === 5 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 529 && ftv.length > 0 && mF.length === 0 && cb.length === 7 && gate.length === 2 && scr.length === 5 && !cb.some((l) => /\(PM/.test(l))
       && d.cl.indexOf('**판38(v529') > 0
       && FIX529.every((x) => d.ix.split(x).length === 2)
-      && /SHELL_CACHE = 'jw-shell-v529'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 529;   // v530(급여 판4)에서 '529 이상'으로 풂
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX529.map((x) => d.ix.split(x).length - 1) } };
   };
   const r529 = chk529(D529);
@@ -22926,6 +22926,25 @@ try {
   T('v529 문서·판 번호(정확 검사): FEATURES 기준 v529 (2026-11-24)·v529 절(판38) · TESTLIST v529 칸 7(화면·운영 확인 5 · 게이트 [x] 2) · CLAUDE.md 한 줄 · 고정 글 22줄 한 번씩 · sw jw-shell-v529 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
     r529.ok && M529.every((v) => v === false), JSON.stringify({ r: r529.info, mut: M529 }));
 } catch (e) { console.log('  (v529 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v530(66 급여 판4 — PM 11/24 'ㄱ'): 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '530 이상'으로 풀 것
+try {
+  const rdU = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DU = { ft: rdU('FEATURES.md'), tl: rdU('TESTLIST.md'), sw: rdU('sw.js'), cl: rdU('CLAUDE.md'), man: rdU('MANUAL.html') };
+  const chkU = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v530 (11/24)', '\n### '), tlv = cut(d.tl, '\n## v530 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l));
+    const FT = ['`pay_my_slips`', '`pay_bg_set`', '최근 24달'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v530 \(2026-11-24\)\./.test(d.ft) && mF.length === 0 && cb.length === 4 && /SHELL_CACHE = 'jw-shell-v530'/.test(d.sw) && d.cl.indexOf('- **66 급여 판4(v530)**') > 0 && d.man.indexOf('<li><b>내 급여명세서</b> (2026-11 v530)') > 0;
+    return { ok, info: { mF, cb: cb.length } };
+  };
+  const rU = chkU(DU);
+  const muU = (k, f) => chkU(Object.assign({}, DU, { [k]: f(DU[k]) })).ok;
+  const MU = [muU('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v529 (')), muU('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v529'")), muU('ft', (s) => s.split('`pay_my_slips`').join('pay_my_slips')), muU('cl', (s) => s.replace('- **66 급여 판4(', '- 66 급여 판4(')), muU('man', (s) => s.replace('<li><b>내 급여명세서</b>', '<li>내 급여명세서'))];
+  T('v530 문서·판 번호(정확 검사): FEATURES 기준 v530 (2026-11-24)·v530 절 · TESTLIST v530 칸 4 · sw v530 · CLAUDE.md·MANUAL 한 줄 · 결함 사본 ' + MU.length + '개 = 모두 ✗', rU.ok && MU.every((v) => v === false), JSON.stringify({ r: rU.info, mut: MU }));
+} catch (e) { console.log('  (v530 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
