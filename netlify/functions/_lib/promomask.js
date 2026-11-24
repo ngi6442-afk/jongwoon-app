@@ -10,6 +10,7 @@
 const API_URL = 'https://api.anthropic.com/v1/messages';
 const API_VERSION = '2023-06-01';
 const MODEL = 'claude-sonnet-5';        // 초안 생성(promoai.js)과 같은 모델
+const CL = require('./claude');         // C264: 400 잔액 글·402 → CREDIT_LOW(공통 가르기) — 나머지는 종전 HTTP_ + 상태 번호
 const MAX_TOKENS = 4096;                 // 상자 40개 × ~35토큰 + 여유(1024는 단체 사진에서 잘렸다 — 적대 검증)
 const TIMEOUT_MS = 40000;
 const PAD = 0.20;                        // 상자 여백 비례(가로·세로 각 20%)
@@ -115,7 +116,7 @@ async function detectBoxes(apiKey, mediaType, b64) {
   } finally { clearTimeout(timer); }
   if (res.status === 401 || res.status === 403) throw new Error('AUTH');
   if (res.status === 429) throw new Error('RATE_LIMIT');
-  if (res.status >= 400) throw new Error('HTTP_' + res.status);
+  if (res.status >= 400) throw new Error(CL.httpFailCode(res.status, text, 'HTTP_'));
   let j = null;
   try { j = JSON.parse(text); } catch (e) { throw new Error('BAD_JSON'); }
   const stop = String((j && j.stop_reason) || '');
@@ -147,7 +148,7 @@ async function askVision(apiKey, mediaType, b64, system, question, schema, maxTo
   } finally { clearTimeout(timer); }
   if (res.status === 401 || res.status === 403) throw new Error('AUTH');
   if (res.status === 429) throw new Error('RATE_LIMIT');
-  if (res.status >= 400) throw new Error('HTTP_' + res.status);
+  if (res.status >= 400) throw new Error(CL.httpFailCode(res.status, text, 'HTTP_'));
   let j = null;
   try { j = JSON.parse(text); } catch (e) { throw new Error('BAD_JSON'); }
   const stop = String((j && j.stop_reason) || '');

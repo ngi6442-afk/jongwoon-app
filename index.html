@@ -4213,6 +4213,9 @@
       .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
       .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
   }
+  // C264: AI 실패 가운데 기다려도 안 풀리는 것(잔액 부족·키 거부·키 없음) — 서버 공통 가르기(_lib/claude.js adminFail)와 같은 식. 화면 글은 AI_ADMIN_TXT 한 곳
+  var AI_ADMIN_TXT = "관리자 확인 필요(AI 잔액·키 문제)";
+  function aiAdminFail(code){ return /(^|_)(CREDIT_LOW|AUTH)$|^NO_API_KEY/.test(String(code || "")); }
 
   function ddayInfo(due){
     var todayD = new Date(todayStr() + "T00:00:00");
@@ -7837,7 +7840,7 @@
       var b64=String(rd.result).split(",")[1]||"";
       gwCall("gw-data",{action:"grade_parse", name:f.name, data:b64}).then(function(res){
         var r=(res.body||{}).result;
-        if(!r){ alert("판독 실패: "+((res.body||{}).error||"결과 없음")); return; }
+        if(!r){ var ge=(res.body||{}).error; alert("판독 실패: "+(aiAdminFail(ge)?AI_ADMIN_TXT:(ge||"결과 없음"))); return; }
         var isSafety=/안전성/.test(r.doc_kind||"");
         // 안전성평가 통보서에는 유효기간이 없을 수 있음 — 평가주기로 만료일 제안.
         // 주기: S=3년 / A·B·C=2년 / D=1년 (KOSHA 석면해체·제거작업 안전성 평가 실시 공고 기준, 2026-08-04 원문 확인)
@@ -9940,7 +9943,7 @@
   }
   function stmtReadShow(ed){ if (STMT.ed !== ed) return; stmtSetHtml("stmtReadMsg", stmtReadMsgHtml(ed)); var b = document.getElementById("stmtReadBox"); if (b) b.classList.toggle("busy", !!(ed.read && ed.read.busy)); }
   function stmtReadPick(){ var ed = STMT.ed, f = document.getElementById("stmtReadFile"); if (!ed || !stmtEdW(ed) || (ed.read && ed.read.busy) || ed.saving) return; if (f){ f.value = ""; f.click(); } }
-  function stmtReadErr(res, code){ var b = (res && res.body) || {}; code = code || b.error_code || ""; return (STMT_READ_ERR[code] || STMT_ERR[code] || (/^(CLAUDE_|NETWORK|API_)/.test(code) ? "AI 판독이 잠시 실패했습니다 — 거래처를 다시 골라(또는 같은 파일을 다시 넣어) 다시 읽혀 주세요" : "") || (code ? "읽지 못했습니다(" + code + ")" : "읽지 못했습니다")) + (b.why ? " — " + b.why : ""); }
+  function stmtReadErr(res, code){ var b = (res && res.body) || {}; code = code || b.error_code || ""; return (STMT_READ_ERR[code] || STMT_ERR[code] || (aiAdminFail(code) ? "AI 판독을 쓸 수 없습니다 — " + AI_ADMIN_TXT : "") || (/^(CLAUDE_|NETWORK|API_)/.test(code) ? "AI 판독이 잠시 실패했습니다 — 거래처를 다시 골라(또는 같은 파일을 다시 넣어) 다시 읽혀 주세요" : "") || (code ? "읽지 못했습니다(" + code + ")" : "읽지 못했습니다")) + (b.why ? " — " + b.why : ""); }
   function stmtReadFile(file){
     var ed = STMT.ed, fr, seq;
     if (!ed || !file || !stmtEdW(ed) || ed.saving || (ed.read && ed.read.busy)) return;
@@ -12917,7 +12920,7 @@
   // 판독 결과 반영(백그라운드·동기 공용) — 조사서/계약서 분기
   function applyAsbParse(entry, c, p){
     if(!p){ entry.parsed="판독 결과 없음"; }
-    else if(p.error){ entry.parsed="판독 실패("+p.error+") — 수동 확인"; }
+    else if(p.error){ entry.parsed="판독 실패("+p.error+") — "+(aiAdminFail(p.error)?AI_ADMIN_TXT:"수동 확인"); }
     else if(p.doc==="biz"){
       entry.parsed=(p.doc_kind||"증빙")+": "+(p.name||"?")+(p.biz_no?" · "+p.biz_no:(p.birth?" · "+p.birth:""));
       entry.biz=p;
@@ -16247,7 +16250,7 @@
     var r = it.res, inC = it.scope !== "top" ? findProc(it.scope) : null;
     if (r.error){
       // 판단 실패 — 파일을 버리지 않고 직접 고르게. 내용을 모르므로 등급 기본은 1(열람 제한), 옛 파일명 규칙으로 전용 판독 후보만 추정
-      it.note = "판독하지 못했습니다(" + r.error + "). 넣을 자리와 개인정보 등급을 골라 주세요.";
+      it.note = "판독하지 못했습니다(" + r.error + ")" + (aiAdminFail(r.error) ? " — " + AI_ADMIN_TXT : "") + ". 넣을 자리와 개인정보 등급을 골라 주세요.";
       it.res = { cls: "other", pii: 1, sub: /석면|조사/.test(it.name) ? "asbestos_survey" : (/사업자\s*등록증/.test(it.name) ? "biz" : "none"), doc_name: "" };
       it.pii = 1;
       cbxToPick(it, inC); return;
@@ -16348,7 +16351,7 @@
     if (!c.attachments) c.attachments = {};
     if (!c.attachments["서류함"]) c.attachments["서류함"] = [];
     var arr = c.attachments["서류함"], entry = { name: it.name, size: it.size, type: (it.file && it.file.type) || "", id: "", parsed: "", added: todayStr() };   // 판독 결과 칸(검수 버튼) — 파일은 서류함에
-    if (fail){ entry.parsed = "판독 실패(" + fail + ") — 수동 확인"; arr.push(entry); c.updated = todayStr(); scheduleContractSave(); return "값을 읽지 못했습니다(" + fail + "). 값은 직접 확인해 주세요."; }
+    if (fail){ entry.parsed = "판독 실패(" + fail + ") — " + (aiAdminFail(fail) ? AI_ADMIN_TXT : "수동 확인"); arr.push(entry); c.updated = todayStr(); scheduleContractSave(); return "값을 읽지 못했습니다(" + fail + ")" + (aiAdminFail(fail) ? " — " + AI_ADMIN_TXT : "") + ". 값은 직접 확인해 주세요."; }
     if (p.judge && c.asb_survey && c.asb_survey.confirmed) return "검수 확정된 조사서 값이 있어 덮지 않았습니다.";
     if (p.doc === "biz" && c.owner_info && c.owner_info.name && p.name && c.owner_info.name !== p.name) return "이미 있는 발주처 정보(" + c.owner_info.name + ")와 달라 덮지 않았습니다.";
     arr.push(entry);
@@ -24827,7 +24830,7 @@
   // 카드에 표시할 생성 조합 라벨 — 신규(gen)·구버전(fi/bi) 겸용
   // v360(PM 9/16 "미생성은 또 뭔말인데"): 카드에 자동 생성 상태를 말로. 상태(ai_st)는 서버 워커·크론이 기록에 쓴다 —
   //   브라우저가 닫혀도 서버(gw-promo-ai-cron, 10분)가 끝까지 책임지고, 실패는 이유·횟수와 함께 보인다.
-  function paFailShort(code){ var m={NETWORK:"네트워크 끊김",TIMEOUT:"시간 초과",BUDGET_CAP:"월 상한 도달",NO_PHOTOS:"사진 없음",REFUSAL:"모델 거부",KICKOFF_FAILED:"기동 실패",ENV_MISSING:"설정 누락",WORKER_THREW:"서버 오류",GENERATE_THREW:"생성 오류",CREDIT_LOW:"API 잔액 부족",BAD_REQUEST:"요청 거부"}; return m[code]||(code||"원인 미상"); }
+  function paFailShort(code){ var m={NETWORK:"네트워크 끊김",TIMEOUT:"시간 초과",BUDGET_CAP:"월 상한 도달",NO_PHOTOS:"사진 없음",REFUSAL:"모델 거부",KICKOFF_FAILED:"기동 실패",ENV_MISSING:"설정 누락",WORKER_THREW:"서버 오류",GENERATE_THREW:"생성 오류",CREDIT_LOW:"API 잔액 부족",AUTH:"API 키 문제(관리자 확인 필요)",BAD_REQUEST:"요청 거부"}; return m[code]||(code||"원인 미상"); }
   // 체크 10 2단계 E(C061, PM 11/10 '2단계 ㄱ'): 사진이 있는데 사진AI 초안이 한 번도 안 생긴 기록의 본문은 자동 예비 글(템플릿)이다 — 승인·완성본을 막는다.
   //   10/23 API 잔액 부족으로 사진AI가 멈춘 사이 예비 글이 승인돼 10/30·11/2에 그대로 게시됐다(마크다운 ** 노출·11월 글 '봄비'). 게시 완료 기록은 손대지 않는다.
   function promoNoAiDraft(p){ return !!p && !p.ai && (p.photos||[]).length>0; }

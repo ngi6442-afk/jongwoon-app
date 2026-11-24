@@ -13220,6 +13220,7 @@ try {
       'function FileReader(){ var me = this; this.readAsDataURL = function(f){ me.result = "data:application/octet-stream;base64," + f.b64; if (f.fail) me.onerror(); else me.onload(); }; }',
       'function confirm(m){ __env.confirms.push(m); return true; } function alert(m){}',
       fn6('esc'), fn6('pad'), fn6('isDate'),
+      (html.match(/\n  var AI_ADMIN_TXT = "[^"\n]*";/) || [''])[0], fn6('aiAdminFail'),   // C264 명세서 판독 글(stmtReadErr)이 씀 — 실함수
       'function myId(){ return "u1"; } function canDo(m){ return m === "stmt"; } function canSee(m){ return true; }',
       'function findVeh(){ return null; } function liveVehicles(){ return []; } function findMember(){ return null; } function dispName(n){ return n; } function gwToast(){} function onSessionInvalid(){}',
       'function gwCall(fn, body){ __env.log.push({ fn: fn, body: JSON.parse(JSON.stringify(body)) }); var k = fn === "gw-stmt" ? body.action : fn, r = __env.resp[k]; if (typeof r === "function") r = r(body); return Promise.resolve(r || { status: 200, body: { status: "OK" } }); }',
@@ -23265,6 +23266,49 @@ try {
   T('v533 문서·판 번호(정확 검사): FEATURES 기준 v533 (2026-11-24)·v533 절(C248) · TESTLIST v533 칸 4(화면·운영 확인 2 · 게이트 [x] 2) · MANUAL 물어보기 내게 온 지시(내부 이름 0) · CLAUDE.md 한 줄 · sw jw-shell-v533 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL 둘·CLAUDE.md·게이트 칸) 모두 ✗',
     r533.ok && M533.every((v) => v === false), JSON.stringify({ r: r533.info, mut: M533 }));
 } catch (e) { console.log('  (v533 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── C264(AI 실패 가르기 — 원장 C264): 잔액·키 문제는 화면에 '관리자 확인 필요'(일반 실패·'잠시 실패' 아님). 서버 실행 검사는 servertest C264 · 여기는 앱 실제 함수(떼어 실행)
+try {
+  const fn264 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error(name); };
+  const chk264 = (src) => {
+    const P = {}, I = {};
+    const txt = (src.match(/\n  var AI_ADMIN_TXT = "[^"\n]*";/) || [''])[0];
+    const api = new Function('var STMT_READ_ERR = { NO_API_KEY: "AI 판독 설정이 없습니다(관리자 확인)" }, STMT_ERR = {}; var saved = 0, picked = 0;'
+      + 'function todayStr(){ return "2026-11-24"; } function scheduleContractSave(){ saved++; } function renderContracts(){} function cbxOf(){ return true; } function findProc(){ return null; } function cbxToPick(){ picked++; }'
+      + txt + '\n' + ['aiAdminFail', 'stmtReadErr', 'applyAsbParse', 'cbxApply', 'cbxSubApply', 'pad', 'esc', 'paFailShort'].map((n) => fn264(src, n)).join('\n')
+      + '\nreturn { adm: aiAdminFail, stmt: stmtReadErr, asb: applyAsbParse, box: cbxApply, sub: cbxSubApply, pa: paFailShort };')();
+    const ADM = /관리자 확인 필요/;
+    I.adm = ['CREDIT_LOW', 'CLAUDE_CREDIT_LOW', 'AUTH', 'CLAUDE_AUTH', 'NO_API_KEY(Netlify 환경변수 ANTHROPIC_API_KEY 확인)', 'CLAUDE_529', 'CLAUDE_SERVER', 'NETWORK', 'BAD_REQUEST', 'NO_JSON', ''].map((c) => api.adm(c) ? 1 : 0).join('');
+    P.adm = I.adm === '11111000000';
+    const sC = api.stmt(null, 'CLAUDE_CREDIT_LOW'), sA = api.stmt(null, 'CLAUDE_AUTH'), sS = api.stmt(null, 'CLAUDE_SERVER');
+    P.stmt = ADM.test(sC) && !/잠시/.test(sC) && ADM.test(sA) && !/잠시/.test(sA) && /잠시 실패/.test(sS) && !ADM.test(sS); I.stmt = [sC, sS].join(' | ');
+    const e1 = { name: '석면조사.pdf' }, e2 = { name: '석면조사.pdf' };
+    api.asb(e1, {}, { error: 'CREDIT_LOW' }); api.asb(e2, {}, { error: 'PARSE_FAILED' });
+    P.asb = ADM.test(e1.parsed) && /판독 실패\(CREDIT_LOW\)/.test(e1.parsed) && /수동 확인/.test(e2.parsed) && !ADM.test(e2.parsed); I.asb = [e1.parsed, e2.parsed].join(' | ');
+    const b1 = { id: 'x', name: '계약서.pdf', scope: 'top' }, b2 = { id: 'y', name: '계약서.pdf', scope: 'top' };
+    api.box(b1, { error: 'AUTH' }); api.box(b2, { error: 'NO_JSON' });
+    P.box = ADM.test(b1.note) && !ADM.test(b2.note) && /판독하지 못했습니다\(NO_JSON\)/.test(b2.note); I.box = [b1.note, b2.note].join(' | ');
+    const c1 = {}, m1 = api.sub({ name: '석면조사.pdf', size: 1, subFail: 'CREDIT_LOW' }, c1), c2 = {}, m2 = api.sub({ name: '석면조사.pdf', size: 1, subFail: 'PARSE_FAILED' }, c2);
+    P.sub = ADM.test(m1) && ADM.test(c1.attachments['서류함'][0].parsed) && !ADM.test(m2) && /수동 확인/.test(c2.attachments['서류함'][0].parsed); I.sub = [m1, m2].join(' | ');
+    P.pa = ADM.test(api.pa('AUTH')) && api.pa('CREDIT_LOW') === 'API 잔액 부족'; I.pa = api.pa('AUTH');
+    // 등급확인서 판독(관리자 화면 alert — 콜백 안 한 줄이라 원문으로)
+    P.grade = /if\(!r\)\{ var ge=\(res\.body\|\|\{\}\)\.error; alert\("판독 실패: "\+\(aiAdminFail\(ge\)\?AI_ADMIN_TXT:\(ge\|\|"결과 없음"\)\)\); return; \}/.test(src);
+    return { ok: Object.values(P).every((v) => v === true), info: JSON.stringify(I) + ' ✗ ' + Object.keys(P).filter((k) => P[k] !== true).join(',') };
+  };
+  const r264 = chk264(html);
+  T('C264 앱 AI 실패 글: aiAdminFail(잔액·키·키 없음 — 머리 CLAUDE_·꼬리 포함, 일시 실패 아님) · 명세서 판독 잔액·키 = \'관리자 확인 필요\'(\'잠시 실패\' 아님, 서버 오류는 그대로) · 첨부 판독·넣기 박스·전용 판독 실패 글 · 블로그 AUTH · 등급확인서', r264.ok, r264.info);
+  const MU264 = [
+    ['return /(^|_)(CREDIT_LOW|AUTH)$|^NO_API_KEY/.test(String(code || ""));', 'return false;'],
+    ['(aiAdminFail(code) ? "AI 판독을 쓸 수 없습니다 — " + AI_ADMIN_TXT : "") || ', ''],
+    ['entry.parsed="판독 실패("+p.error+") — "+(aiAdminFail(p.error)?AI_ADMIN_TXT:"수동 확인");', 'entry.parsed="판독 실패("+p.error+") — 수동 확인";'],
+    ['it.note = "판독하지 못했습니다(" + r.error + ")" + (aiAdminFail(r.error) ? " — " + AI_ADMIN_TXT : "") + ".', 'it.note = "판독하지 못했습니다(" + r.error + ").'],
+    ['return "값을 읽지 못했습니다(" + fail + ")" + (aiAdminFail(fail) ? " — " + AI_ADMIN_TXT : "") + ".', 'return "값을 읽지 못했습니다(" + fail + ").'],
+    ['AUTH:"API 키 문제(관리자 확인 필요)",', ''],
+    ['alert("판독 실패: "+(aiAdminFail(ge)?AI_ADMIN_TXT:(ge||"결과 없음")));', 'alert("판독 실패: "+(ge||"결과 없음"));'],
+  ];
+  const kill264 = MU264.filter(([a, b]) => { if (html.split(a).length !== 2) return true; try { return chk264(html.replace(a, () => b)).ok; } catch (e) { return false; } }).map(([a]) => a.slice(0, 40));
+  T('C264 결함 사본 ' + MU264.length + '개(판정·명세서·첨부 판독·넣기 박스·전용 판독·블로그·등급확인서 하나씩 되돌림) = 모두 ✗', kill264.length === 0, kill264.join(' | '));
+} catch (e) { console.log('  (C264 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

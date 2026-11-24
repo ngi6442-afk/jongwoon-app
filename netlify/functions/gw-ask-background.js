@@ -88,8 +88,8 @@ exports.handler = async function (event) {
 
   let r;
   try { r = await A.ask(q, member); } catch (e) { r = { error: 'ASK_FAILED' }; }
-  if (r.error) {
-    await put({ state: 'done', ok: false, code: r.error, answer: '지금은 답할 수 없습니다. 잠시 뒤 다시 물어보세요.' });
+  if (r.error) {   // C264: 실패 글은 코드별(잔액·키 = 관리자 확인 필요 · 끊긴 답·빈 답 = 그 이유 · 일시 실패만 '잠시 뒤 다시') — 하루 횟수·월 토큰·감사 줄은 차감하지 않는다
+    await put({ state: 'done', ok: false, code: r.error, answer: A.failAnswer(r.error) });
     return { statusCode: 202, body: '' };
   }
   const used = await bumpUsage(member.id, (r.in || 0) + (r.out || 0));

@@ -13,6 +13,7 @@
 const { store, blobGet } = require('./blobs');
 const DS = require('./docscope');
 const CLIBIZ = require('./clibiz');   // v456 거래처 사업자번호 칸 13자리 판정(원문·검색 제외)
+const CL = require('./claude');       // C264 AI 실패 가르기 공통(잔액·키 → 관리자 확인 필요)
 
 const DATA = 'gw_data';
 
@@ -272,6 +273,7 @@ async function ask(question, member) {
   const messages = [{ role: 'user', content: question }];
   const used = [];
   let inTok = 0, outTok = 0, turns = 0, answer = '', cWrite = 0, cRead = 0;
+  let lastStop = '', lastText = '', exhausted = true;   // C264 마지막 회차 판정용
 
   while (turns < MAX_TURNS) {
     turns++;
@@ -280,16 +282,21 @@ async function ask(question, member) {
       headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
       body: JSON.stringify({ model, max_tokens: MAX_TOKENS, system, tools, messages }),
     });
-    if (!resp.ok) return { error: 'CLAUDE_' + resp.status, detail: (await resp.text()).slice(0, 300), turns, in: inTok, out: outTok };
+    if (!resp.ok) {   // C264: 잔액 부족·키 거부는 공통 코드(CREDIT_LOW·AUTH)로 — 나머지는 종전 'CLAUDE_' + 상태 번호
+      const et = await resp.text();
+      return { error: CL.httpFailCode(resp.status, et), detail: et.slice(0, 300), turns, in: inTok, out: outTok };
+    }
     const j = await resp.json();
     inTok += (j.usage && j.usage.input_tokens) || 0;
     outTok += (j.usage && j.usage.output_tokens) || 0;
     cWrite += (j.usage && j.usage.cache_creation_input_tokens) || 0;
     cRead += (j.usage && j.usage.cache_read_input_tokens) || 0;
     const blocks = j.content || [];
-    answer = (blocks.filter((b) => b.type === 'text').map((b) => b.text).join('\n') || answer);
+    lastStop = String(j.stop_reason || '');
+    lastText = blocks.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
+    answer = (lastText || answer);
     const calls = blocks.filter((b) => b.type === 'tool_use');
-    if (!calls.length || j.stop_reason !== 'tool_use') break;
+    if (!calls.length || j.stop_reason !== 'tool_use') { exhausted = false; break; }
     messages.push({ role: 'assistant', content: blocks });
     const results = [];
     for (const c of calls) {
@@ -299,7 +306,19 @@ async function ask(question, member) {
     }
     messages.push({ role: 'user', content: results });
   }
+  // C264: 글 없는 답·잘린 답은 실패 — 성공으로 두면 '(빈 답)'·끊긴 글이 정상 답처럼 보이고 하루 횟수·월 토큰·감사 줄이 차감됐다(호출부는 r.error면 차감하지 않는다).
+  //   잘림 = 마지막 회차 stop_reason max_tokens(글이 조금 있어도) · 회차 소진 = 도구만 부르다 MAX_TURNS를 다 씀 · 빈 답 = 마지막 회차에 글이 없음(앞 회차의 '찾아보겠습니다' 같은 글은 답이 아님)
+  const cut = lastStop === 'max_tokens' ? 'MAX_TOKENS' : (exhausted ? 'MAX_TURNS' : (!String(lastText).trim() ? 'EMPTY' : ''));
+  if (cut) return { error: cut, turns, in: inTok, out: outTok, cw: cWrite, cr: cRead, tools: used, tool_count: tools.length };
   return { answer, turns, in: inTok, out: outTok, cw: cWrite, cr: cRead, tools: used, tool_count: tools.length };
+}
+
+// C264: 실패 코드별 직원 화면 글(gw-ask-background·gw-ask 공용) — 잔액·키는 '관리자 확인 필요', 끊긴 답·빈 답은 그 이유, 나머지(과부하·속도 제한·서버·네트워크)만 '잠시 뒤 다시'
+function failAnswer(code) {
+  if (CL.adminFail(code)) return '지금은 답할 수 없습니다 — ' + CL.ADMIN_FAIL_TEXT;
+  if (code === 'MAX_TOKENS' || code === 'MAX_TURNS') return '답이 길어 끊겼습니다 — 질문을 좁혀 다시 물어보세요.';
+  if (code === 'EMPTY') return '답을 만들지 못했습니다 — 다시 물어보세요.';
+  return '지금은 답할 수 없습니다. 잠시 뒤 다시 물어보세요.';
 }
 
 // 측정값을 서버에 남긴다 — 종전엔 브라우저 화면에만 있어 창을 닫으면 사라졌다(2026-09-10 실사고).
@@ -317,4 +336,4 @@ async function saveRow(row, r) {
 }
 
 
-module.exports = { TOOLS, SYSTEM, METER_Q, ROW_CAP, MAX_TURNS, toolDefs, runTool, permOf, ask, deviceApproved, scopeHas, taskForMe };
+module.exports = { TOOLS, SYSTEM, METER_Q, ROW_CAP, MAX_TURNS, toolDefs, runTool, permOf, ask, failAnswer, deviceApproved, scopeHas, taskForMe };
