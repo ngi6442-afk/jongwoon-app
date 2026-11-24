@@ -6,8 +6,10 @@
 const crypto = require('crypto');
 const zlib = require('zlib');   // v378 큰 본문 gzip(응답·요청) — 10/8 실사고(col:bids 6.69MB > 동기 함수 한도 6MB)
 const { setupBlobContext, store, blobGet, blobSet, blobDelete, blobList } = require('./_lib/blobs');
+const MW = require('./_lib/markwrite');   // C225 판 A 두 번째 검토 — 창을 못 읽은 요청의 속도 제한 기록 쓰기(inquiry:rl)
 const { verifyToken, bearer } = require('./_lib/session');
 const { appendAudit, auditKey, diffItems, MAX_PER_MONTH: AUDIT_MAX_PER_MONTH } = require('./_lib/audit');
+const IMG = require('./_lib/imgsniff');   // C265 홍보 사진 형식(머리 바이트) 확인
 const { badBlobKey } = require('./_lib/blobkey');   // v453 Blobs 키 이름 검사(backup_get·backup_put 400 BAD_KEY — blobs.js도 같은 검사로 SDK 앞에서 막음)
 const AL = require('./_lib/apprlearn');   // v413 결재 학습 신호(clog:appr → lessons:appr, 모델 없음)
 const DONEIF = require('./_lib/doneif');   // v413 clogAppend(해시 체인) 재사용
@@ -367,8 +369,11 @@ async function handleSave(event, d, R) {
   if (permOf(c.member, col) !== 'do' && col !== 'tasks' && col !== 'leaves') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
   if (!d.doc || typeof d.doc !== 'object') return jr(400, { status: 'REJECTED', error_code: 'INVALID_DOC', request_id: R });
   // 감사 로그용 이전 문서(diff 원본) — 읽기 실패해도 저장은 진행
-  let oldItems = [], prevDoc = null, prevReadFailed = false;
-  try { const prev = await blobGet(store(DATA), colKey(col)); if (prev.ok) { if (prev.data) { prevDoc = prev.data; if (Array.isArray(prev.data.items)) oldItems = prev.data.items; } } else prevReadFailed = true; } catch (e) { prevReadFailed = true; }
+  let oldItems = [], prevDoc = null, prevReadFailed = false, prevMissing = false;
+  try { const prev = await blobGet(store(DATA), colKey(col)); if (prev.ok) { if (prev.data) { prevDoc = prev.data; if (Array.isArray(prev.data.items)) oldItems = prev.data.items; } } else { prevReadFailed = true; prevMissing = prev.code === 'NOT_FOUND'; } } catch (e) { prevReadFailed = true; }
+  // C225 판 A: 직전 문서를 못 읽었으면(읽기·파싱 실패) 어느 갈래도 저장하지 않는다 — 빈 문서로 보고 재구성(휴가 타인 줄·차량 관리자 칸 등)한 뒤 덮던 길 · 알림·변경 기록보다 먼저
+  //   (NOT_FOUND = 시험 mock의 '없음' — 실 blobs.js는 없음을 ok:true·null로 준다. 갈래별 기존 PREV_READ_FAILED 가드는 그대로 둔다)
+  if (prevReadFailed && !prevMissing) return jr(500, { status: 'ERROR', error_code: 'PREV_READ_FAILED', request_id: R });
   // 낙관적 락: 클라이언트가 로드했던 문서 시각(base)과 서버 현재가 다르면 409 → 프런트의 기존 충돌 병합 경로가 재조회·병합·재시도.
   // 종전엔 감지 자체가 없어 두 관리자 동시 저장 시 늦은 쪽이 앞선 수정을 통째로 덮었다. base 미전송(구버전 캐시)·첫 저장은 종전대로.
   // v456(원장 C079): 저장된 문서의 updated_at이 유한한 숫자가 아니면(바깥 도구·스크립트가 글자 시각으로 쓴 경우 등) base 비교를 건너뛴다(종전 첫 저장처럼) —
@@ -739,6 +744,7 @@ async function handleSave(event, d, R) {
   const w = await blobSet(store(DATA), colKey(col), doc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   // 감사 로그: 누가·언제·무엇을(이전값→새값). 서버측 기록이라 클라이언트 위변조 불가.
+  let saveAuFail = false;   // C251 「덧대기」: 감사 줄을 못 남겼으면(appendAudit false·예외) 응답에 audit:false — 응답 꼴만(화면 글 없음 · 저장은 이미 됨)
   try {
     let ev;
     if (col === 'checklist') {
@@ -762,8 +768,8 @@ async function handleSave(event, d, R) {
     if (vehDueKept) ev.push({ op: '만기일 보호', id: '-', t: '낡은 사본이 지시 완료 창 만기일 ' + vehDueKept + '칸을 바꾸기 전 날짜로 되돌리려 해 서버 값을 지켰습니다 — 그 사람의 앱 화면이 낡은 사본입니다' });   // P1 판2 검토(S1)
     if (conKept.length) ev.push({ op: '낡은 사본의 승인 차수 이월', id: conKept.slice(0, 10).map(function (x) { return x.cid + '|' + x.pipe + '|' + x.i; }).join(',').slice(0, 200), t: '승인된 변경계약 ' + conKept.length + '차수를 승인 전 사본(같은 상신 번호·같은 사본)으로 보낸 저장 — 그 단계는 서버 승인 값을 지키고 나머지 고침은 저장(그 사람의 앱 화면이 낡은 사본입니다)' });   // P1 판24 5차
     conOrig.slice(0, 20).forEach(function (x) { ev.push({ op: '원계약 칸 바뀜', id: x.cid, t: '승인된 변경계약이 있는 계약의 원계약 ' + x.f.map(function (k) { return k === 'amount' ? '금액' : '준공일'; }).join('·') + ' 칸이 바뀜(값은 적지 않음 — 유효 금액·종료일은 승인된 변경계약 값)' }); });   // P1 판24-③ 3차 재검토 B1
-    if (ev.length) await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: col, ev: ev });
-  } catch (e) {}
+    if (ev.length && (await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: col, ev: ev })) === false) saveAuFail = true;
+  } catch (e) { saveAuFail = true; }
   // 문서함 등재 결재 훅(v314): 비관리자의 '대기' 문서마다 결재함에 '문서함 등재' 카드를 서버가 대신 기안(by=등재한 직원, ref 'doc:'+id, cid 멱등).
   // 문서 저장이 먼저(사용자 본선), 상신은 그 뒤 — 상신 실패는 감사로그로 남기고 이 직원의 다음 문서 저장 때 같은 cid로 다시 시도(멱등이라 중복 0).
   // 재상신(reg_n) 건도 같은 경로. 정정 상신(dupOpenRef)은 'ab:' 전용이라 doc: 중복은 cid 멱등에만 의존한다.
@@ -790,6 +796,7 @@ async function handleSave(event, d, R) {
   if (regWarn) okOut.register_warn = regWarn;
   if (licKept.length) okOut.lic_kept = licKept;
   if (conKept.length) okOut.con_kept = conKept;   // P1 판24 5차: 앱이 그 계약을 서버 값으로 다시 읽음
+  if (saveAuFail) okOut.audit = false;   // C251: 정상 때는 칸 없음(응답 종전 그대로)
   return jr(200, okOut);
 }
 
@@ -878,6 +885,7 @@ async function handleBidsIngest(event, d, R, attempt) {
   const st = store(DATA);
   const r = await blobGet(st, colKey(target));
   if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: r.code || 'STORAGE_READ_FAILED', request_id: R });   // v444 검토 ①
+  if (r.ok && r.data != null && !Array.isArray(r.data.items)) return jr(500, { status: 'ERROR', error_code: 'BIDS_READ_FAILED', request_id: R });   // C225 판 A: 읽혔지만 꼴이 깨진 원장(items 배열 아님)을 빈 원장으로 보고 덮지 않음
   const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
   const at0 = (r.ok && r.data) ? r.data.updated_at : undefined, inItems = d.items;   // v444 검토 ② 처음 읽은 원장 시각 · 받은 줄(되살림 방지가 d.items를 거른 사본으로 바꾸므로 다시 할 때 되돌림)
   const cut = bidsCutDate();
@@ -989,10 +997,14 @@ const AUTOTASK_KEY_RE = {
   wk: new RegExp('^wk:missing:' + AUTOTASK_MONTH + '$'),
 };
 // 돌려주는 값: 'site_missing'·'wk_missing'·'veh_insp90'(스위치 대상) · ''(기존 4규칙 — 스위치 무관) · 'unknown'(허용 목록 밖 — 늘 막음)
-function autotaskRuleOf(autoKey, today) {
+function autotaskRuleOf(autoKey, today, veh) {
   const k = typeof autoKey === 'string' ? autoKey : '';
   if (AUTOTASK_KEY_RE.site.test(k)) return 'site_missing';
   if (AUTOTASK_KEY_RE.wk.test(k)) return 'wk_missing';
+  // C185 판4 ⑦: 셋째 인자 veh = 그 키의 차 레코드(undefined = 인자 없음·차 없음 = 아래 종전 판정 · null = 차량 문서를 못 읽음) — 정기검사 키가 31일 이상 남았을 때만 봄
+  //   규모 '건설기계' = 31일이면 veh_ceq31(그 스위치로 가름) · 32일 이상이면 늘 막음(90일 규칙에서 뺐으므로) · 차량 문서를 못 읽음 = 건설기계인지 모르므로 31일 이상 정기검사 키를 막음(veh_unread)
+  const mc = veh !== undefined ? AUTOTASK_KEY_RE.veh.exec(k) : null, dc = mc && mc[1] === 'insp' ? AR.dayDiff(mc[2], today) : null;
+  if (dc !== null && dc >= AR.CEQ31) { if (veh === null) return 'veh_unread'; if (AR.isCeq(veh)) return dc === AR.CEQ31 ? 'veh_ceq31' : 'unknown'; }
   // veh:<id>:insp:<만료일>은 기존 D-30과 같은 키 꼴 — 만료일이 오늘(KST)부터 31일 이상이면 D-90 규칙(autorules VEH90_MIN · autotask.py DUE_WINDOW 30과 같은 경계)
   const m = AUTOTASK_KEY_RE.veh.exec(k);
   if (m) {
@@ -1027,10 +1039,16 @@ async function handleAutotaskIngest(event, d, R) {
   doc.items.forEach(function (t) { if (t && t.auto_key) { have[t.auto_key] = t; have0[t.auto_key] = 1; } });
   let made = 0, fixed = 0, blocked = 0;
   const blockedBy = {};
+  // C185 판4 ⑦: 받은 정기검사 키의 차 규모(건설기계 31일 판정)를 보려고 차량 문서를 판정 전에 한 번 — 없음 = 빈 대장 · 못 읽음·깨진 꼴 = null(31일 이상 정기검사 키는 막힘 veh_unread)
+  let vehById = {};
+  if (items.some(function (n) { return /^veh:[^:]+:insp:/.test(String((n && n.auto_key) || '')); })) {
+    try { const rv0 = await blobGet(st, colKey('vehicles')); if (!rv0.ok && rv0.code !== 'NOT_FOUND') vehById = null; else if (rv0.ok && rv0.data && !Array.isArray(rv0.data.items)) vehById = null; else ((rv0.ok && rv0.data && rv0.data.items) || []).forEach(function (v) { if (v && v.id) vehById[v.id] = v; }); } catch (e) { vehById = null; }
+  }
+  const vehOfKey = function (k) { if (vehById === null) return null; const v = vehById[String(k).split(':')[1]]; return v || undefined; };
   for (const n of items.slice(0, 100)) {
     const k = String((n && n.auto_key) || '');
     if (!k || have[k]) continue;
-    const rule = autotaskRuleOf(k, today);
+    const rule = autotaskRuleOf(k, today, vehOfKey(k));   // C185 판4 ⑦: 정기검사 키의 차 규모
     if (rule && (rule === 'unknown' || sw.rules[rule] !== 'live')) { blocked++; blockedBy[rule] = (blockedBy[rule] || 0) + 1; continue; }   // v453
     doc.items.push({ id: 't' + crypto.randomBytes(6).toString('hex'), title: String(n.title || '').slice(0, 120),
       detail: String(n.detail || '').slice(0, 500), who_id: '', who: '', scope: [],
@@ -1095,7 +1113,7 @@ async function handleAutotaskIngest(event, d, R) {
   let notified = 0;
   const notSeen = {};   // C185 판2(ⓙ 1): 일반·실행기 알림을 받은 사람(응답 notified = 사람 수 한 번씩)
   if (notifyItems.length) notified = await notifyAutoCreated(st, notifyItems, '정기봇', { seen: notSeen });
-  const blockTxt = blocked ? ' · 스위치 막음 ' + blocked + '(' + Object.keys(blockedBy).map(function (k) { return k + ' ' + blockedBy[k] + ' — ' + (k === 'unknown' ? '허용 꼴 밖' : sw.rules[k]); }).join(', ') + ')' : '';   // v453 규칙 이름·건수·스위치 값만(키·본문 없음)
+  const blockTxt = blocked ? ' · 스위치 막음 ' + blocked + '(' + Object.keys(blockedBy).map(function (k) { return k + ' ' + blockedBy[k] + ' — ' + (k === 'unknown' ? '허용 꼴 밖' : (k === 'veh_unread' ? '차량 문서 못 읽음' : sw.rules[k])); }).join(', ') + ')' : '';   // v453 규칙 이름·건수·스위치 값만(키·본문 없음)
   const licTxt = !lic ? '' : (lic.skip ? ' · 인허가 기한 건너뜀(' + lic.skip + ')' : ((lic.bundled || lic.made || lic.bumped || lic.moved || lic.next || lic.no_who || lic.reopened) ? ' · 인허가 기한 ' + (lic.bundled ? '묶음 ' + lic.bundled + ' · ' : '') + '새 ' + lic.made + ' · 단계 올림 ' + lic.bumped + (lic.moved ? ' · 담당 옮김 ' + lic.moved : '') + (lic.next ? ' · 다음 회차 ' + lic.next : '') + (lic.reopened ? ' · 다시 엶 ' + lic.reopened : '') + (lic.no_who ? ' · 담당 없음 ' + lic.no_who + '행' : '') : ''));   // P1 판20 수·행 수만
   if (made || fixed || assigned || (lic && lic.touched) || srvTouched) {
     doc.updated_by = '정기봇'; doc.updated_at = Date.now();
@@ -1427,6 +1445,7 @@ async function handleBidsRefresh(event, d, R) {
   }
   for (const it of kaptItems) found.push(it);
   const r = await blobGet(st, colKey('bids'));
+  if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: 'BIDS_READ_FAILED', request_id: R });   // C225 판 A: 원장을 못 읽으면 빈 원장에 새 공고만 쓰지 않음
   const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
   await verSnapshot('bids', doc, c.member.name, true);   // 수동 수집도 병합 전 보존(일 1개)
   const m = mergeBidItems(doc, found);
@@ -1449,6 +1468,7 @@ async function handleBidsPurge(event, d, R) {
   }
   const st = store(DATA);
   const r = await blobGet(st, colKey('bids'));
+  if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: 'BIDS_READ_FAILED', request_id: R });   // C225 판 A: 못 읽은 원장을 빈 목록으로 저장하지 않음(세기 dry도 0건으로 답하지 않음)
   const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
   const cutP = bidsCutDate();
   const dryRun = d.dry === true || d.dry === 'true' || d.dry === 1;   // 관용(검토 발견: 문자열 'true'로 실제 정리가 돌지 않게)
@@ -1640,6 +1660,7 @@ async function handleBidsResults(event, d, R) {
   if (!Array.isArray(d.results)) return jr(400, { status: 'REJECTED', error_code: 'INVALID_RESULTS', request_id: R });
   const st = store(DATA);
   const r = await blobGet(st, colKey('bids'));
+  if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: 'BIDS_READ_FAILED', request_id: R });   // C225 판 A: 종전 200 applied 0(봇이 결과를 버림) → 500(봇 실패로 드러남 · 다음 회차가 다시)
   const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
   await verSnapshot('bids', doc, '수집봇', true);   // 결과 반영이 항목을 제자리 변형하므로 변형 전에(일 1개)
   const byId = {};
@@ -1748,7 +1769,9 @@ async function handleInquiryNotify(event, d, R) {
     const ts = ((rl.ok && rl.data && Array.isArray(rl.data.ts)) ? rl.data.ts : []).filter(function (t) { return now - t < INQUIRY_RL_WINDOW; });
     if (ts.length >= INQUIRY_RL_MAX) return jr(200, { status: 'OK', sent: 0, note: 'rate-limited', window_count: ts.length, request_id: R });
     ts.push(now);
-    await blobSet(store(DATA), 'inquiry:rl', { ts: ts.slice(-50) });
+    if (rl.ok || rl.code === 'NOT_FOUND') await blobSet(store(DATA), 'inquiry:rl', { ts: ts.slice(-50) });
+    // C225 판 A 두 번째 검토: 창을 못 읽은 요청 — 다시 읽어 합쳐 씀(깨진 창은 이번 시각으로 다시 세움 — 종전처럼 스스로 고쳐짐) · 층 1에 막혀 속도 제한이 영영 열리지 않게
+    else await MW.markAfterSend(store(DATA), 'inquiry:rl', function (cur) { const t1 = ((cur && Array.isArray(cur.ts)) ? cur.ts : []).filter(function (t) { return now - t < INQUIRY_RL_WINDOW; }); t1.push(now); return { ts: t1.slice(-50) }; });
   } catch (e) {}
   const clean = function (v, n) { return String(v || '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n); };
   const name = clean(d.name, 40), contact = clean(d.contact, 60), service = clean(d.service, 30), region = clean(d.region, 40), msg = clean(d.message, 120), id = clean(d.id, 40);
@@ -1776,10 +1799,12 @@ async function handleProofPut(event, d, R) {
   if (!name || name === '__index__' || !b64 || b64.length > ATT_MAX) return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });   // __index__ 이름 충돌 시 색인 자기파괴 방지
   const st = store(FILES);
   const now = Date.now();
+  // C225 판 A: 색인을 본문보다 먼저 읽는다 — 못 읽으면(읽기·파싱 실패) 본문도 올리지 않고 500(빈 색인으로 덮지 않음 · 색인에 없는 고아 본문을 남기지 않음)
+  const idx = await blobGet(st, 'proof:__index__');
+  if (!idx.ok && idx.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: idx.code || 'STORAGE_READ_FAILED', request_id: R });
   const w = await blobSet(st, 'proof:' + name, { name: String(d.name || '').slice(0, 120), data: b64, by: c.member.name, ts: now });
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '증빙등록', id: name.slice(0, 40), t: '' }] }); } catch (e) {}
-  const idx = await blobGet(st, 'proof:__index__');
   const list = (idx.ok && idx.data && Array.isArray(idx.data.names)) ? idx.data.names : [];
   if (list.indexOf(name) < 0) list.push(name);
   // P1 판19: 색인에 올린 시각(서버)·원래 이름·올린 사람 id를 같이 남긴다 — 완료 신호 크론이 파일 본문 없이 색인 한 번만 읽고 판정(시각 없는 옛 항목은 신호로 안 셈, 옛 자료 이행 없음)
@@ -1790,9 +1815,18 @@ async function handleProofPut(event, d, R) {
   await blobSet(st, 'proof:__index__', { names: list, meta: meta });
   return jr(200, { status: 'OK', name: name, request_id: R });
 }
+// C240 판 A: 증빙 읽기(목록·본문) = 관리자 또는 기기 승인 + 계약 권한 숨김 아님 — 앱에서 보관함을 여는 길은 계약 탭 서류 창의 적격심사 패킷 생성 뒤
+//   일괄 내려받기(proofBundleOffer — 같은 창이 부르는 tpl_get이 계약 숨김을 403으로 막음)와 관리자 양식 관리(openTplManage)뿐. 넣기·지우기는 종전대로 관리자만
+async function proofReadGate(event, c, R) {
+  if (c.member.admin) return null;
+  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
+  if (permOf(c.member, 'contracts') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
+  return null;
+}
 async function handleProofList(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  const pg = await proofReadGate(event, c, R); if (pg) return pg;
   const st = store(FILES);
   const idx = await blobGet(st, 'proof:__index__');
   const names = (idx.ok && idx.data && Array.isArray(idx.data.names)) ? idx.data.names : [];
@@ -1806,6 +1840,7 @@ async function handleProofList(event, d, R) {
 async function handleProofGet(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  const pg = await proofReadGate(event, c, R); if (pg) return pg;
   const r = await blobGet(store(FILES), 'proof:' + proofSlug(d.name));
   if (!r.ok || !r.data) return jr(404, { status: 'NOT_FOUND', request_id: R });
   return jr(200, { status: 'OK', file: r.data.name, data: r.data.data, request_id: R });
@@ -1817,8 +1852,10 @@ async function handleProofDel(event, d, R) {
   const name = proofSlug(d.name);
   if (!name || name === '__index__') return jr(400, { status: 'REJECTED', error_code: 'INVALID_FILE', request_id: R });
   const st = store(FILES);
-  await blobDelete(st, 'proof:' + name);
+  // C225 판 A: 색인을 먼저 읽는다 — 못 읽으면 본문도 지우지 않고 500(지울 한 건이 아니라 나머지 목록 전부가 사라지던 길)
   const idx = await blobGet(st, 'proof:__index__');
+  if (!idx.ok && idx.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: idx.code || 'STORAGE_READ_FAILED', request_id: R });
+  await blobDelete(st, 'proof:' + name);
   const list = ((idx.ok && idx.data && Array.isArray(idx.data.names)) ? idx.data.names : []).filter(function (n) { return n !== name; });
   const om = (idx.ok && idx.data && idx.data.meta && typeof idx.data.meta === 'object' && !Array.isArray(idx.data.meta)) ? idx.data.meta : {};
   const meta = {}; list.forEach(function (n) { if (hasOwn(om, n) && om[n] && typeof om[n] === 'object') meta[n] = om[n]; });   // P1 판19: 지운 항목의 시각 메타도 같이 뺀다
@@ -1932,6 +1969,8 @@ async function handlePushPrimary(event, d, R) {
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   return jr(200, { status: 'OK', primary: curPrimary(), request_id: R });
 }
+// C185 판3: 회원 레코드 하나로 '지금 재직 관리자인가'(명부 전체를 못 읽은 회차의 승인권자 판정용 · 못 읽음 = 아님)
+async function memberAdminNow(id) { try { const r = await blobGet(store(USERS), 'member:' + String(id)); return !!(r.ok && r.data && r.data.admin === true && r.data.del !== 1 && !tier.retired(r.data)); } catch (e) { return false; } }
 async function handlePushSend(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
@@ -1955,8 +1994,10 @@ async function handlePushSend(event, d, R) {
       if (nfP && nfP.events.task_review === 'issuer_approver' && /^task-rv-/.test(tagP)) {
         const atP = await assignRead(store(DATA));
         let hrKeep = false;   // C185 판2 재확인 1: 승인권자가 관리자가 아니고 그 지시가 입·퇴사 지시(hr:·acct:)면 관리자 전원 그대로(지시 문서를 못 읽으면 관리자 전원 쪽) · 승인권자가 관리자·빈칸이면 종전 글자째
-        if (atP.approver_id && tc.adminIds.indexOf(atP.approver_id) < 0) { try { const trP = await blobGet(store(DATA), colKey('tasks')); const tdP = (trP.ok && trP.data && Array.isArray(trP.data.items)) ? trP.data.items : null; const tP = tdP ? tdP.find(function (x) { return x && x.id === tagP.slice(8); }) : null; hrKeep = !tdP || !!(tP && /^(?:hr|acct):/.test(String(tP.auto_key || ''))); } catch (e) { hrKeep = true; } }
+        const apvAdmP = !!atP.approver_id && (tc.unavailable ? await memberAdminNow(atP.approver_id) : tc.adminIds.indexOf(atP.approver_id) >= 0);   // C185 판3: 명부를 못 읽은 회차 = 승인권자 회원 레코드로 관리자 판정(명부 일부로 '관리자 아님'이라 보지 않음)
+        if (atP.approver_id && !apvAdmP) { try { const trP = await blobGet(store(DATA), colKey('tasks')); const tdP = (trP.ok && trP.data && Array.isArray(trP.data.items)) ? trP.data.items : null; const tP = tdP ? tdP.find(function (x) { return x && x.id === tagP.slice(8); }) : null; hrKeep = !tdP || !!(tP && /^(?:hr|acct):/.test(String(tP.auto_key || ''))); } catch (e) { hrKeep = true; } }
         if (atP.approver_id && atP.approver_id !== c.member.id && !hrKeep) ids = [atP.approver_id];
+        if (hrKeep && !ids.length && tc.unavailable) return jr(503, { status: 'ERROR', error_code: 'MEMBERS_UNAVAILABLE', request_id: R });   // C185 판3: 입·퇴사 지시를 관리자에게 보내야 하는데 명부를 못 읽어 0명 = 조용히 0발 대신 실패로
       }
     }
     else ids = [to];
@@ -2056,7 +2097,8 @@ const APPR_LESSONS_KEY = 'lessons:appr';
 async function apprClogAppend(st, rows, nowMs) {
   const ym = new Date(nowMs + 9 * 3600000).toISOString().slice(0, 7);
   const ck = 'clog:appr:' + ym; const cr = await blobGet(st, ck);
-  let cd = (cr.ok && cr.data && Array.isArray(cr.data.items)) ? cr.data : null;
+  if (!cr.ok && cr.code !== 'NOT_FOUND') return { ok: false, code: cr.code || 'STORAGE_READ_FAILED' };   // C225 판 A: 그달 기록을 못 읽으면 새 체인으로 덮지 않음(기록 실패로 돌려줌)
+  let cd =(cr.ok && cr.data && Array.isArray(cr.data.items)) ? cr.data : null;
   rows.forEach(function (r) { cd = DONEIF.clogAppend(cd, Object.assign({ ts: nowMs }, r)); });
   const w = await blobSet(st, ck, cd); if (!w.ok) return { ok: false, code: w.code };
   const L = AL.tally(cd.items, ym); L.updated_at = nowMs;
@@ -2164,6 +2206,13 @@ async function handleVehDueSet(event, d, R) {
   if (!vehDo && cur !== m[3]) return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', why: 'DATE_MOVED', cur: cur, request_id: R });   // 담당 갈래는 그 지시의 그 날짜 칸만
   if (d.base_due !== undefined && String(d.base_due == null ? '' : d.base_due) !== cur) return jr(409, { status: 'CONFLICT', error_code: 'VEH_DUE_STALE', cur: cur, request_id: R });
   if (cur === date) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
+  // P1 판38(C166): 검사 칸이면 law 안 새 칸(이번 수검일·검사 신청일·연장 만료일) 꼴·미래·순서 검사 — 틀리면 쓰기 전에 400(차량·버전 링·감사 그대로)
+  //   8차 지시: 승격본에 기간 칸 있는 행이 없으면(옛 판 — vehBg38S) 새 칸을 보지도 기록하지도 않음(운영 그대로)
+  const bg38 = (field === 'insp_due' && d.law && typeof d.law === 'object') ? await vehBgState(st) : { on: false }, on38 = !!(bg38.on && vehBg38S(bg38.bg));
+  //   8차-d: 자동차 요청에 실려 온 신청일은 버림(검사·기록 안 함 — 앱은 자동차 신청일을 보내지 않음 · 기록 품질)
+  const lawIn = (field === 'insp_due' && on38 && d.law && typeof d.law === 'object' && v.size !== '건설기계') ? Object.assign({}, d.law, { insp_apply: undefined }) : d.law;
+  const lx = (field === 'insp_due' && on38) ? vehLawEx(lawIn, cur, new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10), date) : { ok: true, ex: null };
+  if (!lx.ok) return jr(400, { status: 'REJECTED', error_code: lx.code, field: lx.f, request_id: R });
   await verSnapshot('vehicles', rv.data, c.member.name, false);
   // 검토 S2: 스냅샷(블롭 읽기·쓰기 여러 번) 사이에 끝난 일반 차량 저장을 덮지 않게 쓰기 직전 다시 읽는다 — 문서가 바뀌었으면 새 문서의 그 줄에 적용(그 칸이 그 사이 바뀌었으면 409 · 줄이 없어졌으면 404).
   //   조건부 쓰기가 없어 다시 읽기와 쓰기 사이 창은 남는다(handleSave와 같은 알려진 한계 — 창만 좁힘)
@@ -2181,13 +2230,31 @@ async function handleVehDueSet(event, d, R) {
   wv[field] = date; wv.updated = today;
   wv.due_set = Object.assign({}, (wv.due_set && typeof wv.due_set === 'object') ? wv.due_set : {}); wv.due_set[field] = { prev: cur, at: now };   // 검토 S1: 낡은 사본 되돌림 보호 표식(vehDueGuard·앱 vehDueMergeKeep)
   const lawLog = (field === 'insp_due' && d.law && (await vehBgState(st)).on) ? vehLawLog(d.law, cur, date, today, c.member.id, 'task') : null;   // P1 판27: 법정 검사 제안이 켜진 앱이 보낸 제안 날짜와 확정 날짜(검사 칸만 · 승격일 때만 — 검토 반영, 못 읽으면 기록 안 함 · 표시 기록, 값 판정 없음)
+  // P1 판38: 판38 앱이 보낸 줄(insp_done 칸 있음)이면 새 칸을 기록 줄에 더하고, 차량 줄의 연장 만료일(그 회차 몫)은 기록으로 옮겨졌으니 비움 — 옛 앱 요청은 종전 그대로
+  //   8차-c: 저장 전 차량 줄 연장 값은 판38 길인지와 상관없이 잡음(보험 지시·옛 앱·옛 판 저장에서 감사 f에 거짓 '연장 바뀜'이 찍히지 않게)
+  const extWas = Object.prototype.hasOwnProperty.call(wv, 'insp_ext') ? String(wv.insp_ext == null ? '' : wv.insp_ext) : null;
+  //   6차 검토(11/19): 연장 만료일의 한살이(앱 vehLawLogEntry 같은 규칙) — 같은 회차 정정(vehLawSameS — 수검일·신청일 유무와 관계없이)이면 수검일·신청일 뺌 · 연장은 기록에 안 실음
+  //   기록 줄로 옮기고 차량 줄을 비우는 것은 '갱신 꼴 저장'(vehLawRenewS — 새 만기가 E(종전 만기·연장·수검일/신청일)의 기간 폭 안)일 때만 · 그 밖은 차량 줄 연장 칸 그대로(요청에 새 연장 값이 있으면 그 값 · 일부러 지움이면 지움)
+  let inspDropped = false;
+  if (lawLog && lx.ex) {
+    const bgL = bg38.bg, newExt = lx.ex.insp_ext || '', cleared = !!(lx.clr && lx.was === extWas);
+    const carry = (!newExt && extWas && vehDueDate(extWas) && vehDueDate(cur) && extWas > cur && !cleared) ? extWas : '';
+    //   8차 지시: 근거 행은 차량 줄 속성으로 고름(앱과 같은 행) · 연장은 값 줄 갱신 꼴(vehLawRenewS)일 때만 기록 줄에 싣고, 차량 줄은 실린 값과 같거나 창이 보여 준 값을 사람이 바꿨을 때만 비움
+    if (vehLawSameS(bgL, wv, cur, date)) { inspDropped = !!(lx.ex.insp_done || lx.ex.insp_apply); lx.ex.insp_done = ''; delete lx.ex.insp_apply; delete lx.ex.insp_ext; }
+    else if ((newExt || carry) && vehLawRenewS(bgL, wv, cur, date, Object.assign({}, lx.ex, { insp_ext: newExt || carry }))) { lx.ex.insp_ext = newExt || carry; if (extWas === lx.ex.insp_ext || (lx.shown !== null && lx.shown === extWas)) delete wv.insp_ext; }
+    else delete lx.ex.insp_ext;
+    if (Object.prototype.hasOwnProperty.call(wv, 'insp_ext') || newExt) { if (newExt && !Object.prototype.hasOwnProperty.call(lx.ex, 'insp_ext')) wv.insp_ext = newExt; else if (cleared && !lx.ex.insp_ext) delete wv.insp_ext; }
+    Object.assign(lawLog, lx.ex);
+  }
   if (lawLog) wv.insp_log = (Array.isArray(wv.insp_log) ? wv.insp_log : []).concat([lawLog]).slice(-VEH_LOG_MAX);
   wdoc.updated_by = c.member.id; wdoc.updated_at = now;
   const w = await blobSet(st, colKey('vehicles'), wdoc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   const f = {}; f[field] = [cur, date];
+  const extNow = Object.prototype.hasOwnProperty.call(wv, 'insp_ext') ? String(wv.insp_ext == null ? '' : wv.insp_ext) : '';
+  if (extWas !== null && extWas !== extNow) f.insp_ext = [extWas, extNow]; else if (extWas === null && extNow) f.insp_ext = ['', extNow];
   const au = await appendAudit({ ts: now, by: c.member.name, bid: c.member.id, col: 'vehicles', ev: [{ op: '수정', id: wv.id, t: String(wv.no || wv.id).slice(0, 40) + ' · 지시 완료 창(' + (vehDo ? '차량 수행' : '배정 담당') + ' · 지시 ' + t.id + ')', f: f }] });
-  return jr(200, Object.assign({ status: 'OK', vehicle: { id: wv.id, field: field, value: date, prev: cur, updated: today }, updated_at: now, audit: au !== false, request_id: R }, lawLog ? { law_log: lawLog } : {}));   // P1 판27: 앱이 로컬 줄에도 같은 기록을 붙임(다음 통째 저장이 지우지 않게)
+  return jr(200, Object.assign({ status: 'OK', vehicle: { id: wv.id, field: field, value: date, prev: cur, updated: today }, updated_at: now, audit: au !== false, request_id: R }, inspDropped ? { insp_dropped: true } : {}, (lawLog && lx.ex) ? { ext_now: extNow } : {}, lawLog ? { law_log: lawLog } : {}));   // P1 판27: 앱이 로컬 줄에도 같은 기록을 붙임(다음 통째 저장이 지우지 않게)
 }
 // ---- P1 판26·27(원장 T476·T451 · 시안 판3 ① · PM 11/13 18:14 '45. 판3 ㄱ') 차량 법정 검사 제안 ----
 //   근거 표 bg:veh:law:v1(차량 법령 근거 — 판13 초안·11/20 승격 카드 ②)은 settings:veh.bg_ver 가 그 판 ver 와 같을 때만 '승격'(계약 bg:contract:law:v1 · settings:contract.bg_ver 와 같은 꼴).
@@ -2205,6 +2272,90 @@ function vehLawLog(law, prev, confirmed, today, by, src) {
   if (rule.length > 60 || /[\u0000-\u001f\u007f]/.test(rule)) return null;
   const days = p ? Math.round((Date.parse(confirmed + 'T00:00:00Z') - Date.parse(p + 'T00:00:00Z')) / 86400000) : null;
   return { at: today, prev: prev || '', confirmed: confirmed, proposed: p, rule: p ? rule : '', diff: days, by: String(by || '').slice(0, 40), src: src };
+}
+// P1 판38(원장 C166 · 착수 ㄱ C191): 지시 완료 창이 law 안에 보낸 새 칸 — law 에 insp_done 키가 있을 때만(판38 앱 · "" = 비움, 옛 앱은 키 없음 → ex null = 종전 그대로)
+//   insp_done(이번 수검일)·insp_apply(건설기계 검사 신청일) = 'YYYY-MM-DD' 달력에 있는 날 · 오늘(KST) 뒤 금지 · 신청일 ≤ 수검일 / insp_ext(연장·유예 만료일) = 날짜 · 종전 만기(cur)보다 뒤
+//   앱 vehLawExWhy와 같은 규칙. 반환 { ok, ex } 또는 { ok:false, code, f }
+//   재검토(11/19): date = 새 만기 — 오기 범위는 종전 만기 또는 새 만기 앞뒤(만기가 오래 묵은 차의 첫 수검일 · 만기를 크게 당기는 정정 때 넣은 수검일이 막히지 않게)
+//   ext_was = 완료 창이 열릴 때 연장 칸에 보인 값 — insp_ext "" + ext_was = 지금 차량 줄 값이면 사람이 일부러 지운 것(clr — 기록으로 옮기지 않고 지움) · 다르면 낡은 창(옮김)
+function vehLawEx(law, cur, today, date) {
+  if (!law || typeof law !== 'object' || Array.isArray(law) || !Object.prototype.hasOwnProperty.call(law, 'insp_done')) return { ok: true, ex: null };
+  const ex = {}, own = function (k) { return Object.prototype.hasOwnProperty.call(law, k); };
+  //   3차 검토(11/19): ext_was 꼴이 틀리면(글자 아님·너무 긺) 거절하지 않고 '모름'으로 받음(차량 줄 연장일이 1900년대 같은 값이어도 지시 완료가 막히지 않게 — 비교는 글자째)
+  const wasOk = typeof law.ext_was === 'string' && law.ext_was.length <= 10;
+  const clr = own('insp_ext') && law.insp_ext === '' && wasOk, was = clr ? law.ext_was : null;
+  for (const k of ['insp_done', 'insp_apply', 'insp_ext']) {
+    const s = law[k];
+    if (s == null || s === '') { if (k === 'insp_done') ex[k] = ''; continue; }
+    if (!vehDueDate(s)) return { ok: false, code: 'BAD_INSP_DATE', f: k };
+    if (k !== 'insp_ext' && s > today) return { ok: false, code: 'INSP_FUTURE', f: k };
+    ex[k] = s;
+  }
+  if (ex.insp_apply && ex.insp_done && ex.insp_apply > ex.insp_done) return { ok: false, code: 'INSP_ORDER', f: 'insp_apply' };
+  //   8차 지시(7차 ⓪): 수검일·신청일이 새 만기보다 뒤면 거절(앱 vehLawExWhy 같은 규칙)
+  for (const k of ['insp_done', 'insp_apply']) if (ex[k] && vehDueDate(date) && ex[k] > date) return { ok: false, code: 'INSP_AFTER_DUE', f: k };
+  if (ex.insp_ext && vehDueDate(cur) && !(ex.insp_ext > cur)) return { ok: false, code: 'INSP_EXT_EARLY', f: 'insp_ext' };
+  // 독립 검토 5: 오기 거름(넉넉한 범위 — 앱 VEH_INSP_SPAN_M·VEH_EXT_SPAN_M 같은 값): 수검일·신청일 = 종전 만기(없으면 오늘) 앞뒤 VEH_INSP_SPAN_M개월 · 연장 만료일 = 그 뒤 VEH_EXT_SPAN_M개월까지
+  const base = vehDueDate(cur) || today, near = function (s) { return [base].concat(vehDueDate(date) ? [date] : []).some(function (b) { return s >= vehAddMonthsS(b, -VEH_INSP_SPAN_M) && s <= vehAddMonthsS(b, VEH_INSP_SPAN_M); }); };
+  for (const k of ['insp_done', 'insp_apply']) if (ex[k] && !near(ex[k])) return { ok: false, code: 'INSP_RANGE', f: k };
+  if (ex.insp_ext && ex.insp_ext > vehAddMonthsS(base, VEH_EXT_SPAN_M)) return { ok: false, code: 'INSP_RANGE', f: 'insp_ext' };
+  return { ok: true, ex: ex, clr: clr, was: was, shown: wasOk ? law.ext_was : null };
+}
+// 조문에 상한이 없어 오기만 거르는 넉넉한 값(개월) — 정기검사는 만기 근처에 받음(기간 밖 이른·늦은 수검도 들어감) · 연장·유예는 사유 종료까지(시행규칙 75조 — 상한 없음). 정상 입력이 막히면 늘림(앱과 같이)
+const VEH_INSP_SPAN_M = 36, VEH_EXT_SPAN_M = 120;
+// P1 판38 8차 지시: 근거 행은 그 차 속성·날짜로 고름(앱 vehLawOkOf·vehLawPick과 같은 규칙 — 앱이 보낸 law.rule은 판정에 쓰지 않음 · 기록 줄 rule과 상관없이 앱·서버가 같은 행)
+//   쓸 수 있는 행 = 앱 vehLawRowOk(실측·조문 인용·주기 칸 꼴 · 기간 칸은 셋 다 없거나 셋 다 맞음)
+function vehLawIntS(x, lo, hi) { return typeof x === 'number' && x === Math.floor(x) && x >= lo && x <= hi; }
+function vehLawWinHasS(r) { return !!(r && vehLawIntS(r.win_before, 0, 366) && vehLawIntS(r.win_after, 0, 366) && (r.win_basis === 'pass' || r.win_basis === 'apply')); }
+function vehRealDateS(s) { if (typeof s !== 'string' || !/^(19|20)\d{2}-\d{2}-\d{2}$/.test(s)) return false; const t = new Date(s + 'T00:00:00Z'); return !isNaN(t.getTime()) && t.toISOString().slice(0, 10) === s; }
+function vehLawRowOkS(r) {
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return false;
+  if (!((r.win_before == null && r.win_after == null && r.win_basis == null) || vehLawWinHasS(r))) return false;
+  return typeof r.id === 'string' && !!r.id && r.grade === '실측' && Array.isArray(r.cites) && r.cites.length > 0 && (r.cls === 'car' || r.cls === 'ceq')
+    && vehLawIntS(r.every_m, 1, 120) && (r.first_m == null || vehLawIntS(r.first_m, 1, 120)) && (r.first_adj_days == null || vehLawIntS(r.first_adj_days, -31, 31)) && (r.day_max == null || vehLawIntS(r.day_max, 1, 31)) && (r.reg_min == null || vehRealDateS(r.reg_min));
+}
+//   판38 켜짐(앱 vehLaw38On 같은 규칙) = 승격본에 기간 칸 셋이 있는 쓸 수 있는 행이 하나라도 있음 — 아니면 완료 창 새 칸을 기록하지 않음(옛 판 승격 중 = 운영 그대로)
+function vehBg38S(bg) { return !!(bg && Array.isArray(bg.rows) && bg.rows.some(function (r) { return vehLawRowOkS(r) && vehLawWinHasS(r); })); }
+function vehLawHasS(list, val) { if (list == null || list === '') return true; return (Array.isArray(list) ? list : [list]).indexOf(val) >= 0; }
+function vehLawAgeS(r, v, at) {
+  const base = (r.age_base === 'year' && /^\d{4}$/.test(String(v.ceq_year || ''))) ? String(v.ceq_year) + '-01-01' : String(v.reg_date || '');
+  let a = +at.slice(0, 4) - +base.slice(0, 4);
+  if (at.slice(5) < base.slice(5)) a--;
+  return a;
+}
+function vehLawPickS(ok, v, cls, at) {
+  return ok.filter(function (x) { const age = vehLawAgeS(x, v, at); return vehLawHasS(x.biz, v.biz) && vehLawHasS(x.size, v.size) && (cls !== 'ceq' || vehLawHasS(x.ceq_kind, v.ceq_kind)) && (x.age_min == null || !(age < x.age_min)) && (x.age_max == null || !(age >= x.age_max)) && (x.reg_min == null || !(v.reg_date < x.reg_min)); })[0] || null;
+}
+function vehLawOkOfS(bg, v) { const cls = v && v.size === '건설기계' ? 'ceq' : 'car'; return { cls: cls, ok: (v && vehRealDateS(v.reg_date) && bg && Array.isArray(bg.rows)) ? bg.rows.filter(function (x) { return vehLawRowOkS(x) && x.cls === cls; }) : [] }; }   // 최초등록일이 없거나 틀리면 행 없음(앱 vehLawOkOf 같게)
+function vehDayNumS(s) { return Math.round(Date.parse(s + 'T00:00:00Z') / 86400000); }
+function vehAddDaysS(s, n) { return new Date((vehDayNumS(s) + n) * 86400000).toISOString().slice(0, 10); }
+function vehLawEndS(s, m) { const t = vehAddMonthsS(s, m); return +t.slice(8, 10) < +s.slice(8, 10) ? t : vehAddDaysS(t, -1); }
+// P1 판38 5차 검토: 같은 회차 정정 — 새 만기가 종전 만기 날 근거 행의 검사 기간 폭 안(앱 vehLawSame 같은 규칙)
+function vehLawSameS(bg, v, prev, conf) {
+  const k = vehLawOkOfS(bg, v);
+  if (!v || !vehRealDateS(prev) || !vehRealDateS(conf)) return false;
+  const r = vehLawPickS(k.ok, v, k.cls, prev);
+  return !!(r && vehLawWinHasS(r) && vehDayNumS(conf) >= vehDayNumS(prev) - r.win_before && vehDayNumS(conf) <= vehDayNumS(prev) + r.win_after);
+}
+// 8차 지시: '갱신 꼴 값 저장'(앱 vehLawRenewFe·vehLawStart·vehLawFirstEnd·vehLawFeIn 같은 규칙) — 이번 줄이 값 줄(수검일·신청일 중 하나 이상)이고
+//   ⓐ 종전·새 만기 날짜 · 새 만기 > 종전 만기 · 수검일·신청일 ≤ 새 만기 · 근거 행 기간 칸 ⓑ 새 만기가 E(종전 만기·연장·수검일/신청일로 센 그 회차 만료일 — 민법 160조②③)의 검사 기간 폭 안
+function vehLawRenewS(bg, v, prev, conf, ex) {
+  const k = vehLawOkOfS(bg, v), dn = vehDayNumS, x = ex || {};
+  const vals = [x.insp_done, k.cls === 'ceq' ? x.insp_apply : ''].filter(function (s) { return typeof s === 'string' && s !== ''; });   // 8차-c: 자동차는 신청일만 있는 줄을 값 줄로 보지 않음(앱 vehLawValLine 같은 규칙)
+  if (!v || !vals.length || !vehRealDateS(prev) || !vehRealDateS(conf) || !(conf > prev) || vals.some(function (s) { return !vehRealDateS(s) || s > conf; })) return false;
+  const E = (vehRealDateS(x.insp_ext) && x.insp_ext > prev) ? x.insp_ext : prev, r0 = vehLawPickS(k.ok, v, k.cls, E);
+  if (!r0 || !vehLawWinHasS(r0)) return false;
+  const s = vehRealDateS(x.insp_done) ? x.insp_done : '', ap = (r0.win_basis === 'apply' && vehRealDateS(x.insp_apply)) ? x.insp_apply : '';
+  const early = !!(r0.win_basis === 'apply' && !ap && s && dn(s) < dn(E) - r0.win_before), at = r0.win_basis === 'apply' ? (ap || (early ? s : '')) : s;
+  const inWin = !at || (dn(at) >= dn(E) - r0.win_before && dn(at) <= dn(E) + r0.win_after);
+  const S0 = vehAddDaysS((inWin || !s) ? E : s, 1), r = vehLawPickS(k.ok, v, k.cls, vehAddDaysS(S0, -1)), rS = vehLawPickS(k.ok, v, k.cls, S0);
+  if (!r || !vehLawWinHasS(r)) return false;
+  const w = function (end, rr) { return !!(end && rr && dn(conf) >= dn(end) - rr.win_before && dn(conf) <= dn(end) + rr.win_after); };
+  return w(vehLawEndS(S0, r.every_m), r) || (!!(rS && vehLawWinHasS(rS) && rS.every_m !== r.every_m) && w(vehLawEndS(S0, rS.every_m), rS));
+}
+function vehAddMonthsS(s, n) {   // 앱 vehAddMonths와 같은 말일 맞춤
+  const y = +s.slice(0, 4), m = +s.slice(5, 7) - 1 + n, d = +s.slice(8, 10), yy = y + Math.floor(m / 12), mm = ((m % 12) + 12) % 12, last = new Date(Date.UTC(yy, mm + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(yy, mm, Math.min(d, last))).toISOString().slice(0, 10);
 }
 // 승격 판정 한 곳(읽기·기록 같이 씀): 근거 표 꼴 맞음 ∧ settings:veh.bg_ver = 그 판 ver. 어느 쪽이든 못 읽으면 on false(기록 안 함 — fail-closed)
 async function vehBgState(st) {
@@ -2276,9 +2427,23 @@ async function handleVehBgSet(event, d, R) {
 function vehLogUnion(a, b) {
   const seen = {}, out = [];
   [].concat(Array.isArray(a) ? a : [], Array.isArray(b) ? b : []).forEach(function (e) { if (!e || typeof e !== 'object') return; const k = [e.at, e.confirmed, e.src].join('|'); if (seen[k]) return; seen[k] = 1; out.push(e); });
+  // 6차 검토(M2): 열쇠가 같아도 새 칸 값이 양쪽 다 있고 서로 다르면(같은 날 같은 새 만기로 두 화면이 갱신) 두 줄 다 남김 — 앱 깨끗 조건 ⓔ(8차)(같은 만기에서 두 번 떠남)로 '확인 필요' · 앱 vehLogUnion 같은 규칙
+  const keyL = function (e) { return [e.at, e.confirmed, e.src].join('|'); };
+  [].concat(Array.isArray(a) ? a : [], Array.isArray(b) ? b : []).forEach(function (e) { if (!e || typeof e !== 'object' || out.indexOf(e) >= 0) return; const k = keyL(e), same = out.filter(function (o) { return keyL(o) === k; }); if (same.length && same.every(function (o) { return vehLogClash(o, e); })) out.push(e); });
   out.sort(function (p, q) { const x = String(p.at || ''), y = String(q.at || ''); return x < y ? -1 : (x > y ? 1 : 0); });
-  return out.slice(-VEH_LOG_MAX);
+  // P1 판38(C166): 같은 줄이 한쪽에만 수검일·검사 신청일·연장 만료일을 가졌으면 그 칸을 채운 사본으로(새 칸을 모르는 사본이 먼저 와도 지워지지 않게) — 앱 vehLogUnion과 같은 규칙
+  const all = [].concat(Array.isArray(a) ? a : [], Array.isArray(b) ? b : []);
+  return out.map(function (e) {
+    let f = null;
+    const k = [e.at, e.confirmed, e.src].join('|');
+    all.forEach(function (x) {
+      if (!x || typeof x !== 'object' || x === e || [x.at, x.confirmed, x.src].join('|') !== k || vehLogClash(x, e)) return;
+      ['insp_done', 'insp_apply', 'insp_ext'].forEach(function (n) { const cur = (f || e)[n]; if (typeof x[n] === 'string' && (cur === undefined || (cur === '' && x[n] !== ''))) { f = f || Object.assign({}, e); f[n] = x[n]; } });
+    });
+    return f || e;
+  }).slice(-VEH_LOG_MAX);
 }
+function vehLogClash(p, q) { return ['insp_done', 'insp_apply', 'insp_ext'].some(function (n) { return typeof p[n] === 'string' && typeof q[n] === 'string' && p[n] !== '' && q[n] !== '' && p[n] !== q[n]; }); }
 function vehLogKeep(oldItems, items) {
   const oldById = {};
   (oldItems || []).forEach(function (o) { if (o && o.id && Array.isArray(o.insp_log) && o.insp_log.length) oldById[o.id] = o; });
@@ -3024,7 +3189,7 @@ Object.assign(AUTOTASK_SRV_RULES, {
   hr_join: { uses: ['hr:', 'acct:'], label: '입사 체크리스트 지시(입사일 기준 · 인사·계정 담당)', key: 'hr:<회원>:join:<입사일>:<번호> · acct:<회원>:join:<입사일>', prefix: 'hr:', ready: EV.ready('hr_join') },
   hr_leave: { uses: ['hr:', 'acct:'], label: '퇴사 체크리스트 지시(퇴사일 기준 · 인사·계정 담당)', key: 'hr:<회원>:leave:<퇴사일>:<번호> · acct:<회원>:leave:<퇴사일>', prefix: 'hr:', ready: EV.ready('hr_leave') },
   veh_ceq31: { label: '건설기계 정기검사 지시 31일 전(차량 담당)', key: 'veh:<id>:insp:<만료일>', prefix: 'veh:', ready: EV.ready('veh_ceq31') },
-  ks_report: { label: '현장 실적 신고 지시(매년 1/15~2/15 · 실적 신고 담당)', key: 'ks:<신고 연도>', prefix: 'ks:', ready: EV.ready('ks_report') },
+  ks_report: { uses: ['ks:'], label: '현장 실적 신고 지시(매년 1/15~2/15 · 실적 신고 담당)', key: 'ks:<신고 연도>', prefix: 'ks:', ready: EV.ready('ks_report') },   // 판5: 배정표 '현장 실적 신고' 줄 가드(입·퇴사와 같음 — 담당 없이 켜면 지시가 안 생김)
   veh_event: { label: '차량 매각·말소 지시(사건일 기준 · 차량 담당)', key: 'veh:<id>:ev:<sold|dereg>:<사건일>:<main|waste>', prefix: 'veh:', ready: EV.ready('veh_event') },
 });
 function autotaskReady(k) { return hasOwn(AUTOTASK_SRV_RULES, k) ? AUTOTASK_SRV_RULES[k].ready !== false : hasOwn(AUTOTASK_RULES, k); }
@@ -3171,6 +3336,9 @@ async function handleAutotaskRevert(event, d, R) {
   if (d.base !== undefined && Number(d.base) !== Number(a.updated_at || 0)) return jr(409, { status: 'CONFLICT', error_code: 'AUTOTASK_STALE', request_id: R });
   const rules = autotaskDefaults(); Object.keys(a.prev.rules).forEach(function (k) { if (autotaskValid(k, a.prev.rules[k])) rules[k] = a.prev.rules[k]; });
   Object.keys(rules).forEach(function (rk) { if (rules[rk] === 'live' && !autotaskReady(rk)) rules[rk] = 'dry'; });   // C185 판2(ⓙ 8): 직전 판에 준비 안 된 규칙의 live가 있으면 그 규칙만 연습으로 낮춰 진행(종전 400 대신)   // C185 판1 — 준비 안 된 규칙을 되돌림으로 켜지 않음
+  // C185 판3(판2 검토에서 넘어옴): 되돌린 결과 live인 규칙 가운데 배정표 줄을 쓰는 규칙(입·퇴사)은 켜기와 같은 가드 — 쓰는 줄 담당이 하나라도 빈칸·재직자 아님·못 읽음이면 400 ASSIGN_NEEDED(스위치 그대로)
+  const liveUses = Object.keys(rules).filter(function (rk) { return rules[rk] === 'live' && a.rules[rk] !== 'live' && ((AUTOTASK_SRV_RULES[rk] || {}).uses || []).length; });   // 판3 검토 반영 2: 되돌려서 새로 켜지는 규칙만(이미 켜진 규칙 때문에 관계없는 되돌리기가 막히지 않게)
+  if (liveUses.length) { const asR = await autotaskAssignState(st, liveUses); if (Object.keys(asR).some(function (pf) { return asR[pf] !== 'ok'; })) return jr(400, { status: 'REJECTED', error_code: 'ASSIGN_NEEDED', request_id: R }); }
   // C185 판1 켠 시각: 되돌린 결과 새로 live가 된 규칙 = 지금 시각 · 그대로 live인 규칙 = 지금 값 · 나머지 = 없음
   const now0 = Date.now(), since = {};
   Object.keys(rules).forEach(function (k) { if (rules[k] !== 'live') return; if (a.rules[k] !== 'live') since[k] = now0; else if (a.since && a.since[k]) since[k] = a.since[k]; });
@@ -3342,10 +3510,12 @@ const CON_CLOG_OPS = { docs_set: 1, docs_del: 1, map_add: 1, map_del: 1, scen_de
 const CON_STAGE_ACTS = { done: 1, undo: 1, na: 1, add: 1, del: 1 };
 function conClogHash(prev, entry) { return crypto.createHash('sha256').update(prev + '|' + JSON.stringify(entry)).digest('hex').slice(0, 16); }
 function conClogChainOk(doc) { let prev = ''; for (const it of (doc.items || [])) { const e = Object.assign({}, it); delete e.h; delete e.p; if (it.p !== prev || conClogHash(prev, e) !== it.h) return false; prev = it.h; } return prev === (doc.head || ''); }
-async function conClogRead(st, key) {
-  let doc = { schema: 1, items: [], head: '' };
-  try { const r = await blobGet(st, key || CON_CLOG_KEY); if (r.ok && r.data && Array.isArray(r.data.items)) { doc = { schema: 1, items: r.data.items, head: r.data.head || '' }; if (Array.isArray(r.data.restored)) doc.restored = r.data.restored; } } catch (e) {}
-  return doc;
+async function conClogRead(st, key) { return (await conClogReadF(st, key)).doc; }
+// C225 판 A: 못 읽음(읽기·파싱 실패) 코드도 함께 돌려준다({ doc, code }) — 문서는 종전 conClogRead와 같음(못 읽으면 빈 체인). 사건 기록 쓰기(handleConClogAdd)가 code를 보고 500
+async function conClogReadF(st, key) {
+  let doc = { schema: 1, items: [], head: '' }, code = '';
+  try { const r = await blobGet(st, key || CON_CLOG_KEY); if (!r.ok && r.code !== 'NOT_FOUND') code = r.code || 'STORAGE_READ_FAILED'; if (r.ok && r.data && Array.isArray(r.data.items)) { doc = { schema: 1, items: r.data.items, head: r.data.head || '' }; if (Array.isArray(r.data.restored)) doc.restored = r.data.restored; } } catch (e) { code = 'STORAGE_READ_FAILED'; }
+  return { doc: doc, code: code };
 }
 // v453 검토: 재해 복원(backup_put)이 남긴 되살린 범위 restored[{ts,from,to,bk,added,rechained}]를 다음 기록 쓰기가 지우지 않게 — 쓰는 두 곳이 이것으로 문서를 만든다
 function conClogDoc(doc, extra) { return Object.assign({ schema: 1, items: doc.items, head: doc.head }, extra, Array.isArray(doc.restored) ? { restored: doc.restored } : {}); }
@@ -3466,7 +3636,8 @@ async function handleConClogAdd(event, d, R) {
   const cid = String(d.cid || ''), pipe = String(d.pipe || ''), i = Number(d.i), k = String(d.k || ''), act = String(d.act || '');
   if (!/^[A-Za-z0-9_-]{1,40}$/.test(cid) || !/^[A-Za-z0-9_-]{1,20}$/.test(pipe) || !Number.isInteger(i) || i < 0 || i > 99 || !/^[A-Za-z0-9가-힣_:.-]{1,60}$/.test(k) || !Object.prototype.hasOwnProperty.call(CON_STAGE_ACTS, act)) return jr(400, { status: 'REJECTED', error_code: 'BAD_VALUE', request_id: R });
   const st = store(DATA), key = conClogMonthKey();
-  const doc = await conClogRead(st, key);
+  const crd = await conClogReadF(st, key), doc = crd.doc;
+  if (crd.code) return jr(500, { status: 'ERROR', error_code: crd.code, request_id: R });   // C225 판 A: 그달 기록을 못 읽으면 빈 기록에 새 줄만 쓰지 않음
   if (doc.items.length >= CON_CLOG_MONTH_MAX) return jr(409, { status: 'CONFLICT', error_code: 'CLOG_FULL', request_id: R });
   const entry = { ts: Date.now(), by: c.member.id, op: 'stage_docs', cid: cid, pipe: pipe, i: i, k: k, act: act };
   const h = conClogHash(doc.head || '', entry);
@@ -3509,6 +3680,7 @@ async function appendRecLog(st, entry) {
   try {
     const key = recLogKey();
     const r = await blobGet(st, key);
+    if (!r.ok && r.code !== 'NOT_FOUND') return false;   // C225 판 A: 그달 기록을 못 읽으면 빈 기록에 이번 줄만 쓰지 않음(기록 실패로 돌려줌)
     const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
     doc.items.push(entry);
     if (doc.items.length > RECLOG_MAX) doc.items = doc.items.slice(-RECLOG_MAX);
@@ -4194,14 +4366,14 @@ async function handleCdocGet(event, d, R) {
     if (!Number.isInteger(j) || j < 0 || j >= Number(r.data.parts)) return jr(400, { status: 'REJECTED', error_code: 'BAD_PART', request_id: R });
     if (j === 0 || it.pii === 2) {
       const lg = await appendRecLog(st, { ts: Date.now(), bid: c.member.id, by: String(c.member.name || ''), dept: String(c.member.dept || ''), cid: cid, n: n, i: it.i, dk: it.dk, kind: it.kind, pii: it.pii, name: String(it.name || '').slice(0, 80), reason: reason });
-      if (it.pii === 2 && !lg) return jr(500, { status: 'ERROR', error_code: 'RECLOG_FAILED', request_id: R });
+      if ((it.pii === 2 || it.pii === 1) && !lg) return jr(500, { status: 'ERROR', error_code: 'RECLOG_FAILED', request_id: R });   // C225 판 A: 개인정보(pii 1)도 기록 없이는 내주지 않음
     }
     const pr = await blobGet(store(FILES), BF.attPartKey(r.data.att, j));
     if (!pr.ok || !pr.data) return jr(404, { status: 'REJECTED', error_code: 'NO_FILE', request_id: R });
     return jr(200, { status: 'OK', cid: cid, n: n, part: j, parts: r.data.parts, data: pr.data.data, request_id: R });
   }
   const logged = await appendRecLog(st, { ts: Date.now(), bid: c.member.id, by: String(c.member.name || ''), dept: String(c.member.dept || ''), cid: cid, n: n, i: it.i, dk: it.dk, kind: it.kind, pii: it.pii, name: String(it.name || '').slice(0, 80), reason: reason });
-  if (it.pii === 2 && !logged) return jr(500, { status: 'ERROR', error_code: 'RECLOG_FAILED', request_id: R });   // 민감정보는 기록 없이는 내주지 않는다(fail-closed)
+  if ((it.pii === 2 || it.pii === 1) && !logged) return jr(500, { status: 'ERROR', error_code: 'RECLOG_FAILED', request_id: R });   // 민감정보는 기록 없이는 내주지 않는다(fail-closed) · C225 판 A: 개인정보(pii 1)도 같게(pii 0은 종전대로 logged:false)
   const out = { status: 'OK', cid: cid, n: n, name: it.name, orig: it.orig, kind: it.kind, pii: it.pii, type: (r.data.fill && !r.data.data) ? 'application/json' : docAttMime(it.name), logged: logged, request_id: R };
   if (r.data.data) out.data = r.data.data; else if (r.data.fill) out.fill = r.data.fill;   // v424 초안은 파일이 먼저(옛 초안은 채움 맵만)
   return jr(200, out);
@@ -4277,14 +4449,22 @@ async function handleCdocPurge(event, d, R) {
   if (!it || it.purged) return jr(404, { status: 'REJECTED', error_code: 'NO_FILE', request_id: R });
   if (!it.del) return jr(409, { status: 'CONFLICT', error_code: 'NOT_IN_TRASH', request_id: R });
   if (Date.now() - Number(it.del) < CDOC_TRASH_DAYS * 86400000) return jr(409, { status: 'CONFLICT', error_code: 'TOO_EARLY', days: CDOC_TRASH_DAYS, request_id: R });
+  // C225 판 A 검토: 본문 레코드 읽기는 큰 파일(조각·본 레코드)인지 알려면 꼭 필요 — 못 읽으면(읽기·파싱 실패) 아무것도 지우지 않고 500(다시 할 수 있게).
+  //   본 레코드·본문을 못 지웠으면 '영구 삭제됨' 표식을 남기지 않고 500 — 파기 기록과 남은 파일이 어긋나지 않게(종전엔 결과를 안 봐 표식만 남고 다시 지울 길이 없었다)
   const pr0 = await blobGet(store(FILES), cdocKey(cid, it.i, it.dk, n));
+  // C225 좁은 재확인: 본문 레코드가 깨진 JSON(STORAGE_PARSE_FAILED)이면 지킬 자료가 아니므로 그 본문 열쇠를 force로 지우고 표식·감사를 남김(운영 판처럼 파기됨 ·
+  //   큰 파일인지 알 수 없어 조각이 남을 수 있는 것은 운영 판과 같음) · 일시 읽기 실패는 500(다시 할 수 있음)
+  const pr0Broken = !pr0.ok && pr0.code === 'STORAGE_PARSE_FAILED';
+  if (!pr0.ok && pr0.code !== 'NOT_FOUND' && !pr0Broken) return jr(500, { status: 'ERROR', error_code: pr0.code || 'STORAGE_READ_FAILED', request_id: R });
   if (pr0.ok && pr0.data && pr0.data.att) {   // v423 큰 파일은 조각과 본 레코드까지
     const am = await blobGet(store(FILES), pr0.data.att);
     if (am.ok && am.data) await BF.attDeleteParts(store(FILES), pr0.data.att, am.data);
-    await blobDelete(store(FILES), pr0.data.att);
+    const aw = await blobDelete(store(FILES), pr0.data.att);   // 본 레코드를 못 읽었으면 층 1이 이 지우기를 막음 → 아래 500(조각을 못 지운 채 표식을 남기지 않음)
+    if (!aw.ok) return jr(500, { status: 'ERROR', error_code: aw.code, request_id: R });
   }
   if (it.att0) await blobDelete(store(FILES), 'parse:' + it.att0);   // v423 판독값도 함께(개인정보 항목의 값이 남지 않게)
-  await blobDelete(store(FILES), cdocKey(cid, it.i, it.dk, n));
+  const bw = await blobDelete(store(FILES), cdocKey(cid, it.i, it.dk, n), { force: pr0Broken });
+  if (!bw.ok) return jr(500, { status: 'ERROR', error_code: bw.code, request_id: R });
   it.purged = Date.now(); it.purged_by = c.member.id; it.cur = 0;
   idx.updated_at = Date.now(); idx.updated_by = c.member.id;
   const w = await blobSet(st, cdocIdxKey(cid), idx);
@@ -4856,7 +5036,8 @@ async function handleApprovalDecide(event, d, R) {
       } else if (chk.data.updated_at) newBase = chk.data.updated_at;
     }
   } catch (e) {}
-  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'approvals', ev: [{ op: '결재', id: it.id, t: ((isPmStep ? '승인→대표' : (decision === '확인' ? '열람 확인' : decision)) + (reason ? ' — ' + reason.slice(0, 40) : '') + ' · ' + String(it.title || '').slice(0, 40)) }] }); } catch (e) {}
+  let apprAuFail = false;   // C251 「덧대기」: '결재' 감사 줄을 못 남겼으면 응답에 audit:false — 응답 꼴만(화면 글 없음 · 결재는 이미 됨)
+  try { if ((await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'approvals', ev: [{ op: '결재', id: it.id, t: ((isPmStep ? '승인→대표' : (decision === '확인' ? '열람 확인' : decision)) + (reason ? ' — ' + reason.slice(0, 40) : '') + ' · ' + String(it.title || '').slice(0, 40)) }] })) === false) apprAuFail = true; } catch (e) { apprAuFail = true; }
   // 문서함 등재 훅(v314): 최종 승인='등재'·반려='반려'를 문서 블롭에 반영. 결재 상태(위 쓰기)가 먼저 확정된 뒤라 여기 실패는 결재를 되돌리지 않는다 —
   // 감사로그 '등재반영실패'만 남기고 다음 결재함 조회(approvals_list 폴)에서 같은 함수가 멱등으로 재시도한다. ② 1단계 전환·보류는 문서 무변경.
   let docReg = null;
@@ -4887,7 +5068,7 @@ async function handleApprovalDecide(event, d, R) {
           (isSys || itGrade) ? { ctx: tc, primaryOnly: true } : { ctx: tc });   // 등급 건·자동상신 결과는 우선기기 1발(결정 ③), 구건은 현행(전 기기). ctx 재사용 — 결재 1건에 회원 전수 재스캔이 2~3회 붙던 것 제거
     }
   } catch (e) {}
-  return jr(200, { status: 'OK', id: it.id, decided: it.status, to: it.to, base: newBase, request_id: R });
+  return jr(200, Object.assign({ status: 'OK', id: it.id, decided: it.status, to: it.to, base: newBase, request_id: R }, apprAuFail ? { audit: false } : {}));   // C251: 정상 때는 칸 없음(응답 종전 그대로)
 }
 
 // ---- 계약 첨부파일(석면조사서 등) — Blobs 저장 + 서버측 텍스트 추출 ----
@@ -4976,7 +5157,14 @@ async function handleAttPut(event, d, R) {
   if (b64.length > ATT_MAX) return jr(413, { status: 'REJECTED', error_code: 'FILE_TOO_LARGE', request_id: R });
   const id = 'att_' + crypto.randomBytes(8).toString('hex');
   const kind = ['asbestos', 'contract', 'bldg', 'biz', 'promo'].indexOf(String(d.kind || '')) >= 0 ? String(d.kind) : '';
-  const w = await blobSet(store(FILES), id, { name: name, type: String(d.type || ''), kind: kind, data: b64, by: c.member.name, ts: Date.now() });
+  // C265: 홍보 사진(공개 주소로 나가는 종류)은 그림만 — 보낸 type은 믿지 않고 내용 머리 바이트(JPEG·PNG·WebP)로 정한다. 그림이 아니면 400.
+  //   다른 종류(계약·석면 등 문서)는 앱 안에서만 열려 종전대로 둔다.
+  let type = String(d.type || '');
+  if (kind === 'promo') {
+    type = IMG.sniffB64(b64);
+    if (!type) return jr(400, { status: 'REJECTED', error_code: 'NOT_IMAGE', request_id: R });
+  }
+  const w = await blobSet(store(FILES), id, { name: name, type: type, kind: kind, data: b64, by: c.member.name, bid: String(c.member.id || ''), ts: Date.now() });   // bid = 올린 사람 id(C257 — 홍보 고아 사진 본인 지우기 판정)
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '첨부등록', id: id, t: name.slice(0, 60) }] }); } catch (e) {}
   // 판독은 백그라운드 함수(gw-parse-background)에서 — 첨부는 즉시 완료(타임아웃 방지). promo(현장 사진)는 판독 대상 아님
@@ -5129,6 +5317,11 @@ async function handleBackupList(event, d, R) {
   if (!BACKUP_STORES[sn]) return jr(400, { status: 'REJECTED', error_code: 'BAD_STORE', request_id: R });
   const r = await blobList(store(sn));
   if (!r.ok) return jr(500, { status: 'ERROR', error_code: r.code, request_id: R });
+  // 66 급여 백업 암호화: 열쇠(PAY_BACKUP_KEY)가 없으면 급여 문서는 목록에서 빼고 수만 알림(pay_held) — 하나씩 503 으로 실패시키면 실패 키 한도를 넘어 백업 전체가 저장되지 않으므로
+  if (sn === 'gw_data' && !PAYCRYPT.keyFrom(process.env.PAY_BACKUP_KEY)) {
+    const held = r.keys.filter(function (k) { return String(k).indexOf('pay:') === 0; });
+    if (held.length) return jr(200, { status: 'OK', keys: r.keys.filter(function (k) { return String(k).indexOf('pay:') !== 0; }), pay_held: held.length, request_id: R });
+  }
   return jr(200, { status: 'OK', keys: r.keys, request_id: R });
 }
 async function handleBackupGet(event, d, R) {
@@ -5140,9 +5333,13 @@ async function handleBackupGet(event, d, R) {
   if (badBlobKey(key)) return jr(400, { status: 'REJECTED', error_code: 'BAD_KEY', request_id: R });
   // 민감키 반출 금지 — 백업 인증이 수집키(BIDS_INGEST_KEY) 겸용이라, 키 유출 = VAPID 개인키·PIN 해시 유출로 번지던 것 차단
   if (sn === 'gw_data' && key === 'push:keys') return jr(403, { status: 'FORBIDDEN', error_code: 'SENSITIVE_KEY', request_id: R });
+  // 66 급여 문서는 열쇠(PAY_BACKUP_KEY)가 없으면 내보내지 않는다(평문으로 백업 git 에 남지 않게 — 읽기 전에 막음)
+  const payKey = sn === 'gw_data' && key.indexOf('pay:') === 0 ? PAYCRYPT.keyFrom(process.env.PAY_BACKUP_KEY) : null;
+  if (sn === 'gw_data' && key.indexOf('pay:') === 0 && !payKey) return jr(503, { status: 'ERROR', error_code: 'PAY_BACKUP_KEY_MISSING', request_id: R });
   const r = await blobGet(store(sn), key);
   if (!r.ok) return jr(500, { status: 'ERROR', error_code: r.code, request_id: R });
   let data = r.data;
+  if (payKey) data = PAYCRYPT.seal(data, payKey);   // AES-256-GCM 봉함 — 백업에는 암호문만
   if (sn === 'gw_users' && data && typeof data === 'object' && !Array.isArray(data)) {
     // PIN 해시·salt는 백업에 싣지 않는다(git 스냅샷에 매일 커밋되던 것 포함 차단) — 복원 시엔 서버가 기존 값을 보존한다
     data = Object.assign({}, data); delete data.pin_salt; delete data.pin_hash;
@@ -5187,6 +5384,7 @@ function _bkCount(v) {
 //       합쳐서 월 상한(audit = _lib/audit.js MAX_PER_MONTH · doclog DOCLOG_MAX · reclog RECLOG_MAX)을 넘으면 400 AUDIT_FULL — 이번 달 감사 키(auditKey())는 이 핸들러가 뒤이어 쓰는
 //       '재해복원' 1줄 자리를 남긴다(상한 꽉 채우면 그 1줄이 가장 오래된 진짜 줄을 밀어내므로).
 //       알려진 한계: 읽기 → 병합 → 쓰기 사이에 앱의 appendAudit이 같은 달 키에 쓴 줄은 덮일 수 있다(appendAudit도 같은 읽고-쓰기 — 조건부 쓰기가 없는 SDK). 재해 복원은 앱 사용이 없는 때에.
+//       C251(11/20): appendAudit는 조각 문서를 더는 쓰지 않고 줄마다 새 열쇠(audit:YYYY-MM:e:…)에 쓴다 — 위 한계는 옛 판으로 되돌린 동안에만 남는다. 줄 열쇠도 같은 갈래(audit)로 복원된다(값이 { items:[줄] }라 같은 병합 — 열쇠 하나씩).
 //     · clog:*(해시 체인 — clog:contract·clog:contract:YYYY-MM은 첫 줄 p '' 엄격, clog:appr:YYYY-MM은 상한에서 앞이 잘려 시작 p 허용 · 상한 CON_CLOG_MAX·CON_CLOG_MONTH_MAX·DONEIF.CLOG_MAX):
 //       백업 체인이 온전해야(아니면 400 CLOG_CHAIN_BAD) · 지금 체인 뒤를 잇는 백업이면 그 뒤 줄만 붙이고, 백업이 같거나 짧으면 400 CLOG_NOT_AHEAD,
 //       갈라졌거나 지금 체인이 깨졌으면 지금 줄을 버리지 않고 다시 잇는다(backupClogMerge — rechained 표식 · 문서 restored 범위 · 감사 from/to) · 상한 넘으면 400 CLOG_FULL.
@@ -5207,6 +5405,7 @@ function backupRestoreClass(sn, key) {
   if (key.indexOf('reclog:') === 0) return 'reclog';
   if (key.indexOf('clog:') === 0) return 'clog';   // v453 검토: 해시 체인 기록 전부(clog:contract* · 결재 학습 신호 clog:appr:YYYY-MM — 규약 clog:<domain>:<YYYY-MM>)
   if (key.indexOf('settings:') === 0) return 'settings';
+  if (key.indexOf('pay:') === 0) return 'pay';   // 66 판2 급여 문서(기준·달 대장·설정) — 재해 복원 모드에서만, 꼴 검사(payledger.docOk) 통과분만
   return '';
 }
 // clog 상한·시작 검사: clog:contract(앱이 상한에서 409로 멈춤 — 첫 줄 p '' 엄격) · clog:contract:YYYY-MM(같음) · 그 밖(clog:appr:* — DONEIF.clogAppend가 상한에서 앞을 잘라 첫 줄 p가 ''가 아닐 수 있음 → 시작 p 허용)
@@ -5346,6 +5545,11 @@ async function backupRestorePlan(sn, key, cls, cur, data, preview) {
       });
       if (has(prev, 'leave_date')) { if (JSON.stringify(prev.leave_date) !== JSON.stringify(payload.leave_date)) kept.push('leave_date'); payload.leave_date = prev.leave_date; }
       else if (has(payload, 'leave_date') && tier.retired({ leave_date: payload.leave_date })) { kept.push('leave_date'); delete payload.leave_date; }   // 지난 퇴사일은 받지 않음
+      // C185 판3(검토 16): 퇴사 표식 leave_ev는 퇴사일과 같은 쪽 값 — 지금 퇴사일을 지키면 지금 표식(없으면 없게) · 백업 퇴사일을 받으면 백업 표식 · 지난 퇴사일을 버렸거나 퇴사일이 없으면 표식도 없음 · 재입사 표식 join_ev는 지금 값이 있으면 지금 값
+      const evKeep = function (f, v) { if (JSON.stringify(prev[f]) !== JSON.stringify(payload[f])) kept.push(f); if (v) payload[f] = prev[f]; else delete payload[f]; };
+      if (has(prev, 'leave_date')) evKeep('leave_ev', own(prev, 'leave_ev'));
+      else if (!has(payload, 'leave_date') && own(payload, 'leave_ev')) { kept.push('leave_ev'); delete payload.leave_ev; }
+      if (has(prev, 'join_ev')) evKeep('join_ev', true);
       if (prev.del === 1) { if (payload.del !== 1) delete payload.del; }   // 해제만 받음
       else { if (own(payload, 'del') && JSON.stringify(payload.del) !== JSON.stringify(prev.del)) kept.push('del'); if (own(prev, 'del')) payload.del = prev.del; else delete payload.del; }
       const idNow = has(prev, 'id') ? prev.id : key.slice('member:'.length);
@@ -5377,6 +5581,17 @@ async function backupRestorePlan(sn, key, cls, cur, data, preview) {
     if (mg.err) return { status: 400, body: { status: 'REJECTED', error_code: mg.err } };
     payload = mg.doc; preview.merge = { added: mg.added, kept: mg.kept, rechained: mg.rechained, mode: mg.mode };
     note += ' · 체인 ' + mg.mode + ' · 백업 줄 ' + mg.added + ' · 지금 줄 ' + mg.kept + (mg.rechained ? ' · 다시 이음 ' + mg.rechained + '줄' : '') + ' · from ' + (mg.from || '-') + ' → to ' + (mg.to || '-');
+  } else if (cls === 'pay') {
+    if (PAYCRYPT.isSealed(payload)) {   // 봉한 백업 = 같은 열쇠로 열어서 꼴 검사
+      const pkey = PAYCRYPT.keyFrom(process.env.PAY_BACKUP_KEY);
+      if (!pkey) return { status: 503, body: { status: 'ERROR', error_code: 'PAY_BACKUP_KEY_MISSING' } };
+      const op = PAYCRYPT.open(payload, pkey);
+      if (!op.ok) return { status: 400, body: { status: 'REJECTED', error_code: 'PAY_' + op.code } };
+      payload = op.data; note += ' · 봉한 백업 엶';
+    }
+    const pk = PAYLEDGER.docOk(key, payload);   // 66 판2 — 급여 문서 꼴(모르는 pay: 키·틀린 꼴은 거절). 감사 note 에는 금액 없이 꼴 통과만
+    if (!pk.ok) return { status: 400, body: { status: 'REJECTED', error_code: 'BAD_PAY_DOC', field: String(pk.field || '').slice(0, 60) } };
+    payload = pk.doc; note += ' · 급여 문서 꼴 통과';
   } else if (cls === 'settings' && key === AUTOTASK_KEY) {
     const cl = backupAutotaskClamp(curData, payload);
     payload = cl.payload;
@@ -5411,7 +5626,8 @@ async function handleBackupPut(event, d, R) {
   if (d.confirm !== true) return jr(400, { status: 'REJECTED', error_code: 'NEED_CONFIRM', preview: preview, request_id: R });
   if (plan && plan.status) return jr(plan.status, Object.assign(plan.body, { request_id: R }));
   const payload = plan ? plan.payload : d.data, note = plan ? plan.note : '';
-  const w = await blobSet(store(sn), key, payload);
+  // C225 판 A: 깨진 지금 값(STORAGE_PARSE_FAILED)을 백업으로 바꾸는 것은 이 길의 목적이라 force(_lib/blobs.js 층 1을 지나감) · 일시 읽기 실패면 force 없음 → 막힘(다시 시도)
+  const w = await blobSet(store(sn), key, payload, { force: !cur.ok && cur.code === 'STORAGE_PARSE_FAILED' });
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   try { await appendAudit({ ts: Date.now(), by: '복원', bid: 'restore', col: sn, ev: [{ op: restore ? '재해복원' : '백업복원', id: key, t: (JSON.stringify(preview).slice(0, 120) + note).slice(0, 300) }] }); } catch (e) {}
   return jr(200, { status: 'OK', store: sn, key: key, preview: preview, restore: restore, request_id: R });
@@ -5444,7 +5660,8 @@ async function handleTplGet(event, d, R) {
   if (hasOwn(TPL_PERSON, tplKey)) {
     if (permOf(c.member, 'contracts') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
     if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
-    await appendRecLog(store(DATA), { ts: Date.now(), bid: c.member.id, by: String(c.member.name || ''), dept: String(c.member.dept || ''), cid: '', n: 0, i: -1, dk: 'tpl.' + tplKey, kind: 'tpl', pii: 1, name: tplKey, reason: '' });
+    const tlg = await appendRecLog(store(DATA), { ts: Date.now(), bid: c.member.id, by: String(c.member.name || ''), dept: String(c.member.dept || ''), cid: '', n: 0, i: -1, dk: 'tpl.' + tplKey, kind: 'tpl', pii: 1, name: tplKey, reason: '' });
+    if (!tlg) return jr(500, { status: 'ERROR', error_code: 'RECLOG_FAILED', request_id: R });   // C225 판 A: 사람 정보가 든 양식은 열람 기록 없이 내주지 않음(cdoc 민감정보와 같은 코드)
   }
   const r = await blobGet(store(FILES), 'tpl:' + tplKey);
   if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: r.code || 'STORAGE_READ_FAILED', request_id: R });   // v422: 읽기 실패 ≠ 미등록
@@ -5500,13 +5717,38 @@ async function handleAttGet(event, d, R) {
   return jr(200, { status: 'OK', name: r.data.name, type: r.data.type, data: r.data.data, request_id: R });
 }
 
+// C257(11/20): 홍보 수행 직원이 자기가 올렸지만 아직 어떤 현장 기록에도 붙지 않은 사진만 지우는 좁은 갈래 — 서버가 직접 확인한다.
+//   kind promo · 올린 사람 본인(bid, 옛 첨부는 이름) · promo 수행 권한 · col:promo 어떤 기록의 photos에도 없는 id. 읽기 실패면 지우지 않는다(C225 — 실패를 '없음'으로 보지 않음).
+async function promoOrphanDelCheck(member, id) {
+  if (permOf(member, 'promo') !== 'do') return 'NO_WRITE';
+  const am = await blobGet(store(FILES), id);
+  if (!am.ok) return 'READ_FAILED';
+  const m = am.data;
+  if (!m || typeof m !== 'object' || m.kind !== 'promo') return 'NO_WRITE';
+  const mine = m.bid ? String(m.bid) === String(member.id || '') : String(m.by || '') === String(member.name || '');
+  if (!mine) return 'NOT_OWNER';
+  const pr = await blobGet(store(DATA), 'col:promo');
+  if (!pr.ok) return 'READ_FAILED';
+  const items = (pr.data && Array.isArray(pr.data.items)) ? pr.data.items : [];
+  const used = items.some(function (it) { return it && Array.isArray(it.photos) && it.photos.some(function (p) { return p && (p === id || p.id === id); }); });
+  return used ? 'IN_USE' : 'OK';
+}
 async function handleAttDel(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
-  if (permOf(c.member, 'contracts') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
+  if (permOf(c.member, 'contracts') !== 'do') {
+    if (String(d.id || '').indexOf('att_') !== 0) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });
+    const pk = await promoOrphanDelCheck(c.member, String(d.id || ''));
+    if (pk === 'READ_FAILED') return jr(503, { status: 'UNAVAILABLE', error_code: 'PROMO_ORPHAN_READ_FAILED', request_id: R });
+    if (pk === 'IN_USE') return jr(409, { status: 'CONFLICT', error_code: 'PROMO_PHOTO_IN_USE', request_id: R });
+    if (pk !== 'OK') return jr(403, { status: 'FORBIDDEN', error_code: pk === 'NOT_OWNER' ? 'NOT_OWNER' : 'NO_WRITE', request_id: R });
+  }
   // att_ 프리픽스 강제 — 없으면 tpl:/proof:(proof:__index__ 포함)를 비관리자가 삭제할 수 있다(gw-parse-background와 동일 검사)
   if (String(d.id || '').indexOf('att_') !== 0) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });
   const am0 = await blobGet(store(FILES), String(d.id || ''));
+  // C225 판 A 검토: 첨부 본 레코드를 못 읽으면 보호 검사(서류함 taken·인허가 수령본)를 할 수 없고 본 레코드 지우기도 막힌다 —
+  //   판독값·가린 판만 지우고 200·감사 '첨부삭제'를 남기던 길을 아무것도 지우지 않는 500으로
+  if (!am0.ok && am0.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: am0.code || 'STORAGE_READ_FAILED', request_id: R });
   if (am0.ok && am0.data && am0.data.taken) return jr(409, { status: 'CONFLICT', error_code: 'ALREADY_TAKEN', request_id: R });
   if (am0.ok && am0.data && am0.data.kind === 'lic') return jr(409, { status: 'CONFLICT', error_code: 'LIC_ATT_KEEP', request_id: R });   // P1 판28 인허가 수령본(완료 기록 근거)은 지우는 길 없음   // v423 서류함이 참조하는 조각은 여기서 지우지 않는다(서류함 보관·영구 삭제 경로로)
   if (am0.ok && am0.data && am0.data.parts) await BF.attDeleteParts(store(FILES), String(d.id || ''), am0.data);
@@ -5583,11 +5825,13 @@ async function appendDocLog(st, entry) {
   try {
     const key = docLogKey();
     const r = await blobGet(st, key);
+    if (!r.ok && r.code !== 'NOT_FOUND') return false;   // C225 판 A: 그달 기록을 못 읽으면 빈 기록에 이번 줄만 쓰지 않음
     const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
     doc.items.push(entry);
     if (doc.items.length > DOCLOG_MAX) doc.items = doc.items.slice(-DOCLOG_MAX);
-    await blobSet(st, key, doc);
-  } catch (e) { /* no-op */ }
+    const w = await blobSet(st, key, doc);
+    return !!(w && w.ok);   // C225: 남겼는지 돌려줌(종전엔 돌려주는 값 없음)
+  } catch (e) { return false; }
 }
 async function handleDocLogGet(event, d, R) {
   const c = await currentMember(event);
@@ -5707,9 +5951,10 @@ async function handleDocAttGet(event, d, R) {
   const r = await blobGet(store(FILES), docAttKey(docId, n));
   if (!r.ok || !r.data) return jr(404, { status: 'REJECTED', error_code: 'NO_FILE', request_id: R });
   // 열람 기록(v388) — 누가·언제·어느 문서·어느 파일·원본/열람용. 관리자 열람도 남긴다(유출 추적은 전원)
-  await appendDocLog(st, { ts: Date.now(), bid: c.member.id, by: String(c.member.name || ''), dept: String(c.member.dept || ''), doc: docId, no: String(ld.it.no || ''), title: String(ld.it.title || '').slice(0, 60), n: n, name: String(meta.name || '').slice(0, 80), kind: meta.view === 1 ? 'view' : (isOrig ? 'orig' : 'file') });
+  const dlg = await appendDocLog(st, { ts: Date.now(), bid: c.member.id, by: String(c.member.name || ''), dept: String(c.member.dept || ''), doc: docId, no: String(ld.it.no || ''), title: String(ld.it.title || '').slice(0, 60), n: n, name: String(meta.name || '').slice(0, 80), kind: meta.view === 1 ? 'view' : (isOrig ? 'orig' : 'file') });
   // type은 저장값이 아니라 확장자 고정표(high1) — 저장 시점에 위장값이 들어갔더라도 응답은 표의 값만
-  return jr(200, { status: 'OK', name: r.data.name, type: docAttMime(r.data.name || meta.name), data: r.data.data, request_id: R });
+  // C225 판 A: 기록을 못 남긴 열람은 응답에 logged:false로 드러낸다(계약 기록물 cdoc pii 0 — 개인정보 없음 — 과 같은 꼴 · 문서함 열람은 막지 않음 · 남겼으면 응답 종전 그대로)
+  return jr(200, Object.assign({ status: 'OK', name: r.data.name, type: docAttMime(r.data.name || meta.name), data: r.data.data }, dlg ? {} : { logged: false }, { request_id: R }));
 }
 async function handleDocAttDel(event, d, R) {
   const c = await currentMember(event);
@@ -5991,7 +6236,8 @@ async function handleVerRestore(event, d, R) {
   const cur = await blobGet(store(DATA), colKey(col));
   if (cur.ok && cur.data) await verSnapshot(col, cur.data, g.c.member.name + '(복구 전 자동보존)', false, true);
   const doc = Object.assign({}, vr.data.doc, { updated_by: g.c.member.id, updated_at: Date.now() });
-  const w = await blobSet(store(DATA), colKey(col), doc);
+  // C225 판 A: 지금 문서가 깨졌으면(STORAGE_PARSE_FAILED) 되돌리기가 다시 세우는 길이라 force · 일시 읽기 실패면 force 없음 → 막힘(복구 전 자동보존 없이 덮지 않음)
+  const w = await blobSet(store(DATA), colKey(col), doc, { force: !cur.ok && cur.code === 'STORAGE_PARSE_FAILED' });
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
   try {
     const when = new Date(vr.data.ts + 9 * 3600000).toISOString().replace('T', ' ').slice(0, 16);
@@ -6269,6 +6515,8 @@ PMCON_KINDS.hrbg = { label: '인사 법령 근거 승격', grade: 'R2', fn: hand
 //   판14 와 다른 점: 근거 표를 '못 읽음'과 '없음'을 가른다(못 읽음 = BG_READ_FAILED — 없음으로 보지 않음) · 읽기는 관리자만(급여 자료 — 권한관리 표에 열이 없음).
 //   읽기 pay_bg_get = 로그인 → 기기 승인 → 관리자 · 쓰기 pay_bg_set = pmconGate 쓰기(PM) → 낙관락 → 직전 값(prev) → 감사 1줄(col pay) · PM 콘솔 줄 paybg(R2 · 무응답 = 미승격).
 const PAYBG = require('./_lib/paybg');
+const PAYLEDGER = require('./_lib/payledger');
+const PAYCRYPT = require('./_lib/sealbox');   // 66 급여 백업 암호화(PM 11/24 'ㄱ' — A안): pay:* 는 봉해서만 반출 · 복원은 열어서   // 66 판2 — 백업 복원의 급여 문서 꼴 검사만(급여 읽기·쓰기는 gw-pay)
 const PAY_BG_KEYS = { bg: 'bg:pay:law:v1', flag: 'settings:pay' };
 async function payBgReadFlag(st) {   // { ok, flag } — 없음 = 빈 스위치 · 읽기 실패 = ok false(그 위에 쓰지 않음)
   const r = await blobGet(st, PAY_BG_KEYS.flag);
@@ -6371,6 +6619,10 @@ function gzipOut(event, res) {
 // v456(원장 C066): 요청 본문 gzip 풀기 상한 — 로그인 확인보다 먼저 풀리므로 6MB 안의 압축 본문이 수백 MB로 풀려 그 호출이 메모리 초과로 죽던 길(데이터 손상·다른 요청 영향은 없었음).
 //   지금 가장 큰 정상 요청 = 일감 저장(풀린 크기 약 6.7MB) — 32MB면 다섯 배 여유. 넘으면 zlib이 ERR_BUFFER_TOO_LARGE를 던지고 handlerInner가 413 BODY_TOO_LARGE로 돌려준다(종전 400 INVALID_JSON으로 뭉뚱그림).
 const BODY_GZ_MAX = 32 * 1024 * 1024;
+// C240 판 A-1 가르는 칸(글자만 — _lib/reqshape.js): action 갈래 · collection·col 컬렉션 · kind·key·store·mode·only·fn 표 열쇠·갈래 · secret 봇 열쇠
+//   앱(index.html gwCall)·수집기(jongwoon-appdata/collectors)가 이 칸에 늘 글자를 보냄(전수 표 — 막는판A1_문서초안_1120.md ②)
+const REQSHAPE = require('./_lib/reqshape');
+const GWD_STR_FIELDS = ['action', 'collection', 'col', 'kind', 'key', 'store', 'mode', 'only', 'fn', 'secret'];
 function parseBody(event) {
   const h = (event && event.headers) || {};
   const enc = String(h['x-gw-enc'] || h['X-GW-Enc'] || '').toLowerCase();
@@ -6393,6 +6645,8 @@ async function handlerInner(event) {
     if (e && e.code === 'ERR_BUFFER_TOO_LARGE') return jr(413, { status: 'REJECTED', error_code: 'BODY_TOO_LARGE', request_id: R });   // v456 C066 — 풀린 본문이 BODY_GZ_MAX를 넘음
     return jr(400, { status: 'REJECTED', error_code: 'INVALID_JSON', request_id: R });
   }
+  // C240 판 A-1: 가르는 칸은 글자만 — collection 배열(["bids"]·["leaves"])이 COL 열쇠 검사는 통과하고 뒤의 col === '…' 가드를 전부 건너뛰던 길(검토 ㉠) · 같은 꼴 전수 표의 칸 함께
+  { const bf = REQSHAPE.badField(d, GWD_STR_FIELDS); if (bf) return jr(400, { status: 'REJECTED', error_code: bf === 'collection' ? 'UNKNOWN_COLLECTION' : 'BAD_FIELD', field: bf, request_id: R }); }
   try {
     // 비용 실측 결과 조회(임시, 2026-09-10) — 관리자 전용. 계측기를 지울 때 이 분기도 함께 지운다.
     if (d && d.action === 'meter') {

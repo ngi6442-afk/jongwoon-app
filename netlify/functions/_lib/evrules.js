@@ -109,6 +109,7 @@ function assignFor(k, rules) {   // gw-data assignFor와 같은 판정(가장 �
 //   반환 { sum, made: [새 지시], changed: 바뀐 지시 수, txt: 감사 한 줄 조각(수만) }
 function run(id, input, ctx, tasks, opt, write) {
   const R = RULES[id], sum = emptySum(ctx.mode), out = { sum: sum, made: [], changed: 0, txt: '' };
+  if (R && R.since === false) sum.win = 0;   // C185 판4 검토 권고 4: 날짜 상태 규칙(오늘 그날인 것만 셈)은 연습이어도 '최근 30일' 창이 아님
   tasks = Array.isArray(tasks) ? tasks : [];
   opt = opt || {};
   if (!R || typeof R.plan !== 'function') { out.sum = notReadySum(ctx.mode); return out; }
@@ -241,4 +242,94 @@ function planHrJoin(input, ctx) {
 }
 RULES.hr_join.plan = planHrJoin;
 
-module.exports = { KEY_RE, isEvKey, isEvLike, ruleOfKey, subjOf, RULES, RULE_IDS, BASE_NEEDS, CAP, DRY_WIN, ready, needsOf, kstDay, ctxFor, emptySum, skipSum, notReadySum, MARK, MARK_WHY, markedKind, markTask, unmarkTask, run, botSum, TITLE_MAX, PLAN_TITLE_MAX, PLAN_DETAIL_MAX, HR_JOIN_ITEMS, hrJoinKey, planHrJoin };
+// ---- C185 판3 ② 퇴사(hr_leave) — 계획 함수(착수계획 ⓒ ② · 판3 행) ----
+//   사건 = 삭제·시험 계정·지입차주가 아닌 회원 ∧ 퇴사일이 달력 날짜 ∧ 퇴사 표식 leave_ev.at0 ≥ 켠 시각(표식 = gw-auth 회원 저장이 퇴사일 빈칸 → 날짜 때 찍음) ∧ 퇴사일 ≥ 켠 날(KST)
+//   표식이 없는 옛 퇴사자·켜기 전 표식 = 사건 아님(소급 없음) · 퇴사일이 켠 날보다 앞 = 사건 아님(요약 old) · 미래 퇴사일(사직 승인의 희망일)도 저장한 뒤 첫 실행에 사건
+//   지시 = 아래 항목 표 한 줄에 하나(인사 6 + 계정 1) · 키에 회원 id·퇴사일·번호 · 글에 이름 없음(대상은 관리자 화면의 [인사 카드]) · 끼워 넣는 값 = 퇴사일(MM/DD)뿐 · 공개 범위 = 담당만
+//   기한 = 인사 근거 승격일 때만(짝 근거 행이 모두 승격본에 있고 calc 참 · 사규 항목은 퇴사일 그대로) · 퇴사일을 고치면 새 키로 7항 + 옛 날짜 열린 지시에 '날짜 바뀜' 표시 · 지우면 표시만 · 같은 날짜를 다시 넣으면 표시가 떨어짐
+//   항목을 더하거나 빼는 일 = HR_LEAVE_ITEMS 한 줄 + servertest 'C185 판3' 표본
+const HR_LEAVE_ITEMS = [   // no(키 번호 — 바꾸지 말 것) · pre(키 접두어 = 배정표 줄) · t(제목 꼬리) · due(day0 = 퇴사일 · day14 = 퇴사일 + 14일 · '' = 기한 없음) · rows(짝 인사 근거 행 id — 빈 배열 = 사규 기준) · d(본문)
+  { no: 1, pre: 'hr:', t: '사직서 접수·계약 종료 확인', due: 'day0', rows: [], d: '사직서를 접수하거나 계약 종료를 확인합니다.' },
+  { no: 2, pre: 'hr:', t: '자료·장비·열쇠·차량 반환', due: 'day0', rows: [], d: '업무 자료·장비·열쇠·차량을 돌려받습니다.' },
+  { no: 3, pre: 'hr:', t: '개인 기기·계정 자료 삭제 확인', due: 'day0', rows: [], d: '개인 기기에 남은 회사 자료와 업무 계정 자료가 지워졌는지 확인합니다.' },
+  { no: 4, pre: 'acct:', t: '계정 회수 확인·대장 갱신', due: '', rows: [], d: '그룹웨어 계정·기기 회수를 확인하고 계정 관리대장을 고칩니다. 퇴사 다음 날 아침 자동 회수 기록이 생기면 승인 대기로 올라갑니다.' },
+  { no: 5, pre: 'hr:', t: '4대보험 상실 신고', due: 'day14', rows: ['law.nhi.10-2'], d: '건강보험은 퇴사일 + 14일까지, 고용보험·국민연금은 다음 달 15일까지 신고합니다(기한은 빠른 쪽). 신고한 날 [완료]를 눌러 주세요.' },
+  { no: 6, pre: 'hr:', t: '임금·연차수당 정산', due: 'day14', rows: ['law.lsa.36', 'law.rba.9-1'], d: '임금·연차수당 등 금품을 정산합니다. 처리한 날 [완료]를 눌러 주세요.' },
+  { no: 7, pre: 'hr:', t: '인사 기록 정리·보존', due: '', rows: [], d: '인사 기록을 정리해 보존합니다.' },
+];
+function hrLeaveKey(mid, ld, it) { return it.pre === 'acct:' ? 'acct:' + mid + ':leave:' + ld : 'hr:' + mid + ':leave:' + ld + ':' + it.no; }
+function planHrLeave(input, ctx) {
+  const ms = Array.isArray(input.members) ? input.members : [];
+  const hb = input.hrbg || null, bgOn = !!(hb && hb.on === true && hb.bg && Array.isArray(hb.bg.rows));
+  const rowOk = {};
+  if (bgOn) hb.bg.rows.forEach(function (r) { if (r && typeof r.id === 'string' && r.calc === true) rowOk[r.id] = 1; });
+  const out = { events: [], subjects: {}, old: 0, no_row: [], ref: { new: 0, no_date: 0, jiip: 0, test: 0, del: 0, rejoin_mark: 0, past12_leave: 0, bg_off: bgOn ? 0 : 1 } };
+  const noRow = {}, today = ctx.today, y1 = addDaysK(today, -365);
+  ms.forEach(function (m) {
+    if (!m || typeof m.id !== 'string' || !m.id) return;
+    const ld = String(m.leave_date || ''), ldOk = realDate(ld);
+    if (m.del !== 1) out.subjects[m.id] = ldOk ? HR_LEAVE_ITEMS.map(function (it) { return hrLeaveKey(m.id, ld, it); }) : [];
+    if (m.del !== 1 && !m.test_acct && m.emp_type !== '지입차주' && ldOk && ld >= y1 && ld <= today) out.ref.past12_leave++;   // 참고: 지난 12개월 퇴사(표식 없는 옛 퇴사자 포함 — 소급 없음)
+    if (m.del !== 1 && m.join_ev && Number(m.join_ev.at0) >= ctx.since) out.ref.rejoin_mark++;   // 재입사 표식(입사 규칙 쪽에서 셈)
+    if (!(m.leave_ev && Number(m.leave_ev.at0) >= ctx.since)) return;
+    out.ref.new++;
+    const skipK = m.del === 1 ? 'del' : (m.test_acct ? 'test' : (m.emp_type === '지입차주' ? 'jiip' : ''));   // 삭제·시험 계정·지입차주 = 사건 아님(수만)
+    if (skipK) { out.ref[skipK]++; return; }
+    if (!ldOk) { out.ref.no_date++; return; }
+    if (ld < ctx.since_day) { out.old++; return; }   // 퇴사일이 켠 날보다 앞(옛 퇴사자의 퇴사일을 비웠다 다시 넣음 등) — 소급 없음
+    const md = ld.slice(5).replace('-', '/'), n = HR_LEAVE_ITEMS.length;
+    out.events.push({ subj: m.id, tasks: HR_LEAVE_ITEMS.map(function (it) {
+      let due = '';
+      if (bgOn && it.due) {
+        const miss = it.rows.filter(function (r) { return !rowOk[r]; });
+        if (miss.length) miss.forEach(function (r) { noRow[r] = 1; });
+        else due = it.due === 'day14' ? addDaysK(ld, 14) : ld;
+      }
+      return { key: hrLeaveKey(m.id, ld, it), title: '퇴사(' + md + ') ' + it.no + '/' + n + ' ' + it.t, detail: (it.d + HR_JOIN_TAIL).trim(), due: due, priv: true, vals: [md] };
+    }) });
+  });
+  out.no_row = Object.keys(noRow);
+  return out;
+}
+RULES.hr_leave.plan = planHrLeave;
+
+// ---- C185 판4 ⑦ 건설기계 정기검사 31일 전(veh_ceq31) — 계획 함수(착수계획 ⓒ ⑦ · 판4 행) ----
+//   사건(날짜 상태 — 켠 시각과 견주지 않음) = 규모 '건설기계' ∧ 회색 3종 아님 ∧ 검사 만기가 날짜 ∧ 오늘부터 31일(_lib/autorules ceq31) · 키 = 30일 전 지시와 같은 veh:<id>:insp:<만료일>(31일째에 먼저 만들면 30일 전 규칙은 중복으로 건너뜀)
+//   차량 근거 승격(vehbg.on) ∧ 승격본에 ref.ceq.window 행이 있을 때만 — 아니면 그 실행 0건(skip NOT_PROMOTED·NO_ROW · 그동안 30일 전 지시가 그대로 나감) · 참고 수(규모 건설기계 n대·전체 n대·오늘 31일 n대)는 건너뛸 때도 남김
+//   담당 = 배정표 veh: 줄 · 글 = 지금 차량 정기검사 지시와 같은 꼴(차번호 + '정기검사 갱신' — 회사 차 · 지입 구분 없음 = 종전 30일 전 지시와 같음)
+const CEQ_ROW = 'ref.ceq.window';
+function planVehCeq31(input, ctx) {
+  const vs = Array.isArray(input.vehicles) ? input.vehicles : [];
+  const c = AR.ceq31(vs, ctx.today, []), vb = input.vehbg || null;
+  const out = { events: [], old: 0, no_row: [], ref: { ceq_total: c.total, ceq: c.ceq, ceq_d31: c.count } };
+  if (!(vb && vb.on === true)) { out.skip = 'NOT_PROMOTED'; return out; }
+  const rows = (vb.bg && Array.isArray(vb.bg.rows)) ? vb.bg.rows : [];
+  if (!rows.some(function (r) { return r && r.id === CEQ_ROW; })) { out.no_row = [CEQ_ROW]; out.skip = 'NO_ROW'; return out; }
+  c.items.forEach(function (it) {
+    const no = it.no || '차량';
+    out.events.push({ subj: it.id, tasks: [{ key: it.key, title: no + ' 정기검사 갱신', detail: '건설기계 정기검사 만기(' + it.due + ')가 31일 남았습니다. 검사를 받은 뒤 차량 카드의 검사 만기를 고쳐 주세요.', due: it.due, vals: [no, it.due] }] });
+  });
+  return out;
+}
+RULES.veh_ceq31.plan = planVehCeq31;
+
+// ---- C185 판5 ⑤ 현장 실적 신고(ks_report) — 계획 함수(착수계획 ⓒ ⑤ · 판5 행) ----
+//   사건(날짜 상태 — 켠 시각과 견주지 않음) = 오늘(KST)이 그해 1/15~2/15 ∧ 대상(_lib/autorules ksTargets — 지난해 끝난 현장 · 번호 빈칸 · 계약별 할 일 없음) ≥ 1곳 → 묶음 지시 1건(키 ks:<그해> · 기한 그해 2/15 · 본문에 대장 연번)
+//   같은 해 키가 있으면(지운 것 포함) 0 — 틀 run이 셈 · 1/15에 0곳이어도 2/15까지 생기면 그때 1건 · 기간 밖 = 0건 + 참고 수(지금 세면 대상·올해 끝난 현장으로 세면 대상)
+//   담당 = 배정표 ks: 줄 · 글에 현장 이름·거래처 없음(대장 연번만 — 끼워 넣는 값 = 대상 수·연번)
+const KS_SEQ_MAX = 30;
+function planKsReport(input, ctx) {
+  const today = String(ctx.today), y = Number(today.slice(0, 4)), win = AR.ksWindow(today);
+  const t = AR.ksTargets(input.sites, input.contracts, input.tasks, y - 1), pv = AR.ksTargets(input.sites, input.contracts, input.tasks, y);
+  const out = { events: [], old: 0, no_row: [], ref: { ks_win: win ? 1 : 0, ks_done: t.done, ks_numbered: t.numbered, ks_task: t.has_task, ks_target: t.count, ks_no_end: t.no_end, ks_preview: pv.count } };
+  if (!win || !t.count) return out;
+  const seqs = t.seqs.slice(0, KS_SEQ_MAX).map(String), more = t.seqs.length - seqs.length;
+  const seqTxt = seqs.length ? '대장 연번 ' + seqs.join(', ') + (more > 0 ? ' 외 ' + more + '곳' : '') : '대장 연번 없음';
+  out.events.push({ subj: 'ks' + y, tasks: [{ key: 'ks:' + y, title: '지난해 끝난 현장 실적 신고 — 대상 ' + t.count + '건',
+    detail: '통합실적관리시스템 연도별 신고 대상(지난해 끝난 현장 가운데 신고번호가 빈 곳 · 계약별 실적신고 할 일이 있는 현장은 뺌): ' + seqTxt + '. 신고한 뒤 현장 대장이나 계약 실적 단계에 신고번호를 넣으면 승인 대기로 올라갑니다.',
+    due: y + '-' + AR.KS_DUE, vals: [String(t.count)].concat(seqs) }] });
+  return out;
+}
+RULES.ks_report.plan = planKsReport;
+
+module.exports = { KEY_RE, isEvKey, isEvLike, ruleOfKey, subjOf, RULES, RULE_IDS, BASE_NEEDS, CAP, DRY_WIN, ready, needsOf, kstDay, ctxFor, emptySum, skipSum, notReadySum, MARK, MARK_WHY, markedKind, markTask, unmarkTask, run, botSum, TITLE_MAX, PLAN_TITLE_MAX, PLAN_DETAIL_MAX, HR_JOIN_ITEMS, hrJoinKey, planHrJoin, HR_LEAVE_ITEMS, hrLeaveKey, planHrLeave, CEQ_ROW, planVehCeq31, planKsReport };

@@ -71,4 +71,32 @@ function ratesFor(bg, ym, payYm) {
       cut: { pension: v('cut.pension'), health: v('cut.health'), care: v('cut.care'), local: v('cut.local'), emp: opt1('cut.emp') },
       ot: { ext: v('ot.ext'), night: v('ot.night'), hol: v('ot.hol'), hol8: v('ot.hol8') } } };
 }
-module.exports = { VER: VER, NEED: NEED, ROWS_MAX: ROWS_MAX, missing: missing, bgOk: bgOk, bgSum: bgSum, ratesFor: ratesFor };
+// 66 판2 승격 판정(순수 — 저장소를 모름). gw-pay 가 쓰고, gw-data payBgState 와 같은 판정이다(servertest 가 같은 입력으로 두 판정을 대조).
+//   fr = { ok, flag }(스위치 — 없음 = ok·{}) · br = { ok, bg }(근거 표 — 없음 = ok·null). 반환 { on:true, bg } 또는 { on:false, why }
+function lawPick(fr, br) {
+  if (!fr || fr.ok !== true || !fr.flag || typeof fr.flag !== 'object' || Array.isArray(fr.flag)) return { on: false, why: 'FLAG_READ_FAILED' };
+  if (!br || br.ok !== true) return { on: false, why: 'BG_READ_FAILED' };
+  const bg = br.bg, flag = fr.flag;
+  if (!bg) return { on: false, why: 'NO_BG' };
+  if (!bgOk(bg)) return { on: false, why: 'BAD_BG' };
+  const ver = typeof flag.bg_ver === 'string' ? flag.bg_ver : '', sha = typeof flag.bg_sha === 'string' ? flag.bg_sha : '';
+  if (!ver || ver !== bg.ver || !sha) return { on: false, why: 'NOT_PROMOTED' };
+  if (sha !== bg.sha) return { on: false, why: 'SHA_CHANGED' };
+  return { on: true, bg: bg };
+}
+// 그 달의 비과세 한도(원) — 식대·자가운전보조금. 그 달을 덮는 계산 행이 하나면 값, 없으면 빠짐(한도 모름), 둘 이상이면 overlap 에 키 이름(부르는 쪽이 계산을 멈춤)
+const CAP_KEYS = { meal: 'taxfree.meal', car: 'taxfree.car' };
+function capsFor(bg, ym) {
+  const caps = {}, overlap = [];
+  Object.keys(CAP_KEYS).forEach(function (k) {
+    const hit = bg.rows.filter(function (r) { return r.key === CAP_KEYS[k] && r.calc === true && r.from <= ym && (r.to === '' || ym <= r.to); });
+    if (hit.length === 1) caps[k] = hit[0].n / hit[0].d; else if (hit.length > 1) overlap.push(CAP_KEYS[k]);
+  });
+  return { caps: caps, overlap: overlap };
+}
+// 그 달 나이 문턱(가입 제외 제안용) — 행이 하나일 때만 값, 아니면 null(제안하지 않음)
+function ageFor(bg, key, ym) {
+  const hit = bg.rows.filter(function (r) { return r.key === key && r.calc === true && r.from <= ym && (r.to === '' || ym <= r.to); });
+  return hit.length === 1 ? hit[0].n / hit[0].d : null;
+}
+module.exports = { VER: VER, NEED: NEED, ROWS_MAX: ROWS_MAX, missing: missing, bgOk: bgOk, bgSum: bgSum, ratesFor: ratesFor, lawPick: lawPick, capsFor: capsFor, ageFor: ageFor };

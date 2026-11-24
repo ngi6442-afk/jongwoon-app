@@ -16,6 +16,7 @@
 const crypto = require('crypto');
 const { setupBlobContext, store, blobGet } = require('./_lib/blobs');
 const { keyMatch } = require('./_lib/keymatch');   // P1 판24-② 비밀키 비교 공용
+const IMG = require('./_lib/imgsniff');   // C265 공개 응답 그림 형식 허용 목록
 
 const DATA = 'gw_data';
 const FILES = 'gw_files';
@@ -101,6 +102,7 @@ async function handleIndex(R) {
       let fr = await blobGet(store(FILES), 'mask:' + id);
       if (!(fr.ok && fr.data && String(fr.data.data || ''))) fr = await blobGet(store(FILES), id);
       if (!fr.ok || !fr.data || String(fr.data.kind || '') !== 'promo') continue;
+      if (!IMG.publicImageType(fr.data)) continue;   // C265: img가 거절할 사진(허용 목록 밖 type)은 목록에도 싣지 않는다
       let buf; try { buf = Buffer.from(String(fr.data.data || ''), 'base64'); } catch { continue; }
       const ext = detectImageExt(buf);
       if (!ext) continue;
@@ -141,11 +143,15 @@ async function handleImg(qs, R) {
   if (!(fr.ok && fr.data && String(fr.data.data || ''))) fr = await blobGet(store(FILES), att);
   if (!fr.ok || !fr.data) return jr(404, { ok: false, code: 'NO_FILE', request_id: R });
   if (String(fr.data.kind || '') !== 'promo') return jr(403, { ok: false, code: 'NOT_PROMO', request_id: R });
+  // C265: 공유 주소(gw-promo-img)와 같은 규칙 — 그림 형식 허용 목록·머리 바이트, 밖이면 거절
+  const ctype = IMG.publicImageType(fr.data);
+  if (!ctype) return jr(415, { ok: false, code: 'NOT_IMAGE', request_id: R });
 
   return {
     statusCode: 200,
     headers: Object.assign({
-      'Content-Type': String(fr.data.type || 'image/jpeg'),
+      'Content-Type': ctype,
+      'X-Content-Type-Options': 'nosniff',
       'Cache-Control': 'public, max-age=300',   // v353 후속: 가리기 수정 5분 반영
     }, CORS),
     body: String(fr.data.data || ''),
