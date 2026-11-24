@@ -17868,6 +17868,7 @@
     var body = { action: "con_proc_bg_set", bg_ver: ver, base: base }; if (ver) body.bg_sha = String(sha || "");
     gwCall("gw-data", body).then(function(res){
       conProcSaving = false;
+      if (res.status === 409){ alert("다른 곳에서 방금 바뀌었습니다 — 다시 불러옵니다."); renderConProcCard(); return; }   // C275 좁은 확인: 거절 뒤 단추가 옛 지문을 든 채 남아 같은 거절이 되풀이되던 것 — 콘솔(pmconAct)과 같게 다시 불러옴
       if (res.status !== 200){ alert("배경 승격 저장 실패 (" + ((res.body && res.body.error_code) || res.status) + ")"); return; }
       apprToastShow(ver ? "배경 " + ver + " 승격 — 새로고침부터 새 계약의 단계 기한을 법령 근거로 채웁니다" : "배경 승격 해제 — 새로고침부터 기한 엔진이 꺼집니다");
       renderConProcCard();
