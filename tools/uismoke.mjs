@@ -23703,9 +23703,9 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ["`sfNowState`", "원장 C269"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v540 \(2026-11-24\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 2 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 540 && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 2 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
       && d.cl.indexOf('**C269(v540') > 0
-      && /SHELL_CACHE = 'jw-shell-v540'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 540;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r540 = chk540(D540);
@@ -23767,6 +23767,31 @@ try {
   T('C275 근거 표 승격 줄 방어(앱): 콘솔 줄 hrbg·vehbg·bg 인자 {bg_ver, bg_sha = 본 판 지문} · 조회 shape_ok false = "꼴이 맞지 않아" 막음 · missing n개 = "꼭 읽는 값 n개가 없어" 막음(계약은 거울 꺼짐 글이 먼저) · 막음 없으면 "" · 계약 카드 conProcBgSet = 승격만 bg_sha 실음(해제는 안 실음) · 카드 버튼 지문 속성·막음이면 disabled · 결함 사본 ' + MUT75.length + '개 = 모두 ✗',
     r75.ok && M75.every((v) => v === false), JSON.stringify({ r: r75.info, mut: M75 }));
 } catch (e) { console.log('  (C275 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v541(C275 — 근거 표 승격 줄 방어 · 원장 C275): 실행 검사는 위 C275 블록·servertest C275 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd541 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D541 = { ft: rd541('FEATURES.md'), tl: rd541('TESTLIST.md'), sw: rd541('sw.js'), man: rd541('MANUAL.html'), cl: rd541('CLAUDE.md') };
+  const chk541 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v541 (11/24)', '\n### '), tlv = cut(d.tl, '\n## v541 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`bgGuardBlock`", "원장 C275"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v541 \(2026-11-24\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 2 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C275(v541') > 0
+      && /SHELL_CACHE = 'jw-shell-v541'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r541 = chk541(D541);
+  const mu541 = (k, f) => chk541(Object.assign({}, D541, { [k]: f(D541[k]) })).ok;
+  const M541 = [mu541('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v540 (')), mu541('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v540'")),
+    mu541('ft', (s) => s.split('`bgGuardBlock`').join('bgGuardBlock')),
+    mu541('cl', (s) => s.replace('**C275(v541', 'C275(')),
+    mu541('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 배포 전 전체 게이트 기록 C275_게이트_v541_1124.txt', '\n- (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 배포 전 전체 게이트 기록 C275_게이트_v541_1124.txt'))];
+  T('v541 문서·판 번호(정확 검사): FEATURES 기준 v541 (2026-11-24)·v541 절(C275) · TESTLIST v541 칸 6(화면·운영 확인 4 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v541 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
+    r541.ok && M541.every((v) => v === false), JSON.stringify({ r: r541.info, mut: M541 }));
+} catch (e) { console.log('  (v541 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
