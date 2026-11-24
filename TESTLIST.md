@@ -1814,3 +1814,10 @@
 - [ ] (운영 확인) 급여 탭 요율 줄 [승격 해제]가 PM 계정에서만 되는지(다른 관리자는 'PM만 해제할 수 있습니다')
 - [x] (AI) `servertest` 66 판4 ①②(자기 것만·확정 달만·기기 승인·감사·못 읽은 달 · 결함 사본 3) — ✓ AI 11/24
 - [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `paycalc_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` 통과 · v529 문서 검사를 이 판 이상으로 풀고 v530 문서·판 번호 정확 검사 — ✓ AI 11/24
+
+## v531 — C281 — 자동 풀기 저장 5xx 알림 가름(그 저장 표식)
+- [ ] (AI 시험 화면 대상 — C281) 관리자 화면 하나로 결재함 승인 / 단계 기록 대기 계약 6건이 자동으로 풀린 직후(30초 안) 지시 탭에서 다른 계약 지시를 [승인] → 시험 서버 저장 실패 스위치로 그 계약 저장 500 → "계약이 서버에 저장되지 않았습니다(서버 오류)…" 알림 창 1번 (운영 v529 판: 0)
+- [ ] (AI 시험 화면 대상 — C281) 같은 화면에서 자동 풀기의 첫 계약 저장을 500으로 → 서버 오류 알림 창 0 · 다음 결재함 목록 때 다시 풀어 완료(종전과 같음)
+- [ ] (AI 운영 확인 — C281) 배포 뒤 운영 읽기만: 관리자 화면에서 자동 풀기 뒤 보통 계약 고침·지시 승인 저장이 종전처럼 200으로 들어가는지(알림 0) — 운영에 저장 실패를 일부러 만들지 않음
+- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v530 d5c1008 위로 다시 얹은 판) — 결과는 배포 전 전체 게이트 기록 C281_게이트_v531_1124.txt
+- [x] (AI) `uismoke` C281(실행 14꼴 — a1 서버 사본 기다림·a1l 결재함 목록 기다림·a1b 앞 저장 200 뒤 사람 예약 = 알림 0→1 · a2 자동 풀기 자기 5xx = 알림 0) · 결함 사본 17 · 무작위 5xx 낀 5,000판 사람 고침이 알림 없이 사라짐 운영 v529 288 → 2(남은 2 = 저장 끊김 줄기) · 5xx 없는 5,000판 v529와 다름 0
