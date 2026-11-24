@@ -380,6 +380,38 @@ async function handleConfSave(st, c, d, R) {
   return jr(200, { status: 'OK', rev: doc.rev, audit: au, request_id: R });
 }
 
+// 66 판4 직원 본인 명세서 — 로그인 → 기기 승인(관리자는 늘 통과 — 다른 함수와 같은 규칙) → 자기 것만. 확정한(closed) 달의 얼린 값만(작성 중인 달은 안 보임) · 최근 MY_MONTHS 달.
+//   급여 문서 목록을 읽어 회사·달마다 frozen.rows[자기 id] 만 골라 돌려준다(다른 사람 줄·기준·설정은 싣지 않음) · 감사 남김(급여 명세서 열람 — 금액 없이).
+const MY_MONTHS = 24;
+async function deviceApproved(event, member) {
+  if (member.admin) return true;
+  const h = (event && event.headers) || {};
+  const id = String(h['x-device-id'] || '').trim();
+  if (!id) return false;
+  let r; try { r = await blobGet(store(USERS), 'device:' + id); } catch (e) { return false; }
+  return !!(r.ok && r.data && r.data.status === 'approved');
+}
+async function handleMySlips(st, c, d, R) {
+  const lst = await blobList(st, 'pay:month:');
+  if (!lst.ok) return unread('PAY_READ_FAILED', R);
+  const keys = lst.keys.filter(function (k) { return /^pay:month:(env|con):\d{4}-(0[1-9]|1[0-2])$/.test(String(k)); })
+    .sort(function (a, b) { return a.slice(-7) < b.slice(-7) ? 1 : (a.slice(-7) > b.slice(-7) ? -1 : (a < b ? -1 : 1)); });
+  const yms = []; keys.forEach(function (k) { const ym = k.slice(-7); if (yms.indexOf(ym) < 0) yms.push(ym); });
+  const keep = yms.slice(0, MY_MONTHS), out = [];
+  let miss = 0;
+  for (const k of keys) {
+    if (keep.indexOf(k.slice(-7)) < 0) continue;
+    const corp = k.split(':')[2], ym = k.slice(-7);
+    const mo = await readMonth(st, corp, ym);
+    if (!mo.ok) { miss++; continue; }
+    const doc = mo.doc;
+    if (!doc || doc.state !== 'closed' || !doc.frozen || !doc.frozen.rows || !doc.frozen.rows[c.member.id]) continue;
+    out.push({ corp: corp, ym: ym, pay_day: doc.frozen.pay_day === undefined ? null : doc.frozen.pay_day, period: doc.frozen.period || null, calc: doc.frozen.rows[c.member.id] });
+  }
+  await audit(c, '급여 명세서 열람', c.member.id, out.length + '건' + (miss ? ' · 못 읽은 달 ' + miss : ''));
+  return jr(200, { status: 'OK', slips: out, unread: miss, request_id: R });
+}
+const SELF_ACTS = { pay_my_slips: handleMySlips };   // 관리자 아니어도 되는 동작(자기 것만)
 const ACTS = { pay_month_get: handleMonthGet, pay_row_save: handleRowSave, pay_row_preview: handleRowPreview, pay_month_close: handleClose, pay_month_reopen: handleReopen,
   pay_base_get: handleBaseGet, pay_base_save: handleBaseSave, pay_base_drop: handleBaseDrop, pay_conf_get: handleConfGet, pay_conf_save: handleConfSave };
 async function handler(event) {
@@ -394,12 +426,15 @@ async function handler(event) {
   try { d = JSON.parse(event.isBase64Encoded ? Buffer.from(event.body || '', 'base64').toString('utf8') : (event.body || '{}')); } catch (e) { return bad('INVALID_JSON', R); }
   if (!d || typeof d !== 'object' || Array.isArray(d)) return bad('INVALID_JSON', R);
   const act = typeof d.action === 'string' ? d.action : '';
-  if (!Object.prototype.hasOwnProperty.call(ACTS, act)) return bad('UNKNOWN_ACTION', R);
+  const self = Object.prototype.hasOwnProperty.call(SELF_ACTS, act);
+  if (!self && !Object.prototype.hasOwnProperty.call(ACTS, act)) return bad('UNKNOWN_ACTION', R);
   const c = await currentMember(event);
   if (!c.ok) return jr(c.status, { status: c.status === 401 ? 'UNAUTHORIZED' : 'ERROR', error_code: c.reason, request_id: R });
-  if (c.member.admin !== true) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  if (self) {
+    if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
+  } else if (c.member.admin !== true) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   try {
-    return await ACTS[act](store(DATA), c, d, R);
+    return await (self ? SELF_ACTS : ACTS)[act](store(DATA), c, d, R);
   } catch (e) {
     try { console.log('[gw-pay] ' + act + ' 실패 ' + String((e && e.message) || e).slice(0, 120)); } catch (e2) {}
     return jr(500, { status: 'ERROR', error_code: 'HANDLER_FAILED', request_id: R });

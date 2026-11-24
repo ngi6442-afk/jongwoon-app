@@ -16400,4 +16400,46 @@ function J91a(x) { return JSON.stringify(x); }
   finally { reset38(); }
 }
 
+{ // ---- 66 급여 판4 직원 본인 명세서 pay_my_slips(확정한 달만 · 자기 것만 · 기기 승인) — 가짜 회원·가짜 금액
+  const fsM = require('fs'), ModM = require('module');
+  const FILEM = join(FN, 'gw-pay.js'), SRCM = fsM.readFileSync(FILEM, 'utf8').replace(/\r\n/g, '\n');
+  const loadM = (from, to) => { if (SRCM.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); const m = new ModM(FILEM); m.filename = FILEM; m.paths = ModM._nodeModulePaths(dirname(FILEM)); m._compile(SRCM.replace(from, () => to), FILEM); return m.exports; };
+  const callM = (mod) => async (body, tok, dev) => { const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: tok ? 'Bearer ' + tok : '' }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); let b = {}; try { b = JSON.parse(r.body || '{}'); } catch (e) {} return { code: r.statusCode, body: b }; };
+  const snapM = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  const MA = { id: 'um66a', name: '급여66본인', admin: false, perms: {} }, MB = { id: 'um66b', name: '급여66남', admin: false, perms: {} };
+  const tA = issueSession(MA).token;
+  const ROW = (net) => ({ cols: { base: 1, allow: 0, adj: 0, bonus: 0, meal: 0, car: 0 }, ded: { pension: 0, health: 0, care: 0, emp: 0, income: 0, local: 0 }, taxable: 1, gross: 1, ded_total: 0, net: net, lines: [], notes: [], name: '', rank: '', hire_date: '', emp_no: '' });
+  const MO = (corp, ym, state, rows) => ({ schema: 1, rev: 'abcdef0123456789', corp: corp, ym: ym, state: state, rows: {}, frozen: state === 'closed' ? { at: 1, by: 'uadmin', law_ver: 'v1', period: { from: ym + '-01', to: ym + '-28' }, pay_day: 15, rows: rows } : null, updated_at: 1, updated_by: 'uadmin' });
+  const chkM = async (c) => {
+    const P = {}, I = {};
+    mem.gw_users = { 'member:um66a': MA, 'member:um66b': MB, 'device:devM': { status: 'approved' }, 'device:devP': { status: 'pending' } };
+    mem.gw_data = { 'pay:month:env:2026-10': MO('env', '2026-10', 'closed', { um66a: ROW(1111), um66b: ROW(2222) }), 'pay:month:con:2026-10': MO('con', '2026-10', 'closed', { um66b: ROW(3333) }),
+      'pay:month:env:2026-11': MO('env', '2026-11', 'open', {}), 'pay:month:env:2026-09': MO('env', '2026-09', 'closed', { um66a: ROW(4444) }), 'pay:base:env:um66a': { schema: 1 } };
+    const a0 = auditMock.logs.length;
+    const r = await c({ action: 'pay_my_slips' }, tA, 'devM'), s = r.body.slips || [];
+    P.mine = r.code === 200 && s.length === 2 && s.map((x) => x.ym + ':' + x.calc.net).join() === '2026-10:1111,2026-09:4444' && !/2222|3333/.test(JSON.stringify(r.body)) && s[0].corp === 'env' && s[0].pay_day === 15;
+    I.mine = [r.code, s.map((x) => x.ym + ':' + (x.calc && x.calc.net)).join()];
+    const au = auditMock.logs.slice(a0);
+    P.audit = au.length === 1 && au[0].col === 'pay' && au[0].ev[0].op === '급여 명세서 열람' && !/1111|4444/.test(JSON.stringify(au));
+    const nd = await c({ action: 'pay_my_slips' }, tA, null), pd = await c({ action: 'pay_my_slips' }, tA, 'devP'), na = await c({ action: 'pay_my_slips' }, null), adm = await c({ action: 'pay_month_get', corp: 'env', ym: '2026-11' }, tA, 'devM');
+    P.gate = nd.code === 403 && nd.body.error_code === 'DEVICE_NOT_APPROVED' && pd.code === 403 && na.code === 401 && adm.code === 403 && adm.body.error_code === 'ADMIN_ONLY';
+    I.gate = [nd.code, pd.code, na.code, adm.code];
+    blobsMock.hooks.failGet = (k) => k === 'pay:month:env:2026-09';
+    const rf = await c({ action: 'pay_my_slips' }, tA, 'devM'); blobsMock.hooks.failGet = null;
+    P.unread = rf.code === 200 && rf.body.unread === 1 && (rf.body.slips || []).length === 1;
+    return { ok: Object.values(P).every((v) => v === true), info: JSON.stringify(I) + ' ✗ ' + Object.keys(P).filter((k) => P[k] !== true).join(',') };
+  };
+  try {
+    const RM = await chkM(callM(require(FILEM)));
+    T('66 판4 ① 직원 본인 명세서 pay_my_slips: 확정한 달의 자기 줄만(작성 중인 달·남의 줄·다른 회사 남의 줄 없음 · 최근 달 먼저) · 기기 미승인·승인 대기 403 · 비로그인 401 · 관리자 동작은 그대로 403 ADMIN_ONLY · 감사 1줄(금액 없음) · 못 읽은 달은 수만', RM.ok, RM.info);
+    const MM = [["    if (!doc || doc.state !== 'closed' || !doc.frozen || !doc.frozen.rows || !doc.frozen.rows[c.member.id]) continue;\n    out.push({ corp: corp, ym: ym, pay_day: doc.frozen.pay_day === undefined ? null : doc.frozen.pay_day, period: doc.frozen.period || null, calc: doc.frozen.rows[c.member.id] });", "    if (!doc || !doc.frozen) continue;\n    out.push({ corp: corp, ym: ym, rows: doc.frozen.rows });"],
+      ["    if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });\n", ''],
+      ["  await audit(c, '급여 명세서 열람', c.member.id, out.length + '건' + (miss ? ' · 못 읽은 달 ' + miss : ''));\n", '']];
+    const killM = [];
+    for (const [a, b] of MM) { let k; try { k = !(await chkM(callM(loadM(a, b)))).ok; } catch (e) { k = 'err ' + e.message; } if (k !== true) killM.push(a.trim().slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k)); }
+    T('66 판4 ② 결함 사본 ' + MM.length + '개(남의 줄·작성 중 달까지 · 기기 검사 걷음 · 감사 없음) = 모두 ✗', killM.length === 0, killM.join(' | '));
+  } catch (e) { T('66 판4 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+  finally { const s = JSON.parse(snapM); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

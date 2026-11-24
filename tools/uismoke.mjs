@@ -21121,17 +21121,17 @@ try {
 try {
   const fnQ = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) return ''; let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } return ''; };
   const gpQ = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-pay.js'), 'utf8');
-  const actsQ = ((gpQ.match(/\nconst ACTS = \{([\s\S]*?)\};/) || [0, ''])[1].match(/pay_[a-z_]+(?=:)/g) || []);
+  const actsQ = ((gpQ.match(/\nconst ACTS = \{([\s\S]*?)\};/) || [0, ''])[1].match(/pay_[a-z_]+(?=:)/g) || []).concat(((gpQ.match(/\nconst SELF_ACTS = \{([^}]*)\};/) || [0, ''])[1].match(/pay_[a-z_]+(?=:)/g) || []));   // 66 판4 자기 것만 동작(pay_my_slips)
   const segQ = (H) => { const a = H.indexOf('\n  // @pay-start\n'), b = H.indexOf('\n  // @pay-end\n'); return a > 0 && b > a ? H.slice(a, b) : ''; };
   const chkQ = (H) => {
     const I = {}, seg = segQ(H);
-    const used = (seg.match(/action: "(pay_[a-z_]+)"/g) || []).map((x) => x.slice(9, -1));
+    const used = (seg.match(/gwCall\("gw-pay", \{ action: "(pay_[a-z_]+)"/g) || []).map((x) => x.replace(/^.*action: "/, '').slice(0, -1));
     I.wire = H.indexOf('<button class="tab-btn perm-hidden" data-tab="workers" id="tabWkBtn">인사·일용직</button>\n    <button class="tab-btn perm-hidden" data-tab="pay" id="tabPayBtn">급여</button>') > 0
       && H.indexOf('<section class="view" id="view-pay">') > 0 && H.indexOf('<div id="payHost">') > 0
       && /document\.getElementById\("view-pay"\)\.classList\.toggle\("active", name === "pay"\);/.test(H) && /\n    if \(name === "pay"\) payOpen\(\);/.test(H)
       && /if \(payBtn\) payBtn\.classList\.toggle\("perm-hidden", !adminUser\);[^\n]*\n    if \(currentTab === "pay" && !adminUser\) switchTab\("dash"\);/.test(H)
       && /function payOpen\(\)\{ if \(!isAdmin\(\)\) return;/.test(seg);
-    I.acts = used.length >= 10 && used.every((a) => actsQ.indexOf(a) >= 0) && actsQ.every((a) => used.indexOf(a) >= 0) && seg.indexOf('gwCall("gw-data"') < 0;
+    I.acts = used.length >= 10 && used.every((a) => actsQ.indexOf(a) >= 0) && actsQ.every((a) => used.indexOf(a) >= 0) && (seg.match(/gwCall\("gw-data", \{ action: "([a-z_]+)"/g) || []).every((x) => /pay_bg_(get|set)"$/.test(x));   // 66 판4: gw-data 는 승격 읽기·해제만
     // 금액·요율 숫자를 화면 코드에 적지 않음(다섯 자리 넘는 숫자 없음) · 직원 수정 창·회원 저장 호출 없음
     I.nonum = !/[^\w.]\d{5,}(?![\w])/.test(seg.replace(/\/\/[^\n]*/g, '')) && !/gw-auth|meSave|member_upsert/.test(seg);
     // 사람 이름·글은 esc 를 거쳐 그림(이름 칸·비고 꼬리표·기준 창 제목은 textContent)
