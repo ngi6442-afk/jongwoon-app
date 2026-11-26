@@ -1954,3 +1954,9 @@
 - [x] (AI) `servertest` 절 44-C259(판정 규칙 · 공유 주소·피드·릴레이 · 크론 게시 완료·판 없는 사진 · 워커 판 없음 모드) · `uismoke` 게시 완료 확인창 — ✓ AI 11/26
 - [ ] (운영 확인) 배포 뒤 판 없는 공개 사진 주소가 원본 대신 거절(409)되고, 크론 회차마다 판 없는 사진이 줄어 가린 판이 붙은 기록부터 다시 보임
 - [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `paycalc_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` · `autorulestest` · `botdup_check` 통과 · v551 문서 검사를 이 판 이상으로 풀고 v552 문서·판 번호 정확 검사 — ✓ AI 11/26
+
+## v553 — 체크 29 판⑫: 쿠팡 주문은 안전공구만 · 받은편지함 파일 이름 두 글자 대조 막음
+- [ ] (운영 확인) 11월 쿠팡 상세를 열면 안전공구 줄(11/19 핫팩)만 채워지고 용도가 안전보건 · 다음 메일 수집에서 안전공구 없는 쿠팡 주문은 목록에 안 들어옴
+- [x] (AI 시험 화면 대상) 실물 11월 쿠팡 주문 6통(읽기 전용) = 안전공구 줄 있는 주문 1통(핫팩) · 나머지 5통 줄 0 · 실물 품목 28종 중 넣는 것 3종(작업복·핫팩·구급낭) — ✓ AI 11/26
+- [x] (AI) `stmtmail_check` ⑫ 9건(결함 사본 5) · `uismoke` 29 판⑨ ③-9 덧붙인 줄 용도 — ✓ AI 11/26
+- [x] (AI) `uismoke` · `servertest` · `stmtmail_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `paycalc_check` 통과 · 앞 판 문서 검사를 이 판 이상으로 풀고 v553 문서·판 번호 정확 검사 — ✓ AI 11/26

@@ -9909,9 +9909,9 @@
       var d = x.date ? stmtDateOut(x.date) : "", e;
       e = stmtNewRow(ed);
       e.date = d; e.item = x.item || ""; e.kind = x.kind || e.kind; e.qty = x.qty == null ? "" : String(x.qty); e.unit = x.unit == null ? "" : String(x.unit);
-      e.amt = x.amt == null ? "" : stmtNum(x.amt); e.vat = ""; e.note = x.note || ""; e.how = x.how || "file";
+      e.amt = x.amt == null ? "" : stmtNum(x.amt); e.vat = ""; e.note = x.note || ""; e.how = x.how || "file"; e.use = x.use || "";   // 29 판⑫: 읽은 줄의 용도(쿠팡 안전공구 = 안전보건)를 덧붙일 때도 그대로
       ed.rows.push(e); ed.readRids[e.r] = 1; n++;
-      ed.readDraft.push({ r: e.r, date: x.date || "", veh: "", vraw: "", item: e.item, kind: e.kind, use: "", qty: x.qty == null ? null : String(x.qty), unit: x.unit == null ? null : String(x.unit), amt: x.amt == null ? null : x.amt, vat: null, tire: null, how: e.how, note: e.note });
+      ed.readDraft.push({ r: e.r, date: x.date || "", veh: "", vraw: "", item: e.item, kind: e.kind, use: e.use, qty: x.qty == null ? null : String(x.qty), unit: x.unit == null ? null : String(x.unit), amt: x.amt == null ? null : x.amt, vat: null, tire: null, how: e.how, note: e.note });
     });
     if (!n){ ed.read = { msg: "읽은 줄이 없습니다", bad: true, warn: warn }; stmtReadShow(ed); return; }
     // 29 판⑩: 명세 합계 = 주문별 총 결제금액의 합(쿠팡은 계산서가 없어 명세 합계가 없으면 확정 검산이 '대조할 합계 없음'으로 막힘) — 비었으면 이 주문 총액, 숫자면 더함, 사람이 글을 넣었으면 그대로

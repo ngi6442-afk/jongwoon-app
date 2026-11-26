@@ -159,9 +159,9 @@ function matchVendor(t, vendors, min) {
   const hit = vendors.filter(function (v) { return vendorKeys(v, min).some(function (k) { return n.indexOf(k) >= 0; }); });
   return hit.length === 1 ? hit[0] : null;
 }
-async function guessVendor(buf, name, vendors, ym) {
+async function guessVendor(buf, name, vendors, ym, nameMin) {
   const act = (vendors || []).filter(function (v) { return v && v.active !== false; });
-  const byName = matchVendor(name, act, 2);
+  const byName = matchVendor(name, act, nameMin === 3 ? 3 : 2);   // 29 판⑫ C286: 메일 받은편지함은 3(두 글자 지명 낱말로 엉뚱한 거래처가 걸림) · 사람이 넣은 파일·분류 폴더는 2
   if (byName) return { vk: byName.vk, how: 'name' };
   const kind = sniff(buf, name);
   try {

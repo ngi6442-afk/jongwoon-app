@@ -13380,7 +13380,7 @@ try {
   {
     const V13 = { vk: 'v13', name: '쿠팡', group: 'tool', kind: 'tool', basis: 'total', carry: false, active: true, hint: ['쿠팡'] };
     const R9a = { ok: true, src: 'coupang', basis: 'total', rows: [{ date: '2026-10-05', vraw: '', item: '가짜 생수', kind: 'tool', qty: 2, unit: 12000, amt: 24000, vat: null, note: '판매자 쿠팡(주)', how: 'file' }, { date: '2026-10-05', vraw: '', item: '할인금액', kind: 'tool', qty: 1, unit: -1000, amt: -1000, vat: null, note: '', how: 'file' }], sum: { total: 23000 }, warn: [] };
-    const R9b = { ok: true, src: 'coupang', basis: 'total', rows: [{ date: '2026-10-05', vraw: '', item: '가짜 생수', kind: 'tool', qty: 2, unit: 12000, amt: 24000, vat: null, note: '판매자 쿠팡(주)', how: 'file' }, { date: '2026-10-20', vraw: '', item: '가짜 장갑', kind: 'tool', qty: 1, unit: 9900, amt: 9900, vat: null, note: '판매자 가짜상사', how: 'file' }], sum: { total: 9900 }, warn: [] };
+    const R9b = { ok: true, src: 'coupang', basis: 'total', rows: [{ date: '2026-10-05', vraw: '', item: '가짜 생수', kind: 'tool', qty: 2, unit: 12000, amt: 24000, vat: null, note: '판매자 쿠팡(주)', how: 'file' }, { date: '2026-10-20', vraw: '', item: '가짜 장갑', kind: 'tool', use: 'safety', qty: 1, unit: 9900, amt: 9900, vat: null, note: '판매자 가짜상사', how: 'file' }], sum: { total: 9900 }, warn: [] };   // 판⑫: 읽은 줄 용도 안전보건 — 덧붙이는 둘째 주문에서도 남아야 함
     const run9 = async (src) => {
       const L9 = [E6('b', { vk: 'v13', src: 'coupang', name: '쿠팡 주문 2026-10-20.html', kind: 'html', at: 20 }), E6('a', { vk: 'v13', src: 'coupang', name: '쿠팡 주문 2026-10-05.html', kind: 'html', at: 5 }), E6('z', { vk: 'v13', src: 'coupang', applied: 3, at: 1 })];
       const U9 = mk6({ list: L9, resp: { stmt_drop_get: (b) => ({ status: 200, body: { status: 'OK', entry: L9.find((x) => x.id === b.id), result: b.id[0] === 'a' ? R9a : R9b } }) } }, src);
@@ -13393,7 +13393,8 @@ try {
       U9.api.fill(ed9, 'a'.repeat(24)); await fl6();   // 같은 원본 다시 [채우기] = 막힘
       return { U9, ed9, n0, gets: U9.env.log.filter((x) => x.body.action === 'stmt_drop_get').map((x) => x.body.id[0]) };
     };
-    const okRun9 = (m) => { const r = m.ed9.rows.map((e) => e.item); return J6(m.gets) === J6(['a', 'b']) && m.n0 === 4 && r.length === 4 && r.filter((x) => x === '가짜 생수').length === 2 && String(m.ed9.stated) === '32,900' && /이미 넣은 주문/.test((m.ed9.read && m.ed9.read.msg) || ''); };
+    const okRun9 = (m) => { const r = m.ed9.rows.map((e) => e.item); return J6(m.gets) === J6(['a', 'b']) && m.n0 === 4 && r.length === 4 && r.filter((x) => x === '가짜 생수').length === 2 && String(m.ed9.stated) === '32,900' && /이미 넣은 주문/.test((m.ed9.read && m.ed9.read.msg) || '')
+      && m.ed9.rows.filter((e) => e.item === '가짜 장갑').every((e) => e.use === 'safety') && (m.ed9.readDraft || []).filter((x) => x.item === '가짜 장갑').every((x) => x.use === 'safety'); };   // 판⑫: 덧붙인 줄 용도 안전보건(화면 줄·초안 둘 다)
     const a9 = await run9();
     const rows9 = a9.ed9.rows.map((e) => [e.date, e.item, e.amt]);
     T('29 판⑨ ③-9 쿠팡 자동 채우기: 그 달 주문 원본(a·b — 채운 z 뺌)을 주문 차례로 stmt_drop_get 2번 · 줄 = 두 통 합 4줄(같은 날 같은 상품을 두 주문에서 사도 둘 다 — 실물 11/17 물티슈 꼴) · 같은 원본 다시 [채우기] = "이미 넣은 주문"·줄 그대로·서버 안 부름 · 줄 금액 기준 부가세 포함 · 명세 합계 = 두 주문 총 결제금액 합 32,900(판⑩ — 쿠팡은 계산서가 없어 확정 검산의 대조 합계) · 바꿀지 묻지 않음 · dropIds [a·b]',
@@ -13404,6 +13405,7 @@ try {
       ['덧붙이기 걷음(바꾸기로)', 'if (r.src === "coupang" && keep.length && rows.length) return stmtReadAppend(ed, r, name, keep);', ''],
       ['쿠팡 전부 채우기 걷음', 'if (l.every(function(x){ return x.src === "coupang"; })){', 'if (false){'],
       ['같은 원본 두 번 막기 걷음', 'if (x.src === "coupang" && (x.applied || (ed.dropIds || []).indexOf(id) >= 0)){', 'if (false){'],
+      ['덧붙일 때 용도 버림', 'e.how = x.how || "file"; e.use = x.use || "";', 'e.how = x.how || "file";'],
       ['명세 합계 더하기 걷음', 'else if (typeof st0 === "number") ed.stated = stmtNum(st0 + r.sum.total);', ''],
     ];
     const caught9 = [];
@@ -24222,8 +24224,8 @@ try {
     const FT = ['`_lib/maskgate.js`', '`pickPublic`', '`mask:`', '409', '503', '먼저막기'];
     const GATE = ["uismoke","servertest","consheet_check","proctpl_check","settletest","rectest","promoqual_check","promogen_check","promoqlearn_check","promostream_check","promo_wrap_check","promo_post_check","paycalc_check","stmtread_a_check","stmtread_b_check","stmtread_c_check","stmtread_d_check","stmtmail_check","autorulestest","botdup_check"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0), last = gate[gate.length - 1] || '';
-    const ok = /기준: v552 \(2026-11-26\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
-      && GATE.every((g) => last.indexOf('`' + g + '`') > 0) && /SHELL_CACHE = 'jw-shell-v552'/.test(d.sw);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 552 && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => last.indexOf('`' + g + '`') > 0) && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 552;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
   };
   const rZ = chkZ(DZ);
@@ -24233,6 +24235,30 @@ try {
   T('v552 문서·판 번호(정확 검사): FEATURES 기준 v552 (2026-11-26)·v552 절(maskgate·pickPublic·409·503·먼저막기) · TESTLIST v552 칸 3(운영 확인 1 · 게이트 [x] 2 — 20종) · sw jw-shell-v552 · 결함 사본 ' + MZ.length + '개 = 모두 ✗',
     rZ.ok && MZ.every((v) => v === false), JSON.stringify({ r: rZ.info, mut: MZ }));
 } catch (e) { console.log('  (v552 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v553(29 판⑫ — 쿠팡 안전공구만 · C286): 실행 검사는 tools/stmtmail_check.mjs ⑫ · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '553 이상'으로 풀 것
+try {
+  const rdT = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DT = { ft: rdT('FEATURES.md'), tl: rdT('TESTLIST.md'), sw: rdT('sw.js'), man: rdT('MANUAL.html'), cl: rdT('CLAUDE.md') };
+  const chkT = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v553 (11/26)', '\n### '), tlv = cut(d.tl, '\n## v553 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[x\] \(AI 시험 화면 대상\)/.test(l)), op = cb.filter((l) => /^- \[ \] \(운영 확인\)/.test(l));
+    const FT = ['`isSafetyItem`', '`SAFETY_WORDS`', '`NOT_SAFETY`', '`nosafe`', '`stmt_drop_get`', '`nameMin`', 'C286', '안전공구만 넣기'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v553 \(2026-11-26\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 1 && op.length === 1
+      && d.man.indexOf('안전공구(작업복·핫팩·구급함·장갑·안전화 등)만 넣고 생수·음료·물티슈·간식·사무용품은 넣지 않습니다(v553)') > 0
+      && d.cl.indexOf('**월말명세서 판⑫(v553)**') > 0 && /SHELL_CACHE = 'jw-shell-v553'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, op: op.length } };
+  };
+  const rT = chkT(DT);
+  const muT = (k, f) => chkT(Object.assign({}, DT, { [k]: f(DT[k]) })).ok;
+  const MT = [muT('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v552 (')), muT('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v552'")), muT('ft', (s) => s.split('`isSafetyItem`').join('isSafetyItem')),
+    muT('man', (s) => s.replace('사무용품은 넣지 않습니다(v553)', '사무용품은 넣지 않습니다')), muT('cl', (s) => s.replace('**월말명세서 판⑫(v553)**', '월말명세서 판⑫')),
+    muT('tl', (s) => s.replace("\n- [x] (AI) `stmtmail_check` ⑫", "\n- (AI) `stmtmail_check` ⑫"))];
+  T('v553 문서·판 번호(정확 검사): FEATURES 기준 v553 (2026-11-26)·v553 절(29 판⑫) · TESTLIST v553 칸 4(운영 확인 1 · 시험 화면 [x] 1 · 게이트 [x] 2) · MANUAL 쿠팡 줄 안전공구 문장 · CLAUDE.md 한 줄 · sw jw-shell-v553 · 결함 사본(기준 줄·sw·FEATURES 글·MANUAL 판 표시·CLAUDE 줄·TESTLIST 칸) ✗',
+    rT.ok && MT.every((v) => v === false), JSON.stringify({ r: rT.info, mut: MT }));
+} catch (e) { console.log('  (v553 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

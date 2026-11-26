@@ -89,7 +89,7 @@ function readOrder(buf, day) {
       let item = String(cells[0]).slice(0, S.LIMIT.item);
       if (S.piiScan(item, true)) { item = ''; warn.push('품목 이름에 연락처 꼴 글이 있어 비웠습니다'); }
       const seller = String(cells[4] || '').replace(/[^가-힣A-Za-z0-9 ()㈜.&-]/g, '').slice(0, 30);
-      rows.push({ date: date, vraw: '', item: item, kind: '', qty: Number.isFinite(qty) && qty > 0 ? qty : null, unit: unit, amt: amt, vat: null, note: seller ? '판매자 ' + seller : '', how: 'file' });
+      rows.push({ _k: 'item', date: date, vraw: '', item: item, kind: '', qty: Number.isFinite(qty) && qty > 0 ? qty : null, unit: unit, amt: amt, vat: null, note: seller ? '판매자 ' + seller : '', how: 'file' });
       continue;
     }
     if (cells.length === 2) {
@@ -102,14 +102,41 @@ function readOrder(buf, day) {
       else if (/할인|쿠폰/.test(cells[0]) && v !== 0) rows.push({ date: date, vraw: '', item: String(cells[0]).replace(/\s+/g, ' ').slice(0, S.LIMIT.item), kind: '', qty: 1, unit: -Math.abs(v), amt: -Math.abs(v), vat: null, note: '', how: 'file' });
     }
   }
-  if (!rows.length) return { ok: false, code: 'NO_ROWS', why: '주문 표에서 줄을 찾지 못했습니다' };
+  if (!rows.some(function (x) { return x._k === 'item'; })) return { ok: false, code: 'NO_ROWS', why: '주문 표에서 줄을 찾지 못했습니다' };
   if (ship > 0) rows.push({ date: date, vraw: '', item: '배송비', kind: '', qty: 1, unit: ship, amt: ship, vat: null, note: '', how: 'file' });
   const sum = rows.reduce(function (a, x) { return a + (x.amt || 0); }, 0);
-  const gs = rows.filter(function (x) { return x.amt > 0 && x.item !== '배송비'; }).reduce(function (a, x) { return a + x.amt; }, 0);
+  const gs = rows.filter(function (x) { return x._k === 'item'; }).reduce(function (a, x) { return a + x.amt; }, 0);
   if (goods != null && gs !== goods) warn.push('품목 금액 합(' + gs + ')이 상품 가격(' + goods + ')과 다릅니다');
-  if (total != null && sum !== total) warn.push('줄 합(' + sum + ')이 총 결제금액(' + total + ')과 다릅니다 — 쿠팡캐시·적립금 등으로 낸 몫이 있으면 그 차이입니다');
   if (!date) warn.push('주문일을 알 수 없습니다');
-  return { ok: true, src: 'coupang', vendor: { name: '쿠팡' }, ym_hint: date ? date.slice(0, 7) : '', rows: rows, basis: 'total', inv: null, carry: null, sum: total != null ? { total: total } : null, warn: warn };
+  // 29 판⑫(PM 11/26 12:43 "다 빼기. 안전공구만 넣기."): 명세에는 안전공구 품목 줄만 — 생수·음료·물티슈·간식·사무용품은 뺌 · 넣는 줄은 용도 '안전보건'
+  //   주문 전체가 안전공구면 할인·배송비 줄도 넣고 총 결제금액과 맞춰 봄 · 섞인 주문이면 할인·배송비는 품목에 나눌 수 없어 빼고 안전공구 줄 금액(쿠팡가 × 수량)만 · 안전공구가 없으면 줄 0(메일 에이전트는 저장 안 함)
+  const items = rows.filter(function (x) { return x._k === 'item'; }), safe = items.filter(function (x) { return isSafetyItem(x.item); });
+  const cut = items.length - safe.length;
+  let out;
+  if (!cut) {
+    out = rows;
+    if (total != null && sum !== total) warn.push('줄 합(' + sum + ')이 총 결제금액(' + total + ')과 다릅니다 — 쿠팡캐시·적립금 등으로 낸 몫이 있으면 그 차이입니다');
+  } else {
+    out = safe;
+    if (safe.length) warn.push('안전공구가 아닌 품목 ' + cut + '개' + (rows.length > items.length ? '와 할인·배송비 줄은' : '는') + ' 뺐습니다(안전공구 줄 금액은 쿠팡가 × 수량 — 할인은 나눌 수 없어 넣지 않음)');
+  }
+  out = out.map(function (x) { const y = Object.assign({}, x, { use: 'safety' }); delete y._k; return y; });
+  const outSum = out.reduce(function (a, x) { return a + (x.amt || 0); }, 0);
+  return { ok: true, src: 'coupang', vendor: { name: '쿠팡' }, ym_hint: date ? date.slice(0, 7) : '', rows: out, safe_cut: cut, basis: 'total', inv: null, carry: null,
+    sum: out.length ? { total: cut ? outSum : (total != null ? total : outSum) } : null, warn: warn };
+}
+// 안전공구 품목 — 품목 이름 낱말(보호구·작업복·응급·한랭/온열 대비 착용품·현장 안전 표지류). 음료·생수·물티슈는 넣지 않음(PM 11/26). 낱말은 실물 품목으로 늘림
+// 확인 반영: 두루 쓰이는 낱말(장갑·마스크·토시·방한·밴드)은 쓰임이 드러나는 꼴로만 — 주방 고무장갑·마스크팩·토시살·방한 문풍지·고무밴드가 걸리던 것
+const SAFETY_WORDS = ['작업복', '보호복', '방진복', '방호복', '안전화', '안전모', '헬멧', '안전대', '안전벨트', '안전그네', '보안경', '고글', '귀마개', '귀덮개',
+  '방진마스크', '방독', '보건용마스크', '방역마스크', '산업용마스크', 'KF94', 'KF80', 'KF99',
+  '작업장갑', '안전장갑', '코팅장갑', '반코팅', '목장갑', '면장갑', '방한장갑', '용접장갑', '절연장갑',
+  '팔토시', '쿨토시', '작업토시', '각반', '무릎보호', '안전조끼', '반사조끼', '형광조끼', '쿨조끼', '아이스조끼', '넥쿨러', '핫팩', '방한복', '방한화', '방한모', '방한조끼', '우의', '우비', '장화',
+  '구급', '응급', '소독약', '붕대', '소화기', '라바콘', '안전콘', '경광', '차단봉', '안전표지', '안전테이프', '경고테이프', '안전망', '추락방지'];
+const NOT_SAFETY = /생수|샘물|이온음료|음료|물티슈|커피|과자|스낵/;
+function isSafetyItem(name) {
+  const t = String(name || '').replace(/\s+/g, '').toUpperCase();
+  if (NOT_SAFETY.test(String(name || ''))) return false;
+  return SAFETY_WORDS.some(function (w) { return t.indexOf(w) >= 0; });
 }
 
-module.exports = { isOrderMail, isCoupangOrder, orderHtml, readOrder, cellRows };
+module.exports = { isOrderMail, isCoupangOrder, orderHtml, readOrder, cellRows, isSafetyItem, SAFETY_WORDS };

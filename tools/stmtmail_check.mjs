@@ -151,7 +151,7 @@ const byName = (n) => drops.filter((d) => d.name === n)[0];
 const CP = require(join(LIB, 'stmtcoupang.js'));
 function cpHtml(o) {
   o = o || {};
-  const items = o.items || [['가짜 생수 2L, 6개', '12,000원', '2', '24,000원', '쿠팡(주)'], ['가짜 작업장갑 10켤레', '9,900원', '1', '9,900원', '가짜상사']];
+  const items = o.items || [['가짜 안전화 280 2켤레', '12,000원', '2', '24,000원', '쿠팡(주)'], ['가짜 작업장갑 10켤레', '9,900원', '1', '9,900원', '가짜상사']];
   return Buffer.from('<html><head><style>td{}</style></head><body><div>나*짜님, 쿠팡에서 주문하신 구매내역을 안내드립니다.</div>'
     + '<table><thead><tr><th>구매 상세내역</th><th>쿠팡가</th><th>수량</th><th>구매금액</th><th>판매자</th></tr></thead><tbody>'
     + items.map((r) => '<tr><td><span>' + r[0] + '</span></td><td>' + r[1] + '</td><td>' + r[2] + '</td><td><strong>' + r[3] + '</strong></td><td>' + r[4] + '</td></tr>').join('')
@@ -167,15 +167,15 @@ function cpHtml(o) {
   T('⑨ 쿠팡 주문 메일 알아보기: 보낸 도메인 coupang.com(하위 포함)·제목 "주문하신 내역" · 멤버십·약관·다른 곳 = 아님', CP.isOrderMail('e.coupang.com', '[쿠팡] 나*운님 주문하신 내역을 확인해주세요.') && CP.isOrderMail('coupang.com', '주문하신 내역') && !CP.isOrderMail('coupang.com', '[쿠팡] 와우 멤버십 월회비가 결제되었습니다.') && !CP.isOrderMail('coupangpay.com', '주문하신 내역') && !CP.isOrderMail('fakecoupang.com.evil.test', '주문하신 내역'));
   const bp = M.bodyPart({ type: 'multipart/alternative', childNodes: [{ part: '1', type: 'text/plain' }, { part: '2', type: 'text/html', encoding: 'base64', size: 400 }] }), bp1 = M.bodyPart({ type: 'text/html', encoding: 'quoted-printable', size: 900 });
   T('⑨ 본문 HTML 파트: 여러 파트면 text/html 파트 번호 · 한 파트면 "1" · base64 크기 3/4', bp && bp.part === '2' && bp.est === 300 && bp1 && bp1.part === '1' && bp1.est === 900 && M.bodyPart({ type: 'text/plain' }) === null, JSON.stringify([bp, bp1]));
-  const raw = cpHtml({ items: [['가짜 생수 2L, 6개', '12,000원', '2', '24,000원', '쿠팡(주)'], ['가짜 작업장갑 10켤레', '9,900원', '1', '9,900원', '가짜상사']], goods: '33,900원', disc: '-1,000원', ship: '3,000원', total: '35,900원' });
+  const raw = cpHtml({ items: [['가짜 안전화 280 2켤레', '12,000원', '2', '24,000원', '쿠팡(주)'], ['가짜 작업장갑 10켤레', '9,900원', '1', '9,900원', '가짜상사']], goods: '33,900원', disc: '-1,000원', ship: '3,000원', total: '35,900원' });
   const at = Date.parse('2026-11-15T10:00:00+09:00');
   const oh = CP.orderHtml(raw, at), ohs = oh.toString('utf8');
-  T('⑨ 남기는 원본 = 주문 표·결제 금액만 · 받는 사람·연락처·주소·계좌·쿠팡 사업자번호 없음 · 제목에 주문일', CP.isCoupangOrder(raw) && CP.isCoupangOrder(oh) && /<title>쿠팡 주문 2026-11-15<\/title>/.test(ohs) && /가짜 생수 2L/.test(ohs) && /총 결제금액/.test(ohs) && !/유\*가짜|8888|1234|가짜시|37800|99988877766|가짜은행|120-88/.test(ohs), ohs.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 300));
+  T('⑨ 남기는 원본 = 주문 표·결제 금액만 · 받는 사람·연락처·주소·계좌·쿠팡 사업자번호 없음 · 제목에 주문일', CP.isCoupangOrder(raw) && CP.isCoupangOrder(oh) && /<title>쿠팡 주문 2026-11-15<\/title>/.test(ohs) && /가짜 안전화 280/.test(ohs) && /총 결제금액/.test(ohs) && !/유\*가짜|8888|1234|가짜시|37800|99988877766|가짜은행|120-88/.test(ohs), ohs.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 300));
   const r = CP.readOrder(oh, '');
   const J = (x) => JSON.stringify(x);
   T('⑨ 읽기: 품목 2줄 + 할인 −1,000 + 배송비 3,000 = 4줄 · 날짜 = 주문일 · 수량·단가·금액(부가세 포함 — basis total·세액 칸 비움) · 판매자 = 비고 · 줄 합 = 총 결제금액(경고 0)',
     r.ok && r.src === 'coupang' && r.basis === 'total' && r.rows.length === 4 && r.rows.every((x) => x.date === '2026-11-15' && x.vat === null && x.how === 'file')
-    && J(r.rows.map((x) => [x.item, x.qty, x.unit, x.amt, x.note])) === J([['가짜 생수 2L, 6개', 2, 12000, 24000, '판매자 쿠팡(주)'], ['가짜 작업장갑 10켤레', 1, 9900, 9900, '판매자 가짜상사'], ['할인금액', 1, -1000, -1000, ''], ['배송비', 1, 3000, 3000, '']])
+    && J(r.rows.map((x) => [x.item, x.qty, x.unit, x.amt, x.note])) === J([['가짜 안전화 280 2켤레', 2, 12000, 24000, '판매자 쿠팡(주)'], ['가짜 작업장갑 10켤레', 1, 9900, 9900, '판매자 가짜상사'], ['할인금액', 1, -1000, -1000, ''], ['배송비', 1, 3000, 3000, '']])
     && r.warn.length === 0 && r.sum.total === 35900 && r.vendor.name === '쿠팡', J(r));
   const bad = CP.readOrder(CP.orderHtml(cpHtml({ total: '30,000원' }), at), '');
   T('⑨ 줄 합 ≠ 총 결제금액(쿠팡캐시 등) = 경고 · 주문 표 없음(멤버십 결제 메일) = 알아보지 않음', bad.ok && bad.warn.some((w) => /총 결제금액/.test(w)) && !CP.isCoupangOrder(Buffer.from('<html>[쿠팡] 와우 멤버십 월회비가 결제되었습니다. coupang</html>')), J(bad.warn));
@@ -352,7 +352,7 @@ function cpHtml(o) {
   }
   // 판⑩ 독립 검토 반영 6건
   {
-    const base = cpHtml({ items: [['가짜 물티슈 100매', '13,080원', '1', '13,080원', '가짜상사']], goods: '13,080원', total: '13,080원' });
+    const base = cpHtml({ items: [['가짜 핫팩 100매', '13,080원', '1', '13,080원', '가짜상사']], goods: '13,080원', total: '13,080원' });
     const o1 = CP.orderHtml(base, Date.parse('2026-11-17T09:00:00+09:00'), 'k1'), o2 = CP.orderHtml(base, Date.parse('2026-11-17T15:00:00+09:00'), 'k2');
     const sh = (b) => require('node:crypto').createHash('sha256').update(b).digest('hex');
     const s2 = mkStore(), f2 = mkStore();
@@ -363,8 +363,8 @@ function cpHtml(o) {
     const evil = Buffer.from(base.toString('utf8').replace('</tbody>', '<tr><td>받는사람</td><td>홍가짜</td><td>휴대폰</td><td>010-1234-5678</td></tr></tbody>')
       .replace('<td>가짜은행 99988877766 / 무통장입금</td>', '<td>토스뱅크 1000-1234-5678 간편이체</td>'), 'utf8');
     const oe = CP.orderHtml(evil, 0, 'k').toString('utf8');
-    T('⑩-검토③④ 주문 표 안의 받는 사람 4칸 줄·간편이체 계좌 글 = 남기는 원본에 이름·번호 없음', !/홍가짜|5678|1234|토스뱅크/.test(oe) && /가짜 물티슈/.test(oe), oe.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 300));
-    const sticker = cpHtml({ items: [['가짜 주소 스티커 100매', '5,000원', '1', '5,000원', '가짜상사']], goods: '5,000원', total: '5,000원' });
+    T('⑩-검토③④ 주문 표 안의 받는 사람 4칸 줄·간편이체 계좌 글 = 남기는 원본에 이름·번호 없음', !/홍가짜|5678|1234|토스뱅크/.test(oe) && /가짜 핫팩/.test(oe), oe.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 300));
+    const sticker = cpHtml({ items: [['가짜 안전표지 주소 스티커 100매', '5,000원', '1', '5,000원', '가짜상사']], goods: '5,000원', total: '5,000원' });
     const rs = CP.readOrder(CP.orderHtml(sticker, Date.parse('2026-11-17T09:00:00+09:00'), 'k'), '');
     T('⑩-검토⑤ 상품 이름에 \'주소\'가 있어도 주문을 끝까지 읽음', rs.ok && rs.rows.length === 1 && rs.rows[0].amt === 5000, J(rs));
     const tx2 = taxMk2('철탑공구', '0000000001', '20261120');
@@ -377,6 +377,79 @@ function cpHtml(o) {
     T('⑩-검토⑥ 사람이 넣은 쿠팡 주문 본문도 주문 표만 남김(gw-stmt handleDrop — 자르기 전 원본이 남지 않게)', /if \(CPN\.isCoupangOrder\(buf\) && !\/<meta name="jw-src" content="coupang-order">\/\.test\(buf\.slice\(0, 600\)\.toString\('utf8'\)\)\) buf = CPN\.orderHtml\(buf, 0, ''\);/.test(gs) && gs.indexOf("buf = CPN.orderHtml") < gs.indexOf("const sha = crypto.createHash('sha256').update(buf)", gs.indexOf('async function handleDrop(')));
   }
   T('⑩ 결함 사본 ' + MU10.length + '개(받는 회사·작성일 귀속·받은편지함 낱말·상호 두 글자) = 모두 ✗', c10.length === 0, J(c10));
+}
+
+// ---- ⑫ 29 판⑫(PM 11/26 12:43 "다 빼기. 안전공구만 넣기."): 쿠팡 주문은 안전공구 품목 줄만 · C286 받은편지함 파일 이름 3자 대조
+{
+  const J = (x) => JSON.stringify(x);
+  const REAL = ['미라클 샘물 무라벨, 200개, 500ml', '가드맨 PP 원피스 작업복, 2XL, 핑크, 24개', '포카리스웨트, 240ml, 60개', '맥심 모카골드 마일드 커피믹스, 12g, 160개입, 2박스', '롤앤롤 라벤더 화장지 30롤 3겹', '팔도 쿠퍼스 헛개차, 175ml, 60개',
+    '가드데이 프리미엄 정제수 휴대용 물티슈 캡형, 230g', '토레타 이온음료, 240ml, 60개', '로지텍 무선 일반형 키보드 K270', '하루온 포켓형 군인핫팩 160g, 60개', '자연은 프리미엄 음료세트, 3개', '한눈알 에탄올 워셔액, 1.8L, 12개',
+    '모완비 스피드 구급낭 파우치 구급가방 응급키트', '샌디스크 USB 메모리 CZ50 16GB', '탐사 베이킹소다 주방세제 레몬향, 780ml', '명가철물 철판 패킹 고무 실리콘 몰딩 ㄷ자 테두리 보호'];
+  const inn = REAL.filter(CP.isSafetyItem);
+  T('⑫ 안전공구 가르기(실물 4~11월 품목 이름): 작업복·핫팩·구급낭만 넣음 — 생수·이온음료·물티슈·커피·차·음료세트·화장지·키보드·USB·워셔액·차량 패킹·세제 = 뺌', J(inn) === J([REAL[1], REAL[9], REAL[12]]), J(inn));
+  const at = Date.parse('2026-11-15T10:00:00+09:00');
+  const mixed = CP.readOrder(CP.orderHtml(cpHtml({ items: [['가짜 생수 2L, 6개', '12,000원', '2', '24,000원', '쿠팡(주)'], ['가짜 작업장갑 10켤레', '9,900원', '1', '9,900원', '가짜상사']], goods: '33,900원', disc: '-1,000원', ship: '3,000원', total: '35,900원' }), at, 'k'), '');
+  T('⑫ 섞인 주문(생수 + 작업장갑 · 할인 · 배송비): 작업장갑 1줄만(용도 안전보건) · 할인·배송비 뺌(나눌 수 없음) · 명세 합계 = 넣은 줄 합 9,900 · 뺀 까닭 경고', mixed.ok && mixed.rows.length === 1 && mixed.rows[0].item === '가짜 작업장갑 10켤레' && mixed.rows[0].use === 'safety' && mixed.rows[0].amt === 9900 && mixed.sum.total === 9900 && mixed.safe_cut === 1 && mixed.warn.some((w) => /안전공구가 아닌 품목 1개와 할인·배송비 줄은 뺐습니다/.test(w)) && !mixed.rows.some((x) => '_k' in x), J(mixed));
+  const allSafe = CP.readOrder(CP.orderHtml(cpHtml({ items: [['가짜 안전화 280 2켤레', '12,000원', '2', '24,000원', '쿠팡(주)'], ['가짜 작업장갑 10켤레', '9,900원', '1', '9,900원', '가짜상사']], goods: '33,900원', disc: '-1,000원', ship: '3,000원', total: '35,900원' }), at, 'k'), '');
+  T('⑫ 모두 안전공구인 주문: 품목 2 + 할인 + 배송비 = 4줄(모두 용도 안전보건) · 명세 합계 = 총 결제금액 35,900 · 경고 0', allSafe.ok && allSafe.rows.length === 4 && allSafe.rows.every((x) => x.use === 'safety') && allSafe.sum.total === 35900 && allSafe.warn.length === 0, J(allSafe.warn));
+  const none = CP.readOrder(CP.orderHtml(cpHtml({ items: [['가짜 생수 2L, 6개', '12,000원', '2', '24,000원', '쿠팡(주)']], goods: '24,000원', total: '24,000원' }), at, 'k'), '');
+  T('⑫ 안전공구 없는 주문(생수만) = 줄 0 · 합계 없음', none.ok && none.rows.length === 0 && none.sum === null, J(none));
+  // 메일 에이전트: 안전공구 없는 주문은 저장 안 함(nosafe) · 있는 주문은 넣음
+  const s12 = mkStore(), f12 = mkStore();
+  const noneRaw = cpHtml({ items: [['가짜 생수 2L, 6개', '12,000원', '2', '24,000원', '쿠팡(주)']], goods: '24,000원', total: '24,000원' }), okRaw = cpHtml();
+  const m12 = [{ uid: 51, box: '청구서함', key: 'n1', at: at, from: { addr: 'no-reply@e.coupang.com', name: '쿠팡' }, subject: '[쿠팡] 주문하신 내역', atts: [{ part: '1', name: '쿠팡 주문 2026-11-15.html', est: 2000, body: 'coupang' }] },
+    { uid: 52, box: '청구서함', key: 'n2', at: at + 1000, from: { addr: 'no-reply@e.coupang.com', name: '쿠팡' }, subject: '[쿠팡] 주문하신 내역', atts: [{ part: '1', name: '쿠팡 주문 2026-11-15.html', est: 2000, body: 'coupang' }] }];
+  const b12 = mkBox(m12, { '51:1': noneRaw, '52:1': okRaw }); b12.get = async (uid, part) => (uid === 51 ? noneRaw : okRaw);
+  const r12 = await M.run(mkIo(s12, f12, b12, { now: () => Date.parse('2026-11-16T07:00:00+09:00') }));
+  const d12 = Array.from(s12.m.keys()).filter((k) => k.indexOf('stmtdrop:') === 0).map((k) => JSON.parse(s12.m.get(k)));
+  T('⑫ 메일 에이전트: 생수만 주문 = 저장 안 함(nosafe 1 · 처리 표시) · 안전공구 든 주문 = 넣음(쿠팡 v13 · 읽은 줄 = 안전공구 줄만)', r12.nosafe === 1 && r12.added === 1 && d12.length === 1 && d12[0].vk === 'v13' && d12[0].n === 2 && d12[0].result.rows.every((x) => x.use === 'safety'), J({ r12, n: d12.map((x) => x.n) }));
+  // C286: 받은편지함 파일 이름 두 글자 대조 막음
+  const koita = '2026년_영남사무소_연간교육일정____2.pdf';
+  const gIn = await RD.guessVendor(unknown, koita, VEND, '2026-11', 3), gBox = await RD.guessVendor(unknown, koita, VEND, '2026-11', 2), gChul = await RD.guessVendor(unknown, '철탑종합상사-26.10.pdf', VEND, '2026-10');
+  const s13 = mkStore(), f13 = mkStore();
+  const b13 = mkBox([{ uid: 61, box: 'INBOX', key: 'kk', at: Date.parse('2026-11-23T09:42:00+09:00'), from: { addr: 'edu@koita.test', name: '협회' }, subject: '연간 교육 일정 안내', atts: [{ part: '2', name: koita, est: unknown.length }] }], { '61:2': unknown });
+  const r13 = await M.run(mkIo(s13, f13, b13, { now: () => Date.parse('2026-11-24T07:00:00+09:00') }));
+  T('⑫ C286 받은편지함: 「…영남사무소_연간교육일정.pdf」= 두 글자 \'영남\'으로 영남주유소에 붙지 않음(넣지 않음) · 분류 폴더·사람이 넣은 파일은 종전 2자(철탑종합상사 → 철탑 v10)', gIn === null && gBox && gBox.vk === 'v06' && gChul && gChul.vk === 'v10' && r13.added === 0, J({ gIn, gBox, gChul, r13 }));
+  const gs12 = readFileSync(join(FN, 'gw-stmt.js'), 'utf8');
+  T('⑫ 이미 들어와 있던 쿠팡 원본도 채울 때 다시 읽음(gw-stmt stmt_drop_get — 남긴 원본으로 readFile · 저장은 안 바꿈)', /if \(result && g\.data\.src === 'coupang'\) \{/.test(gs12) && /RD\.readFile\(Buffer\.from\(f\.data\.data, 'base64'\), g\.data\.name/.test(gs12));
+  const src12 = readFileSync(join(LIB, 'stmtcoupang.js'), 'utf8'), ml12 = readFileSync(join(LIB, 'stmtmail.js'), 'utf8');
+  const MU12 = [
+    ['안전공구 거름 걷음', src12, 'out = safe;', 'out = rows;', async (m) => { const r = m.CP.readOrder(m.CP.orderHtml(cpHtml({ items: [['가짜 생수 2L, 6개', '12,000원', '2', '24,000원', '쿠팡(주)'], ['가짜 작업장갑 10켤레', '9,900원', '1', '9,900원', '가짜상사']] }), at, 'k'), ''); return r.rows.length === 1; }],
+    ['생수 빼기 걷음', src12, "if (NOT_SAFETY.test(String(name || ''))) return false;", '', async (m) => !m.CP.isSafetyItem('가짜 작업장갑 생수 세트')],
+    ['명세 합계를 총 결제금액으로', src12, 'sum: out.length ? { total: cut ? outSum : (total != null ? total : outSum) } : null', 'sum: total != null ? { total: total } : null', async (m) => { const r = m.CP.readOrder(m.CP.orderHtml(cpHtml({ items: [['가짜 생수 2L, 6개', '12,000원', '2', '24,000원', '쿠팡(주)'], ['가짜 작업장갑 10켤레', '9,900원', '1', '9,900원', '가짜상사']], total: '33,900원' }), at, 'k'), ''); return r.sum && r.sum.total === 9900; }],
+    ['안전공구 없는 주문도 저장', ml12, 'if (ro.ok && !ro.rows.length) {', 'if (false) {', null],
+    ['받은편지함도 2자', ml12, "const nameMin = m.box === 'INBOX' && !a.body ? 3 : 2;", 'const nameMin = 2;', null],
+  ];
+  const c12 = [];
+  for (const [nm, src, a, b, chk] of MU12) {
+    if (src.indexOf(a) < 0) { c12.push(nm + ':원문없음'); continue; }
+    let good = false;
+    try {
+      const mm = { exports: {} };
+      new Function('module', 'exports', 'require', src.split(a).join(b))(mm, mm.exports, (p) => require(p.indexOf('./') === 0 ? join(LIB, p.slice(2)) : p));
+      if (chk) good = await chk({ CP: mm.exports });
+      else {
+        const sx = mkStore(), fx = mkStore();
+        const bx = mkBox(m12.concat([{ uid: 61, box: 'INBOX', key: 'kk', at: Date.parse('2026-11-23T09:42:00+09:00'), from: { addr: 'edu@koita.test', name: '협회' }, subject: '연간 교육 일정 안내', atts: [{ part: '2', name: koita, est: unknown.length }] }]), {});
+        bx.get = async (uid) => (uid === 51 ? noneRaw : uid === 52 ? okRaw : unknown);
+        const rx = await mm.exports.run(mkIo(sx, fx, bx, { now: () => Date.parse('2026-11-24T07:00:00+09:00') }));
+        good = rx.nosafe === 1 && rx.added === 1;
+      }
+    } catch (e) { good = false; }
+    if (good) c12.push(nm);
+  }
+  // 확인 반영: 받은편지함 쿠팡 주문(거래처 이름 두 글자) = 들어감 · 읽기 실패한 쿠팡 본문 = 조용히 버리지 않고 저장(실패 줄) · 두루 쓰이는 낱말 가르기
+  const s14 = mkStore(), f14 = mkStore();
+  const brokenRaw = Buffer.from('<html><table><tr><td>구매 상세내역</td><td>쿠팡가</td></tr></table> coupang 가짜 바뀐 양식</html>', 'utf8');
+  const b14 = mkBox([{ uid: 71, box: 'INBOX', key: 'i1', at: at, from: { addr: 'no-reply@e.coupang.com', name: '쿠팡' }, subject: '[쿠팡] 주문하신 내역', atts: [{ part: '1', name: '쿠팡 주문 2026-11-15.html', est: 2000, body: 'coupang' }] },
+    { uid: 72, box: '청구서함', key: 'i2', at: at + 1, from: { addr: 'no-reply@e.coupang.com', name: '쿠팡' }, subject: '[쿠팡] 주문하신 내역', atts: [{ part: '1', name: '쿠팡 주문 2026-11-15.html', est: 2000, body: 'coupang' }] }], {});
+  b14.get = async (uid) => (uid === 71 ? okRaw : brokenRaw);
+  const r14 = await M.run(mkIo(s14, f14, b14, { now: () => Date.parse('2026-11-16T07:00:00+09:00') }));
+  const d14 = Array.from(s14.m.keys()).filter((k) => k.indexOf('stmtdrop:') === 0).map((k) => JSON.parse(s14.m.get(k)));
+  const W = ['가짜 주방 고무장갑', '가짜 마스크팩 10매', '한우 토시살 300g', '방한 문풍지 커튼', '사무용 고무밴드', '식품의약품안전처 허가 KF94 마스크', '안전 경고 테이프 50m', '가짜 반코팅 장갑 10켤레'].map((n) => CP.isSafetyItem(n));
+  T('⑫ 확인 반영: 받은편지함 쿠팡 주문도 들어감(쿠팡 v13) · 양식이 바뀌어 못 읽은 쿠팡 본문은 버리지 않고 저장(못 읽음 줄로 보임) · 고무장갑·마스크팩·토시살·방한 문풍지·고무밴드 = 뺌 · KF94 마스크·안전 경고 테이프·반코팅 장갑 = 넣음',
+    r14.added === 2 && d14.some((x) => x.vk === 'v13' && x.state === 'read') && d14.some((x) => x.state === 'fail') && !r14.nosafe && J(W) === J([false, false, false, false, false, true, true, true]), J({ r14, st: d14.map((x) => x.state), W }));
+  T('⑫ 결함 사본 ' + MU12.length + '개(안전공구 거름·생수 빼기·명세 합계·안전공구 없는 주문 저장·받은편지함 2자) = 모두 ✗', c12.length === 0, J(c12));
 }
 RD.readByAi = realAi;
 console.log('\n' + (fail ? '✗ ' : '✓ ') + pass + ' pass, ' + fail + ' fail');

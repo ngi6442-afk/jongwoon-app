@@ -135,6 +135,8 @@ async function run(io) {
       if (a.body === 'coupang') {   // 본문 → 주문 표·결제 금액만 남긴 HTML(받는 사람·연락처·주소·계좌 없이) · 주문 표가 없으면(멤버십 등) 저장 안 함
         if (!CP.isCoupangOrder(buf)) { sum.skip++; seen.add(sk); seenAdd.push(sk); continue; }
         buf = CP.orderHtml(buf, m.at, m.key);   // 메일 키를 넣어 같은 날 같은 내용의 두 주문도 sha가 갈림(판⑩ 검토)
+        const ro = CP.readOrder(buf, '');   // 29 판⑫(PM 11/26 '안전공구만'): 안전공구 품목이 없는 주문(생수·음료·간식·사무용품만)은 저장 안 함
+        if (ro.ok && !ro.rows.length) { sum.nosafe = (sum.nosafe || 0) + 1; seen.add(sk); seenAdd.push(sk); continue; }
       }
       // 29 판⑩(12월 첫 실사용 점검): 국세청 계산서·표준 XML은 내용을 먼저 읽어 ① 받는 회사가 종운환경이 아니면(종운건설 등) 거래처가 맞아도 넣지 않음 ② 귀속 달 = 계산서 작성일의 달(받은 날 20일 규칙 아님 — 건별 발행 계산서가 앞달로 가던 것)
       const fkind = RD.sniff(buf, a.name) || '';
@@ -153,10 +155,12 @@ async function run(io) {
       if (list.length >= DROP_MAX) { sum.full++; continue; }
       const fh = senderHash(m.from.addr);
       let v = null, how = '';
-      const gv = await RD.guessVendor(buf, a.name, io.cfg, ym);
+      // 29 판⑫ C286: 받은편지함은 파일 이름·보낸 이·제목 대조도 3자 이상 낱말로(11/23 KOITA '…영남사무소_연간교육일정.pdf'가 '영남' 두 글자로 영남주유소에 붙음) — 분류 폴더(청구서함·청구서)는 종전대로 2자
+      const nameMin = m.box === 'INBOX' && !a.body ? 3 : 2;   // 쿠팡 주문 본문은 거래처 이름이 '쿠팡' 두 글자라 받은편지함이어도 2(확인 반영)
+      const gv = await RD.guessVendor(buf, a.name, io.cfg, ym, nameMin);
       if (gv && byVk[gv.vk]) { v = byVk[gv.vk]; how = gv.how; }
       if (!v && smap[fh] && smap[fh].vk && byVk[smap[fh].vk] && byVk[smap[fh].vk].active !== false) { v = byVk[smap[fh].vk]; how = 'mail'; }
-      if (!v) { const mv = RD.matchVendor(m.from.name + ' ' + m.subject, act, 2); if (mv) { v = mv; how = 'mail'; } }
+      if (!v) { const mv = RD.matchVendor(m.from.name + ' ' + m.subject, act, nameMin); if (mv) { v = mv; how = 'mail'; } }
       if (!v && !looksStmt(a.name + ' ' + m.subject)) { sum.skip++; seen.add(sk); seenAdd.push(sk); continue; }   // 명세·계산서로 안 보임 — 저장 안 함
       // 29 판⑩: 받은편지함은 거래처를 찾은 것만 — 낱말(명세·내역·청구…)만으로는 급여명세서·카드 이용대금·보험료 고지 같은 다른 서류까지 '거래처 고르기'로 올라옴(분류 폴더 청구서함·청구서만 낱말로)
       if (!v && m.box === 'INBOX') { sum.other = (sum.other || 0) + 1; seen.add(sk); seenAdd.push(sk); continue; }

@@ -694,8 +694,26 @@ async function handleDropGet(st, c, d, R) {
   const g = await getOpt(st, dropKey(d.ym, d.id));
   if (!g.ok) return fail(g.code, R);
   if (!g.data) return jr(404, { status: 'NOT_FOUND', error_code: 'NO_FILE', request_id: R });
-  return jr(200, { status: 'OK', entry: dropMeta(g.data), result: g.data.state === 'read' ? (g.data.result || null) : null, why: g.data.why || '', request_id: R });
+  let result = g.data.state === 'read' ? (g.data.result || null) : null, reread = false;
+  // 29 판⑫(PM 11/26 '안전공구만'): 쿠팡 주문 원본은 줄 때마다 남긴 원본에서 다시 읽음(AI 없음 · 이미 들어와 있던 11월 주문도 안전공구 줄만 — 저장은 안 바꿈)
+  if (result && g.data.src === 'coupang') {
+    try {
+      const f = await getOpt(store(FILES), fileKey(d.id));
+      if (f.ok && f.data && f.data.data) {
+        const v = vendorOfCfg(await cfgRead(st), g.data.vk);
+        const r2 = await RD.readFile(Buffer.from(f.data.data, 'base64'), g.data.name, { ym: d.ym, vk: g.data.vk, vendor: v ? { name: v.name, kind: v.kind, group: v.group, hint: v.hint } : null });
+        if (r2.ok && r2.result) { result = r2.result; reread = true; }
+      }
+    } catch (e) { /* 다시 읽기 실패면 저장된 결과를 거름 */ }
+    if (!reread) {   // 확인 반영: 원본을 못 읽어도 생수 등이 든 옛 결과를 그대로 주지 않음 — 안전공구 줄만 남기고(할인·배송비는 나눌 수 없어 뺌) 합계 다시
+      const CPG = require('./_lib/stmtcoupang');
+      const keep = (Array.isArray(result.rows) ? result.rows : []).filter(function (x) { return x && x.amt > 0 && x.item !== '배송비' && CPG.isSafetyItem(x.item); }).map(function (x) { return Object.assign({}, x, { use: 'safety' }); });
+      result = Object.assign({}, result, { rows: keep, sum: keep.length ? { total: keep.reduce(function (a, x) { return a + (x.amt || 0); }, 0) } : null, warn: (Array.isArray(result.warn) ? result.warn : []).concat(['원본을 다시 읽지 못해 저장된 결과에서 안전공구 줄만 남겼습니다(할인·배송비 뺌)']) });
+    }
+  }
+  return jr(200, { status: 'OK', entry: dropMeta(g.data), result: result, why: g.data.why || '', request_id: R });
 }
+function vendorOfCfg(cfg, vk) { return cfg && cfg.ok ? vendorOf(cfg, vk) : null; }
 // 거래처 고르기·바꾸기(다시 읽음) · 채운 표시(applied)
 async function handleDropSet(st, c, d, R) {
   if (!dropIdOk(d)) return bad('BAD_REQUEST', R);
