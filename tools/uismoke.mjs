@@ -1637,12 +1637,14 @@ try {
   const seg = html.slice(html.indexOf('var GROUPS = ['), html.indexOf('var TYPE_LABEL'));
   const sud = html.slice(html.indexOf('var SUDSI = ['), html.indexOf('// ---- 상태 ----'));
   const ids = [...seg.matchAll(/\{id:"([a-z0-9]+)"/g)].map((m) => m[1]);
-  const need = ['w1', 'm1', 'm2', 'm3', 'm4', 'q1', 'q2', 'q3', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h7', 'y1', 'y2', 'y3', 'y4', 'y5', 'y6', 'y7', 'y8', 'y9', 'y10', 'y11', 'y12', 'y13', 'y14', 'y15', 'y16', 'y17', 'y18'];
-  T('v387 체크리스트 정의: 항목 33개 id 순서 그대로(기존 id 보존 + h7·y11~y18) · 중복 없음 · 수시 su1~su6 · 퇴사자(김혁) 담당 없음 · KOITA 조사표 4월 30일·위험성평가 인정 사후점검·재인정 3개월 문구 · 정본 v3 주석',
+  // v551(C232): 정본 v4 — 월간 m5·m6, 반기 h8~h11, 연간 y19~y24, 수시 su7~su9를 각 묶음 끝에(기존 id·순서 보존)
+  const need = ['w1', 'm1', 'm2', 'm3', 'm4', 'm5', 'm6', 'q1', 'q2', 'q3', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8', 'h9', 'h10', 'h11', 'y1', 'y2', 'y3', 'y4', 'y5', 'y6', 'y7', 'y8', 'y9', 'y10', 'y11', 'y12', 'y13', 'y14', 'y15', 'y16', 'y17', 'y18', 'y19', 'y20', 'y21', 'y22', 'y23', 'y24'];
+  T('v387·v551 체크리스트 정의: 항목 45개 id 순서 그대로(기존 id 보존 + v387 h7·y11~y18 + v551 m5·m6·h8~h11·y19~y24) · 중복 없음 · 수시 su1~su9 · 퇴사자(김혁) 담당 없음 · KOITA 조사표 4월 30일·위험성평가 인정 사후점검·재인정 3개월 문구 · ESG 절차 부칙 반영 줄(자가측정·경영검토 ESG 보고·고충 7일) · 정본 v4 주석',
     JSON.stringify(ids) === JSON.stringify(need) && new Set(ids).size === ids.length
-    && ['su1', 'su2', 'su3', 'su4', 'su5', 'su6'].every((k) => sud.includes('{id:"' + k + '"')) && !/김혁/.test(seg)
+    && ['su1', 'su2', 'su3', 'su4', 'su5', 'su6', 'su7', 'su8', 'su9'].every((k) => sud.includes('{id:"' + k + '"')) && !/김혁/.test(seg)
     && /KOITA 연구개발활동조사표 제출 — 전년도분, 4월 30일까지/.test(seg) && /위험성평가 인정 사후점검 수검/.test(seg) && /재인정 신청 \(만료 3개월 전부터\)/.test(seg) && /30일 이내 KOITA 변경신고/.test(sud)
-    && /JW-02-04-001 주기별 업무 체크리스트 v3/.test(html), JSON.stringify(ids));
+    && /대기배출시설 자가측정\(측정대행 위탁\)/.test(seg) && /경영검토에 ESG 보고/.test(seg) && /7일 이내 조치 계획 또는 처리 결과 회신/.test(sud) && /\(중처법 4조7호\)/.test(seg)
+    && /JW-02-04-001 주기별 업무 체크리스트 v4/.test(html), JSON.stringify(ids));
 } catch (e) { console.log('  (v387 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v388(PM 10/19 "33. ㄱ지금"): 문서함 직원 출력·권한 — 열람용 PDF·[보기·인쇄]·원본 권한(클라=서버 규칙)·열람 이력 ----
@@ -3145,7 +3147,7 @@ try {
   const known32 = new Map(gItems32.concat(sItems32));
   const miss32 = ids32.filter((id) => !known32.has(id)), dupT32 = ids32.filter((id) => known32.has(id) && sec32.indexOf(known32.get(id)) >= 0);
   T('v432 ① 안전 항목 26개(SF_NOW_CHECK) = 코드 지도 목록 그대로(w1·m1·m3·q1·h1~h7·y1~y6·y11·y15~y18·su1·su3·su5·su6) · 전부 GROUPS(' + gItems32.length + ')·SUDSI(' + sItems32.length + ')에 실재 · 겹침 0 · 제목을 구간에 다시 적지 않음(sfNowItem이 GROUPS·SUDSI에서 읽음 — 문구 그대로)',
-    ids32.join(',') === WANT32 && new Set(ids32).size === 26 && miss32.length === 0 && dupT32.length === 0 && gItems32.length >= 30 && sItems32.length === 6
+    ids32.join(',') === WANT32 && new Set(ids32).size === 26 && miss32.length === 0 && dupT32.length === 0 && gItems32.length >= 30 && sItems32.length === 9
     && /if \(GROUPS\[i\]\.items\[j\]\.id === id\)/.test(fn32('sfNowItem')) && /if \(SUDSI\[k\]\.id === id\)/.test(fn32('sfNowItem')),
     '없음: ' + miss32.join(',') + ' / 제목 다시 적음: ' + dupT32.join(',') + ' / ' + ids32.join(','));
   const seedNo32 = new Set((JSON.parse(rd32('data/duties_seed.json')).items || []).map((d) => d.no));
@@ -24152,9 +24154,9 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ["원장 T234", "`hwpParas`", "`cdoc_pair_assign`", "MANUAL_OFF", "원장 C294", "T298"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v550 \(2026-11-26\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 1 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 550 && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 1 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
       && d.ix.indexOf('"키스콘 신고"') < 0 && d.ix.split('"통합실적관리시스템"').length === 3
-      && /SHELL_CACHE = 'jw-shell-v550'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 550;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r550 = chk550(D550);
@@ -24164,6 +24166,31 @@ try {
   T('v550 문서·판 번호(정확 검사): FEATURES 기준 v550 (2026-11-26)·v550 절(T234·C294·T298) · TESTLIST v550 칸 3(운영 확인 2 · 게이트 [x] 1) · 현장 줄 머리 두 곳 = 통합실적관리시스템 · sw jw-shell-v550 · 결함 사본(기준 줄·sw·FEATURES 낱말·옛 줄 머리) 모두 ✗',
     r550.ok && M550.every((v) => v === false), JSON.stringify({ r: r550.info, mut: M550 }));
 } catch (e) { console.log('  (v550 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v551(C232 — 주기별 업무 체크리스트 = 정본 v4 · 원장 C232): 실행 검사는 위 v387·v551 체크리스트 정의 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd551 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D551 = { ft: rd551('FEATURES.md'), tl: rd551('TESTLIST.md'), sw: rd551('sw.js'), man: rd551('MANUAL.html'), cl: rd551('CLAUDE.md') };
+  const chk551 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v551 (11/26)', '\n### '), tlv = cut(d.tl, '\n## v551 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`rows_v4.json`", "원장 C232"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v551 \(2026-11-26\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 2 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C232(v551') > 0
+      && /SHELL_CACHE = 'jw-shell-v551'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r551 = chk551(D551);
+  const mu551 = (k, f) => chk551(Object.assign({}, D551, { [k]: f(D551[k]) })).ok;
+  const M551 = [mu551('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v550 (')), mu551('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v550'")),
+    mu551('ft', (s) => s.split('`rows_v4.json`').join('rows_v4.json')),
+    mu551('cl', (s) => s.replace('**C232(v551', 'C232(')),
+    mu551('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 배포 전 전체 게이트 기록 C232_게이트_v551_1126.txt', '\n- (AI) 게이트'))];
+  T('v551 문서·판 번호(정확 검사): FEATURES 기준 v551 (2026-11-26)·v551 절(C232) · TESTLIST v551 칸 6(화면·운영 확인 4 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v551 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
+    r551.ok && M551.every((v) => v === false), JSON.stringify({ r: r551.info, mut: M551 }));
+} catch (e) { console.log('  (v551 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
