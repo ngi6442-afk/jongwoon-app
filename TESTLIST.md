@@ -1931,3 +1931,8 @@
 - [ ] (운영 확인) 석면 현장에 일용직을 넣고 착수일보다 1주일 넘게 전 특별교육 기록만 있으면 신고 서류 표 특별교육 칸이 노랑 '확인 필요'인지 · 배치전건강진단을 넣으면 다음 예정일(만료일)이 기한·캘린더에 뜨는지
 - [x] (AI) `uismoke` C262(판정·만료일·안내 글 · 결함 사본 4) — ✓ AI 11/26
 - [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `paycalc_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` 통과 · v547 문서 검사를 이 판 이상으로 풀고 v548 문서·판 번호 정확 검사 — ✓ AI 11/26
+
+## v549 — 연구노트 확정본 다시 받기 — 확정 8일째부터 한 줄(원장 C177 ⓑ · 서버 그대로)
+- [ ] (AI 운영 확인 — 연구노트 C177ⓑ) 12월 첫 확정 뒤 8일째에 PM 콘솔에 '연구노트 최근 확정본' 한 줄과 [n월 확정본 받기]가 보이고 눌러 내려받아짐 — 원장 C173과 같이 확인
+- [x] (AI) `uismoke` 'C174 ③④'·'P1 판21 ④'(결함 사본 28개) · 시험 서버(실제 서버 함수·백업 사본)에서 8일 지난 확정본 = 한 줄·단추 눌러 내려받기 — ✓ AI 11/26
+- [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · 원본 읽기 검사 4종 · `paycalc_check` · `stmtmail_check` 전부 통과 + node --check + 앱 스크립트 전체 파싱 오류 0 — 숫자는 커밋 메시지

@@ -35318,6 +35318,12 @@ function dutyStage(nx){
   //   원장 C174 ④: 초안 없이 확정본만 남은 카드는 확정 뒤 7일까지만 보인다(그 뒤엔 숨김 — 콘솔에 계속 남지 않게). 초안 카드의 [n월 확정본 받기]는 그대로.
   //   원장 C174 ③: 서버가 못 읽은 달(unread)을 따로 내린다 — 나머지 달은 그대로 보이고 못 읽은 달은 한 줄로 알린다.
   function rnoteFresh(d){ var ts = Number(d && d.status === "confirmed" && d.confirmed && d.confirmed.ts) || 0; return ts > 0 && Date.now() - ts < 7 * 86400000; }
+  //   원장 C177 ⓑ: 확정 8일째부터 다음 초안이 나올 때까지 확정본을 다시 받을 길이 없던 것 → 카드 대신 한 줄(달·확정한 날) + [n월 확정본 받기]만(글·메타·확정 단추 없음)
+  function rnoteLastHtml(lt){
+    var t = new Date(Number(lt.confirmed && lt.confirmed.ts) || 0), when = isNaN(t.getTime()) || !t.getTime() ? "" : String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0");
+    return '<div class="pc-btns" style="justify-content:flex-start;align-items:center;flex-wrap:wrap;gap:8px;font-size:13px;"><span>' + esc("연구노트 최근 확정본: " + rnoteMonth(lt.period) + (when ? " (" + when + " 확정)" : "")) + '</span>'
+      + '<button type="button" class="mini-btn" data-rnote="downlast">' + esc(rnoteMonth(lt.period) + " 확정본 받기") + '</button></div>';
+  }
   function rnoteRender(host){
     if (!host) return;
     gwCall("gw-data", { action: "rnote_get" }).then(function(res){
@@ -35325,6 +35331,7 @@ function dutyStage(nx){
       var latest = res.body.latest || null, doc = res.body.doc || (rnoteFresh(latest) ? latest : null);
       var unread = (res.body.unread || []).filter(function(p){ return /^20\d{2}-\d{2}$/.test(String(p || "")); });
       if (!doc && unread.length){ host.style.display = ""; host.innerHTML = '<div style="font-weight:600;font-size:13.5px;">연구노트</div><div class="pc-none" style="color:#B00020;">' + esc("읽지 못한 달: " + unread.map(rnoteMonth).join(" · ") + " — 잠시 뒤 다시 열어 주세요") + '</div>'; pmconChecksSync(); return; }
+      if (!doc && latest && latest.status === "confirmed"){ host.style.display = ""; host.innerHTML = rnoteLastHtml(latest); rnoteBind(host, latest, false, { latest: latest }); pmconChecksSync(); return; }   // 원장 C177 ⓑ: 8일째부터는 한 줄만
       if (!doc){ host.style.display = "none"; host.innerHTML = ""; pmconChecksSync(); return; }
       var ex = { latest: latest, unread: unread, others: (res.body.months || []).filter(function(x){ return x && x.status !== "confirmed" && x.period !== doc.period; }).map(function(x){ return x.period; }) };
       host.style.display = "";
