@@ -16547,7 +16547,7 @@
     if (!d) return null;
     sub = "AI v" + d.ver + " " + cdocGenDay(d) + (d.late ? "(최종본 올릴 때 자동)" : "") + " · "; old = !!(g && g.pdn && g.pdn !== d.n);
     if (f){
-      sub += "직원 최종 v" + f.ver + " " + cdocGenDay(f) + " · ";
+      sub += "직원 최종 v" + f.ver + " " + cdocGenDay(f) + (f.phow === "manual" ? "(사람이 고른 짝)" : "") + " · ";
       if (g){
         sub += "간극 " + Math.round(g.pgap * 100) + "%" + (g !== f ? "(직원 v" + g.ver + " 기준, 최신은 비교 불가 " + (f.ext || "") + ")" : "");
         if (old){ var od = G.l.filter(function(y){ return y.n === g.pdn; })[0]; sub += "(AI" + (od ? " v" + od.ver : " 이전 판") + " 기준, 새 AI는 수정본 기다리는 중)"; }
@@ -16557,6 +16557,23 @@
     return { sub: sub, ok: !!(f && !old), d: d, f: f };
   }
   function cdocGenOpen(c, x, label, tip){ return (x.pii && !canDo("con")) ? "" : '<button type="button" class="vs-chip" data-cs-copen="' + esc(c.id) + '|' + x.n + '|' + (x.pii || 0) + '"' + (tip ? ' title="' + esc(tip) + '"' : '') + '>' + label + '</button>'; }
+  // C294(T248) 짝 수동 지정 — 자동으로 짝을 못 정한 최종본 줄에만 작은 선택칸(계약 '수행'·진행 중 계약·학습 제외·민감 등급 2 아님). 고르면 그 AI 초안과 짝·간극을 잰다
+  function cdocPairSel(c, x, G){
+    if (!canDo("con") || c.status === "done" || x.plearn === "TYPE_EXCLUDED" || Number(x.pii) === 2 || !G.order.length) return "";
+    return '<select data-cs-cpair="' + esc(c.id) + '|' + x.n + '" style="font-size:11.5px;max-width:170px;" title="이 최종본이 어느 AI 초안을 고친 것인지 고르면 그 초안과 짝을 맺고 간극을 잽니다"><option value="">AI 초안 고르기</option>'
+      + G.order.map(function(k){ var d = G.by[k]; return '<option value="' + d.n + '">' + esc(genLabel(k)) + ' v' + d.ver + '</option>'; }).join("") + '</select>';
+  }
+  function cdocUnpairBtn(c, f){ return (f && f.phow === "manual" && canDo("con") && c.status !== "done") ? '<button type="button" class="vs-chip" data-cs-cunpair="' + esc(c.id) + '|' + f.n + '" title="사람이 고른 짝을 풉니다(다시 자동으로 묶지 않음)">짝 풀기</button>' : ""; }
+  function csCdocPair(cid, n, draftN){
+    var c = findProc(cid); if (!c || !canDo("con")) return;
+    if (!draftN && !confirm("이 짝을 풀까요?\n(간극 기록에서 빠지고, 다시 자동으로 묶지 않습니다)")) return;
+    cbxSerial(function(){ return gwCall("gw-data", draftN ? { action: "cdoc_pair_assign", cid: cid, n: n, draft_n: draftN } : { action: "cdoc_pair_assign", cid: cid, n: n, unpair: true }); }).then(function(res){
+      var ec = (res.body && res.body.error_code) || res.status;
+      if (res.status !== 200) alert((ec === "PII2_FORBIDDEN" || ec === "PII_FORBIDDEN") ? "열람 권한이 없는 개인정보 등급 파일입니다 — 관리자에게 요청해 주세요." : ec === "TYPE_EXCLUDED" ? "학습에서 빼는 서류라 짝을 맺지 않습니다." : "짝 지정 실패(" + ec + ")");
+      else apprToastShow(draftN ? "짝 지정됨" : "짝 풂");
+      cdocLoad(c, true);
+    }).catch(function(){ alert("처리 실패(네트워크)"); });
+  }
   function cdocGenDelBtn(c, d){ return (canDo("con") && c.status !== "done") ? '<button type="button" class="vs-chip" data-cs-cdel="' + esc(c.id) + '|' + d.n + '" title="이 AI 초안을 보관함으로(잘못 만들었을 때)">보관</button>' : ""; }
   // skip(양식 → 1)이 있으면 단계 줄에 이미 나온 양식은 빼고 '줄에 없는 AI 생성본 · 짝 없는 최종본'만(v427 단계·서류 탭 아래)
   function cdocGenHtml(c, skip){
@@ -16564,10 +16581,10 @@
     if (!order.length && !orphans.length) return "";
     var rows = order.map(function(k){
       var L = cdocGenLine(c, k, G), d = L.d, f = L.f;
-      return '<div class="it"><span class="st ' + (L.ok ? "ok" : "wait") + '">' + (L.ok ? "✓" : "◻") + '</span><span class="nm">' + esc(genLabel(k)) + '<div class="sub" style="white-space:normal;" title="' + esc(L.sub) + '">' + esc(L.sub) + '</div></span>' + cdocGenOpen(c, d, "AI 사본", "서버 사본입니다. 주민번호·사람 칸은 비어 있습니다") + (f ? cdocGenOpen(c, f, "최종") : "") + cdocGenDelBtn(c, d) + '</div>';
+      return '<div class="it"><span class="st ' + (L.ok ? "ok" : "wait") + '">' + (L.ok ? "✓" : "◻") + '</span><span class="nm">' + esc(genLabel(k)) + '<div class="sub" style="white-space:normal;" title="' + esc(L.sub) + '">' + esc(L.sub) + '</div></span>' + cdocGenOpen(c, d, "AI 사본", "서버 사본입니다. 주민번호·사람 칸은 비어 있습니다") + (f ? cdocGenOpen(c, f, "최종") : "") + cdocUnpairBtn(c, f) + cdocGenDelBtn(c, d) + '</div>';
     }).join("");
-    var WHY = { NO_MATCH:"맞는 AI 초안을 못 찾음", NO_DRAFT:"같은 단계에 AI 초안 없음", TYPE_EXCLUDED:"학습에서 빼는 서류", DRAFT_READ_FAILED:"초안을 못 읽음", LEARN_THREW:"처리 오류" };
-    rows += orphans.map(function(x){ var why = x.pair ? "짝 못 정함(자동)" : (WHY[x.plearn] || x.plearn); return '<div class="it"><span class="st wait">◻</span><span class="nm">' + esc(x.orig || x.name) + '<div class="sub" style="white-space:normal;">직원 최종 v' + x.ver + " " + cdocGenDay(x) + " · 짝 없음(" + esc(why) + ')</div></span>' + cdocGenOpen(c, x, "최종") + '</div>'; }).join("");
+    var WHY = { NO_MATCH:"맞는 AI 초안을 못 찾음", NO_DRAFT:"같은 단계에 AI 초안 없음", TYPE_EXCLUDED:"학습에서 빼는 서류", DRAFT_READ_FAILED:"초안을 못 읽음", LEARN_THREW:"처리 오류", MANUAL_OFF:"사람이 풂" };
+    rows += orphans.map(function(x){ var why = x.pair ? "짝 못 정함(자동)" : (WHY[x.plearn] || x.plearn); return '<div class="it"><span class="st wait">◻</span><span class="nm">' + esc(x.orig || x.name) + '<div class="sub" style="white-space:normal;">직원 최종 v' + x.ver + " " + cdocGenDay(x) + " · 짝 없음(" + esc(why) + ')</div></span>' + cdocGenOpen(c, x, "최종") + cdocPairSel(c, x, G) + '</div>'; }).join("");
     return '<div class="cs-pk" style="margin-bottom:10px;"><div class="h">' + (skip ? '줄에 없는 AI 생성본 · 짝 없는 최종본 <small>' + order.length + '종 · ' + orphans.length + '건</small>' : 'AI 생성본 ↔ 직원 최종본 <small>' + order.length + '종 · 간극 = 직원이 고친 비율</small>') + '</div>' + rows + '</div>';
   }
   function cbxEtcHtml(c){
@@ -18780,6 +18797,8 @@
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-copen]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var q = el.getAttribute("data-cs-copen").split("|"); csCdocOpen(q[0], Number(q[1]), Number(q[2])); }); });
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-ccur]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var q = el.getAttribute("data-cs-ccur").split("|"); csCdocMark(q[0], Number(q[1]), "cur"); }); });
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-cdel]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var q = el.getAttribute("data-cs-cdel").split("|"); csCdocMark(q[0], Number(q[1]), "del"); }); });
+      Array.prototype.forEach.call(root.querySelectorAll("[data-cs-cpair]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); }); el.addEventListener("change", function(){ if (!el.value) return; var q = el.getAttribute("data-cs-cpair").split("|"); csCdocPair(q[0], Number(q[1]), Number(el.value)); }); });   // C294(T248)
+      Array.prototype.forEach.call(root.querySelectorAll("[data-cs-cunpair]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var q = el.getAttribute("data-cs-cunpair").split("|"); csCdocPair(q[0], Number(q[1]), 0); }); });
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-crestore]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var q = el.getAttribute("data-cs-crestore").split("|"); csCdocMark(q[0], Number(q[1]), "restore"); }); });   // v408 보관함
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-cpurge]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var q = el.getAttribute("data-cs-cpurge").split("|"); csCdocPurge(q[0], Number(q[1])); }); });
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-wladd]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var c = findProc(el.getAttribute("data-cs-wladd")); var row = root.querySelector('[data-cs-wlform="' + (c ? c.id : "") + '"]'); if (c && row) csWlAdd(c, row); }); });
@@ -20288,7 +20307,7 @@
         + siteEduLine(r)   // v433 특별교육 줄 넷(안전 권한 = 앱 판정 · 그 밖 = 서버 site_edu_gap 이름)
         + (k==="asbestos" && r.conc ? sheetRow("공기 중 농도", '<span class="num">'+esc(r.conc)+'</span> 개/㎤') : "")
         + (k==="asbestos" && r.waste_no ? sheetRow("폐기물 인계번호", esc(r.waste_no)) : "")
-        + (ks.no ? sheetRow("키스콘 신고", '<span class="num">'+esc(ks.no)+'</span> · '+esc(ks.year)+'년 · '+esc(ks.biz)) : "")
+        + (ks.no ? sheetRow("통합실적관리시스템", '<span class="num">'+esc(ks.no)+'</span> · '+esc(ks.year)+'년 · '+esc(ks.biz)) : "")
         + (ks.amount ? sheetRow("계약액", '<span class="num">'+fmtAmount(ks.amount)+'원</span>'+(ks.done_amount?' · 기성 <span class="num">'+fmtAmount(ks.done_amount)+'원</span>':"")) : "")
         + (ks.approve ? sheetRow("발주자 승인", esc(ks.approve), (String(ks.approve).indexOf("취소")>=0?"warn":"")) : "")
         + (asbKeepUntil(r) ? sheetRow("기록 보존 만료", '<span class="num">'+esc(asbKeepUntil(r))+'</span>') : "")
@@ -20492,7 +20511,7 @@
     out.push(["참여 근로자", who + wk, p.n ? "" : "warn"]);
     if (k === "asbestos" && r.conc) out.push(["공기 중 농도", '<span class="num">' + esc(r.conc) + '</span> 개/㎤', ""]);
     if (k === "asbestos" && r.waste_no) out.push(["폐기물 인계번호", esc(r.waste_no), ""]);
-    if (ks.no) out.push(["키스콘 신고", '<span class="num">' + esc(ks.no) + '</span> · ' + esc(ks.year) + '년 · ' + esc(ks.biz), ""]);
+    if (ks.no) out.push(["통합실적관리시스템", '<span class="num">' + esc(ks.no) + '</span> · ' + esc(ks.year) + '년 · ' + esc(ks.biz), ""]);
     if (ks.amount) out.push(["계약액", '<span class="num">' + fmtAmount(ks.amount) + '원</span>' + (ks.done_amount ? ' · 기성 <span class="num">' + fmtAmount(ks.done_amount) + '원</span>' : ""), ""]);
     if (ks.approve) out.push(["발주자 승인", esc(ks.approve), String(ks.approve).indexOf("취소") >= 0 ? "warn" : ""]);
     keep = k === "asbestos" ? asbKeepUntil(r) : "";

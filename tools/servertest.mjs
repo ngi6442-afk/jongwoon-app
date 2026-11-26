@@ -4962,6 +4962,71 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   T('73 날인 스캔 pdf: 서류 이름으로 짝 · 비교 불가(간극 없음 null) · 짝은 남음', L.ok && L.how === 'name' && L.kind === 'none' && L.gap.cell_ratio === null && ix.pgap === null && ix.ptpl === 'work_start', JSON.stringify([L, ix]));
   r = await call({ action: 'cdoc_put', cid: 'c73', i: 1, doc_key: 'main.작성-6', kind: 'final', name: '수기.hwp', data: Buffer.from([0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1, 1, 2]).toString('base64') }, tk, 'dev1');
   T('73 hwp 파일 + 같은 단계 초안 여럿: 내용 비교 불가라 미매칭(자동으로 안 묶음)', r.code === 200 && r.body.learn.status === 'unmatched' && r.body.learn.candidates.length === 3, JSON.stringify(r.body.learn));
+  // ---- C294 판1: 구형 hwp 본문 문단 읽기(시험 재료 = 한컴 COM으로 만든 가짜 글 — tools/fixtures/c294: fx_a.hwpx·fx_a.hwp 같은 글, fx_b.hwp 한 문단 고침) ----
+  {
+    const FX = (n) => require('fs').readFileSync(join(ROOT, 'tools', 'fixtures', 'c294', n));
+    const ax = FX('fx_a.hwpx'), ah = FX('fx_a.hwp'), bh = FX('fx_b.hwp');
+    const pX = DD.hwpxParas(ax), pH = DD.hwpParas(ah), pB = DD.hwpParas(bh);
+    const enc = Buffer.from(ah); const si = enc.indexOf('HWP Document File'); if (si >= 0) enc[si + 36] |= 2;   // 암호 비트
+    const dst = Buffer.from(ah); if (si >= 0) dst[si + 36] |= 4;   // 배포용 비트
+    const d1 = DD.hwpParaDiff(ax, 'hwpx', bh), d0 = DD.hwpParaDiff(ax, 'hwpx', ah);
+    T('C294 hwp 문단: hwpx와 같은 글 = 문단 9개 글자째 같음(표 칸 4·탭 공백) · 한 문단 고친 hwp = 1건(11.1%) · 결과에 글 없음 · 암호·배포용·깨진 파일·hwp 아님 = null(읽은 척 안 함)',
+      pX && pH && JSON.stringify(pX) === JSON.stringify(pH) && pH.length === 9 && pH.indexOf('칸 넷') === 7 && pH.indexOf('탭 뒤 글자') === 3 && pB[2] !== pH[2]
+      && d0.ok && d0.changed === 0 && d1.ok && d1.kind === 'hwp_para' && d1.changed === 1 && d1.ratio === 0.111 && JSON.stringify(d1).indexOf('공사기간') < 0
+      && si >= 0 && DD.hwpParas(enc) === null && DD.hwpParas(dst) === null && DD.hwpParas(ah.slice(0, 3000)) === null && DD.hwpParas(Buffer.alloc(600)) === null && DD.hwpParas(ax) === null,
+      JSON.stringify({ pH, d1, si }));
+    const recX = { data: ax.toString('base64') };
+    T('C294 hwp 일치율: hwpx 초안 ↔ 같은 글 hwp = 1 · 한 문단 고침 = 0.889 · xlsx·docx 초안 ↔ hwp = null(종전대로 단계로만) · 못 읽는 hwp = null',
+      DD.matchScore(recX, 'hwpx', 'hwp', ah) === 1 && Math.abs(DD.matchScore(recX, 'hwpx', 'hwp', bh) - 8 / 9) < 1e-9 && DD.matchScore(recX, 'xlsx', 'hwp', ah) === null && DD.matchScore(recX, 'docx', 'hwp', ah) === null && DD.matchScore(recX, 'hwpx', 'hwp', enc) === null,
+      '');
+    // 끝에서 끝: 같은 단계에 한글 초안 + 엑셀 초안 — 표식 없는 hwp 수정본이 내용으로 한글 초안에 묶이고 문단 간극이 남음
+    const fdR = await call({ action: 'cdoc_put', cid: 'c73', i: 7, doc_key: 'gen.c294_form', kind: 'draft', pii: 1, name: '착공 공문.hwpx', data: ax.toString('base64') }, tk, 'dev1');
+    const fdN = (fdR.body.item || {}).n;
+    await call({ action: 'cdoc_put', cid: 'c73', i: 7, doc_key: 'gen.c294_sheet', kind: 'draft', pii: 1, name: '내역.xlsx', data: b64(mkXl({ A1: '내역' })) }, tk, 'dev1');
+    r = await call({ action: 'cdoc_put', cid: 'c73', i: 7, doc_key: 'main.작성-9', kind: 'final', name: '착공 공문 2014저장.hwp', data: bh.toString('base64') }, tk, 'dev1');
+    L = r.body.learn || {}; pair = mem.gw_data['learn:contract:in:' + L.id] || {};
+    T('C294 끝에서 끝: 한글 2014로 다시 저장한 hwp 수정본 = 내용으로 한글 초안에 짝(how content · kind hwp_para · 간극 11.1% · 일치율 0.889 · 모델 대상 아님) · 짝 블롭에 글 없음',
+      r.code === 200 && L.ok && L.how === 'content' && L.tpl === 'c294_form' && L.kind === 'hwp_para' && L.gap.cell_ratio === 0.111 && L.status === 'done_nomodel' && pair.match === 0.889 && JSON.stringify(pair).indexOf('공사기간') < 0,
+      JSON.stringify([r.code, L, pair.match]));
+    r = await call({ action: 'cdoc_put', cid: 'c73', i: 7, doc_key: 'main.작성-10', kind: 'final', name: '암호 걸린.hwp', data: enc.toString('base64') }, tk, 'dev1');
+    T('C294 암호 hwp + 같은 단계 초안 둘: 종전대로 미매칭(내용 비교 불가)', r.code === 200 && r.body.learn.status === 'unmatched' && r.body.learn.candidates.length === 2, JSON.stringify(r.body.learn));
+    // ---- C294(T248) 짝 수동 지정·풀기 ----
+    const encN = (r.body.item || {}).n, oldPair = r.body.learn.id;
+    let a = await call({ action: 'cdoc_pair_assign', cid: 'c73', n: encN, draft_n: fdN }, tk, 'dev1');
+    const ixE = mem.gw_data['recidx:c73'].items.find((x) => x.n === encN), pNew = mem.gw_data['learn:contract:in:' + (a.body.learn || {}).id] || {};
+    T('C294 수동 지정: 미매칭 최종본에 고른 한글 초안으로 짝(how manual · 못 읽는 hwp라 kind none) · 색인 ptpl·phow·pdn · 앞 미매칭 짝은 무효(superseded) · 감사 1줄',
+      a.code === 200 && a.body.learn.how === 'manual' && a.body.learn.tpl === 'c294_form' && a.body.learn.kind === 'none' && ixE.ptpl === 'c294_form' && ixE.phow === 'manual' && ixE.pdn === fdN && pNew.how === 'manual'
+      && mem.gw_data['learn:contract:in:' + oldPair].status === 'superseded' && a.body.audit === true, JSON.stringify([a.code, a.body.error_code, a.body.learn, ixE]));
+    a = await call({ action: 'cdoc_pair_assign', cid: 'c73', n: encN, draft_n: fdN }, tk, 'dev1');
+    const noChg = a.code === 400 && a.body.error_code === 'NO_CHANGE';
+    a = await call({ action: 'cdoc_pair_assign', cid: 'c73', n: encN, draft_n: encN }, tk, 'dev1');
+    const badDr = a.code === 400 && a.body.error_code === 'BAD_DRAFT';
+    a = await call({ action: 'cdoc_pair_assign', cid: 'c73', n: fdN, draft_n: fdN }, tk, 'dev1');
+    const badKind = a.code === 400 && a.body.error_code === 'BAD_KIND';
+    a = await call({ action: 'cdoc_pair_assign', cid: 'c73', n: 99999, draft_n: fdN }, tk, 'dev1');
+    const noFile = a.code === 404;
+    a = await call({ action: 'cdoc_pair_assign', cid: 'c73', n: encN, draft_n: 0 }, tk, 'dev1');
+    const badArg = a.code === 400 && a.body.error_code === 'BAD_DRAFT';
+    T('C294 수동 지정 거절: 같은 초안 다시 = NO_CHANGE · 초안 자리에 최종본 번호 = BAD_DRAFT · 최종본 자리에 초안 = BAD_KIND · 없는 번호 = 404 · 초안 번호 없음 = BAD_DRAFT', noChg && badDr && badKind && noFile && badArg, JSON.stringify({ noChg, badDr, badKind, noFile, badArg }));
+    const manPair = ixE.pair;
+    a = await call({ action: 'cdoc_pair_assign', cid: 'c73', n: encN, unpair: true }, tk, 'dev1');
+    const ixU = mem.gw_data['recidx:c73'].items.find((x) => x.n === encN);
+    const again = await call({ action: 'cdoc_pair_assign', cid: 'c73', n: encN, unpair: true }, tk, 'dev1');
+    T('C294 짝 풀기: 짝 무효(superseded) · 색인 짝 칸 지움 · 사유 MANUAL_OFF(다시 자동으로 안 묶음) · 두 번 풀기 = NO_CHANGE',
+      a.code === 200 && mem.gw_data['learn:contract:in:' + manPair].status === 'superseded' && !ixU.pair && !ixU.ptpl && ixU.plearn === 'MANUAL_OFF' && again.code === 400 && again.body.error_code === 'NO_CHANGE', JSON.stringify([a.code, ixU]));
+    a = await call({ action: 'cdoc_pair_assign', cid: 'c73', n: encN, draft_n: fdN }, 'no-such-token', 'dev1');
+    T('C294 수동 지정: 로그인 없음 = 401', a.code === 401, String(a.code));
+    await call({ action: 'cdoc_put', cid: 'c73', i: 8, doc_key: 'gen.c294_only_sheet', kind: 'draft', pii: 1, name: '표만.xlsx', data: b64(mkXl({ A1: '표만' })) }, tk, 'dev1');
+    r = await call({ action: 'cdoc_put', cid: 'c73', i: 8, doc_key: 'main.작성-11', kind: 'final', name: '한글로 낸 것.hwp', data: ah.toString('base64') }, tk, 'dev1');
+    L = r.body.learn || {};
+    T('C294 이 단계엔 엑셀 초안뿐이어도 다른 단계 한글 초안과 글이 같으면 그 초안에 내용 짝(일치율 1 · 간극 0)',
+      r.code === 200 && L.ok && L.how === 'content' && L.tpl === 'c294_form' && L.kind === 'hwp_para' && L.gap.cell_ratio === 0, JSON.stringify(L));
+    await call({ action: 'cdoc_put', cid: 'c73b', i: 1, doc_key: 'gen.c294_b_sheet', kind: 'draft', pii: 1, name: '표만.xlsx', data: b64(mkXl({ A1: '표만' })) }, tk, 'dev1');
+    r = await call({ action: 'cdoc_put', cid: 'c73b', i: 1, doc_key: 'main.작성-0', kind: 'final', name: '한글로 낸 것.hwp', data: ah.toString('base64') }, tk, 'dev1');
+    L = r.body.learn || {};
+    T('C294 계약에 한글 초안이 하나도 없음: 종전대로 내용 비교 안 함 → 같은 단계 초안 하나로 단계 짝(kind none)',
+      r.code === 200 && L.ok && L.how === 'stage' && L.kind === 'none', JSON.stringify([r.code, r.body.error_code, L]));
+  }
   r = await call({ action: 'cdoc_put', cid: 'c73', i: 1, doc_key: 'main.작성-7', kind: 'final', name: '건진.xlsx', pii: 2, data: b64(mkXl({ A1: '착공계', C1: '칸' }, M1)) }, tk, 'dev1');
   T('73 민감정보 등급 2: 표식이 있어도 짝을 안 만듦', r.code === 200 && r.body.learn.code === 'TYPE_EXCLUDED', JSON.stringify(r.body.learn));
   const sameB = b64(mkXl({ A1: '그대로' }, 'JWG1.c73.safety_cost.same000000'));
@@ -7259,11 +7324,14 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       walk(FN); return out.sort(); };
     const st88 = sites88(), stM88 = sites88({ 'gw-data.js': '\n    const raw2 = zlib.inflateRawSync(data, { maxOutputLength: DD.ZIP_ENTRY_MAX });' });
     const pb88 = (() => { const i = S88.gwd.indexOf('function parseBody('), j = S88.gwd.indexOf('\n}', i); return i >= 0 ? S88.gwd.slice(i, j) : ''; })();
-    const fix88 = (L) => JSON.stringify(L) === JSON.stringify(['_lib/docdiff.js:inflateRawSync', 'gw-data.js:gunzipSync', 'gw-stmt.js:gunzipSync']);   // v461(29): gw-stmt parseBody도 요청 gzip 1곳(GZ_MAX_OUT 6MB 상한 — 아래 pbS88)
+    // C294 판1: docdiff hwpParasRaw의 hwp 섹션 풀기 1곳 더함(섹션당 HWP_SEC_MAX 64MB · 파일 총량 HWP_TOTAL_MAX 128MB — zip 예산과 같은 꼴, 아래 hwp88)
+    const fix88 = (L) => JSON.stringify(L) === JSON.stringify(['_lib/docdiff.js:inflateRawSync', '_lib/docdiff.js:inflateRawSync', 'gw-data.js:gunzipSync', 'gw-stmt.js:gunzipSync']);   // v461(29): gw-stmt parseBody도 요청 gzip 1곳(GZ_MAX_OUT 6MB 상한 — 아래 pbS88)
+    const ddS88 = fs88.readFileSync(join(FN, '_lib', 'docdiff.js'), 'utf8');
+    const hwp88 = /d = zlib\.inflateRawSync\(d, \{ maxOutputLength: HWP_SEC_MAX \}\);\n\s*total \+= d\.length; if \(total > HWP_TOTAL_MAX\) return null;/.test(ddS88) && /\nconst HWP_SEC_MAX = 64 \* 1024 \* 1024, HWP_TOTAL_MAX = 128 \* 1024 \* 1024/.test(ddS88);
     const gws88 = fs88.readFileSync(join(FN, 'gw-stmt.js'), 'utf8'), pbS88 = (() => { const i = gws88.indexOf('function parseBody('), j = gws88.indexOf('\n}', i); return i >= 0 ? gws88.slice(i, j) : ''; })();
     const capS88 = /gunzipSync\(.*, \{ maxOutputLength: GZ_MAX_OUT \}\)/.test(pbS88) && /\nconst GZ_MAX_OUT = 6 \* 1024 \* 1024;/.test(gws88);
     T('88 v456 2차 검토 ④ 정적: 함수 폴더 동기·비동기 압축 풀기 호출 = _lib/docdiff.js inflateRawSync 1곳 + gw-data.js gunzipSync 1곳(parseBody 안) + gw-stmt.js gunzipSync 1곳(parseBody 안·maxOutputLength GZ_MAX_OUT 6MB — v461)뿐 · 결함 사본(gw-data에 항목당 상한만 건 inflateRawSync 1줄) ✗',
-      fix88(st88) && /gunzipSync\(/.test(pb88) && capS88 && !fix88(stM88), JSON.stringify({ st88, stM88, capS88 }));
+      fix88(st88) && /gunzipSync\(/.test(pb88) && capS88 && hwp88 && !fix88(stM88), JSON.stringify({ st88, stM88, capS88, hwp88 }));
     // ⑤ appdata autotask --selftest(원장 C106 — 워크플로는 --dry-run·실행만 돌림): 형제 폴더 jongwoon-appdata·python이 있을 때만 rc 0·"selftest 통과"·결함 사본 줄 ✓ — 없으면 생략을 알림
     const ad88 = join(ROOT, '..', 'jongwoon-appdata', 'collectors', 'autotask.py');
     if (!fs88.existsSync(ad88)) console.log('  (88 ⑤ 생략 — jongwoon-appdata 폴더 없음)');

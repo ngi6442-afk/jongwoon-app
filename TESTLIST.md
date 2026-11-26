@@ -1936,3 +1936,8 @@
 - [ ] (AI 운영 확인 — 연구노트 C177ⓑ) 12월 첫 확정 뒤 8일째에 PM 콘솔에 '연구노트 최근 확정본' 한 줄과 [n월 확정본 받기]가 보이고 눌러 내려받아짐 — 원장 C173과 같이 확인
 - [x] (AI) `uismoke` 'C174 ③④'·'P1 판21 ④'(결함 사본 28개) · 시험 서버(실제 서버 함수·백업 사본)에서 8일 지난 확정본 = 한 줄·단추 눌러 내려받기 — ✓ AI 11/26
 - [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · 원본 읽기 검사 4종 · `paycalc_check` · `stmtmail_check` 전부 통과 + node --check + 앱 스크립트 전체 파싱 오류 0 — 숫자는 커밋 메시지
+
+## v550 — T234 현장 줄 머리 · C294 판1 hwp 문단 비교 · 학습 짝 수동 지정(T248)
+- [ ] (AI 운영 확인 — T234) 배포 뒤 현장 탭 석면 건 하나 펼침(PC 표·폰 옛 카드): 신고번호 줄 머리가 '통합실적관리시스템'(값 그대로) · 폰 375px에서 넘치지 않음
+- [ ] (AI 운영 확인 — C294) 다음에 직원이 hwp 최종본을 올리면 계약 서류 탭 'AI 생성본 ↔ 직원 최종본' 줄에 간극이 나옴(비교 불가 아님) · 짝 없는 줄에 [AI 초안 고르기]가 계약 수행 권한자에게만 보임
+- [x] (AI) `servertest` C294 10검사(hwp 문단·일치율·끝에서 끝·암호·수동 지정·거절·풀기·401) · `uismoke` C294 짝 선택칸 실행 검사·v434 고정 화면·v445 해시·v549 검사 이 판 이상으로 풂 · 게이트 전부 통과 + 앱 스크립트 전체 파싱 오류 0 — ✓ AI 11/26

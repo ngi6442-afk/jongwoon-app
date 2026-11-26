@@ -296,6 +296,110 @@ function hwpxParaDiff(draftBuf, finalBuf) {
   if (!A || !B) return { ok: false, code: 'NO_SECTION', kind: 'hwpx_para', compared: 0, changed: 0, uncomparable: 0 };
   return paraDiff(A, B, 'hwpx_para');
 }
+// ---- 구형 hwp(5.0 바이너리) 본문 문단(원장 C294 판1 · T269 대책 1) ----
+// 직원이 한글 2014 등에서 hwpx 초안을 hwp로 다시 저장해 올리면 지금까지는 비교 불가(kind none)였다. 복합 문서(OLE)를 외부 라이브러리 없이 따라가
+//   FileHeader(압축·암호·배포용 비트) → BodyText 저장소의 Section0..N 스트림 → (압축이면) raw deflate 풀기 → 레코드를 돌며 HWPTAG_PARA_TEXT(67) 글자만 모은다.
+// 제어 글자: 0·10·13·24~31 = 한 칸(10 줄바꿈·30·31 빈칸은 공백) · 그 밖 0~31 = 확장·인라인 8칸 묶음(9 탭만 공백). 표 칸 문단도 같은 스트림의 문단이라 차례대로 들어간다.
+// 암호·배포용(ViewText) 문서·깨진 파일은 null(비교 불가 — 읽은 척하지 않는다). 문단 글자는 hwpxParas와 같은 normS, 빈 문단은 뺀다(같은 규칙).
+const HWP_SEC_MAX = 64 * 1024 * 1024, HWP_TOTAL_MAX = 128 * 1024 * 1024, HWP_SECS_MAX = 256;
+function oleOpen(buf) {
+  if (!buf || buf.length < 512 || buf.readUInt32LE(0) !== 0xE011CFD0 || buf.readUInt32LE(4) !== 0xE11AB1A1) return null;
+  const secSize = 1 << buf.readUInt16LE(30), miniSize = 1 << buf.readUInt16LE(32), END = 0xFFFFFFFA;
+  if (secSize !== 512 && secSize !== 4096) return null;
+  const nFat = buf.readUInt32LE(44), dirStart = buf.readUInt32LE(48), miniCut = buf.readUInt32LE(56), miniFatStart = buf.readUInt32LE(60), difStart = buf.readUInt32LE(68);
+  const off = function (s) { return (s + 1) * secSize; };
+  const fatSecs = [];
+  for (let i = 0; i < 109 && fatSecs.length < nFat; i++) { const s = buf.readUInt32LE(76 + i * 4); if (s < END) fatSecs.push(s); }
+  let dif = difStart, g0 = 0;
+  while (dif < END && g0++ < 4096 && fatSecs.length < nFat) {
+    const o = off(dif); if (o + secSize > buf.length) return null;
+    for (let i = 0; i < secSize / 4 - 1 && fatSecs.length < nFat; i++) { const s = buf.readUInt32LE(o + i * 4); if (s < END) fatSecs.push(s); }
+    dif = buf.readUInt32LE(o + secSize - 4);
+  }
+  const per = secSize / 4;
+  const next = function (s) { const fs = fatSecs[Math.floor(s / per)]; if (fs === undefined) return END; const o = off(fs) + (s % per) * 4; return o + 4 <= buf.length ? buf.readUInt32LE(o) : END; };
+  const read = function (start, cap) {
+    const out = []; let s = start, g = 0, n = 0;
+    while (s < END && g++ < 1000000) { const o = off(s); if (o + secSize > buf.length) break; out.push(buf.slice(o, o + secSize)); n += secSize; if (n > cap) return null; s = next(s); }
+    return Buffer.concat(out);
+  };
+  const dir = read(dirStart, 16 * 1024 * 1024); if (!dir) return null;
+  const ents = [];
+  for (let p = 0; p + 128 <= dir.length; p += 128) {
+    const nl = dir.readUInt16LE(p + 64);
+    ents.push({ name: nl >= 2 && nl <= 64 ? dir.slice(p, p + nl - 2).toString('utf16le') : '', type: dir[p + 66], left: dir.readUInt32LE(p + 68), right: dir.readUInt32LE(p + 72), child: dir.readUInt32LE(p + 76), start: dir.readUInt32LE(p + 116), size: dir.readUInt32LE(p + 120) });
+  }
+  const root = ents.filter(function (e) { return e.type === 5; })[0] || null;
+  let mini = null;
+  const stream = function (e, cap) {
+    if (!e || e.type !== 2 || e.size > cap) return null;
+    if (e.size >= miniCut || !root) { const d = read(e.start, e.size + secSize); return d ? d.slice(0, e.size) : null; }
+    if (!mini) { mini = { s: read(root.start, HWP_TOTAL_MAX), f: read(miniFatStart, 16 * 1024 * 1024) }; }
+    if (!mini.s || !mini.f) return null;
+    const out = []; let s = e.start, g = 0;
+    while (s < END && g++ < 1000000) { if ((s + 1) * miniSize > mini.s.length || s * 4 + 4 > mini.f.length) return null; out.push(mini.s.slice(s * miniSize, (s + 1) * miniSize)); s = mini.f.readUInt32LE(s * 4); }
+    return Buffer.concat(out).slice(0, e.size);
+  };
+  // 저장소 e의 자식(레드블랙 나무 — left·right·child 번호)을 모두
+  const kids = function (e) {
+    const out = [], st = e && e.child < ents.length ? [e.child] : [], seen = {};
+    while (st.length && out.length < 4096) { const i = st.pop(); if (i >= ents.length || seen[i]) continue; seen[i] = 1; const x = ents[i]; out.push(x); if (x.left < ents.length) st.push(x.left); if (x.right < ents.length) st.push(x.right); }
+    return out;
+  };
+  return { root: root, kids: kids, stream: stream };
+}
+function hwpParaText(rec) {
+  let s = '', i = 0;
+  const n = rec.length >> 1;
+  while (i < n) {
+    const c = rec.readUInt16LE(i * 2);
+    if (c >= 32) { s += String.fromCharCode(c); i++; continue; }
+    if (c === 13) break;
+    if (c === 10 || c === 30 || c === 31) { s += ' '; i++; continue; }
+    if (c === 0 || (c >= 24 && c <= 29)) { i++; continue; }
+    if (c === 9) s += ' ';
+    i += 8;   // 인라인·확장 제어(8칸 묶음)
+  }
+  return s;
+}
+function hwpParas(buf) { return memoBuf(MEMO_HWP, buf, hwpParasRaw); }
+const MEMO_HWP = new WeakMap();
+function hwpParasRaw(buf) {
+  try {
+    const ole = oleOpen(buf); if (!ole || !ole.root) return null;
+    const top = ole.kids(ole.root);
+    const fh = ole.stream(top.filter(function (e) { return e.name === 'FileHeader' && e.type === 2; })[0], 4096);
+    if (!fh || fh.length < 40 || fh.slice(0, 17).toString('latin1') !== 'HWP Document File') return null;
+    const prop = fh.readUInt32LE(36), packed = (prop & 1) !== 0;
+    if (prop & 2 || prop & 4) return null;   // 암호·배포용 — 본문을 못 읽는다
+    const body = top.filter(function (e) { return e.name === 'BodyText' && e.type === 1; })[0];
+    if (!body) return null;
+    const secs = ole.kids(body).filter(function (e) { return e.type === 2 && /^Section\d+$/.test(e.name); })
+      .sort(function (a, b) { return Number(a.name.slice(7)) - Number(b.name.slice(7)); });
+    if (!secs.length || secs.length > HWP_SECS_MAX) return null;
+    const out = []; let total = 0;
+    for (let k = 0; k < secs.length; k++) {
+      let d = ole.stream(secs[k], HWP_SEC_MAX); if (!d) return null;
+      if (packed) d = zlib.inflateRawSync(d, { maxOutputLength: HWP_SEC_MAX });
+      total += d.length; if (total > HWP_TOTAL_MAX) return null;
+      let p = 0;
+      while (p + 4 <= d.length) {
+        const h = d.readUInt32LE(p); p += 4;
+        let size = h >>> 20; const tag = h & 0x3FF;
+        if (size === 0xFFF) { if (p + 4 > d.length) return null; size = d.readUInt32LE(p); p += 4; }
+        if (p + size > d.length) return null;
+        if (tag === 67) { const t = normS(hwpParaText(d.slice(p, p + size))); if (t) out.push(t); }
+        p += size;
+      }
+    }
+    return out;
+  } catch (e) { return null; }
+}
+function hwpParaDiff(draftBuf, draftExt, finalBuf) {
+  const A = draftExt === 'hwp' ? hwpParas(draftBuf) : draftExt === 'docx' ? docxParas(draftBuf) : hwpxParas(draftBuf), B = hwpParas(finalBuf);
+  if (!A || !B) return { ok: false, code: !B ? 'HWP_UNREADABLE' : 'NO_SECTION', kind: 'hwp_para', compared: 0, changed: 0, uncomparable: 0 };
+  return paraDiff(A, B, 'hwp_para');
+}
 // ---- hwpx 칸(토큰) 비교(P1 판16 · 원장 T396 — 계약 학습 2차) ----
 // 앱은 hwpx 양식 글자 안의 {{칸 이름}}을 값으로 바꿔 초안을 만든다(index.html fillHwpxTemplate — 칸이 든 문단만 고치고 문단 수는 그대로).
 // 서버에 남은 빈 양식(tpl:<양식>) · 초안 · 최종본 세 파일의 문단을 읽어
@@ -524,6 +628,14 @@ function matchScore(rec, draftExt, finalExt, finalBuf) {
     if (db && draftExt === 'xlsx') { const d = xlsxFileDiff(db, finalBuf); if (!d.ok) return null; if (d.ratio === null) return d.uncomparable > 0 ? 0 : null; return 1 - d.ratio; }
     return MATCH_FAM[draftExt] ? 0 : null;
   }
+  // C294 판1: 구형 hwp 최종본은 한글 초안(hwpx·hwp)과만 문단으로 잰다 — 그 밖 초안·못 읽는 hwp(암호·배포용)는 종전대로 null(단계로만 묶음)
+  if (finalExt === 'hwp') {
+    if ((draftExt !== 'hwpx' && draftExt !== 'hwp') || !db) return null;
+    const H = hwpParas(finalBuf); if (!H || !H.length) return null;
+    const D = draftExt === 'hwp' ? hwpParas(db) : hwpxParas(db); if (!D || !D.length) return null;
+    const ha = D.slice(0, PARA_CAP), hb = H.slice(0, PARA_CAP);
+    return lcsLen(ha, hb) / Math.max(ha.length, hb.length);
+  }
   if (!MATCH_FAM[finalExt]) return null;
   if (draftExt !== finalExt) return (MATCH_FAM[draftExt] || draftExt === 'json') ? 0 : null;   // hwpx 파일 ↔ xlsx 초안
   if (!db) return null;
@@ -581,4 +693,4 @@ function cellRows(edits, finalBuf, allowRefs) {
   });
   return { ok: true, rows: rows, hidden_changed: hidden_changed.slice(0, 100), hidden_same_n: hidden_same };
 }
-module.exports = { ZIP_ENTRY_MAX, ZIP_TOTAL_MAX, ZIP_ENTRIES_MAX, XLSX_CELLS_MAX, zipBudget, zipEntries, zipCheck, xlsxCells, xlsxCellDiff, xlsxFileDiff, docxParas, docxParaDiff, hwpxParas, hwpxParaDiff, hwpxParaItems, hwpxTokDiff, hwpxTokRows, tplFinger, TOK_PARA_CAP, matchScore, genMarkOf, genMarkParse, listDiff, gapScore, refRC, inMergedNonAnchor, splitRef, cellRows, flattenEdits };
+module.exports = { ZIP_ENTRY_MAX, ZIP_TOTAL_MAX, ZIP_ENTRIES_MAX, XLSX_CELLS_MAX, zipBudget, zipEntries, zipCheck, xlsxCells, xlsxCellDiff, xlsxFileDiff, docxParas, docxParaDiff, hwpxParas, hwpxParaDiff, hwpParas, hwpParaDiff, hwpxParaItems, hwpxTokDiff, hwpxTokRows, tplFinger, TOK_PARA_CAP, matchScore, genMarkOf, genMarkParse, listDiff, gapScore, refRC, inMergedNonAnchor, splitRef, cellRows, flattenEdits };

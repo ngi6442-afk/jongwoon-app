@@ -3808,6 +3808,13 @@ async function cdocLearnPair(st, member, ref, idx, item, ext, b64, orig, d) {
   const all = idx.items.filter(isDraft);
   const want = (d && typeof d.pair_tpl === 'string') ? d.pair_tpl.trim().slice(0, 40) : '';
   let pick = byMark, how = byMark ? 'mark' : '', match = null;
+  // C294(T248): 사람이 고른 초안(cdoc_pair_assign) — 같은 계약의 살아 있는 AI 초안만. 비교는 아래 형식별 그대로(형식이 다르면 kind none)
+  const manualN = (d && d.pair_draft_n !== undefined) ? Number(d.pair_draft_n) : 0;
+  if (manualN) {
+    const mx = idx.items.filter(function (x) { return live(x) && Number(x.n) === manualN; })[0];
+    if (!mx) return { ok: false, code: 'NO_DRAFT' };
+    pick = mx; how = 'manual';
+  }
   // v423 넣기 박스: 서류 이름으로 양식이 정해지면(pair_tpl) 초안이 다른 단계에서 만들어졌어도 그 초안과 짝을 맺는다
   if (!pick && want) {
     pick = drafts.filter(function (x) { return x.dk === 'gen.' + want; })[0] || all.filter(function (x) { return x.dk === 'gen.' + want; }).sort(function (a, b) { return b.n - a.n; })[0] || null;
@@ -3825,7 +3832,10 @@ async function cdocLearnPair(st, member, ref, idx, item, ext, b64, orig, d) {
   if (!pick) {
     if (!all.length) return { ok: false, code: 'NO_DRAFT' };
     // 비교되는 형식이면 형식이 맞는 초안만, 이 단계 먼저·최근 판 먼저 대조한다. 형식이 맞는 초안이 없으면 다른 서류
-    const fam = { xlsx: 1, hwpx: 1, docx: 1 }, cmp = !!fam[ext], fmtOk = function (x) { return ext === 'xlsx' ? (x.ext === 'xlsx' || x.ext === 'json') : x.ext === ext; };
+    const fam = { xlsx: 1, hwpx: 1, docx: 1 }, fmtOk = function (x) { return ext === 'xlsx' ? (x.ext === 'xlsx' || x.ext === 'json') : ext === 'hwp' ? (x.ext === 'hwpx' || x.ext === 'hwp') : x.ext === ext; };
+    // C294 판1: 구형 hwp는 본문이 읽히고(암호·배포용 아님) 한글 초안(hwpx·hwp)이 있을 때만 내용으로 잰다 — 아니면 종전대로 비교 불가 형식(단계로만 묶음)
+    const hwpCmp = ext === 'hwp' && !!fb && !!DD.hwpParas(fb) && all.some(fmtOk);
+    const cmp = !!fam[ext] || hwpCmp;
     const pool = cmp ? drafts.filter(fmtOk).concat(all.filter(function (x) { return x.i !== ref.i && fmtOk(x); }).sort(function (a, b) { return b.n - a.n; })) : [];
     if (cmp && !pool.length) return { ok: false, code: 'NO_MATCH' };
     const order = pool.slice(0, PAIR_SCAN_MAX), scored = [];
@@ -3877,6 +3887,8 @@ async function cdocLearnPair(st, member, ref, idx, item, ext, b64, orig, d) {
     if (tk && tk.ok) { diff = tk; kind = 'hwpx_tok'; }
     else { diff = DD.hwpxParaDiff(db, fb); kind = 'hwpx_para'; if (diff && tk && tk.code) diff.tok_code = String(tk.code).slice(0, 30); }
   }
+  // C294 판1: 한글 초안(hwpx·hwp) ↔ 구형 hwp 최종본 = 문단 비교(간극만 — 모델 학습은 칸 비교만). 본문을 못 읽으면(암호·배포용·깨짐) 종전대로 none
+  else if (fb && db && ext === 'hwp' && (pick.ext === 'hwpx' || pick.ext === 'hwp')) { const hd = DD.hwpParaDiff(db, pick.ext, fb); if (hd.ok) { diff = hd; kind = 'hwp_para'; } }
   const gap = DD.gapScore(diff, null, 0);
   const s = await learnSettings(st);
   const status = ((kind === 'xlsx_cell' || kind === 'hwpx_tok') && learnAllowed(s, tpl)) ? 'pending' : 'done_nomodel';   // 모델 학습은 칸 비교만(허용 사전이 칸 단위 — 한글 양식은 칸 = {{칸 이름}}) — 문단 비교는 간극만
@@ -4355,6 +4367,57 @@ async function handleCdocMove(event, d, R) {
     }
   }
   return jr(200, { status: 'OK', cid: ref.cid, n: n, item: cdocPublic(it), learn: learn, audit: audit, request_id: R });
+}
+// C294(T248): 자동으로 짝을 못 정한 직원 최종본에 사람이 AI 초안을 골라 짝을 맺는다(또는 풀기). v424 원칙대로 직원에게 묻지 않고, 서류 줄의 작은 선택칸으로만 —
+//   계약 '수행' 권한 · 최종본만 · 민감정보 등급 2는 짝을 만들지 않음(cdocLearnPair TYPE_EXCLUDED) · 같은 계약의 살아 있는 AI 초안만 · 앞 짝은 무효(superseded)로 · 감사 1줄.
+//   풀기(unpair) = 앞 짝 무효 + 줄에 '사람이 풂'(plearn MANUAL_OFF)을 남겨 다시 자동으로 묶지 않음.
+async function handleCdocPairAssign(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
+  if (permOf(c.member, 'contracts') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
+  const cid = String(d.cid || '');
+  if (!/^[A-Za-z0-9_-]{1,40}$/.test(cid)) return jr(400, { status: 'REJECTED', error_code: 'BAD_CID', request_id: R });
+  const n = Number(d.n), unpair = d.unpair === true, dn = Number(d.draft_n);
+  if (!(n >= 1) || !Number.isInteger(n)) return jr(400, { status: 'REJECTED', error_code: 'BAD_ID', request_id: R });
+  if (!unpair && !(dn >= 1 && Number.isInteger(dn))) return jr(400, { status: 'REJECTED', error_code: 'BAD_DRAFT', request_id: R });
+  const st = store(DATA), files = store(FILES);
+  const ld = await conLoadItem(st, cid);
+  if (!ld.ok) return jr(ld.http, { status: ld.http === 500 ? 'ERROR' : 'REJECTED', error_code: ld.code, request_id: R });
+  const ix = await cdocIdxRead(st, cid);
+  if (!ix.ok) return jr(500, { status: 'ERROR', error_code: ix.code, request_id: R });
+  const idx = ix.doc, it = idx.items.find(function (x) { return x && Number(x.n) === n; });
+  if (!it || it.purged || it.gc || it.del) return jr(404, { status: 'REJECTED', error_code: 'NO_FILE', request_id: R });
+  if (it.kind !== 'final') return jr(400, { status: 'REJECTED', error_code: 'BAD_KIND', request_id: R });
+  if (!cdocCanRead(c.member, it)) return jr(403, { status: 'FORBIDDEN', error_code: it.pii === 2 ? 'PII2_FORBIDDEN' : 'PII_FORBIDDEN', request_id: R });
+  if (unpair) {
+    if (!it.pair && it.plearn === 'MANUAL_OFF') return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
+    await cdocPairVoid(st, it);
+    cdocPairClear(it); it.plearn = 'MANUAL_OFF';
+    idx.updated_at = Date.now(); idx.updated_by = c.member.id;
+    const w = await blobSet(st, cdocIdxKey(cid), idx);
+    if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+    const audit = await cdocAudit(c.member, '학습짝풂', cid, it.name);
+    return jr(200, { status: 'OK', cid: cid, n: n, item: cdocPublic(it), learn: null, audit: audit, request_id: R });
+  }
+  const dx = idx.items.find(function (x) { return x && Number(x.n) === dn; });
+  if (!dx || dx.kind !== 'draft' || dx.del || dx.gc || dx.purged || typeof dx.dk !== 'string' || dx.dk.indexOf('gen.') !== 0) return jr(400, { status: 'REJECTED', error_code: 'BAD_DRAFT', request_id: R });
+  if (it.pair && Number(it.pdn) === dn) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
+  const fr = await blobGet(files, cdocKey(cid, it.i, it.dk, n));
+  if (!fr.ok || !fr.data) return jr(404, { status: 'REJECTED', error_code: 'NO_FILE', request_id: R });
+  let learn = null;
+  try {
+    const b64 = fr.data.att ? await BF.attReadB64(files, fr.data.att, (await blobGet(files, fr.data.att)).data) : String(fr.data.data || '');
+    await cdocPairVoid(st, it);
+    cdocPairClear(it);
+    learn = await cdocLearnPair(st, c.member, { cid: cid, i: it.i, dk: it.dk }, idx, it, it.ext, b64, it.orig, { pair_draft_n: dn });
+  } catch (e) { learn = { ok: false, code: 'LEARN_THREW' }; }
+  cdocPairMeta(it, learn || { code: 'LEARN_THREW' });
+  idx.updated_at = Date.now(); idx.updated_by = c.member.id;
+  const w = await blobSet(st, cdocIdxKey(cid), idx);
+  if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  const audit = await cdocAudit(c.member, '학습짝지정', cid, it.name);
+  return jr(learn && learn.id ? 200 : 409, { status: learn && learn.id ? 'OK' : 'REJECTED', error_code: learn && learn.id ? undefined : (learn && learn.code) || 'PAIR_FAILED', cid: cid, n: n, item: cdocPublic(it), learn: learn, audit: audit, request_id: R });
 }
 // 계약 시작 카드에서 사람이 판단을 그대로 뒀는지(ok) 고쳤는지 — 고친 것만 box:fixes에 쌓는다. 값은 유형·사급관급 같은 분류뿐
 async function handleBoxFix(event, d, R) {
@@ -6863,6 +6926,7 @@ async function handlerInner(event) {
     if (d && d.action === 'box_put') return await handleBoxPut(event, d, R);   // v423 넣기 박스
     if (d && d.action === 'cdoc_attach') return await handleCdocAttach(event, d, R);
     if (d && d.action === 'cdoc_move') return await handleCdocMove(event, d, R);
+    if (d && d.action === 'cdoc_pair_assign') return await handleCdocPairAssign(event, d, R);   // C294(T248) 짝 수동 지정·풀기
     if (d && d.action === 'box_fix') return await handleBoxFix(event, d, R);
     if (d && d.action === 'box_pending') return await handleBoxPending(event, d, R);
     if (d && d.action === 'cdoc_put') return await handleCdocPut(event, d, R);   // v406 계약 서류함(D3)

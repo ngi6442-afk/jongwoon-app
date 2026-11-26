@@ -4423,7 +4423,7 @@ try {
   ];
   const PIN_OPT35 = { can: true, members: [{ id: 'u1', name: '홍길동' }], workers: [{ id: 'w1', name: '일용 갑' }] };
   const PIN_V434_35 = [
-    '<div class="item asb-item" style="display:block;padding:0;"><button type="button" class="asb-hd" data-site-fold="pA" aria-expanded="false"><span class="asb-seq">석면 #7</span><span class="asb-t">현장 고정 석면 &lt;b&gt;</span><span class="asb-end">2099-06-30</span><span class="sec-caret">▾</span></button><div class="asb-bd" id="siteBd-pA" style="display:none;"><div class="jw-sheet-wrap"><table class="jw-sheet"><tr><th>종류·상태</th><td>석면 · 작업중</td></tr><tr><th>발주처</th><td>포항시 &amp; 교육청</td></tr><tr><th>소재지</th><td>포항시 남구</td></tr><tr><th>기간</th><td><span class="num">2099-05-01 ~ 2099-06-30</span></td></tr><tr><th>자재·면적</th><td>천장텍스 · <span class="num">120.5㎡</span></td></tr><tr><th>작업신고 마감</th><td class="warn"><span class="num">2099-04-24</span> (착수 7일 전)</td></tr><tr><th>참여 근로자</th><td><b class="num">2명</b> · 홍길동, 일용 갑 <button class="mini-btn" data-site-wk="pA" style="margin-left:6px;">근로자 추가</button></td></tr><tr><th>특별교육</th><td class="warn"><b>미이수 2명</b> — 홍길동, 일용 갑 (배치 전 이수 필요)</td></tr><tr><th>공기 중 농도</th><td><span class="num">0.002</span> 개/㎤</td></tr><tr><th>폐기물 인계번호</th><td>W-1</td></tr><tr><th>키스콘 신고</th><td><span class="num">K-9</span> · 2099년 · 석면해체</td></tr><tr><th>계약액</th><td><span class="num">12345678원</span> · 기성 <span class="num">2000000원</span></td></tr><tr><th>발주자 승인</th><td class="warn">승인 취소</td></tr><tr><th>기록 보존 만료</th><td><span class="num">2129-06-30</span></td></tr><tr><th>메모</th><td>첫 줄<br>둘째 줄</td></tr></table></div><button class="link-btn" data-asb-edit="pA" style="text-align:left;width:auto;padding:2px 0 0;">수정</button></div></div>',
+    '<div class="item asb-item" style="display:block;padding:0;"><button type="button" class="asb-hd" data-site-fold="pA" aria-expanded="false"><span class="asb-seq">석면 #7</span><span class="asb-t">현장 고정 석면 &lt;b&gt;</span><span class="asb-end">2099-06-30</span><span class="sec-caret">▾</span></button><div class="asb-bd" id="siteBd-pA" style="display:none;"><div class="jw-sheet-wrap"><table class="jw-sheet"><tr><th>종류·상태</th><td>석면 · 작업중</td></tr><tr><th>발주처</th><td>포항시 &amp; 교육청</td></tr><tr><th>소재지</th><td>포항시 남구</td></tr><tr><th>기간</th><td><span class="num">2099-05-01 ~ 2099-06-30</span></td></tr><tr><th>자재·면적</th><td>천장텍스 · <span class="num">120.5㎡</span></td></tr><tr><th>작업신고 마감</th><td class="warn"><span class="num">2099-04-24</span> (착수 7일 전)</td></tr><tr><th>참여 근로자</th><td><b class="num">2명</b> · 홍길동, 일용 갑 <button class="mini-btn" data-site-wk="pA" style="margin-left:6px;">근로자 추가</button></td></tr><tr><th>특별교육</th><td class="warn"><b>미이수 2명</b> — 홍길동, 일용 갑 (배치 전 이수 필요)</td></tr><tr><th>공기 중 농도</th><td><span class="num">0.002</span> 개/㎤</td></tr><tr><th>폐기물 인계번호</th><td>W-1</td></tr><tr><th>통합실적관리시스템</th><td><span class="num">K-9</span> · 2099년 · 석면해체</td></tr><tr><th>계약액</th><td><span class="num">12345678원</span> · 기성 <span class="num">2000000원</span></td></tr><tr><th>발주자 승인</th><td class="warn">승인 취소</td></tr><tr><th>기록 보존 만료</th><td><span class="num">2129-06-30</span></td></tr><tr><th>메모</th><td>첫 줄<br>둘째 줄</td></tr></table></div><button class="link-btn" data-asb-edit="pA" style="text-align:left;width:auto;padding:2px 0 0;">수정</button></div></div>',
     '<div class="item asb-item" style="display:block;padding:0;"><button type="button" class="asb-hd" data-site-fold="pB" aria-expanded="false"><span class="asb-seq">철거</span><span class="asb-t">현장 고정 철거</span><span class="asb-end">2024-03-09</span><span class="sec-caret">▾</span></button><div class="asb-bd" id="siteBd-pB" style="display:none;"><div class="jw-sheet-wrap"><table class="jw-sheet"><tr><th>종류·상태</th><td>철거 · 종결</td></tr><tr><th>발주처</th><td>—</td></tr><tr><th>소재지</th><td class="warn"><b>미입력</b></td></tr><tr><th>기간</th><td><span class="num">2024-03-02 ~ 2024-03-09</span></td></tr><tr><th>참여 근로자</th><td class="warn"><b>미지정</b> <button class="mini-btn" data-site-wk="pB" style="margin-left:6px;">근로자 추가</button></td></tr><tr><th>기록 보존 만료</th><td><span class="num">2054-03-09</span></td></tr></table></div><button class="link-btn" data-asb-edit="pB" style="text-align:left;width:auto;padding:2px 0 0;">수정</button></div></div>',
     '<div class="item asb-item" style="display:block;padding:0;"><button type="button" class="asb-hd" data-site-fold="pC" aria-expanded="false"><span class="asb-seq">준설</span><span class="asb-t">(공사명 없음)</span><span class="asb-end">기간 미상</span><span class="sec-caret">▾</span></button><div class="asb-bd" id="siteBd-pC" style="display:none;"><div class="jw-sheet-wrap"><table class="jw-sheet"><tr><th>종류·상태</th><td>준설 · 예정</td></tr><tr><th>발주처</th><td>—</td></tr><tr><th>소재지</th><td>현장 준설 구역</td></tr><tr><th>기간</th><td><span class="num">? ~ ?</span></td></tr><tr><th>참여 근로자</th><td class="warn"><b>미지정</b> <button class="mini-btn" data-site-wk="pC" style="margin-left:6px;">근로자 추가</button></td></tr></table></div><button class="link-btn" data-asb-edit="pC" style="text-align:left;width:auto;padding:2px 0 0;">수정</button></div></div>',
   ];
@@ -9849,7 +9849,7 @@ try {
 
   // ⑫ 폰(859px 이하) = phone:"legacy" — 옛 그리기 본문 renderSitesLegacy = v444(7387ade) renderSites 본문 글자째(sha256) · 그대로 두는 함수 19개 해시(특별교육 두 벌·대장 읽기·저장·현장 창 등) ·
   //   실행: 375 = 옛 카드 11·표 줄 0·옛 종류 버튼 줄 flex·자리 legacy → 1366(경계 넘음) = 표·버튼 줄 none → 표 검색칸에 '준설' = p3,d1 + 묶음 저절로 펼침 o3 → 375 = 옛 카드·옛 검색어 '준설'(머리 '총 3건')
-  const HASH45 = { renderSitesLegacy: '4446f7906cd66cd300e5833142b2e4f45a9005ff8f3edce4fc0b0b716b3d9b23', siteEduLine: '430cc9af2f8779b48ab301e3c55732a41c498151473949188f1cd01cb0b7e64a', asbNoSpecial: '8028c49624797dcd8db74f6b8fac3cfc0d5e62c6b300157e42d2cabb19f62161',
+  const HASH45 = { renderSitesLegacy: 'c4e3f979b9c1dfdc00ed2896de119deb0507f2626124f926082ee93ff9b7dc3a',   // T234: v444 본문에서 줄 머리 '키스콘 신고' → '통합실적관리시스템' 한 낱말만(옛 4446f7906cd6…) siteEduLine: '430cc9af2f8779b48ab301e3c55732a41c498151473949188f1cd01cb0b7e64a', asbNoSpecial: '8028c49624797dcd8db74f6b8fac3cfc0d5e62c6b300157e42d2cabb19f62161',
     asbWorkerNames: '1b19314636ac3e991335bc6a1449a643e71b3af4771e52201097e5dd20627c2f', siteYear: '1809126db67bd12286c9fb8b49fbcf0ff3fb0c2b84aa76c48e1e1df6320359a2', sheetRow: 'f77f0201e4dee7c2179eec69c9503a423dd46ce569d4b76061847b29d0b26fc8',
     bindFold: '2e17be3f057f6b655fa35148f5297d965924e9b512d7fb3eb04b85640cd1c2bc', renderSiteFilter: 'e97f8fe38b3fd5a03059965f57755e56759cc40c7045814b5f34718bef78dd7a', siteLabel: '049362d010ea05ceeffb8696f4991ef0217d477609575e6b06b2c7f2fd0a7f8e',
     siteKind: '64c88120acef6e84df6790fd6d823260eecfaf65797395716fc915db9c6c0c68', liveSites: 'e00f9252efe93c334c686519f1045752b921aa980071aa9cf0ad9c7bc1ceb206', asbNotifyDue: '69a4a67bc06987e081064888bb7a94bf1dd41cb8010f5aa75cde6ff4f409059f',
@@ -9871,7 +9871,7 @@ try {
   typeQ45(X12, '준설'); const l12q = order45(X12.host._h);
   X12.env.width = 375; X12.env.breakAll(); const l12c = [X12.host.getAttribute('data-vs-mode'), X12.host._h.indexOf('data-vs-row') < 0, X12.env.host('siteFilterBar').style.display, X12.api.q(), X12.env.host('siteHead').textContent].join('|');
   const legDef12 = X12.api.def().legacy === X12.api.legacy && X12.api.def().phone === 'legacy';
-  T('v445 ⑫ 폰 legacy(실행 + 해시): 옛 본문 renderSitesLegacy = v444 renderSites 본문 글자째(sha256 4446f7906cd6…) · 함수 19개 해시 고정(특별교육 두 벌 siteEduLine·asbNoSpecial·asbWorkerNames · 대장 loadAsb·doSaveAsb·loadSiteEduGap·siteGapSig(s) · 지난 자료 siteYear · 현장 창 openSiteWorkers·renderSwList(이 둘은 v445 검토로 고친 본문 — 창 안 선택 swSel, ⑳) · sheetRow·bindFold·renderSiteFilter·siteLabel·siteKind·liveSites·asbNotifyDue·asbKeepUntil) · 375 = 옛 카드 11·표 줄 0·버튼 줄 flex·머리 "총 11건 (지난 자료 4건 접힘)" → 1366 = 표 ' + MAIN45 + '·버튼 줄 none → 검색칸 "준설" = p3,d1,o3(묶음 저절로 펼침) → 375 = 옛 카드·옛 검색어 "준설"·머리 "총 3건"',
+  T('v445 ⑫ 폰 legacy(실행 + 해시): 옛 본문 renderSitesLegacy = v444 renderSites 본문 글자째(T234 줄 머리 한 낱말만 바꿈 — sha256 c4e3f979b9c1…) · 함수 19개 해시 고정(특별교육 두 벌 siteEduLine·asbNoSpecial·asbWorkerNames · 대장 loadAsb·doSaveAsb·loadSiteEduGap·siteGapSig(s) · 지난 자료 siteYear · 현장 창 openSiteWorkers·renderSwList(이 둘은 v445 검토로 고친 본문 — 창 안 선택 swSel, ⑳) · sheetRow·bindFold·renderSiteFilter·siteLabel·siteKind·liveSites·asbNotifyDue·asbKeepUntil) · 375 = 옛 카드 11·표 줄 0·버튼 줄 flex·머리 "총 11건 (지난 자료 4건 접힘)" → 1366 = 표 ' + MAIN45 + '·버튼 줄 none → 검색칸 "준설" = p3,d1,o3(묶음 저절로 펼침) → 375 = 옛 카드·옛 검색어 "준설"·머리 "총 3건"',
     hBad12.length === 0 && legDef12 && l12a === 'legacy|11|true|flex|legacy|총 11건 (지난 자료 4건 접힘)' && l12b === 'sheet|' + MAIN45 + '|none|sheet' && l12q === 'p3,d1,o3' && l12c === 'legacy|true|flex|준설|총 3건' && noMiss45(m12),
     JSON.stringify({ hBad12, l12a, l12b, l12q, l12c, miss: miss45.slice(m12) }));
 
@@ -24109,10 +24109,10 @@ try {
     const FT = ["`rnoteLastHtml`", "원장 C177 ⓑ", "`downlast`"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = "그 뒤에는 다음 달 초안이 나올 때까지 '연구노트 최근 확정본' 한 줄과";
-    const ok = /기준: v549 \(2026-11-26\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && scr.length === 1 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 549 && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && scr.length === 1 && !cb.some((l) => /\(PM/.test(l))
       && d.man.indexOf(MAN) > 0
       && d.cl.indexOf('**연구노트 C177ⓑ(v549') > 0
-      && /SHELL_CACHE = 'jw-shell-v549'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 549;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r549 = chk549(D549);
@@ -24124,6 +24124,46 @@ try {
   T('v549 문서·판 번호(정확 검사): FEATURES 기준 v549 (2026-11-26)·v549 절(연구노트 C177ⓑ) · TESTLIST v549 칸 3(화면·운영 확인 1 · 게이트 [x] 2) · MANUAL 연구노트 확정본 한 줄(내부 이름 0) · CLAUDE.md 한 줄 · sw jw-shell-v549 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL·CLAUDE.md·게이트 칸) 모두 ✗',
     r549.ok && M549.every((v) => v === false), JSON.stringify({ r: r549.info, mut: M549 }));
 } catch (e) { console.log('  (v549 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── C294(T248) 계약 서류 짝 수동 지정 — 실제 cdocPairSel·cdocUnpairBtn 실행 + 배선(정적)
+try {
+  const fnC = (name) => { const i = html.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < html.length; j++) { const ch = html[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html.slice(i, j + 1); } } throw new Error('짝 안 맞음'); };
+  const mk = (can) => new Function('canDo', 'esc', 'genLabel', fnC('cdocPairSel') + '\n' + fnC('cdocUnpairBtn') + '\nreturn { sel: cdocPairSel, un: cdocUnpairBtn };')(() => can, (s) => String(s).replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]), (k) => '양식 ' + k);
+  const A = mk(true), B = mk(false);
+  const G = { order: ['work_start', 'seal'], by: { work_start: { n: 3, ver: 2 }, seal: { n: 5, ver: 1 } } }, G0 = { order: [], by: {} };
+  const c = { id: 'c1', status: 'run' }, cDone = { id: 'c1', status: 'done' };
+  const s1 = A.sel(c, { n: 9, plearn: 'NO_MATCH', pii: 0 }, G);
+  const ok1 = s1.indexOf('data-cs-cpair="c1|9"') > 0 && s1.indexOf('<option value="3">양식 work_start v2</option>') > 0 && s1.indexOf('<option value="5">양식 seal v1</option>') > 0;
+  const none = [B.sel(c, { n: 9, plearn: 'NO_MATCH' }, G), A.sel(cDone, { n: 9, plearn: 'NO_MATCH' }, G), A.sel(c, { n: 9, plearn: 'TYPE_EXCLUDED' }, G), A.sel(c, { n: 9, plearn: 'NO_MATCH', pii: 2 }, G), A.sel(c, { n: 9, plearn: 'NO_MATCH' }, G0)].every((x) => x === '');
+  const u1 = A.un(c, { n: 9, phow: 'manual' }), uNone = [A.un(c, { n: 9, phow: 'content' }), A.un(c, null), B.un(c, { n: 9, phow: 'manual' }), A.un(cDone, { n: 9, phow: 'manual' })].every((x) => x === '');
+  const wire = html.indexOf('querySelectorAll("[data-cs-cpair]")') > 0 && html.indexOf('querySelectorAll("[data-cs-cunpair]")') > 0 && /action: "cdoc_pair_assign", cid: cid, n: n, draft_n: draftN/.test(html) && /unpair: true/.test(html)
+    && html.indexOf('cdocOpen(c, x, "최종") + cdocPairSel(c, x, G)') < 0 && html.indexOf('cdocGenOpen(c, x, "최종") + cdocPairSel(c, x, G)') > 0 && html.indexOf('MANUAL_OFF:"사람이 풂"') > 0;
+  T('C294 짝 수동 지정(실행 — 실제 cdocPairSel·cdocUnpairBtn): 짝 없는 최종본 줄 = 선택칸(이 계약 AI 초안 양식·판) · 수행 권한 없음·끝난 계약·학습 제외·민감 등급 2·초안 없음 = 없음 · [짝 풀기]는 사람이 고른 짝에만 · 선택·풀기 배선·사유 "사람이 풂"',
+    ok1 && none && u1.indexOf('data-cs-cunpair="c1|9"') > 0 && uNone && wire, JSON.stringify({ ok1, none, u1: !!u1, uNone, wire }));
+} catch (e) { console.log('  (C294 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v550(T234·T298 + C294 판1·T248): 실행 검사는 위 C294 블록·v434 고정 화면·v445 해시·servertest C294 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd550 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D550 = { ft: rd550('FEATURES.md'), tl: rd550('TESTLIST.md'), sw: rd550('sw.js'), ix: rd550('index.html') };
+  const chk550 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v550 (11/26)', '\n### '), tlv = cut(d.tl, '\n## v550 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["원장 T234", "`hwpParas`", "`cdoc_pair_assign`", "MANUAL_OFF", "원장 C294", "T298"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v550 \(2026-11-26\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 1 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
+      && d.ix.indexOf('"키스콘 신고"') < 0 && d.ix.split('"통합실적관리시스템"').length === 3
+      && /SHELL_CACHE = 'jw-shell-v550'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r550 = chk550(D550);
+  const mu550 = (k, f) => chk550(Object.assign({}, D550, { [k]: f(D550[k]) })).ok;
+  const M550 = [mu550('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v549 (')), mu550('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v549'")),
+    mu550('ft', (s) => s.split('`hwpParas`').join('hwpParas')), mu550('ix', (s) => s.replace('"통합실적관리시스템"', '"키스콘 신고"'))];
+  T('v550 문서·판 번호(정확 검사): FEATURES 기준 v550 (2026-11-26)·v550 절(T234·C294·T298) · TESTLIST v550 칸 3(운영 확인 2 · 게이트 [x] 1) · 현장 줄 머리 두 곳 = 통합실적관리시스템 · sw jw-shell-v550 · 결함 사본(기준 줄·sw·FEATURES 낱말·옛 줄 머리) 모두 ✗',
+    r550.ok && M550.every((v) => v === false), JSON.stringify({ r: r550.info, mut: M550 }));
+} catch (e) { console.log('  (v550 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
