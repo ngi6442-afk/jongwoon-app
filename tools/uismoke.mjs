@@ -23857,9 +23857,9 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ["`push_miss`", "원장 C253"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v543 \(2026-11-26\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 2 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 543 && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 2 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
       && d.cl.indexOf('**C253(v543') > 0
-      && /SHELL_CACHE = 'jw-shell-v543'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 543;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r543 = chk543(D543);
@@ -23871,6 +23871,37 @@ try {
   T('v543 문서·판 번호(정확 검사): FEATURES 기준 v543 (2026-11-26)·v543 절(C253) · TESTLIST v543 칸 6(화면·운영 확인 4 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v543 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
     r543.ok && M543.every((v) => v === false), JSON.stringify({ r: r543.info, mut: M543 }));
 } catch (e) { console.log('  (v543 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v544(운반일지 처리상태 감시 — 원장 C075): 실행 검사는 위 v351 블록 'C075 처리상태 배지'·servertest 'C075' · 여기는 문서·판 번호 정확 검사 + 고정 글 2줄(빼면 ✗)
+try {
+  const rd544 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D544 = { ft: rd544('FEATURES.md'), tl: rd544('TESTLIST.md'), sw: rd544('sw.js'), man: rd544('MANUAL.html'), cl: rd544('CLAUDE.md'), ix: rd544('index.html') };
+  const FIX544 = ["function abStateUnknownHtml(){", "if (!abDay.loading) h += abStateUnknownHtml();"];
+  const MANA544 = "(2026-11 v544) 올바로 인계서의 처리상태에 처음 보는 값(예:";
+  const chk544 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v544 (11/26)', '\n### '), tlv = cut(d.tl, '\n## v544 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`state_counts`", "`state_unknown`", "`notifyNewStates`", "`allbaro:state_notified`", "`abStateUnknownHtml`", "`overlap_checked:false`", "원장 C075", "원장 C279"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = "(2026-11 v544) 올바로 인계서의 처리상태에 처음 보는 값(예:";
+    const ok = /기준: v544 \(2026-11-26\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && scr.length === 1 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf(MAN) > 0
+      && d.cl.indexOf('**운반일지 처리상태 감시(v544') > 0
+      && FIX544.every((x) => d.ix.split(x).length === 2)
+      && /SHELL_CACHE = 'jw-shell-v544'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX544.map((x) => d.ix.split(x).length - 1) } };
+  };
+  const r544 = chk544(D544);
+  const mu544 = (k, f) => chk544(Object.assign({}, D544, { [k]: f(D544[k]) })).ok;
+  const M544 = [mu544('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v543 (')), mu544('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v543'")),
+    mu544('ft', (s) => s.split('`state_counts`').join('state_counts')),
+    mu544('man', (s) => s.replace(MANA544, '')), mu544('cl', (s) => s.replace('**운반일지 처리상태 감시(v544', '운반일지 처리상태 감시(')),
+    mu544('tl', (s) => s.replace('\n- [x] (AI) `servertest` \'C075\'', '\n- (AI) `servertest` \'C075\''))]
+    .concat(FIX544.map((x) => mu544('ix', (s) => s.replace(x, ''))));
+  T('v544 문서·판 번호(정확 검사): FEATURES 기준 v544 (2026-11-26)·v544 절(운반일지 처리상태 감시) · TESTLIST v544 칸 3(화면·운영 확인 1 · 게이트 [x] 2) · MANUAL 처리상태 배지 문장(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 2줄 한 번씩 · sw jw-shell-v544 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
+    r544.ok && M544.every((v) => v === false), JSON.stringify({ r: r544.info, mut: M544 }));
+} catch (e) { console.log('  (v544 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

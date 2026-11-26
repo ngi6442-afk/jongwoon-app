@@ -1905,3 +1905,8 @@
 - [ ] (AI 운영 확인 — C253) 12/1 아침 월 점검 뒤 운영책임자 콘솔 › 점검 카드 › 월 점검 › 구독 줄: '최근 30일 알림을 받은 재직 회원 중 알림 기기 없는 사람 n명 · 이들 앞 알림 m건'
 - [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 배포 전 전체 게이트 기록 C253_게이트_1126.txt
 - [x] (AI) `servertest` C253 일곱 줄(알림함 줄 devices·no_device·subs_unavailable·log_only · 월 점검 구독 항목 · 미도달 알림 push_miss 기본 끔·하루 1번·되풀이 없음 · 결함 사본 18 — push.js 12 · mchk.js 6)
+
+## v544 — 운반일지 처리상태 어휘 감시(원장 C075 — 처음 보는 값 알림·배지)
+- [ ] (AI 운영 확인 — 운반일지 처리상태 감시) 배포 다음 아침 수집 뒤 운영 읽기만: 일자 문서에 state_counts가 실리고 state_unknown이 빈 목록인지(아는 값만이면 알림·배지 없음)
+- [x] (AI) `servertest` 'C075' 6검사 · `uismoke` 'C075 처리상태 배지'·'C279 겹침 확인 건너뜀 알림'·'C279 노선표 밖 좌표' · 워커 실제 handler 끝에서 끝 4검사 · v543 문서 검사를 이 판 이상으로 풂 — ✓ AI 11/26
+- [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` 등 게이트 전부 통과 + autorulestest + 앱 스크립트 전체 파싱 오류 0(끝 게이트 이름은 백틱 없이) — ✓ AI 11/26
