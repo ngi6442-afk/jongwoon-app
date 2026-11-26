@@ -210,6 +210,37 @@ async function notifyPendingAndVariants(st, dayDocs, tcIn) {
   return { pend_days: days.length, pend_n: pendN, var_n: varMsgs.length };
 }
 
+// C075(2026-11-26 · 덧대기): 올바로 처리상태에 아는 값 밖의 값이 처음 보이면 운영부+PM에 1회 푸시(값당 한 번 — 표식은 지우지 않음).
+//   그날 저장·집계는 종전 규칙 그대로(예약·확정·취소만 제외). 표식 blob을 못 읽으면(없음 제외) 보내지 않는다(fail-closed — 잠정·변형 알림과 따로).
+const STATE_KEY = 'allbaro:state_notified';   // {schema:1, keys:{'<처리상태 값>': 'YYYY-MM-DD(처음 본 날)'}}
+async function notifyNewStates(st, dayDocs, tcIn) {
+  const fresh = Object.create(null);   // 값 → {n, days}
+  for (const dd of (Array.isArray(dayDocs) ? dayDocs : [])) {
+    const sc = (dd && dd.state_counts) || {};
+    for (const k of (Array.isArray(dd && dd.state_unknown) ? dd.state_unknown : [])) {
+      const f = fresh[k] = fresh[k] || { n: 0, days: [] };
+      f.n += Number(sc[k]) || 0; f.days.push(dd.day);
+    }
+  }
+  const vals = Object.keys(fresh);
+  if (!vals.length) return { state_n: 0 };
+  const sr = await blobGet(st, STATE_KEY);
+  if (!sr.ok && sr.code !== 'NOT_FOUND') return { state_n: 0, skipped: 'READ_FAIL' };
+  const doc = (sr.ok && sr.data && sr.data.keys && typeof sr.data.keys === 'object') ? sr.data : { schema: 1, keys: {} };
+  const today = kstDate(0);
+  const news = vals.filter(function (k) { return !doc.keys[k]; }).sort();
+  if (!news.length) return { state_n: 0 };
+  news.forEach(function (k) { doc.keys[k] = today; });
+  const w = await blobSet(st, STATE_KEY, doc);   // 표식을 먼저 남긴다 — 저장 실패면 보내지 않는다(매일 다시 쏘지 않게)
+  if (!w.ok) return { state_n: 0, skipped: 'WRITE_FAIL' };
+  const tc = tcIn || await push.tierCtx();
+  const msg = news.map(function (k) { const f = fresh[k]; return "'" + k + "' " + f.n + '건(' + f.days.sort().map(mmdd).join('·') + ')'; });
+  await push.sendTo(opsPmIds(tc), { title: '운반일지 올바로 처리상태에 처음 보는 값 ' + news.length + '개',
+    body: (msg.slice(0, 3).join(' · ') + (msg.length > 3 ? ' 외 ' + (msg.length - 3) + '개' : '') + ' — 올바로 표시 방식이 바뀌었을 수 있습니다. 집계는 종전대로(예약·확정·취소만 빼고 셈) — 이 값이 실행 전을 뜻하면 회수가 많게 잡힐 수 있으니 운반일지에서 확인').slice(0, 300),
+    url: './', tag: 'allbaro-state-' + today }, { ctx: tc });
+  return { state_n: news.length };
+}
+
 // ---- 운반일지 자동 기안(결재 2차, 2026-09-02) — 공무의 매일 수동 상신을 대체 ----
 const APPR_KEY = 'col:approvals';   // gw-data colKey('approvals')와 동일 키(전용 액션 밖의 유일한 쓰기 지점)
 
@@ -308,6 +339,7 @@ async function regenAfterCollect(st, rec, mode, saved, log) {
 exports.regenAfterCollect = regenAfterCollect;
 exports.abSummary = abSummary;   // C244 검사용(자동 상신 본문 합계 = 화면 규칙)
 exports.opsPmIds = opsPmIds; exports.notifyPendingAndVariants = notifyPendingAndVariants; exports.PEND_KEY = PEND_KEY; exports.VAR_KEY = VAR_KEY;   // v366 검사용
+exports.notifyNewStates = notifyNewStates; exports.STATE_KEY = STATE_KEY;   // C075 검사용
 exports.handler = async function (event, context) {
   let st = null, job = '', rec = null;
   const scrub = makeScrub();
@@ -450,11 +482,17 @@ exports.handler = async function (event, context) {
       }
       // 차량번호별 합계(2026-08-24) — 주는돈(지입차 지급) 마감 정산 참고. 일지에는 안 싣는다.
       const vehTotals = Array.isArray(dd.veh_totals) ? dd.veh_totals : [];
+      // C075(2026-11-26): 처리상태 값별 건수 — 꼴을 걸러 싣고, 아는 값 밖의 값은 라이브러리 기준(stateKnown)으로 여기서 다시 센다(응답 값을 믿지 않음).
+      const scIn = (dd.state_counts && typeof dd.state_counts === 'object' && !Array.isArray(dd.state_counts)) ? dd.state_counts : {};
+      const stateCounts = {};
+      Object.keys(scIn).slice(0, 60).forEach(function (k) { const n = Math.floor(Number(scIn[k])); if (Number.isFinite(n) && n > 0) stateCounts[String(k).slice(0, 40)] = n; });
+      const stateUnknown = Object.keys(stateCounts).filter(function (k) { return k !== AB.STATE_BLANK && !AB.stateKnown(k); }).sort();
+      if (stateUnknown.length) log.push('[' + day + '] 처리상태 처음 보는 값 ' + stateUnknown.map(function (k) { return k + ' ' + stateCounts[k] + '건'; }).join(', ').slice(0, 200) + ' — 집계는 종전 규칙대로');
       // schema 2 = 수량 필드 추가(1단계 문서와 구분). 소비자는 필드별로 방어적으로 읽는다.
-      const w = await blobSet(st, dayKey(day), { schema: 2, day: day, total: total, total_qty_ton: qty, qty_unknown: qtyUnknown, counts: counts, unmatched: unmatched, excluded: excluded, pending: pendingRows, veh_totals: vehTotals, routes_ver: AB.routesVer(), ts: Date.now(), job: job });
+      const w = await blobSet(st, dayKey(day), { schema: 2, day: day, total: total, total_qty_ton: qty, qty_unknown: qtyUnknown, counts: counts, unmatched: unmatched, excluded: excluded, pending: pendingRows, veh_totals: vehTotals, state_counts: stateCounts, state_unknown: stateUnknown, routes_ver: AB.routesVer(), ts: Date.now(), job: job });
       if (!w.ok) { writeFail++; log.push('[저장실패] ' + day + ' ' + (w.code || '')); continue; }
       saved.push({ day: day, total: total, qty_ton: qty, unmatched_n: un });
-      dayDocs.push({ day: day, counts: counts, pending: pendingRows });
+      dayDocs.push({ day: day, counts: counts, pending: pendingRows, state_counts: stateCounts, state_unknown: stateUnknown });
       unmatchedTotal += un;
       if (un > 0) unmatchedDays.push(day + ' ' + un + '건');
     }
@@ -480,6 +518,8 @@ exports.handler = async function (event, context) {
     try { if (rec.status === 'done') await autoDraftApproval(st); } catch (e) {}
     // v366: 잠정(예약 밀림)·표기 변형 알림 — 수집 성공한 실행만, 운영부+PM, (day,인계번호)/(이름)당 1회. 실패는 삼킨다.
     try { if (rec.status === 'done' && dayDocs.length) { const nt = await notifyPendingAndVariants(st, dayDocs); if (nt && (nt.pend_n || nt.var_n)) log.push('[알림] 잠정 ' + nt.pend_n + '건(' + nt.pend_days + '일) · 표기 변형 ' + nt.var_n + '건'); } } catch (e) {}
+    // C075: 처리상태 새 값 알림 — 수집 성공한 실행만, 값당 1회. 실패는 삼킨다(수집 결과를 바꾸지 않음).
+    try { if (rec.status === 'done' && dayDocs.length) { const ns = await notifyNewStates(st, dayDocs); if (ns && ns.state_n) log.push('[알림] 처리상태 새 값 ' + ns.state_n + '개'); } } catch (e) {}
 
     // 관리자 웹푸시 — 실패는 반드시, 미매칭이 있으면 알림(노선표 손질이 필요하다는 신호).
     // 성공 + 미매칭 0이면 푸시하지 않는다(매일 오는 알림은 소음이다).

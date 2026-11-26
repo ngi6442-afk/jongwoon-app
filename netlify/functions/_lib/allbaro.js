@@ -649,6 +649,17 @@ function cmpCounts(a, b) {
     || cmpStr(countRowKey(a), countRowKey(b)) || cmpStr(a.vehicle_type || '', b.vehicle_type || '');
 }
 
+// C075(2026-11-26 · 덧대기): 올바로 '처리상태' 어휘 감시. 미실행 판정(예약·확정·취소)이 이 값에 기대는데, 올바로 공지 112751
+//   (2026-08-10 '전자인계서 진행상태·처리결과 표시기준 변경' — 8/11 보류, 재적용 예고)이 다시 적용되면 열 수는 그대로 값만 바뀔 수 있다.
+//   원천은 올바로 표시 방식이라 우리 쪽에 고칠 자리가 없다 — 그날 저장은 종전대로 하고, 아는 값 밖의 값이 처음 보이면 알린다.
+//   아는 값 = 실측(8/10 응답 처리중·처리완료 · 일자 문서 잠정 행 운반중) + 판정 코드가 쓰는 예약·확정·취소(…) + 공란.
+const KNOWN_STATES = ['예약', '확정', '운반중', '처리중', '처리완료'];
+function stateKnown(s) {
+  const t = cleanText(s);
+  return !t || KNOWN_STATES.indexOf(t) >= 0 || t.indexOf('취소') >= 0;
+}
+const STATE_BLANK = '(공란)';   // 일자 문서 state_counts의 공란 열쇠(빈 글자 열쇠 대신)
+
 function aggregate(rows, day, opts) {
   // 형식이 틀린 기준일을 조용히 0건으로 넘기면 그날 일지가 통째로 비어 버린다 — 시끄럽게 중단한다.
   if (day != null && day !== '' && !validDay(day)) throw new Error('집계 기준일 형식 오류: ' + String(day));
@@ -665,6 +676,7 @@ function aggregate(rows, day, opts) {
                          // (동일산업 2건이 인계일자 21·22로 계수됐다가 나중에 24로 밀림 — 유령 계수).
                          // 제외하면 8/20 사고(공란 기준으로 하루 전멸)를 재현하므로 제외하지 않는다.
   let total = 0;
+  const stateCounts = Object.create(null);   // C075 처리상태 값 → 건수
   let totalSubstituted = 0;   // 인수량이 비어 위탁량으로 '실제 대체된' 행 수(A-minor2 카운터)
   // 차량번호별 합계(PM 지시 2026-08-24) — 주는돈(지입차주 지급) 마감 정산 참고용.
   // 차량번호는 '일지'에는 싣지 않는다(PM: "일지 입력X, 정산업무에만") — 월 정산 카드만 소비한다.
@@ -690,6 +702,7 @@ function aggregate(rows, day, opts) {
     // 제외는 조용히 버리지 않고 excluded에 인계번호·사유·상태를 남긴다(일지에서 사람이 확인).
     const tranFirm = cleanText(r.tranFirm);
     const state = cleanText(r.state);
+    stateCounts[state || STATE_BLANK] = (stateCounts[state || STATE_BLANK] || 0) + 1;   // C075: 그날 행(타사·미실행 포함) 처리상태 값별 건수
     if (tranFirm && tranFirm.indexOf('종운') < 0) {
       excluded.push({ manf: String(r.manf == null ? '' : r.manf), from: from, to: to, item: item,
         why: '타사 운반(' + tranFirm + ')', state: state });
@@ -829,6 +842,9 @@ function aggregate(rows, day, opts) {
     // 사람이 본다. 확정·인계일자 갱신이 올라오면 창 내 일일 재수집이 자동으로 정리한다(8/24 신설).
     pending: pending,
     total_pending: pending.length,
+    // C075: 처리상태 값별 건수(공란은 '(공란)') · 그중 아는 값 밖의 값(정렬) — 저장은 종전대로, 워커가 처음 보는 값만 알리고 앱이 배지로 보인다
+    state_counts: Object.assign({}, stateCounts),
+    state_unknown: Object.keys(stateCounts).filter((k) => k !== STATE_BLANK && !stateKnown(k)).sort(cmpStr),
     counts: counts,
     unmatched: unmatched,
     // 차량번호별 합계 — 주는돈(지입차 지급) 정산 참고. 일지·노선 배정과 무관한 병렬 집계.
@@ -1321,6 +1337,7 @@ module.exports = {
   ALIAS, ITEM_ALIAS, VEHICLE_TAGS, UNIT_FACTOR, BASE, ENTN, ENTN_NAME, TD,
   // 순수 함수(픽스처 테스트 대상)
   normName, normItem, itemHit, matchRoute, matchRouteEx, rematchDoc,
+  KNOWN_STATES, STATE_BLANK, stateKnown,   // C075 처리상태 어휘 감시
   vehicleTagOf, vehicleTagOk, normVehNo, buildVehicleIndex, vehicleTypeOf,
   parseSheetXml, sheetTotal, aggregate, validDay, toSlash, kstTodayISO,
   isPosco, opDayFromTrtm, dayMinus, mergeMonthCounts,

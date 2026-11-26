@@ -32272,6 +32272,15 @@ function dutyStage(nx){
     abStatus.hidden_error = false;
   }
   // 표 아래 '숨긴 노선 n개 · [보기]' — 누가·언제 + 관리자 [복구]. 숨김 blob을 못 읽었으면 그 사실을, 숨긴 줄이 없으면 빈 문자열.
+  // C075(2026-11-26 · 덧대기): 그날 수집에 올바로 처리상태 값 중 아는 값(예약·확정·운반중·처리중·처리완료·취소…·공란) 밖의 값이 있으면 배지 한 줄.
+  //   서버가 일자 문서에 state_unknown(값 목록)·state_counts(값별 건수)를 남긴다. 집계는 종전 규칙 그대로라 '확인' 안내만 — 처음 보이면 운영부·PM에 푸시 1회(워커).
+  function abStateUnknownHtml(){
+    var d = abDay.data || {}, U = Array.isArray(d.state_unknown) ? d.state_unknown : [], sc = (d.state_counts && typeof d.state_counts === "object") ? d.state_counts : {};
+    if (!U.length) return "";
+    return '<div class="ab-hidden-line"><span class="dday amber">처리상태 확인</span> 올바로 처리상태에 처음 보는 값: ' +
+      esc(U.map(function(k){ return "'" + k + "' " + abInt(sc[k]) + "건"; }).join(", ")) +
+      ' — 올바로 표시 방식이 바뀌었을 수 있습니다. 이날 회수는 종전 규칙(예약·확정·취소만 빼고 셈)으로 셌으니, 이 값이 실행 전을 뜻하면 회수가 많게 잡혔을 수 있습니다.</div>';
+  }
   function abHiddenListHtml(){
     if (abStatus && abStatus.hidden_error) return '<div class="ab-hidden-line">숨긴 노선 목록을 읽지 못해 모든 줄을 표시합니다 — 새로고침 후에도 계속되면 관리자에게 알려주세요.</div>';
     var hs = abHiddenRoutes(); if (!hs.length) return "";
@@ -32484,6 +32493,7 @@ function dutyStage(nx){
       '<label class="ab-toggle" title="회수가 빈 줄을 이 화면에서만 뺍니다(이 기기 기억)"><input type="checkbox" id="abHideEmptyChk"' + (abHideEmpty ? " checked" : "") + '> 빈 줄 숨기기</label></div>';   // v323 #9
     var stl = (abStatus && Array.isArray(abStatus.stale_days)) ? abStatus.stale_days.length : 0;   // v327: 노선표 변경 뒤 아직 재정렬 못 한 날짜(서버가 현황 조회 때 최신순 7일씩, 날짜를 열면 그 자리에서 정리)
     if (stl) h += '<div class="ab-hidden-line">노선표 변경 뒤 재정렬 대기 ' + stl + '일(열면 자동 정리)</div>';
+    if (!abDay.loading) h += abStateUnknownHtml();   // C075: 올바로 처리상태에 처음 보는 값이 있던 날
     if (abDay.loading){
       h += '<div class="loading">불러오는 중…</div>';
       host.innerHTML = h;

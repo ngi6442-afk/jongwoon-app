@@ -1358,6 +1358,15 @@ try {
           /if \(res\.status === 401\)\{ onSessionInvalid\(\); return; \}/.test(sv) && f9.log.toasts.length === 0 && f9.log.calls.length === 1
           && /^새 노선 L50 추가 · 기존 줄 R40에서 옮겨 온 인계서 5회\(최근 14일 — 더 지난 날짜도 열 때 옮겨짐\)$/.test(fm.log.toasts[0] || ''), JSON.stringify([f9.log.toasts, fm.log.toasts])); } }
   }
+  // C075(2026-11-26): 처리상태 새 값 배지 — 실제 함수(abStateUnknownHtml)로: 새 값이 없으면 빈 글 · 있으면 값·건수와 '종전 규칙' 안내 · 이름은 esc · 불러오는 중엔 안 그림
+  {
+    const c0 = html.indexOf('function abStateUnknownHtml('), c1 = html.indexOf('function abHiddenListHtml(', c0);
+    const mkS = (data) => new Function('DATA', 'var abDay = { data: DATA }; function esc(s){ return String(s).replace(/</g, "&lt;"); } function abInt(v){ var n = Math.round(Number(v)); return (isFinite(n) && n > 0) ? n : 0; }' + html.slice(c0, c1) + 'return abStateUnknownHtml();')(data);
+    const one = mkS({ state_unknown: ['정상', '<b>'], state_counts: { '정상': 4, '<b>': 1, '처리중': 9 } });
+    T('C075 처리상태 배지: 새 값 없음·필드 없음·꼴 깨짐 = 빈 글 · 새 값 = "처리상태 확인" 배지 + \'정상\' 4건 · 이름 esc · 종전 규칙 안내 · 불러오는 중엔 그리지 않음',
+      c0 > 0 && mkS({}) === '' && mkS({ state_unknown: [] }) === '' && mkS({ state_unknown: 'x' }) === '' && /<span class="dday amber">처리상태 확인<\/span>/.test(one) && /'정상' 4건, '&lt;b>' 1건/.test(one) && /종전 규칙\(예약·확정·취소만 빼고 셈\)/.test(one)
+      && /if \(!abDay\.loading\) h \+= abStateUnknownHtml\(\);/.test(html), one.slice(0, 200));
+  }
 } catch (e) { console.log('  (v351 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v352(PM 9/11 #33): 숨김·노선 변경 뒤 엑셀 재생성 요청(dispatch) + 내려받기 stale 경고 ----

@@ -1587,6 +1587,40 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   blobsMock.hooks.beforeGet = null;
   T('표식 blob 읽기 예외는 위로 던져 워커가 삼킨다(발송 없음) — 매일 다시 쏘는 쪽이 더 나쁨', n3 && n3.threw === true && pushMock.calls.length === before + 2, JSON.stringify(n3));
   delete mem.gw_data[wk.PEND_KEY]; delete mem.gw_data[wk.VAR_KEY];
+  // C075(2026-11-26 · 덧대기): 올바로 처리상태 어휘 감시 — 아는 값(예약·확정·운반중·처리중·처리완료·취소…·공란)은 조용히, 밖의 값이 처음 보이면 값당 1회 푸시
+  {
+    const R = (state, x) => Object.assign({ emis: '동일산업(주)', trtm: '스틸싸이클 주식회사', wasteName: '분진(고상)', date: '20261120', confirmedAt: '20261120 09:00', state: state, manf: 'M' + Math.random() }, x || {});
+    const known = ['처리중', '처리완료', '운반중', '', '예약', '확정', '취소', '취소요청'].map((s) => R(s));
+    const a1 = abLib.aggregate(known, '2026-11-20', {});
+    T('C075 aggregate: 아는 값만 있으면 state_counts에 값별 건수(공란은 "(공란)") · state_unknown [] · 계수는 종전대로(예약·확정·취소 4건 제외 → 4회)',
+      JSON.stringify(a1.state_counts) === JSON.stringify({ '처리중': 1, '처리완료': 1, '운반중': 1, '(공란)': 1, '예약': 1, '확정': 1, '취소': 1, '취소요청': 1 }) && JSON.stringify(a1.state_unknown) === '[]'
+      && a1.total === 4 && a1.excluded.length === 4, JSON.stringify([a1.state_counts, a1.state_unknown, a1.total]));
+    const a2 = abLib.aggregate(known.concat([R('정상'), R('정상'), R('오류'), R(' 마감 '), R('처리중', { tranFirm: '남의운수(주)' })]), '2026-11-20', {});
+    T('C075 aggregate: 공지 112751의 새 값(정상·오류·마감) → state_unknown ["마감","오류","정상"](정렬 · 앞뒤 공백 정리) · 그날 저장·계수는 종전 규칙(새 값은 세어짐 → 8회 · 타사 운반 행도 상태 건수엔 들어감)',
+      JSON.stringify(a2.state_unknown) === '["마감","오류","정상"]' && a2.state_counts['정상'] === 2 && a2.state_counts['처리중'] === 2 && a2.total === 8 && a2.excluded.length === 5 && abLib.stateKnown(' 처리중 ') && !abLib.stateKnown('정상') && abLib.stateKnown('') && abLib.stateKnown('취소완료'),
+      JSON.stringify([a2.state_unknown, a2.total, a2.excluded.length]));
+    delete mem.gw_data[wk.STATE_KEY];
+    const b0 = pushMock.calls.length;
+    const sd = [{ day: kst(-1), state_counts: { '정상': 3, '처리중': 2 }, state_unknown: ['정상'] }, { day: kst(0), state_counts: { '정상': 1, '오류': 1 }, state_unknown: ['오류', '정상'] }];
+    const s1 = await wk.notifyNewStates(stD, sd, tcT);
+    const ps = pushMock.calls.slice(b0);
+    T('C075 알림 1회차: 새 값 2개(오류·정상) → 푸시 1(운영부+PM · tag allbaro-state-<오늘> · 값·건수·날짜) · 표식 2개(처음 본 날 = 오늘)',
+      s1.state_n === 2 && ps.length === 1 && ps[0].tag === 'allbaro-state-' + kst(0) && /처음 보는 값 2개/.test(ps[0].title) && /'오류' 1건/.test(ps[0].body) && /'정상' 4건/.test(ps[0].body) && /예약·확정·취소만 빼고 셈/.test(ps[0].body)
+      && JSON.stringify(mem.gw_data[wk.STATE_KEY].keys) === JSON.stringify({ '오류': kst(0), '정상': kst(0) }), JSON.stringify([s1, ps.map((p) => [p.title, p.body])]));
+    const s2 = await wk.notifyNewStates(stD, sd, tcT);
+    const s2b = await wk.notifyNewStates(stD, [{ day: kst(0), state_counts: { '처리중': 9 }, state_unknown: [] }], tcT);
+    T('C075 알림 2회차(같은 값 다시) → 0 · 새 값이 없는 날 → 표식 읽기도 안 함(0) · 발송 늘지 않음', s2.state_n === 0 && s2b.state_n === 0 && pushMock.calls.length === b0 + 1, JSON.stringify([s2, s2b]));
+    const s3 = await wk.notifyNewStates(stD, [{ day: kst(0), state_counts: { '정상': 1, '보류': 2 }, state_unknown: ['보류', '정상'] }], tcT);
+    T('C075 알림: 이미 알린 값(정상)과 섞여도 새 값(보류)만 1회', s3.state_n === 1 && pushMock.calls.length === b0 + 2 && /'보류' 2건/.test(pushMock.calls[pushMock.calls.length - 1].body) && !/'정상'/.test(pushMock.calls[pushMock.calls.length - 1].body), JSON.stringify(s3));
+    blobsMock.hooks.failGet = (k) => k === wk.STATE_KEY;
+    const s4 = await wk.notifyNewStates(stD, [{ day: kst(0), state_counts: { '새값': 1 }, state_unknown: ['새값'] }], tcT);
+    blobsMock.hooks.failGet = null;
+    blobsMock.hooks.failSet = (k) => k === wk.STATE_KEY;
+    const s5 = await wk.notifyNewStates(stD, [{ day: kst(0), state_counts: { '새값': 1 }, state_unknown: ['새값'] }], tcT);
+    blobsMock.hooks.failSet = null;
+    T('C075 알림: 표식을 못 읽으면 READ_FAIL·못 쓰면 WRITE_FAIL — 둘 다 발송 없음(매일 다시 쏘지 않게)', s4.skipped === 'READ_FAIL' && s5.skipped === 'WRITE_FAIL' && pushMock.calls.length === b0 + 2 && !mem.gw_data[wk.STATE_KEY].keys['새값'], JSON.stringify([s4, s5]));
+    delete mem.gw_data[wk.STATE_KEY];
+  }
 }
 
 // ===== 32d. v368 무기계약직 레이더 — contractPlan 순수 함수(기간제법 4조: 2년 시계·55세 예외·단계 멱등) =====
