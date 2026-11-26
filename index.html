@@ -4456,10 +4456,10 @@
   var REC_SORTS = [["billed_asc","청구일 오래된순"],["billed_desc","청구일 최신순"],["amount_desc","금액 큰순"],["client","거래처명"]];
   function fillRecSort(sel){ sel.innerHTML = REC_SORTS.map(function(o){ return '<option value="'+o[0]+'"'+(o[0]===recSort?" selected":"")+'>'+o[1]+'</option>'; }).join(""); }
   function recSortCmp(a,b){
-    if(recSort==="billed_desc") return (b.billed||"").localeCompare(a.billed||"");
+    if(recSort==="billed_desc") return String(b.billed||"").localeCompare(a.billed||"");
     if(recSort==="amount_desc") return (b.amount||0)-(a.amount||0);
-    if(recSort==="client") return (a.client||"").localeCompare(b.client||"");
-    return (a.billed||"").localeCompare(b.billed||"");
+    if(recSort==="client") return String(a.client||"").localeCompare(b.client||"");
+    return String(a.billed||"").localeCompare(b.billed||"");
   }
   function moduleArr(mod){ return mod==="tasks"?tasks:(mod==="veh"?vehicles:receivables); }
   function moduleLive(mod){ return moduleArr(mod).filter(function(x){ return x && x.del !== 1; }); }
@@ -11665,7 +11665,7 @@
   function renderVehHistory(v){
     var host = document.getElementById("vehHistList"); if (!host) return;
     var canEdit = canDo("veh");
-    var hist = (v.history || []).slice().sort(function(a,b){ return (b.date||"").localeCompare(a.date||""); });
+    var hist = (v.history || []).slice().sort(function(a,b){ return String(b.date||"").localeCompare(a.date||""); });
     var total = 0; hist.forEach(function(h){ total += (h.cost||0); });
     host.innerHTML = (total ? '<div style="font-size:13px;color:var(--sub);margin-bottom:6px;">누적 수리비 <b>' + fmtAmount(total) + '원</b></div>' : '') +
       (hist.length ? hist.map(function(h){
@@ -14050,7 +14050,7 @@
     if(!ws || !ws.length) return "";
     if(!canSee("safety")) return "③ 건강진단(유무·검진일) — 빈칸, 안전 담당 확인(건강진단 기록은 안전 권한)";
     if(wkEduSt!=="ok") return "③ 건강진단(유무·검진일) — 안전 › 체크 칸 기록을 아직 읽지 못해 빈칸입니다(잠시 뒤 다시 [생성]하면 기록으로 채웁니다)";
-    L=ws.slice().sort(function(a,b){ return ((a.role==="반장"?0:1)-(b.role==="반장"?0:1)) || (a.name||"").localeCompare(b.name||""); }).slice(0,12);
+    L=ws.slice().sort(function(a,b){ return ((a.role==="반장"?0:1)-(b.role==="반장"?0:1)) || String(a.name||"").localeCompare(b.name||""); }).slice(0,12);
     L.forEach(function(w){ if(!wkExamDate(w)) n++; });
     return n ? "③ 건강진단 기록이 없는 사람 "+n+"명 — 빈칸(안전 › 체크에서 확인)" : "";
   }
@@ -14074,7 +14074,7 @@
     var done=liveContracts().filter(function(c){ return c.status==="done"; });
     if(!done.length){ alert("완료된 계약이 없습니다 — 계약이 수금확인까지 종결되면 실적으로 잡힙니다."); return; }
     var rows=[["공사명","발주처","공종","시나리오 요소","현장","계약금액","착공일","준공일","수금일","시행회사","연면적(대장)"]];
-    done.sort(function(a,b){ return (a.updated||"").localeCompare(b.updated||""); });
+    done.sort(function(a,b){ return String(a.updated||"").localeCompare(b.updated||""); });
     done.forEach(function(c){
       var ci=c.contract_info||{};
       var el=c.elems||{}; var elTxt=Object.keys(CON_ELEM_LABEL).filter(function(k){return el[k];}).map(function(k){return CON_ELEM_LABEL[k];}).join("·");
@@ -14821,7 +14821,7 @@
       Array.prototype.forEach.call(document.querySelectorAll("[data-xgw]:checked"),function(inp){
         var w=findWk(inp.getAttribute("data-xgw")); if(w) sel.push(w);
       });
-      sel.sort(function(a,b){ return ((a.role==="반장"?0:1)-(b.role==="반장"?0:1)) || (a.name||"").localeCompare(b.name||""); });
+      sel.sort(function(a,b){ return ((a.role==="반장"?0:1)-(b.role==="반장"?0:1)) || String(a.name||"").localeCompare(b.name||""); });
       if(sel.length>12){ if(!xgLateOn) alert("인력이 "+sel.length+"명인데 양식 슬롯은 12명입니다. 12명까지만 들어갑니다."); sel=sel.slice(0,12); }
       var nAll=sel.length?sel.length+1:0;   // +관리자 나종운
       var cntTxt=nAll?nAll+"명":"";
@@ -19400,7 +19400,7 @@
     var all=liveLeaves();
     var visible = isAdmin() ? all.slice() : all.filter(function(l){ return l.member_id===me; });
     function prio(l){ return (l.status==="pending" || (l.status==="approved" && l.cancel_req)) ? 0 : 1; }
-    visible.sort(function(a,b){ var ap=prio(a), bp=prio(b); if(ap!==bp) return ap-bp; return (b.start||"").localeCompare(a.start||""); });
+    visible.sort(function(a,b){ var ap=prio(a), bp=prio(b); if(ap!==bp) return ap-bp; return String(b.start||"").localeCompare(a.start||""); });
     // P1 판9 ④(검토): 시험 계정의 신청은 관리자 목록에 줄째 남기고('시험 계정' 칩 · 승인·반려 단추 그대로 — leaveRowHtml) "n건 대기" 수에서만 뺀다(내 신청은 내가 시험 계정이어도 셈)
     var pend=visible.filter(function(l){ return (l.status==="pending" || (l.status==="approved" && l.cancel_req)) && (l.member_id===me || !leaveOfTest(l)); }).length;
     var head=document.getElementById("leaveHead"); if(head) head.textContent = pend ? (pend+"건 대기") : "";
@@ -22533,7 +22533,7 @@
     var h='<div class="fam-sec-h">제도별 실시 건수 — '+r.start+' ~ '+r.end+'</div>'
       +'<div class="card fam-scroll" style="padding:4px 12px;"><table class="fam-table"><tr><th>제도</th><th class="num">건수</th><th class="num">대상 인원</th><th>실시 내역 (날짜 · 대상)</th></tr>';
     FAM_TYPES.forEach(function(t){
-      var list=recs.filter(function(x){ return x.type===t[0]; }).sort(function(a,b){ return (a.date||"").localeCompare(b.date||""); });
+      var list=recs.filter(function(x){ return x.type===t[0]; }).sort(function(a,b){ return String(a.date||"").localeCompare(b.date||""); });
       var uniq={}; list.forEach(function(x){ if(x.member_id) uniq[x.member_id]=1; });
       var det=list.map(function(x){ return esc((x.date||"").slice(5))+" "+esc(famName(x)); }).join(" · ");
       h+='<tr><td style="white-space:nowrap;">'+t[1]+'</td><td class="num">'+list.length+'건</td><td class="num">'+Object.keys(uniq).length+'명</td><td style="font-size:12px;color:var(--sub);">'+(det||"—")+'</td></tr>';
@@ -22584,7 +22584,7 @@
     var host=document.getElementById("famList");
     if(host){
       // P1 판9 검토: 시험 계정 기록은 목록·건수에서 뺌
-      var list=liveFam().filter(function(x){ return !isTestMember(findMember(x.member_id)); }).sort(function(a,b){ return (b.date||"").localeCompare(a.date||"") || (b.created||"").localeCompare(a.created||""); });
+      var list=liveFam().filter(function(x){ return !isTestMember(findMember(x.member_id)); }).sort(function(a,b){ return String(b.date||"").localeCompare(a.date||"") || String(b.created||"").localeCompare(a.created||""); });
       var head=document.getElementById("famHead"); if(head) head.textContent=list.length?("총 "+list.length+"건"):"";
       host.innerHTML=list.length?list.map(function(x){
         var chip=FAM_CHIP[x.type]||"from-chip";
@@ -22775,7 +22775,7 @@
   function renderQuotes(){
     var host=document.getElementById("qtList"); if(!host) return;
     var head=document.getElementById("qtHead");
-    var list=liveQuotes().slice().sort(function(a,b){ return (b.no||"").localeCompare(a.no||""); });
+    var list=liveQuotes().slice().sort(function(a,b){ return String(b.no||"").localeCompare(a.no||""); });
     if(head) head.textContent = list.length ? ("총 "+list.length+"건") : "";
     if(!list.length){ host.innerHTML='<div class="empty-line">발행한 견적서가 없습니다. [+ 견적서 발행]으로 시작하세요.</div>'; return; }
     host.innerHTML=list.map(function(q){

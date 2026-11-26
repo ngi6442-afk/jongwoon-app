@@ -1217,13 +1217,27 @@ try {
   // ---- ③ 정적: 레코드 필드에 거는 localeCompare는 전부 String()으로 감싼다 ----
   {
     const bare = [];
-    const re = /\(\s*[ab]\.\w+\s*\|\|\s*"[^"]*"\s*\)\.localeCompare/g;
-    let m; while ((m = re.exec(html))) bare.push(html.slice(Math.max(0, m.index - 60), m.index + m[0].length).replace(/\s+/g, ' '));
+    // T746(v542): 받는 쪽이 '(필드 || "글")' 또는 맨 필드(a.x·obj.k[i] 등)인 localeCompare — String()으로 감싸지 않으면
+    // 필드에 숫자·null이 들어온 날 정렬이 TypeError로 죽어 화면이 비는 9/9 사고 꼴이다. 바로 앞이 String이면 감싼 것.
+    const reOr = /\(\s*[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+\s*\|\|\s*(["'])[^"']*\1\s*\)\.localeCompare/g;
+    const reField = /(?<![\w$.\])])[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+\.localeCompare/g;
+    // 예외 3곳 = 원문 해시로 얼린 본문(v439 ⑧ renderTasksLegacy · v440 ⑮ renderReceivablesLegacy · v442 ⑨ sortedWorkers) —
+    // 고치려면 그 해시 검사를 함께 다시 못 박아야 하므로 이 판에서는 두고 이름으로만 뺀다(예외는 늘리지 않는다).
+    const FROZEN = ['(b.done_at || "").localeCompare(a.done_at || "")', '(a.name||"").localeCompare(b.name||"")', '(b.paid || "").localeCompare(a.paid || "")'];
+    const frozenSeen = new Set();
+    for (const re of [reOr, reField]) {
+      let m; while ((m = re.exec(html))) {
+        if (html.slice(Math.max(0, m.index - 6), m.index) === 'String') continue;
+        const f = FROZEN.find(s => html.startsWith(s, m.index));
+        if (f && !frozenSeen.has(f)) { frozenSeen.add(f); continue; }
+        bare.push(html.slice(Math.max(0, m.index - 40), m.index + m[0].length).replace(/\s+/g, ' '));
+      }
+    }
     T('v337: 석면·교육 렌더 정렬이 String()으로 못 박혀 있다',
       /String\(b\.start\|\|""\)\.localeCompare\(String\(a\.start\|\|""\)\)/.test(html.replace(/\s+/g, ''))
       && /String\(a\.next\|\|"9999"\)\.localeCompare\(String\(b\.next\|\|"9999"\)\)/.test(html.replace(/\s+/g, '')), '');
-    // 남은 맨 localeCompare는 리포트만 한다(석면·교육 밖 — 이번 갈래가 아니다)
-    if (bare.length) console.log('  (참고: String() 없이 필드에 거는 localeCompare ' + bare.length + '곳 남음 — 휴가·기성 등 다른 갈래)');
+    // T746(v542): 남은 곳을 리포트만 하던 것을 실패로 — 새 정렬도 받는 쪽은 String()으로 감싼다
+    T('T746: 필드에 거는 localeCompare는 모두 String()으로 감쌌다(0곳)', bare.length === 0, bare.slice(0, 5).join(' | '));
   }
 
   // ---- ④ 409 병합도 입구다: 재저장 경로가 normAsbRow를 다시 건다 ----
@@ -23986,10 +24000,10 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), op = cb.filter((l) => /^- \[ \] \(운영 확인\)/.test(l));
     const FT = ['`biz13`', '`cn13`', '`cliBn10`', '`DEV_ONLY`', '평일 08:10', '검토·투찰·낙찰·유찰·패스', 'C276 ④'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v546 \(2026-11-26\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 2 && gate.length === 1 && op.length === 1
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 546 && ftv.length > 0 && mF.length === 0 && cb.length === 2 && gate.length === 1 && op.length === 1
       && d.ix.indexOf('관리자에게 승인을 요청') < 0 && d.ix.indexOf('관리자에게 기기 승인을 요청') < 0 && (d.ix.match(/기기 승인 담당\(시스템 관리 계정\)에게/g) || []).length === 6
       && d.ix.indexOf('매일 08:10') < 0 && d.ix.indexOf('검토·참여·패스 처리한 항목은 보존됩니다.') < 0 && d.ix.indexOf('검토·투찰·낙찰·유찰·패스 처리한 항목은 보존됩니다.') > 0
-      && d.cl.indexOf('**C270(v546)**') > 0 && /SHELL_CACHE = 'jw-shell-v546'/.test(d.sw);
+      && d.cl.indexOf('**C270(v546)**') > 0 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 546;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
   };
   const rZ = chkZ(DZ);
@@ -24000,6 +24014,29 @@ try {
   T('v546 C270·C276 화면 글·문서·판 번호(정확 검사): 기기 승인 안내 6곳 = 기기 승인 담당(시스템 관리 계정) · 규칙 카드 평일 08:10 · 재수집 창 상태 이름 · FEATURES·TESTLIST·CLAUDE.md·sw · 결함 사본 ' + MZ.length + '개 = 모두 ✗',
     rZ.ok && MZ.every((v) => v === false), JSON.stringify({ r: rZ.info, mut: MZ }));
 } catch (e) { console.log('  (v546 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v547(T746 — 64): 실행 검사는 위 ③ 'T746' · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '547 이상'으로 풀 것
+try {
+  const rdY = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DY = { ft: rdY('FEATURES.md'), tl: rdY('TESTLIST.md'), sw: rdY('sw.js'), cl: rdY('CLAUDE.md') };
+  const chkY = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v547 (11/26)', '\n### '), tlv = cut(d.tl, '\n## v547 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), op = cb.filter((l) => /^- \[ \] \(AI 운영 확인/.test(l));
+    const FT = ['원장 T746', '`recSortCmp`', '`renderTasksLegacy`', '`sortedWorkers`', '`renderReceivablesLegacy`'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v547 \(2026-11-26\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**T746(v547') > 0 && /SHELL_CACHE = 'jw-shell-v547'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
+  };
+  const rY = chkY(DY);
+  const muY = (k, f) => chkY(Object.assign({}, DY, { [k]: f(DY[k]) })).ok;
+  const MY = [muY('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v546 (')), muY('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v546'")),
+    muY('ft', (s) => s.split('`recSortCmp`').join('recSortCmp')), muY('cl', (s) => s.replace('**T746(v547', 'T746(v547')),
+    muY('tl', (s) => s.replace('\n## v547 ', '\n## v5470 '))];
+  T('v547 T746 문서·판 번호(정확 검사): FEATURES 기준 v547 (2026-11-26)·v547 절(고친 곳·얼린 3곳 이름) · TESTLIST v547 칸 3(운영 확인 1 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v547 · 결함 사본 ' + MY.length + '개 = 모두 ✗',
+    rY.ok && MY.every((v) => v === false), JSON.stringify({ r: rY.info, mut: MY }));
+} catch (e) { console.log('  (v547 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
