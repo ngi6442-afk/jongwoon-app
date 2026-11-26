@@ -11228,13 +11228,13 @@ try {
     S51({ id: 's6', seq: 6, kind: 'asbestos', title: '석면 투입 없음', start: '2026-11-25', status: 'plan' })];
   const E51 = (id, ptype, pid, kind, date, x) => Object.assign({ id, ptype, pid, kind, date, hours: '', next: '', note: '' }, x || {});
   const EDU51 = () => [
-    E51('a1', 'worker', 'w1', 'special', '2026-11-01'), E51('a2', 'worker', 'w1', 'spec_med', '2026-03-02', { org: 'jw' }), E51('a3', 'worker', 'w1', 'basic_con', '2019-04-01'),
-    E51('b1', 'worker', 'w2', 'special', '2026-11-01'), E51('b2', 'worker', 'w2', 'spec_med', '2026-04-20', { org: 'other' }), E51('b3', 'worker', 'w2', 'basic_con', '2020-06-01'),
+    E51('a1', 'worker', 'w1', 'special', '2026-11-20'), E51('a2', 'worker', 'w1', 'spec_med', '2026-03-02', { org: 'jw' }), E51('a3', 'worker', 'w1', 'basic_con', '2019-04-01'),
+    E51('b1', 'worker', 'w2', 'special', '2026-11-20'), E51('b2', 'worker', 'w2', 'spec_med', '2026-04-20', { org: 'other' }), E51('b3', 'worker', 'w2', 'basic_con', '2020-06-01'),
     E51('c1', 'worker', 'w3', 'pre_med', '2026-08-01'),
-    E51('d1', 'worker', 'w4', 'special', '2026-11-01'), E51('d2', 'worker', 'w4', 'spec_med', '2026-05-20', { org: 'other' }), E51('d3', 'worker', 'w4', 'basic_con', '2021-01-05'),
+    E51('d1', 'worker', 'w4', 'special', '2026-11-20'), E51('d2', 'worker', 'w4', 'spec_med', '2026-05-20', { org: 'other' }), E51('d3', 'worker', 'w4', 'basic_con', '2021-01-05'),
     E51('g1', 'worker', 'w7', 'spec_med', '2026-10-01', { org: 'jw', del: 1 }), E51('g2', 'worker', 'w7', 'pre_med', '확인 중'), E51('g3', 'worker', 'w7', 'pre_med', '2025-01-01', { org: 'jw' }),
     E51('h1', 'worker', 'w8', 'special', '2024-05-01'),
-    E51('k1', 'worker', 'w10', 'spec_med', '2026-05-25', { org: 'other' }), E51('k2', 'worker', 'w10', 'basic_con', '2022-02-02'), E51('k3', 'worker', 'w10', 'special', '2026-11-01'),
+    E51('k1', 'worker', 'w10', 'spec_med', '2026-05-25', { org: 'other' }), E51('k2', 'worker', 'w10', 'basic_con', '2022-02-02'), E51('k3', 'worker', 'w10', 'special', '2026-11-20'),
     E51('m1a', 'member', 'm1', 'special', '2026-11-01'), E51('m1b', 'member', 'm1', 'spec_med', '2026-01-10', { org: 'jw' }),
     E51('p1', 'worker', 'w11', 'spec_med', '2026-03-01', { org: 'jw' }), E51('p2', 'worker', 'w11', 'pre_med', '2026-06-01', { org: 'other' }), E51('p3', 'worker', 'w11', 'spec_med', '2026-13-01', { org: 'jw' })];
   const mkS51 = (o) => mk51(Object.assign({ workers: WK51(), asb: ASB51(), edu: EDU51(), members: MEM51() }, o || {}));
@@ -11301,7 +11301,7 @@ try {
   const btn4 = (act, p, x) => ' <button type="button" class="mini-btn" data-site-doc="' + act + '" data-doc-p="' + p + '"' + (act === 'edit' ? ' data-doc-id="' + x + '"' : ' data-doc-kind="' + x + '"') + '>' + (act === 'edit' ? '수정' : '+ 기록') + '</button>';
   T('v451 ④ 근로자별 신고 서류 표(실행): 석면 예정 = 6줄(직원 → 일용직 차례) · 갑돌 = "✓ 2026-11-01"·"2026-03-02 · 종운건설 · 유효 ~2027-03-02"·"✓ 2019-04-01" 색 없음·칸마다 [수정] · 을순 검진 = 빨강 "2026-04-20 · 타회사 · 만료 2026-10-20" + [수정] + [+ 기록] · 병수 = 특별교육 노랑 "기록 없음"·검진 "2026-08-01 · 명의 모름 · 유효 ~2027-02-01"·건설 기초 노랑 · 무진 = 세 칸 노랑 "기록 없음" + [+ 기록](특별교육·검진·건설 기초 종류) · 직원 건설 기초 = "직원 — 판정 안 함"(색 없음) · 머리 "신고 서류 — 근로자별 6명"·꼬리 유효기간 규칙·기준일 · 안전 보기 = 버튼 0(표는 보임) · 종결 현장 = 2줄·색 0·"기록만 보여 줍니다(판정 안 함)"·버튼 있음 · 안전 권한 없음·기록 못 읽음·철거 = 표 없음 · 일용직 숨김 = 직원 줄 + "일용직 7명은 일용직 명부를 볼 권한이 없어"',
     R4.length === 6 && R4.map((r) => r.name).join(',') === '석면직원,갑돌,을순,병수,정미,무진' && R4.map((r) => r.type).join(',') === '직원,일용직,일용직,일용직,일용직,일용직'
-    && JSON.stringify(by4(R4, '갑돌').k) === '["","",""]' && by4(R4, '갑돌').c[0] === '✓ 2026-11-01' + btn4('edit', 'worker:w1', 'a1') && by4(R4, '갑돌').c[1] === '2026-03-02 · 종운건설 · 유효 ~2027-03-02' + btn4('edit', 'worker:w1', 'a2') && by4(R4, '갑돌').c[2] === '✓ 2019-04-01' + btn4('edit', 'worker:w1', 'a3')
+    && JSON.stringify(by4(R4, '갑돌').k) === '["","",""]' && by4(R4, '갑돌').c[0] === '✓ 2026-11-20' + btn4('edit', 'worker:w1', 'a1')   /* C262: 일용직 특별교육은 기준일 1주일 안 — 가짜 자료 11-20 */ && by4(R4, '갑돌').c[1] === '2026-03-02 · 종운건설 · 유효 ~2027-03-02' + btn4('edit', 'worker:w1', 'a2') && by4(R4, '갑돌').c[2] === '✓ 2019-04-01' + btn4('edit', 'worker:w1', 'a3')
     && JSON.stringify(by4(R4, '을순').k) === '["","vs-dan",""]' && by4(R4, '을순').c[1] === '2026-04-20 · 타회사 · 만료 2026-10-20' + btn4('edit', 'worker:w2', 'b2') + btn4('add', 'worker:w2', 'spec_med')
     && JSON.stringify(by4(R4, '병수').k) === '["vs-warn","","vs-warn"]' && by4(R4, '병수').c[1] === '2026-08-01 · 명의 모름 · 유효 ~2027-02-01' + btn4('edit', 'worker:w3', 'c1')
     && JSON.stringify(by4(R4, '무진').k) === '["vs-warn","vs-warn","vs-warn"]' && JSON.stringify(by4(R4, '무진').c) === JSON.stringify(['기록 없음' + btn4('add', 'worker:w5', 'special'), '기록 없음' + btn4('add', 'worker:w5', 'spec_med'), '기록 없음' + btn4('add', 'worker:w5', 'basic_con')])
@@ -24037,6 +24037,37 @@ try {
   T('v547 T746 문서·판 번호(정확 검사): FEATURES 기준 v547 (2026-11-26)·v547 절(고친 곳·얼린 3곳 이름) · TESTLIST v547 칸 3(운영 확인 1 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v547 · 결함 사본 ' + MY.length + '개 = 모두 ✗',
     rY.ok && MY.every((v) => v === false), JSON.stringify({ r: rY.info, mut: MY }));
 } catch (e) { console.log('  (v547 검사 생략 — ' + e.message + ')'); fails++; }
+// ── C262(석면 신고 서류 판정 두 곳 · 시행규칙 별표4 비고 2 원문 09_조사_문서/특별교육범위_자료_20261112): ① 일용직 특별교육은 기준일 1주일 안 기록만 ✓ ② 배치전건강진단도 만료일이 다음 예정일
+try {
+  const fnC = (name) => { const i = html.indexOf('  function ' + name + '('); if (i < 0) throw new Error('함수 없음 ' + name); let d = 0, st = false; for (let j = i; j < html.length; j++) { const ch = html[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return html.slice(i, j + 1); } } return ''; };
+  const lineC = (pre) => { const i = html.indexOf(pre); if (i < 0) throw new Error('줄 없음 ' + pre); const j = html.indexOf('\n', i); return html.slice(i, j); };
+  const runC = (H) => {
+    const src = H === html ? null : H;
+    const get = (name) => { if (!src) return fnC(name); const i = src.indexOf('  function ' + name + '('); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } return ''; };
+    const lineS = (pre) => { const S = src || html; const i = S.indexOf(pre); const j = S.indexOf('\n', i); return S.slice(i, j); };
+    const body = [lineS('  var ASB_MED_MONTHS'), ['pad', 'fmtDate', 'isDate', 'asbMedMonths', 'asbAddMonths', 'asbAddDays', 'eduKindDef', 'liveEdu', 'eduLatest', 'eduHasValidSpecial', 'eduIsMed', 'eduMonthsFor', 'eduNextFor', 'asbDocOf'].map(get).join('\n')];
+    const kinds = (src || html).slice((src || html).indexOf('  var EDU_KINDS = ['), (src || html).indexOf('];', (src || html).indexOf('  var EDU_KINDS = [')) + 2);
+    const f = new Function('edu', kinds + '\n' + body.join('\n') + '\nfunction findMember(){ return null; } function eduRegNeed(){ return 0; } function eduHoursNum(){ return 0; } function eduHalfEnd(){ return ""; }\nfunction asbMedLatest(){ return null; } function asbMedOf(){ return { st: "ok" }; }\nreturn { docOf: asbDocOf, next: eduNextFor };');
+    const E = [{ id: 'a', ptype: 'worker', pid: 'w1', kind: 'special', date: '2026-11-18' }, { id: 'b', ptype: 'worker', pid: 'w2', kind: 'special', date: '2026-10-01' }, { id: 'c', ptype: 'member', pid: 'm1', kind: 'special', date: '2025-01-01' }, { id: 'd', ptype: 'worker', pid: 'w3', kind: 'special' }];
+    const x = f(E);
+    const BASE = '2026-11-25';
+    const w1 = x.docOf('worker', 'w1', BASE), w2 = x.docOf('worker', 'w2', BASE), m1 = x.docOf('member', 'm1', BASE), w3 = x.docOf('worker', 'w3', BASE), w2n = x.docOf('worker', 'w2', '');
+    const I = {};
+    I.spec = w1.sp.ok === true && !w1.sp.stale && w2.sp.ok === false && w2.sp.stale === true && m1.sp.ok === true && w3.sp.ok === false && w3.sp.stale === true && w2n.sp.ok === true && x.docOf('worker', 'w9', BASE).sp.ok === false && !x.docOf('worker', 'w9', BASE).sp.stale;
+    I.med = x.next('pre_med', 'worker:w1', '2026-03-02', '', '', 'jw') === '2027-03-02' && x.next('pre_med', 'worker:w1', '2026-03-02', '', '', 'other') === '2026-09-02' && x.next('pre_med', 'worker:w1', '2026-03-02', '', '', '') === '2026-09-02'
+      && x.next('spec_med', 'worker:w1', '2026-03-02', '', '', 'jw') === '2027-03-02' && x.next('pre_med', 'worker:w1', '', '', '', 'jw') === '';
+    I.hint = (src || html).indexOf('다른 사업장에서 12개월 내') < 0 && /k:"pre_med",[^\n]*hint:"배치 전 실시\. 석면 신고 검진 유효기간은 받은 회사 명의로/.test(src || html);
+    return { ok: Object.values(I).every((v) => v === true), info: I };
+  };
+  const rC = runC(html);
+  const muC = (a, b) => { if (html.split(a).length !== 2) return 'no-site:' + a.slice(0, 40); try { return runC(html.replace(a, () => b)).ok; } catch (e) { return false; } };
+  const MC = [muC('if (!mem && sp && base && o.sp.ok && !(isDate(sp.date) && sp.date >= asbAddDays(base, -7))){', 'if (false){'),
+    muC('if (!mem && sp && base && o.sp.ok && !(isDate(sp.date) && sp.date >= asbAddDays(base, -7))){', 'if (sp && base && o.sp.ok && !(isDate(sp.date) && sp.date >= asbAddDays(base, -7))){'),
+    muC('    if (d && eduIsMed(k) && isDate(date)) return asbAddMonths(date, eduMonthsFor(k, p, org));', ''),
+    muC('    if (k === "spec_med" || k === "pre_med") m = asbMedMonths(org);', '    if (k === "spec_med") m = asbMedMonths(org);')];
+  T('C262 석면 신고 서류 판정: ① 일용직 특별교육 = 기준일 1주일 안 기록만 ✓(옛 기록·날짜 없음은 "확인 필요" 표시 · 기준일 없으면 그대로 · 직원은 한 번 받으면 ✓ — 별표4 비고 2·라목) ② 배치전건강진단 다음 예정일 = 받은 회사 명의 만료일(종운건설 12 · 다른 회사·모름 6개월 — 특수건강진단과 같음) · 안내 글 회사 규칙 · 결함 사본 ' + MC.length + '개 = 모두 ✗',
+    rC.ok && MC.every((v) => v === false), JSON.stringify({ r: rC.info, mut: MC }));
+} catch (e) { console.log('  (C262 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
