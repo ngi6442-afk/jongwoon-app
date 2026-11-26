@@ -9230,7 +9230,7 @@ try {
 
   // ⑫ 못 읽은 부동산(앱을 켠 직후 읽는 중·읽기 실패 — 빈 배열) — 저장이 서버 부동산 문서를 덮지 않는다(이미 막혀 있음 — 확인만, v443 bidsLoaded 같은 막음은 더하지 않음):
   //   저장 예약은 setObStatus 한 곳뿐이고 setObStatus는 원장에서 찾은 물건만 바꾼다 → 빈 원장에서 상태 누름(흉내·직접) = 저장 예약 0·요청 0 · 읽은 뒤 바꾸고 1.2초 안에 로그아웃(토큰 없음·원장 비움) = PUT 0 ·
-  //   409(남이 먼저 저장)면 다시 읽어 합친(mergeBidsLocal — 로컬 우선 합집합) 원장을 다시 보냄(사람이 바꾼 상태가 남음) · 정적: scheduleOnbidSave 부르는 곳 = setObStatus 하나 · doSaveOnbid 부르는 곳 = 예약 타이머·409 다시 보내기 둘 · 로그아웃 clearSessionData가 onbids를 비움
+  //   409(남이 먼저 저장)면 다시 읽어 합친(mergeBidsLocal — 로컬 우선 합집합) 원장을 다시 보냄(사람이 바꾼 상태가 남음) · 정적: scheduleOnbidSave 부르는 곳 = setObStatus 하나 · doSaveOnbid 부르는 곳 = 예약 타이머·409 다시 보내기 둘 + C242 판 A 다시 보내기 등록부(rsFns — 이미 나간 저장이 5xx·끊김일 때만 · 대기 표시·토큰·회원 확인 뒤 · 로그아웃이 등록부를 비움) · 로그아웃 clearSessionData가 onbids를 비움
   const X12 = mk44({ obs: [], sha: null }); X12.api.render(); X12.api.setStatus('onbid-o1', '검토'); X12.api.act('st', 'onbid-o1', '검토'); X12.env.tick(1300); await flush44();
   const s12 = [X12.api.obs().length, !!X12.api.timer(), X12.api.pending(), X12.env.fetchLog.length];
   const X12b = mk44(); X12b.api.render(); X12b.api.setStatus('onbid-o2', '검토'); X12b.env.noTok = true; X12b.api.setObs([]); X12b.env.tick(1300); await flush44(); s12.push(X12b.env.fetchLog.join(',') === '', X12b.api.pending());
@@ -9239,7 +9239,7 @@ try {
   X12c.api.setStatus('onbid-o2', '참여'); X12c.env.tick(1300); await flush44(); await flush44(); await flush44(); await flush44();
   s12.push(X12c.env.fetchLog.join(','), stOf44(X12c, 'o2'), stOf44(X12c, 'o9'), X12c.api.obs().length);
   const st12 = (html.match(/scheduleOnbidSave\(/g) || []).length === 2 && /scheduleOnbidSave\(\); renderOnbid\(\);/.test(fn44(html, 'setObStatus')) && /var b=findOb\(id\); if\(!b\) return;/.test(fn44(html, 'setObStatus')) && /if\(!isAdmin\(\)\) return;/.test(fn44(html, 'setObStatus'))
-    && (html.match(/\bdoSaveOnbid\b/g) || []).length === 3 && /setTimeout\(doSaveOnbid,1200\)/.test(fn44(html, 'scheduleOnbidSave')) && /onbidSha=j\.sha;\} return doSaveOnbid\(\);/.test(fn44(html, 'doSaveOnbid'))
+    && (html.match(/\bdoSaveOnbid\b/g) || []).length === 4 && /onbid: \[function\(\)\{ doSaveOnbid\(\); \}, function\(\)\{ return onbidPending; \}/.test(html) && /setTimeout\(doSaveOnbid,1200\)/.test(fn44(html, 'scheduleOnbidSave')) && /onbidSha=j\.sha;\} return doSaveOnbid\(\);/.test(fn44(html, 'doSaveOnbid'))
     && /bids = \[\]; onbids = \[\];/.test(fn44(html, 'clearSessionData')) && /var token=getToken\(\); if\(!token\) return;/.test(fn44(html, 'doSaveOnbid'));
   T('v444 ⑫ 못 읽은 부동산 — 저장이 서버 문서를 덮지 않음(실행 — 실제 setObStatus·scheduleOnbidSave·doSaveOnbid · 이미 막혀 있어 막음은 더하지 않음): 빈 원장에서 상태 누름(직접·누름 길) = 원장 0·저장 예약 0·요청 0 · 읽은 뒤 바꾸고 1.2초 안에 로그아웃(토큰 없음·원장 비움) = PUT 0 · 409 = 다시 읽기 → 합친 원장(내가 바꾼 참여 + 남이 바꾼 패스 + 새 물건 = 11건) 다시 보냄 · 정적: 저장 예약 = setObStatus 한 곳(찾은 물건만·관리자 검사) · doSaveOnbid = 예약 타이머·409 다시 보내기 · 토큰 없으면 안 보냄 · 로그아웃이 원장 비움',
     JSON.stringify(s12) === JSON.stringify([0, false, false, 0, true, true, 'PUT@ob:10,GET@ob,PUT@ob:11', '참여', '패스', 11]) && st12,
@@ -18242,6 +18242,7 @@ try {
       const apis = (H.match(/\n  var [A-Z_]+_(?:ROOT|PATH|API) = [^\n]*/g) || []).map((s) => s.slice(1)).join('\n');
       src = ['var window = {}, DATA_OWNER = "o", DATA_REPO = "r", isOffline = false;',
         'var _colBase = {}, _col409 = {}, _col409t = {}, _COL409_MS = 30000, _colRead403 = {};',
+        (/\n  var rsQ = /.test(H) ? [varH(H, 'RS_DELAYS'), varH(H, 'rsQ'), fnH(H, 'rsDrop')].join('\n') : ''),   // C242 판 A: 세션 비울 때 부르는 다시 보내기 등록부(saveRetryReset — 닫힘이 실제 본문으로 떼 옴)의 상태 + rsDrop(forEach에 이름으로만 넘겨 닫힘이 못 따라감) · 이 판 전 html에는 없음
         apis,
         'var vehicles=[], vehSha=null, vehPending=false, receivables=[], recSha=null, recPending=false, licenses=[], duties=[], licSha=null, licPending=false, licRemoteOk=false;',
         'var records={}, customItems={}, checkScopes={}, checkScopeTs={}, checkAssignee={}, checkAssigneeTs={}, checkReview={}, checkReviewTs={}, currentSha=null, pendingSave=false;',
@@ -23851,6 +23852,148 @@ try {
   T('C275 근거 표 승격 줄 방어(앱): 콘솔 줄 hrbg·vehbg·bg 인자 {bg_ver, bg_sha = 본 판 지문} · 조회 shape_ok false = "꼴이 맞지 않아" 막음 · missing n개 = "꼭 읽는 값 n개가 없어" 막음(계약은 거울 꺼짐 글이 먼저) · 막음 없으면 "" · 계약 카드 conProcBgSet = 승격만 bg_sha 실음(해제는 안 실음) · 카드 버튼 지문 속성·막음이면 disabled · 결함 사본 ' + MUT75.length + '개 = 모두 ✗',
     r75.ok && M75.every((v) => v === false), JSON.stringify({ r: r75.info, mut: M75 }));
 } catch (e) { console.log('  (C275 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── C242 판 A(저장 실패 다시 보내기 등록부 · 컬렉션별 띠): 실제 등록부 본문(gwCall ~ gwCallSend)과 setOffline·saveFailToast·cbxReportFix를 떼어 실행 — 저장·읽기 함수·네트워크·시계만 대역
+try {
+  const cut242 = (h, a, b) => { const i = h.indexOf(a); if (i < 0) throw new Error('자리 없음 ' + a); const j = h.indexOf(b, i); if (j < 0) throw new Error('끝 없음 ' + b); return h.slice(i, j); };
+  const b64u = (o) => Buffer.from(JSON.stringify(o)).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const mk242 = (h) => {
+    const E = { now: 1e6, me: 'm1', tok: b64u({ mid: 'm1', role: '팀장' }) + '.sig', timers: [], saves: [], sids: [], gets: 0, next: {}, banner: false, gz: null, calls: 0, toasts: 0, inval: 0, hold: [], srv: { at: 10, items: [{ id: 'v1', a: 0, b: 0 }, { id: 'v2', a: 0, b: 0 }] } };
+    const cl = (x) => JSON.parse(JSON.stringify(x));
+    const src = ['var sessViewerId = "m1", vehicles = [], vehPending = false, vehSaveTimer = null, tasks = [], tasksPending = false, tasksSaveTimer = null, pendingSave = false, saveTimer = null, wkPending = false, wkSaveTimer = null, isOffline = false, GW_GZ_MIN = 1048576, base = 0, licenses = [], duties = [];',
+      'function myId(){ return ENV.me; } function gwToken(){ return ENV.tok; } function b64DecodeUnicode(s){ return B64(s); } function gwHeaders(){ return {}; } function reportErr(){} function gwToast(){ ENV.toasts++; } function onSessionInvalid(){ ENV.inval++; }',
+      'function mgEq(a, b){ return JSON.stringify(a) === JSON.stringify(b); } function mgCopy(v){ return v === undefined ? undefined : JSON.parse(JSON.stringify(v)); }',
+      'var IM = {}; function imSt(c){ return IM[c] || (IM[c] = { base: {}, at: 0, out: 0, has: false, sent: {}, sk: 0 }); } function imSet(c, items, at){ var s = imSt(c); s.has = true; s.at = at; s.base = {}; items.forEach(function(x){ s.base[x.id] = mgCopy(x); }); }',
+      'function gwGzip(){ return new Promise(function(r){ ENV.gz = r; }); }',
+      'function gwSend(fn, txt){ var b = JSON.parse(txt); return ENV.reply(b); }',
+      'function doSaveVeh(){ ENV.calls++; var s = imSt("vehicles"), k = ++s.sk, m = {}, body = mgCopy(vehicles); vehicles.forEach(function(x){ m[x.id] = mgCopy(x); }); s.sent[k] = m; s.out++; var end = function(){ if (s.sent[k]){ delete s.sent[k]; s.out--; } };',
+      '  return gwCall("gw-data", { action: "save", collection: "vehicles", doc: { items: vehicles }, base: base }).then(function(r){ end(); if (r.status === 401){ onSessionInvalid(); return; } if (r.status === 409){ if (ENV.noRe) return; if (ENV.pf) vehPending = false; return loadVehicles().then(function(){ if (ENV.pf){ ENV.pf = 0; return; } vehPending = true; return doSaveVeh(); }); } if (r.status === 403){ vehPending = false; return; } if (r.status !== 200){ saveFailToast("차량", r.status); setOffline(true, "vehicles"); return; } base = r.body.updated_at; imSet("vehicles", body, base); setOffline(false, "vehicles"); if (!vehSaveTimer) vehPending = false; }).catch(function(){ end(); saveFailToast("차량"); setOffline(true, "vehicles"); }); }',
+      'function loadVehicles(){ return gwCall("gw-data", { action: "get", collection: "vehicles" }).then(function(r){ if (r.status === 404){ vehicles = []; imSet("vehicles", [], 0); return; } if (r.status !== 200 || !r.body.doc) return; var d = r.body.doc, s = imSt("vehicles"); if (s.has && d.updated_at < s.at) return; var ri = d.items;',
+      '  if (vehPending || s.out > 0){ var L = {}; vehicles.forEach(function(x){ L[x.id] = x; }); ri.forEach(function(x){ var l = L[x.id], b = s.base[x.id] || {}; if (!l){ vehicles.push(mgCopy(x)); return; } Object.keys(x).forEach(function(k){ if (mgEq(l[k], b[k])) l[k] = x[k]; }); }); vehicles = vehicles.filter(function(x){ return ri.some(function(y){ return y.id === x.id; }) || !s.base[x.id] || !mgEq(x, s.base[x.id]); }); } else vehicles = mgCopy(ri); if (ENV.badMerge){ vehicles.forEach(function(x){ if (x.id === "v2") x.b = 0; }); } base = d.updated_at; imSet("vehicles", ri, base); }).catch(function(){}); }',
+      cut242(h, '  function gwCall(fn, body){', '  function _ghResp('), cut242(h, '  function setOffline(state, col){', '  // 화면 알림(v331)'), cut242(h, '  function saveFailToast(', '  //   판24h 검토'), cut242(h, '  function cbxChanged(it){', '  // 계약서로 새 계약 시작'),
+      'return { ex: function(s){ return eval(s); } };'].join('\n');
+    const doc = () => ({ doc: { items: cl(E.srv.items), updated_at: E.srv.at } });
+    E.reply = (b) => {
+      const key = b.action + ':' + (b.collection || ''), q = E.next[key] || E.next[b.action]; const st = q && q.length ? q.shift() : 'ok'; if (E.hook) E.hook(b);
+      const real = () => { if (b.action === 'get') { E.gets++; return { status: 200, body: doc() }; } if (b.action !== 'save') return { status: 200, body: {} }; const sids = E.srv.sids || [], jj = JSON.stringify(b.doc || {});
+        if (b.sid){ const hit = sids.filter((x) => x.s === b.sid && x.j === jj)[0]; if (hit) return { status: 200, body: { status: 'OK', already: true, sid_at: hit.at, at: E.srv.at } }; }
+        if (b.base !== E.srv.at) return { status: 409, body: b.sid ? { error_code: 'STALE_BASE', at: E.srv.at, sids: sids.map((x) => ({ s: x.s, at: x.at })) } : {} };
+        E.srv = { at: E.srv.at + 1, items: cl(b.doc.items || []), sids: b.sid ? sids.concat([{ s: b.sid, at: E.srv.at + 1, j: jj }]).slice(-8) : [] }; return { status: 200, body: { updated_at: E.srv.at } }; };
+      if (b.action === 'save') { E.saves.push(b.collection + ':' + (E.tokMid())); E.sids.push(b.sid || ''); }
+      if (st === 'net') return Promise.reject(new Error('net'));
+      if (st === 'lost') { real(); return Promise.resolve({ status: 504, body: {} }); }
+      if (st === 'hold') { const r0 = real(); return new Promise((r, j) => { E.hold.push((x) => (x === 'net' ? j(new Error('net')) : r(x ? { status: x, body: {} } : r0))); }); }
+      if (st === 'hold0') return new Promise((r, j) => { E.hold.push((x) => (x === 'net' ? j(new Error('net')) : r(x ? { status: x, body: {} } : real()))); });
+      if (st === 'old') return Promise.resolve({ status: 200, body: { doc: E.old } });
+      return Promise.resolve(st === 'ok' ? real() : { status: st, body: {} });
+    };
+    E.tokMid = () => JSON.parse(Buffer.from(E.tok.split('.')[0], 'base64url').toString()).mid;
+    const api = new Function('ENV', 'B64', 'setTimeout', 'clearTimeout', 'Date', 'document', 'navigator', src)(E, (s) => Buffer.from(s, 'base64').toString('utf8'), (fn, ms) => { E.timers.push({ fn, ms }); return E.timers.length; }, (id) => { if (id) E.timers[id - 1] = null; }, { now: () => E.now },
+      { getElementById: () => ({ classList: { add() { E.banner = true; }, remove() { E.banner = false; } } }) }, { onLine: true });
+    E.ex = (s) => api.ex(s); E.fl = async () => { for (let i = 0; i < 30; i++) await new Promise((r) => setImmediate(r)); };
+    E.live = () => E.timers.filter(Boolean).map((t) => t.ms); E.fire = async () => { const i = E.timers.findIndex(Boolean); if (i < 0) return; const t = E.timers[i]; E.timers[i] = null; E.now += t.ms; t.fn(); await E.fl(); };
+    E.read = async (st) => { E.next['get:vehicles'] = st ? [].concat(st) : []; E.ex('loadVehicles()'); await E.fl(); };
+    E.edit = async (st, js) => { E.next['save:vehicles'] = [].concat(st); E.ex('vehicles[0] && (' + (js || 'vehicles[0].a = (vehicles[0].a || 0) + 1') + '); vehPending = true; doSaveVeh()'); await E.fl(); };
+    E.other = (js) => { const d = E.srv.items; new Function('d', js)(d); E.srv = { at: E.srv.at + 1, items: d, sids: E.srv.sids }; };   // 다른 서버 길처럼 번호는 이어 감
+    E.m2 = () => { E.tok = b64u({ mid: 'm2' }) + '.sig'; }; E.pend = () => E.ex('vehPending'); E.rel = async (x) => { const f = E.hold.shift(); f(x); await E.fl(); };
+    return E;
+  };
+  const run242 = async (h) => {
+    const o = {}; let E; const up = async () => { E = mk242(h); await E.read(); return E; };
+    await up(); await E.edit('ok'); o.ok = [E.saves.length, E.live()];
+    await up(); await E.edit(500); const t1 = E.live(); await E.fire(); o.s5 = [t1, E.saves.length, E.ex('Object.keys(rsQ).length'), E.srv.items[0].a, E.pend()];
+    await up(); await E.edit('net'); o.net = E.live();
+    await up(); await E.edit(500); E.m2(); await E.fire(); o.otherTab = [E.saves.length, E.calls];
+    await up(); E.m2(); await E.edit(500); o.otherTabEdit = E.live();
+    await up(); await E.edit(500); E.ex('sessViewerId = "mX"'); await E.fire(); o.viewer = [E.saves.length, E.calls];
+    await up(); await E.edit(500); E.me = 'm2'; await E.fire(); o.screen = [E.saves.length, E.calls];
+    await up(); E.next['save:vehicles'] = ['hold']; E.ex('vehPending = true; doSaveVeh()'); await E.fl(); E.ex('saveRetryReset(); rsOk.vehicles = 1'); await E.rel(500); o.late = E.live();   // 세션을 비우기 전 사람 저장의 늦은 500
+    await up(); await E.read(404); await E.edit(500); o.r404 = E.live();
+    await up(); await E.edit(500); await E.read(403); await E.fire(); o.r403 = [E.saves.length, E.calls];
+    await up(); E.m2(); await E.read(); E.tok = b64u({ mid: 'm1' }) + '.s'; await E.edit(500); o.readOther = E.live();
+    E = mk242(h); await E.edit(500); o.noRead = E.live();
+    await up(); await E.read(500); await E.edit(500); o.r500 = E.live();
+    await up(); await E.edit(500); E.ex('saveRetryReset()'); const r1 = E.live(); await E.edit(500); o.reset = [r1, E.live()];
+    for (const st of [400, 401, 403, 412]) { await up(); await E.edit(500); const tn = E.toasts; E.next['save:vehicles'] = [st]; await E.fire(); o['s' + st] = [E.saves.length, E.live(), E.pend(), E.inval, E.toasts - tn, E.ex('!!rsQ.vehicles')]; }   // 자동 줄기의 거절 = 그 줄기만 조용히(대기 남음 · 로그인 창·알림 없음)
+    await up(); await E.edit(500); const tn5 = E.toasts; E.next['save:vehicles'] = [500, 'net']; await E.fire(); await E.fire(); o.quiet = [E.saves.length, E.toasts - tn5, E.live()];
+    // 409 — ㉠ 자동은 병합·다시 보내기 없이 대기(어느 경우든) · 온전한 읽기 뒤에만 다시 켬
+    await up(); await E.edit(500); E.other('d[1].b = 7'); await E.fire(); await E.fire(); o.c409 = [E.saves.length, E.srv.items[0].a, E.srv.items[1].b, E.pend(), E.ex('!!rsOk.vehicles'), E.gets]; await E.edit('ok', 'vehicles[1].a = 2'); await E.read(); await E.edit(500); o.c409on = E.live();   // 사람 저장 200 · 온전한 읽기 뒤 다시 켜짐
+    await up(); E.other('d[1].b = 7'); E.noRe = 1; await E.edit('ok'); E.noRe = 0; await E.edit(500); o.h409 = E.live();   // 사람 저장의 409(다시 읽지 않은 채) 뒤에도 자동 끔
+    await up(); await E.edit(500); E.next['save:vehicles'] = [409, 409, 409, 409]; for (let i = 0; i < 6; i++) await E.fire(); o.c409loop = [E.saves.length, E.live()];
+    // 대기 중 읽기가 남이 저장한 판 = 자동으로 보내지 않음(같은 칸·다른 칸 모두) · 판이 그대로면 보냄 · 409 줄기의 다시 읽기는 대기가 없어도 온전한 읽기가 아님
+    await up(); await E.edit(500); E.other('d[0].a = 9'); await E.read(); await E.fire(); o.pendRead = [E.saves.length, E.srv.items[0].a];
+    await up(); await E.edit(500); E.other('d[1].b = 7'); await E.read(); await E.fire(); o.pendReadOk = [E.saves.length, E.srv.items[0].a, E.srv.items[1].b];
+    await up(); await E.edit(500); await E.read(); await E.fire(); o.pendReadSame = [E.saves.length, E.srv.items[0].a];
+    await up(); E.other('d[1].b = 7'); E.ex('rsOk.vehicles = 1'); E.pf = 1; await E.edit('ok'); o.reRead = [E.ex('!!rsOk.vehicles'), E.gets]; await E.edit(500); o.reRead.push(E.live().length);
+    // 자동은 줄을 휴지통으로 보내거나 빼는 목록을 보내지 않음
+    await up(); await E.edit(500, 'vehicles[0].del = 1'); await E.fire(); o.cutDel = [E.saves.length, E.pend(), E.srv.items[0].del || 0];
+    await up(); await E.edit(500, 'vehicles.splice(1, 1)'); await E.fire(); o.cutRow = [E.saves.length, E.pend(), E.srv.items.length];
+    await up(); await E.edit(500); E.old = { items: [{ id: 'v1', a: 0, b: 0 }], updated_at: 10 }; await E.read('old'); await E.fire(); o.partRead = [E.saves.length, E.srv.items.length];
+    await up(); await E.edit(500); E.other(''); await E.read(); await E.fire(); o.sameNew = E.saves.length;   // 남이 같은 내용으로 저장(판 시각만 바뀜)도 남이 저장한 판   // 대기 중 읽기가 판 시각은 같고 줄이 빠짐(R5)
+    // 버린 늦은 읽기는 목록을 온전하다고 보지 않음
+    await up(); E.old = { items: [{ id: 'v1', a: 0, b: 0 }], updated_at: 5 }; E.ex('rsTaint("vehicles")'); await E.read('old'); await E.edit(500); o.lateRead = E.live();
+    // 자동 S1 이 나가 있는 동안 사람이 또 고쳐 S2 실패 — 도착 순서 둘
+    await up(); await E.edit(500); E.next['save:vehicles'] = ['hold']; await E.fire(); await E.edit(502, 'vehicles[1].a = 5'); await E.rel(); o.s4b = [E.pend(), E.ex('!!rsQ.vehicles')]; await E.fire(); o.s4b.push(E.srv.items[0].a, E.srv.items[1].a, E.pend());
+    await up(); await E.edit(500); E.next['save:vehicles'] = ['hold']; await E.fire(); E.next['save:vehicles'] = ['hold0']; E.ex('vehicles[1].a = 5; vehPending = true; doSaveVeh()'); await E.fl(); await E.rel(); o.s4a = [E.pend()]; await E.rel(502); await E.fire(); o.s4a.push(E.srv.items[0].a, E.srv.items[1].a, E.pend());
+    await up(); await E.edit(500); E.next['save:vehicles'] = ['hold']; await E.fire(); E.ex('vehicles[1].a = 5; vehPending = true; vehSaveTimer = 1'); await E.rel(); o.s4t = [E.pend(), E.ex('!!rsQ.vehicles')];   // 뒤 고침이 아직 예약
+    // 사람 저장 둘 — 앞 저장의 200이 뒤 저장의 실패보다 늦게 · 뒤 저장이 나가 있는 동안 앞 저장 200
+    await up(); E.next['save:vehicles'] = ['hold']; E.ex('vehicles[0].a = 1; vehPending = true; doSaveVeh()'); await E.fl(); await E.edit(502, 'vehicles[1].a = 5'); await E.rel(); o.hh1 = [E.pend(), E.ex('!!rsQ.vehicles')]; await E.fire(); o.hh1.push(E.srv.items[0].a, E.srv.items[1].a, E.pend());
+    await up(); E.next['save:vehicles'] = ['hold', 'hold0']; E.ex('vehicles[0].a = 1; vehPending = true; doSaveVeh()'); await E.fl(); E.ex('vehicles[1].a = 5; vehPending = true; doSaveVeh()'); await E.fl(); await E.rel(); await E.rel(502); o.hh2 = [E.pend(), E.ex('!!rsQ.vehicles')]; await E.fire(); o.hh2.push(E.srv.items[1].a, E.pend());
+    await up(); E.next['save:vehicles'] = ['hold0', 'hold']; E.ex('vehicles[0].a = 1; vehPending = true; doSaveVeh()'); await E.fl(); E.ex('vehicles[1].a = 5; vehPending = true; doSaveVeh()'); await E.fl(); await E.rel(502); await E.rel(); o.hh3 = [E.pend(), E.ex('!!rsQ.vehicles'), E.srv.items[1].a];   // 뒤 저장이 200 = 다 들어감
+    // 저장 번호(sid): 영문·숫자 · 응답을 잃은 저장(서버엔 듦)을 같은 내용으로 다시 = already(대기 풀림 · 기준 = 서버 판) · 내 것이 마지막인 409 = 알림·병합 없이 기준만 바꿔 다시 보냄 · 그 뒤 남이 저장했으면 종전 길
+    await up(); await E.edit('lost'); o.sidForm = E.sids.every((x) => /^[A-Za-z0-9]{8,32}$/.test(x)); await E.fire(); o.sidAgain = [E.saves.length, E.sids[0] === E.sids[1], E.pend(), E.ex('base') === E.srv.at, E.srv.items[0].a, E.live()];
+    await up(); await E.edit('lost'); const tq = E.toasts; await E.edit('ok', 'vehicles[1].a = 5'); o.sidMine = [E.saves.length, E.sids[1] === E.sids[2], E.pend(), E.srv.items[1].a, E.toasts - tq, E.gets, E.ex('!!rsOk.vehicles')];
+    await up(); await E.edit('lost'); E.other('d[1].b = 7'); await E.edit('ok', 'vehicles[1].a = 5'); o.sidOther = [E.saves.length, E.srv.items[1].b, E.srv.items[1].a, E.gets, E.ex('!!rsOk.vehicles')];
+    await up(); await E.edit('lost'); await E.edit('ok', 'vehicles[1].a = 5'); await E.edit('ok', 'vehicles[1].a = 0'); o.sidRevert = [E.srv.items[1].a, E.pend()];   // 내용을 되돌려도 서버에 듦
+    await up(); await E.edit('lost'); await E.edit(['ok', 'lost'], 'vehicles[1].a = 5'); await E.edit('ok', 'vehicles[1].a = 0'); o.sidRevert2 = [E.srv.items[1].a, E.pend()];
+    await up(); await E.edit('lost'); E.ex('saveRetryReset(); rsOk.vehicles = 1'); E.noRe = 1; await E.edit('ok', 'vehicles[1].a = 5'); E.noRe = 0; o.sidReset = [E.saves.length, E.pend()];
+    await up(); await E.edit('lost'); E.other('d[1].b = 7'); E.next['save:vehicles'] = []; await E.fire(); o.sidLater = [E.saves.length, E.pend(), E.ex('base') < E.srv.at, E.srv.items[1].b];   // 그 뒤 남이 저장 = already지만 기준 그대로
+    // 결함 1(되돌린 저장이 옛 번호로 묻힘): X 들어감·응답 잃음 → 남이 저장 → 내 Y 409 → 병합 뒤 W 403 → X 때 값으로 되돌려 저장 = 서버에 듦(사람 저장은 늘 새 번호)
+    await up(); await E.edit('lost'); E.other('d[1].a = 9'); await E.edit([409, 403], 'vehicles[1].a = 5'); await E.edit('ok', 'vehicles[1].a = 0'); o.rvBack = [E.srv.items[1].a, E.pend(), E.sids[E.sids.length - 1] !== E.sids[0]];
+    await up(); await E.edit('lost'); E.ex('vehPending = true; doSaveVeh()'); await E.fl(); o.humanSame = [E.sids.length, E.sids[0] !== E.sids[1]];   // 사람이 같은 내용으로 다시 저장해도 새 번호
+    // 결함 2(할 일 없는 대기를 다시 켬): k1 느린 200 · k2 500 · k3 409 → 병합 → 200(다 들어감) → k1 늦은 200 = 대기 꺼진 채
+    await up(); E.next['save:vehicles'] = ['hold', 502]; E.ex('vehicles[0].a = 3; vehPending = true; doSaveVeh()'); await E.fl(); E.ex('vehicles[1].a = 4; vehPending = true; doSaveVeh()'); await E.fl(); E.next['save:vehicles'] = []; await E.edit('ok', 'vehicles[1].a = 6'); await E.rel(); o.fkLate = [E.pend(), E.srv.items[0].a, E.srv.items[1].a];
+    // 응답을 잃은 자동 저장이 서버에 듦 → 같은 칸을 또 고침 → 내 값이라 겹침이 아님
+    await up(); await E.edit(500); E.next['save:vehicles'] = ['lost']; await E.fire(); await E.edit(500); await E.fire(); await E.fire(); o.lostOwn = [E.srv.items[0].a, E.pend()];
+    // 자동이 나가 있는 동안 전환 → 다음 사람 저장은 막히지 않음 · 늦은 응답은 다음 사람 화면을 안 건드림
+    await up(); await E.edit(500); E.next['save:vehicles'] = ['hold0']; await E.fire(); E.ex('saveRetryReset(); sessViewerId = "m2"'); E.m2(); E.me = 'm2'; E.next['save:vehicles'] = []; E.ex('vehicles[1].b = 3; vehPending = true; doSaveVeh()'); await E.fl(); const n2 = E.saves.join(); await E.rel(500); o.human = [n2, E.srv.items[1].b, E.pend(), E.ex('Object.keys(rsQ).length')];
+    await up(); await E.edit(500); E.next['save:vehicles'] = ['hold']; await E.fire(); E.ex('saveRetryReset(); sessViewerId = "m2"'); E.m2(); E.me = 'm2'; await E.rel(); o.late200 = [E.pend(), E.ex('base')];
+    await up(); await E.edit(500); E.next['save:vehicles'] = ['hold']; await E.fire(); E.ex('vehSaveTimer = 1'); await E.rel(); o.s4u = [E.pend(), E.ex('!!rsQ.vehicles')];
+    await up(); await E.edit(500); E.next['save:vehicles'] = [401]; await E.fire(); await E.edit('ok', 'vehicles[1].b = 4'); o.after401 = [E.srv.items[1].b, E.pend()];
+    await up(); await E.edit(500); E.ex('GW_GZ_MIN = 1'); await E.fire(); E.now += 70000; E.m2(); E.gz(null); await E.fl(); o.gz = [E.saves.length, E.pend()];
+    await up(); await E.edit(500); for (let i = 0; i < 30; i++) { E.next['save:vehicles'] = [500]; if (E.live().length) await E.fire(); else { E.now += 61000; E.ex('saveRetryKick("vis")'); await E.fl(); } } o.cap = E.saves.length;
+    await up(); await E.edit(500); E.ex('ENV.b0 = rsList("vehicles"); rsCacheIn("vehicles", ENV.b0)'); const a0 = E.live().length; E.ex('vehicles = [{ id: "z" }]; rsCacheIn("vehicles", ENV.b0)'); o.cache = [a0, E.live().length];
+    await up(); await E.edit(500); E.ex('wkPending = false; rsQ.asbestos = { n: 0, t: null, at: 0, uid: "m1" }; rsOk.asbestos = 1; var asb = [], asbPending = true, asbSaveTimer = null'); o.wkWait = [];
+    await up(); E.ex('setOffline(true, "tasks")'); const f1 = E.banner; E.ex('setOffline(false, "vehicles")'); const f2 = E.banner; await E.edit(500); const f3 = E.banner; E.ex('setOffline(false, "tasks")'); const f4 = E.banner; await E.fire(); o.band = [f1, f2, f3, f4, E.banner];
+    await up(); await E.edit(500); E.ex('saveRetryReset(); setOffline(false, "tasks")'); o.bandReset = E.banner;
+    E = mk242(h); E.next.box_fix = [500]; E.ex('ENV.it = { form: { type: "a" }, ai: { type: "b" } }; cbxReportFix(ENV.it)'); await E.fl(); const x1 = E.it.fixSent; E.m2(); E.ex('cbxReportFix(ENV.it)'); const x2 = E.it.fixSent; E.tok = b64u({ mid: 'm1' }) + '.s'; E.ex('cbxReportFix(ENV.it)'); o.boxfix = [x1, x2, E.it.fixSent];
+    delete o.wkWait; return JSON.stringify(o);
+  };
+  const exp242 = JSON.stringify({ ok: [1, []], s5: [[15000], 2, 0, 1, false], net: [15000], otherTab: [1, 1], otherTabEdit: [], viewer: [1, 1], screen: [1, 1], late: [], r404: [], r403: [1, 1], readOther: [], noRead: [], r500: [15000], reset: [[], []],
+    s400: [2, [], true, 0, 0, false], s401: [2, [], true, 0, 0, false], s403: [2, [], true, 0, 0, false], s412: [2, [], true, 0, 0, false], quiet: [3, 0, [300000]], c409: [2, 0, 7, true, false, 1], c409on: [15000], h409: [], c409loop: [2, []],
+    pendRead: [1, 9], pendReadOk: [1, 0, 7], pendReadSame: [2, 1], reRead: [false, 2, 0], cutDel: [1, true, 0], cutRow: [1, true, 2], partRead: [1, 2], sameNew: 1, lateRead: [], s4b: [true, true, 1, 5, false], s4a: [true, 1, 5, false], s4t: [true, true], hh1: [true, true, 1, 5, false], hh2: [true, true, 5, false], hh3: [false, false, 5], sidForm: true, sidAgain: [2, true, false, true, 1, []], sidMine: [3, true, false, 5, 0, 1, true], sidOther: [3, 7, 5, 2, false], sidRevert: [0, false], sidRevert2: [0, false], sidReset: [2, true], sidLater: [2, false, true, 7], rvBack: [0, false, true], humanSame: [3, true], fkLate: [false, 3, 6], lostOwn: [2, false], human: ['vehicles:m1,vehicles:m1,vehicles:m2', 3, false, 0], late200: [true, 10], s4u: [true, true], after401: [4, false], gz: [1, true], cap: 9, cache: [1, 0], band: [true, false, true, true, false], bandReset: false, boxfix: [0, 0, 1] });
+  const got242 = await run242(html);
+  const MUT242 = [['hit = own && lf && lf.j === j ? lf : null', 'hit = lf && lf.j === j ? lf : null'], ['hit = own && lf && lf.j === j ? lf : null', 'hit = null'],
+    ['if (st === 200 && e && e.k > k){ rsHold(col, f); return; }', 'if (st === 200 && e && e.k > k) return;'],
+    ['x && x.at === rb.at && (rsSidQ[col]', 'x && (rsSidQ[col]'], ['updated_at: rb.sid_at === rb.at ? rb.at : keep', 'updated_at: rb.at'], ['if (st === 0 || st >= 500){ rsSidKeep(col, sid, j); return res; }', 'if (st === 0 || st >= 500){ return res; }'],
+    ['rsRe = {}; rsSidQ = {};', 'rsRe = {};'],
+    ['if (st === 409) return rsTaint(col);', 'if (st === 409) return;'], ['|| !rsSameBase(rc, st0, doc)) rsTaint(rc);', ') rsTaint(rc);'], ['return n === R.length;', 'return true;'], ['if (st === 409 && g === rsGen) return rsTaint(col);', 'if (st === 409 && g === rsGen) return rsDrop(col);'], ['if (rsCuts(col)) return rsDrop(col);', ''], ['return !l || (l.del === 1 && !(b && b.del === 1));', 'return !l;'], ['return !l || (l.del === 1', 'return (!!l && l.del === 1'],
+    ['{ if (re || at !== at0 || !rsSameBase(rc, st0, doc)) rsTaint(rc);', '{ if (re || !rsSameBase(rc, st0, doc)) rsTaint(rc);'], ['if (re || rf.pend() || rf.timer()', 'if (rf.pend() || rf.timer()'], ['if (st === 409 && rsFns(col)){ rsRe[col] = 1;', 'if (false){ rsRe[col] = 1;'], ['st.has && st.at === at) rsOk[rc] = 1;', 'st.has) rsOk[rc] = 1;'],
+    ['if (st === 0 || st >= 500){\n      if (!uid', 'if (st === 0){\n      if (!uid'], [' && uid === rsTokId(); }', '; }'], [' && uid === sessViewerId && uid', ' && uid'], ['!!uid && uid === myId() &&', '!!uid &&'], ['function rsTaint(col){ delete rsOk[col];', 'function rsTaint(col){'], ['delete rsOk[col]; rsDrop(col); }', 'delete rsOk[col]; }'],
+    ['if (!uid || !rsOk[col]) return rsDrop(col);', 'if (!uid) return rsDrop(col);'], ['if (!uid || !rsOk[col]) return rsDrop(col);', 'if (!rsOk[col]) return rsDrop(col);'], ['rsGen++; rsOk = {};', 'rsGen++;'], ['if (g === rsGen) rsSeen(col, st, uid, k); };', 'rsSeen(col, st, uid, k); };'], 
+    ['if (!ru || s !== 200 || !doc) return rsTaint(rc);', 'if (s !== 200 || !doc) return rsTaint(rc);'], ['if (!ru || s !== 200 || !doc) return rsTaint(rc);', 'if (!ru || s !== 200 || !doc) return;'], 
+     ['      if (own && !own()) return Promise.reject(new Error("RS_STOP"));\n', ''],
+    ['if (st === 200 && own()){', 'if (st === 200){'], ['f.set(); if (rsQ[col] === e)', 'if (rsQ[col] === e)'], ['var same = !!snap && rsList(col) === snap && !f.timer()', 'var same = true || !f.timer()'], ['&& rsList(col) === snap && !f.timer()', '&& rsList(col) === snap'], ['rsHush(function(){ c.rej', '(function(x){ x(); })(function(){ c.rej'], ['else rsDrop(col);\n    };', 'else c.res;\n    };'],
+    ['    if (typeof rsQuiet !== "undefined" && rsQuiet) return;   // C242 판 A: 자동 줄기의 실패는', '    //'], ['if (e.stop || e.n >= RS_MAX){ e.stop = 1; return; }', ''], ['if (!f || !rsMine(e.uid) || !rsOk[col] || !f.pend()) return rsDrop(col);', 'if (!f || !f.pend()) return rsDrop(col);'], ['if (!before || rsList(col) !== before) rsTaint(col);', ''],
+    ['&& !(typeof rsQ !== "undefined" && rsQ[col])){ delete oc[col]; col = "boot"; }', '&& false){ }'], [' if (oc && oc[col]){ delete oc[col]; oc.boot = 1; } }', ' }'], ['(it.fixWho && !rsMine(it.fixWho))', 'false'], ['s === 0 || s >= 500) return;', 's === 0) return;'], ['if (p.rsCap) return p.rsCap;', 'if (p.rsCap) p = p.rsCap;']];
+  const m242 = [];
+  for (const [a, b] of MUT242) { if (html.split(a).length !== 2) { m242.push('자리 ' + html.split(a).length + ' ' + a.slice(0, 40)); continue; } let r; try { r = await run242(html.replace(a, () => b)); } catch (e) { r = 'err'; } m242.push(r === got242 ? '못 잡음 ' + a.slice(0, 60) : 1); }
+  const st242 = ['tasks', 'vehicles', 'receivables', 'licenses'].every((c) => html.split('rsList("' + c + '")').length === 2 && html.split('rsCacheIn("' + c + '", rs0)').length === 2)
+    && (html.match(/^      [a-z]+: \[function\(\)\{ [A-Za-z]+\(\); \}, function\(\)\{ return [^\n]*\],?$/gm) || []).length === 12 && !/\n      (contracts|documents|mytasks|checklist|clients|bids): \[function/.test(html)
+    && (html.match(/if \(typeof saveRetryReset === "function"\) saveRetryReset\(\);/g) || []).length === 3 && /asbestos: \[function\(\)\{ doSaveAsb\(\); \}/.test(html) && /\(col === "asbestos" && \(wkPending \|\| wkSaveTimer\)\)/.test(html);
+  T('C242 판 A 다시 보내기 등록부(실행 — 실제 gwCall~gwCallSend·setOffline·saveFailToast·cbxReportFix): 500·끊김 = 15초 뒤 다시 · 첫 저장 200 = 적지 않음 · 다른 탭 계정·딴 토큰 저장·보는 사람이 다름 = 안 보냄 · 읽기 404·403·딴 토큰 읽기·못 읽음·버린 늦은 읽기·캐시가 목록을 바꿈 = 안 보냄 · 자동의 400·401·403·412 = 그 줄기만 조용히(대기 남음·로그인 창·알림 0) · 409 = 다른 줄·다른 칸이면 병합해 보냄 / 같은 칸·없어진 줄·병합이 남의 고침을 지움이면 멈춤 · 대기 중 읽기의 겹침 = 안 보냄 · 자동이 나가 있는 동안 또 고친 것(도착 순서 둘·예약)은 대기·등록이 남아 들어감 · 응답을 잃은 내 저장은 겹침이 아님 · 전환·401 뒤 사람 저장은 막히지 않음 · 70초 압축 뒤 계정 바뀜 = 안 보냄 · 상한 1 + 8 · 띠 · 판단 보고 · 자리(캐시 넷·등록 12·비움 셋) · 결함 사본 ' + MUT242.length + ' · ㉠ 409(자동·사람)·남이 저장한 판의 병합 읽기·409 줄기의 다시 읽기 = 자동 끔(온전한 읽기 뒤 다시) · 휴지통·줄 빼기는 자동으로 안 보냄 · 저장 번호(자동 재전송만 그 대기 저장의 번호 · 사람 저장은 새 번호 · already · 내 것이 마지막인 409 = 다시 보냄) · 대기 중 읽기가 판 시각은 같고 내용이 기준과 다름 = 자동 끔(R5)',
+    got242 === exp242 && st242 && m242.every((x) => x === 1), JSON.stringify({ same: got242 === exp242, got: got242, st: st242, mut: m242.filter((x) => x !== 1) }));
+} catch (e) { console.log('  (C242 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ── v541(C275 — 근거 표 승격 줄 방어 · 원장 C275): 실행 검사는 위 C275 블록·servertest C275 · 여기는 문서·판 번호 정확 검사
 try {

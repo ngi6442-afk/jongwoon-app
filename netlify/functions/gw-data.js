@@ -28,6 +28,14 @@ const DATA = 'gw_data';
 const USERS = 'gw_users';
 // 컬렉션 → 권한키
 const COL = { tasks: 'tasks', vehicles: 'veh', receivables: 'rec', licenses: 'lic', checklist: 'check', documents: 'doc', clients: 'cli', contracts: 'con', leaves: 'leaves', bids: 'bid', onbid: 'bid', workers: 'wk', quotes: 'quote', promo: 'promo', family: 'fam', asbestos: 'site', edu: 'safety' };  // onbid=공매·부동산(관리자 전용), workers=일용직 명부(wk), quotes=견적서 탭 독립 권한(영업 문서 — 계약 파이프라인의 견적 "서류" 생성은 별개로 con 권한), promo=홍보(현장 기록→블로그·갤러리), family=가족친화 실적 대장(혁신⑧ — bids처럼 관리자 전용 서버 강제), asbestos=현장 대장(안전 › 현장, site 권한, 30년 보존 — 석면·철거·준설, 2026-09-10 인허가 lic에서 분리 · 안전성평가 전산화 항목), edu=직원·일용직 교육·건강진단 기록(안전 › 교육·검진, safety 권한 — v430 메뉴 56 3단계, 종전 hr 관리자 전용)
+// C242 저장 번호(sid — PM 11/26 "번호 넣고 올려"): 앱의 자동 재전송 대상 12자료만. 요청에 sid(영문·숫자·_·- 8~40자)가 있으면 저장 문서에 최근 8개를 같은 쓰기로 남긴다(_sids: {s, at, h})
+//   · 같은 sid·같은 내용(h)이 다시 오면 쓰지 않고 already · 409 STALE_BASE에 at·sids. sid가 없는 요청(옛 앱)·대상 밖 컬렉션은 종전과 글자째 같음.
+//   같은 문서를 다시 쓰는 다른 서버 길이 _sids를 떨어뜨려도 됨 — 그 번호는 '모르는 번호'가 되어 종전 길(409 → 앱 병합)로 돌아갈 뿐(일부러 이어 붙이지 않음)
+const SID_COLS = { tasks: 1, vehicles: 1, receivables: 1, licenses: 1, leaves: 1, onbid: 1, quotes: 1, promo: 1, workers: 1, family: 1, asbestos: 1, edu: 1 };
+const SID_MAX = 8;
+function saveSid(col, d) { return (Object.prototype.hasOwnProperty.call(SID_COLS, col) && typeof d.sid === 'string' && /^[A-Za-z0-9_-]{8,40}$/.test(d.sid)) ? d.sid : null; }
+function sidHash(doc) { const o = Object.assign({}, doc); delete o._sids; return crypto.createHash('sha256').update(JSON.stringify(o)).digest('hex').slice(0, 16); }   // 보낸 doc의 짧은 지문(화면이 보낸 _sids는 빼고)
+function sidList(prevDoc) { return (prevDoc && Array.isArray(prevDoc._sids)) ? prevDoc._sids.filter(function (x) { return x && typeof x.s === 'string'; }) : []; }
 // 사용자별 비공개 컬렉션(본인만 접근, 회원 id로 분리 저장)
 const PRIVATE_COL = { mytasks: true };
 
@@ -293,6 +301,7 @@ async function handleGet(event, d, R) {
   const r = await blobGet(store(DATA), colKey(col));
   if (!r.ok) return jr(500, { status: 'ERROR', error_code: r.code, request_id: R });
   let doc = r.data || { schema: 1, items: [] };
+  if (Object.prototype.hasOwnProperty.call(SID_COLS, col) && doc && typeof doc === 'object' && Object.prototype.hasOwnProperty.call(doc, '_sids')) { doc = Object.assign({}, doc); delete doc._sids; }   // C242 저장 번호는 서버 안 기록 — 번호를 쓰는 12자료의 읽기 응답은 종전 꼴 그대로(대상 밖은 손대지 않음)
   // 차량 취득가액·무자료금액은 관리자 전용 — 비관리자에겐 서버에서 제거(클라이언트 숨김이 아닌 하드 차단)
   if (col === 'vehicles' && !c.member.admin && Array.isArray(doc.items)) {
     doc = Object.assign({}, doc, { items: doc.items.map(function (v) {
@@ -388,13 +397,18 @@ async function handleSave(event, d, R) {
   // v456(원장 C079): 저장된 문서의 updated_at이 유한한 숫자가 아니면(바깥 도구·스크립트가 글자 시각으로 쓴 경우 등) base 비교를 건너뛴다(종전 첫 저장처럼) —
   //   종전엔 Number(글자) = NaN이라 어떤 base도 맞지 않아 매번 409 → 앱이 다시 읽기·병합·재시도를 끝없이 되풀이했다(시험 서버에서 몇 분에 요청 3,000건+).
   //   아래 저장이 updated_at을 Date.now()(숫자)로 고쳐 쓰므로 다음 저장부터 낙관락이 다시 걸린다. 감사 줄은 아래 diffItems 그대로(값 고침은 따로 안 적음).
+  // C242 저장 번호: 낙관락 비교 앞 — 같은 sid·같은 내용이 이미 들어가 있으면(응답만 잃은 저장의 재전송) 아무것도 쓰지 않고(감사·알림·자동 지시·버전 스냅샷 없음) already
+  const sid = saveSid(col, d), sidPrev = sid ? sidList(prevDoc) : [], sidH = sid ? sidHash(d.doc) : '';
+  if (sid) { const hit = sidPrev.filter(function (x) { return x.s === sid && x.h === sidH; })[0]; if (hit) return jr(200, { status: 'OK', already: true, sid_at: hit.at, at: prevDoc.updated_at, request_id: R }); }
+  const stale = function () { return jr(409, sid ? { status: 'CONFLICT', error_code: 'STALE_BASE', at: prevDoc.updated_at, sids: sidPrev.map(function (x) { return { s: x.s, at: x.at }; }), request_id: R } : { status: 'CONFLICT', error_code: 'STALE_BASE', request_id: R }); };   // sid 없는 요청은 종전 응답 그대로
   if (d.base !== undefined && prevDoc && prevDoc.updated_at && Number.isFinite(Number(prevDoc.updated_at)) && Number(d.base) !== Number(prevDoc.updated_at))
-    return jr(409, { status: 'CONFLICT', error_code: 'STALE_BASE', request_id: R });
+    return stale();
   // v456 검토: 숫자가 아닌 updated_at 앞에서도 base 0(목록 GET을 못 받고 캐시로 부팅한 기기 — 지시 v421·문서함 T502의 가드)은 409로 병합 경로에 보낸다
   //   (건너뛰면 빈 목록 기기가 원장을 통째로 덮음). 서버 문서를 받은 기기는 base로 그 글자를 보내므로(Number = NaN) 되풀이 409는 없다.
   if (d.base !== undefined && prevDoc && prevDoc.updated_at && !Number.isFinite(Number(prevDoc.updated_at)) && Number(d.base) === 0)
-    return jr(409, { status: 'CONFLICT', error_code: 'STALE_BASE', request_id: R });
+    return stale();
   const doc = Object.assign({}, d.doc, { updated_by: c.member.id, updated_at: Date.now() });
+  if (sid) { delete doc._sids; doc._sids = sidPrev.slice(-(SID_MAX - 1)).concat([{ s: sid, at: doc.updated_at, h: sidH }]); }   // C242: 화면이 보낸 _sids는 버리고 서버 것만 — 이 쓰기와 한 묶음
   // items형 컬렉션 정규화 — items가 배열이 아니면(콘솔 우회 등) 아래 재구성 가드들이 통째로 건너뛰어진다(리뷰 지적)
   if (col !== 'checklist' && !Array.isArray(doc.items)) doc.items = [];
   // v456(원장 C080): 거래처 사업자번호 칸의 13자리(주민·법인등록번호 꼴 — _lib/clibiz.js, 앱 cliBiz13과 같은 규칙)는 '이번에 새로 들어오거나 바뀐 항목'만 400 CLI_BIZ13(저장 안 함 · 값은 응답에 없음).

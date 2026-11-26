@@ -17482,4 +17482,80 @@ function J91a(x) { return JSON.stringify(x); }
   }
 }
 
+{ // ---- C242 저장 번호(sid — PM 11/26 "번호 넣고 올려"): handleSave 낙관락 자리 한 곳 · 실제 핸들러(mock 저장소) · 결함 사본(gw-data 한 곳을 바꿔 메모리에서 컴파일)은 실패해야 함
+  const fsS = require('fs'), ModS = require('module');
+  const FILES = join(FN, 'gw-data.js'), SRCS = fsS.readFileSync(FILES, 'utf8');
+  const loadS = (src) => { const m = new ModS(FILES); m.filename = FILES; m.paths = ModS._nodeModulePaths(dirname(FILES)); m._compile(src, FILES); return m.exports; };
+  const callerS = (mod) => async (body, tok) => { const r = await mod.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tok }, body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+  const snapS = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  const resetS = () => { const s = JSON.parse(snapS); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; auditMock.logs.length = 0; };
+  const chkS = async (call2) => {
+    const o = {}, K = 'col:vehicles', doc = (n) => ({ schema: 1, items: [{ id: 'v1', no: 'n' + n }] }), cur = () => mem.gw_data[K];
+    resetS(); mem.gw_data[K] = { schema: 1, items: [{ id: 'v1', no: 'n0' }], updated_at: 1000 };
+    // sid 없음 = 종전(저장 문서·응답·409 꼴)
+    let r = await call2({ action: 'save', collection: 'vehicles', base: 1000, doc: doc(1) }, tokA);
+    o.noSid = [r.code, Object.keys(r.body).sort().join(), Object.keys(cur()).sort().join()];
+    r = await call2({ action: 'save', collection: 'vehicles', base: 5, doc: doc(1) }, tokA); o.noSid409 = [r.code, Object.keys(r.body).sort().join()];
+    // 첫 sid 저장 = _sids 1개(s·at·h) · 화면이 보낸 _sids는 버림
+    r = await call2({ action: 'save', collection: 'vehicles', base: cur().updated_at, sid: 'sidAAAA1', doc: Object.assign(doc(2), { _sids: [{ s: 'fake0000', at: 1, h: 'x' }] }) }, tokA);
+    const s1 = cur()._sids || []; o.first = [r.code, s1.length, s1[0] && s1[0].s, s1[0] && s1[0].at === cur().updated_at, s1[0] && /^[0-9a-f]{16}$/.test(s1[0].h)];
+    // 같은 sid·같은 내용 다시(낡은 base) = already · 쓰기 0(문서·감사·버전)
+    const at1 = cur().updated_at, j1 = JSON.stringify(cur()), a1 = auditMock.logs.length, v1 = Object.keys(mem.gw_data).filter((k) => /^ver/.test(k)).length;
+    r = await call2({ action: 'save', collection: 'vehicles', base: 3, sid: 'sidAAAA1', doc: doc(2) }, tokA);
+    o.again = [r.code, r.body.already === true, r.body.sid_at === at1, r.body.at === at1, JSON.stringify(cur()) === j1, auditMock.logs.length === a1, Object.keys(mem.gw_data).filter((k) => /^ver/.test(k)).length === v1];
+    mem.gw_data[K] = Object.assign({}, cur(), { updated_at: at1 + 5 });   // 그 뒤 다른 서버 길이 _sids를 남긴 채 다시 씀
+    r = await call2({ action: 'save', collection: 'vehicles', base: 3, sid: 'sidAAAA1', doc: doc(2) }, tokA); o.againLater = [r.code, r.body.already === true, r.body.sid_at === at1, r.body.at === at1 + 5];
+    mem.gw_data[K] = Object.assign({}, cur(), { updated_at: at1 });
+    // 같은 sid·다른 내용 = 보통 길(낡은 base면 409 · 맞는 base면 저장)
+    r = await call2({ action: 'save', collection: 'vehicles', base: 3, sid: 'sidAAAA1', doc: doc(3) }, tokA); o.diff409 = [r.code, r.body.error_code, r.body.at === at1, JSON.stringify(r.body.sids)];
+    r = await call2({ action: 'save', collection: 'vehicles', base: at1, sid: 'sidAAAA1', doc: doc(3) }, tokA); o.diffOk = [r.code, !r.body.already, cur().items[0].no, (cur()._sids || []).length];
+    // 9번째에서 가장 옛 번호가 떨어짐(최근 8개)
+    for (let i = 0; i < 8; i++) await call2({ action: 'save', collection: 'vehicles', base: cur().updated_at, sid: 'sidN000' + i, doc: doc(10 + i) }, tokA);
+    o.cap = [(cur()._sids || []).length, (cur()._sids || []).map((x) => x.s).join()];
+    // 대상 밖 컬렉션·잘못된 꼴의 sid = 무시(종전)
+    mem.gw_data['col:checklist'] = { records: {}, custom: {}, updated_at: 50 };
+    r = await call2({ action: 'save', collection: 'checklist', base: 50, sid: 'sidCCCC1', doc: { records: {}, custom: {} } }, tokA); o.out = [r.code, !('_sids' in mem.gw_data['col:checklist'])];
+    r = await call2({ action: 'save', collection: 'checklist', base: 1, sid: 'sidCCCC1', doc: { records: {}, custom: {} } }, tokA); o.out409 = Object.keys(r.body).sort().join();
+    r = await call2({ action: 'save', collection: 'vehicles', base: cur().updated_at, sid: 'bad', doc: doc(30) }, tokA); o.badSid = [r.code, (cur()._sids || []).length === 0];
+    // 다른 서버 길이 _sids를 떨어뜨린 뒤 = 그 번호는 모름 → 409
+    r = await call2({ action: 'save', collection: 'vehicles', base: cur().updated_at, sid: 'sidDDDD1', doc: doc(40) }, tokA);
+    const keep = cur(); mem.gw_data[K] = { schema: 1, items: keep.items, updated_at: keep.updated_at + 7 };
+    r = await call2({ action: 'save', collection: 'vehicles', base: keep.updated_at, sid: 'sidDDDD1', doc: doc(40) }, tokA); o.dropped = [r.code, r.body.already === true, JSON.stringify(r.body.sids)];
+    // 읽기 응답에는 _sids가 없음(종전 꼴)
+    r = await call2({ action: 'save', collection: 'vehicles', base: cur().updated_at, sid: 'sidEEEE1', doc: doc(50) }, tokA);
+    r = await call2({ action: 'get', collection: 'vehicles' }, tokA); o.get = [r.code, !('_sids' in (r.body.doc || {})), !!(cur()._sids || []).length];
+    mem.gw_data['col:clients'] = { schema: 1, items: [], _sids: [{ s: 'sidZZZZ1', at: 1, h: 'x' }], updated_at: 9 };
+    r = await call2({ action: 'get', collection: 'clients' }, tokA); o.getOut = Array.isArray((r.body.doc || {})._sids);   // 대상 밖 컬렉션의 읽기 응답은 종전 그대로(손대지 않음)
+    return o;
+  };
+  const expS = JSON.stringify({ noSid: [200, 'request_id,status,updated_at', 'items,schema,updated_at,updated_by'], noSid409: [409, 'error_code,request_id,status'], first: [200, 1, 'sidAAAA1', true, true],
+    again: [200, true, true, true, true, true, true], againLater: [200, true, true, true], diff409: [409, 'STALE_BASE', true, JSON.stringify([{ s: 'sidAAAA1', at: 0 }]).replace('"at":0', '"at":AT')], diffOk: [200, true, 'n3', 2],
+    cap: [8, 'sidN0000,sidN0001,sidN0002,sidN0003,sidN0004,sidN0005,sidN0006,sidN0007'], out: [200, true], out409: 'error_code,request_id,status', badSid: [200, true], dropped: [409, false, '[]'], get: [200, true, true], getOut: true });
+  try {
+    const norm = (o) => { const x = JSON.parse(JSON.stringify(o)); x.diff409[3] = String(x.diff409[3]).replace(/"at":\d+/, '"at":AT'); return JSON.stringify(x); };
+    const gotS = norm(await chkS(call));
+    T('C242 저장 번호(실행 — 실제 handleSave·handleGet): sid 없음 = 저장 문서·200·409 꼴 종전 · 첫 sid 저장 = _sids 1개(s·at·지문 16자 · 화면이 보낸 _sids 버림) · 같은 sid·같은 내용 = already(sid_at·at) · 쓰기 0(문서·감사·버전) · 같은 sid·다른 내용 = 보통 길(409에 at·sids — s·at만) · 최근 8개 · 대상 밖 컬렉션·잘못된 꼴 = 무시 · 다른 서버 길이 _sids를 떨어뜨린 뒤 = 409 · 읽기 응답에 _sids 없음(대상 밖 컬렉션 읽기 응답은 그대로)',
+      gotS === expS, gotS);
+    const MUTS = [
+      ['  if (sid) { const hit = sidPrev.filter(function (x) { return x.s === sid && x.h === sidH; })[0];', '  if (false) { const hit = sidPrev.filter(function (x) { return x.s === sid && x.h === sidH; })[0];'],
+      ['return x.s === sid && x.h === sidH; })[0];', 'return x.s === sid; })[0];'],
+      ['sidPrev.slice(-(SID_MAX - 1))', 'sidPrev'],
+      ["at: prevDoc.updated_at, sids: sidPrev.map(function (x) { return { s: x.s, at: x.at }; }), request_id: R }", 'request_id: R }'],
+      ['sids: sidPrev.map(function (x) { return { s: x.s, at: x.at }; })', 'sids: sidPrev'],
+      ['return jr(409, sid ? {', 'return jr(409, true ? {'],
+      ["(Object.prototype.hasOwnProperty.call(SID_COLS, col) && typeof d.sid", "(typeof d.sid"],
+      ['/^[A-Za-z0-9_-]{8,40}$/.test(d.sid)', 'd.sid.length > 0'],
+      ["  if (Object.prototype.hasOwnProperty.call(SID_COLS, col) && doc && typeof doc === 'object' && Object.prototype.hasOwnProperty.call(doc, '_sids')) { doc = Object.assign({}, doc); delete doc._sids; }", ''],
+      ["  if (Object.prototype.hasOwnProperty.call(SID_COLS, col) && doc && typeof doc === 'object' && Object.prototype.hasOwnProperty.call(doc, '_sids')) {", "  if (doc && typeof doc === 'object' && Object.prototype.hasOwnProperty.call(doc, '_sids')) {"],
+      ['  if (sid) { delete doc._sids; doc._sids =', '  if (sid) { doc._sids = (doc._sids || []).concat(sidPrev).slice(-(SID_MAX - 1)); doc._sids_x ='],
+      ['already: true, sid_at: hit.at, at: prevDoc.updated_at,', 'already: true, sid_at: hit.at, at: hit.at,'],
+      ["const o = Object.assign({}, doc); delete o._sids; return crypto", "const o = Object.assign({}, doc); return crypto"],
+    ];
+    const killS = [];
+    for (const [a, b] of MUTS) { let k; try { if (SRCS.split(a).length !== 2) throw new Error('자리 ' + SRCS.split(a).length); k = norm(await chkS(callerS(loadS(SRCS.replace(a, () => b))))) !== expS; } catch (e) { k = 'err ' + e.message; } if (k !== true) killS.push(a.trim().slice(0, 50) + ':' + k); }
+    T('C242 저장 번호 결함 사본 ' + MUTS.length + '개(이미 받음 판정 걷음·지문 비교 걷음·8개 상한 걷음·409 at·sids 걷음·409에 지문까지·sid 없는 409도 새 꼴·대상 컬렉션 거름 걷음·sid 꼴 검사 걷음·읽기 응답 _sids 거름 걷음·대상 밖 읽기 응답도 거름·화면 _sids 섞음·already at 틀림·지문에 _sids 섞음) = 모두 잡힘', killS.length === 0, killS.join(' | '));
+  } catch (e) { T('C242 저장 번호 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+  finally { resetS(); }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

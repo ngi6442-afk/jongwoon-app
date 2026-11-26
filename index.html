@@ -4038,9 +4038,209 @@
     } catch(e){ return Promise.resolve(null); }
   }
   function gwCall(fn, body){
+    var p = rsTake(fn, body) || rsSend(fn, body);
+    if (p.rsCap) return p.rsCap;   // 자동 줄기가 떼어 간 저장 — 지켜보지 않음(rsGo가 맡음)
+    try { gwCallWatch(fn, body, p); } catch(e){}   // C242 판 A: 저장 응답 지켜보기(다시 보내기 등록부) · 단발 요청 실패 기록 — 요청·응답·돌려주는 약속은 그대로
+    return p;
+  }
+  // C242 판 A(원장 C242 — 줄기 B 「원천」): 저장 실패 뒤 다시 보내기 등록부.
+  //   종전엔 저장이 5xx·끊김이면 대기 표시만 남고 다음 편집 때까지 다시 보내지 않았다 — 서버가 회복돼도 브라우저는 온라인이라 online 이벤트가 오지 않고,
+  //   새로 고침하면 대기 없이 부팅해 서버 목록이 고친 것을 덮었다(재현 표본 ① 지시 500).
+  //   모든 저장(대역 3971 길 · 직접 저장 넷)이 지나가는 gwCall에서 저장(action "save") 응답을 컬렉션별로 지켜본다 —
+  //   사람 저장이 5xx·끊김이면 적고(한 컬렉션 한 벌) 15초 → 1분 → 5분 뒤, 그 뒤로는 online·화면 복귀·5분 폴 때 한 번씩(화면 복귀·폴은 60초에 한 번까지) 같은 저장 함수를 다시 부른다
+  //   (한 줄기에 모두 RS_MAX번 — 그 뒤로는 멈추고 띠·실패 글만 · 멈춘 뒤 30분이 지나 사람 저장이 또 실패하면 새 줄기). 본문·기준 시각은 다시 보낼 때의 것.
+  //   자동 줄기는 사람 저장 길과 갈라 놓는다: 저장 함수를 불러 나가려는 요청만 떼어 와(rsCap) 이 자리에서 보내고, 응답 200만 그 저장 함수에 돌려준다.
+  //     그 밖(401·403·400·409·412·5xx·끊김)은 그 저장 함수의 실패 길을 조용히 돈다(알림·경고창·띠·로그인 창 없음) — 사람 저장·로그인·세션은 건드리지 않는다.
+  //   11/26 PM ㉠: 그사이 다른 사람이 저장한 자료에서는 자동으로 보내지 않는다 — 409(자동·사람 모두)·남이 저장한 판을 병합하는 읽기·409 줄기의 다시 읽기면 그 자료의 자동을 끄고(rsOk) 대기로 남긴다(v541과 같음).
+  //     다시 켜는 것은 대기 없이 통째로 받은 온전한 읽기(정상 불러오기·새로 고침)를 화면이 실제로 들였을 때뿐. 병합·충돌 알림은 사람 저장 길(v541) 그대로.
+  //   자동은 기준 사본에 있던 줄을 빼거나 휴지통으로 보내는 목록(rsCuts)은 보내지 않는다(그 고침은 대기로 남아 사람이 다음에 저장할 때 나감).
+  //   다시 보내는 것은 아래 둘이 다 맞을 때만:
+  //   ① 지금 토큰의 회원 = 화면 회원 = 이 화면 목록을 읽은 회원 = 그 저장을 보낸 회원(rsMine) — 보내기 직전·큰 본문을 압축한 뒤·응답이 왔을 때 모두
+  //   ② 화면 목록이 '이 회원이 서버에서 통째로 받은 목록 + 이 회원의 고침'(rsOk) — 읽기 404·403·그 밖 4xx·빈 응답·딴 토큰 읽기·기기 캐시가 목록을 바꿈(rsCacheIn)·위 ㉠·로그아웃·전환·만료이면 끔
+  //   건너뜀(세지 않음): 저장 타이머가 걸려 있음 · 같은 컬렉션 저장(사람·자동)이 나가 있음 · 브라우저가 끊김 · 현장 대장은 일용직 명부가 대기 중.
+  //   첫 저장이 200이면 아무것도 적지 않는다(정상 길 요청 수·본문 같음). 계약·문서함·내 할 일·체크·거래처·입찰 공고는 등록부에 없다.
+  var RS_DELAYS = [15000, 60000, 300000], RS_MAX = 8, RS_GAP = 60000, RS_RESTART_MS = 30 * 60000;
+  var RS_BAND = { tasks: 1, vehicles: 1, receivables: 1, licenses: 1 };   // 저장 실패가 띠를 켜는 자료
+  var rsQ = {}, rsOut = {}, rsGen = 0, rsOk = {}, rsAuto = {}, rsCap = null, rsQuiet = 0, rsSeq = {}, rsRe = {};
+  function rsTokId(){ try { return String(JSON.parse(b64DecodeUnicode(String(gwToken() || "").split(".")[0].replace(/-/g, "+").replace(/_/g, "/"))).mid || ""); } catch(e){ return ""; } }
+  function rsMine(uid){ return !!uid && uid === myId() && uid === sessViewerId && uid === rsTokId(); }
+  function rsTaint(col){ delete rsOk[col]; rsDrop(col); }
+  //   gwCall 자리: 자동 줄기가 부른 저장 요청이면 떼어 두고(보내지 않음) — 아니면 null(종전 길)
+  function rsTake(fn, body){
+    if (fn !== "gw-data" || !body || !rsCap || body.action !== "save" || body.collection !== rsCap.col || rsCap.res) return null;
+    var c = rsCap; c.body = body; return { rsCap: new Promise(function(a, b){ c.res = a; c.rej = b; }) };
+  }
+  function rsSoon(fn){ var k = 0; (function go(){ if (k++ < 80) Promise.resolve().then(go); else fn(); })(); }   // 지금 이어지는 약속 줄기가 다 끝난 뒤(다른 일이 끼기 전)
+  function rsHush(fn){ rsQuiet++; fn(); rsSoon(function(){ rsQuiet--; }); }   // 자동 줄기의 실패 — 저장 함수의 실패 길을 돌되 알림·띠는 새로 띄우지 않음(saveFailToast·setOffline이 봄)
+  //   읽기 실패로 기기 캐시를 들인 자리(네 자료): 들이기 전 목록(rsList)과 달라졌으면 끔 — 캐시는 이 기기의 다른 사람·다른 탭 것일 수 있다
+  function rsList(col){ try { var f = rsFns(col); return JSON.stringify(f.list()); } catch(e){ return ""; } }
+  function rsCacheIn(col, before){ try { if (!before || rsList(col) !== before) rsTaint(col); } catch(e){} }
+  function rsRows(col){ var f = rsFns(col), l = col === "licenses" ? licenses : f.list(); return l || []; }
+  //   받은 문서가 기준 사본과 글자째 같은가(줄 수·줄마다 값 · 인허가는 의무 대장도 지금 화면과) — 다르면 참이 아님(대기 중 읽기가 기준을 바꿔 자동이 짧은 목록을 보내지 않게)
+  function rsSameBase(col, st, doc){
+    try {
+      var R = Array.isArray(doc.items) ? doc.items : null, B = st.base, n = 0;
+      if (!st.has || !R || (col === "licenses" && JSON.stringify(doc.duties || []) !== JSON.stringify(duties || []))) return false;
+      for (var i = 0; i < R.length; i++){ var r = R[i]; if (!r || !r.id || !B[r.id] || !mgEq(r, B[r.id])) return false; }
+      Object.keys(B).forEach(function(){ n++; });
+      return n === R.length;
+    } catch(e){ return false; }
+  }
+  //   자동이 보내려는 목록이 기준 사본(imSt)에 있던 줄을 빼거나 휴지통으로 보내나(기준 사본이 없으면 참)
+  function rsCuts(col){
+    try {
+      var st = imSt(col), L = {}; if (!st.has) return true;
+      rsRows(col).forEach(function(x){ if (x && x.id) L[x.id] = x; });
+      return Object.keys(st.base).some(function(id){ var l = L[id], b = st.base[id]; return !l || (l.del === 1 && !(b && b.del === 1)); });
+    } catch(e){ return true; }
+  }
+  //   저장 · 대기 · 타이머 · 대기 다시 켜기 · 화면 목록 — 받은 사본(imSt)과 줄을 견줄 수 있는 12개만
+  function rsFns(col){
+    var F = {
+      tasks: [function(){ doSaveTasks(); }, function(){ return tasksPending; }, function(){ return tasksSaveTimer; }, function(){ tasksPending = true; }, function(){ return tasks; }],
+      vehicles: [function(){ doSaveVeh(); }, function(){ return vehPending; }, function(){ return vehSaveTimer; }, function(){ vehPending = true; }, function(){ return vehicles; }],
+      receivables: [function(){ doSaveRec(); }, function(){ return recPending; }, function(){ return recSaveTimer; }, function(){ recPending = true; }, function(){ return receivables; }],
+      licenses: [function(){ doSaveLic(); }, function(){ return licPending; }, function(){ return licSaveTimer; }, function(){ licPending = true; }, function(){ return [licenses, duties]; }],
+      leaves: [function(){ doSaveLeaves(); }, function(){ return leavesPending; }, function(){ return leavesSaveTimer; }, function(){ leavesPending = true; }, function(){ return leaves; }],
+      onbid: [function(){ doSaveOnbid(); }, function(){ return onbidPending; }, function(){ return onbidSaveTimer; }, function(){ onbidPending = true; }, function(){ return onbids; }],
+      quotes: [function(){ doSaveQuotes(); }, function(){ return quotePending; }, function(){ return quoteSaveTimer; }, function(){ quotePending = true; }, function(){ return quotes; }],
+      promo: [function(){ doSavePromo(); }, function(){ return promoPending; }, function(){ return promoSaveTimer; }, function(){ promoPending = true; }, function(){ return promoItems; }],
+      workers: [function(){ doSaveWorkers(); }, function(){ return wkPending; }, function(){ return wkSaveTimer; }, function(){ wkPending = true; }, function(){ return workers; }],
+      family: [function(){ doSaveFam(); }, function(){ return famPending; }, function(){ return famSaveTimer; }, function(){ famPending = true; }, function(){ return fam; }],
+      asbestos: [function(){ doSaveAsb(); }, function(){ return asbPending; }, function(){ return asbSaveTimer; }, function(){ asbPending = true; }, function(){ return asb; }],
+      edu: [function(){ doSaveEdu(); }, function(){ return eduPending; }, function(){ return eduSaveTimer; }, function(){ eduPending = true; }, function(){ return edu; }]
+    }[col];
+    return F ? { save: F[0], pend: F[1], timer: F[2], set: F[3], list: F[4] } : null;
+  }
+  function rsDrop(col){ var e = rsQ[col], oc = setOffline.cols; if (e && e.t) clearTimeout(e.t); delete rsQ[col]; if (oc && oc[col]){ delete oc[col]; oc.boot = 1; } }   // 더 다시 보내지 않으면 띠는 종전 규칙(어느 요청이든 성공하면 꺼짐)으로
+  function rsArm(col, e){ if (!e.t && !e.stop && e.n < RS_DELAYS.length) e.t = setTimeout(function(){ rsFire(col, "timer"); }, RS_DELAYS[e.n]); }
+  //   사람 저장의 응답: st = 응답 코드(0 = 끊김) · uid = 그 저장을 보낸 때의 회원(토큰·화면·목록의 회원이 서로 다르면 빈 글)
+  //   k = 그 저장의 보낸 차례 — 뒤에 보낸 저장이 실패한 채인데 앞 저장의 200이 늦게 오면 적은 것을 지우지 않고 대기를 다시 켬(그 200이 푼 대기 표시가 뒤 고침까지 푸는 것)
+  function rsSeen(col, st, uid, k){
+    var e = rsQ[col], f = rsFns(col);
+    if (!f) return;
+    if (st === 409) return rsTaint(col);   // ㉠ 그사이 다른 사람이 저장함 — 사람 저장의 병합 길(v541)이 맡고, 자동은 온전한 읽기 뒤까지 끔
+    if (st === 200 && e && e.k > k){ rsHold(col, f); return; }
+    if (st === 0 || st >= 500){
+      if (!uid || !rsOk[col]) return rsDrop(col);
+      if (!e) e = rsQ[col] = { n: 0, t: null, at: 0 };
+      else if (e.stop && Date.now() - e.at >= RS_RESTART_MS){ e.n = 0; e.stop = 0; }   // 상한으로 멈춘 뒤 30분이 지나 사람 저장이 또 실패 = 새 줄기(15초부터) — 30분 안에는 상한 그대로(서버가 계속 5xx여도 컬렉션마다 30분에 8번까지)
+      e.last = st; e.uid = uid; e.k = Math.max(e.k || 0, k); rsHold(col, f);
+      if (e.n >= RS_MAX) e.stop = 1;
+      rsArm(col, e);
+      return;
+    }
+    if (e) rsDrop(col);
+  }
+  function rsHold(col, f){ var g = rsGen; rsSoon(function(){ if (g === rsGen && rsQ[col] && !f.pend()) f.set(); }); }
+  function rsFire(col, why){
+    var e = rsQ[col], f = rsFns(col);
+    if (!e) return;
+    if (why === "timer") e.t = null;
+    if (!f || !rsMine(e.uid) || !rsOk[col] || !f.pend()) return rsDrop(col);
+    if (e.stop || e.n >= RS_MAX){ e.stop = 1; return; }
+    if (f.timer() || (rsOut[col] || 0) > 0 || rsAuto[col] || (col === "asbestos" && (wkPending || wkSaveTimer))) return;
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+    if ((why === "vis" || why === "poll") && Date.now() - e.at < RS_GAP) return;
+    if (rsCuts(col)) return rsDrop(col);   // 줄을 빼거나 휴지통으로 보내는 목록은 자동으로 보내지 않음
+    e.n++; e.at = Date.now();
+    rsGo(col, e, f);
+  }
+  function rsOwnNow(col, e){ var g = rsGen; return function(){ return g === rsGen && rsQ[col] === e && rsMine(e.uid) && !!rsOk[col]; }; }
+  //   자동 한 번: own() = 같은 세션·같은 적음·같은 회원·온전한 목록 — 보내기 직전·압축 뒤·응답 때 확인
+  function rsGo(col, e, f){
+    var g = rsGen, c = { col: col }, snap = rsList(col), own = rsOwnNow(col, e);
+    rsCap = c; try { f.save(); } catch(err){} rsCap = null;
+    if (!c.res) return;   // 저장 함수가 보내지 않음(못 읽은 목록 등)
+    rsAuto[col] = 1;
+    var fin = function(st, res){
+      delete rsAuto[col];
+      if (st === 200 && own()){
+        var same = !!snap && rsList(col) === snap && !f.timer() && !(rsOut[col] > 0);
+        if (same) rsDrop(col);
+        c.res(res);
+        rsSoon(function(){ if (same || g !== rsGen) return; f.set(); if (rsQ[col] === e){ rsArm(col, e); if (!f.timer() && !(rsOut[col] > 0) && RS_BAND[col]) setOffline(true, col); } });   // 뒤에 고친 것(이미 보내 실패했거나 나가 있음)은 아직 안 들어감 — 대기 다시
+        return;
+      }
+      rsHush(function(){ c.rej(new Error("RS_AUTO")); });
+      if (st === 409 && g === rsGen) return rsTaint(col);   // ㉠ 대기로 남김 — 병합·다시 보내기 없음
+      if (!own()) return;
+      if (st === 0 || st >= 500){ e.last = st; if (e.n >= RS_MAX) e.stop = 1; rsArm(col, e); }
+      else rsDrop(col);
+    };
+    rsSend("gw-data", c.body, own).then(function(r){ fin((r && r.status) || 0, r); }, function(){ fin(0); });
+  }
+  //   why = "online"(걸려 있는 시간 타이머도 앞당김) · "vis"(화면이 다시 보임) · "poll"(5분 폴)
+  function saveRetryKick(why){
+    Object.keys(rsQ).forEach(function(col){
+      var e = rsQ[col]; if (!e) return;
+      if (e.t){ if (why !== "online") return; clearTimeout(e.t); e.t = null; }
+      rsFire(col, why);
+    });
+  }
+  function saveRetryReset(){ rsGen++; rsOk = {}; rsRe = {}; rsSidQ = {}; rsSidLast = {}; Object.keys(rsQ).forEach(rsDrop); }
+  // C242 저장 번호(sid — PM 11/26 "번호 넣고 올려" · 서버 handleSave와 짝): 12자료 저장마다 번호를 붙여 보냄 — 가장 최근에 보내 결과를 모르는 저장과 같은 내용을 다시 보내면 같은 번호, 그 밖은 새 번호(옛 번호의 내용으로 되돌린 저장이 already로 묻히지 않게)
+  //   같은 번호를 다시 쓰는 것은 자동 재전송이 그 대기 저장(가장 최근에 결과를 모른 채 남은 저장 rsSidLast)을 같은 내용으로 다시 보낼 때뿐 — 사람 저장은 늘 새 번호
+  //   결과를 모르는(응답을 못 받은 · 5xx) 번호는 자료별로 기억(rsSidQ · 최근 8 · 메모리 — 로그아웃·전환·만료에 비움) · 서버가 달라진 것이 확인되면(200·already·남의 409·4xx) 그 자료의 결과 모르는 번호를 모두 비움
+  //   ① 응답 already(서버에 이미 들어감 · 쓰지 않음) = 그 저장 함수에는 보통 200으로 돌려줌(대기 풀림) — sid_at === at이면 기준 판 시각 = at, 다르면(그 뒤 남이 저장) 보낸 기준 그대로(다음 저장이 409 → 종전 병합)
+  //   ② 409의 sids에 내 '결과 모르는 번호'가 있고 그 at이 응답 at과 같으면(서버의 마지막 저장이 내 것 · 그 뒤 아무도 안 씀) = 알림·병합 없이 기준을 at으로 바꿔 이 저장을 그대로 한 번 다시 보냄(그 결과를 돌려줌)
+  //   그 밖 409·대상 밖 자료·sid 없는 응답(옛 서버)은 종전 그대로
+  var rsSidQ = {}, rsSidLast = {}, RS_SID_MAX = 8;
+  function rsSidNew(){ var r = ""; try { var u = new Uint32Array(2); crypto.getRandomValues(u); r = u[0].toString(36) + u[1].toString(36); } catch(e){ r = Math.random().toString(36).slice(2, 10); } return ("s" + Math.floor(Date.now()).toString(36) + r).slice(0, 32); }
+  function rsSidKeep(col, sid, j){ var q = rsSidQ[col] || (rsSidQ[col] = []); if (!q.some(function(x){ return x.s === sid; })) q.push({ s: sid, j: j }); while (q.length > RS_SID_MAX) q.shift(); rsSidLast[col] = { s: sid, j: j }; }
+  function rsSidClear(col){ rsSidQ[col] = []; delete rsSidLast[col]; }
+  function rsSidDrop(col, sid){ if (rsSidQ[col]) rsSidQ[col] = rsSidQ[col].filter(function(x){ return x.s !== sid; }); }
+  function rsSend(fn, body, own){
+    var col = body && body.collection;
+    if (fn !== "gw-data" || !body || body.action !== "save" || !rsFns(col)) return gwCallSend(fn, body, own);
+    var j = JSON.stringify(body.doc || {}), g = rsGen, lf = rsSidLast[col], hit = own && lf && lf.j === j ? lf : null, sid = hit ? hit.s : rsSidNew(), b = Object.assign({}, body, { sid: sid });
+    var done = function(res, again){
+      var st = (res && res.status) || 0, rb = (res && res.body) || {};
+      if (g !== rsGen) return res;
+      if (st === 200 && rb.already === true){ rsSidClear(col); var keep = (typeof b.base === "number" && isFinite(b.base)) ? b.base : rb.sid_at; return { status: 200, body: { status: "OK", updated_at: rb.sid_at === rb.at ? rb.at : keep } }; }
+      if (st === 200){ rsSidClear(col); return res; }
+      if (st === 0 || st >= 500){ rsSidKeep(col, sid, j); return res; }
+      if (st === 409 && !again && rb.at !== undefined && Array.isArray(rb.sids) && rb.sids.some(function(x){ return x && x.at === rb.at && (rsSidQ[col] || []).some(function(q){ return q.s === x.s; }); })){
+        rsSidDrop(col, sid); b = Object.assign({}, b, { base: rb.at });
+        return gwCallSend(fn, b, own).then(function(r2){ return done(r2, true); }, function(e){ if (g === rsGen) rsSidKeep(col, sid, j); throw e; });
+      }
+      rsSidClear(col); return res;   // 남의 409·4xx = 서버가 달라짐(또는 받지 않음) — 결과 모르는 번호를 already로 받아들이지 않게 비움
+    };
+    return gwCallSend(fn, b, own).then(function(res){ return done(res, false); }, function(e){ if (g === rsGen) rsSidKeep(col, sid, j); throw e; });
+  }
+  // C242 판 A(줄기 G 「원천」): 응답을 안 보는 단발 요청(알림 보내기·첨부 지우기·기기 승인·배경 판독 시작 등)이 실패를 삼키던 것 — 화면 글은 그대로, 오류 기록(err_log)에만 남김
+  var GW_FIRE_ACT = { push_send: 1, push_unsub: 1, att_del: 1, proof_del: 1, box_fix: 1, device_approve: 1, device_revoke: 1, device_delete: 1, map_publish: 1 };
+  var GW_FIRE_FN = { "gw-stmt-read-background": 1, "gw-parse-background": 1 };
+  function gwCallWatch(fn, body, p){
+    if (!p || typeof p.then !== "function") return;
+    if (fn === "gw-data" && body && body.action === "save" && typeof body.collection === "string"){
+      var col = body.collection, g = rsGen, uid = rsMine(myId()) ? myId() : "", k = rsSeq[col] = (rsSeq[col] || 0) + 1;
+      rsOut[col] = (rsOut[col] || 0) + 1;
+      var fin = function(st){ rsOut[col]--; if (st === 409 && rsFns(col)){ rsRe[col] = 1; rsSoon(function(){ delete rsRe[col]; }); } if (g === rsGen) rsSeen(col, st, uid, k); };   // 409 바로 뒤 이 자료의 첫 읽기 = 그 저장 함수의 다시 읽기(같은 약속 줄기 안에서 나감)
+      p.then(function(res){ fin((res && res.status) || 0); }, function(){ fin(0); });
+      return;
+    }
+    if (fn === "gw-data" && body && body.action === "get" && rsFns(body.collection)){
+      var rc = body.collection, rf = rsFns(rc), rg = rsGen, ru = rsMine(myId()), re = !!rsRe[rc], st0 = imSt(rc), at0 = st0.at;
+      delete rsRe[rc];
+      p.then(function(res){
+        var s = (res && res.status) || 0, doc = res && res.body && res.body.doc, st = imSt(rc), at = Number(doc && doc.updated_at) || 0;
+        if (rg !== rsGen || s === 0 || s >= 500) return;   // 5xx·끊김은 목록을 안 바꿈(캐시를 들이는 넷은 rsCacheIn)
+        if (!ru || s !== 200 || !doc) return rsTaint(rc);
+        if (re || rf.pend() || rf.timer() || st.out > 0 || (rc === "tasks" && pendingSave)){ if (re || at !== at0 || !rsSameBase(rc, st0, doc)) rsTaint(rc); return; }   // ㉠ 병합하는 읽기 — 그사이 남이 저장한 판·409 줄기의 다시 읽기·판 시각은 같은데 내용이 기준과 다른 읽기면 자동을 끔
+        rsSoon(function(){ if (rg === rsGen && st.has && st.at === at) rsOk[rc] = 1; });   // 받을 때 대기가 없었고 화면이 실제로 들인 온전한 읽기만(버린 늦은 읽기는 판 시각이 다름)
+      }, function(){});
+      return;
+    }
+    var tag = GW_FIRE_FN[fn] ? fn : ((body && GW_FIRE_ACT[body.action]) ? body.action : "");
+    if (!tag) return;
+    p.then(function(res){ var s = res && res.status; if (!(s >= 200 && s < 300)) reportErr("단발 요청 실패 " + tag + " " + s, "gwFire"); }, function(){ reportErr("단발 요청 실패 " + tag + " 끊김", "gwFire"); });
+  }
+  function gwCallSend(fn, body, own){   // own = 자동 줄기의 확인(압축 뒤 다시) — 사람 저장은 없음
     var txt = JSON.stringify(body || {});
     if (txt.length < GW_GZ_MIN) return gwSend(fn, txt, gwHeaders("application/json"));
     return gwGzip(txt).then(function(buf){
+      if (own && !own()) return Promise.reject(new Error("RS_STOP"));
       if (!buf) return gwSend(fn, txt, gwHeaders("application/json"));
       var h = gwHeaders("application/octet-stream"); h["X-GW-Enc"] = "gzip";
       return gwSend(fn, buf, h);
@@ -4067,6 +4267,7 @@
   }
   function onSessionInvalid(){
     setGwToken(null); curMemberObj = null;
+    if (typeof saveRetryReset === "function") saveRetryReset();   // C242 판 A: 세션 만료 = 다시 보내기 정지·비움(대기 표시는 그대로 — 다시 로그인한 뒤 다음 편집 때 나감)
     // 잠금·세팅 화면이 떠 있는 중의 세션 만료 — 반투명 로그인 모달로 바꾸면 뒤 내용이 노출되므로
     // 리로드로 초기화한다(토큰은 이미 지워져 빈 화면 위 로그인만 뜬다. 세팅 중이면 PIN 미저장 = 잃을 것 없음)
     if ((typeof lockShown !== "undefined" && lockShown) || (typeof lockSetupShown !== "undefined" && lockSetupShown)){
@@ -4103,6 +4304,7 @@
     abManual = { day: "", items: [], loaded: false, timer: null, saving: false, dirty: false, savedTs: 0, bad: 0, err: "", errBad: false, pendingRender: false };
     abLearnDone = {}; abLearnOpen = ""; abLearnNew = ""; abNrDraft = null;
     stmtReset();   // 29 판② 월말명세서 — 연 달·상세·고치던 줄
+    if (typeof saveRetryReset === "function") saveRetryReset();   // C242 판 A: 다시 보내기 등록부 정지·비움(앞사람 고침을 다시 보내지 않게 — 그 전에 나간 저장의 늦은 응답도 적지 않음)
   }
   // v452(원장 C104 — 개인정보): 로그인 창 '전환'(로그아웃 없이 다른 사람으로 다시 로그인 — 새로고침 없음)과 세션 만료 뒤 다른 사람의 로그인은 clearSessionData를 거치지 않아
   //   앞사람이 읽은 일용직 명부(workers)·체크 칸 기록(edu — 교육·건강진단)이 메모리에 남았다 — 일용직 권한이 없는 다음 사람에게 석면해체계획서 생성 창 투입 인력 목록(renderXgWorkers)·
@@ -4126,6 +4328,7 @@
     if (sessViewerId === who) return false;
     if (sessViewerId === null){ sessViewerId = who; return false; }
     sessViewerId = who;
+    if (typeof saveRetryReset === "function") saveRetryReset();   // C242 판 A: 보는 사람이 바뀜 = 다시 보내기 정지·비움(앞사람 고침을 뒷사람 이름으로 자동으로 보내지 않게)
     if (typeof sessReadReset === "function") sessReadReset();   // P1 판24h 검토: 기준 시각(계약 밖)·403 표시·읽음 표시·개인 목록(위) — 계약은 v493 그대로
     if (typeof csTplInvalidate === "function") csTplInvalidate();   // T216 검토: 로그인 창 '전환' — 직원이 받은 양식 목록(관리자 전용 키 빠짐)으로 관리자 화면이 '미등록'·교체 확인 없이 덮기가 되지 않게
     if (wkSaveTimer){ clearTimeout(wkSaveTimer); wkSaveTimer = null; }
@@ -4298,10 +4501,18 @@
   }
 
   // ---- 렌더: 공통 ----
-  function setOffline(state){
-    isOffline = state;
+  // C242 판 A(줄기 D 「원천」): 띠를 컬렉션별로 — 종전엔 전역 띠 하나를 체크·지시·차량·기성·인허가 다섯이 켜고 꺼서, 지시 저장 500 뒤 차량 읽기 200이 띠를 껐다(지시는 여전히 대기).
+  //   11/25 검토 확정(후보 ㉯ 재현): 읽기 한 번 실패로 켠 띠는 그 컬렉션을 다시 읽는 일이 없으면 영영 안 꺼졌다 → 다시 보낼 저장이 적혀 있는 컬렉션(rsQ)만 제 이름으로 켜고, 나머지(읽기 실패·다시 안 보내는 400·412)는 종전대로 어느 요청이든 성공하면 꺼짐("boot")
+  //   col = 켜고 끄는 컬렉션(없으면 "boot" — 오프라인 콜드스타트) · 띠·isOffline은 켜 둔 컬렉션이 하나라도 있을 때만 · 끄면 제 컬렉션과 "boot"만 끔(어느 요청이든 성공 = 연결은 됨) · 띠 글·모양 그대로
+  function setOffline(state, col){
+    if (state && typeof rsQuiet !== "undefined" && rsQuiet) return;   // 자동 줄기의 실패 — 띠는 그대로(이미 사람 저장의 실패가 켬)
+    var oc = setOffline.cols || (setOffline.cols = {});
+    col = col || "boot";
+    if (state && col !== "boot" && !(typeof rsQ !== "undefined" && rsQ[col])){ delete oc[col]; col = "boot"; }
+    if (state) oc[col] = 1; else { delete oc[col]; delete oc.boot; }
+    isOffline = Object.keys(oc).length > 0;
     var b = document.getElementById("offlineBanner");
-    if (state) b.classList.add("show"); else b.classList.remove("show");
+    if (isOffline) b.classList.add("show"); else b.classList.remove("show");
   }
   // 화면 알림(v331) — alert처럼 흐름을 막지 않되 저장 실패·되돌림은 반드시 눈에 띄게. 같은 문구가 연속으로 쌓이지 않게 타이머 하나만 쓴다.
   var gwToastTimer = null;
@@ -4325,6 +4536,7 @@
   //     한 세션 안에서만 그렇다 — 세션 만료 뒤 다시 로그인하면 거래처·내 할 일·문서함은 대기 병합 없이 서버 값으로 덮여 사라진다(v493도 같음 — 2차 검토) · 그래서 '사라질 수 있습니다'
   //   redo = 대기로 남지 않는 자료(문서함 — 다시 읽으면 화면에서 빠짐)는 새로고침 뒤 없으면 다시 하라고
   function saveFailToast(what, st, redo){
+    if (typeof rsQuiet !== "undefined" && rsQuiet) return;   // C242 판 A: 자동 줄기의 실패는 알리지 않음(사람 저장의 실패 알림은 그대로)
     if (st === 412) return;
     if (st === 401){ onSessionInvalid(); return; }
     gwToast(what + " 저장에 실패했습니다" + (st ? "(서버 응답 " + st + ")" : "(연결 끊김)") + (redo
@@ -4870,7 +5082,7 @@
     myApprItems = []; myApprFetchedAt = 0; myApprInflight = false;
     apprRefresh(); apprFlushCreates();
     if (apprPollTimer) clearInterval(apprPollTimer);
-    apprPollTimer = setInterval(function(){ apprRefresh(); apprFlushCreates(); }, 5 * 60 * 1000);
+    apprPollTimer = setInterval(function(){ apprRefresh(); apprFlushCreates(); if (typeof saveRetryKick === "function") saveRetryKick("poll"); }, 5 * 60 * 1000);   // C242 판 A: 5분 폴 때 적어 둔 저장도 한 번
   }
   function apprDaysAgo(iso){
     var t = Date.parse(iso || ""); if (isNaN(t)) return "";
@@ -6803,7 +7015,7 @@
           checkReviewTs = parsed.review_ts || {};
         }
         if (typeof recBaseSet === "function") recBaseSet(parsed.records);   // P1 판24j 검토: 받은 체크 기록(병합은 옛 기준으로 한 뒤)
-        setOffline(false);
+        setOffline(false, "checklist");
         saveCache();
         renderList();
         renderSummary();
@@ -6821,13 +7033,13 @@
         checkAssigneeTs = cache.assignee_ts || {};
         checkReview = cache.review || {};
         checkReviewTs = cache.review_ts || {};
-        setOffline(true);
+        setOffline(true, "checklist");
         renderList();
         renderSummary();
       } else {
         document.getElementById("listHost").innerHTML =
           '<div class="loading">오프라인 상태이며 저장된 기록이 없습니다.<br>네트워크 연결 후 새로고침 해주세요.</div>';
-        setOffline(true);
+        setOffline(true, "checklist");
       }
     });
   }
@@ -6862,14 +7074,14 @@
       }
       return resp.json().then(function(json){
         currentSha = json.content && json.content.sha;
-        setOffline(false);
+        setOffline(false, "checklist");
         saveCache();
         if (typeof saveTimer === "undefined" || !saveTimer) pendingSave = false;   // P1 판24j 검토: 저장 타이머가 걸려 있으면 대기 표시를 남김
         // v331: 종전엔 403(쓰기권한 없음)이 200으로 위조돼 저장된 것처럼 보였다 — 이제 표시한다
         if (json.write_denied) gwToast("주기업무 저장 권한이 없어 서버가 이 변경을 받지 않았습니다.\n화면 값은 새로고침하면 서버 값으로 돌아갑니다.", true);
       });
     }).catch(function(){
-      setOffline(true);
+      setOffline(true, "checklist");
       gwToast("주기업무 저장에 실패했습니다 — 편집은 남아 있고 연결되면 다시 저장합니다.", true);
     });
   }
@@ -6967,7 +7179,7 @@
         tasks = (tasksPending || pendingSave || (imS && imS.out > 0)) ? mergeTasks(tasks, remoteItems) : remoteItems;
         if (imS) imBaseSet("tasks", remoteItems);   // 판24i: 병합은 옛 기준으로 한 뒤 기준을 새로 받은 것으로
         if (typeof csAlignTasksAll === "function"){ try { csAlignTasksAll(); } catch(e){} }   // v384 2차 F7·F11: 단계가 끝난 지시는 닫는다(동률 병합으로 review로 남거나 도착 전 진행된 고아)
-        setOffline(false);
+        setOffline(false, "tasks");
         markLoadedForAutoGen("tasks");
         saveTasksCache();
         renderTasks();
@@ -6975,18 +7187,19 @@
         renderDashboard();
       });
     }).catch(function(){
-      var cache = loadTasksCache();
+      var cache = loadTasksCache(), rs0 = (typeof rsList === "function") ? rsList("tasks") : "";
       if (cache){
         tasksSha = cache.sha;
         tasks = cache.items || [];
-        setOffline(true);
+        if (typeof rsCacheIn === "function") rsCacheIn("tasks", rs0);   // C242 판 A
+        setOffline(true, "tasks");
         renderTasks();
         renderSummary();
         renderDashboard();
       } else {
         var lh = document.getElementById("taskList");
         if (lh) lh.innerHTML = '<div class="loading" style="padding:18px 0;">오프라인 상태이며 저장된 지시가 없습니다.</div>';
-        setOffline(true);
+        setOffline(true, "tasks");
       }
     });
   }
@@ -7028,14 +7241,14 @@
         tasksSha = json.content && json.content.sha;
         // 판24i: 저장 200 = 보낸 목록이 서버 사본 — 세대가 같으면 통째로, 그사이 기준을 새로 세웠으면(다시 읽기·409) 이 200의 판이 더 새로울 때만 · 쓰기 거절은 서버에 안 들어가 세우지 않음
         if (!json.write_denied && typeof imBaseSet === "function"){ var sent = JSON.parse(body).items; if (imSt("tasks").gen === imG) imBaseSet("tasks", sent); else imBaseLate("tasks", sent); }
-        setOffline(false);
+        setOffline(false, "tasks");
         saveTasksCache();
         // 판24i 검토: 이 저장이 나간 뒤 고쳐 저장 타이머가 걸려 있으면 대기 표시를 풀지 않음 — 풀면 그사이 온 읽기가 목록을 통째로 바꿔 타이머 저장이 그 고침 없이 나감(알림 0 · v494도 같음)
         if (!tasksSaveTimer) tasksPending = false;
         apprFlushCreates();   // 대표 상신은 지시 저장이 실제로 성공한 뒤에만(결재함 C안)
       });
     }).catch(function(){
-      setOffline(true);
+      setOffline(true, "tasks");
     });
   }
 
@@ -7083,7 +7296,10 @@
       loadUsers();
     }
     cliReloadIfUnread();   // v441 검토: 오프라인 콜드 스타트·읽기 실패로 거래처 대장을 못 읽은 채면(읽는 중이 아니면) 다시 읽음 — 못 읽은 동안은 저장·대장에 추가를 막아 이 기기에 고친 것이 없음
+    setTimeout(function(){ if (typeof saveRetryKick === "function") saveRetryKick("online"); }, 2000);   // C242 판 A: 실패해 적어 둔 저장을 다시 보냄(위 읽기가 먼저 병합하도록 2초 뒤 · 본문·기준 시각은 그때 것)
   });
+  // C242 판 A: 화면이 다시 보일 때도 적어 둔 저장을 한 번(60초에 한 번까지 · 시간 단계 중이면 그 타이머가 맡음)
+  document.addEventListener("visibilitychange", function(){ if (!document.hidden && typeof saveRetryKick === "function") saveRetryKick("vis"); });
 
   // ---- 탭 ----
   function closeNav(){ var tb=document.getElementById("tabbar"); if(tb) tb.classList.remove("open"); }
@@ -8066,11 +8282,11 @@
         // P1 판24j(C209): 받은 사본과 함께 — 저장 대기·나가 있는 저장 중이면 병합(옛 기준) 뒤 기준을 받은 목록으로 · 읽는 사이 로그아웃(0)·옛 판(1)이면 버림
         if (typeof imRead === "function"){ var nx = imRead("vehicles", imG0, vehicles, ri, vehPending, mergeVeh); if (nx === 0 || nx === 1) return; vehSha = json.sha; vehicles = nx; }
         else { vehSha = json.sha; vehicles = (vehPending ? mergeVeh(vehicles, ri) : ri); }
-        setOffline(false); saveVehiclesCache(); renderVehicles(); renderDashboard(); markLoadedForAutoGen("veh");
+        setOffline(false, "vehicles"); saveVehiclesCache(); renderVehicles(); renderDashboard(); markLoadedForAutoGen("veh");
       });
     }).catch(function(){
-      var c = loadVehiclesCache();
-      if (c){ vehSha = c.sha; vehicles = c.items || []; setOffline(true); renderVehicles(); renderDashboard(); markLoadedForAutoGen("veh"); }   // 캐시 폴백도 로드 완료로 — 없으면 이 세션 내내 만기 자동생성 미실행
+      var c = loadVehiclesCache(), rs0 = (typeof rsList === "function") ? rsList("vehicles") : "";
+      if (c){ vehSha = c.sha; vehicles = c.items || []; if (typeof rsCacheIn === "function") rsCacheIn("vehicles", rs0); setOffline(true, "vehicles"); renderVehicles(); renderDashboard(); markLoadedForAutoGen("veh"); }   // 캐시 폴백도 로드 완료로 — 없으면 이 세션 내내 만기 자동생성 미실행
       else {
         var lh = document.getElementById("vehList");
         if (lh) lh.innerHTML = '<div class="empty-line">오프라인 상태이며 저장된 차량 데이터가 없습니다.</div>';
@@ -11812,8 +12028,8 @@
       if (resp.status === 401){ clearToken(); showTokenScreen(true); return; }
       if (resp.status === 409 || resp.status === 422){ return resolveVehConflictAndRetry(); }
       if (!resp.ok) throw new Error("HTTP " + resp.status);
-      return resp.json().then(function(json){ vehSha = json.content && json.content.sha; setOffline(false); saveVehiclesCache(); if (typeof vehSaveTimer === "undefined" || !vehSaveTimer) vehPending = false; });   // P1 판24j 검토: 저장 타이머가 걸려 있으면 대기 표시를 남김(판24i 지시와 같은 꼴)
-    }).catch(function(){ setOffline(true); });
+      return resp.json().then(function(json){ vehSha = json.content && json.content.sha; setOffline(false, "vehicles"); saveVehiclesCache(); if (typeof vehSaveTimer === "undefined" || !vehSaveTimer) vehPending = false; });   // P1 판24j 검토: 저장 타이머가 걸려 있으면 대기 표시를 남김(판24i 지시와 같은 꼴)
+    }).catch(function(){ setOffline(true, "vehicles"); });
   }
   function resolveVehConflictAndRetry(){
     var imG0 = (typeof imSt === "function") ? imSt("vehicles").gen : 0;
@@ -12367,6 +12583,7 @@
       // 저장 직후 재조회 — 서버 스탬프(등재자 by·게이트 상태 대기/등재·비관리자 재구성분)를 화면에 반영. 응답엔 updated_at만 온다
       return resp.json().then(function(json){
         docSha = json.content && json.content.sha;
+        if (json.write_denied){ saveFailToast("문서함", 403, true); return; }   // C242 판 A(줄기 C): 쓰기 거절(대역이 200 + write_denied로 넘김)을 성공처럼 지나가 다시 읽기로 고친 것을 소리 없이 지우지 않고 이 함수의 실패 길로(위 줄과 같은 글)
         if (json.register_warn) alert("등재 요청이 아직 결재함에 못 갔습니다 — 자동 재시도됩니다(관리자가 결재함을 열면 카드가 만들어집니다).");
         loadDocuments();
       });
@@ -16362,11 +16579,11 @@
   // 사람이 판단을 그대로 뒀는지 고쳤는지 보고 — 공사명은 관급만(사급은 개인 이름이 섞일 수 있다)
   function cbxReportFix(it){
     var f = it.form || {}, a = it.ai || {}, changed = cbxChanged(it);
-    if (it.fixSent) return changed;
-    it.fixSent = 1;
+    if (it.fixSent || (it.fixWho && !rsMine(it.fixWho))) return changed;   // C242 판 A: 앞사람의 실패한 보고를 뒷사람 토큰으로 보내지 않음
+    it.fixSent = 1; it.fixWho = myId();
     var pub = !!f.pub, combo = !!f.combo && (f.type === "asbestos" || f.type === "demolition");
     var clsChanged = changed.some(function(k){ return k === "type" || k === "pub" || k === "combo"; });
-    try { gwCall("gw-data", clsChanged ? { action: "box_fix", title: pub ? (f.title || "") : "", from: { type: a.type, pub: a.pub, combo: a.combo }, to: { type: f.type, pub: pub, combo: combo } } : { action: "box_fix", ok: true }).catch(function(){}); } catch(e){}
+    try { gwCall("gw-data", clsChanged ? { action: "box_fix", title: pub ? (f.title || "") : "", from: { type: a.type, pub: a.pub, combo: a.combo }, to: { type: f.type, pub: pub, combo: combo } } : { action: "box_fix", ok: true }).then(function(res){ if (!res || res.status !== 200) it.fixSent = 0; }, function(){ it.fixSent = 0; }); } catch(e){ it.fixSent = 0; }   // C242 판 A(줄기 E·G): 보고가 서버에 안 들어갔으면 '보냄' 표시를 되돌려 다음 부름(계약 시작)에서 다시 보냄 — 보내는 동안은 1이라 두 번 나가지 않음 · 실패는 gwCall이 오류 기록에 남김
     return changed;
   }
   // 계약서로 새 계약 시작 — 단계는 유형·사급관급으로 정해진 PM 원문 그대로. 계약서가 있으면 견적 단계는 지난 것으로
@@ -28734,7 +28951,7 @@
     fetch(MYTASKS_API, {method: "PUT", headers: Object.assign({"Content-Type":"application/json"}, ghHeaders()), body: JSON.stringify(payload)}).then(function(resp){
       if (resp.status === 401) return;
       if (!resp.ok){ saveFailToast("내 할 일", resp.status); return; }   // 판24h: 실패 알림(종전엔 삼킴)
-      return resp.json().then(function(json){ myTodoSha = json.content && json.content.sha; });
+      return resp.json().then(function(json){ myTodoSha = json.content && json.content.sha; if (json && json.write_denied) saveFailToast("내 할 일", 403); });   // C242 판 A(줄기 C): 쓰기 거절을 성공처럼 넘기지 않고 이 함수의 실패 길로(위 줄과 같은 글)
     }).catch(function(){ saveFailToast("내 할 일"); });
   }
   // 기한(due, 선택) — 지시와 같은 D-day 배지(경과 빨강·3일 내 주황). 미완료 행에는 인라인 날짜칸으로 기한을 바로 고친다(v309, PM 9/3).
@@ -29140,12 +29357,12 @@
         // P1 판24j(C209): 받은 사본과 함께(병합은 옛 기준 → 기준 = 받은 목록) · 로그아웃 사이(0)·옛 판(1) 버림
         if (typeof imRead === "function"){ var nx = imRead("receivables", imG0, receivables, recRemote, recPending, mergeRec); if (nx === 0 || nx === 1) return; recSha = json.sha; receivables = nx; }
         else { recSha = json.sha; receivables = recPending ? mergeRec(receivables, recRemote) : recRemote; }   // 오프라인 편집(pending) 병합 — tasks/veh/lic와 동일(없으면 online 복귀 때 입금 처리분 증발)
-        setOffline(false); saveRecCache(); renderReceivables(); renderDashboard();
+        setOffline(false, "receivables"); saveRecCache(); renderReceivables(); renderDashboard();
         recOverdueGen();   // 미수 장기화 자동 지시(만기 자동생성이 먼저 돈 경우 보충)
       });
     }).catch(function(){
-      var c = loadRecCache();
-      if (c){ recSha = c.sha; receivables = c.items || []; setOffline(true); renderReceivables(); renderDashboard(); }
+      var c = loadRecCache(), rs0 = (typeof rsList === "function") ? rsList("receivables") : "";
+      if (c){ recSha = c.sha; receivables = c.items || []; if (typeof rsCacheIn === "function") rsCacheIn("receivables", rs0); setOffline(true, "receivables"); renderReceivables(); renderDashboard(); }
     });
   }
 
@@ -29192,8 +29409,8 @@
       if (resp.status === 401){ clearToken(); showTokenScreen(true); return; }
       if (resp.status === 409 || resp.status === 422){ return resolveRecConflictAndRetry(); }
       if (!resp.ok) throw new Error("HTTP " + resp.status);
-      return resp.json().then(function(json){ recSha = json.content && json.content.sha; setOffline(false); saveRecCache(); if (typeof recSaveTimer === "undefined" || !recSaveTimer) recPending = false; });
-    }).catch(function(){ setOffline(true); });
+      return resp.json().then(function(json){ recSha = json.content && json.content.sha; setOffline(false, "receivables"); saveRecCache(); if (typeof recSaveTimer === "undefined" || !recSaveTimer) recPending = false; });
+    }).catch(function(){ setOffline(true, "receivables"); });
   }
 
   function resolveRecConflictAndRetry(){
@@ -30060,11 +30277,11 @@
         var rd = (parsed && parsed.duties) || [];   // duties도 같은 문서에서 — 로드가 편집을 덮지 않게 pending이면 병합
         duties = (licPending ? mergeDuties(duties, rd) : rd);
         licRemoteOk = true;   // 시드 허용 조건 — 캐시 폴백이 아닌 진짜 원격 상태를 봤을 때만(리뷰 high: 폴백 시드가 남의 편집을 덮음)
-        setOffline(false); saveLicCache(); renderLicenses(); renderDashboard(); markLoadedForAutoGen("lic");
+        setOffline(false, "licenses"); saveLicCache(); renderLicenses(); renderDashboard(); markLoadedForAutoGen("lic");
       });
     }).catch(function(){
-      var c = loadLicCache();
-      if (c){ licSha = c.sha; licenses = c.items || []; duties = c.duties || []; setOffline(true); renderLicenses(); renderDashboard(); markLoadedForAutoGen("lic"); }   // 캐시 폴백도 로드 완료로(차량과 동일)
+      var c = loadLicCache(), rs0 = (typeof rsList === "function") ? rsList("licenses") : "";
+      if (c){ licSha = c.sha; licenses = c.items || []; duties = c.duties || []; if (typeof rsCacheIn === "function") rsCacheIn("licenses", rs0); setOffline(true, "licenses"); renderLicenses(); renderDashboard(); markLoadedForAutoGen("lic"); }   // 캐시 폴백도 로드 완료로(차량과 동일)
     });
   }
 
@@ -30107,8 +30324,8 @@
       if (resp.status === 401){ clearToken(); showTokenScreen(true); return; }
       if (resp.status === 409 || resp.status === 422){ return resolveLicConflictAndRetry(); }
       if (!resp.ok) throw new Error("HTTP " + resp.status);
-      return resp.json().then(function(json){ licSha = json.content && json.content.sha; setOffline(false); saveLicCache(); if (typeof licSaveTimer === "undefined" || !licSaveTimer) licPending = false; if (json.lic_kept && json.lic_kept.length) lmKeptNotice(json.lic_kept); });
-    }).catch(function(){ setOffline(true); });
+      return resp.json().then(function(json){ licSha = json.content && json.content.sha; setOffline(false, "licenses"); saveLicCache(); if (typeof licSaveTimer === "undefined" || !licSaveTimer) licPending = false; if (json.lic_kept && json.lic_kept.length) lmKeptNotice(json.lic_kept); });
+    }).catch(function(){ setOffline(true, "licenses"); });
   }
   function resolveLicConflictAndRetry(){
     var imG0 = (typeof imSt === "function") ? imSt("licenses").gen : 0;
