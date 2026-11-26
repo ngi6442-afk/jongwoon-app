@@ -1949,3 +1949,8 @@
 - [ ] (AI 운영 확인 — C232) 배포 뒤 안전 › 현황 ① 이번 주기 안전 점검이 배포 전과 같은 26줄이다(새 줄은 안전 항목이 아님)
 - [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 배포 전 전체 게이트 기록 C232_게이트_v551_1126.txt
 - [x] (AI) `uismoke` v387·v551 체크리스트 정의(항목 45개 id 순서 · 수시 su1~su9 · 부칙 반영 문구 · 정본 v4 주석) · v432 ① 수시 개수 9 · v551 문서·판 번호 정확 검사
+
+## v552 — 홍보 사진 공개 길: 가린 판이 확인된 사진만(C259 · 먼저 막기)
+- [x] (AI) `servertest` 절 44-C259(판정 규칙 · 공유 주소·피드·릴레이 · 크론 게시 완료·판 없는 사진 · 워커 판 없음 모드) · `uismoke` 게시 완료 확인창 — ✓ AI 11/26
+- [ ] (운영 확인) 배포 뒤 판 없는 공개 사진 주소가 원본 대신 거절(409)되고, 크론 회차마다 판 없는 사진이 줄어 가린 판이 붙은 기록부터 다시 보임
+- [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `paycalc_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` · `autorulestest` · `botdup_check` 통과 · v551 문서 검사를 이 판 이상으로 풀고 v552 문서·판 번호 정확 검사 — ✓ AI 11/26

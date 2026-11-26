@@ -24196,9 +24196,9 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ["`rows_v4.json`", "원장 C232"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v551 \(2026-11-26\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 2 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 551 && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 2 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
       && d.cl.indexOf('**C232(v551') > 0
-      && /SHELL_CACHE = 'jw-shell-v551'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 551;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r551 = chk551(D551);
@@ -24210,6 +24210,29 @@ try {
   T('v551 문서·판 번호(정확 검사): FEATURES 기준 v551 (2026-11-26)·v551 절(C232) · TESTLIST v551 칸 6(화면·운영 확인 4 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v551 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
     r551.ok && M551.every((v) => v === false), JSON.stringify({ r: r551.info, mut: M551 }));
 } catch (e) { console.log('  (v551 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v552(C259 — 홍보 사진 공개 길 가린 판 확인): 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '552 이상'으로 풀 것
+try {
+  const rdZ = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DZ = { ft: rdZ('FEATURES.md'), tl: rdZ('TESTLIST.md'), sw: rdZ('sw.js') };
+  const chkZ = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v552 (11/26)', '\n### '), tlv = cut(d.tl, '\n## v552 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), op = cb.filter((l) => /^- \[ \] \(운영 확인\)/.test(l));
+    const FT = ['`_lib/maskgate.js`', '`pickPublic`', '`mask:`', '409', '503', '먼저막기'];
+    const GATE = ["uismoke","servertest","consheet_check","proctpl_check","settletest","rectest","promoqual_check","promogen_check","promoqlearn_check","promostream_check","promo_wrap_check","promo_post_check","paycalc_check","stmtread_a_check","stmtread_b_check","stmtread_c_check","stmtread_d_check","stmtmail_check","autorulestest","botdup_check"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0), last = gate[gate.length - 1] || '';
+    const ok = /기준: v552 \(2026-11-26\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => last.indexOf('`' + g + '`') > 0) && /SHELL_CACHE = 'jw-shell-v552'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
+  };
+  const rZ = chkZ(DZ);
+  const muZ = (k, f) => chkZ(Object.assign({}, DZ, { [k]: f(DZ[k]) })).ok;
+  const MZ = [muZ('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v551 (')), muZ('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v551'")),
+    muZ('ft', (s) => s.split('`pickPublic`').join('pickPublic')), muZ('tl', (s) => s.split('\n## v552 ').join('\n## vX '))];
+  T('v552 문서·판 번호(정확 검사): FEATURES 기준 v552 (2026-11-26)·v552 절(maskgate·pickPublic·409·503·먼저막기) · TESTLIST v552 칸 3(운영 확인 1 · 게이트 [x] 2 — 20종) · sw jw-shell-v552 · 결함 사본 ' + MZ.length + '개 = 모두 ✗',
+    rZ.ok && MZ.every((v) => v === false), JSON.stringify({ r: rZ.info, mut: MZ }));
+} catch (e) { console.log('  (v552 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
