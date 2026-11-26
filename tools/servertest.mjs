@@ -6929,6 +6929,25 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       return { ok: d1.code === 400 && d1.body.error_code === 'CLI_BIZ13' && d1.body.n === 1 && same1 && JSON.stringify(d1.body).indexOf('９') < 0 && d2.code === 200 && d3.code === 400 && d3.body.error_code === 'CLI_BIZ13' && d4.code === 200 && mem.gw_data['col:clients'].items.length === 4,
         info: [d1.code, d1.body.error_code, same1, d2.code, d3.code, d4.code] };
     },
+    // ⑤-H C270 ⓐ(11/26): 거래처 biz_no·기성 client_num의 13자리 원문 = 관리자·수행만 · 보기 권한 = 빈 값 + 표시 칸(biz13·cn13) · 10자리·빈 값·다른 칸 그대로 · 문서 원본 무변 · 보기 권한 저장 = 403
+    H: async (mod) => { reset86(); seedU86(); const c = caller86(mod);
+      const VW = { id: 'uv86', name: '보기86', admin: false, perms: { cli: 'view', rec: 'view' } }, DO = { id: 'ud86', name: '수행86', admin: false, perms: { cli: 'do', rec: 'do' } };
+      mem.gw_users['member:uv86'] = JSON.parse(JSON.stringify(VW)); mem.gw_users['member:ud86'] = JSON.parse(JSON.stringify(DO));
+      const tV = issueSession(VW).token, tD = issueSession(DO).token;
+      mem.gw_data['col:clients'] = { schema: 1, items: [{ id: 'c1', name: '가', biz_no: '900101-1234567', phone: '010' }, { id: 'c2', name: '나', biz_no: '123-45-67890' }, { id: 'c3', name: '다', biz_no: '' }], updated_at: 862 };
+      mem.gw_data['col:receivables'] = { schema: 1, items: [{ id: 'r1', client: '가', client_num: '9001011234567', amount: 1 }, { id: 'r2', client: '나', client_num: '1234567890', amount: 2 }], updated_at: 863 };
+      const gv = await c({ action: 'get', collection: 'clients' }, tV, 'dev1'), rv = await c({ action: 'get', collection: 'receivables' }, tV, 'dev1');
+      const gd = await c({ action: 'get', collection: 'clients' }, tD, 'dev1'), rd = await c({ action: 'get', collection: 'receivables' }, tD, 'dev1');
+      const ga = await c({ action: 'get', collection: 'clients' }, tA86, 'dev1'), ra = await c({ action: 'get', collection: 'receivables' }, tA86, 'dev1');
+      const vI = gv.body.doc.items, vR = rv.body.doc.items;
+      const hid = gv.code === 200 && vI[0].biz_no === '' && vI[0].biz13 === true && vI[0].phone === '010' && vI[1].biz_no === '123-45-67890' && !('biz13' in vI[1]) && vI[2].biz_no === '' && !('biz13' in vI[2])
+        && rv.code === 200 && vR[0].client_num === '' && vR[0].cn13 === true && vR[0].amount === 1 && vR[1].client_num === '1234567890' && !('cn13' in vR[1])
+        && JSON.stringify(gv.body).indexOf('1234567') < 0 && JSON.stringify(rv.body).indexOf('9001011234567') < 0;
+      const raw = [gd, ga].every((g) => g.code === 200 && g.body.doc.items[0].biz_no === '900101-1234567' && !('biz13' in g.body.doc.items[0])) && [rd, ra].every((g) => g.code === 200 && g.body.doc.items[0].client_num === '9001011234567' && !('cn13' in g.body.doc.items[0]));
+      const kept = mem.gw_data['col:clients'].items[0].biz_no === '900101-1234567' && !('biz13' in mem.gw_data['col:clients'].items[0]) && mem.gw_data['col:receivables'].items[0].client_num === '9001011234567';
+      const sv = await c({ action: 'save', collection: 'receivables', base: 863, doc: { schema: 1, items: vR } }, tV, 'dev1');
+      return { ok: hid && raw && kept && sv.code === 403 && mem.gw_data['col:receivables'].items[0].client_num === '9001011234567', info: [gv.code, rv.code, hid, raw, kept, sv.code] };
+    },
     // ⑤-1 C082 ① 명부 exam: 안전 권한 없는 일용직 수행자 읽기 = exam 칸 없음 · 안전 보기·관리자 = 있음 · 그 사람 저장 = exam 서버 값 이월(보낸 값 버림·새 줄 exam 없음) · 안전 권한자 저장 = 반영 · 직전 명부 못 읽으면 500 PREV_READ_FAILED
     E: async (mod) => { reset86(); seedU86(); const c = caller86(mod);
       mem.gw_data['col:workers'] = { schema: 1, items: [{ id: 'w86a', name: '가', exam: '2026-01-02' }, { id: 'w86b', name: '나' }], updated_at: 861 };
@@ -6979,6 +6998,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     C: [['gwd', "prevDoc.updated_at && Number.isFinite(Number(prevDoc.updated_at)) && Number(d.base)", "prevDoc.updated_at && Number(d.base)"]],
     D: [['gwd', '    if (biz13N) return jr(400', '    if (false) return jr(400']],
     E: [['gwd', "  if (col === 'workers' && !wkExamSee(c.member) && Array.isArray(doc.items)) {\n    doc = ", "  if (false) {\n    doc = "], ['gwd', "  if (col === 'workers' && !wkExamSee(c.member)) {", '  if (false) {']],
+    H: [['gwd', "  if ((col === 'clients' || col === 'receivables') && !c.member.admin && p !== 'do' && Array.isArray(doc.items)) {", "  if (false) {"], ['gwd', "&& !c.member.admin && p !== 'do' && Array.isArray(doc.items)) {\n    const fld", "&& !c.member.admin && Array.isArray(doc.items)) {\n    const fld"]],
     F: [['gwd', '      if (orphans.length) return jr(400', '      if (false) return jr(400']],   // v456 2차 검토: orphanN → orphans(고아 id 목록도 돌려줌 — 88 ③) · 같은 거절 줄 걷음
     G: [['gwd', "  if (!bot) return jr(403, { status: 'FORBIDDEN', error_code: 'BOT_KEY_ONLY'", "  if (false) return jr(403, { status: 'FORBIDDEN', error_code: 'BOT_KEY_ONLY'"]],
   };
@@ -7034,6 +7054,8 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     const CB86 = require(join(FN, '_lib/clibiz.js'));
     T('86 v456 ④ C080 거래처 13자리: 새 거래처(전각·전각 줄표) = 400 CLI_BIZ13(n 1·저장 안 됨·응답에 번호 없음) · 서버에 있던 13자리 그대로 + 다른 줄 고침 = 200(옛 값이 저장을 막지 않음) · 있던 줄을 13자리로 바꿈 = 400 · 가린 번호·10자리·쉼표로 나눈 둘 = 200 · 물어보기 clients = "13자리(숨김)"·그 번호로 물으면 0행 · 결함 사본(서버 거절 걷음·물어보기 가림 걷음) ✗',
       R86.D.ok && killed86('D') && ask86 && !askMut86 && CB86.biz13('900101-1234567') && !CB86.biz13('900101-1******') && !CB86.biz13('123-45-67890'), JSON.stringify({ D: R86.D.info, mut: MUT86.D, ask86, askMut86 }));
+    T('86 C270 ⓐ 13자리 원문은 관리자·수행만: 보기 권한 get clients·receivables = biz_no·client_num 빈 값 + biz13·cn13 표시 칸(10자리·빈 값·다른 칸 그대로 · 응답에 원문 글자 0) · 수행·관리자 = 원문 · 저장 문서 무변 · 보기 권한 저장 403 · 결함 사본 2(가림 걷음 · 수행도 가림) ✗',
+      R86.H.ok && killed86('H'), JSON.stringify({ H: R86.H.info, mut: MUT86.H }));
     T('86 v456 ⑤ C082 ① 명부 옛 건강진단 exam: 안전 권한 없는 일용직 수행자 읽기 = exam 칸 없음 · 안전 보기·관리자 = 있음 · 그 사람 저장 = exam 서버 값 이월(보낸 값 버림·새 줄 exam 없음) · 안전 권한자 저장 = 반영 · 직전 명부 못 읽음 = 500 PREV_READ_FAILED(쓰지 않음) · 결함 사본(읽기 빼기 걷음·저장 이월 걷음) ✗',
       R86.E.ok && killed86('E'), JSON.stringify({ E: R86.E.info, mut: MUT86.E }));
     T('86 v456 ⑤ C082 ② 현장 대장 고아 일용직 id: 그 줄에 있던 명부 밖 id + 새 명부 id = 200 · 새 명부 밖 id = 400 ORPHAN_WORKER(n 1·저장 안 됨) · 새 줄 글자 "[...]" 모양도 400 · 지운 일용직(명부에 있음) = 200 · 새 id 있는데 명부 못 읽음 = 500 WORKERS_READ_FAILED · 결함 사본(거절 걷음) ✗',

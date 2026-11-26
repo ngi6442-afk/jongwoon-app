@@ -3371,7 +3371,7 @@
 <div class="modal-backdrop" id="devicePendingBackdrop">
   <div class="modal">
     <h3>기기 승인 필요</h3>
-    <p style="text-align:left;line-height:1.6;">이 기기는 아직 관리자 승인을 받지 않았습니다.<br>관리자에게 승인을 요청하고, 승인되면 새로고침(F5) 하세요.</p>
+    <p style="text-align:left;line-height:1.6;">이 기기는 아직 승인을 받지 않았습니다.<br>기기 승인 담당(시스템 관리 계정)에게 승인을 요청하고, 승인되면 새로고침(F5) 하세요.</p>
     <p id="devPendInfo" style="font-size:12px;color:var(--sub);text-align:left;"></p>
     <button class="secondary" id="devPendLogout">다른 계정으로 로그인</button>
   </div>
@@ -7435,7 +7435,7 @@
   document.getElementById("bidPurgeBtn").addEventListener("click", function(){
     var btn = this;
     if (btn.disabled) return;
-    if (!confirm("미검토(신규) 공고를 전부 비우고 새 필터로 다시 수집할까요?\n검토·참여·패스 처리한 항목은 보존됩니다.")) return;
+    if (!confirm("미검토(신규) 공고를 전부 비우고 새 필터로 다시 수집할까요?\n검토·투찰·낙찰·유찰·패스 처리한 항목은 보존됩니다.")) return;
     btn.disabled = true; btn.textContent = "재수집 중…";
     gwCall("gw-data", { action: "bids_purge", mode: "new" }).then(function(res){
       if (res.status !== 200){ btn.disabled=false; btn.textContent="🧹 재수집"; alert("비우기 실패 ("+res.status+")"); return; }
@@ -8705,7 +8705,7 @@
   var STMT_WHY = { amt: "금액 없음", calc: "수량×단가 ≠ 금액", kind: "종류 없음", veh: "차량 없음", use: "용도 없음" };   // 서버 rowIssues 5종
   var STMT_ERR = {
     NO_ACCESS: "월말명세서 권한이 없습니다(권한관리 '월말명세서' 열).", NO_WRITE: "보기 권한 — 저장은 수행 권한자만 할 수 있습니다.",
-    DEVICE_NOT_APPROVED: "승인되지 않은 기기입니다 — 관리자에게 기기 승인을 요청해 주세요.",
+    DEVICE_NOT_APPROVED: "승인되지 않은 기기입니다 — 기기 승인 담당(시스템 관리 계정)에게 승인을 요청해 주세요.",
     STMT_STALE: "다른 곳에서 먼저 저장해 이번 저장은 하지 않았습니다 — [다시 불러오기]로 최신 판을 연 뒤 고쳐 주세요(다시 불러오면 지금 화면의 고친 내용은 사라집니다).",
     NOT_BALANCED: "검산이 맞지 않아 확정하지 않았습니다.", UNKNOWN_VEH: "차량 목록에 없는 차량이 있어 저장하지 않았습니다.", UNKNOWN_VENDOR: "거래처 목록에 없는 거래처입니다.",
     IDX_INVALID: "이 달 색인이 깨져 있습니다 — [색인 다시 만들기]를 눌러 주세요.", CFG_INVALID: "거래처 목록 저장값이 깨져 있습니다 — 관리자 확인이 필요합니다.",
@@ -13626,7 +13626,7 @@
       //   권한(NO_WRITE — 일용직 수행이 아님 · 권한이 바뀐 직후 등)이면 서버가 이 변경을 받을 일이 없으므로 대기·표시·잡힌 저장을 내리고 서버 명부를 다시 읽는다
       //   (종전엔 403을 삼켜 대기 표시가 켜진 채 남아, 그 뒤 읽기마다 이 기기에만 있는 줄이 병합으로 살아남았다 — 표·현장 창·서류 명단 후보에 서버에 없는 사람)
       if(res.status===403){
-        if((res.body&&res.body.error_code)==="DEVICE_NOT_APPROVED") gwToast("승인되지 않은 기기입니다 — 관리자에게 기기 승인을 요청하세요.\n일용직 명부 변경은 아직 서버에 저장되지 않았습니다.", true);
+        if((res.body&&res.body.error_code)==="DEVICE_NOT_APPROVED") gwToast("승인되지 않은 기기입니다 — 기기 승인 담당(시스템 관리 계정)에게 승인을 요청하세요.\n일용직 명부 변경은 아직 서버에 저장되지 않았습니다.", true);
         else {
           wkPending=false; wkDirty={}; if(wkSaveTimer){ clearTimeout(wkSaveTimer); wkSaveTimer=null; }
           gwToast("일용직 명부 저장 권한이 없어 서버가 이 변경을 받지 않았습니다.\n명부를 서버 값으로 다시 읽습니다.", true);
@@ -21571,7 +21571,7 @@
       //   v430(검토): 기기 승인 취소(403 DEVICE_NOT_APPROVED — 서버 handleSave가 권한보다 먼저 본다)는 권한 문제가 아니다 — 기기 안내를 띄우고
       //   보류는 유지한다(로컬 변경을 버리지 않음 — 기기를 다시 승인받은 뒤 다음 저장 때 함께 올라간다. 그 밖의 오류와 같은 처리)
       if(res.status===403){
-        if((res.body&&res.body.error_code)==="DEVICE_NOT_APPROVED") gwToast("승인되지 않은 기기입니다 — 관리자에게 기기 승인을 요청하세요.\n안전 › 체크 칸 기록 변경은 아직 서버에 저장되지 않았습니다.", true);
+        if((res.body&&res.body.error_code)==="DEVICE_NOT_APPROVED") gwToast("승인되지 않은 기기입니다 — 기기 승인 담당(시스템 관리 계정)에게 승인을 요청하세요.\n안전 › 체크 칸 기록 변경은 아직 서버에 저장되지 않았습니다.", true);
         else { eduPending=false; gwToast("안전 › 체크 칸 기록 저장 권한이 없어 서버가 이 변경을 받지 않았습니다.\n화면 값은 새로고침하면 서버 값으로 돌아갑니다.", true); }
       }
       if(res.status!==200&&res.status!==403) saveFailToast("안전 › 체크 칸 기록", res.status);   // P1 판24h(C206): 500 등도 알림(대기는 남김 — 종전엔 알림 0)
@@ -28011,6 +28011,8 @@
   function cliLinkReset(){ CLI_LINK = null; }
   function cliNameKey(s){ return String(s == null ? "" : s).replace(/（/g, "(").replace(/）/g, ")").replace(/\s+/g, "").replace(/\(주\)|㈜|주식회사/g, "").toLowerCase(); }
   function cliDigits(s){ return String(s == null ? "" : s).replace(/[^0-9]/g, ""); }
+  // C270 ⓑ(11/26): 거래처 잇기·같은 거래처 의심·미수 셈의 번호 열쇠는 사업자번호 꼴(숫자 10자리)만 — 13자리(주민·법인등록번호 꼴)끼리 맞추면 추측한 번호의 기성 줄을 넣어 숨긴 거래처에 붙는지로 번호를 맞혀 볼 수 있었다(그 밖 자릿수는 상호 열쇠로만)
+  function cliBn10(s){ var d = cliDigits(s); return d.length === 10 ? d : ""; }
   // 사업자번호 칸의 13자리(주민·법인등록번호 꼴) — 전각 숫자는 반각으로 바꾸고 띄어쓰기·줄표(- ‐ ‑ ‒ – — ― − － ㅡ)를 뺀 뒤 숫자가 13자리 이상 이어지면 참(v441 검토: '숫자가 모두 13개'만 보던 것은
   //   사업자번호와 함께 적거나·한 자리 더 치거나·전각으로 적은 주민번호가 빠졌다). 입력은 막고(saveCliModal) 옛 값은 PC 표·펼침·검색 글·전역 검색 줄·옛 [상세 ›] 창에 원문을 그리지 않는다(수정 창 칸에만 — 지우라고).
   //   가린 번호('900101-1******')·10자리는 그대로 통과 · 사업자번호 둘을 띄어쓰기만으로 이으면 13자리 넘게 이어져 막힘(안내 글이 쉼표로 나누라고 함) · 닫은 예외: 폰 옛 목록 펼침(v469)·물어보기 _lib/ask.js(v456)·폰 옛 목록 검색(C147 ① — 수행이 아니면 cliBizHay)
@@ -28024,17 +28026,17 @@
   function cliBizHay(c){ if (!c || c.indiv) return ""; return cliBiz13(c.biz_no) ? "" : String(c.biz_no == null ? "" : c.biz_no).trim(); }
   // 기성·계약 → 대장 거래처: 번호(숫자)가 같은 대장 거래처가 먼저, 없으면 상호 열쇠가 같은 거래처를 대장 순서로 — 두 번호가 모두 10자리이고 서로 다르면 건너뜀(위 주석 — 계약은 번호 없음), 없으면 null(대장 밖)
   function cliResolve(x, name, num){
-    var b = cliDigits(num), k, L, i, cb;
+    var b = cliBn10(num), k, L, i, cb;
     if (b && x.byBn["#" + b]) return x.byBn["#" + b];
     k = cliNameKey(name); L = k ? (x.byNm["#" + k] || []) : [];
-    for (i = 0; i < L.length; i++){ cb = cliDigits(L[i].biz_no); if (b.length === 10 && cb.length === 10 && cb !== b) continue; return L[i]; }
+    for (i = 0; i < L.length; i++){ cb = cliBn10(L[i].biz_no); if (b && cb && cb !== b) continue; return L[i]; }
     return null;
   }
   function cliLinkIdx(){
     var x, outs = {}, order = [], seeRec, seeCon, addOut;
     if (CLI_LINK) return CLI_LINK;
     x = { live: [], ids: {}, byBn: {}, byNm: {}, rec: {}, con: {}, out: [], outBy: {} };
-    clients.forEach(function(c){ var b, k; if (!c || c.del === 1) return; x.live.push(c); x.ids[c.id] = 1; b = cliDigits(c.biz_no); k = cliNameKey(c.name); if (b && !x.byBn["#" + b]) x.byBn["#" + b] = c; if (k) (x.byNm["#" + k] = x.byNm["#" + k] || []).push(c); });   // 상호 열쇠는 대장 순서 목록(v441 검토 — 번호가 다른 거래처를 건너뛰고 다음 후보로: cliResolve)
+    clients.forEach(function(c){ var b, k; if (!c || c.del === 1) return; x.live.push(c); x.ids[c.id] = 1; b = cliBn10(c.biz_no); k = cliNameKey(c.name); if (b && !x.byBn["#" + b]) x.byBn["#" + b] = c; if (k) (x.byNm["#" + k] = x.byNm["#" + k] || []).push(c); });   // 상호 열쇠는 대장 순서 목록(v441 검토 — 번호가 다른 거래처를 건너뛰고 다음 후보로: cliResolve)
     seeRec = canSee("rec"); seeCon = canSee("con");
     // 대장 밖 상호 — 열쇠마다 한 줄(원문 표기가 여럿이면 가장 많이 쓴 것 · 같으면 먼저 나온 것을 이름으로), 기성 공급받는자 번호는 사업자번호 꼴(10자리)이 하나뿐일 때만 남김
     addOut = function(nm, it, isRec){
@@ -28060,8 +28062,8 @@
     if (!cli) return [];
     x = cliLinkIdx();
     if (x.ids[cli.id]) return (x.rec[cli.id] || []).slice();
-    bn = cliDigits(cli.biz_no); k = cliNameKey(cli.name);
-    return liveRec().filter(function(r){ var rb; if (r.paid || recIsCredit(r) || !recVisible(r)) return false; rb = cliDigits(r.client_num); if (bn && rb === bn) return true; if (bn.length === 10 && rb.length === 10) return false; return k !== "" && cliNameKey(r.client) === k; });   // 번호가 둘 다 10자리이고 다르면 상호가 같아도 아님(cliResolve와 같은 판정)
+    bn = cliBn10(cli.biz_no); k = cliNameKey(cli.name);
+    return liveRec().filter(function(r){ var rb; if (r.paid || recIsCredit(r) || !recVisible(r)) return false; rb = cliBn10(r.client_num); if (bn && rb === bn) return true; if (bn && rb) return false; return k !== "" && cliNameKey(r.client) === k; });   // 번호가 둘 다 10자리이고 다르면 상호가 같아도 아님(cliResolve와 같은 판정)
   }
   function cliContracts(cli){
     var x, k;
@@ -28075,10 +28077,10 @@
   function cliDelMsg(c){ return "이 거래처를 대장에서 삭제할까요?\n" + ((c && c.name) || "(상호없음)") + "\n(지운 표시만 남깁니다 — 미수·계약 기록은 그대로이고, 그 이름은 표 아래 '대장에 없는 이름'으로 다시 보일 수 있습니다)"; }
   // 같은 거래처 의심(추가·수정 창 저장·[대장에 추가]·409 병합 — 사람 확인) — 사업자번호(숫자)가 같거나, 상호 열쇠가 같고 두 사업자번호가 서로 다르지 않은 살아 있는 거래처(list — 없으면 대장 전체)
   function cliTwinOf(name, biz, exceptId, list){
-    var k = cliNameKey(name), b = cliDigits(biz), i, c, cb, L = list || clients;
+    var k = cliNameKey(name), b = cliBn10(biz), i, c, cb, L = list || clients;
     for (i = 0; i < L.length; i++){
       c = L[i]; if (!c || c.del === 1 || c.id === exceptId) continue;
-      cb = cliDigits(c.biz_no);
+      cb = cliBn10(c.biz_no);
       if (b && cb && b === cb) return { c: c, by: "biz" };
       if (k && cliNameKey(c.name) === k && !(b && cb && b !== cb)) return { c: c, by: "name" };
     }
@@ -28097,7 +28099,7 @@
     document.getElementById("cliDetailTitle").textContent = c.name || "거래처";
     var html="";
     var info=[];
-    if(c.indiv) info.push("개인(사업자 없음)"); else if(cliBiz13(c.biz_no)) info.push("사업자번호 13자리(숨김) — 수정에서 지워 주세요"); else if(c.biz_no) info.push("사업자 "+esc(c.biz_no));   // v441 검토: 13자리(주민·법인등록번호 꼴) 원문을 이 창에도 그리지 않음 · 개인 거래처 표시
+    if(c.indiv) info.push("개인(사업자 없음)"); else if(c.biz13 || cliBiz13(c.biz_no)) info.push("사업자번호 13자리(숨김) — 수정에서 지워 주세요"); else if(c.biz_no) info.push("사업자 "+esc(c.biz_no));   // v441 검토: 13자리(주민·법인등록번호 꼴) 원문을 이 창에도 그리지 않음 · 개인 거래처 표시
     if(c.contact) info.push("담당 "+esc(c.contact)+(c.phone?" "+esc(c.phone):""));
     else if(c.phone) info.push(esc(c.phone));
     if(c.address) info.push(esc(c.address));
@@ -28226,7 +28228,7 @@
   function cliSheetUnpSum(L){ var s = 0; L.forEach(function(x){ s += Number(x.amount) || 0; }); return s; }
   function cliSheetUnpTxt(L){ var s = cliSheetUnpSum(L); return (s ? recSheetMoney(s) : "0") + "원 · " + L.length + "건"; }   // 부호 살림(v440 recSheetMoney — 수정세금계산서 음수)
   // 사업자번호 칸 — 개인 거래처 '개인(사업자 없음)'(회색) · 빈 칸 노랑 '미입력' · 13자리 노랑 '13자리(숨김)'(원문은 수정 창에만 — 지우라는 뜻) · 10자리 NNN-NN-NNNNN · 그 밖 적은 그대로
-  function cliBizKind(c){ var raw = String(c.biz_no == null ? "" : c.biz_no).trim(); if (c.indiv) return "indiv"; if (!raw) return "empty"; if (cliBiz13(raw)) return "id13"; return recSheetBizFmt(raw) ? "biz" : "other"; }
+  function cliBizKind(c){ var raw = String(c.biz_no == null ? "" : c.biz_no).trim(); if (c.indiv) return "indiv"; if (c.biz13) return "id13"; if (!raw) return "empty";   /* C270 ⓐ: 보기 권한에는 서버가 13자리를 빈 값 + biz13으로 보냄 */ if (cliBiz13(raw)) return "id13"; return recSheetBizFmt(raw) ? "biz" : "other"; }
   function cliBizTxt(c){ var k = cliBizKind(c), raw = String(c.biz_no == null ? "" : c.biz_no).trim(); return k === "indiv" ? "개인(사업자 없음)" : (k === "empty" ? "미입력" : (k === "id13" ? "13자리(숨김)" : (k === "biz" ? recSheetBizFmt(raw) : raw))); }
   function cliBizHtml(c){ var k = cliBizKind(c), t = cliBizTxt(c); if (k === "indiv") return '<span class="rec-st paid">' + t + '</span>'; if (k === "empty" || k === "id13") return '<span class="rec-st wait">' + t + '</span>'; return esc(t); }
   function cliBizTitle(c){ var k = cliBizKind(c); return k === "empty" ? "사업자번호를 아직 넣지 않았습니다 — [수정]에서" : (k === "id13" ? "사업자번호 칸에 13자리 번호(주민·법인등록번호 꼴)가 있습니다 — 원문은 보이지 않습니다, [수정]에서 지워 주세요" : cliBizTxt(c)); }
@@ -28301,7 +28303,7 @@
     return cliDetTab;
   }
   // 같은 상호 열쇠·사업자번호의 다른 거래처(대장 안 겹침) — 미수·계약은 대장 순서 첫 거래처에만 붙는다(cliLinkIdx)
-  function cliSheetTwins(r){ var k = cliNameKey(r.name), b = cliDigits(r.biz_no); return cliLinkIdx().live.filter(function(c){ return c !== r && ((k && cliNameKey(c.name) === k) || (b && cliDigits(c.biz_no) === b)); }).length; }
+  function cliSheetTwins(r){ var k = cliNameKey(r.name), b = cliBn10(r.biz_no); return cliLinkIdx().live.filter(function(c){ return c !== r && ((k && cliNameKey(c.name) === k) || (b && cliBn10(c.biz_no) === b)); }).length; }
   function cliSheetOv(r){
     var cd = canDo("cli"), tw = cliSheetTwins(r), h = '<div class="vs-kv">'
       + cliSheetKv("사업자번호", cliBizHtml(r) + (cliBizKind(r) === "id13" ? ' <span class="vs-dsub">' + esc(cliBizTitle(r)) + '</span>' : ''))
@@ -29524,7 +29526,7 @@
   // 공급받는자 번호 — 10자리 사업자번호 꼴(NNN-NN-NNNNN, 줄표 없어도)만 그대로 · 그 밖(개인 주민번호 등)은 '개인(번호 숨김)' · 원문은 관리자만(명세 — 표 칸·검색·거르기에는 이 값을 쓰지 않음)
   //   v440 검토: 세무 내보내기도 관리자만 원문, 그 밖은 같은 가림(recSheetBizTxt — 파일 글)
   function recSheetBizFmt(raw){ var d; raw = String(raw == null ? "" : raw).trim(); if (!/^\d{3}-?\d{2}-?\d{5}$/.test(raw)) return null; d = raw.replace(/-/g, ""); return d.slice(0, 3) + "-" + d.slice(3, 5) + "-" + d.slice(5); }
-  function recSheetBizTxt(r){ var raw = String(r.client_num == null ? "" : r.client_num).trim(); return raw ? (recSheetBizFmt(raw) || "개인(번호 숨김)") : ""; }
+  function recSheetBizTxt(r){ var raw = String(r.client_num == null ? "" : r.client_num).trim(); if (r.cn13) return "개인(번호 숨김)"; return raw ? (recSheetBizFmt(raw) || "개인(번호 숨김)") : ""; }
   function recSheetBizNo(r){
     var raw = String(r.client_num == null ? "" : r.client_num).trim(), d;
     if (!raw) return REC_DASH;
@@ -30844,7 +30846,7 @@ function dutyStage(nx){
     NEED_REASON: "사유를 적어 주세요.", TOO_LONG: "글이 너무 깁니다.", IS_NA: "이미 해당 없음으로 끈 행입니다.", NO_CHANGE: "바뀐 것이 없습니다.", NO_DUE: "기준일이 없어 회차가 없습니다 — [기준일 입력]부터 해 주세요.",
     NOT_NEEDED: "기준일이 이미 있는 행입니다 — 기한이 다르면 [기한 정정]으로.", BAD_ATT: "수령본을 다시 올려 주세요.", BAD_EXT: "pdf·jpg·png만 올릴 수 있습니다.", FILE_TOO_LARGE: "파일이 큽니다(약 4.3MB까지).",
     NOT_AUTO: "자동 회차 행이 아닙니다 — 의무 대장에서 봅니다.", BG_READ_FAILED: "기한 근거표를 읽지 못했습니다 — 잠시 뒤 다시 해 주세요.",
-    NO_DUTY: "의무 대장에 이 행이 없습니다 — 화면을 새로 읽어 주세요.", DEVICE_NOT_APPROVED: "이 기기는 아직 승인되지 않았습니다 — 관리자에게 기기 승인을 요청해 주세요.", NO_ACCESS: "인허가를 볼 권한이 없습니다.",
+    NO_DUTY: "의무 대장에 이 행이 없습니다 — 화면을 새로 읽어 주세요.", DEVICE_NOT_APPROVED: "이 기기는 아직 승인되지 않았습니다 — 기기 승인 담당(시스템 관리 계정)에게 승인을 요청해 주세요.", NO_ACCESS: "인허가를 볼 권한이 없습니다.",
     BAD_RANGE: "넣을 수 있는 날짜 범위 밖입니다(기한 정정은 계산 기한 앞뒤 1년, 제출한 날은 회차 기한 1년 전부터 오늘까지).", BAD_FILE: "파일 내용이 pdf·jpg·png가 아니거나 너무 작습니다 — 접수증을 다시 골라 주세요.",
     INVALID_FILE: "파일을 읽지 못했습니다 — 다시 골라 주세요.", BAD_FIELD: "앱이 낡았습니다 — 새로고침한 뒤 다시 해 주세요.", BAD_OP: "앱이 낡았습니다 — 새로고침한 뒤 다시 해 주세요.", BAD_NO: "앱이 낡았습니다 — 새로고침한 뒤 다시 해 주세요.",
     BAD_VALUE: "넣은 값의 꼴이 맞지 않습니다.", UNAUTHORIZED: "로그인이 끝났습니다 — 다시 로그인해 주세요.", "401": "로그인이 끝났습니다 — 다시 로그인해 주세요." };
@@ -31566,7 +31568,7 @@ function dutyStage(nx){
     ENV_MISSING: "관리자 설정 필요 — Netlify 환경변수(GW_ALLBARO_ID·GW_ALLBARO_PW)가 설정되지 않았습니다.",
     ADMIN_ONLY: "관리자·개발자만 수집을 실행할 수 있습니다.",
     NO_PERMISSION: "이 작업을 수행할 권한이 없습니다.",
-    DEVICE_NOT_APPROVED: "승인되지 않은 기기입니다 — 관리자에게 기기 승인을 요청하세요.",
+    DEVICE_NOT_APPROVED: "승인되지 않은 기기입니다 — 기기 승인 담당(시스템 관리 계정)에게 승인을 요청하세요.",
     BAD_DAY: "날짜 형식이 올바르지 않습니다.",
     BAD_DAYS: "수집할 날짜 목록이 올바르지 않습니다(최대 14일).",
     DAYS_RANGE: "수집 범위를 벗어났습니다 — 오늘부터 60일 이내만 가능합니다.",
@@ -34266,7 +34268,7 @@ function dutyStage(nx){
       }).join("");
       var prev = b.prev;
       host.innerHTML = rows
-        + '<div class="empty-line" style="margin-top:6px;">★ = 기본 dry(발행 0 — 매일 08:10 정기업무 봇이 수만 센다). ' + (dry ? '마지막 집계 ' + esc(new Date(dry.ts).toLocaleString("ko-KR", { hour12: false }).slice(0, 16)) + (dry.run ? ' · ' + esc(dry.run) : '') : '아직 집계 없음(다음 08:10 실행 뒤)') + '. live 전환은 결정 4(R1 D-3 예고·담당 구독·정리·수용 뒤). 담당은 배정표 site:·wk: 행(결정 2).'
+        + '<div class="empty-line" style="margin-top:6px;">★ = 기본 dry(발행 0 — 평일 08:10 정기업무 봇이 수만 센다). ' + (dry ? '마지막 집계 ' + esc(new Date(dry.ts).toLocaleString("ko-KR", { hour12: false }).slice(0, 16)) + (dry.run ? ' · ' + esc(dry.run) : '') : '아직 집계 없음(다음 08:10 실행 뒤)') + '. live 전환은 결정 4(R1 D-3 예고·담당 구독·정리·수용 뒤). 담당은 배정표 site:·wk: 행(결정 2).'
         + (prev ? ' · 직전 설정 보존 <button type="button" class="link-btn" id="autoRulesRevertBtn">되돌리기</button>' : '') + '</div>';
       Array.prototype.forEach.call(host.querySelectorAll("[data-ar-set]"), function(btn){ btn.addEventListener("click", function(){ var p = btn.getAttribute("data-ar-set").split(":"); autoRulesSet({ rule: p[0], mode: p[1] }); }); });
       var rb = document.getElementById("autoRulesRevertBtn"); if (rb) rb.addEventListener("click", function(){ if (!confirm("규칙 스위치를 직전 판으로 되돌립니다. 계속할까요?")) return; autoRulesSet({ revert: true }); });
@@ -34379,7 +34381,7 @@ function dutyStage(nx){
     AUTO_RULE_ORDER.forEach(function(k){
       var m = meta[k] || { label: k }, cur = rules[k];
       if (cur === "off") out.push({ id: "autotask:" + k + ":dry", q: m.label + " — 꺼진 규칙을 연습 모드(발행 0)로 되돌릴까요?", recTxt: "연습(발행 0)", curTxt: "꺼짐", args: { rule: k, mode: "dry" }, def: "rec",
-        why: "연습 모드는 매일 08:10에 수만 세고 지시를 만들지 않습니다.", setBase: b.updated_at || 0 });
+        why: "연습 모드는 평일 08:10에 수만 세고 지시를 만들지 않습니다.", setBase: b.updated_at || 0 });
       else if (live.indexOf(k) >= 0 && cur !== "live") out.push({ id: "autotask:" + k + ":live", q: m.label + " — 연습에서 실제 발행으로 바꿀까요?", recTxt: "실제 발행", curTxt: cur === "dry" ? "연습(발행 0)" : String(cur || ""), args: { rule: k, mode: "live" }, def: "rec",
         why: "바꾸면 다음 08:10 실행부터 실제 지시가 생깁니다." + (plan && plan.note ? " · " + plan.note : ""), setBase: b.updated_at || 0 });
     });

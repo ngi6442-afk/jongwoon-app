@@ -2742,7 +2742,7 @@ try {
   const noWr30 = (r) => r.log.length === 2 && r.log[0] === 'gw-data:save:edu' && r.log[1].indexOf('toast:warn:안전 › 체크 칸 기록 저장 권한이 없어 서버가 이 변경을 받지 않았습니다') === 0 && r.pending === false;
   T('v430 doSaveEdu: 서버 거절 403 NO_WRITE(안전 수행이 아님 — 이유 코드가 없는 403도)면 경고 토스트 "안전 › 체크 칸 기록 저장 권한이 없어 서버가 이 변경을 받지 않았습니다"(v447 칸 이름)·보류 해제(다음 읽기 때 서버 값) / 403 DEVICE_NOT_APPROVED(기기 승인 취소)면 "승인되지 않은 기기입니다" 안내·권한 문구 없음·보류 유지 / 200은 토스트 없음 / 그 밖의 오류는 종전대로(보류 유지)',
     noWr30(ds403_30) && noWr30(ds403n_30)
-    && ds403d_30.log.length === 2 && ds403d_30.log[1].indexOf('toast:warn:승인되지 않은 기기입니다 — 관리자에게 기기 승인을 요청하세요.') === 0 && ds403d_30.log[1].indexOf('저장 권한이 없어') < 0 && ds403d_30.pending === true
+    && ds403d_30.log.length === 2 && ds403d_30.log[1].indexOf('toast:warn:승인되지 않은 기기입니다 — 기기 승인 담당(시스템 관리 계정)에게 승인을 요청하세요.') === 0 && ds403d_30.log[1].indexOf('저장 권한이 없어') < 0 && ds403d_30.pending === true
     && ds200_30.log.join(',') === 'gw-data:save:edu' && ds200_30.pending === false && ds500_30.log.join(',') === 'gw-data:save:edu,fail:안전 › 체크 칸 기록:500' && ds500_30.pending === true,   // 판24h: 500 = 보류 유지 + 실패 알림 1번(종전 알림 0)
     JSON.stringify({ a: ds403_30, n: ds403n_30, d: ds403d_30, b: ds200_30, c: ds500_30 }));
 
@@ -6098,7 +6098,7 @@ try {
   };
   const TASKS40 = () => [{ id: 't5', title: '입금확인: 사아공단 준설토 운반 22,000,000원', detail: '금액 불일치 — 확인 필요', who_id: '', who: '', scope: ['m1'], from: '기성', from_id: 'm1', due: '2026-08-01', status: 'open', done_at: null, done_by: null, rec_id: 'r5', created: '2026-08-01', updated: '2026-08-01' }];
   const REAL40 = ['esc', 'isDate', 'vehDday', 'liveRec', 'findRec', 'fmtAmount', 'recVisible', 'liveTasks', 'findTask', 'taskForMe', 'taskVisible', 'findRecTask', 'findOpenRecTask', 'createRecTask', 'completeRecTask', 'reopenRecTask', 'removeRecTask',
-    'recTaxExport', 'addReceivable', 'toggleRecReview', 'toggleRecPaid', 'toggleRecInvoice', 'toggleRecMismatch', 'toggleRecHl', 'saveRecModal', 'closeRecModal', 'recAging', 'recRowHtml', 'renderRecAging', 'recAgingKey', 'cliLinkReset', 'cliNameKey', 'cliDigits', 'cliResolve', 'cliLinkIdx', 'liveContracts', 'recIsCredit', 'recMatchesSearch', 'unpaidReceivables',
+    'recTaxExport', 'addReceivable', 'toggleRecReview', 'toggleRecPaid', 'toggleRecInvoice', 'toggleRecMismatch', 'toggleRecHl', 'saveRecModal', 'closeRecModal', 'recAging', 'recRowHtml', 'renderRecAging', 'recAgingKey', 'cliLinkReset', 'cliNameKey', 'cliDigits', 'cliBn10', 'cliResolve', 'cliLinkIdx', 'liveContracts', 'recIsCredit', 'recMatchesSearch', 'unpaidReceivables',
     'renderReceivablesLegacy', 'bindRecHandlers', 'recSortCmp', 'fillRecSort', 'selCount', 'selBoxHtml', 'bindSelBoxes', 'renderSelBar', 'hardDelete', 'bulkDelete', 'bulkRestore', 'renderDeletedList',
     'moduleArr', 'moduleLive', 'moduleDeleted', 'moduleCan', 'moduleFind', 'saveModule', 'scheduleModuleSave', 'renderModuleList', 'renderModule', 'csTitle', 'csSiteText',
     'impEsc', 'xlsxUnescape', 'xlsxCol', 'xlsxZip', 'xlsxEntry', 'xlsxSS', 'xlsxSheet', 'xlsxRows', 'recImportMap', 'recDayGap', 'recMergeTwins', 'recImportPlan', 'recNewRec', 'recImportApply', 'recMergeInto', 'handleRecImportFile', 'showRecImportPreview', 'confirmRecImport'];
@@ -6870,8 +6870,8 @@ try {
     { id: 'k3', client: '새발주처', status: 'run', label: '폐기물', start: '2026-10-10', pipes: [] }, { id: 'k4', client: '새 발주처', status: 'done', label: '폐기물', start: '2026-05-10', pipes: [] },
     { id: 'k5', client: '사아', status: 'run', label: '준설', start: '2026-10-01', pipes: [] }, { id: 'k6', client: '가나건설', status: 'run', label: '지운 계약', del: 1, pipes: [] }, { id: 'k7', client: '', status: 'run', label: '거래처 없음', pipes: [] }];
   const DOCS41 = () => [{ id: 'd1', title: '가나건설 계약서', no: 'JW-04-01-001' }, { id: 'd2', title: '사아공단 협약', no: 'JW-04-01-002' }, { id: 'd3', title: '사아 견적', no: 'JW-04-01-003' }, { id: 'd4', title: '사아 지운 문서', no: 'JW-04-01-004', del: 1 }];
-  const REAL41 = ['esc', 'isDate', 'vehDday', 'fmtAmount', 'recAging', 'liveRec', 'recVisible', 'liveContracts', 'csTitle', 'recSheetMoney', 'recSheetMoneyHtml', 'recSheetBizFmt', 'bindFold', 'sheetRow',
-    'findCli', 'recIsCredit', 'cliLinkReset', 'cliNameKey', 'cliDigits', 'cliBiz13', 'cliBizShown', 'cliBizHay', 'cliResolve', 'cliLinkIdx', 'cliUnpaid', 'cliContracts', 'cliRelatedDocs', 'cliDelMsg', 'cliTwinOf', 'cliIndivSync', 'cliMarkDirty', 'cliReloadIfUnread',
+  const REAL41 = ['esc', 'isDate', 'vehDday', 'fmtAmount', 'recAging', 'liveRec', 'recVisible', 'liveContracts', 'csTitle', 'recSheetMoney', 'recSheetMoneyHtml', 'recSheetBizFmt', 'recSheetBizTxt', 'bindFold', 'sheetRow',
+    'findCli', 'recIsCredit', 'cliLinkReset', 'cliNameKey', 'cliDigits', 'cliBn10', 'cliBiz13', 'cliBizShown', 'cliBizHay', 'cliResolve', 'cliLinkIdx', 'cliUnpaid', 'cliContracts', 'cliRelatedDocs', 'cliDelMsg', 'cliTwinOf', 'cliIndivSync', 'cliMarkDirty', 'cliReloadIfUnread',
     'openCliDetail', 'renderClientsLegacy', 'openCliModal', 'closeCliModal', 'saveCliModal', 'deleteCliFromModal'];
   const VARS41 = ['  var CLI_LINK = ', '  var CLI_BIZ13_MSG = ', '  var CLI_UNREAD_MSG = '].map((h) => line41(html, h));
   const PRE41 = [
@@ -6898,7 +6898,7 @@ try {
     + ' unpaid: cliUnpaid, cons: cliContracts, docs: cliRelatedDocs, idx: cliLinkIdx, reset: cliLinkReset, key: cliNameKey, shown: cliBizShown, sText: cliSheetSearchText, fromGs: cliSheetFromGs, act: cliSheetAct, goCon: cliSheetGoCon,'
     + ' openModal: openCliModal, saveModal: saveCliModal, delModal: deleteCliFromModal, closeModal: closeCliModal, sync: cliIndivSync, detail: openCliDetail, setTerm: function(t){ cliSearchTerm = t; }, setEditing: function(id){ editingCliId = id; },'
     + ' clis: function(){ return clients; }, budget: VS_STAGE_BUDGET, con: function(){ return [conOpenId, conDetTab, conSheet.chip, JSON.stringify(conSheet.f)].join("|"); },'
-    + ' hay: cliBizHay, biz13: cliBiz13, onTab: cliSheetOnTab, setLoaded: function(v){ cliLoaded = !!v; }, dirty: function(){ return JSON.stringify(cliDirty); } };']).join('\n');
+    + ' hay: cliBizHay, biz13: cliBiz13, bn10: cliBn10, resolve: cliResolve, bizKind: cliBizKind, recBizTxt: recSheetBizTxt, onTab: cliSheetOnTab, setLoaded: function(v){ cliLoaded = !!v; }, dirty: function(){ return JSON.stringify(cliDirty); } };']).join('\n');
   // 작은 DOM — 선택자는 태그·#id·.class·[속성]·[속성="값"]을 붙여 쓴 것까지(자손 결합자 없음)
   const match41 = (el, sel) => {
     const re = /(#[\w-]+)|(\.[\w-]+)|(\[[\w-]+(?:="(?:[^"\\]|\\.)*")?\])|([a-zA-Z][\w-]*)/g; let m, at = 0;
@@ -7214,6 +7214,19 @@ try {
     const s69 = [h69.indexOf('9001011234567') < 0, h69.indexOf('<span class="rec-st wait">13자리(숨김)</span>') > 0, h69.indexOf('개인(사업자 없음)') > 0, h69.indexOf('123-45-67890') > 0, css69, !ed69];
     T('v469 폰 거래처 펼침 사업자번호: 13자리 원문 0 · 13자리(숨김) · 개인 표시 · 10자리 그대로 · 보기 권한 [상세 ›] 되살림·[수정] 숨김 그대로', s69.every(Boolean), JSON.stringify(s69));
   }
+  // C270(11/26): ⓑ 잇기 번호 열쇠는 10자리만(cliBn10) — 13자리 거래처 c4와 같은 13자리 공급받는자 번호의 기성 줄은 번호로 붙지 않음(상호가 다르면 대장 밖) · 10자리는 그대로 붙음
+  //   ⓐ 서버가 가린 줄(biz_no 빈 값 + biz13 · client_num 빈 값 + cn13) = 화면 글 '13자리(숨김)'·'개인(번호 숨김)'(빈 값을 '미입력'으로 그리지 않음)
+  {
+    const X70 = mk41({ width: 1366 }); X70.api.render();
+    const api = X70.api, x = api.idx();
+    const r13 = { id: 'q1', client: '아무개', client_num: '9001011234567' }, r10 = { id: 'q2', client: '아무개', client_num: '123-45-67890' };
+    const ln13 = new Function('x', 'r', 'f', 'return f(x, r.client, r.client_num);');
+    const s70 = [typeof api.bn10 === 'function' && api.bn10('900101-1234567') === '' && api.bn10('123-45-67890') === '1234567890' && api.bn10('') === '',
+      api.resolve ? !api.resolve(x, r13.client, r13.client_num) : 'no-resolve', api.resolve ? (api.resolve(x, r10.client, r10.client_num) || {}).id === 'c1' : 'no-resolve',
+      api.bizKind({ biz_no: '', biz13: true }) === 'id13', api.bizKind({ biz_no: '' }) === 'empty', api.recBizTxt ? api.recBizTxt({ client_num: '', cn13: true }) === '개인(번호 숨김)' : 'no-rec'];
+    T('C270 앱: ⓑ 번호 열쇠 10자리만(13자리 공급받는자 번호로 13자리 거래처에 안 붙음 · 10자리는 붙음) · ⓐ 서버가 가린 줄 biz13 = "13자리(숨김)" 갈래 · 표시 칸 없는 빈 값 = 미입력 · cn13 = "개인(번호 숨김)"',
+      s70.every((v) => v === true), JSON.stringify(s70));
+  }
   // v508(C147 ①): 폰 옛 목록 검색 — 거래처 수행이 아닌 계정(직원C 보기·직원E 보기)은 숨긴 13자리 번호(c4 9001011234567)를 숫자로 찾아도 0줄(맞는지 알 수 없음) ·
   //   거래처 수행(관리자A·직원B·직원D — 수정 창에서 원문을 봄)은 그대로 1줄 · 10자리 번호('123-45' 줄표 꼴·'2223344444')는 모두 그대로 찾음 · 상호 글자도 그대로
   {
@@ -7352,7 +7365,7 @@ try {
   //   ② 다른 기기가 같은 거래처('사아')를 먼저 넣고 이 기기가 '(주)사아'를 넣음 = 둘 다 남기고 알림 1 ③ 409 두 번 = '계속 바뀌어' 알림·요청 3번에서 멈춤·고친 표시 남음 ④ 다시 읽기 실패 = '이번 저장이 들어가지 않았습니다' 알림 ·
   //   ⑤ 못 읽은 대장 = 요청 0 ⑥ 보내는 사이 또 고친 거래처는 성공해도 고친 표시가 남음 · 안 고친 성공 = 비움 ⑦ loadClients 200 = 읽음·서버 목록·고친 표시 비움 / 404 = 못 읽음·빈 목록 / 실패 = 그대로
   const flush41 = () => new Promise((r) => setTimeout(r, 0));
-  const RS19 = ['cliNameKey', 'cliDigits', 'cliTwinOf', 'cliMarkDirty', 'loadClients', 'cliReloadIfUnread', 'saveClients', 'cliSaveConflict', 'cliMergeRemote', 'b64DecodeUnicode', 'b64EncodeUnicode'].map((n) => fn41(html, n));
+  const RS19 = ['cliNameKey', 'cliDigits', 'cliBn10', 'cliTwinOf', 'cliMarkDirty', 'loadClients', 'cliReloadIfUnread', 'saveClients', 'cliSaveConflict', 'cliMergeRemote', 'b64DecodeUnicode', 'b64EncodeUnicode'].map((n) => fn41(html, n));
   const mk19 = (local, loaded, q) => {
     const env = { calls: [], sent: [], log: [], q: q.slice(), local, loaded };
     const src = ['var clients = ENV.local, cliSha = null, cliLoaded = ENV.loaded, cliDirty = {}, cliLoading = 0, CLIENT_API = "https://api.github.com/repos/x/contents/data/clients.json";',
@@ -13755,7 +13768,7 @@ try {
     JSON.stringify({ b1, b2: b2.choice, b3: [b3.choice, b3.def_is_rec], b4: [b4.def_is_rec, b4.args] }));
   // ④ 기존 카드 그대로(함수 해시 — 판29 착수 전 v460 387b98e와 같음) + renderPermMgmt 카드 호출 그대로
   const HASH29 = { renderPermMgmt: '9634640c8096104c', renderAssignCard: '0224820afb855ba0', assignSet: 'c4dd84fd50465303', renderNotifyCard: '732f47e42cc4be01', renderDoneifRow: '2b5840e3d2b0ce80', doneifSet: '154d942b3f411d9f', notifySet: '2bef31b5c054b599',
-    renderBriefCard: '593629d27006f18d', briefSet: 'e495abde62818c48', renderAutoRulesCard: '485ac6738f31e203', autoRulesSet: '9d58c46d488f5df1', renderConLearnCard: '41d94b8e8b5223b5' /* P1 판16: 한글 양식 칸 비교(hwpx_tok) 상태 글·안내 한 문장만 바뀜(v460 '3c2765291ce8e16f') */, renderConProcCard: 'ac42b6918802dc2e', conProcBgSet: '68f6350fea39a64a' };
+    renderBriefCard: '593629d27006f18d', briefSet: 'e495abde62818c48', renderAutoRulesCard: '04087b92b4014d47' /* C276(11/26): 카드 글 '매일 08:10' → '평일 08:10'(봇은 평일만) — 종전 485ac6738f31e203 */, autoRulesSet: '9d58c46d488f5df1', renderConLearnCard: '41d94b8e8b5223b5' /* P1 판16: 한글 양식 칸 비교(hwpx_tok) 상태 글·안내 한 문장만 바뀜(v460 '3c2765291ce8e16f') */, renderConProcCard: 'ac42b6918802dc2e', conProcBgSet: '68f6350fea39a64a' };
   // C275(11/24): renderConProcCard·conProcBgSet 해시 갱신 — [배경 승격] 버튼이 본 판 지문(data-conproc-bgsha)을 보내고 막음(bgGuardBlock)이면 disabled · 승격 요청에 bg_sha 만 더함(실행 시험 'C275 근거 표 승격 줄 방어(앱)')
   // C185 판3 검토 반영 3(11/20): autoRulesSet 해시 갱신 — 되돌리기 거절(400 ASSIGN_NEEDED)이면 켜기와 같은 글로 알리는 갈래 하나만 더함(실행 시험 'C185 판3 검토 반영 ③')
   // C275 좁은 확인 반영(11/24): conProcBgSet 해시 갱신 — 409 거절이면 안내 뒤 카드를 다시 불러오는 갈래 하나만 더함
@@ -23952,8 +23965,8 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ['`bidNoQualMethod`', '`g2bFetch`', '원장 C003', 'ext.dneg'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    return /기준: v545 \(2026-11-26\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
-      && d.cl.indexOf('**C003·C135①(v545') > 0 && /SHELL_CACHE = 'jw-shell-v545'/.test(d.sw);
+    return Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 545 && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C003·C135①(v545') > 0 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 545   /* v546(C270)에서 '545 이상'으로 풂 */;
   };
   const muD = (k, f) => chkD(Object.assign({}, D, { [k]: f(D[k]) }));
   const MD2 = [muD('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v541 (')), muD('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v541'")),
@@ -23962,6 +23975,31 @@ try {
   T('v545 문서·판 번호(정확 검사): FEATURES 기준 v545 (2026-11-26)·v545 절(경계 표 포함) · TESTLIST v545 칸 5(화면·운영 확인 3 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v545 · 결함 사본 모두 ✗',
     chkD(D) && MD2.every((v) => v === false), JSON.stringify({ MD2 }));
 } catch (e) { console.log('  (v545 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v546(C270 · C276 — 45-1): 실행 검사는 위 'C270 앱'·servertest 86 C270 · 여기는 화면 글·문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '546 이상'으로 풀 것
+try {
+  const rdZ = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DZ = { ft: rdZ('FEATURES.md'), tl: rdZ('TESTLIST.md'), sw: rdZ('sw.js'), cl: rdZ('CLAUDE.md'), ix: rdZ('index.html') };
+  const chkZ = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v546 (11/26)', '\n### '), tlv = cut(d.tl, '\n## v546 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), op = cb.filter((l) => /^- \[ \] \(운영 확인\)/.test(l));
+    const FT = ['`biz13`', '`cn13`', '`cliBn10`', '`DEV_ONLY`', '평일 08:10', '검토·투찰·낙찰·유찰·패스', 'C276 ④'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v546 \(2026-11-26\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 2 && gate.length === 1 && op.length === 1
+      && d.ix.indexOf('관리자에게 승인을 요청') < 0 && d.ix.indexOf('관리자에게 기기 승인을 요청') < 0 && (d.ix.match(/기기 승인 담당\(시스템 관리 계정\)에게/g) || []).length === 6
+      && d.ix.indexOf('매일 08:10') < 0 && d.ix.indexOf('검토·참여·패스 처리한 항목은 보존됩니다.') < 0 && d.ix.indexOf('검토·투찰·낙찰·유찰·패스 처리한 항목은 보존됩니다.') > 0
+      && d.cl.indexOf('**C270(v546)**') > 0 && /SHELL_CACHE = 'jw-shell-v546'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
+  };
+  const rZ = chkZ(DZ);
+  const muZ = (k, f) => chkZ(Object.assign({}, DZ, { [k]: f(DZ[k]) })).ok;
+  const MZ = [muZ('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v545 (')), muZ('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v545'")), muZ('ft', (s) => s.split('`cliBn10`').join('cliBn10')),
+    muZ('ix', (s) => s.replace('평일 08:10 정기업무 봇이', '매일 08:10 정기업무 봇이')), muZ('ix', (s) => s.replace('검토·투찰·낙찰·유찰·패스 처리한', '검토·참여·패스 처리한')),
+    muZ('ix', (s) => s.replace('기기 승인 담당(시스템 관리 계정)에게', '관리자에게')), muZ('cl', (s) => s.replace('**C270(v546)**', 'C270(v546)'))];
+  T('v546 C270·C276 화면 글·문서·판 번호(정확 검사): 기기 승인 안내 6곳 = 기기 승인 담당(시스템 관리 계정) · 규칙 카드 평일 08:10 · 재수집 창 상태 이름 · FEATURES·TESTLIST·CLAUDE.md·sw · 결함 사본 ' + MZ.length + '개 = 모두 ✗',
+    rZ.ok && MZ.every((v) => v === false), JSON.stringify({ r: rZ.info, mut: MZ }));
+} catch (e) { console.log('  (v546 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

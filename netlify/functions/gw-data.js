@@ -300,6 +300,15 @@ async function handleGet(event, d, R) {
       const s = Object.assign({}, v); delete s.acq_price; delete s.nodoc_amt; return s;
     }) });
   }
+  // C270 ⓐ(11/26): 13자리(주민·법인등록번호 꼴 — _lib/clibiz.js, 앱 cliBiz13과 같은 규칙) 원문은 관리자·수행에게만 — 보기 권한에게는 칸을 빈 값으로 바꾸고 표시 칸만(거래처 biz13 · 기성 cn13).
+  //   앱 화면은 v441·v469·v508부터 '13자리(숨김)'·'개인(번호 숨김)'만 그렸지만 서버는 원문을 그대로 내려 보내 브라우저 안에는 남았다. 보기 권한은 저장이 403(NO_WRITE)이라 빈 값이 서버 원문을 덮을 길은 없다(수행 이상은 원문 그대로).
+  if ((col === 'clients' || col === 'receivables') && !c.member.admin && p !== 'do' && Array.isArray(doc.items)) {
+    const fld = col === 'clients' ? 'biz_no' : 'client_num', flag = col === 'clients' ? 'biz13' : 'cn13';
+    doc = Object.assign({}, doc, { items: doc.items.map(function (x) {
+      if (!x || typeof x !== 'object' || !CLIBIZ.biz13(x[fld])) return x;
+      const s = Object.assign({}, x); s[fld] = ''; s[flag] = true; return s;
+    }) });
+  }
   // v456(원장 C082 ①) 명부 옛 건강진단 값(exam)은 안전 권한에게만 — 그 밖 사람에게는 칸째 뺀다(저장 때 서버 값 이월 — handleSave)
   if (col === 'workers' && !wkExamSee(c.member) && Array.isArray(doc.items)) {
     doc = Object.assign({}, doc, { items: doc.items.map(function (w) {
