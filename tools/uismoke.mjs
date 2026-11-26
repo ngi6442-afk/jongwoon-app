@@ -23885,11 +23885,11 @@ try {
     const FT = ["`state_counts`", "`state_unknown`", "`notifyNewStates`", "`allbaro:state_notified`", "`abStateUnknownHtml`", "`overlap_checked:false`", "원장 C075", "원장 C279"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = "(2026-11 v544) 올바로 인계서의 처리상태에 처음 보는 값(예:";
-    const ok = /기준: v544 \(2026-11-26\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && scr.length === 1 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 544 && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && scr.length === 1 && !cb.some((l) => /\(PM/.test(l))
       && d.man.indexOf(MAN) > 0
       && d.cl.indexOf('**운반일지 처리상태 감시(v544') > 0
       && FIX544.every((x) => d.ix.split(x).length === 2)
-      && /SHELL_CACHE = 'jw-shell-v544'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 544;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX544.map((x) => d.ix.split(x).length - 1) } };
   };
   const r544 = chk544(D544);
@@ -23902,6 +23902,66 @@ try {
   T('v544 문서·판 번호(정확 검사): FEATURES 기준 v544 (2026-11-26)·v544 절(운반일지 처리상태 감시) · TESTLIST v544 칸 3(화면·운영 확인 1 · 게이트 [x] 2) · MANUAL 처리상태 배지 문장(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 2줄 한 번씩 · sw jw-shell-v544 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
     r544.ok && M544.every((v) => v === false), JSON.stringify({ r: r544.info, mut: M544 }));
 } catch (e) { console.log('  (v544 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v545(C003·C135①·C004 — 홈 낙찰 카드 기한 · 지금 수집 오류 꼴 · 적격 지시 경계): 실행 검사 ①② + 문서·판 번호 정확 검사
+try {
+  const rdV = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const IDX = rdV('index.html'), GWD = rdV('netlify/functions/gw-data.js');
+  // ① 홈 카드 기한 — 카드 구간의 실제 글을 떼어 돌린다
+  const cutV = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i); return j < 0 ? '' : s.slice(i, j + b.length); };
+  const cardSrc = cutV(IDX, 'var qk="bid:"+b.id+":qual", qt=null;', 'dd=vehDday(due);');
+  const runCard = (src, b, tasks, today) => {
+    const isDate = (x) => /^\d{4}-\d{2}-\d{2}$/.test(String(x || ''));
+    const addDaysStr = (d, n) => { const t = new Date(d + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
+    const vehDday = (d) => ({ text: 'D-' + Math.round((new Date(d + 'T00:00:00Z') - new Date(today + 'T00:00:00Z')) / 864e5) });
+    return new Function('b', 'tasks', 'today', 'isDate', 'addDaysStr', 'vehDday', src + '\nreturn [due, dd.text];')(b, tasks, today, isDate, addDaysStr, vehDday);
+  };
+  const chkCard = (src) => {
+    if (!src) return false;
+    const tk = [{ auto_key: 'bid:x1:qual', due: '2026-11-20' }, { auto_key: 'bid:zz:qual', due: '2026-01-01' }];
+    const a = runCard(src, { id: 'x1', result: null }, tk, '2026-11-26');                       // 수동 낙찰 · 지시 있음 → 지시 기한
+    const b2 = runCard(src, { id: 'x2', result: { checked: '2026-11-24' } }, tk, '2026-11-26');  // 지시 없음 · 확인일 + 7
+    const c = runCard(src, { id: 'x3' }, [], '2026-11-26');                                      // 지시·확인일 없음 → 오늘 + 7(종전)
+    return a[0] === '2026-11-20' && a[1] === 'D--6' && b2[0] === '2026-12-01' && c[0] === '2026-12-03';
+  };
+  const okCard = chkCard(cardSrc);
+  const MC = [chkCard(cardSrc.replace('(qt&&isDate(qt.due))?qt.due:', '')), chkCard(cardSrc.replace('t.auto_key===qk', 't.auto_key===b.id')), chkCard('')];
+  // ② g2bFetch 오류 꼴 — 서버 구간의 실제 글을 떼어 돌린다
+  const g2bSrc = cutV(GWD, "const r0 = (j && typeof j === 'object' && j.response", 'const body = r0.body || {};');
+  const runG = (src, j) => { try { return { ok: true, body: new Function('j', 'op', src + '\nreturn body;')(j, 'getBidPblancListInfoServc') }; } catch (e) { return { ok: false, msg: String(e.message) }; } };
+  const chkG = (src) => {
+    if (!src) return false;
+    const n0 = runG(src, { response: { header: { resultCode: '00', resultMsg: '정상' }, body: { items: [1], totalCount: 1 } } });
+    const n3 = runG(src, { response: { header: { resultCode: '03', resultMsg: 'NODATA' }, body: {} } });
+    const e7 = runG(src, { 'nkoneps.com.response.ResponseError': { header: { resultCode: '07', resultMsg: '입력범위값 초과 에러' } } });
+    const eh = runG(src, {});
+    const e30 = runG(src, { response: { header: { resultCode: '30', resultMsg: 'SERVICE_KEY' } } });
+    return n0.ok && n0.body.totalCount === 1 && n3.ok && !e7.ok && /G2B API 07 입력범위값/.test(e7.msg) && !eh.ok && !e30.ok;
+  };
+  const okG = chkG(g2bSrc);
+  const MG = [chkG(g2bSrc.replace(/\n\s*if \(code !== '00'[^\n]*/, '')), chkG(g2bSrc.replace("j.response && typeof j.response === 'object') ? j.response", "true) ? (j.response || {})")), chkG('')];
+  T('v545 ① 홈 낙찰 카드 적격심사 기한 = 그 공고 지시(bid:<id>:qual)의 due · 지시 없으면 확인일(없으면 오늘) + 7 · 결함 사본(지시 안 읽음·키 틀림·구간 없음) 모두 ✗',
+    okCard && MC.every((v) => v === false), JSON.stringify({ okCard, MC, len: cardSrc.length }));
+  T('v545 ② 지금 수집 g2bFetch 조달청 오류 꼴 — 00·03 통과 · nkoneps 07·머리 없음·30은 던짐(메시지에 코드) · 결함 사본(검사 줄 없음·response만 읽음·구간 없음) 모두 ✗',
+    okG && MG.every((v) => v === false), JSON.stringify({ okG, MG, len: g2bSrc.length }));
+  // 문서·판 번호 정확 검사
+  const D = { ft: rdV('FEATURES.md'), tl: rdV('TESTLIST.md'), sw: rdV('sw.js'), cl: rdV('CLAUDE.md') };
+  const chkD = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v545 (11/26)', '\n### '), tlv = cut(d.tl, '\n## v545 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ['`bidNoQualMethod`', '`g2bFetch`', '원장 C003', 'ext.dneg'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    return /기준: v545 \(2026-11-26\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C003·C135①(v545') > 0 && /SHELL_CACHE = 'jw-shell-v545'/.test(d.sw);
+  };
+  const muD = (k, f) => chkD(Object.assign({}, D, { [k]: f(D[k]) }));
+  const MD2 = [muD('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v541 (')), muD('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v541'")),
+    muD('ft', (s) => s.split('ext.dneg').join('dneg')), muD('cl', (s) => s.replace('**C003·C135①(v545', 'C003(')),
+    muD('tl', (s) => s.replace('\n- [x] (AI) `uismoke` v545 ①', '\n- (AI) `uismoke` v545 ①'))];
+  T('v545 문서·판 번호(정확 검사): FEATURES 기준 v545 (2026-11-26)·v545 절(경계 표 포함) · TESTLIST v545 칸 5(화면·운영 확인 3 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v545 · 결함 사본 모두 ✗',
+    chkD(D) && MD2.every((v) => v === false), JSON.stringify({ MD2 }));
+} catch (e) { console.log('  (v545 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

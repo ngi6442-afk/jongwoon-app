@@ -12098,8 +12098,12 @@
       var cols=[{t:"수주",sub:"",cards:[]},{t:"계약·서류",sub:"",cards:[]},{t:"시공 중",sub:"",cards:[]},{t:"기성·수금",sub:"",cards:[]}];
       if(isAdmin()){
         awarded.forEach(function(b){
+          // C003(v545): 기한 = 그 공고의 적격심사 지시(auto_key bid:<id>:qual)에 저장된 기한 — 지시가 없을 때만 낙찰 확인일(result.checked) 또는 오늘 + 7일.
+          //   종전엔 그릴 때마다 '오늘 + 7일'을 다시 셈해 수동 낙찰(result.checked 없음)은 늘 D-7로 보였다(지시 기한은 만든 날 + 7일로 고정).
+          var qk="bid:"+b.id+":qual", qt=null;
+          tasks.some(function(t){ if(t&&t.auto_key===qk){ qt=t; return true; } return false; });
           var base=(b.result&&isDate(b.result.checked))?b.result.checked:today;
-          var due=addDaysStr(base,7), dd=vehDday(due);
+          var due=(qt&&isDate(qt.due))?qt.due:addDaysStr(base,7), dd=vehDday(due);
           cols[0].cards.push('<div class="pipe-card win"><b>🏆 '+esc((b.title||"").slice(0,34))+'</b><div class="s">낙찰'+(bidNoQualMethod(b)?' · 계약 시작 대기':' · 적격심사 기한 '+due+' ('+dd.text+')')+'</div>'
             +'<button class="mini-btn appr-btn" data-award-con="'+b.id+'" style="margin-top:4px;">계약 시작</button></div>');
         });

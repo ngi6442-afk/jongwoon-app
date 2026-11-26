@@ -1266,7 +1266,16 @@ async function handleBidsRefresh(event, d, R) {
     const resp = await fetch(G2B_BASE + op + '?' + q.toString());
     if (!resp.ok) throw new Error('G2B HTTP ' + resp.status);
     const j = await resp.json();
-    const body = ((j || {}).response || {}).body || {};
+    // C135①(v545): 조달청 오류는 HTTP 200에 'response'가 아닌 다른 최상위 키로 온다
+    //   (실측 11/13 — {"nkoneps.com.response.ResponseError":{"header":{"resultCode":"07","resultMsg":"입력범위값 초과 에러"}}}).
+    //   종전엔 response.body만 읽어 오류여도 빈 목록으로 지나갔다 — 머리를 어느 키에서든 읽고 정상(00·0)·자료 없음(03)이 아니면 던진다
+    //   (부가 오퍼레이션 BsisAmount는 호출부 .catch가 빈 목록으로 받음 · 본 오퍼레이션은 500 HANDLER_FAILED + err:log에 코드).
+    const r0 = (j && typeof j === 'object' && j.response && typeof j.response === 'object') ? j.response
+      : (Object.values(j && typeof j === 'object' ? j : {}).find(function (v) { return v && typeof v === 'object' && v.header; }) || {});
+    const hdr = r0.header || {};
+    const code = String(hdr.resultCode == null ? '' : hdr.resultCode);
+    if (code !== '00' && code !== '0' && code !== '03') throw new Error('G2B API ' + (code || '?') + ' ' + String(hdr.resultMsg || '') + ' (' + op + ')');
+    const body = r0.body || {};
     let items = body.items || [];
     if (items && items.item) items = items.item;
     if (!Array.isArray(items)) items = items ? [items] : [];

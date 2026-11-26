@@ -14869,7 +14869,7 @@ function J91a(x) { return JSON.stringify(x); }
   // ② 층 2 — gw-data(mock 저장소)
   const BID_ITEM225 = { bidNtceNo: 'T2026NEW01', bidNtceOrd: '000', bidNtceNm: '시험 하수관로 준설 용역', ntceInsttNm: '시험기관', bidClseDt: '2099-11-30 10:00', presmptPrce: '1000000', sucsfbidMthdNm: '적격심사', bidNtceDt: '2026-11-20' };
   const fetch225 = async (url) => { const u = String(url);
-    if (u.indexOf('apis.data.go.kr') >= 0) { const op = (u.split('BidPublicInfoService/')[1] || '').split('?')[0]; const items = op === 'getBidPblancListInfoServc' ? [BID_ITEM225] : []; return { ok: true, status: 200, json: async () => ({ response: { body: { items: items, totalCount: items.length } } }) }; }
+    if (u.indexOf('apis.data.go.kr') >= 0) { const op = (u.split('BidPublicInfoService/')[1] || '').split('?')[0]; const items = op === 'getBidPblancListInfoServc' ? [BID_ITEM225] : []; return { ok: true, status: 200, json: async () => ({ response: { header: { resultCode: '00', resultMsg: '정상' }, body: { items: items, totalCount: items.length } } }) }; }   // v545 C135①: 실제 조달청 정상 응답 꼴(머리 00 — 머리 없는 응답은 g2bFetch가 던짐)
     return { ok: true, status: 200, text: async () => '<html></html>', json: async () => ({}), headers: { get: () => null } }; };
   const chkG = async (G) => {
     const c = clG(G), o = {};
