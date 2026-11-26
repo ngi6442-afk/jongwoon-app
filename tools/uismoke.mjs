@@ -4436,7 +4436,8 @@ try {
   // ②-2 고정(v435 검토 — 위 ②-2는 같은 소스의 두 화면끼리라 siteCard 글이 바뀌면 양쪽이 함께 바뀌어 통과했다): v434(c1cc9b1) renderSites로 뽑아 고정한 카드 3장과 글자째 대조.
   //   표본 PIN35 = 카드 칸을 될 수 있는 대로 모두 지나는 3줄(현장 수행 권한 — 버튼 포함): 석면 작업중 2099(작업신고 마감·참여 근로자 직원+일용직·특별교육 줄·농도·인계번호·키스콘·계약액·발주자 승인 취소(warn)·보존 만료·메모 줄바꿈·이스케이프) /
   //   철거 종결 2024(발주처 —·소재지 미입력·미지정 — 묶음 안) / 준설 상태 칸 없음·날짜 없음((공사명 없음)·기간 미상·? ~ ? — 종결 아님이라 밖). 날짜는 오늘과 무관(2099·2024 — 신고 D-n 칩 없음).
-  //   고정 글 = git show c1cc9b1:index.html의 renderSites를 이 하네스와 같은 대역(명부 홍길동·일용 갑, 교육 기록 0, 안전 권한형)으로 돌린 목록 글(v434는 접힘이 없다). 카드 글을 일부러 바꿀 때만 이 고정 글을 함께 고친다  const PIN35 = [
+  //   고정 글 = git show c1cc9b1:index.html의 renderSites를 이 하네스와 같은 대역(명부 홍길동·일용 갑, 교육 기록 0, 안전 권한형)으로 돌린 목록 글(v434는 접힘이 없다). 카드 글을 일부러 바꿀 때만 이 고정 글을 함께 고친다
+  const PIN35 = [
     { id: 'pA', seq: 7, title: '현장 고정 석면 <b>', kind: 'asbestos', client: '포항시 & 교육청', site: '포항시 남구', start: '2099-05-01', end: '2099-06-30', material: '천장텍스', area: '120.5', status: 'run', conc: '0.002', waste_no: 'W-1', note: '첫 줄\n둘째 줄', member_ids: ['u1'], worker_ids: ['w1'], ks: { no: 'K-9', year: 2099, biz: '석면해체', amount: 12345678, done_amount: 2000000, approve: '승인 취소' } },
     { id: 'pB', title: '현장 고정 철거', kind: 'demolition', client: '', site: '', start: '2024-03-02', end: '2024-03-09', status: 'done', member_ids: [], worker_ids: [] },
     { id: 'pC', title: '', kind: 'dredge', site: '현장 준설 구역', start: '', end: '', member_ids: [], worker_ids: [] },
@@ -9883,7 +9884,8 @@ try {
   //   v456 검토: 400 ORPHAN_WORKER 첫 번은 명부 저장을 끝낸 뒤 한 번만 다시 보냄(asbOrphTry)·알림 글에서 새로고침 안내 뺌 → 다시 고정(be7d2128… → 7495f882… — 고친 동작은 v456 묶음 ⑥이 실행으로 지킴)
   //   v456 2차 검토: 두 번째 400 ORPHAN_WORKER에서 서버가 돌려준 고아 id만 대장에서 빼고 한 번 더 저장(asbOrphDrop) → 다시 고정(7495f882… → 930e3cae… — 고친 동작은 v456 묶음 ⑧이 실행으로 지킴)
   //   P1 판24h(C206): doSaveAsb는 500·끊김 실패 알림을 더한 본문으로 다시 고정(c222ce0b… → 95db3507… — 고친 동작은 'P1 판24h'가 실행으로 지킴)
-  //   P1 판24j(C209 2판): loadAsb·doSaveAsb는 받은 사본(읽기·409 다시 읽기·저장 200)을 더한 본문으로 다시 고정(82117c35… → b6701fc2… · 95db3507… → 399dc53f…(검토 반영: 저장 200 뒤 저장 타이머가 있으면 대기 남김 한 줄 — 200/실패 갈래 다음 줄) — 고친 동작은 'P1 판24j'가 실행으로 지킴, v433·v337 글 검사는 그대로 통과)  const hBad12 = Object.keys(HASH45).filter((n) => sha45(body45(n)) !== HASH45[n]);
+  //   P1 판24j(C209 2판): loadAsb·doSaveAsb는 받은 사본(읽기·409 다시 읽기·저장 200)을 더한 본문으로 다시 고정(82117c35… → b6701fc2… · 95db3507… → 399dc53f…(검토 반영: 저장 200 뒤 저장 타이머가 있으면 대기 남김 한 줄 — 200/실패 갈래 다음 줄) — 고친 동작은 'P1 판24j'가 실행으로 지킴, v433·v337 글 검사는 그대로 통과)
+  const hBad12 = Object.keys(HASH45).filter((n) => sha45(body45(n)) !== HASH45[n]);
   const m12 = miss45.length, X12 = mk45({ width: 375 }); X12.api.render();
   const l12a = [X12.host.getAttribute('data-vs-mode'), (X12.host._h.match(/class="item asb-item"/g) || []).length, X12.host._h.indexOf('data-vs-row') < 0, X12.env.host('siteFilterBar').style.display, X12.api.cur(), X12.env.host('siteHead').textContent].join('|');
   X12.env.width = 1366; X12.env.breakAll(); const l12b = [X12.host.getAttribute('data-vs-mode'), order45(X12.host._h), X12.env.host('siteFilterBar').style.display, X12.api.cur()].join('|');
@@ -24127,7 +24129,7 @@ try {
     oa.split('asbKsFill(r);').length === 2 && oa.indexOf('asbKsFill(r);') > oa.indexOf('"asbNote"') && sa.split('asbKsApply(r);').length === 2 && sa.indexOf('asbKsApply(r);') > sa.indexOf('r.note=') && sa.indexOf('asbKsApply(r);') < sa.indexOf('scheduleAsbSave();')
     && html.split('sheetRow("통합실적관리시스템", \'<span').length === 2 && html.split('out.push(["통합실적관리시스템", \'<span').length === 2 && html.indexOf('키스콘 신고') < 0);
   // ⑧ 문서·판 번호(이 판 이상 — 다음 판이 올라가도 깨지지 않게, 결함 사본은 ✗)
-  const VT = Number('5XX');
+  const VT = Number('554');
   const rdT = (f) => readFileSync(join(ROOT, f), 'utf8').replace(/\r\n/g, '\n');
   const DT = { ft: rdT('FEATURES.md'), tl: rdT('TESTLIST.md'), sw: rdT('sw.js'), cl: rdT('CLAUDE.md') };
   const chkT = (d) => {
@@ -24344,9 +24346,9 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[x\] \(AI 시험 화면 대상\)/.test(l)), op = cb.filter((l) => /^- \[ \] \(운영 확인\)/.test(l));
     const FT = ['`isSafetyItem`', '`SAFETY_WORDS`', '`NOT_SAFETY`', '`nosafe`', '`stmt_drop_get`', '`nameMin`', 'C286', '안전공구만 넣기'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v553 \(2026-11-26\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 1 && op.length === 1
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 553 && ftv.length > 0   /* v554(T216·T302)에서 '553 이상'으로 풂 */ && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 1 && op.length === 1
       && d.man.indexOf('안전공구(작업복·핫팩·구급함·장갑·안전화 등)만 넣고 생수·음료·물티슈·간식·사무용품은 넣지 않습니다(v553)') > 0
-      && d.cl.indexOf('**월말명세서 판⑫(v553)**') > 0 && /SHELL_CACHE = 'jw-shell-v553'/.test(d.sw);
+      && d.cl.indexOf('**월말명세서 판⑫(v553)**') > 0 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 553;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, op: op.length } };
   };
   const rT = chkT(DT);
