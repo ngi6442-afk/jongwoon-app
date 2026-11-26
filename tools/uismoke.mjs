@@ -14734,7 +14734,7 @@ try {
   const chk70 = (d) => {
     const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
     const ftv = cut(d.ft, '\n### v470 (11/14)', '\n### '), tlv = cut(d.tl, '\n## v470 ', '\n## ');
-    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[ \] \(AI 시험 화면 대상/.test(l));
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상/.test(l));   // 11/26: 화면 칸을 시험 화면에서 확인해 [x]로 닫음(원장 C153 ②) — 칸이 있는지만 봄
     const FT = ['`blog_urls`', '`promoParseUrls`', '`promoSetUrls`', '`promoUrlsBtn`', 'promo_learn_ingest.py', '`blog_set_ingest`', 'superseded', '12000'];
     const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
@@ -23805,9 +23805,9 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ['`gw-ask-meter.js`', '원장 T090', '`meter:cost`'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = left.length === 0 && /기준: v542 \(2026-11-26\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
+    const ok = left.length === 0 && Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 542 && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
       && d.cl.indexOf('**T090(v542') > 0
-      && /SHELL_CACHE = 'jw-shell-v542'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 542;
     return { ok, info: { left, mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r542 = chk542(D542);
@@ -23821,6 +23821,31 @@ try {
   T('v542 T090 계측기 걷어 냄: index.html·MANUAL에 계측기 흔적 0(단추·결과 칸·meterRun/Poll/Fmt·METER_Q·gw-ask-meter·안내 글) · FEATURES 기준 v542 (2026-11-26)·v542 절 · TESTLIST v542 칸 4(화면·운영 확인 2 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v542 · 결함 사본(단추·호출·안내 글 되살림·기준 줄·sw·CLAUDE.md·FEATURES 낱말) 모두 ✗',
     r542.ok && M542.every((v) => v === false), JSON.stringify({ r: r542.info, mut: M542 }));
 } catch (e) { console.log('  (v542 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v543(C253 — 받을 기기 없는 알림 가시화 · 원장 C253): 실행 검사는 servertest C253 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd543 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D543 = { ft: rd543('FEATURES.md'), tl: rd543('TESTLIST.md'), sw: rd543('sw.js'), man: rd543('MANUAL.html'), cl: rd543('CLAUDE.md') };
+  const chk543 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v543 (11/26)', '\n### '), tlv = cut(d.tl, '\n## v543 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`push_miss`", "원장 C253"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v543 \(2026-11-26\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 2 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C253(v543') > 0
+      && /SHELL_CACHE = 'jw-shell-v543'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r543 = chk543(D543);
+  const mu543 = (k, f) => chk543(Object.assign({}, D543, { [k]: f(D543[k]) })).ok;
+  const M543 = [mu543('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v542 (')), mu543('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v542'")),
+    mu543('ft', (s) => s.split('`push_miss`').join('push_miss')),
+    mu543('cl', (s) => s.replace('**C253(v543', 'C253(')),
+    mu543('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 배포 전 전체 게이트 기록 C253_게이트_1126.txt', '\n- (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 배포 전 전체 게이트 기록 C253_게이트_1126.txt'))];
+  T('v543 문서·판 번호(정확 검사): FEATURES 기준 v543 (2026-11-26)·v543 절(C253) · TESTLIST v543 칸 6(화면·운영 확인 4 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v543 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
+    r543.ok && M543.every((v) => v === false), JSON.stringify({ r: r543.info, mut: M543 }));
+} catch (e) { console.log('  (v543 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
