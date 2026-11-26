@@ -24272,7 +24272,7 @@ try {
     oa.split('asbKsFill(r);').length === 2 && oa.indexOf('asbKsFill(r);') > oa.indexOf('"asbNote"') && sa.split('asbKsApply(r);').length === 2 && sa.indexOf('asbKsApply(r);') > sa.indexOf('r.note=') && sa.indexOf('asbKsApply(r);') < sa.indexOf('scheduleAsbSave();')
     && html.split('sheetRow("통합실적관리시스템", \'<span').length === 2 && html.split('out.push(["통합실적관리시스템", \'<span').length === 2 && html.indexOf('키스콘 신고') < 0);
   // ⑧ 문서·판 번호(이 판 이상 — 다음 판이 올라가도 깨지지 않게, 결함 사본은 ✗)
-  const VT = Number('554');
+  const VT = Number('554');   // v555(C242)에서 확인: 처음부터 '이 판 이상'이라 풀 것 없음
   const rdT = (f) => readFileSync(join(ROOT, f), 'utf8').replace(/\r\n/g, '\n');
   const DT = { ft: rdT('FEATURES.md'), tl: rdT('TESTLIST.md'), sw: rdT('sw.js'), cl: rdT('CLAUDE.md') };
   const chkT = (d) => {
@@ -24502,6 +24502,31 @@ try {
   T('v553 문서·판 번호(정확 검사): FEATURES 기준 v553 (2026-11-26)·v553 절(29 판⑫) · TESTLIST v553 칸 4(운영 확인 1 · 시험 화면 [x] 1 · 게이트 [x] 2) · MANUAL 쿠팡 줄 안전공구 문장 · CLAUDE.md 한 줄 · sw jw-shell-v553 · 결함 사본(기준 줄·sw·FEATURES 글·MANUAL 판 표시·CLAUDE 줄·TESTLIST 칸) ✗',
     rT.ok && MT.every((v) => v === false), JSON.stringify({ r: rT.info, mut: MT }));
 } catch (e) { console.log('  (v553 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v555(C242 판 A — 저장 실패 다시 보내기 · 원장 C242): 실행 검사는 위 C242 블록 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd555 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D555 = { ft: rd555('FEATURES.md'), tl: rd555('TESTLIST.md'), sw: rd555('sw.js'), man: rd555('MANUAL.html'), cl: rd555('CLAUDE.md') };
+  const chk555 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v555 (11/26)', '\n### '), tlv = cut(d.tl, '\n## v555 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`rsOk`", "원장 C242"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v555 \(2026-11-26\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 14 && gate.length === 2 && scr.length === 12 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C242(v555') > 0
+      && /SHELL_CACHE = 'jw-shell-v555'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r555 = chk555(D555);
+  const mu555 = (k, f) => chk555(Object.assign({}, D555, { [k]: f(D555[k]) })).ok;
+  const M555 = [mu555('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v554 (')), mu555('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v554'")),
+    mu555('ft', (s) => s.split('`rsOk`').join('rsOk')),
+    mu555('cl', (s) => s.replace('**C242(v555', 'C242(')),
+    mu555('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 배포 전 전체 게이트 기록 C242_게이트_배포전_1126.txt', '\n- (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 배포 전 전체 게이트 기록 C242_게이트_배포전_1126.txt'))];
+  T('v555 문서·판 번호(정확 검사): FEATURES 기준 v555 (2026-11-26)·v555 절(C242) · TESTLIST v555 칸 14(화면·운영 확인 12 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v555 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
+    r555.ok && M555.every((v) => v === false), JSON.stringify({ r: r555.info, mut: M555 }));
+} catch (e) { console.log('  (v555 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
