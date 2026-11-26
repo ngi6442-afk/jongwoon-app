@@ -23778,9 +23778,9 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ["`bgGuardBlock`", "원장 C275"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v541 \(2026-11-24\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 2 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 541 && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 2 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
       && d.cl.indexOf('**C275(v541') > 0
-      && /SHELL_CACHE = 'jw-shell-v541'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 541;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r541 = chk541(D541);
@@ -23792,6 +23792,35 @@ try {
   T('v541 문서·판 번호(정확 검사): FEATURES 기준 v541 (2026-11-24)·v541 절(C275) · TESTLIST v541 칸 6(화면·운영 확인 4 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v541 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
     r541.ok && M541.every((v) => v === false), JSON.stringify({ r: r541.info, mut: M541 }));
 } catch (e) { console.log('  (v541 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v542(T090 — 물어보기 임시 비용 계측기 걷어 냄 · 원장 T090): 화면·문서에 계측기 흔적 없음 + 문서·판 번호 정확 검사(서버 쪽은 servertest T090)
+try {
+  const rd542 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D542 = { ix: rd542('index.html'), ft: rd542('FEATURES.md'), tl: rd542('TESTLIST.md'), sw: rd542('sw.js'), man: rd542('MANUAL.html'), cl: rd542('CLAUDE.md') };
+  const GONE542 = ['meterRunBtn', 'meterOut', 'meterPoll', 'meterRun', 'meterFmt', 'METER_Q', 'gw-ask-meter', '질문창 비용 실측', '30문항 실측'];
+  const chk542 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const left = GONE542.filter((x) => d.ix.indexOf(x) >= 0).concat(['질문창 비용 실측', '30문항 실측'].filter((x) => d.man.indexOf(x) >= 0).map((x) => 'MANUAL:' + x));
+    const ftv = cut(d.ft, '\n### v542 (11/26)', '\n### '), tlv = cut(d.tl, '\n## v542 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ['`gw-ask-meter.js`', '원장 T090', '`meter:cost`'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = left.length === 0 && /기준: v542 \(2026-11-26\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**T090(v542') > 0
+      && /SHELL_CACHE = 'jw-shell-v542'/.test(d.sw);
+    return { ok, info: { left, mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r542 = chk542(D542);
+  const mu542 = (k, f) => chk542(Object.assign({}, D542, { [k]: f(D542[k]) })).ok;
+  const M542 = [mu542('ix', (s) => s.replace('<section class="view" id="view-progress">', '<section class="view" id="view-progress"><button id="meterRunBtn"></button>')),
+    mu542('ix', (s) => s + '\n<script>gwCall("gw-ask-meter-background",{})</script>'),
+    mu542('man', (s) => s.replace('</ul>', '<li>질문창 비용 실측</li></ul>')),
+    mu542('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v541 (')), mu542('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v541'")),
+    mu542('cl', (s) => s.replace('**T090(v542', 'T090(')),
+    mu542('ft', (s) => s.split('`meter:cost`').join('meter:cost'))];
+  T('v542 T090 계측기 걷어 냄: index.html·MANUAL에 계측기 흔적 0(단추·결과 칸·meterRun/Poll/Fmt·METER_Q·gw-ask-meter·안내 글) · FEATURES 기준 v542 (2026-11-26)·v542 절 · TESTLIST v542 칸 4(화면·운영 확인 2 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v542 · 결함 사본(단추·호출·안내 글 되살림·기준 줄·sw·CLAUDE.md·FEATURES 낱말) 모두 ✗',
+    r542.ok && M542.every((v) => v === false), JSON.stringify({ r: r542.info, mut: M542 }));
+} catch (e) { console.log('  (v542 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

@@ -17000,4 +17000,20 @@ function J91a(x) { return JSON.stringify(x); }
   finally { reset75(); }
 }
 
+// T090(v542) 물어보기 임시 비용 계측기 걷어 냄 — 옛 앱 호환 한 줄: action 'meter'는 누구에게나 '측정 끝'만(인증·저장소 읽기·쓰기 없음, 자료 없음)
+{
+  const fs90 = require('fs');
+  const before90 = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  const m90 = [await call({ action: 'meter' }, null), await call({ action: 'meter' }, tokW), await call({ action: 'meter' }, tokA, 'dev1')];
+  T('T090 ① action meter = 로그인 전·직원·관리자 모두 200 · run.state done · rows 빈 배열(옛 앱 6초 되풀이가 한 번에 멈춤) · 저장소 그대로',
+    m90.every((x) => x.code === 200 && x.body.doc && x.body.doc.run && x.body.doc.run.state === 'done' && Array.isArray(x.body.doc.rows) && x.body.doc.rows.length === 0)
+      && JSON.stringify({ u: mem.gw_users, d: mem.gw_data }) === before90,
+    JSON.stringify(m90.map((x) => [x.code, x.body.doc && x.body.doc.run])).slice(0, 200));
+  const A90 = require(join(FN, '_lib/ask.js'));
+  const gone90 = ['gw-ask-meter.js', 'gw-ask-meter-background.js'].every((f) => !fs90.existsSync(join(FN, f)));
+  const src90 = fs90.readFileSync(join(FN, 'gw-data.js'), 'utf8');
+  T('T090 ② 계측기 함수 파일 2개 없음 · _lib/ask.js 내보내기에 METER_Q·saveRow 없음 · gw-data가 meter:cost 키를 읽지 않음',
+    gone90 && !('METER_Q' in A90) && !('saveRow' in A90) && src90.indexOf("'meter:cost'") < 0);
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

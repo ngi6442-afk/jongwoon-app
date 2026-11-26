@@ -1891,3 +1891,9 @@
 - [ ] (AI 운영 확인 — C275) 차량 새 판 veh-v1-20261119 를 올린 뒤 콘솔 차량 줄에 막음 글 없이 [ㄱ]이 열려 있음
 - [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 배포 전 전체 게이트 기록 C275_게이트_v541_1124.txt
 - [x] (AI) `servertest` C275 셋(인사·차량·계약 승격 — 지문 대조 409 BG_CHANGED · 꼭 읽는 값 409 BG_INCOMPLETE · base 400 NEED_BASE · 꼴 409 BG_MISSING · 해제는 그대로 200 · 결함 사본 22) · `uismoke` C275(콘솔 인자 bg_sha · 계약 카드 지문 · 결함 사본 10)
+
+## v542 — T090 — 물어보기 임시 비용 계측기 걷어 냄
+- [ ] (AI 시험 화면 대상 — T090) 진척도 탭(관리자): 진척도 문서만 보이고 '질문창 비용 실측' 제목·설명·단추·결과 칸이 없음 · 앱을 연 뒤 gw-data {action:'meter'} 호출이 나가지 않음 · 콘솔 오류 없음
+- [ ] (AI 운영 확인 — T090) 배포 뒤 운영 index.html에 meterRunBtn·gw-ask-meter 없음 · 운영 gw-data {action:'meter'} = 로그인 전에도 200 run.state 'done'(옛 앱 되풀이 멈춤) · gw-ask-meter 함수 404
+- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 배포 전 전체 게이트 기록 T090_게이트_v542_1126.txt
+- [x] (AI) `servertest` T090 ①(action meter 로그인 전·직원·관리자 200 done·자료 없음·저장소 그대로) ②(함수 파일 2개 없음·ask.js 내보내기에 METER_Q·saveRow 없음) · `uismoke` v542(화면·안내 흔적 0 · 결함 사본 7)

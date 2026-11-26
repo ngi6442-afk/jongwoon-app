@@ -6745,14 +6745,9 @@ async function handlerInner(event) {
   // C240 판 A-1: 가르는 칸은 글자만 — collection 배열(["bids"]·["leaves"])이 COL 열쇠 검사는 통과하고 뒤의 col === '…' 가드를 전부 건너뛰던 길(검토 ㉠) · 같은 꼴 전수 표의 칸 함께
   { const bf = REQSHAPE.badField(d, GWD_STR_FIELDS); if (bf) return jr(400, { status: 'REJECTED', error_code: bf === 'collection' ? 'UNKNOWN_COLLECTION' : 'BAD_FIELD', field: bf, request_id: R }); }
   try {
-    // 비용 실측 결과 조회(임시, 2026-09-10) — 관리자 전용. 계측기를 지울 때 이 분기도 함께 지운다.
-    if (d && d.action === 'meter') {
-      const cm = await currentMember(event);
-      if (!cm.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: cm.reason, request_id: R });
-      if (!cm.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
-      const mr = await blobGet(store(DATA), 'meter:cost');
-      return jr(200, { status: 'OK', doc: (mr.ok && mr.data) ? mr.data : { schema: 1, rows: [] }, request_id: R });
-    }
+    // T090(v542) 옛 앱 호환 — 비용 계측기는 지웠다. 새 판을 받기 전에 열려 있던 옛 앱은 시작할 때 이 action을 부르고, 답에 run.state 'done'이 없으면 6초마다 끝없이 다시 부른다
+    //   (관리자가 아니면 403이라 v346부터 열린 앱마다 그랬다). 인증·저장소 읽기 없이 '측정 끝'만 돌려 옛 앱의 되풀이를 멈춘다 — 돌려주는 자료 없음. 옛 앱이 다 바뀐 뒤 이 줄을 지운다.
+    if (d && d.action === 'meter') return jr(200, { status: 'OK', doc: { schema: 1, rows: [], run: { state: 'done' } }, request_id: R });
     if (d && d.action === 'get') return await handleGet(event, d, R);
     if (d && d.action === 'site_edu_gap') return await handleSiteEduGap(event, d, R);   // v433 현장 대장 특별교육 미이수(이름만 — 안전 권한 없는 현장 권한자용)
     if (d && d.action === 'save') return await handleSave(event, d, R);
