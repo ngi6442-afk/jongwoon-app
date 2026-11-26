@@ -1603,7 +1603,7 @@ try {
   T('v383 CON_PACKETS 4(계약·착공·준공·청구) · gen 키는 TPL_LABELS 또는 가상 키(con_docs·quote·html_contract) · tpl_list 캐시(csLoadTpl) · 서류 탭에 csPacketsHtml + 첨부함 · [생성] 배선(html_contract → 계약서 툴, 그 외 openXlsxGen)',
     pks.join(',') === 'con,start,complete,bill'
     && [...sc.matchAll(/t:"gen", k:"(\w+)"/g)].map((m) => m[1]).every((k) => ['con_docs', 'quote', 'html_contract', 'safety_pack'].includes(k) || new RegExp('\\b' + k + ':"').test(html.slice(html.indexOf('var TPL_LABELS='), html.indexOf('var TPL_LABELS=') + 900)))
-    && /gwCall\("gw-data", \{ action:"tpl_list" \}\)/.test(sc) && /h \+= csStagesHtml\(c\); h \+= cbxEtcHtml\(c\) \+ csMoreHtml\(c\) \+ conAttBoxHtml\(c\) \+ cdocTrashHtml\(c\);/.test(html) && /ev = csPkEval\(c, pk, it0, X\)/.test(html) && /querySelectorAll\("\[data-cs-gen\]"\)/.test(html) && /openDocFromContract\(p\[0\]\); else openXlsxGen\(p\[0\], csGenKind/.test(html)   // v427 패킷 항목은 단계·서류 줄로(같은 판정 csPkEval)
+    && /gwCall\("gw-data", \{ action:"tpl_list" \}\)/.test(sc) && /h \+= csStagesHtml\(c\); h \+= cbxEtcHtml\(c\) \+ csMoreHtml\(c\) \+ csRefTplHtml\(c\) \+ conAttBoxHtml\(c\) \+ cdocTrashHtml\(c\);/.test(html) && /ev = csPkEval\(c, pk, it0, X\)/.test(html) && /querySelectorAll\("\[data-cs-gen\]"\)/.test(html) && /openDocFromContract\(p\[0\]\); else openXlsxGen\(p\[0\], csGenKind/.test(html)   // v427 패킷 항목은 단계·서류 줄로(같은 판정 csPkEval)
     && /\.cs-pk \.st\.gap\{/.test(html), pks.join(','));
   T('v383 검토 반영: tpl_list 실패는 캐시 null 유지 + csTplErr 쿨다운(30초) · 비200 불신 · then 2인자 · tpl_put 성공·관리 목록 수신 → csTplInvalidate/csTplSet · 모달 닫기 재그리기 · 첨부 claim 1회 + ex 제외 · 정규식 좁힘(사업자 제외 등록증·세금계산서·4대보험)',
     /if \(csTplErr && Date\.now\(\) - csTplErr < 30000\) return;/.test(sc) && /if \(!\(res && res\.status === 200 && res\.body && res\.body\.templates\)\)\{ csTplErr = Date\.now\(\);/.test(sc) && /\}, function\(\)\{ csTplLoading = false; csTplErr = Date\.now\(\); renderContracts\(\); \}\);/.test(sc)
@@ -2197,7 +2197,7 @@ try {
   const sc22 = html.slice(html.indexOf('// @con-scen-start'), html.indexOf('// @con-scen-end'));
   T('v422 패킷: ✗ 4항목은 t:"gap"을 유지하고 gen(준설 한정)을 곁들임(옛 판은 ✗ 그대로) · 줄 그릴 때 gen 우선', ['safety_plan', 'safety_pack', 'safety_cost', 'labor_split'].every((k) => new RegExp('t:"gap"[^\\n]*gen:\\{ t:"gen", k:"' + k + '"[^\\n]*when:"dredge" \\}').test(sc22)) && sc22.indexOf('var it = (it0.gen && csPkWhen(c, it0.gen.when)) ? it0.gen : it0;') > 0);
   const swv22 = readFileSync(join(ROOT, 'sw.js'), 'utf8');
-  T('v422 tpl_list 동시 읽기(키 21개) · 응답 키 순서는 TPL_KEYS 그대로 · sw ≥422', /await Promise\.all\(Object\.keys\(TPL_KEYS\)\.map\(async \(key\) =>/.test(gwd) && /for \(const key of Object\.keys\(TPL_KEYS\)\) templates\[key\] = out\[key\];/.test(gwd) && Number((swv22.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 422);
+  T('v422 tpl_list 동시 읽기(키 22개 — T216부터 관리자 전용 키는 비관리자 목록에서 뺌) · 응답 키 순서는 TPL_KEYS 그대로 · sw ≥422', /const keys = Object\.keys\(TPL_KEYS\)\.filter\(\(key\) => c\.member\.admin \|\| !hasOwn\(TPL_ADMIN, key\)\);/.test(gwd) && /await Promise\.all\(keys\.map\(async \(key\) =>/.test(gwd) && /for \(const key of keys\) \{ templates\[key\] = out\[key\]; labels\[key\] = TPL_KEYS\[key\]; \}/.test(gwd) && Number((swv22.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 422);
 } catch (e) { console.log('  (v422 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- (11/2) Blob 컨텍스트 전수: netlify/functions/*.js 중 store(·blobGet(·blobSet(·blobList(를 쓰는 함수는 setupBlobContext( 호출 필수 — gw-lawwatch가 빠져 첫 실제 경보가 502(11/2)
@@ -2224,7 +2224,7 @@ try {
 try {
   const srv24 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-data.js'), 'utf8'), ask24 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'ask.js'), 'utf8'), ds24 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'docscope.js'), 'utf8'), dd24 = readFileSync(join(ROOT, 'netlify', 'functions', '_lib', 'docdiff.js'), 'utf8'), pb24 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-parse-background.js'), 'utf8'), lw24 = readFileSync(join(ROOT, 'netlify', 'functions', 'gw-learn-background.js'), 'utf8'), sw24 = readFileSync(join(ROOT, 'sw.js'), 'utf8');
   T('v424 물어보기: 문서 도구가 docVisible을 거침 · 판정 한 곳(_lib/docscope.js, gw-data는 가져다 씀) · sw ≥ 424', /DS\.docVisible\(member, d, ds\)/.test(ask24) && /function docVisible\(m, it, settings\)/.test(ds24) && !/function docVisible\(/.test(srv24) && /require\('\.\/_lib\/docscope'\)/.test(srv24) && Number((sw24.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 424);
-  const dl24 = [...html.matchAll(/downloadBlob\(([^\n]{0,60})/g)].map((m) => m[1]).filter((x) => !/^"(?:차량목록|전체백업|실적목록|세무|연구노트_|급여대장_)/.test(x) && !/^r2\.body\.file/.test(x) && !/^res\.body\.name/.test(x) && !/^name, /.test(x) && !/^name\+"_안전 패킷/.test(x) && !/^name, blob\)\{/.test(x));
+  const dl24 = [...html.matchAll(/downloadBlob\(([^\n]{0,60})/g)].map((m) => m[1]).filter((x) => !/^"(?:차량목록|전체백업|실적목록|세무|연구노트_|급여대장_)/.test(x) && !/^r2\.body\.file/.test(x) && !/^res\.body\.name/.test(x) && !/^name, /.test(x) && !/^name\+"_안전 패킷/.test(x) && !/^name, blob\)\{/.test(x) && !/^nm, new Blob\(\[dataUrlToBytes\("x," \+ res\.body\.data\)\]/.test(x));   // T216 csRefTplGet = 등록된 빈 양식 원본 받기(생성본 아님 — 채움·초안 없음)
   T('v424 생성 경로: 양식으로 만든 파일은 전부 xgOut을 거침(직접 내려받기 없음) · 생성 12경로', dl24.length === 0 && (html.match(/xgOut\(|xgHwpxGen\(c, /g) || []).length >= 13 && /function xgHwpxGen\([^)]*\)\{[\s\S]{0,300}?return xgOut\(c, kind, name, blob,/.test(html) && ['"qual_packet"', '"contract_pledge"', '"seal_reg"', '"bond_waiver"', '"labor_exempt"', '"settle_doc"', '"adv_pay"', '"bid_rate"', 'qtKey'].every((k) => html.indexOf('xgOut(c, ' + k) > 0 || html.indexOf('xgHwpxGen(c, ' + k) > 0), JSON.stringify(dl24));   // P1 판16: 한글 양식은 xgHwpxGen(학습 칸 → xgOut) 한 곳을 거침
   T('v426 착공계 주민번호: 창 문구에 "양식 기본값" 없음 · 비우면 확인요망 · 서버가 주민번호 꼴 양식을 거부 · 앱이 쉬운 말로 알림 · 백업 흔적 통로', html.indexOf('양식 기본값 유지') < 0 && html.indexOf('현장대리인 주민등록번호(양식에 넣어 두지 않습니다') > 0 && /BJ\.rrnScan\(Buffer\.from\(b64, 'base64'\)\)/.test(gwd) && html.indexOf('tplCode === "TPL_HAS_RRN"') > 0 && /action === 'backup_stamp'/.test(gwd));
   T('v425 최종본 연결: 넣기가 초안 없으면 xgDraftMake 먼저(내려받기·값 저장·확인창 없음) · 창과 같은 토큰 함수 · 파일이 들어오면 단계 체크 · 사람이 쓰는 창은 안 건드림', /prep = xgDraftMake\(c, tpl\)/.test(html) && /o = \{ noDownload: true, noBack: true, wait: true, late: true \}/.test(html) && /var cdT=xgConTok\(c\)/.test(html) && /var qtT=xgQuoteTok\(\)/.test(html) && /var adT=xgAdvTok\(\)/.test(html) && /dd\.st = "done"; dd\.auto = 1/.test(html) && /back\.classList\.contains\("show"\)\) \|\| xgLateOn/.test(html));
@@ -4436,8 +4436,7 @@ try {
   // ②-2 고정(v435 검토 — 위 ②-2는 같은 소스의 두 화면끼리라 siteCard 글이 바뀌면 양쪽이 함께 바뀌어 통과했다): v434(c1cc9b1) renderSites로 뽑아 고정한 카드 3장과 글자째 대조.
   //   표본 PIN35 = 카드 칸을 될 수 있는 대로 모두 지나는 3줄(현장 수행 권한 — 버튼 포함): 석면 작업중 2099(작업신고 마감·참여 근로자 직원+일용직·특별교육 줄·농도·인계번호·키스콘·계약액·발주자 승인 취소(warn)·보존 만료·메모 줄바꿈·이스케이프) /
   //   철거 종결 2024(발주처 —·소재지 미입력·미지정 — 묶음 안) / 준설 상태 칸 없음·날짜 없음((공사명 없음)·기간 미상·? ~ ? — 종결 아님이라 밖). 날짜는 오늘과 무관(2099·2024 — 신고 D-n 칩 없음).
-  //   고정 글 = git show c1cc9b1:index.html의 renderSites를 이 하네스와 같은 대역(명부 홍길동·일용 갑, 교육 기록 0, 안전 권한형)으로 돌린 목록 글(v434는 접힘이 없다). 카드 글을 일부러 바꿀 때만 이 고정 글을 함께 고친다
-  const PIN35 = [
+  //   고정 글 = git show c1cc9b1:index.html의 renderSites를 이 하네스와 같은 대역(명부 홍길동·일용 갑, 교육 기록 0, 안전 권한형)으로 돌린 목록 글(v434는 접힘이 없다). 카드 글을 일부러 바꿀 때만 이 고정 글을 함께 고친다  const PIN35 = [
     { id: 'pA', seq: 7, title: '현장 고정 석면 <b>', kind: 'asbestos', client: '포항시 & 교육청', site: '포항시 남구', start: '2099-05-01', end: '2099-06-30', material: '천장텍스', area: '120.5', status: 'run', conc: '0.002', waste_no: 'W-1', note: '첫 줄\n둘째 줄', member_ids: ['u1'], worker_ids: ['w1'], ks: { no: 'K-9', year: 2099, biz: '석면해체', amount: 12345678, done_amount: 2000000, approve: '승인 취소' } },
     { id: 'pB', title: '현장 고정 철거', kind: 'demolition', client: '', site: '', start: '2024-03-02', end: '2024-03-09', status: 'done', member_ids: [], worker_ids: [] },
     { id: 'pC', title: '', kind: 'dredge', site: '현장 준설 구역', start: '', end: '', member_ids: [], worker_ids: [] },
@@ -9464,9 +9463,9 @@ try {
   const MAIN45 = 'p3,p1,p2,d2,d1,d3,p4', OLD45 = 'o1,o3,o2,o4';   // 기간 ▼(옛 목록 정렬 식 String(start || end) 최신 먼저 · 빈 값 뒤 · 같으면 대장 순서) — 묶음 안도 같은 정렬
   const REAL45 = ['pad', 'fmtDate', 'esc', 'isDate', 'addDays', 'vehDday', 'asList', 'liveAsb', 'findAsb', 'normAsbRow', 'asbNotifyDue', 'asbKeepUntil', 'asbWorkerNames', 'liveEdu', 'eduLatest', 'eduHasValidSpecial', 'asbNoSpecial', 'siteSpecKind', 'eduAnyKind', 'memberRetired',
     'siteGapSig', 'siteGapSigs', 'siteEduLine', 'siteEduLines', 'sheetRow', 'bindFold', 'siteKind', 'liveSites', 'siteLabel', 'siteYear', 'renderSiteFilter', 'renderSitesLegacy',
-    'asbKindOf', 'asbKindApply', 'asbUpdateDerived', 'openAsb', 'closeAsb', 'saveAsb', 'deleteAsb', 'tabRoute', 'safetyPanes', 'setSafetyLayer', 'applySafetyPerms', 'calEvents', 'sfNowGo', 'sfNowTop'];
+    'asbKindOf', 'asbKindApply', 'asbUpdateDerived', 'openAsb', 'closeAsb', 'asbKsShow', 'asbKsFill', 'asbKsApply', 'saveAsb', 'deleteAsb', 'tabRoute', 'safetyPanes', 'setSafetyLayer', 'applySafetyPerms', 'calEvents', 'sfNowGo', 'sfNowTop'];
   const VARH45 = ['  var ASB_STATUS = ', '  var SITE_KIND = ', '  var SITE_ORDER = ', '  var siteFilter = ', '  var SITE_OLD_BEFORE = ', '  var siteOldOpen = ', '  var siteEduGap;', '  var siteEduGapSig = ', '  var siteEduGapSeq = ',
-    '  var asbSaveBusy = ', '  var ASB_ONLY_IDS = ', '  var ASB_UNREAD_MSG = ', '  var ASB_KIND_OUT_MSG = ', '  var asbOpenSeq = ', '  var TAB_ALIAS = '];   // v445 검토: 종류 바꾸기 확인 글·창 연 차례
+    '  var asbSaveBusy = ', '  var ASB_KS_FIELDS = ', '  var ASB_ONLY_IDS = ', '  var ASB_UNREAD_MSG = ', '  var ASB_KIND_OUT_MSG = ', '  var asbOpenSeq = ', '  var TAB_ALIAS = '];   // v445 검토: 종류 바꾸기 확인 글·창 연 차례
   const PRE45 = [
     'var asb = ENV.asb, asbBase = 0, asbPending = false, asbSaveTimer = null, asbEditId = null, asbLoaded = ENV.asbLoaded !== false;',
     'var members = ENV.members, workers = ENV.workers, edu = ENV.edu, wkLoaded = ENV.wkLoaded !== false, eduLoaded = ENV.eduLoaded !== false;',   // v451 eduLoaded(@asb-doc 신고 서류 줄·표)
@@ -9884,8 +9883,7 @@ try {
   //   v456 검토: 400 ORPHAN_WORKER 첫 번은 명부 저장을 끝낸 뒤 한 번만 다시 보냄(asbOrphTry)·알림 글에서 새로고침 안내 뺌 → 다시 고정(be7d2128… → 7495f882… — 고친 동작은 v456 묶음 ⑥이 실행으로 지킴)
   //   v456 2차 검토: 두 번째 400 ORPHAN_WORKER에서 서버가 돌려준 고아 id만 대장에서 빼고 한 번 더 저장(asbOrphDrop) → 다시 고정(7495f882… → 930e3cae… — 고친 동작은 v456 묶음 ⑧이 실행으로 지킴)
   //   P1 판24h(C206): doSaveAsb는 500·끊김 실패 알림을 더한 본문으로 다시 고정(c222ce0b… → 95db3507… — 고친 동작은 'P1 판24h'가 실행으로 지킴)
-  //   P1 판24j(C209 2판): loadAsb·doSaveAsb는 받은 사본(읽기·409 다시 읽기·저장 200)을 더한 본문으로 다시 고정(82117c35… → b6701fc2… · 95db3507… → 399dc53f…(검토 반영: 저장 200 뒤 저장 타이머가 있으면 대기 남김 한 줄 — 200/실패 갈래 다음 줄) — 고친 동작은 'P1 판24j'가 실행으로 지킴, v433·v337 글 검사는 그대로 통과)
-  const hBad12 = Object.keys(HASH45).filter((n) => sha45(body45(n)) !== HASH45[n]);
+  //   P1 판24j(C209 2판): loadAsb·doSaveAsb는 받은 사본(읽기·409 다시 읽기·저장 200)을 더한 본문으로 다시 고정(82117c35… → b6701fc2… · 95db3507… → 399dc53f…(검토 반영: 저장 200 뒤 저장 타이머가 있으면 대기 남김 한 줄 — 200/실패 갈래 다음 줄) — 고친 동작은 'P1 판24j'가 실행으로 지킴, v433·v337 글 검사는 그대로 통과)  const hBad12 = Object.keys(HASH45).filter((n) => sha45(body45(n)) !== HASH45[n]);
   const m12 = miss45.length, X12 = mk45({ width: 375 }); X12.api.render();
   const l12a = [X12.host.getAttribute('data-vs-mode'), (X12.host._h.match(/class="item asb-item"/g) || []).length, X12.host._h.indexOf('data-vs-row') < 0, X12.env.host('siteFilterBar').style.display, X12.api.cur(), X12.env.host('siteHead').textContent].join('|');
   X12.env.width = 1366; X12.env.breakAll(); const l12b = [X12.host.getAttribute('data-vs-mode'), order45(X12.host._h), X12.env.host('siteFilterBar').style.display, X12.api.cur()].join('|');
@@ -21621,7 +21619,7 @@ try {
   add('문서 개정일(saveDocModal)', ['saveDocModal'], callOf('saveDocModal'), { els: { docTitle: { value: 'x' }, docRevised: BAD, docScope: { value: '' } }, stubs: () => ({ canDo: () => true, editingDocId: 'd1', findDoc: () => doc, isAdmin: () => true, curMember: () => ({ id: 'm1', name: 'n' }), docCatSelectGet: () => '05-01', docMajorOf: () => '05', docStatusOf: () => '등재', documents: [] }) }, () => doc.revised === '2026-05-01');
   // 현장(석면 작업)
   const asb = { id: 'a1', title: 'x', start: '2026-12-31', end: '2027-01-31', kind: 'asbestos' };
-  const asbStub = () => ({ asbSaveBusy: false, asbLoaded: true, asbEditId: 'a1', findAsb: () => asb, asbKindOf: () => 'asbestos', siteKind: () => 'asbestos', getCheckedMembers: () => [], asbGetCheckedWorkers: () => [], asb: [] });
+  const asbStub = () => ({ asbSaveBusy: false, asbLoaded: true, asbEditId: 'a1', findAsb: () => asb, asbKindOf: () => 'asbestos', siteKind: () => 'asbestos', getCheckedMembers: () => [], asbGetCheckedWorkers: () => [], asbKsApply: () => {}, asb: [] });   // T302 실적 칸 저장(asbKsApply)은 날짜 검사 뒤 — 대역
   add('현장 착공일(saveAsb)', ['saveAsb'], callOf('saveAsb'), { els: { asbTitle: { value: 'x' }, asbStart: BAD, asbEnd: D('2027-01-31') }, stubs: asbStub }, () => asb.start === '2026-12-31');
   add('현장 종료일(saveAsb)', ['saveAsb'], callOf('saveAsb'), { els: { asbTitle: { value: 'x' }, asbStart: D('2026-12-31'), asbEnd: BAD }, stubs: asbStub }, () => asb.end === '2027-01-31');
   // 의무 기준일
@@ -24046,6 +24044,106 @@ try {
   T('v546 C270·C276 화면 글·문서·판 번호(정확 검사): 기기 승인 안내 6곳 = 기기 승인 담당(시스템 관리 계정) · 규칙 카드 평일 08:10 · 재수집 창 상태 이름 · FEATURES·TESTLIST·CLAUDE.md·sw · 결함 사본 ' + MZ.length + '개 = 모두 ✗',
     rZ.ok && MZ.every((v) => v === false), JSON.stringify({ r: rZ.info, mut: MZ }));
 } catch (e) { console.log('  (v546 검사 생략 — ' + e.message + ')'); fails++; }
+// ---- T216·T302(PM 11/26 12:43 "t216. 추천대로. 단, 관리자만 가능하게." · "t302. 7개.") ----
+//   T216 = 철거 계약 단계 탭의 관리자 참고 양식(sub_contract — 공사 도급계약서 빈 양식, 채움 없음) · 서버 tpl_get·tpl_list 관리자만(servertest 'T216' 3항)
+//   T302 = 현장 [수정] 창의 실적 신고 칸 7개(대장 ks 값 그대로 · 바뀐 칸만 저장) · 카드 줄 이름은 v550(T234)에서 이미 '통합실적관리시스템'으로 바뀌어 이 판은 손대지 않음
+try {
+  const cutT = (a, b) => { const i = html.indexOf(a), j = html.indexOf(b, i + 1); if (i < 0 || j < 0) throw new Error('구간 없음 ' + a.slice(0, 30)); return html.slice(i, j); };
+  // ① T216 키·확장자·서버 표
+  const labT = (html.match(/var TPL_LABELS=\{[^\r\n]*\};/) || [''])[0], extT = (html.match(/var TPL_EXT=\{[^\r\n]*\};/) || [''])[0];
+  T('T216 ① 양식 키 sub_contract: 앱 라벨·확장자 .docx · 서버 TPL_KEYS · 관리자 전용 표 TPL_ADMIN = { sub_contract: 1 } · 계약 거울 상수(CON_PACKETS)에는 없음(거울과 무관한 따로 줄)',
+    /\bsub_contract:"공사 도급계약서 양식\(관리자 전용\)"/.test(labT) && /\bsub_contract:"\.docx"/.test(extT) && /\bsub_contract: '공사 도급계약서 양식/.test(gwd) && /const TPL_ADMIN = \{ sub_contract: 1 \};/.test(gwd)
+    && cutT('  var CON_PACKETS = [', '  function csPkWhen(').indexOf('sub_contract') < 0);
+  // ② 서버 받기 순서: 관리자 전용 검사가 계약 숨김·사람 정보 검사보다 앞, 본문 읽기보다 앞
+  const tg = gwd.slice(gwd.indexOf('async function handleTplGet('), gwd.indexOf('async function handleTplList('));
+  const iAd = tg.indexOf("if (hasOwn(TPL_ADMIN, tplKey) && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY'");
+  T('T216 ② 서버 tpl_get: 관리자 전용 검사 1곳 — 로그인 확인 뒤·계약 숨김·사람 정보 검사·blobGet보다 앞', iAd > tg.indexOf('currentMember(event)') && iAd < tg.indexOf("permOf(c.member, 'contracts') === 'hide'") && iAd < tg.indexOf('hasOwn(TPL_PERSON, tplKey)') && iAd < tg.indexOf('blobGet(') && tg.split('TPL_ADMIN').length === 2, String(iAd));
+  // ③ 실행: csRefTplHtml(관리자·철거 계약만 · 확인 중·등록·미등록) · csRefTplGet(관리자만 · 200 내려받기 · 404 · 403)
+  const refSrc = cutT('  var CS_REF_TPLS = ', '  // 작업현황(준설 작업 단계)'), whenSrc = cutT('  function csPkWhen(', '  // 등록 양식 목록(tpl_list)');
+  const mkRef = (o) => {
+    const S = { admin: o.admin, keys: o.keys === undefined ? null : o.keys, err: 0, loads: 0, calls: [], dl: [], al: [], inv: 0, rc: 0 };
+    const f = new Function('S', 'TPL_LABELS', 'TPL_EXT', 'DOC_ATT_MIME', 'esc', 'dataUrlToBytes', 'Blob',
+      'var csTplKeys = S.keys, csTplErr = S.err; function isAdmin(){ return S.admin; } function csLoadTpl(){ S.loads++; } function csTplInvalidate(){ S.inv++; } function renderContracts(){ S.rc++; } function downloadBlob(n, b){ S.dl.push([n, b.type]); } function alert(m){ S.al.push(m); } var onSessionInvalid = function(){ S.al.push("세션"); };'
+      + ' function gwCall(fn, b){ S.calls.push(b); return { then: function(ok, bad){ if (S.hold){ S.later = function(){ ok(S.res); }; return; } if (S.net) bad(); else ok(S.res); } }; }'
+      + whenSrc + refSrc + ' return { html: csRefTplHtml, get: csRefTplGet, setBusy: function(v){ csRefTplBusy = v; } };');
+    const api = f(S, { sub_contract: '공사 도급계약서 양식(관리자 전용)' }, { sub_contract: '.docx' }, { docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+      (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'), () => new Uint8Array([80, 75]), class { constructor(p, o2) { this.type = o2.type; } });
+    return { S, api };
+  };
+  const DEMO = { id: 'c1', type: 'demolition', docType: 'private', elems: { demo: 1, wst: 1 } }, COMBO = { id: 'c2', type: 'asbestos', docType: 'public', elems: { asb: 1, labor: 1, demo: 1, wst: 1 } }, DRG = { id: 'c3', type: 'dredge', docType: 'public', elems: { dredge: 1 } };
+  const a0 = mkRef({ admin: false, keys: { sub_contract: 1 } }), a1 = mkRef({ admin: true }), a2 = mkRef({ admin: true, keys: { sub_contract: 1 } }), a3 = mkRef({ admin: true, keys: {} });
+  const h0 = a0.api.html(DEMO), h1 = a1.api.html(DEMO), h2 = a2.api.html(DEMO), h2c = a2.api.html(COMBO), h2d = a2.api.html(DRG), h3 = a3.api.html(DEMO);
+  T('T216 ③ 블록: 비관리자 = 빈 글(등록돼 있어도) · 관리자·철거 = "관리자 참고 양식" — 목록 받기 전 "확인 중"(목록 1회 부름·단추 없음) · 등록 = ✓ [받기](data-cs-reftpl="sub_contract") · 미등록 = ✗ 넣기 박스 안내(단추 없음) · 석면+철거 한 건도 보임 · 준설 = 빈 글',
+    h0 === '' && /관리자 참고 양식/.test(h1) && /양식 확인 중/.test(h1) && a1.S.loads === 1 && h1.indexOf('data-cs-reftpl') < 0 && /<span class="st ok">✓<\/span>/.test(h2) && h2.split('data-cs-reftpl="sub_contract"').length === 2 && />받기<\/button>/.test(h2)
+    && /<span class="st gap">✗<\/span>/.test(h3) && /맨 위 넣기 박스에 빈 양식\(\.docx\)/.test(h3) && h3.indexOf('data-cs-reftpl') < 0 && /관리자 참고 양식/.test(h2c) && h2d === '', JSON.stringify([h0.length, h1.slice(0, 80), h2d.length]));
+  const g0 = mkRef({ admin: false, keys: { sub_contract: 1 } }); g0.api.get('sub_contract');
+  const g1 = mkRef({ admin: true, keys: { sub_contract: 1 } }); g1.S.res = { status: 200, body: { name: '공사도급계약서_양식.docx', data: 'UEs=' } }; g1.api.get('sub_contract');
+  const g2 = mkRef({ admin: true, keys: { sub_contract: 1 } }); g2.S.res = { status: 404, body: { error_code: 'NOT_FOUND' } }; g2.api.get('sub_contract');
+  const g3 = mkRef({ admin: true, keys: { sub_contract: 1 } }); g3.S.res = { status: 403, body: { error_code: 'ADMIN_ONLY' } }; g3.api.get('sub_contract');
+  const g4 = mkRef({ admin: true, keys: { sub_contract: 1 } }); g4.S.net = 1; g4.api.get('sub_contract'); g4.S.net = 0; g4.S.res = { status: 200, body: { name: '', data: 'UEs=' } }; g4.api.get('sub_contract');
+  const g5 = mkRef({ admin: true }); g5.api.get('work_start');
+  const g6 = mkRef({ admin: true, keys: { sub_contract: 1 } }); g6.S.hold = 1; g6.S.res = { status: 200, body: { name: 'a.docx', data: 'UEs=' } }; g6.api.get('sub_contract'); g6.api.get('sub_contract'); const g6n = g6.S.calls.length; g6.S.hold = 0; g6.S.later(); g6.api.get('sub_contract');
+  T('T216 ③-3 [받기] 연타: 응답 전 두 번째 누름 = 서버 호출 없음 · 응답 뒤 다시 누르면 받음 · 사람 바뀜(로그아웃·로그인 창 "전환") 때 양식 목록 캐시 비움 2곳',
+    g6n === 1 && g6.S.calls.length === 2 && g6.S.dl.length === 2 && /function clearSessionData\(\)\{[\s\S]{0,1500}?if \(typeof csTplInvalidate === "function"\) csTplInvalidate\(\);/.test(html) && /function sessViewerSwap\(\)\{[\s\S]{0,600}?if \(typeof csTplInvalidate === "function"\) csTplInvalidate\(\);/.test(html)
+    && /note: "메모", ks: "실적 신고" \}/.test(html), JSON.stringify([g6n, g6.S.calls.length, g6.S.dl.length]));
+  T('T216 ③-2 [받기]: 비관리자 = 서버 호출 0 · 200 = tpl_get 1회·받은 이름·docx 형식으로 내려받기 · 404 = 목록 캐시 비움·다시 그림·안내 · 403 = 관리자 안내 · 네트워크 실패 뒤 다시 누르면 받음(이름 없으면 라벨+.docx) · 표에 없는 키 = 호출 0',
+    g0.S.calls.length === 0 && g1.S.calls.length === 1 && g1.S.calls[0].action === 'tpl_get' && g1.S.calls[0].key === 'sub_contract' && JSON.stringify(g1.S.dl) === JSON.stringify([['공사도급계약서_양식.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']])
+    && g2.S.inv === 1 && g2.S.rc === 1 && /등록된 양식이 없습니다/.test(g2.S.al[0] || '') && g2.S.dl.length === 0 && /관리자만 받을 수 있는/.test(g3.S.al[0] || '') && g4.S.calls.length === 2 && /네트워크/.test(g4.S.al[0] || '') && g4.S.dl.length === 1 && g4.S.dl[0][0] === '공사 도급계약서 양식(관리자 전용).docx' && g5.S.calls.length === 0,
+    JSON.stringify([g1.S.dl, g2.S.al, g3.S.al, g4.S.dl]));
+  T('T216 ④ 배선: 단계 탭 = csMoreHtml 다음 csRefTplHtml 한 곳 · [data-cs-reftpl] 누르면 csRefTplGet(이 곳뿐)', html.split('+ csRefTplHtml(c) +').length === 2 && html.split('csRefTplHtml(').length === 3 && /csMoreHtml\(c\) \+ csRefTplHtml\(c\) \+ conAttBoxHtml\(c\)/.test(html)
+    && html.split('querySelectorAll("[data-cs-reftpl]")').length === 2 && /csRefTplGet\(el\.getAttribute\("data-cs-reftpl"\)\)/.test(html));
+
+  // ⑤ T302 창 칸 7개 — 자리(근로자 상자 뒤·메모 앞) · details 안
+  const KS_IDS = ['asbKsNo', 'asbKsYear', 'asbKsBiz', 'asbKsAmt', 'asbKsDone', 'asbKsDate', 'asbKsApprove'];
+  const mdl = cutT('<div class="modal-backdrop" id="asbBackdrop">', '<button class="primary" id="asbSave">'), wrapS = mdl.indexOf('<details id="asbKsWrap"'), wrapE = mdl.indexOf('</details>', wrapS);
+  T('T302 ⑤ 창: 실적 신고 묶음(details#asbKsWrap) = 일용직 상자 뒤·메모 앞 · 칸 7개 모두 그 안 · 업종 목록 2(CON_SITE_BIZ 두 값) · 날짜 칸은 글자 칸(옛 꼴 보존)',
+    wrapS > mdl.indexOf('id="asbWorkers"') && wrapS < mdl.indexOf('id="asbNote"') && KS_IDS.every((id) => { const k = mdl.indexOf('id="' + id + '"'); return k > wrapS && k < wrapE && mdl.split('id="' + id + '"').length === 2; })
+    && /<option value="비계ㆍ구조물해체공사업"><\/option><option value="상ㆍ하수도설비공사업"><\/option>/.test(mdl) && /<input type="text" id="asbKsDate"/.test(mdl));
+  // ⑥ 실행: asbKsFill·asbKsApply
+  const ksSrc = cutT('  var ASB_KS_FIELDS = ', '  var asbSaveBusy = false;');
+  const mkKs = () => {
+    const els = {}; KS_IDS.concat(['asbKsWrap', 'asbKsDraft']).forEach((id) => { els[id] = { value: '', open: false, style: { display: '' } }; });
+    const api = new Function('document', ksSrc + ' return { fill: asbKsFill, apply: asbKsApply };')({ getElementById: (id) => els[id] || null });
+    return { els, api };
+  };
+  const K1 = mkKs(), r1 = { status: 'run', ks: { no: 'K-1', year: 2025, biz: '비계ㆍ구조물해체공사업', amount: 12345678, done_amount: 0, contract_date: '2025.03.12', approve: '-', corp: '주식회사 종운건설' } }, r1o = JSON.stringify(r1);
+  K1.api.fill(r1);
+  const shown1 = KS_IDS.map((id) => K1.els[id].value).join('|'); K1.api.apply(r1); const same1 = JSON.stringify(r1) === r1o;
+  K1.els.asbKsNo.value = ''; K1.els.asbKsAmt.value = ' 1,000원 '; K1.els.asbKsDone.value = ''; K1.api.apply(r1);
+  const K2 = mkKs(), r2 = { status: 'plan' }; K2.api.fill(r2); const open2 = K2.els.asbKsWrap.open, emp2 = KS_IDS.every((id) => K2.els[id].value === ''); K2.api.apply(r2); const none2 = !('ks' in r2);
+  K2.els.asbKsNo.value = 'K-2'; K2.api.apply(r2);
+  const K3 = mkKs(), r3 = { status: 'done', ks: { no: '', year: '2026', biz: '비계ㆍ구조물해체공사업', amount: 0, done_amount: 0, contract_date: '2026-11-02', approve: '-', corp: '주식회사 종운건설', draft: 1 } };
+  K3.api.fill(r3); const dr3 = K3.els.asbKsDraft.style.display, open3 = K3.els.asbKsWrap.open; K3.api.apply(r3); const keepDraft3 = r3.ks.draft === 1; K3.els.asbKsNo.value = 'K-3'; K3.api.apply(r3);
+  const K4 = mkKs(), r4 = { status: 'done' }; K4.api.fill(r4);
+  T('T302 ⑥ 채우기·저장: 지금 값을 보임(금액 쉼표·0은 "0"·옛 날짜 꼴·숫자 연도 글자) · 손대지 않고 저장 = ks 글자째 그대로(숫자 연도·corp 보존) · 지운 칸 = 빈 값 · 금액은 숫자만 남겨 수 · 실적 없던 현장에 빈 칸 저장 = ks 안 만듦 · 한 칸 넣으면 그 칸만 · 초안은 번호가 생길 때만 지움 · 값 있거나 종결이면 펼침',
+    shown1 === 'K-1|2025|비계ㆍ구조물해체공사업|12,345,678|0|2025.03.12|-' && same1 && K1.els.asbKsWrap.open === true && K1.els.asbKsDraft.style.display === 'none'
+    && r1.ks.no === '' && r1.ks.amount === 1000 && r1.ks.done_amount === '' && r1.ks.year === 2025 && r1.ks.corp === '주식회사 종운건설' && r1.ks.contract_date === '2025.03.12'
+    && open2 === false && emp2 && none2 && JSON.stringify(r2.ks) === '{"no":"K-2"}'
+    && dr3 === '' && open3 === true && keepDraft3 && r3.ks.no === 'K-3' && !('draft' in r3.ks) && r3.ks.year === '2026' && K4.els.asbKsWrap.open === true,
+    JSON.stringify({ shown1, same1, r1: r1.ks, r2: r2.ks, r3: r3.ks, dr3 }));
+  // ⑦ 배선·카드 이름
+  const oa = cutT('  function openAsb(id){', '  function closeAsb(){'), sa = cutT('  function saveAsb(){', '  function deleteAsb(){');
+  T('T302 ⑦ 배선: openAsb가 메모 뒤 asbKsFill(r) 1회 · saveAsb가 메모 뒤·scheduleAsbSave 앞 asbKsApply(r) 1회 · 카드·PC 펼침 줄 이름은 v550(T234) "통합실적관리시스템" 그대로 2곳 · "키스콘 신고" 0',
+    oa.split('asbKsFill(r);').length === 2 && oa.indexOf('asbKsFill(r);') > oa.indexOf('"asbNote"') && sa.split('asbKsApply(r);').length === 2 && sa.indexOf('asbKsApply(r);') > sa.indexOf('r.note=') && sa.indexOf('asbKsApply(r);') < sa.indexOf('scheduleAsbSave();')
+    && html.split('sheetRow("통합실적관리시스템", \'<span').length === 2 && html.split('out.push(["통합실적관리시스템", \'<span').length === 2 && html.indexOf('키스콘 신고') < 0);
+  // ⑧ 문서·판 번호(이 판 이상 — 다음 판이 올라가도 깨지지 않게, 결함 사본은 ✗)
+  const VT = Number('5XX');
+  const rdT = (f) => readFileSync(join(ROOT, f), 'utf8').replace(/\r\n/g, '\n');
+  const DT = { ft: rdT('FEATURES.md'), tl: rdT('TESTLIST.md'), sw: rdT('sw.js'), cl: rdT('CLAUDE.md') };
+  const chkT = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v' + VT + ' (11/26) — T216·T302', '\n### '), tlv = cut(d.tl, '\n## v' + VT + ' — T216·T302', '\n## ');
+    const cb = tlv.split('\n').filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ['`TPL_ADMIN = { sub_contract: 1 }`', '`csRefTplHtml`', '`asbKsApply`', '공사도급계약서_양식.docx', '계약 거울(`CON_PACKETS`)에는 넣지 않는다'];
+    return Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= VT && ftv.length > 0 && FT.every((x) => ftv.indexOf(x) > 0) && cb.length === 5 && gate.length === 2 && scr.length === 3 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**T216·T302(v' + VT + ' — 관리자 전용 양식') > 0 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= VT;
+  };
+  const muT = (k, f) => chkT(Object.assign({}, DT, { [k]: f(DT[k]) }));
+  const MT = [muT('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v' + (VT - 1) + ' (')), muT('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v" + (VT - 1) + "'")),
+    muT('ft', (s) => s.split('`TPL_ADMIN = { sub_contract: 1 }`').join('TPL_ADMIN')), muT('cl', (s) => s.replace('**T216·T302(v' + VT, 'T216(')), muT('tl', (s) => s.replace('\n- [x] (AI) `uismoke` T216·T302', '\n- (AI) `uismoke` T216·T302'))];
+  T('T216·T302 ⑧ 문서·판 번호: FEATURES 기준 ≥ 이 판·절(관리자 전용 표·블록·저장 함수·등록 파일·거울 밖) · TESTLIST 칸 5(화면·운영 확인 3 · 게이트 [x] 2 · PM 칸 없음) · CLAUDE.md 한 줄 · sw ≥ 이 판 · 결함 사본 모두 ✗',
+    chkT(DT) && MT.every((v) => v === false), JSON.stringify({ VT, MT }));
+} catch (e) { console.log('  (T216·T302 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ── v547(T746 — 64): 실행 검사는 위 ③ 'T746' · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '547 이상'으로 풀 것
 try {

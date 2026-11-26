@@ -3053,6 +3053,19 @@
     <div class="mchecks" id="asbMembers"></div>
     <span class="fld-label">투입 근로자 — 일용직</span>
     <div class="mchecks" id="asbWorkers"></div>
+    <!-- T302(PM 11/26 12:43 "t302. 7개."): 실적 신고 칸 7개 — 대장에 이미 쌓이는 ks 값(no·year·biz·amount·done_amount·contract_date·approve) 그대로, 새 키 없음. 서버 실적 신고 규칙(ksTargets)이 ks.no를 읽어 번호를 넣은 현장은 대상에서 빠진다 -->
+    <details id="asbKsWrap" style="margin:4px 0 8px;">
+      <summary class="fld-label" style="cursor:pointer;">실적 신고(통합실적관리시스템)</summary>
+      <div id="asbKsDraft" class="empty-line" style="margin:2px 2px 6px;display:none;">계약을 끝낼 때 자동으로 만든 초안입니다 — 신고번호를 넣으면 초안 표시가 사라집니다.</div>
+      <input type="text" id="asbKsNo" placeholder="신고번호" autocomplete="off">
+      <input type="text" id="asbKsYear" placeholder="신고 연도 (예: 2026)" inputmode="numeric" autocomplete="off">
+      <input type="text" id="asbKsBiz" placeholder="업종" list="asbKsBizList" autocomplete="off">
+      <datalist id="asbKsBizList"><option value="비계ㆍ구조물해체공사업"></option><option value="상ㆍ하수도설비공사업"></option></datalist>
+      <input type="text" id="asbKsAmt" placeholder="계약액 (원)" inputmode="numeric" autocomplete="off">
+      <input type="text" id="asbKsDone" placeholder="기성액 (원)" inputmode="numeric" autocomplete="off">
+      <input type="text" id="asbKsDate" placeholder="계약일 (예: 2026-03-12)" autocomplete="off">
+      <input type="text" id="asbKsApprove" placeholder="발주자 승인" autocomplete="off">
+    </details>
     <input type="text" id="asbNote" placeholder="메모 (선택)" autocomplete="off">
     <button class="primary" id="asbSave">저장</button>
     <button class="danger" id="asbDelete">삭제</button>
@@ -4071,6 +4084,7 @@
     if (typeof _colBase !== "undefined") delete _colBase.contracts;
     // P1 판24h(C206): 다른 컬렉션의 기준 시각·403 표시·읽음 표시·가족친화 기준도 비움(아래 sessReadReset — 로그인 창 '전환'의 sessViewerSwap과 한 묶음 · 계약은 바로 위·아래 줄)
     if (typeof sessReadReset === "function") sessReadReset();   // 로그아웃 길
+    if (typeof csTplInvalidate === "function") csTplInvalidate();   // T216 검토: 양식 목록(tpl_list)이 관리자·직원에게 다르게 오므로 다음 사람에게 앞사람 목록을 넘기지 않음
     if (typeof conBaseSet === "function") conBaseSet([]);
     if (typeof conSaveOut !== "undefined") conSaveOut = 0;
     if (typeof imBaseDrop === "function") imBaseDrop("tasks");   // 판24i: 지시 배열을 비우므로 지시 기준 사본도(세대 +1 — 앞사람의 늦은 저장 200이 기준을 세우지 못하게 · 나가 있는 저장 수 0) · 로그인 창 '전환'은 배열을 안 비워 기준도 짝으로 남김
@@ -4113,6 +4127,7 @@
     if (sessViewerId === null){ sessViewerId = who; return false; }
     sessViewerId = who;
     if (typeof sessReadReset === "function") sessReadReset();   // P1 판24h 검토: 기준 시각(계약 밖)·403 표시·읽음 표시·개인 목록(위) — 계약은 v493 그대로
+    if (typeof csTplInvalidate === "function") csTplInvalidate();   // T216 검토: 로그인 창 '전환' — 직원이 받은 양식 목록(관리자 전용 키 빠짐)으로 관리자 화면이 '미등록'·교체 확인 없이 덮기가 되지 않게
     if (wkSaveTimer){ clearTimeout(wkSaveTimer); wkSaveTimer = null; }
     if (eduSaveTimer){ clearTimeout(eduSaveTimer); eduSaveTimer = null; }
     workers = []; wkLoaded = false; wkPending = false; wkDirty = {}; wkBase = 0;
@@ -14131,8 +14146,8 @@
   }
 
   // ---- 서류 양식 등록/생성 ----
-  var TPL_LABELS={asb_plan:"석면해체계획서", work_start:"착공계", work_complete:"준공계", demo_report:"해체신고서", waste_report:"폐기물배출신고서", qual_packet:"적격심사 패킷", contract_pledge:"계약이행서약서", seal_reg:"사용인감계", bond_waiver:"채권포기각서", labor_exempt:"노무비제외신청서", quote_env:"견적서(환경)", quote_con:"견적서(건설)", adv_pay:"선금지급신청 세트", settle_doc:"준공 정산합의서", safety_plan:"안전보건관리계획서", safety_risk:"위험성평가표(준설)", safety_rule:"준설 작업 안전 수칙", safety_emerg:"비상상황 대응체계", safety_ppe:"안전보호구 지급 대장", safety_cost:"산업안전보건관리비 사용내역서", labor_split:"노무비 구분관리 서식"};
-  var TPL_EXT={qual_packet:".hwpx", contract_pledge:".hwpx", seal_reg:".hwpx", bond_waiver:".hwpx", labor_exempt:".hwpx", quote_env:".hwpx", quote_con:".hwpx", adv_pay:".hwpx", safety_plan:".hwpx", safety_rule:".hwpx", safety_emerg:".hwpx", safety_ppe:".hwpx", labor_split:".hwpx"};   // 기본 .xlsx, hwpx 양식만 예외
+  var TPL_LABELS={asb_plan:"석면해체계획서", work_start:"착공계", work_complete:"준공계", demo_report:"해체신고서", waste_report:"폐기물배출신고서", qual_packet:"적격심사 패킷", contract_pledge:"계약이행서약서", seal_reg:"사용인감계", bond_waiver:"채권포기각서", labor_exempt:"노무비제외신청서", quote_env:"견적서(환경)", quote_con:"견적서(건설)", adv_pay:"선금지급신청 세트", settle_doc:"준공 정산합의서", safety_plan:"안전보건관리계획서", safety_risk:"위험성평가표(준설)", safety_rule:"준설 작업 안전 수칙", safety_emerg:"비상상황 대응체계", safety_ppe:"안전보호구 지급 대장", safety_cost:"산업안전보건관리비 사용내역서", labor_split:"노무비 구분관리 서식", sub_contract:"공사 도급계약서 양식(관리자 전용)"};   // T216 sub_contract = 철거 계약 관리자 참고 양식(채움 없음 · 서버 tpl_get·tpl_list도 관리자만)
+  var TPL_EXT={sub_contract:".docx",qual_packet:".hwpx", contract_pledge:".hwpx", seal_reg:".hwpx", bond_waiver:".hwpx", labor_exempt:".hwpx", quote_env:".hwpx", quote_con:".hwpx", adv_pay:".hwpx", safety_plan:".hwpx", safety_rule:".hwpx", safety_emerg:".hwpx", safety_ppe:".hwpx", labor_split:".hwpx"};   // 기본 .xlsx, hwpx 양식만 예외
   function openTplManage(){
     if(!isAdmin()) return;
     var host=document.getElementById("tplRows");
@@ -18459,6 +18474,38 @@
     if (!canDo("con")) return "";   // 끝난 계약도 종전 아래쪽 [생성][서류]처럼 열어 둔다(검토 ui-3)
     return '<div class="cs-pk cs-more" style="margin-bottom:10px;"><div class="h">다른 서류 만들기 <small>줄에 없는 서류</small></div><div class="cs-act" style="margin-top:2px;"><button type="button" class="vs-chip" data-con-xlsx="' + esc(c.id) + '">양식 생성 창</button><button type="button" class="vs-chip" data-con-doc="' + esc(c.id) + '">서류 작성 툴</button></div></div>';
   }
+  // T216(PM 11/26 12:43 "t216. 추천대로. 단, 관리자만 가능하게.") 철거 계약의 관리자 참고 양식 — 종운건설이 갑(하수급을 줄 때)인 공사 도급계약서 빈 양식(11/2 체결본 기준).
+  //   채움 없음(받아서 Word로 작성) · 패킷 ✓/✗ 수에 넣지 않음 · CON_PACKETS 밖에 둔다(계약 거울이 켜지면 CON_PACKETS는 서버 사본으로 바뀐다 — 이 줄은 거울과 무관).
+  //   관리자가 아닌 화면에는 블록 자체가 없고, 서버도 tpl_get(ADMIN_ONLY)·tpl_list(키 빠짐)에서 관리자만 — 화면 숨김만으로 막지 않는다
+  var CS_REF_TPLS = [{ k: "sub_contract", h: "공사 도급계약서 양식", sub: "종운건설이 갑 · 하수급을 줄 때 · 빈 양식(받아서 Word로 작성)", when: "demo" }];
+  function csRefTplHtml(c){
+    if (!isAdmin() || !c) return "";
+    var items = CS_REF_TPLS.filter(function(it){ return csPkWhen(c, it.when); });
+    if (!items.length) return "";
+    if (csTplKeys === null) csLoadTpl();
+    return '<div class="cs-pk cs-ref" style="margin-bottom:10px;"><div class="h">관리자 참고 양식 <small>관리자에게만 보임</small></div>' + items.map(function(it){
+      var reg = csTplKeys === null ? null : !!csTplKeys[it.k];
+      var st = reg === null ? (csTplErr ? "양식 목록 확인 실패 — 잠시 뒤 다시 시도합니다(등록 여부 아님)" : "양식 확인 중") : (reg ? it.sub : "미등록 — 맨 위 넣기 박스에 빈 양식(.docx)을 넣고 '" + TPL_LABELS[it.k] + "'(으)로 등록하세요");
+      return '<div class="it"><span class="st ' + (reg === null ? "wait" : (reg ? "ok" : "gap")) + '">' + (reg === null ? "…" : (reg ? "✓" : "✗")) + '</span><span class="nm">' + esc(it.h) + '<div class="sub">' + esc(st) + '</div></span>' + (reg ? '<button type="button" class="vs-chip" data-cs-reftpl="' + esc(it.k) + '">받기</button>' : "") + '</div>';
+    }).join("") + '</div>';
+  }
+  var csRefTplBusy = false;
+  function csRefTplGet(key){
+    if (!isAdmin() || csRefTplBusy || !TPL_LABELS[key]) return;
+    csRefTplBusy = true;
+    gwCall("gw-data", { action: "tpl_get", key: key }).then(function(res){
+      csRefTplBusy = false;
+      if (res && res.status === 200 && res.body && res.body.data){
+        var nm = String(res.body.name || "") || (TPL_LABELS[key] + (TPL_EXT[key] || ""));
+        downloadBlob(nm, new Blob([dataUrlToBytes("x," + res.body.data)], { type: DOC_ATT_MIME.docx }));
+        return;
+      }
+      var code = (res && res.body && res.body.error_code) || (res && res.status) || "네트워크";
+      if (res && res.status === 404){ csTplInvalidate(); renderContracts(); alert("등록된 양식이 없습니다 — 맨 위 넣기 박스로 다시 등록해 주세요."); }
+      else if (res && res.status === 401 && typeof onSessionInvalid === "function") onSessionInvalid();
+      else alert(code === "ADMIN_ONLY" ? "관리자만 받을 수 있는 양식입니다." : "양식 받기 실패(" + code + ")");
+    }, function(){ csRefTplBusy = false; alert("양식 받기 실패(네트워크)"); });
+  }
   function csChgBtnHtml(c){ var ck = (c.scen && canDo("con")) ? csChgCan(c) : null; if (!ck || !ck.ok) return ""; var q = csPipeOf(c, "chg"), n = q ? q.stages.length + 1 : 1; if (n > 9) return ""; return '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><button type="button" class="vs-chip" data-cs-chgadd="' + esc(c.id) + '">+ 변경계약 ' + n + '차</button><small class="empty-line" style="overflow-wrap:anywhere;">필요할 때만 · 본 단계 아래 별도 줄 · 금액·계약기간이 바뀌면 결재(계약 단계)</small></div>'; }   // v402 카드 9
   // 작업현황(준설 작업 단계) — 날짜·구간·실중량 kg·실수량 ㎥·시간·차량·근로자·사진. 준공 수량·사진대지·실적의 원천(시나리오 J2)
   var CS_WL_COLS = [["date","날짜","date"],["section","구간","text"],["kg","실중량 kg","num"],["m3","실수량 ㎥","num"],["hrs","시간","num"],["veh","차량","text"],["workers","근로자","num"],["photos","사진","num"]];
@@ -18631,7 +18678,7 @@
     h += cbxBoxHtml(c);   // v423 이 계약 서류 넣기 — 입구 하나(탭마다 따로 올리던 버튼 대신)
     var tab = conDetTab === "doc" ? "st" : conDetTab;   // v427 단계·서류 한 탭 — 옛 '서류' 탭 값은 단계·서류로
     h += '<div class="vs-stabs">' + [["ov", "개요"], ["st", "단계·서류"], ["lk", "연결"]].map(function(t){ return '<button type="button" class="vs-stab' + (tab === t[0] ? ' on' : '') + '" data-cs-tab="' + t[0] + '">' + t[1] + '</button>'; }).join("") + '</div>';
-    if (tab === "st"){ csApprSync(c); h += csStagesHtml(c); h += cbxEtcHtml(c) + csMoreHtml(c) + conAttBoxHtml(c) + cdocTrashHtml(c); }   // v384 결재 결과 동기화(60초 1회) · v427 단계 안에 서류(시안 ①②③) · v423 그 밖의 서류 · 다른 서류 만들기 · 이전 첨부 · v408 관리자 보관함
+    if (tab === "st"){ csApprSync(c); h += csStagesHtml(c); h += cbxEtcHtml(c) + csMoreHtml(c) + csRefTplHtml(c) + conAttBoxHtml(c) + cdocTrashHtml(c); }   // v384 결재 결과 동기화(60초 1회) · v427 단계 안에 서류(시안 ①②③) · v423 그 밖의 서류 · 다른 서류 만들기 · 이전 첨부 · v408 관리자 보관함
     else if (tab === "lk") h += csLinksHtml(c);
     else h += csOverviewHtml(c);
     if (canDo("con")) h += '<div class="vs-act">' + (conHasBldg(c) ? '<button class="mini-btn" data-con-bldg="' + esc(c.id) + '">대장</button>' : '') + '<button class="mini-btn danger" data-con-del="' + esc(c.id) + '">삭제</button></div>';   // v427 [생성][서류]는 서류 줄의 [생성]·'다른 서류 만들기'로
@@ -18797,6 +18844,7 @@
       }); });
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-rchk], [data-cs-rna]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var na = el.hasAttribute("data-cs-rna"), v = String(el.getAttribute(na ? "data-cs-rna" : "data-cs-rchk") || ""), j = v.indexOf("|"); if (j > 0) csRowAct(v.slice(0, j), v.slice(j + 1), na ? "na" : "chk"); }); });   // v427 묶음·합친 줄·패킷 줄
       var csAct = function(attr, fn){ Array.prototype.forEach.call(root.querySelectorAll("[" + attr + "]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var p = el.getAttribute(attr).split("|"), c = findProc(p[0]); if (!c) return; var pipe = csPipeOf(c, p[1]), i = Number(p[2]); if (!pipe || isNaN(i)) return; fn(c, pipe, i, el); }); }); };
+      Array.prototype.forEach.call(root.querySelectorAll("[data-cs-reftpl]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); csRefTplGet(el.getAttribute("data-cs-reftpl")); }); });   // T216 관리자 참고 양식 [받기]
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-gen]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var p = el.getAttribute("data-cs-gen").split("|"); if (p[1] === "html_contract") openDocFromContract(p[0]); else openXlsxGen(p[0], csGenKind(findProc(p[0]) || {}, p[1])); }); });   // v383 패킷 [생성]
       Array.prototype.forEach.call(root.querySelectorAll("[data-cs-site]"), function(el){ el.addEventListener("click", function(e){ e.stopPropagation(); var c = findProc(el.getAttribute("data-cs-site")); if (!c) return; var r = csLinkSiteLater(c); alert(typeof r === "object" ? ("현장 대장에 연결했습니다: " + (r.title || "")) : (r === "wait" ? "현장 대장을 불러오는 중입니다 — 받는 대로 연결합니다(잠시 뒤 연결 탭 확인)." : (r === "noperm" ? "현장 대장 열람 권한(현장)이 없어 연결할 수 없습니다." :"연결할 수 없습니다(현장 권한 또는 종류)."))); renderContracts(); }); });   // v384
       csAct("data-cs-done", function(c, p, i){ var s0 = p.stages[i], fp = (s0 && s0.aw === "amt") ? root.querySelector('[data-cs-fpanel="' + p.key + '|' + i + '"]') : null; if (fp && csSaveFields(c, p, i, fp) === false) return; csDoneStage(c, p, i); });   // C280: 날짜 칸이 틀리면 저장도 완료도 하지 않음(안내는 csSaveFields)   // v402 R15: 변경계약은 입력 칸 값을 먼저 저장한 뒤 판정
@@ -19728,7 +19776,7 @@
     // P1 판24j(C209): 칸 단위(공용 imMerge) · 이름표 = 현장 기록 창 칸 글 · 알림 이름 = 공사명
     if (typeof imMerge === "function") return imMerge("asbestos", local, remote, {
       name: function(r){ return r.title || "현장"; },
-      lbl: { kind: "종류", title: "공사명", client: "발주처", site: "작업장 소재지", start: "작업 시작일", end: "작업 종료일", material: "자재 종류", area: "면적", status: "진행 상태", conc: "공기 중 석면농도", waste_no: "폐기물 인계번호", member_ids: "투입 근로자 — 직원", worker_ids: "투입 근로자 — 일용직", note: "메모" }
+      lbl: { kind: "종류", title: "공사명", client: "발주처", site: "작업장 소재지", start: "작업 시작일", end: "작업 종료일", material: "자재 종류", area: "면적", status: "진행 상태", conc: "공기 중 석면농도", waste_no: "폐기물 인계번호", member_ids: "투입 근로자 — 직원", worker_ids: "투입 근로자 — 일용직", note: "메모", ks: "실적 신고" }   // T302: 실적 칸이 창에서 고치는 칸이 됨 — 겹침 알림에 이름으로
     });
     var byId = {}; (local||[]).forEach(function(r){ if(r&&r.id) byId[r.id]=r; });
     (remote||[]).forEach(function(x){
@@ -20797,6 +20845,7 @@
     document.getElementById("asbConc").value = r ? (r.conc||"") : "";
     document.getElementById("asbWaste").value = r ? (r.waste_no||"") : "";
     document.getElementById("asbNote").value = r ? (r.note||"") : "";
+    asbKsFill(r);   // T302 실적 신고 칸 7개
     renderMemberPicks("asbMembers", r ? asList(r.member_ids) : []);   // v332: 공개범위용 상자(dept:·rank:)를 쓰면 명단에 사람이 빠진다 / v336: asList
     asbRenderWorkerChecks(r ? asList(r.worker_ids) : []);
     // v445 검토: 일용직 명부를 아직 못 읽었으면(일용직 권한 있음 — 읽는 중·실패) 다시 읽고, 이 창이 그대로 열려 있으면 일용직 상자를 지금 체크 그대로 다시 그린다(openSiteWorkers v442와 같은 꼴)
@@ -20807,6 +20856,35 @@
     document.getElementById("asbBackdrop").classList.add("show");
   }
   function closeAsb(){ document.getElementById("asbBackdrop").classList.remove("show"); asbEditId=null; }
+  // T302(PM 11/26 12:43 "t302. 7개.") 현장 [수정] 창의 실적 신고 칸 7개 — 대장 ks 값 그대로(새 키 없음). 창에는 지금 값을 보이고(금액은 쉼표), 저장은 바뀐 칸만 쓴다:
+  //   손대지 않은 칸은 옛 값·옛 꼴(숫자·글자) 그대로 · 사람이 지운 칸은 빈 값 · 금액은 숫자만 남겨 수로 · 신고번호가 들어 있으면 계약 종결 초안 표시(draft)를 지움 ·
+  //   실적 값이 없던 현장에서 칸을 하나도 안 채우면 ks를 만들지 않음 · 그 밖의 ks 키(corp 등)는 손대지 않음. 계약 종결 초안(csSiteDone)은 지금처럼 빈 칸만 채운다
+  var ASB_KS_FIELDS = [["no","asbKsNo","t"],["year","asbKsYear","t"],["biz","asbKsBiz","t"],["amount","asbKsAmt","n"],["done_amount","asbKsDone","n"],["contract_date","asbKsDate","t"],["approve","asbKsApprove","t"]];
+  function asbKsShow(v, kind){
+    if (v == null || v === "") return "";
+    if (kind === "n"){ var d = String(v).replace(/[^0-9]/g, ""); return d ? Number(d).toLocaleString() : String(v); }
+    return String(v);
+  }
+  function asbKsFill(r){
+    var ks = (r && r.ks && typeof r.ks === "object") ? r.ks : {}, any = false;
+    ASB_KS_FIELDS.forEach(function(f){ var el = document.getElementById(f[1]), v = asbKsShow(ks[f[0]], f[2]); if (el) el.value = v; if (v) any = true; });
+    var wrap = document.getElementById("asbKsWrap"), dr = document.getElementById("asbKsDraft");
+    if (wrap) wrap.open = !!(r && (r.status === "done" || any));   // 종결 현장이거나 값이 있으면 펼쳐서
+    if (dr) dr.style.display = (ks.draft && !String(ks.no == null ? "" : ks.no).trim()) ? "" : "none";
+  }
+  function asbKsApply(r){
+    var ks = (r.ks && typeof r.ks === "object") ? r.ks : null, out = ks || {}, ch = 0;
+    ASB_KS_FIELDS.forEach(function(f){
+      var el = document.getElementById(f[1]); if (!el) return;
+      var v = String(el.value || "").trim();
+      if (v === asbKsShow(ks ? ks[f[0]] : "", f[2])) return;   // 그대로
+      if (f[2] === "n"){ var d = v.replace(/[^0-9]/g, ""); out[f[0]] = d ? Number(d) : ""; } else out[f[0]] = v;
+      ch++;
+    });
+    if (!ch) return;
+    if (!ks) r.ks = out;
+    if (String(r.ks.no == null ? "" : r.ks.no).trim()) delete r.ks.draft;
+  }
   var asbSaveBusy = false;   // v335: 같은 클릭이 두 번 처리돼 기록이 겹쳐 쌓이는 것 차단
   function saveAsb(){
     if (asbSaveBusy) return;
@@ -20836,6 +20914,7 @@
     r.conc=document.getElementById("asbConc").value.trim();
     r.waste_no=document.getElementById("asbWaste").value.trim();
     r.note=document.getElementById("asbNote").value.trim();
+    asbKsApply(r);   // T302 실적 신고 칸 — 바뀐 칸만
     r.member_ids=getCheckedMembers("asbMembers");
     r.worker_ids=asbGetCheckedWorkers();
     r.updated=todayStr();

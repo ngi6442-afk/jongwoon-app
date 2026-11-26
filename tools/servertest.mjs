@@ -121,8 +121,24 @@ r = await call({ action: 'tpl_put', key: 'safety_plan', name: '안전보건관�
 {
   const r1 = r, r2 = await call({ action: 'tpl_list' }, tokA), r3 = await call({ action: 'tpl_get', key: 'safety_plan' }, tokA);
   const t2 = (r2.body && r2.body.templates) || {}, ks = Object.keys(t2);
-  T('v422 tpl_put 새 키 200 · tpl_list에 이름 · 21키 전부 응답(미등록 null) · 순서 = 등록표 · tpl_get 본문', r1.code === 200 && r2.code === 200 && t2.safety_plan && t2.safety_plan.name === '안전보건관리계획서.hwpx' && ks.length === 21 && t2.labor_split === null && ks[0] === 'asb_plan' && ks[ks.length - 1] === 'labor_split' && r3.code === 200 && r3.body.data === 'AAAA', JSON.stringify([r1.code, r2.code, r2.body && r2.body.error_code, r3.code, ks]));
+  T('v422 tpl_put 새 키 200 · tpl_list에 이름 · 22키 전부 응답(미등록 null — T216 관리자 전용 sub_contract 포함, 관리자 호출) · 순서 = 등록표 · tpl_get 본문', r1.code === 200 && r2.code === 200 && t2.safety_plan && t2.safety_plan.name === '안전보건관리계획서.hwpx' && ks.length === 22 && t2.labor_split === null && t2.sub_contract === null && ks[0] === 'asb_plan' && ks[ks.length - 2] === 'labor_split' && ks[ks.length - 1] === 'sub_contract' && r3.code === 200 && r3.body.data === 'AAAA', JSON.stringify([r1.code, r2.code, r2.body && r2.body.error_code, r3.code, ks]));
   delete mem.gw_files['tpl:safety_plan'];
+}
+// T216(PM 11/26 12:43 "관리자만 가능하게") 관리자 전용 양식 sub_contract — 화면 숨김만이 아니라 서버 받기·목록에서 관리자만
+{
+  mem.gw_users['member:ucon216'] = { id: 'ucon216', name: '계약직원', admin: false, perms: { con: 'do' } };
+  const tokC216 = issueSession(mem.gw_users['member:ucon216']).token;
+  const p1 = await call({ action: 'tpl_put', key: 'sub_contract', name: '공사도급계약서_양식.docx', data: 'UEsDBA' }, tokW);
+  const p2 = await call({ action: 'tpl_put', key: 'sub_contract', name: '공사도급계약서_양식.docx', data: 'UEsDBA' }, tokA);
+  const g1 = await call({ action: 'tpl_get', key: 'sub_contract' }, tokA);
+  const g2 = await call({ action: 'tpl_get', key: 'sub_contract' }, tokC216, 'dev1');
+  const g3 = await call({ action: 'tpl_get', key: 'sub_contract' }, tokW, 'dev1');
+  const l1 = await call({ action: 'tpl_list' }, tokA), l2 = await call({ action: 'tpl_list' }, tokC216);
+  const ta = (l1.body && l1.body.templates) || {}, tc = (l2.body && l2.body.templates) || {}, lc = (l2.body && l2.body.labels) || {};
+  T('T216 sub_contract: 비관리자 넣기 403 ADMIN_ONLY · 관리자 넣기 200 · 관리자 받기 200(본문 그대로)', p1.code === 403 && p1.body.error_code === 'ADMIN_ONLY' && p2.code === 200 && g1.code === 200 && g1.body.data === 'UEsDBA' && g1.body.name === '공사도급계약서_양식.docx', JSON.stringify([p1.code, p2.code, g1.code]));
+  T('T216 sub_contract: 계약 수행 직원·일반 직원 받기 = 403 ADMIN_ONLY(등록돼 있어도 · 본문 없음)', g2.code === 403 && g2.body.error_code === 'ADMIN_ONLY' && !g2.body.data && g3.code === 403 && g3.body.error_code === 'ADMIN_ONLY' && !g3.body.data, JSON.stringify([g2.code, g2.body, g3.code]));
+  T('T216 tpl_list: 관리자에게만 sub_contract(이름) · 비관리자 응답엔 키·이름표 모두 없음, 나머지 21키는 그대로', l1.code === 200 && ta.sub_contract && ta.sub_contract.name === '공사도급계약서_양식.docx' && l2.code === 200 && !('sub_contract' in tc) && !('sub_contract' in lc) && Object.keys(tc).length === 21 && Object.keys(lc).length === 21 && Object.keys(tc)[20] === 'labor_split', JSON.stringify([l1.code, l2.code, Object.keys(tc).length, Object.keys(lc).length]));
+  delete mem.gw_files['tpl:sub_contract']; delete mem.gw_users['member:ucon216'];
 }
 // 11 proof __index__ 자기파괴 방지
 r = await call({ action: 'proof_put', name: '__index__', data: 'AAAA' }, tokA);

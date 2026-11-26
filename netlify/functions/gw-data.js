@@ -5784,7 +5784,9 @@ async function handleBackupPut(event, d, R) {
 }
 
 // ---- 서류 양식(템플릿) 보관 — 관리자 등록, 영구 보관. 생성 시 원본 복사라 오염 없음 ----
-const TPL_KEYS = { asb_plan: '석면해체계획서', work_start: '착공계', work_complete: '준공계', demo_report: '해체신고서(완료신고 포함)', waste_report: '폐기물배출신고서(수탁확인 포함)', qual_packet: '적격심사 패킷(신청서·심사표·각서·확약서 hwpx)', contract_pledge: '계약이행 통합서약서(hwpx)', seal_reg: '사용인감계(hwpx)', bond_waiver: '지역개발채권 포기각서(hwpx)', labor_exempt: '노무비 적용제외 신청서(hwpx·수기서식)', quote_env: '견적서 — (주)종운환경(hwpx)', quote_con: '견적서 — ㈜종운건설(hwpx)', adv_pay: '선금지급신청 세트(공문+별첨2~5, hwpx)', settle_doc: '준공 정산합의서(사후정산, xlsx)', safety_plan: '안전보건관리계획서(준설, hwpx)', safety_risk: '위험성평가표(준설, xlsx)', safety_rule: '준설 작업 안전 수칙(hwpx)', safety_emerg: '비상상황 대응체계(준설, hwpx)', safety_ppe: '안전보호구 지급 대장(준설, hwpx)', safety_cost: '산업안전보건관리비 사용내역서(준설, xlsx)', labor_split: '노무비 구분관리 서식1~7(hwpx)' };
+const TPL_KEYS = { asb_plan: '석면해체계획서', work_start: '착공계', work_complete: '준공계', demo_report: '해체신고서(완료신고 포함)', waste_report: '폐기물배출신고서(수탁확인 포함)', qual_packet: '적격심사 패킷(신청서·심사표·각서·확약서 hwpx)', contract_pledge: '계약이행 통합서약서(hwpx)', seal_reg: '사용인감계(hwpx)', bond_waiver: '지역개발채권 포기각서(hwpx)', labor_exempt: '노무비 적용제외 신청서(hwpx·수기서식)', quote_env: '견적서 — (주)종운환경(hwpx)', quote_con: '견적서 — ㈜종운건설(hwpx)', adv_pay: '선금지급신청 세트(공문+별첨2~5, hwpx)', settle_doc: '준공 정산합의서(사후정산, xlsx)', safety_plan: '안전보건관리계획서(준설, hwpx)', safety_risk: '위험성평가표(준설, xlsx)', safety_rule: '준설 작업 안전 수칙(hwpx)', safety_emerg: '비상상황 대응체계(준설, hwpx)', safety_ppe: '안전보호구 지급 대장(준설, hwpx)', safety_cost: '산업안전보건관리비 사용내역서(준설, xlsx)', labor_split: '노무비 구분관리 서식1~7(hwpx)', sub_contract: '공사 도급계약서 양식(종운건설이 갑 · 관리자 전용, docx)' };
+// T216(PM 11/26 12:43 "추천대로. 단, 관리자만 가능하게"): 관리자만 받고(tpl_get) 관리자에게만 목록에 보이는(tpl_list) 양식 — 화면 숨김만이 아니라 이 서버 길에서 막는다
+const TPL_ADMIN = { sub_contract: 1 };
 async function handleTplPut(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
@@ -5806,8 +5808,9 @@ const TPL_PERSON = { work_start: 1, work_complete: 1, asb_plan: 1, demo_report: 
 async function handleTplGet(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
-  if (permOf(c.member, 'contracts') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
   const tplKey = String(d.key || '');
+  if (hasOwn(TPL_ADMIN, tplKey) && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });   // T216 관리자 전용 양식
+  if (permOf(c.member, 'contracts') === 'hide') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_ACCESS', request_id: R });
   if (hasOwn(TPL_PERSON, tplKey)) {
     if (permOf(c.member, 'contracts') !== 'do') return jr(403, { status: 'FORBIDDEN', error_code: 'NO_WRITE', request_id: R });
     if (!(await deviceApproved(event, c.member))) return jr(403, { status: 'FORBIDDEN', error_code: 'DEVICE_NOT_APPROVED', request_id: R });
@@ -5824,16 +5827,17 @@ async function handleTplList(event, d, R) {
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
   const out = {};
   let readFailed = false;
-  await Promise.all(Object.keys(TPL_KEYS).map(async (key) => {   // v422: 키가 21개라 동시에 읽는다(응답 키 순서는 뒤에서 고정)
+  const keys = Object.keys(TPL_KEYS).filter((key) => c.member.admin || !hasOwn(TPL_ADMIN, key));   // T216 관리자 전용 양식은 관리자에게만(이름·등록자·시각도 내주지 않음)
+  await Promise.all(keys.map(async (key) => {   // v422: 키가 21개라 동시에 읽는다(응답 키 순서는 뒤에서 고정)
     let r = await blobGet(store(FILES), 'tpl:' + key);
     if (!r.ok && r.code !== 'NOT_FOUND') r = await blobGet(store(FILES), 'tpl:' + key);   // 한 번 더
     if (!r.ok && r.code !== 'NOT_FOUND') { readFailed = true; return; }
     out[key] = (r.ok && r.data) ? { name: r.data.name, ts: r.data.ts, by: r.data.by } : null;
   }));
   if (readFailed) return jr(503, { status: 'ERROR', error_code: 'TPL_READ_FAILED', request_id: R });   // v422: 읽기 실패를 미등록(null)으로 돌려주지 않는다 — 앱은 "확인 실패, 잠시 뒤 재시도"로 처리
-  const templates = {};
-  for (const key of Object.keys(TPL_KEYS)) templates[key] = out[key];
-  return jr(200, { status: 'OK', templates: templates, labels: TPL_KEYS, request_id: R });
+  const templates = {}, labels = {};
+  for (const key of keys) { templates[key] = out[key]; labels[key] = TPL_KEYS[key]; }
+  return jr(200, { status: 'OK', templates: templates, labels: labels, request_id: R });
 }
 
 async function handleAttGet(event, d, R) {
