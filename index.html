@@ -32078,7 +32078,10 @@ function dutyStage(nx){
   function abMovedText(b){
     var M = Array.isArray(b && b.moved) ? b.moved : [], n = 0, i;
     for (i = 0; i < M.length; i++) n += abInt(M[i] && M[i].trips);
-    return n ? (" · 기존 줄 " + M.map(function(x){ return String(x.side || "") + abInt(x.row); }).join("·") + "에서 옮겨 온 인계서 " + n + "회(최근 14일 — 더 지난 날짜도 열 때 옮겨짐)") : "";
+    var s = n ? (" · 기존 줄 " + M.map(function(x){ return String(x.side || "") + abInt(x.row); }).join("·") + "에서 옮겨 온 인계서 " + n + "회(최근 14일 — 더 지난 날짜도 열 때 옮겨짐)") : "";
+    // C279 남은 것(11/26): 서버가 학습 사전·일자 문서를 못 읽어 겹침 미리 보기를 건너뛰고 만든 경우(overlap_checked:false) — 알림에 한 구절
+    if (b && b.overlap_checked === false) s += " · 겹침 확인을 못 했습니다(저장소 읽기 실패) — 이 줄 때문에 기존 줄 인계서가 미배정으로 풀렸는지 미배정 목록을 확인해 주세요";
+    return s;
   }
   function abVariantSplit(side, row, name){
     if (abLearnBusy || !abCanLearn() || !name) return;
@@ -32455,8 +32458,11 @@ function dutyStage(nx){
       }
       return t + "</tbody></table>";
     }
+    // C279 남은 것(11/26): 노선표 밖 좌표로 간 묶음도 노선표 안 줄처럼 같은 좌표끼리 합친 값(byKey)으로 한 줄만 — 종전엔 묶음마다 같은 좌표 줄이 따로 나왔다
+    var extraSeen = {};
     for (i = 0; i < rows.length; i++){ c = rows[i]; if (!c || !c.route) continue; k = String(c.route.side || "") + "|" + c.route.row;
-      if (!rl.some(function(r){ return r.s + "|" + r.r === k; })){ var sd = (c.route.side === "R") ? "R" : "L"; extra[sd].push(c); } }
+      if (extraSeen[k]) continue;
+      if (!rl.some(function(r){ return r.s + "|" + r.r === k; })){ extraSeen[k] = 1; var sd = (c.route.side === "R") ? "R" : "L"; extra[sd].push(byKey[k] || c); } }
     return { html: '<div class="ab-sheet">' + table(halves[0], "L") + table(halves[1], "R") + "</div>", hiddenN: hiddenN, emptyN: emptyN };
   }
   // C244(계산 검산 11/20): 같은 양식 줄(side|row)로 가는 묶음이 둘 이상이면(올바로 원문 표기·품목이 달라 서버가 따로 묶음) 회수·잠정·단위미상을 더한다

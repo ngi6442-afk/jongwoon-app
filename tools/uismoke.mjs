@@ -1367,6 +1367,22 @@ try {
       c0 > 0 && mkS({}) === '' && mkS({ state_unknown: [] }) === '' && mkS({ state_unknown: 'x' }) === '' && /<span class="dday amber">처리상태 확인<\/span>/.test(one) && /'정상' 4건, '&lt;b>' 1건/.test(one) && /종전 규칙\(예약·확정·취소만 빼고 셈\)/.test(one)
       && /if \(!abDay\.loading\) h \+= abStateUnknownHtml\(\);/.test(html), one.slice(0, 200));
   }
+  // C279 남은 것(2026-11-26): ① 겹침 확인을 건너뛰고 만든 경우(overlap_checked:false) 알림 구절 ② 노선표 밖 좌표 묶음도 같은 좌표끼리 합쳐 한 줄 — 실제 함수로
+  {
+    const m0 = html.indexOf('function abMovedText('), m1 = html.indexOf('function abVariantSplit(', m0);
+    const MV = new Function('function abInt(v){ var n = Math.round(Number(v)); return (isFinite(n) && n > 0) ? n : 0; }' + html.slice(m0, m1) + 'return abMovedText;')();
+    T('C279 겹침 확인 건너뜀 알림: overlap_checked:false면 "겹침 확인을 못 했습니다 … 미배정 목록을 확인" · true·없음이면 구절 없음 · moved와 같이 나옴',
+      /겹침 확인을 못 했습니다\(저장소 읽기 실패\)/.test(MV({ overlap_checked: false })) && MV({ overlap_checked: true }) === '' && MV({}) === ''
+      && /^ · 기존 줄 R40에서 옮겨 온 인계서 2회.* · 겹침 확인을 못 했습니다/.test(MV({ overlap_checked: false, moved: [{ side: 'R', row: 40, trips: 2 }] })), MV({ overlap_checked: false }));
+    const t0 = html.indexOf('function abSheetTableHtml('), t1 = html.indexOf('function abSortKey(', t0);
+    const TB = new Function('var abHideEmpty = false, AB_PEND_STALE_DAYS = 3, AB_PEND_HINT = ""; function abCanLearn(){ return false; } function esc(s){ return String(s); } function abInt(v){ var n = Math.round(Number(v)); return (isFinite(n) && n > 0) ? n : 0; } function abNum(v){ var n = Number(v); return (isFinite(n) && n > 0) ? n : 0; }'
+      + 'function abRowEmpty(c){ return !c || (abInt(c.n) === 0 && abInt(c.n_pending) === 0); } function abPendInfo(){ return { stale: 0, title: "" }; } function abVariantHtml(){ return ""; } function abSortKey(n){ return [0, String(n)]; }'
+      + html.slice(t0, t1) + 'return abSheetTableHtml;')();
+    const rl = [{ s: 'L', r: 5, f: '가', t: '나', i: '다', h: false }];
+    const out = TB(rl, [{ from: '유령A', to: 'x', item: 'y', n: 1, route: { side: 'L', row: 77 } }, { from: '유령B', to: 'x', item: 'y', n: 2, route: { side: 'L', row: 77 } }, { from: '가', to: '나', item: '다', n: 4, route: { side: 'L', row: 5 } }]).html;
+    T('C279 노선표 밖 좌표(L77) 묶음 2개(1회·2회) → 표에 L77 줄 1개·회수 3 · 노선표 안 줄 L5는 그대로 4',
+      (out.match(/<span class="ab-rowno">L77<\/span>/g) || []).length === 1 && /L77<\/span><\/td><td class="n">3</.test(out) && /<td>가<\/td><td>나<\/td><td>다<\/td><td class="n">4</.test(out), out.replace(/\s+/g, ' ').slice(0, 300));
+  }
 } catch (e) { console.log('  (v351 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v352(PM 9/11 #33): 숨김·노선 변경 뒤 엑셀 재생성 요청(dispatch) + 내려받기 stale 경고 ----
