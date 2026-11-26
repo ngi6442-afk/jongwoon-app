@@ -11375,11 +11375,11 @@ try {
     const info = { box: [box1, box2, box4], org0, org1, nx1, nx3, r1: [r1.kind, r1.org, r1.next, r1.pid], r2: [r2.kind, r2.org], r3: [r3.org, 'org' in r3, r3.next], r4: [r4.kind, 'org' in r4], bulk, r5: ['org' in r5], nf, n: X.api.edu().length - n0 };
     const ok = JSON.stringify(info.box) === '["","","none"]' && org0 === '' && org1 === 'jw' && nx1 === '2027-06-10' && nx3 === '2026-12-10' && JSON.stringify(info.r1) === '["spec_med","jw","2027-06-10","w5"]' && JSON.stringify(info.r2) === '["special",null]'
       && JSON.stringify(info.r3) === '[null,false,"2026-12-10"]' && r3.org === undefined && JSON.stringify(info.r4) === '["hire",false]' && JSON.stringify(bulk) === '[["w1","pre_med","other",""],["w3","pre_med","other",""]]'
-      && info.r5[0] === false && JSON.stringify(nf) === '["2027-06-10","2026-12-10","2026-12-10","2026-12-10",""]' && info.n === 6 && /종운건설 12개월 · 타회사·모름 6개월/.test(note1);
+      && info.r5[0] === false && JSON.stringify(nf) === '["2027-06-10","2026-12-10","2026-12-10","2026-12-10","2027-06-10"]'   /* C262 ②: 배치전도 만료일(종운건설 12개월) */ && info.n === 6 && /종운건설 12개월 · 타회사·모름 6개월/.test(note1);
     return { ok, info };
   };
   const r7_51 = chk7_51(html);
-  const m7_51 = [mut51('if(org) r.org=org; else if(!isNew && r.org!=null) r.org=null;', 'if(org) r.org=org;'), mut51('        if(org) nr.org=org;   // v451\n', ''), mut51('if (k === "spec_med") m = asbMedMonths(org);', ''),
+  const m7_51 = [mut51('if(org) r.org=org; else if(!isNew && r.org!=null) r.org=null;', 'if(org) r.org=org;'), mut51('        if(org) nr.org=org;   // v451\n', ''), mut51('if (k === "spec_med" || k === "pre_med") m = asbMedMonths(org);', ''),   /* C262: 배치전도 같은 줄 */
     mut51('return (eduIsMed(kind) && Object.prototype.hasOwnProperty.call(ASB_MED_ORG, v)) ? v : "";', 'return v;'), mut51('if(ob) ob.style.display = eduIsMed(k) ? "" : "none";', 'if(ob) ob.style.display = "";')].map((s) => safe51(() => chk7_51(s)).ok);
   const h51 = html.indexOf('<select id="eduOrg"><option value="">명의 모름</option><option value="jw">종운건설</option><option value="other">타회사</option></select>') > 0 && V.cnt47(html, 'id="eduOrgBox"') === 1
     && V.cnt47(html, 'document.getElementById("eduOrg").addEventListener("change", function(){ if (document.getElementById("eduKind").value === "spec_med") eduAutoNext(); });') === 1;
@@ -24025,8 +24025,8 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), op = cb.filter((l) => /^- \[ \] \(AI 운영 확인/.test(l));
     const FT = ['원장 T746', '`recSortCmp`', '`renderTasksLegacy`', '`sortedWorkers`', '`renderReceivablesLegacy`'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v547 \(2026-11-26\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
-      && d.cl.indexOf('**T746(v547') > 0 && /SHELL_CACHE = 'jw-shell-v547'/.test(d.sw);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 547 && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**T746(v547') > 0 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 547   /* v548(C262)에서 '547 이상'으로 풂 */;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
   };
   const rY = chkY(DY);
@@ -24068,6 +24068,25 @@ try {
   T('C262 석면 신고 서류 판정: ① 일용직 특별교육 = 기준일 1주일 안 기록만 ✓(옛 기록·날짜 없음은 "확인 필요" 표시 · 기준일 없으면 그대로 · 직원은 한 번 받으면 ✓ — 별표4 비고 2·라목) ② 배치전건강진단 다음 예정일 = 받은 회사 명의 만료일(종운건설 12 · 다른 회사·모름 6개월 — 특수건강진단과 같음) · 안내 글 회사 규칙 · 결함 사본 ' + MC.length + '개 = 모두 ✗',
     rC.ok && MC.every((v) => v === false), JSON.stringify({ r: rC.info, mut: MC }));
 } catch (e) { console.log('  (C262 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v548(C262 석면 신고 서류 판정): 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '548 이상'으로 풀 것
+try {
+  const rdW = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DW = { ft: rdW('FEATURES.md'), tl: rdW('TESTLIST.md'), sw: rdW('sw.js') };
+  const chkW = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v548 (11/26)', '\n### '), tlv = cut(d.tl, '\n## v548 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l));
+    const FT = ['`asbDocOf`', '`sp.stale`', '`eduNextFor`', '비고 2'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v548 \(2026-11-26\)\./.test(d.ft) && mF.length === 0 && cb.length === 3 && /SHELL_CACHE = 'jw-shell-v548'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length } };
+  };
+  const rW = chkW(DW);
+  const muW = (k, f) => chkW(Object.assign({}, DW, { [k]: f(DW[k]) })).ok;
+  const MW = [muW('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v547 (')), muW('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v547'")), muW('ft', (s) => s.split('`sp.stale`').join('sp.stale')), muW('tl', (s) => s.split('\n## v548 ').join('\n## vX '))];
+  T('v548 문서·판 번호(정확 검사): FEATURES 기준 v548 (2026-11-26)·v548 절(C262) · TESTLIST v548 칸 3 · sw v548 · 결함 사본 ' + MW.length + '개 = 모두 ✗', rW.ok && MW.every((v) => v === false), JSON.stringify({ r: rW.info, mut: MW }));
+} catch (e) { console.log('  (v548 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

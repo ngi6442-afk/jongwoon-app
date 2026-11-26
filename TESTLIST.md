@@ -1926,3 +1926,8 @@
 - [ ] (AI 운영 확인 — T746) 배포 뒤 기성 탭 정렬(청구일·거래처)·차량 이력·견적서 목록·가족친화 화면이 그대로 그려짐(빈 화면 없음)
 - [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 배포 전 전체 게이트 기록 T746_게이트_v547_1126.txt
 - [x] (AI) `uismoke` T746(필드 localeCompare 0곳 · 얼린 본문 3곳만 이름 예외 · 결함 사본 1 = ✗) · v547 문서·판 번호 정확 검사
+
+## v548 — C262 석면 신고 서류 판정 두 곳(일용직 특별교육 1주일 · 배치전건강진단 만료일)
+- [ ] (운영 확인) 석면 현장에 일용직을 넣고 착수일보다 1주일 넘게 전 특별교육 기록만 있으면 신고 서류 표 특별교육 칸이 노랑 '확인 필요'인지 · 배치전건강진단을 넣으면 다음 예정일(만료일)이 기한·캘린더에 뜨는지
+- [x] (AI) `uismoke` C262(판정·만료일·안내 글 · 결함 사본 4) — ✓ AI 11/26
+- [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `paycalc_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` 통과 · v547 문서 검사를 이 판 이상으로 풀고 v548 문서·판 번호 정확 검사 — ✓ AI 11/26
