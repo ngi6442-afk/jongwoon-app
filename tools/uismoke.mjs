@@ -25359,8 +25359,8 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), op = cb.filter((l) => /^- \[ \] \(AI 운영 확인/.test(l));
     const FT = ['`notifyAutoCreated`', '`notifyLeaves`', '`tasksGuard`', '`task_kept`', '원장 C238'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v575 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
-      && d.cl.indexOf('**C238 G(v575') > 0 && /SHELL_CACHE = 'jw-shell-v575'/.test(d.sw);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 575 && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C238 G(v575') > 0 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 575   /* v576(C326)에서 '575 이상'으로 풂 */;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
   };
   const r575 = chk575(D575);
@@ -25370,6 +25370,29 @@ try {
   T('v575 C238 G 문서·판 번호(정확 검사): FEATURES 기준 v575·v575 절(낱말 5) · TESTLIST v575 칸 3 · CLAUDE.md 한 줄 · sw jw-shell-v575 · 결함 사본 ' + M575.length + '개 = 모두 ✗',
     r575.ok && M575.every((v) => v === false), JSON.stringify({ r: r575.info, mut: M575 }));
 } catch (e) { console.log('  (v575 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v576(C326 — 45-1): 실행 검사는 uismoke C326 ①·단계 이름 가림 표·② 회사 칸 · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '576 이상'으로 풀 것
+try {
+  const rdW = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DW = { ft: rdW('FEATURES.md'), tl: rdW('TESTLIST.md'), sw: rdW('sw.js'), cl: rdW('CLAUDE.md') };
+  const chkW = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v576 (11/27)', '\n### '), tlv = cut(d.tl, '\n## v576 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), op = cb.filter((l) => /^- \[ \] \(운영 확인\)/.test(l));
+    const FT = ['`CS_PAY_STAGE_RE`', '`CS_CON_STAGE_RE`', '`toggleRecPaid`', '`recCo`', '`recImpCo`', '견적·수의계약'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const closed = /\n- \[x\] \(검토 반영\) 기성 입금 처리 때 "수금확인 단계 완료" 확인창은[^\n]*✓ AI 11\/27 v576\(C326\)/.test(d.tl) && /\n- \[x\] 견적서·기성·계약 화면의 회사 선택지가[^\n]*✓ AI 11\/27 v576\(C326 ②\)/.test(d.tl);
+    const ok = /기준: v576 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 1 && op.length === 2 && closed
+      && d.cl.indexOf('**C326(v576)**') > 0 && /SHELL_CACHE = 'jw-shell-v576'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length, closed } };
+  };
+  const rW = chkW(DW);
+  const muW = (k, f) => chkW(Object.assign({}, DW, { [k]: f(DW[k]) })).ok;
+  const MW = [muW('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v575 (')), muW('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v575'")), muW('ft', (s) => s.split('`CS_PAY_STAGE_RE`').join('CS_PAY_STAGE_RE')),
+    muW('cl', (s) => s.replace('**C326(v576)**', 'C326(v576)')), muW('tl', (s) => s.replace('- [x] 견적서·기성·계약 화면의 회사 선택지가', '- [ ] 견적서·기성·계약 화면의 회사 선택지가'))];
+  T('v576 C326 문서·판 번호(정확 검사): FEATURES 기준 v576·v576 절 · TESTLIST v576 칸 3 · 651·511 칸 닫음 · CLAUDE.md 한 줄 · sw · 결함 사본 ' + MW.length + '개 = 모두 ✗',
+    rW.ok && MW.every((v) => v === false), JSON.stringify({ r: rW.info, mut: MW }));
+} catch (e) { console.log('  (v576 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

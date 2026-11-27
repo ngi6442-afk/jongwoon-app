@@ -110,6 +110,7 @@
 - **C244(v569 — 계산 수리 옮김 · C244)**: 건설기계조종사 안전교육·운수종사자 정기교육 기한은 `eduYearEndDue` 한 곳(해 끝 — 개월 더하기 아님) · 주기 체크리스트는 적기 전 `periodKeysRoll(type)`(넘어갔으면 적지 않고 다시 그림) · `_lib/duty.js`·앱 DUTY_SHARED 직전 이행 행 유예는 회차마다 한 번(두 벌 같이) · 선금 소계 `xadSubOf`(`Math.floor(E/1.1)` 금지) · 기성 금액 글은 `recSheetMoney`(전역 `fmtAmount`는 부호를 지움) · 감사 화면 달은 KST(전달·그달 키) · 입찰·적격 가지(calc-bid)는 예규 제393호 대조 전이라 안 옮김
 - **C238(v567 — 로그인 잠금 칸 · C238)**: `gw-auth` `handleLogin`은 잠금 칸(`lock:`·`lockm:`)을 못 읽으면 PIN 검사 전 500, 실패 수를 못 적으면 500 — '못 읽음 = 잠금 없음'으로 되돌리지 말 것(servertest C238 판 A 결함 사본). 이 파일의 '없음' 관례는 `ok:true,data:null` 또는 `code:'NOT_FOUND'` 둘 다.
 - **C246·C280 후속(v566)**: 폰 작은 단추는 `.mini-btn` 폰 규칙 한 줄(최소 32px — 더 키울 자리는 T688처럼 id로 덮기) · 내 할 일 기한은 키를 친 change는 저장 안 함(칸 떠날 때 · `__dueTyped`) — 날짜 칸을 '치는 동안 바로 저장'으로 새로 만들지 말 것.
+- **C326(v576)**: 계약 단계 이름은 부분 일치로 가리지 말 것 — 입금 처리 확인창은 `CS_PAY_STAGE_RE`(따로 선 수금·입금확인만 · '청구 및 입금확인'은 결재 단계), 계약 단계 완료는 `CS_CON_STAGE_RE`(견적·수의계약 뺌). 새 정규식은 CON_SCEN 이름 전부에 대 보고 넣기. 회사 표시 글은 '(주)종운환경 / ㈜종운건설', 값은 env/con.
 - **T152(v565)**: 투찰 잠금 거절 알림 = `bidGateNotify`(받는 사람 `bidNotifyIds` − 누른 사람 · 하루 1번 `bids:gate_sent` · 설정 `bid_gate`) — 낙찰 알림 수신자를 바꾸면 이것도 같이 바뀜 · 누르면 `?go=bid`(sw `SW_GO_TABS`).
 - **C238 G(v575 — 알림은 저장 뒤 · C238)**: `handleSave` 지시·휴가 갈래와 `autotask_ingest`는 알림 대상만 저장 전에 계산하고 `notifyAutoCreated`·`notifyLeaves`는 쓰기 성공 뒤에 부른다 — 저장 앞으로 옮기지 말 것(servertest C238 G 결함 사본).
 - **C238 D+E(v574 — 쓰기 결과 · C238)**: 계약 기록물 `cdocPairVoid`는 true/false — 부르는 쪽은 false면 저장·감사 전에 멈춘다(연결만 지우지 않기) · 증빙 색인·결재 합쳐 다시 쓰기도 결과를 본다(servertest C238 판 D·E 결함 사본).
