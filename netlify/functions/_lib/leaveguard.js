@@ -29,7 +29,7 @@ const LEAVE_VIEW_FIELDS = ['id', 'member_id', 'member_name', 'type', 'status', '
 // 읽기: 본인 줄 = 통째(지운 줄 포함) · 남의 줄 = 앱 캘린더가 그리는 줄(지우지 않음·승인·연차/반차/휴직·같은 부서 — 앱 leaveCalVisible과 같은 판정, 부서는 서버 회원 레코드)만 위 칸 + _view 1 · 그 밖은 뺌
 //   members = 회원 레코드 전부(push.loadMembers) — 지운 회원(del 1)은 앱 회원 목록에 없어 앱이 그리지 않으므로 같이 뺀다 · members가 null(못 읽음)이면 본인 줄만
 function leavesView(me, items, members) {
-  const dept = {};
+  const dept = Object.create(null);
   (members || []).forEach(function (m) { if (m && m.id && m.del !== 1) dept[m.id] = m.dept; });
   const myDept = me && me.dept;
   const out = [];
@@ -76,13 +76,13 @@ function leaveOwnGuard(a, b) {
 function leavesRebuild(me, oldItems, items) {
   const mine = me.id;
   const others = (oldItems || []).filter(function (o) { return o && o.member_id !== mine; });
-  const ownOld = {}, otherBy = {};
+  const ownOld = Object.create(null), otherBy = Object.create(null);   // id 표는 프로토타입 없는 객체(좁은 확인: id '__proto__' 줄이 {}에서는 칸이 안 돼 이월·가드를 건너뜀)
   (oldItems || []).forEach(function (o) {
     if (!o || o.id == null || o.id === '') return;
     const k = String(o.id);
     if (o.member_id === mine) { if (!hasOwn(ownOld, k)) ownOld[k] = o; } else if (!hasOwn(otherBy, k)) otherBy[k] = o;
   });
-  const seen = {}, own = [], kept = [];
+  const seen = Object.create(null), own = [], kept = [];
   const keep = function (b) { const id = (b && b.id != null) ? String(b.id).slice(0, 60) : ''; if (kept.indexOf(id) < 0) kept.push(id); };
   (items || []).forEach(function (b) {
     if (!b || typeof b !== 'object') return;
@@ -106,9 +106,9 @@ function leavesRebuild(me, oldItems, items) {
 // 관리자 저장: 표시(_view) 달린 줄 = 서버 원본(서버에 없으면 버림) · 서버에 있는데 보낸 목록에서 빠진 줄 = 서버 원본 이월(앱은 휴가 줄을 빼지 않고 del 1로 지움)
 //   — 직원으로 받은 줄인 사본을 든 채 관리자가 된 화면의 저장이 전사 휴가를 줄이지 않게(㉯). 표시 달린 줄이 있었으면 kept로 그 화면이 다시 읽게 한다
 function leavesAdminFix(oldItems, items) {
-  const oldBy = {};
+  const oldBy = Object.create(null);
   (oldItems || []).forEach(function (o) { if (o && o.id != null && o.id !== '' && !hasOwn(oldBy, String(o.id))) oldBy[String(o.id)] = o; });
-  const seen = {}, out = [], kept = [];
+  const seen = Object.create(null), out = [], kept = [];
   (items || []).forEach(function (b) {
     if (!b || typeof b !== 'object') { out.push(b); return; }
     const k = (b.id == null || b.id === '') ? null : String(b.id);

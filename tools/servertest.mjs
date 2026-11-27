@@ -18318,6 +18318,15 @@ function J91a(x) { return JSON.stringify(x); }
     mine = SEED(); mine.forEach((x) => { if (x.id === 'v5') { x.status = 'approved'; x.approver = '가짜관리이'; x.approved_at = '2026-11-27'; } });
     r = await save(mine, 'a');
     T('C240 A-2a ④ 관리자 정상 승인 → 반영 · leave_kept 없음', r.code === 200 && byId('v5')[0].status === 'approved' && !('leave_kept' in r.body), JSON.stringify(r.body));
+    // ④b 좁은 확인 반영: id가 '__proto__'·'constructor'인 줄 — 관리자 저장 반복에 줄이 늘지 않음 · 승인된 그 줄을 직원이 못 고침
+    put();
+    mem.gw_data['col:leaves'].items.push({ id: '__proto__', member_id: 'u2aemp', type: 'annual', start: '2026-12-15', end: '2026-12-15', days: 1, status: 'approved', updated: '2026-11-02' }, { id: 'constructor', member_id: 'u2aemp', type: 'annual', start: '2026-12-16', end: '2026-12-16', days: 1, status: 'approved', updated: '2026-11-02' });
+    for (let i = 0; i < 3; i++) r = await save(cp(sv()), 'a');
+    const nProto = byId('__proto__').length, nCons = byId('constructor').length, nAll = sv().length;
+    r = await getL('e'); mine = cp(r.body.doc.items); mine.forEach((x) => { if (x.id === '__proto__' || x.id === 'constructor') { x.days = 7; x.del = 1; } });
+    r = await save(mine, 'e');
+    T('C240 A-2a ④b id \'__proto__\'·\'constructor\' 줄: 관리자 저장 세 번에 9줄 그대로 · 직원 고침·지움 → 원본(승인·1일) + leave_kept',
+      nProto === 1 && nCons === 1 && nAll === 9 && byId('__proto__')[0].days === 1 && byId('__proto__')[0].del !== 1 && byId('constructor')[0].days === 1 && (r.body.leave_kept || []).indexOf('__proto__') >= 0, JSON.stringify({ nProto, nCons, nAll, kept: r.body.leave_kept, p: byId('__proto__') }));
     // ⑤ 앱 — 대역이 leave_kept를 넘기고 doSaveLeaves가 다시 읽음(글 확인)
     const fsA2 = require('fs'); const ixA2 = fsA2.readFileSync(join(ROOT, 'index.html'), 'utf8');
     T('C240 A-2a ⑤ 앱: 저장 대역이 leave_kept를 넘김 · doSaveLeaves가 leave_kept면 알림 + loadLeaves',
