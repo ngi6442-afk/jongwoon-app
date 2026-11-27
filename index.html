@@ -8215,6 +8215,7 @@
       if (d){ if (res.body && Array.isArray(res.body.files) && res.body.files.length) d.files = res.body.files; else delete d.files; d.updated_ts = Date.now(); d.updated = todayStr(); if (typeof imBaseAdvance === "function") imBaseAdvance("documents", d.id, { files: d.files }); }   // P1 판24j: 받은 사본도
       if (res.body && res.body.updated_at) _colBase["documents"] = res.body.updated_at;
       docAttRenderModal(); renderDocuments();
+      if (res.body && res.body.bytes_deleted === false){ alert("첨부 삭제 실패 (STORAGE_DELETE_FAILED)"); return; }   // C327 ②: 목록에선 빠졌지만 서버 본문이 남음 — '삭제됨'이라 하지 않음
       apprToastShow("첨부 삭제됨");
     }).catch(function(){ docAttBusy = false; alert("첨부 삭제 실패(네트워크)"); });
   }
@@ -13156,10 +13157,13 @@
     var arr=c.attachments[key];
     if(arr && i>=0 && i<arr.length){
       var att=arr[i];
-      if(att.id) gwCall("gw-data", { action:"att_del", id:att.id }).catch(function(){});
-      arr.splice(i,1);
-      if(!arr.length) delete c.attachments[key];
-      scheduleContractSave(); renderContracts();
+      var drop=function(){ var a2=c.attachments&&c.attachments[key], j=a2?a2.indexOf(att):-1; if(j>=0){ a2.splice(j,1); if(!a2.length) delete c.attachments[key]; } scheduleContractSave(); renderContracts(); };
+      // C327 ①: 서버가 지운 뒤에만 목록에서 뺀다(종전엔 결과를 안 보고 먼저 빼 서버 파일이 남아도 지운 것처럼 보임)
+      if(!att.id){ drop(); return; }
+      gwCall("gw-data", { action:"att_del", id:att.id }).then(function(res){
+        if(!res || res.status!==200){ alert("첨부 삭제 실패 (" + ((res && res.body && res.body.error_code) || (res && res.status)) + ")"); renderContracts(); return; }
+        drop();
+      }).catch(function(){ alert("첨부 삭제 실패(네트워크)"); renderContracts(); });
     }
   }
   // ---- xlsx 파싱(브라우저 내장 DecompressionStream, 외부 라이브러리 없음) ----
@@ -14467,7 +14471,7 @@
       Array.prototype.forEach.call(host.querySelectorAll("[data-proof-del]"),function(el){
         el.addEventListener("click",function(){
           if(!confirm("증빙 삭제: "+el.getAttribute("data-proof-del")+" — 맞습니까?")) return;
-          gwCall("gw-data",{action:"proof_del", name:el.getAttribute("data-proof-del")}).then(proofRefresh);
+          gwCall("gw-data",{action:"proof_del", name:el.getAttribute("data-proof-del")}).then(function(res){ if(!res || res.status!==200) alert("삭제 실패 (" + ((res && res.body && res.body.error_code) || (res && res.status)) + ")"); proofRefresh(); }).catch(function(){ alert("삭제 실패 (네트워크)"); proofRefresh(); });   // C327 ③: 종전엔 응답을 안 보고 다시 읽기만
         });
       });
     }).catch(function(){ host.innerHTML='<span style="color:#c0392b;">목록 불러오기 실패</span>'; });
@@ -16632,6 +16636,8 @@
         }
         var lm = cbxLearnMsg(b.learn);
         it.n = item.n; it.placed = 1; it.st = "done";
+        if (b.box_left){ it.att = ""; setTimeout(cbxRestore, 0); }   // C327 ②: 서버 넣기 박스에 파일이 남음 — 실제 상태대로 '넣다 만 파일' 카드로 다시 보임
+        if (b.learn && b.learn.idx_saved === false) setTimeout(function(){ cdocLoad(c, true); }, 0);   // C327 ②: 짝 표시가 색인에 안 써짐 — 서류함을 서버 그대로 다시 읽음
         var subNote = cbxSubApply(it, c), notes = [it.note, subNote].filter(Boolean).join(" ");
         var where = it.scope === "top" ? ((csTitle(c) || c.client || c.label || "") + " · ") : "";
         it.note = "";
@@ -16642,11 +16648,21 @@
     }).catch(function(){ cbxFail(it, '"' + it.name + '" 넣기 실패(네트워크)', "place"); });
   }
   function cbxLearnMsg(L){
+    if (L && L.idx_saved === false) return "";   // C327 ②: 짝 표시가 서류함 색인에 안 써짐 — '짝' 문구를 내지 않음(서류함 다시 읽기는 부르는 쪽)
     if (L && L.ok && L.status === "unmatched") return " · 내용으로 가릴 수 없는 형식이거나 비슷한 초안이 여럿이라 짝을 정하지 못했습니다";
     if (L && L.ok){ var g = L.gap || {}; return " · AI 초안(" + genLabel(L.tpl) + (L.late ? ", 이때 자동으로 만듦" : "") + ")과 짝" + (g.cell_ratio !== null && g.cell_ratio !== undefined ? " · 간극 " + Math.round(g.cell_ratio * 100) + "%" : " · 이 형식은 비교 불가"); }
     if (L && L.code === "NO_DRAFT") return " · 같은 단계에 AI 초안이 없어 비교하지 않았습니다";
     if (L && L.code === "NO_MATCH") return " · 맞는 AI 초안을 찾지 못했습니다";
     return "";
+  }
+  // C327 ①: ✕로 버린 파일은 서버가 지운 뒤에만 카드를 뺀다 — 못 지우면 카드를 그대로 두고 기존 '첨부 삭제 실패' 꼴로 알림(종전엔 결과를 안 보고 빼 다음에 다시 열면 되살아남)
+  function cbxDropAsk(it){
+    if (!it.att || it.placed){ it.att = ""; cbxRemove(it); return; }
+    var id = it.att;
+    gwCall("gw-data", { action: "att_del", id: id }).then(function(res){
+      if (!res || res.status !== 200){ alert("첨부 삭제 실패 (" + ((res && res.body && res.body.error_code) || (res && res.status)) + ")"); cbxRedraw(it.scope); return; }
+      it.att = ""; cbxRemove(it);
+    }).catch(function(){ alert("첨부 삭제 실패(네트워크)"); cbxRedraw(it.scope); });
   }
   function cbxDiscard(it){ if (it.att && !it.placed){ try { gwCall("gw-data", { action: "att_del", id: it.att }).catch(function(){}); } catch(e){} } it.att = ""; }
   function cbxChanged(it){ var a = it.ai || {}, f = it.form || {}, out = []; ["type", "pub", "combo", "title", "client", "site", "amount", "d1", "d2", "d3", "guarantee"].forEach(function(k){ if (String(a[k] === undefined ? "" : a[k]) !== String(f[k] === undefined ? "" : f[k])) out.push(k); }); return out; }
@@ -16933,7 +16949,7 @@
   function cbxAct(it, act){
     var c = it.cid ? findProc(it.cid) : null, dw;
     if ((act === "start" || act === "startnew" || act === "into") && (dw = cbxDateWhy(it))){ alert(dw); return; }   // C280: 틀린 날짜로 계약을 만들거나 채우지 않음(카드 그대로)
-    if (act === "drop" || act === "close"){ cbxDiscard(it); cbxRemove(it); }
+    if (act === "drop" || act === "close"){ cbxDropAsk(it); }   // C327 ①: 서버 결과를 보고 카드를 뺀다
     else if (act === "edit"){ it.edit = !it.edit; cbxRedraw(it.scope); }
     else if (act === "start") cbxStart(it);
     else if (act === "startnew"){ it.forceNew = 1; cbxStart(it); }
@@ -36354,6 +36370,7 @@ function dutyStage(nx){
     if (curMember() && editingMemberId === curMember().id) return;  // 본인 삭제 금지
     var delId = editingMemberId;
     gwCall("gw-auth", { action: "member_delete", id: delId }).then(function(res){
+      if (res.status !== 200 && res.body && res.body.deleted === true){ alert("삭제 실패 (" + (res.body.error_code || res.status) + ")"); members = members.filter(function(m){ return m.id !== delId; }); try{ saveUsersCache(); }catch(e){} closeMemberEdit(); drawHrRoster(); render(); return; }   // C327 ④: 회원은 지워짐(명단에서 뺌) · 색인 회수만 실패
       if (res.status !== 200){ var ec = res.body && res.body.error_code; alert(ec === "LAST_PM" ? "마지막 PM은 삭제할 수 없습니다 — 다른 관리자를 먼저 PM으로 지정하세요." : (ec === "LAST_DEV" ? "마지막 개발자는 삭제할 수 없습니다." : "삭제 실패 (" + (ec || res.status) + ")")); return; }
       members = members.filter(function(m){ return m.id !== delId; });
       try{ saveUsersCache(); }catch(e){}

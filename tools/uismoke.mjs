@@ -25438,6 +25438,37 @@ try {
   T('v578 C327 서버 문서·판 번호(정확 검사): FEATURES 기준 v578·v578 절(낱말 5) · TESTLIST v578 칸 3 · CLAUDE.md 한 줄 · sw jw-shell-v578 · 결함 사본 ' + M578.length + '개 = 모두 ✗',
     r578.ok && M578.every((v) => v === false), JSON.stringify({ r: r578.info, mut: M578 }));
 } catch (e) { console.log('  (v578 검사 생략 — ' + e.message + ')'); fails++; }
+// ── C327 ①~④(64): 실패했는데 된 것처럼 보이던 화면 자리 — 서버 결과를 보고 목록을 실제 상태로(기존 실패 글 꼴만) · 시험 화면 확인 = work\09_조사_문서\서버읽기실패_자료_20261120\C327_화면시험_1127\화면확인_결과_1127.md
+try {
+  const ix327 = readFileSync(join(ROOT, 'index.html'), 'utf8');
+  const fnBody = (s, head) => { const i = s.indexOf(head); if (i < 0) return ''; let d = 0, j = s.indexOf('{', i); for (let k = j; k < s.length; k++) { if (s[k] === '{') d++; else if (s[k] === '}') { d--; if (!d) return s.slice(i, k + 1); } } return ''; };
+  const chk327 = (s) => {
+    const con = fnBody(s, 'function conDelAttach(conId, key, i){'), drop = fnBody(s, 'function cbxDropAsk(it){'), dad = fnBody(s, 'function docAttDel(docId, n){'), lm = fnBody(s, 'function cbxLearnMsg(L){'), dm = fnBody(s, 'function deleteMemberEdit(){');
+    const P = {
+      con: /gwCall\("gw-data", \{ action:"att_del", id:att\.id \}\)\.then\(function\(res\)\{\s*if\(!res \|\| res\.status!==200\)\{ alert\("첨부 삭제 실패 \("/.test(con) && con.lastIndexOf('drop();') > con.indexOf('.then(') && !/\.catch\(function\(\)\{\}\);\s*\n\s*arr\.splice/.test(con),
+      drop: /if \(act === "drop" \|\| act === "close"\)\{ cbxDropAsk\(it\); \}/.test(s) && /if \(!res \|\| res\.status !== 200\)\{ alert\("첨부 삭제 실패 \("/.test(drop) && drop.lastIndexOf('cbxRemove(it)') > drop.indexOf('.then('),
+      bytes: /if \(res\.body && res\.body\.bytes_deleted === false\)\{ alert\("첨부 삭제 실패 \(STORAGE_DELETE_FAILED\)"\); return; \}/.test(dad) && dad.indexOf('bytes_deleted === false') < dad.indexOf('apprToastShow("첨부 삭제됨")'),
+      learn: /if \(L && L\.idx_saved === false\) return "";/.test(lm),
+      place: /if \(b\.box_left\)\{ it\.att = ""; setTimeout\(cbxRestore, 0\); \}/.test(s) && /if \(b\.learn && b\.learn\.idx_saved === false\) setTimeout\(function\(\)\{ cdocLoad\(c, true\); \}, 0\);/.test(s),
+      proof: /action:"proof_del", name:el\.getAttribute\("data-proof-del"\)\}\)\.then\(function\(res\)\{ if\(!res \|\| res\.status!==200\) alert\("삭제 실패 \("/.test(s) && !/action:"proof_del", name:el\.getAttribute\("data-proof-del"\)\}\)\.then\(proofRefresh\)/.test(s),
+      member: /if \(res\.status !== 200 && res\.body && res\.body\.deleted === true\)\{ alert\("삭제 실패 \(" \+ \(res\.body\.error_code \|\| res\.status\) \+ "\)"\); members = members\.filter/.test(dm),
+    };
+    return { ok: Object.values(P).every(Boolean), P };
+  };
+  const r327 = chk327(ix327);
+  const mu327 = (a, b) => { if (ix327.split(a).length !== 2) return 'err:' + a.slice(0, 30); return chk327(ix327.replace(a, () => b)).ok; };
+  const M327 = [
+    mu327('if (act === "drop" || act === "close"){ cbxDropAsk(it); }', 'if (act === "drop" || act === "close"){ cbxDiscard(it); cbxRemove(it); }'),
+    mu327('      if (res.body && res.body.bytes_deleted === false){ alert("첨부 삭제 실패 (STORAGE_DELETE_FAILED)"); return; }', ''),
+    mu327('    if (L && L.idx_saved === false) return "";', ''),
+    mu327('        if (b.box_left){ it.att = ""; setTimeout(cbxRestore, 0); }', ''),
+    mu327('.then(function(res){ if(!res || res.status!==200) alert("삭제 실패 ("', '.then(function(res){ if(false) alert("삭제 실패 ("'),
+    mu327('      if (res.status !== 200 && res.body && res.body.deleted === true){', '      if (false){'),
+    mu327('        if(!res || res.status!==200){ alert("첨부 삭제 실패 (" + ((res && res.body && res.body.error_code) || (res && res.status)) + ")"); renderContracts(); return; }\n        drop();', '        drop();'),
+  ];
+  T('C327 ①~④ 화면: 계약 첨부 ✕·넣기 박스 ✕ = 서버가 지운 뒤에만 빼고 실패면 기존 \'첨부 삭제 실패 (코드)\' · 문서함 첨부 본문 남음 = \'첨부 삭제됨\' 대신 실패 알림 · 박스 정리 남음 = 넣다 만 파일 다시 잇기 · 짝 표시 못 씀 = \'짝\' 문구 없음·서류함 다시 읽기 · 증빙 삭제 응답 봄 · 회원 삭제 deleted:true = 명단에서 빼고 알림 · 결함 사본 ' + M327.length + '개 = 모두 ✗',
+    r327.ok && M327.every((v) => v === false), JSON.stringify({ P: r327.P, mut: M327 }));
+} catch (e) { console.log('  (C327 ①~④ 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
