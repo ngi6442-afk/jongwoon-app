@@ -9,6 +9,7 @@ const { setupBlobContext, store, blobGet, blobSet, blobDelete, blobList } = requ
 const MW = require('./_lib/markwrite');   // C225 판 A 두 번째 검토 — 창을 못 읽은 요청의 속도 제한 기록 쓰기(inquiry:rl)
 const { verifyToken, bearer } = require('./_lib/session');
 const { appendAudit, auditKey, diffItems, MAX_PER_MONTH: AUDIT_MAX_PER_MONTH } = require('./_lib/audit');
+const LINELOG = require('./_lib/linelog');   // C304 열람 기록(doclog·reclog) 줄 열쇠 — 쓰기·읽기·접기(감사 C251과 같은 꼴)
 const IMG = require('./_lib/imgsniff');   // C265 홍보 사진 형식(머리 바이트) 확인
 const { badBlobKey } = require('./_lib/blobkey');   // v453 Blobs 키 이름 검사(backup_get·backup_put 400 BAD_KEY — blobs.js도 같은 검사로 SDK 앞에서 막음)
 const AL = require('./_lib/apprlearn');   // v413 결재 학습 신호(clog:appr → lessons:appr, 모델 없음)
@@ -3761,7 +3762,7 @@ async function handleConClogAdd(event, d, R) {
 // ---- 계약 서류함 cdoc(v406, 계약 D3 1일차 · 설계안 10/22 §4-1 Stored 1안) — 기록물은 Blobs만(git 경로 없음), append-only, 새 버전=새 키, 소프트 삭제 → 30일 뒤 관리자 confirm 영구 삭제(R3) ----
 // 바이트: gw_files 'cdoc:<cid>:S<nn>:<doc_key>:<n>' {name(표준 파일명), orig(올린 이름), type(확장자 고정표), kind, data|fill, by, ts, sha}
 // 색인:  gw_data  'recidx:<cid>' {schema, cid, seq, items:[{n,i,dk,kind,ver,cur,name,orig,ext,size,sha,pii,by,ts,del?,del_by?,purged?,gc?}]} — 항목은 지우지 않는다(표식만)
-// 열람 기록: gw_data 'reclog:YYYY-MM'(doclog 패턴) · 감사: col 'contracts' op 기록물등록/기록물보관/기록물복구/기록물현재/기록물영구삭제 — 실패 시 응답 audit:false
+// 열람 기록: gw_data 'reclog:YYYY-MM'(doclog 패턴 · C304부터 줄마다 'reclog:YYYY-MM:e:…' + 접은 문서 ':f:…' — _lib/linelog.js) · 감사: col 'contracts' op 기록물등록/기록물보관/기록물복구/기록물현재/기록물영구삭제 — 실패 시 응답 audit:false
 // 표준 파일명(설계 §4-1 명명): C<cid>_S<nn>_<doc_key>_v<N>_<YYYYMMDD>[_종운환경|_종운건설].<ext> — 회사는 거울 map:contract:v1 단계 co(env/con)로 서버가 정한다. 발주처명·금액은 이름에 넣지 않는다
 // pii 0=없음(기본) 1=근로자 명단·위임장·신분증 등(contracts 'do' 또는 관리자만 열람) 2=건강진단 결과표 등 민감정보(관리자·관리부만 + 열람 사유 필수, 학습·주입 제외)
 const CDOC_KINDS = { draft: 1, final: 1, received: 1 };
@@ -3787,17 +3788,12 @@ function recLogKey(month) {
   const d = new Date(Date.now() + 9 * 3600 * 1000);
   return 'reclog:' + d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0');
 }
+// C304(11/27 「원천」): 종전엔 그달 문서를 읽고 → 한 줄 붙이고 → 통째로 써서 두 열람이 0.1초 안에 겹치면 둘 다 true인데 한 줄이 사라졌다(재현 40줄 중 37줄).
+//   지금은 줄마다 새 열쇠 'reclog:YYYY-MM:e:…'(_lib/linelog.js append — 감사 C251과 같은 꼴). 반환값 뜻은 그대로: 남겼으면 true · 못 남김 false(부르는 쪽이 개인정보 열람·양식 받기를 막음).
+//   그달 머리를 읽지 않으므로(C225 '못 읽으면 쓰지 않음'의 대상 문서가 없어짐) 머리를 못 읽는 때에도 이 줄은 남는다 — 못 남기는 때 = 이 줄 열쇠 쓰기 실패뿐.
+//   월 상한 RECLOG_MAX는 읽는 쪽(rec_log_get)이 합친 결과로 판정(종전 쓰는 쪽이 오래된 줄을 잘라 냄 — 지금은 저장소에서 지우지 않고 보여 주는 쪽에서만 같은 수로 자름).
 async function appendRecLog(st, entry) {
-  try {
-    const key = recLogKey();
-    const r = await blobGet(st, key);
-    if (!r.ok && r.code !== 'NOT_FOUND') return false;   // C225 판 A: 그달 기록을 못 읽으면 빈 기록에 이번 줄만 쓰지 않음(기록 실패로 돌려줌)
-    const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
-    doc.items.push(entry);
-    if (doc.items.length > RECLOG_MAX) doc.items = doc.items.slice(-RECLOG_MAX);
-    const w = await blobSet(st, key, doc);
-    return !!(w && w.ok);
-  } catch (e) { return false; }
+  return LINELOG.append(st, recLogKey(), entry);
 }
 // ---- 학습 짝(v410, 계약 D4 2일차 — 설계 §5 "같은 (계약·단계)의 final 업로드 즉시 learn:contract:in 생성") ----
 // 최종본이 올라오면 같은 단계의 현재 초안(생성 훅 gen.<양식> fill, 또는 draft 파일)과 짝을 만들고 셀·문단 단위 차이와 간극을 그 자리에서 잰다(모델 호출 없음).
@@ -4655,8 +4651,10 @@ async function handleRecLogGet(event, d, R) {
   if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   const month = (typeof d.month === 'string' && /^\d{4}-\d{2}$/.test(d.month)) ? d.month : '';
   const key = recLogKey(month);
-  const r = await blobGet(store(DATA), key);
-  const items = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : [];
+  // C304: 옛 머리 + 줄 열쇠 + 접은 문서를 시각순으로 합쳐 읽는다(_lib/linelog.js readMonth) · 하나라도 못 읽으면 503(C225 — 종전엔 못 읽으면 빈 달로 보임) · 월 상한은 합친 결과로(종전 쓰는 쪽 자르기와 같은 수)
+  const rm = await LINELOG.readMonth(store(DATA), key);
+  if (!rm.ok) return jr(503, { status: 'ERROR', error_code: 'RECLOG_READ_FAILED', request_id: R });
+  const items = rm.items.length > RECLOG_MAX ? rm.items.slice(-RECLOG_MAX) : rm.items;
   const limit = Math.min(500, Math.max(1, parseInt(d.limit, 10) || 200));
   return jr(200, { status: 'OK', month: key.slice(7), total: items.length, items: items.slice(-limit).reverse(), request_id: R });
 }
@@ -5563,6 +5561,7 @@ function _bkCount(v) {
 //       '재해복원' 1줄 자리를 남긴다(상한 꽉 채우면 그 1줄이 가장 오래된 진짜 줄을 밀어내므로).
 //       알려진 한계: 읽기 → 병합 → 쓰기 사이에 앱의 appendAudit이 같은 달 키에 쓴 줄은 덮일 수 있다(appendAudit도 같은 읽고-쓰기 — 조건부 쓰기가 없는 SDK). 재해 복원은 앱 사용이 없는 때에.
 //       C251(11/20): appendAudit는 조각 문서를 더는 쓰지 않고 줄마다 새 열쇠(audit:YYYY-MM:e:…)에 쓴다 — 위 한계는 옛 판으로 되돌린 동안에만 남는다. 줄 열쇠도 같은 갈래(audit)로 복원된다(값이 { items:[줄] }라 같은 병합 — 열쇠 하나씩).
+//       C304(11/27): 열람 기록 doclog·reclog도 같은 꼴(줄 열쇠 'doclog:YYYY-MM:e:…'·접은 문서 ':f:…' — _lib/linelog.js) — 접두어가 같아 같은 갈래(doclog·reclog)·같은 병합(열쇠 하나씩 · 상한은 열쇠마다 — 줄 열쇠 1줄·접은 문서 ≤ 2,000줄).
 //     · clog:*(해시 체인 — clog:contract·clog:contract:YYYY-MM은 첫 줄 p '' 엄격, clog:appr:YYYY-MM은 상한에서 앞이 잘려 시작 p 허용 · 상한 CON_CLOG_MAX·CON_CLOG_MONTH_MAX·DONEIF.CLOG_MAX):
 //       백업 체인이 온전해야(아니면 400 CLOG_CHAIN_BAD) · 지금 체인 뒤를 잇는 백업이면 그 뒤 줄만 붙이고, 백업이 같거나 짧으면 400 CLOG_NOT_AHEAD,
 //       갈라졌거나 지금 체인이 깨졌으면 지금 줄을 버리지 않고 다시 잇는다(backupClogMerge — rechained 표식 · 문서 restored 범위 · 감사 from/to) · 상한 넘으면 400 CLOG_FULL.
@@ -6013,24 +6012,17 @@ function docOrigAllowed(m, it) {
   if (docMinorOf(it) === '03') return true;
   return it.orig_dl === 'all';
 }
-// 열람 기록 — 월 블롭 doclog:YYYY-MM(KST), 감사로그와 같은 방식(실패는 삼킴 — 기록이 열람을 막지 않는다). 상한 5,000건/월
+// 열람 기록 — 월 블롭 doclog:YYYY-MM(KST), 감사로그와 같은 방식(실패는 삼킴 — 기록이 열람을 막지 않는다). 상한 5,000건/월 · C304부터 줄마다 'doclog:YYYY-MM:e:…'(옛 머리는 그대로 읽음 · 접기 = gw-audit-fold-cron)
 const DOCLOG_MAX = 5000;
 function docLogKey(month) {
   if (month && /^\d{4}-\d{2}$/.test(month)) return 'doclog:' + month;
   const d = new Date(Date.now() + 9 * 3600 * 1000);
   return 'doclog:' + d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0');
 }
+// C304(11/27 「원천」): 줄마다 새 열쇠 'doclog:YYYY-MM:e:…'(_lib/linelog.js append) — 종전 '읽고 → 붙이고 → 통째로 쓰기'는 두 열람이 겹치면 한 줄이 사라졌다(재현 40줄 중 36~37줄).
+//   반환값 뜻 그대로(C225: 남겼는지 — 못 남긴 열람은 doc_att_get 응답 logged:false) · 월 상한 DOCLOG_MAX는 읽는 쪽(doc_log_get)이 합친 결과로 판정.
 async function appendDocLog(st, entry) {
-  try {
-    const key = docLogKey();
-    const r = await blobGet(st, key);
-    if (!r.ok && r.code !== 'NOT_FOUND') return false;   // C225 판 A: 그달 기록을 못 읽으면 빈 기록에 이번 줄만 쓰지 않음
-    const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
-    doc.items.push(entry);
-    if (doc.items.length > DOCLOG_MAX) doc.items = doc.items.slice(-DOCLOG_MAX);
-    const w = await blobSet(st, key, doc);
-    return !!(w && w.ok);   // C225: 남겼는지 돌려줌(종전엔 돌려주는 값 없음)
-  } catch (e) { return false; }
+  return LINELOG.append(st, docLogKey(), entry);
 }
 async function handleDocLogGet(event, d, R) {
   const c = await currentMember(event);
@@ -6038,8 +6030,10 @@ async function handleDocLogGet(event, d, R) {
   if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   const month = (typeof d.month === 'string' && /^\d{4}-\d{2}$/.test(d.month)) ? d.month : '';
   const key = docLogKey(month);
-  const r = await blobGet(store(DATA), key);
-  const items = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data.items : [];
+  // C304: 옛 머리 + 줄 열쇠 + 접은 문서 합쳐 읽기 · 못 읽으면 503(화면은 종전 글 '열람 이력을 불러오지 못했습니다 (코드)') · 월 상한은 합친 결과로
+  const rm = await LINELOG.readMonth(store(DATA), key);
+  if (!rm.ok) return jr(503, { status: 'ERROR', error_code: 'DOCLOG_READ_FAILED', request_id: R });
+  const items = rm.items.length > DOCLOG_MAX ? rm.items.slice(-DOCLOG_MAX) : rm.items;
   const limit = Math.min(500, Math.max(1, parseInt(d.limit, 10) || 200));
   return jr(200, { status: 'OK', month: key.slice(7), total: items.length, items: items.slice(-limit).reverse(), request_id: R });
 }
