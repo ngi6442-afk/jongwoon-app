@@ -1955,7 +1955,8 @@ async function handleProofPut(event, d, R) {
   const om = (idx.ok && idx.data && idx.data.meta && typeof idx.data.meta === 'object' && !Array.isArray(idx.data.meta)) ? idx.data.meta : {};
   list.forEach(function (n) { if (hasOwn(om, n) && om[n] && typeof om[n] === 'object') meta[n] = om[n]; });
   meta[name] = { ts: now, file: String(d.name || '').slice(0, 120), by_id: String(c.member.id || '') };
-  await blobSet(st, 'proof:__index__', { names: list, meta: meta });
+  const iw = await blobSet(st, 'proof:__index__', { names: list, meta: meta });   // C238 판 E: 색인 쓰기 결과를 봄(본문은 들어갔는데 목록에 안 보이는 채 200이던 것 — 다시 넣으면 색인을 씀)
+  if (!iw.ok) return jr(500, { status: 'ERROR', error_code: iw.code || 'STORAGE_WRITE_FAILED', request_id: R });
   return jr(200, { status: 'OK', name: name, request_id: R });
 }
 // C240 판 A: 증빙 읽기(목록·본문) = 관리자 또는 기기 승인 + 계약 권한 숨김 아님 — 앱에서 보관함을 여는 길은 계약 탭 서류 창의 적격심사 패킷 생성 뒤
@@ -1998,11 +1999,13 @@ async function handleProofDel(event, d, R) {
   // C225 판 A: 색인을 먼저 읽는다 — 못 읽으면 본문도 지우지 않고 500(지울 한 건이 아니라 나머지 목록 전부가 사라지던 길)
   const idx = await blobGet(st, 'proof:__index__');
   if (!idx.ok && idx.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: idx.code || 'STORAGE_READ_FAILED', request_id: R });
-  await blobDelete(st, 'proof:' + name);
+  const bd = await blobDelete(st, 'proof:' + name);   // C238 판 E: 본문을 못 지우면 색인·감사 전에 500(목록에서만 빠지고 본문이 남던 것)
+  if (!bd.ok) return jr(500, { status: 'ERROR', error_code: bd.code || 'STORAGE_DELETE_FAILED', request_id: R });
   const list = ((idx.ok && idx.data && Array.isArray(idx.data.names)) ? idx.data.names : []).filter(function (n) { return n !== name; });
   const om = (idx.ok && idx.data && idx.data.meta && typeof idx.data.meta === 'object' && !Array.isArray(idx.data.meta)) ? idx.data.meta : {};
   const meta = {}; list.forEach(function (n) { if (hasOwn(om, n) && om[n] && typeof om[n] === 'object') meta[n] = om[n]; });   // P1 판19: 지운 항목의 시각 메타도 같이 뺀다
-  await blobSet(st, 'proof:__index__', { names: list, meta: meta });
+  const iw = await blobSet(st, 'proof:__index__', { names: list, meta: meta });   // C238 판 E: 색인 쓰기 결과(본문은 지워짐 — 목록은 본문 없는 이름을 건너뜀 · 다시 지우면 색인을 씀)
+  if (!iw.ok) return jr(500, { status: 'ERROR', error_code: iw.code || 'STORAGE_WRITE_FAILED', request_id: R });
   try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '증빙삭제', id: name.slice(0, 40), t: '' }] }); } catch (e) {}
   return jr(200, { status: 'OK', request_id: R });
 }
@@ -5124,7 +5127,8 @@ async function apprCreateItem(st, member, o) {
         if (cur2 && cur2.updated !== dr2.updated && (cur2.status === '대기' || cur2.status === '보류')) {
           cur2.title = dr2.title; cur2.body = dr2.body; cur2.by = dr2.by; cur2.updated = dr2.updated; if (dr2.to) cur2.to = dr2.to;
           chk2.data.updated_by = member.id; chk2.data.updated_at = Date.now();
-          await blobSet(st, colKey('approvals'), chk2.data);
+          const w2 = await blobSet(st, colKey('approvals'), chk2.data);   // C238 판 E: 합쳐 다시 쓴 결과를 봄(겹친 저장에 정정이 되돌려진 채 성공이던 것)
+          if (!w2.ok) return { ok: false, code: w2.code || 'STORAGE_WRITE_FAILED' };
         }
       }
     } catch (e) {}
@@ -5175,7 +5179,8 @@ async function apprCreateItem(st, member, o) {
     if (chk.ok && chk.data && Array.isArray(chk.data.items) && !chk.data.items.some(function (x) { return x && x.id === item.id; })) {
       chk.data.items.push(item);
       chk.data.updated_by = member.id; chk.data.updated_at = Date.now();
-      await blobSet(st, colKey('approvals'), chk.data);
+      const w2 = await blobSet(st, colKey('approvals'), chk.data);   // C238 판 E: 합쳐 다시 쓴 결과를 봄(겹친 저장에 밀린 상신이 빠진 채 성공이던 것)
+      if (!w2.ok) return { ok: false, code: w2.code || 'STORAGE_WRITE_FAILED' };
     }
   } catch (e) {}
   // 전결 종결은 감사로그 '전결' 1건(상신+결재를 한 행위로 기록) · 푸시 없음(본인 결재 — 결재 요청도 결과 통지도 받을 사람이 없다)
@@ -5274,7 +5279,8 @@ async function handleApprovalDecide(event, d, R) {
         if (it.to) cur.to = it.to;
         if (Array.isArray(it.chain)) cur.chain = it.chain;
         chk.data.updated_by = c.member.id; chk.data.updated_at = Date.now();
-        await blobSet(st, colKey('approvals'), chk.data);
+        const w2 = await blobSet(st, colKey('approvals'), chk.data);   // C238 판 E: 합쳐 다시 쓴 결과를 봄(겹친 저장에 결재가 되돌려진 채 200·알림이던 것 — 감사·알림·등재 반영 전에 500)
+        if (!w2.ok) return jr(500, { status: 'ERROR', error_code: w2.code || 'STORAGE_WRITE_FAILED', request_id: R });
         newBase = chk.data.updated_at;
       } else if (chk.data.updated_at) newBase = chk.data.updated_at;
     }

@@ -18899,4 +18899,68 @@ function J91a(x) { return JSON.stringify(x); }
   } catch (e) { T('C238 판 D 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
 }
 
+{ // ---- C238 판 E(11/27) 증빙·결재 쓰기 결과 — 증빙 색인 쓰기·본문 지우기 · 결재 상신·결재의 겹친 저장 합쳐 다시 쓰기
+  //   거절: 증빙 색인 못 씀 = 500 → 다시 넣으면 200·목록에 보임 · 증빙 본문 못 지움 = 500·색인·감사 그대로 · 색인 못 씀 = 500 → 다시 지우면 200 ·
+  //         상신·결재가 겹친 저장에 밀리고 합쳐 쓰기 실패 = 500·감사 없음. 허용: 정상 = 종전. 결함 사본 = 고친 곳을 하나씩 되돌림 → 실패해야 한다.
+  const fsE238 = require('fs'), ModE238 = require('module');
+  const FDATAE = join(FN, 'gw-data.js'), SDATAE = fsE238.readFileSync(FDATAE, 'utf8');
+  const loadE238 = (src) => { const m = new ModE238(FDATAE); m.filename = FDATAE; m.paths = ModE238._nodeModulePaths(dirname(FDATAE)); m._compile(src, FDATAE); return m.exports; };
+  const snapE238 = JSON.stringify({ d: mem.gw_data || {}, f: mem.gw_files || {} });
+  const PDFe = Buffer.from('%PDF-1.4 e238!!').toString('base64');
+  const chkE238 = async (GD) => {
+    const c = async (body, tok, dev) => { const r = await GD.handler({ httpMethod: 'POST', headers: Object.assign({ authorization: 'Bearer ' + tok }, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+    const P = {}, I = {};
+    const reset = () => { const s = JSON.parse(snapE238); mem.gw_data = s.d; mem.gw_files = s.f; ['failSet', 'failDel', 'afterSet'].forEach((h) => { blobsMock.hooks[h] = null; }); auditMock.logs.length = 0; };
+    const race = (key) => { const before = JSON.parse(JSON.stringify(mem.gw_data[key] || { schema: 1, items: [] })); let n = 0;
+      blobsMock.hooks.afterSet = async (k) => { if (k === key && n++ === 0) { mem.gw_data[key] = JSON.parse(JSON.stringify(before)); blobsMock.hooks.failSet = (x) => x === key; } }; };
+    const aud = (op) => auditMock.logs.some((l) => l && (l.ev || []).some((e) => e && e.op === op));
+    const pnames = () => ((mem.gw_files['proof:__index__'] || {}).names || []);
+    try {
+      // ① 증빙 넣기 — 색인 못 씀 → 500 → 다시 넣기 200·목록에 이름
+      reset(); blobsMock.hooks.failSet = (k) => k === 'proof:__index__';
+      let r = await c({ action: 'proof_put', name: 'c238증빙', file: 'a.pdf', data: PDFe }, tokA); blobsMock.hooks.failSet = null;
+      const r1b = await c({ action: 'proof_put', name: 'c238증빙', file: 'a.pdf', data: PDFe }, tokA);
+      const nm = pnames().find((x) => /c238/.test(x)) || '';
+      P.put = r.code === 500 && r1b.code === 200 && !!nm; I.put = [r.code, r.body.error_code, r1b.code, nm];
+      // ② 증빙 지우기 — 본문 못 지움 → 500·색인 그대로·감사 없음 / 색인 못 씀 → 500 → 다시 지우기 200·색인에서 빠짐
+      blobsMock.hooks.failDel = (k) => k === 'proof:' + nm; r = await c({ action: 'proof_del', name: nm }, tokA); blobsMock.hooks.failDel = null;
+      const d1 = r.code === 500 && pnames().indexOf(nm) >= 0 && !!mem.gw_files['proof:' + nm] && !aud('증빙삭제');
+      blobsMock.hooks.failSet = (k) => k === 'proof:__index__'; const r2 = await c({ action: 'proof_del', name: nm }, tokA); blobsMock.hooks.failSet = null;
+      const d2 = r2.code === 500 && !aud('증빙삭제');
+      const r3 = await c({ action: 'proof_del', name: nm }, tokA);
+      P.del = d1 && d2 && r3.code === 200 && pnames().indexOf(nm) < 0 && aud('증빙삭제'); I.del = [r.code, r2.code, r3.code];
+      // ③ 상신 — 겹친 저장에 밀리고 합쳐 쓰기 실패 → 500·감사 없음
+      reset(); race('col:approvals'); r = await c({ action: 'approval_create', kind: '지시', title: 'C238 상신' }, tokW, 'dev1');
+      P.create = r.code === 500 && !aud('상신'); I.create = [r.code, r.body.error_code];
+      // ④ 결재 — 상신(정상) 뒤 결재가 겹친 저장에 되돌려지고 합쳐 쓰기 실패 → 500·감사 없음·카드 그대로 대기
+      reset(); const cr = await c({ action: 'approval_create', kind: '지시', title: 'C238 결재' }, tokW, 'dev1'); auditMock.logs.length = 0;
+      race('col:approvals'); r = await c({ action: 'approval_decide', id: cr.body.id, decision: '승인' }, tokA);
+      const card = ((mem.gw_data['col:approvals'] || {}).items || []).find((x) => x && x.id === cr.body.id) || {};
+      P.decide = cr.code === 200 && r.code === 500 && !aud('결재') && card.status === '대기'; I.decide = [cr.code, r.code, r.body.error_code, card.status];
+      // ⑤ 허용(정상 무변): 증빙 넣기·지우기 · 상신 · 결재 = 200
+      reset(); const n1 = await c({ action: 'proof_put', name: 'c238증빙2', file: 'b.pdf', data: PDFe }, tokA);
+      const nm2 = pnames().find((x) => /c238/.test(x)) || ''; const n2 = await c({ action: 'proof_del', name: nm2 }, tokA);
+      const n3 = await c({ action: 'approval_create', kind: '지시', title: 'C238 정상' }, tokW, 'dev1'); const n4 = await c({ action: 'approval_decide', id: n3.body.id, decision: '승인' }, tokA);
+      const card2 = ((mem.gw_data['col:approvals'] || {}).items || []).find((x) => x && x.id === n3.body.id) || {};
+      P.normal = [n1, n2, n3, n4].every((x) => x.code === 200) && pnames().indexOf(nm2) < 0 && card2.status === '승인' && aud('상신') && aud('결재');
+      I.normal = [n1.code, n2.code, n3.code, n4.code, card2.status];
+    } finally { const s = JSON.parse(snapE238); mem.gw_data = s.d; mem.gw_files = s.f; ['failSet', 'failDel', 'afterSet'].forEach((h) => { blobsMock.hooks[h] = null; }); }
+    return { ok: Object.values(P).every((v) => v === true), info: { P, I } };
+  };
+  try {
+    const E0 = await chkE238(loadE238(SDATAE));
+    T('C238 판 E 증빙·결재 쓰기 결과: 증빙 색인 못 씀 = 500 → 다시 넣기 200 · 본문 못 지움 = 500·색인·감사 그대로 · 색인 못 씀 = 500 → 다시 지우기 200 · 상신·결재가 겹친 저장에 밀리고 합쳐 쓰기 실패 = 500·감사 없음·카드 대기 · 정상 4길 200 무변', E0.ok, JSON.stringify(E0.info));
+    const MUTE = [
+      ["  if (!iw.ok) return jr(500, { status: 'ERROR', error_code: iw.code || 'STORAGE_WRITE_FAILED', request_id: R });\n  return jr(200, { status: 'OK', name: name, request_id: R });", "  return jr(200, { status: 'OK', name: name, request_id: R });"],
+      ["  if (!bd.ok) return jr(500, { status: 'ERROR', error_code: bd.code || 'STORAGE_DELETE_FAILED', request_id: R });\n", ''],
+      ["  if (!iw.ok) return jr(500, { status: 'ERROR', error_code: iw.code || 'STORAGE_WRITE_FAILED', request_id: R });\n  try { await appendAudit", "  try { await appendAudit"],
+      ["      const w2 = await blobSet(st, colKey('approvals'), chk.data);   // C238 판 E: 합쳐 다시 쓴 결과를 봄(겹친 저장에 밀린 상신이 빠진 채 성공이던 것)\n      if (!w2.ok) return { ok: false, code: w2.code || 'STORAGE_WRITE_FAILED' };\n", "      await blobSet(st, colKey('approvals'), chk.data);\n"],
+      ["        if (!w2.ok) return jr(500, { status: 'ERROR', error_code: w2.code || 'STORAGE_WRITE_FAILED', request_id: R });\n        newBase = chk.data.updated_at;", "        newBase = chk.data.updated_at;"],
+    ];
+    const kill = [];
+    for (const [from, to] of MUTE) { let k; try { if (SDATAE.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); k = !(await chkE238(loadE238(SDATAE.replace(from, () => to)))).ok; } catch (e) { k = 'err ' + e.message; } if (k !== true) kill.push(from.trim().slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k)); }
+    T('C238 판 E 결함 사본 ' + MUTE.length + '개(증빙 넣기 색인 · 증빙 본문 지우기 · 증빙 지우기 색인 · 상신 합쳐 쓰기 · 결재 합쳐 쓰기) 모두 잡힘', kill.length === 0, kill.join(' | '));
+  } catch (e) { T('C238 판 E 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);
