@@ -129,9 +129,9 @@ function dutyNext(d, lic, today){
       if (start < 0){ start = 0; while (start < cands.length && dutyAddMonths(cands[start], per) <= lim) start++; }   // 기준 없음: DUTY_FROM에 이미 한 주기 넘게 지난 회차는 안 보인다(그 뒤 회차는 닫힐 때까지 남음 — 판20 검토 A)
     } else {   // last_done · manual — 직전 이행일(runs) 또는 사람이 넣은 기준일부터 한 주기
       if (!anchor){ out.missing = "base"; return out; }
-      due = dutyAddMonths(anchor, per);
-      if (grace) due = dutyAddDays(due, grace);
-      for (k = 0; k < 6; k++){ cands.push(due); due = dutyAddMonths(due, per); }
+      // C244(계산 검산 11/20): 유예는 회차마다 그 회차 기준일에 한 번만 붙인다 — 유예를 더한 앞 회차에 다시 주기를 더하면 유예가 쌓였다(71행 6개월·유예 30: 2027-07-29 → 2027-07-30)
+      due = anchor;
+      for (k = 0; k < 6; k++){ due = dutyAddMonths(due, per); cands.push(grace ? dutyAddDays(due, grace) : due); }
     }
   } else {
     return null;   // event·always·na — 자동 회차 없음

@@ -3983,6 +3983,15 @@
   }
 
   var CURRENT_KEYS = periodKeys(new Date());
+  // C244(계산 검산 11/20): 주기 키는 페이지를 연 때 한 번만 정해져, 자정·월요일·매월 1일을 넘겨 켜 둔 화면이 지난 주기 칸에 완료를 적었다.
+  //   periodKeysRoll(type) = 지금 시각으로 다시 센 키가 그린 키와 다르면 CURRENT_KEYS를 바꾸고 true(type을 주면 그 주기만 비교 — 없는 주기 이름은 비교 안 함).
+  //   적는 곳(toggleItem·approveCheck·rejectCheck)은 바뀌었으면 적지 않고 새 주기로 다시 그린다 · 화면이 다시 보일 때(periodKeysRedraw)도 바뀌었으면 다시 그린다
+  function periodKeysRoll(type){
+    var nk = periodKeys(new Date()), ch = false;
+    Object.keys(nk).forEach(function(t){ if ((!type || t === type) && nk[t] !== CURRENT_KEYS[t]) ch = true; });
+    if (ch) CURRENT_KEYS = nk;
+    return ch;
+  }
 
   function b64DecodeUnicode(str){
     var binary = atob(str.replace(/\n/g, ""));
@@ -6781,6 +6790,7 @@
   function toggleItem(type, itemId){
     var isAssignee = checkAssignee[itemId] && checkAssignee[itemId] === getMemberId();
     if (!canDo("check") && !isAssignee) return;
+    if (periodKeysRoll(type)){ renderList(); renderSummary(); return; }   // C244: 주기가 넘어간 화면 — 지난 주기 칸에 적지 않고 새 주기로 다시 그림
     var key = CURRENT_KEYS[type];
     if (!records[type]) records[type] = {};
     if (!records[type][key]) records[type][key] = {};
@@ -6801,6 +6811,7 @@
   }
   function approveCheck(type, id){
     if (!isAdmin()) return;
+    if (periodKeysRoll(type)){ renderList(); renderSummary(); return; }   // C244
     var key = CURRENT_KEYS[type];
     if (!records[type]) records[type] = {};
     if (!records[type][key]) records[type][key] = {};
@@ -6811,6 +6822,7 @@
   }
   function rejectCheck(type, id){
     if (!isAdmin()) return;
+    if (periodKeysRoll(type)){ renderList(); renderSummary(); return; }   // C244
     clearReview(type, CURRENT_KEYS[type], id);
     saveCache(); renderList(); renderSummary(); scheduleSave();
   }
@@ -22065,6 +22077,7 @@
       return k === "super" ? (y + 1) + "-12-31" : eduHalfEnd(date);
     }
     if (k === "spec_med") return asbAddMonths(date, eduMonthsFor(k, p, org));   // v451 검토: 검진 만료일(asbMedUntil)과 같은 달 더하기(말일 맞춤)
+    if (eduYearEndDue(k, date)) return eduYearEndDue(k, date);   // C244: 건설기계조종사 안전교육·운수종사자 정기교육 = 해 끝 기한(체크 칸 줄과 같은 값)
     dt = new Date(date + "T00:00:00"); dt.setMonth(dt.getMonth() + eduMonthsFor(k, p, org));
     return fmtDate(dt);
   }
@@ -22297,7 +22310,7 @@
           for (i = 0; i < x.age.length; i++){ if (age >= x.age[i][0]){ mon = x.age[i][1]; break; } }
           basis += " · 만 " + age + "세 = " + (mon % 12 === 0 ? (mon / 12) + "년" : mon + "개월") + "마다";
         }
-        it = rec ? eduCycle(x.k, rec, mon, basis) : eduIt({ t: "기록 없음", cls: "vs-warn", tgt: true, miss: true, cat: "기록 없음", kind: x.k, basis: basis + " — 기록 없음" });
+        it = rec ? eduCycle(x.k, rec, mon, basis, eduYearEndDue(x.k, rec.date)) : eduIt({ t: "기록 없음", cls: "vs-warn", tgt: true, miss: true, cat: "기록 없음", kind: x.k, basis: basis + " — 기록 없음" });
         out.push({ k: x.k, lab: lab, it: it });
       });
     });
@@ -22319,6 +22332,11 @@
   function eduRegNeed(m, y, sup){ return (sup ? EDU_STD.super : ((m && m.office === true) ? EDU_STD.office : EDU_STD.other)) * (eduReduceOn(m, y) ? 0.5 : 1); }   // 정기교육 기준 시간(사무직 반기 6 · 그 밖 12 · 관리감독자 연 16 — 감면 해는 3 · 6 · 8)
   function eduYm(d){ return isDate(d) ? d.slice(0, 7) : ""; }
   function eduAddMonths(d, n){ var dt = new Date(d + "T00:00:00"); dt.setMonth(dt.getMonth() + n); return fmtDate(dt); }
+  // C244(계산 검산 11/20) 해 끝 기한 — 마지막 기록 + 개월이 아니라 (마지막 기록 해 + n)년 12-31인 두 종류. 그 밖 종류는 "" (종전 개월 더하기)
+  //   cm_edu 3: 건설기계관리법 시행규칙 83조③2호 '마지막으로 안전교육등을 받은 날부터 3년이 되는 날이 속하는 해의 1월 1일부터 12월 31일까지'(의무 대장 14행)
+  //   drv_edu 1: 의무 대장 4행 '매년 1회 이상을 달력연도 단위(매년 12/31까지)로 읽음' — 이수한 해의 다음 해 12-31
+  //   체크 칸 펼침 줄(eduQualItems → eduCycle dueAt)과 기록 창 다음 예정(eduNextFor)이 이 한 곳을 쓴다
+  function eduYearEndDue(k, d){ var n = k === "cm_edu" ? 3 : (k === "drv_edu" ? 1 : 0); return (n && isDate(d)) ? (Number(d.slice(0, 4)) + n) + "-12-31" : ""; }
   function eduSiteStart(r){ var s = siteTermPart(r && r.start); return isDate(s) ? s : ""; }
   // v447 검토 2: 올해 위험성평가 회차(직원 결과 공유 판정이 거는 평가일) — 위험성평가 두 종류 줄의 회차 표식 중
   //   ① 직원(회원) 줄만: 일용직 줄·시험 계정(test_acct)·지운 회원·회원 목록에 없는 id의 줄은 빼고(행에서 뺀 사람의 기록이 다른 사람 판정에 들지 않게 — 종전엔 시험 계정·일용직 한 줄이 전원 기한을 정함)
@@ -30660,9 +30678,9 @@ function dutyNext(d, lic, today){
       if (start < 0){ start = 0; while (start < cands.length && dutyAddMonths(cands[start], per) <= lim) start++; }   // 기준 없음: DUTY_FROM에 이미 한 주기 넘게 지난 회차는 안 보인다(그 뒤 회차는 닫힐 때까지 남음 — 판20 검토 A)
     } else {   // last_done · manual — 직전 이행일(runs) 또는 사람이 넣은 기준일부터 한 주기
       if (!anchor){ out.missing = "base"; return out; }
-      due = dutyAddMonths(anchor, per);
-      if (grace) due = dutyAddDays(due, grace);
-      for (k = 0; k < 6; k++){ cands.push(due); due = dutyAddMonths(due, per); }
+      // C244(계산 검산 11/20): 유예는 회차마다 그 회차 기준일에 한 번만 붙인다 — 유예를 더한 앞 회차에 다시 주기를 더하면 유예가 쌓였다(71행 6개월·유예 30: 2027-07-29 → 2027-07-30)
+      due = anchor;
+      for (k = 0; k < 6; k++){ due = dutyAddMonths(due, per); cands.push(grace ? dutyAddDays(due, grace) : due); }
     }
   } else {
     return null;   // event·always·na — 자동 회차 없음
@@ -36535,6 +36553,10 @@ function dutyStage(nx){
     }).catch(function(){});
   }
   document.addEventListener("visibilitychange", function(){ if (!document.hidden) refreshMemberPerms(); });
+  // C244: 화면이 다시 보일 때 주기(주·월·분기·반기·연)가 넘어갔으면 키를 다시 세고 주기 체크리스트·요약·홈·안전 현황을 다시 그린다(저장 없음)
+  function periodKeysRedraw(){ if (!periodKeysRoll()) return; renderList(); renderSummary(); if (currentTab === "dash") renderDashboard(); sfNowRefresh(); }
+  document.addEventListener("visibilitychange", function(){ if (!document.hidden) periodKeysRedraw(); });
+  window.addEventListener("focus", periodKeysRedraw);
   // 시작: 세션 검증 → 유효하면 데이터 로드, 아니면 로그인
   (function boot(){
     if (!gwToken()){ showMemberLogin(); return; }

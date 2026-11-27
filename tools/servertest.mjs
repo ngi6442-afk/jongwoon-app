@@ -18226,6 +18226,32 @@ function J91a(x) { return JSON.stringify(x); }
   } catch (e) { T('C127 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
   finally { global.fetch = realFetch127; process.env.ANTHROPIC_API_KEY = savedK127[0] || ''; process.env.GW_ANTHROPIC_KEY = savedK127[1] || ''; }
 }
+// ── C244(계산 검산 11/20) 인허가 회차 — 직전 이행·직접 입력 행의 유예는 회차마다 그 회차 기준일에 한 번(쌓이지 않음) · _lib/duty.js(앱 DUTY_SHARED와 같은 본문) · 결함 사본 ──
+{
+  try {
+    const fsC244 = require('fs'), DFC244 = join(ROOT, 'netlify', 'functions', '_lib', 'duty.js'), DSC244 = fsC244.readFileSync(DFC244, 'utf8');
+    const ldC244 = (src) => { const m = { exports: {} }; new Function('module', 'exports', 'require', src)(m, m.exports, require); return m.exports; };
+    const chkC244 = (D) => {
+      const s71 = { auto: true, type: 'interval', base: 'manual', every_n: 6, every_unit: 'month', grace_days: 30 }, s29 = { auto: true, type: 'interval', base: 'last_done', every_n: 1, every_unit: 'month', grace_days: 0 };
+      const sN = { auto: true, type: 'interval', base: 'last_done', every_n: 12, every_unit: 'month', grace_days: -30 }, sG = { auto: true, type: 'interval', base: 'last_done', every_n: 1, every_unit: 'month', grace_days: 10 };
+      const a = D.dutyNext({ sched: s71, base_date: '2026-06-30' }, null, '2027-07-10'), b = D.dutyNext({ sched: s29, base_date: '2026-01-31' }, null, '2026-05-10');
+      const c = D.dutyNext({ sched: sG, runs: [{ due: '2026-03-10', done_at: '2026-01-31' }] }, null, '2026-04-01'), n = D.dutyNext({ sched: sN, base_date: '2026-03-31' }, null, '2028-02-15');
+      const info = { a: [a.due, a.ahead.map((x) => x.due)], b: [b.due, b.ahead.map((x) => x.due)], c: [c.due, c.ahead.map((x) => x.due)], n: [n.due, n.ahead.map((x) => x.due)] };
+      // 71행 꼴: 지금 회차 2027-01-29(종전과 같음) · 다음 회차 2027-07-30(종전 07-29 — 유예를 더한 앞 회차에 다시 6개월) / 29행 꼴(유예 없음): 종전 그대로
+      // 유예 10(완료 기록 runs의 due는 계산 기한 — 03-10 회차가 닫혀 다음 04-07) / 유예 −30: 2027-03-01 · 다음 2028-03-01
+      const ok = JSON.stringify(info) === JSON.stringify({ a: ['2027-01-29', ['2027-07-30']], b: ['2026-02-28', ['2026-03-28', '2026-04-28', '2026-05-28']], c: ['2026-04-07', []], n: ['2027-03-01', ['2028-03-01']] });
+      return { ok, info };
+    };
+    const r = chkC244(ldC244(DSC244));
+    const mutS = (from, to) => { if (DSC244.split(from).length !== 2) throw new Error('결함 심을 자리: ' + from.slice(0, 50)); return DSC244.replace(from, () => to); };
+    const LOOP = '      for (k = 0; k < 6; k++){ due = dutyAddMonths(due, per); cands.push(grace ? dutyAddDays(due, grace) : due); }';
+    const M = [mutS(LOOP, '      due = dutyAddDays(dutyAddMonths(anchor, per), grace);\n      for (k = 0; k < 6; k++){ cands.push(due); due = dutyAddMonths(due, per); }'), mutS(LOOP, '      for (k = 0; k < 6; k++){ due = dutyAddMonths(due, per); cands.push(due); }'),
+      mutS('      due = anchor;\n', '      due = dutyAddDays(anchor, grace);\n')].map((s) => { try { return chkC244(ldC244(s)).ok; } catch (e) { return 'err ' + e.message; } });
+    T('C244 인허가 회차(_lib/duty.js): 직전 이행·직접 입력 행 유예는 회차마다 기준일에 한 번 — 71행 꼴(6개월·유예 30) 다음 회차 2027-07-30 · 매월 유예 10 완료 뒤 04-07 · 유예 −30 연 회차 2028-03-01 · 29행 꼴(유예 없음) 종전 그대로 · 결함 사본 3(유예 쌓기·유예 뺌·기준일에 유예) 잡힘',
+      r.ok && M.every((v) => v === false), JSON.stringify({ r: r.info, mut: M }));
+  } catch (e) { T('C244 인허가 회차 검사 실행', false, String(e && e.stack || e).slice(0, 300)); }
+}
+
 
 { // ---- C240 판 A-2a(11/27) — 휴가 읽기 가림 · 휴가 저장 가드 · 받지 않은 줄 leave_kept · 줄인 사본(_view) 관리자 저장 ----
   try {

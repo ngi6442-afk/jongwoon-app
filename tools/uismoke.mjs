@@ -13580,17 +13580,18 @@ try {
     const nx = (id) => { const h = X.host.innerHTML, m = new RegExp('<tr class="vs-r[^"]*" data-vs-row="' + id + '">([\\s\\S]*?)</tr>').exec(h); return m ? m[1].replace(/<[^>]+>/g, '|') : ''; };
     const info = { q1: q('member:q1'), q2: q('member:q2'), q3: q('member:q3'), q4: q('member:q4'), q5: q('member:q5'), q6: q('member:q6'), q7: q('member:q7'), w1: q('worker:w1'), miss: [p1.st.miss, p4.st.miss, p5.st.miss], over: [p1.st.over, p4.st.over], cand: p1.st.cand.map((c) => c.k + '/' + (c.lab || '')), row1: nx('member:q1').slice(0, 200) };
     const base5 = p5.st.miss;   // 표시 없는 직원의 빠진 항목(열 항목만) — 같은 처지 q1은 여기에 자격 줄 빠짐이 더해짐
-    const ok = JSON.stringify(info.q1) === JSON.stringify(['drv_edu:기록 없음[vs-warn]!', 'drv_fit:✓ 2024-01@2027-01-10', 'cm_edu:경과 42일[vs-dan]!@2026-10-01', 'cm_fit:경과 680일[vs-dan]!@2025-01-01'])
-      && JSON.stringify(info.q2) === JSON.stringify(['drv_edu:D-8[vs-warn]@2026-11-20', 'drv_fit:—', 'cm_edu:기록 없음[vs-warn]!', 'cm_fit:✓ 2020-01@2030-01-01'])
+    // C244(11/20): 건설기계조종사 안전교육·운수종사자 정기교육은 해 끝 기한(83조③2호 · 의무 대장 4행) — cm_edu 2023-10-01 → 2026-12-31 · drv_edu 2025-11-20 → 2026-12-31 · 2026-03-01 → 2027-12-31
+    const ok = JSON.stringify(info.q1) === JSON.stringify(['drv_edu:기록 없음[vs-warn]!', 'drv_fit:✓ 2024-01@2027-01-10', 'cm_edu:✓ 2023-10@2026-12-31', 'cm_fit:경과 680일[vs-dan]!@2025-01-01'])
+      && JSON.stringify(info.q2) === JSON.stringify(['drv_edu:✓ 2025-11@2026-12-31', 'drv_fit:—', 'cm_edu:기록 없음[vs-warn]!', 'cm_fit:✓ 2020-01@2030-01-01'])
       && JSON.stringify(info.q3) === JSON.stringify(['drv_edu:기록 없음[vs-warn]!', 'drv_fit:근거 확인 중'])
       && JSON.stringify(info.q4) === JSON.stringify(['wst_edu:✓ 2025-06@2028-06-01', 'env_edu:D-19[vs-warn]@2026-12-01', 'tech_edu:기록 없음[vs-warn]!', 'elec_edu:기록 없음[vs-warn]!'])
       && JSON.stringify(info.q5) === '[]' && JSON.stringify(info.q6) === '[]' && JSON.stringify(info.w1) === '[]'
-      && JSON.stringify(info.q7) === JSON.stringify(['drv_edu:✓ 2026-03@2027-03-01', 'drv_fit:경과 42일[vs-dan]!@2026-10-01'])
-      && p1.st.miss === base5 + 3 && p4.st.miss >= 2 && p1.st.over === true && p1.st.cand[0].k === 'q:cm_fit' && p1.st.cand[0].lab === '건설기계조종사 정기적성검사'
+      && JSON.stringify(info.q7) === JSON.stringify(['drv_edu:✓ 2026-03@2027-12-31', 'drv_fit:경과 42일[vs-dan]!@2026-10-01'])
+      && p1.st.miss === base5 + 2 && p4.st.miss >= 2 && p1.st.over === true && p1.st.cand[0].k === 'q:cm_fit' && p1.st.cand[0].lab === '건설기계조종사 정기적성검사'
       && /건설기계조종사 정기적성검사 경과 680일 외 \d+/.test(nx('member:q1'))
       && det.indexOf('<b>운수종사자 정기교육</b></td><td class="edu-basis">운수종사자 표시 — 매년 1회 이상(인허가 의무 대장 4행) — 기록 없음</td>') > 0 && det.indexOf('만 68세 = 3년마다') > 0 && det.indexOf('만 68세 = 5년마다') > 0
       && /data-edu-kind="cm_fit"/.test(det) && /65세 미만이라 대상 아님/.test(X.api.find('member:q2').st.x.q[1].it.basis) && /생년월일이 없거나 볼 수 없어/.test(X.api.find('member:q3').st.x.q[1].it.basis) && /만 71세 = 1년마다/.test(X.api.find('member:q7').st.x.q[1].it.basis)
-      && X.api.nextFor('cm_edu', 'member:q1', '2026-01-10', 0, null) === '2029-01-10' && X.api.nextFor('drv_edu', 'member:q1', '2026-01-10', 0, null) === '2027-01-10' && X.api.nextFor('drv_fit', 'member:q1', '2026-01-10', 0, null) === '';
+      && X.api.nextFor('cm_edu', 'member:q1', '2026-01-10', 0, null) === '2029-12-31' && X.api.nextFor('drv_edu', 'member:q1', '2026-01-10', 0, null) === '2027-12-31' && X.api.nextFor('drv_fit', 'member:q1', '2026-01-10', 0, null) === '';
     return { ok, info };
   };
   const r1_60 = chk1_60(html);
@@ -21050,6 +21051,112 @@ try {
   T('v505 문서·판 번호(정확 검사): FEATURES 기준 v505 (2026-11-20)·v505 절(C220) · TESTLIST v505 칸 4(화면·운영 확인 2 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v505 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
     r505.ok && M505.every((v) => v === false), JSON.stringify({ r: r505.info, mut: M505 }));
 } catch (e) { console.log('  (v505 검사 생략 — ' + e.message + ')'); fails++; }
+// ── C244(계산 검산 11/20) 인허가·주기 업무 기한 — 실제 함수(앱 본문에서 떼어 냄)·'오늘'은 인자 · 결함 사본 ──
+//   ① 건설기계조종사 안전교육 = (마지막 기록 해 + 3)년 12-31(건설기계관리법 시행규칙 83조③2호) · 운수종사자 정기교육 = 이수한 해 다음 해 12-31(의무 대장 4행 달력연도) — 체크 칸 줄(eduQualItems)·기록 창 다음 예정(eduNextFor) 같은 값
+//   ② 주기 체크리스트 — 주기가 넘어간 묵은 화면에서 누르면 지난 주기 칸에 적지 않고 새 주기로 다시 그림(toggleItem·approveCheck·rejectCheck) · 화면 복귀 때 다시 그림(periodKeysRedraw)
+//   ③ 앱 DUTY_SHARED 본문: 직전 이행·직접 입력 행의 유예는 회차마다 기준일에 한 번(71행 꼴 다음 회차 2027-07-30) · 유예 없는 행은 종전 그대로
+try {
+  const fnC = (src, name) => { const i = src.indexOf('  function ' + name + '('); if (i < 0) throw new Error('함수 없음 ' + name); let d = 0; const j = src.indexOf('{', i); for (let k = j; k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}') { d--; if (!d) return src.slice(i, k + 1); } } throw new Error('닫힘 없음 ' + name); };
+  const blkC = (src, head) => { const i = src.indexOf(head); if (i < 0) throw new Error('구간 없음 ' + head); return src.slice(i, src.indexOf('\n  ];', i) + 5); };
+  const lineC = (src, head) => { const i = src.indexOf(head); if (i < 0) throw new Error('줄 없음 ' + head); return src.slice(i, src.indexOf('\n', i)); };
+  const mutC = (a, b) => { const n = html.split(a).length - 1; if (n !== 1) throw new Error('결함 심을 자리 ' + n + '곳: ' + a.slice(0, 60)); return html.replace(a, () => b); };
+  // ① 교육 — 실제 함수 + 대역(todayStr·findMember·liveEdu 원장)
+  const EDU_FN = ['pad', 'fmtDate', 'isDate', 'vehDday', 'eduIsMed', 'eduKindDef', 'eduKindLabel', 'eduAge', 'eduLastOf', 'eduIt', 'eduOk', 'eduNone', 'eduGreyIt', 'eduYm', 'eduAddMonths', 'eduYearEndDue', 'eduCycle', 'eduQualItems',
+    'eduNextFor', 'eduMonthsFor', 'eduHoursNum', 'liveEdu', 'eduRegNeed', 'eduReduceOn', 'eduHalfEnd', 'asbAddMonths', 'asbMedMonths'];
+  const eduC = (src, today) => {
+    const code = [blkC(src, '  var EDU_KINDS = ['), blkC(src, '  var EDU_QUAL = ['), lineC(src, '  var EDU_STD = '), lineC(src, '  var EDU_SOON = '), lineC(src, '  var EDU_CHK = '), 'var sfSet = null, ASB_MED_MONTHS = { jw: 12, other: 6 }, ASB_MED_UNK = 6, edu = [];',
+      'function todayStr(){ return __t; } function findMember(id){ return null; }'].concat(EDU_FN.map((n) => fnC(src, n)), ['return { qual: eduQualItems, next: eduNextFor, cyc: eduCycle };']).join('\n');
+    return new Function('__t', code)(today);
+  };
+  const rowC = (q, kind, date) => ({ ptype: 'member', grp: 'cur', m: { id: 'z1', quals: [q], birth: '1980-01-01' }, recs: [{ id: 'r1', ptype: 'member', pid: 'z1', kind, date }] });
+  const qC = (E, q, kind, date) => { const p = rowC(q, kind, date), it = E.qual(p, p.recs).filter((x) => x.k === kind)[0].it; return it.t + (it.cls ? '[' + it.cls + ']' : '') + (it.miss ? '!' : '') + '@' + it.due; };
+  const chkEduC = (src) => {
+    const A = eduC(src, '2026-11-20'), B = eduC(src, '2027-03-06'), C = eduC(src, '2027-01-02'), D = eduC(src, '2026-12-01');
+    const info = {
+      cm: [qC(A, 'cm', 'cm_edu', '2023-03-10'), qC(A, 'cm', 'cm_edu', '2023-12-31'), qC(A, 'cm', 'cm_edu', '2024-02-29'), qC(eduC(src, '2027-01-01'), 'cm', 'cm_edu', '2023-03-10')],
+      drv: [qC(B, 'drv', 'drv_edu', '2026-03-05'), qC(C, 'drv', 'drv_edu', '2025-03-05'), qC(D, 'drv', 'drv_edu', '2025-12-31'), qC(A, 'drv', 'drv_edu', '2026-01-02')],
+      next: [A.next('cm_edu', 'member:z1', '2026-01-10', 0, null), A.next('drv_edu', 'member:z1', '2026-01-10', 0, null), A.next('drv_edu', 'member:z1', '2026-12-31', 0, null),
+        A.next('wst_edu', 'member:z1', '2026-01-10', 0, null), A.next('elec_edu', 'member:z1', '2026-01-10', 0, null), A.next('chem_edu', 'member:z1', '2026-01-10', 0, null)],
+      env: qC(A, 'env', 'env_edu', '2023-12-01')
+    };
+    const ok = JSON.stringify(info.cm) === JSON.stringify(['✓ 2023-03@2026-12-31', '✓ 2023-12@2026-12-31', '✓ 2024-02@2027-12-31', '경과 1일[vs-dan]!@2026-12-31'])
+      && JSON.stringify(info.drv) === JSON.stringify(['✓ 2026-03@2027-12-31', '경과 2일[vs-dan]!@2026-12-31', 'D-30[vs-warn]@2026-12-31', '✓ 2026-01@2027-12-31'])
+      && JSON.stringify(info.next) === JSON.stringify(['2029-12-31', '2027-12-31', '2027-12-31', '2029-01-10', '2029-01-10', '2028-01-10'])
+      && info.env === 'D-11[vs-warn]@2026-12-01';   // 그 밖 종류는 종전 개월 더하기 그대로
+    return { ok, info };
+  };
+  const rE = chkEduC(html);
+  const mE = [mutC('var n = k === "cm_edu" ? 3 : (k === "drv_edu" ? 1 : 0);', 'var n = 0;'), mutC('var n = k === "cm_edu" ? 3 : (k === "drv_edu" ? 1 : 0);', 'var n = k === "cm_edu" ? 36 : (k === "drv_edu" ? 12 : 0);'),
+    mutC('it = rec ? eduCycle(x.k, rec, mon, basis, eduYearEndDue(x.k, rec.date)) :', 'it = rec ? eduCycle(x.k, rec, mon, basis) :'),
+    mutC('    if (eduYearEndDue(k, date)) return eduYearEndDue(k, date);', ''), mutC('"-12-31" : ""; }\n', '"-12-30" : ""; }\n')].map((s) => { try { return chkEduC(s).ok; } catch (e) { return 'err ' + e.message; } });
+  T('C244 ① 교육 해 끝 기한(실제 eduQualItems·eduCycle·eduNextFor · 오늘은 인자): 건설기계조종사 안전교육 마지막 2023-03-10 → 기한 2026-12-31(오늘 11-20 D-41이라 ✓ — 종전 2026-03-10 경과 255일) · 2023-12-31 → 2026-12-31 · 2024-02-29 → 2027-12-31 · 2027-01-01 경과 1일 · 운수종사자 정기교육 2026-03-05 → 2027-12-31(2027-03-06 ✓ — 종전 경과 1일) · 2025-03-05 → 2027-01-02 경과 2일 · 다음 예정 cm 2029-12-31 · drv 2027-12-31 · 폐기물·전기 36개월·화학 24개월·환경 그대로 · 결함 사본 5(해 끝 끔·개월 수로·줄에 기한 안 넘김·다음 예정 종전·12-30) 모두 잡힘',
+    rE.ok && mE.every((v) => v === false), JSON.stringify({ r: rE.info, mut: mE }));
+  // ② 주기 체크리스트 묵은 화면 — 실제 periodKeys·periodKeysRoll·toggleItem·approveCheck·rejectCheck·periodKeysRedraw + 시계 대역(new Date() 인자 없음 = __now)
+  const PK_FN = ['pad', 'fmtDate', 'mondayOfWeek', 'periodKeys', 'periodKeysRoll', 'toggleItem', 'approveCheck', 'rejectCheck', 'reviewStamp', 'setReview', 'clearReview', 'recStamp', 'periodKeysRedraw'];
+  const pkC = (src, open, admin) => {
+    const code = ['var Date = (function(RD){ function F(a, b, c, d, e){ if (!arguments.length) return new RD(__S.now.getTime()); if (arguments.length === 1) return new RD(a); return new RD(a, b, c === undefined ? 1 : c, d || 0, e || 0); } F.now = function(){ return __S.now.getTime(); }; return F; })(__RD);',
+      'var records = {}, customItems = {}, checkReview = {}, checkReviewTs = {}, checkRecTs = {}, checkAssignee = {}, currentTab = "check";',
+      'function canDo(){ return true; } function isAdmin(){ return __S.admin; } function getMemberId(){ return "m1"; } function myName(){ return "시험"; } function hasOwnKey(o, k){ return Object.prototype.hasOwnProperty.call(o, k); }',
+      'function getReview(t, k, id){ return checkReview[t] && checkReview[t][k] && checkReview[t][k][id]; } function todayStr(){ return fmtDate(new Date()); }',
+      'function saveCache(){} function scheduleSave(){ __S.log.push("save"); } function renderList(){ __S.log.push("list"); } function renderSummary(){ __S.log.push("sum"); } function renderDashboard(){ __S.log.push("dash"); } function sfNowRefresh(){ __S.log.push("sfnow"); }']
+      .concat(PK_FN.map((n) => fnC(src, n)), [lineC(src, '  var CURRENT_KEYS = '), 'return { rec: function(){ return records; }, rev: function(){ return checkReview; }, keys: function(){ return CURRENT_KEYS; }, tog: toggleItem, ap: approveCheck, rj: rejectCheck, redraw: periodKeysRedraw, seed: function(t, k, id){ if (!checkReview[t]) checkReview[t] = {}; if (!checkReview[t][k]) checkReview[t][k] = {}; checkReview[t][k][id] = { by: "갑", date: k }; } };']).join('\n');
+    const S = { now: open, admin: admin, log: [] };
+    return { S, X: new Function('__S', '__RD', code)(S, Date) };
+  };
+  const at = (y, mo, d, h, mi) => new Date(y, mo - 1, d, h, mi);
+  const chkPkC = (src) => {
+    const info = {};
+    // 주: 11/22(일) 23:50에 연 화면 → 11/23(월) 09:00 누름 — 첫 누름은 적지 않고 다시 그림, 둘째 누름이 이번 주 칸에
+    let { S, X } = pkC(src, at(2026, 11, 22, 23, 50), true);
+    S.now = at(2026, 11, 23, 9, 0); X.tog('weekly', 'w1'); info.w1 = [JSON.stringify(X.rec()), X.keys().weekly, S.log.join(',')];
+    S.log = []; X.tog('weekly', 'w1'); info.w2 = [JSON.stringify(X.rec()), S.log.join(',')];
+    // 월: 11/30 밤 → 12/01 승인(관리자)
+    ({ S, X } = pkC(src, at(2026, 11, 30, 22, 0), true)); X.seed('monthly', '2026-11', 'm1');
+    S.now = at(2026, 12, 1, 8, 0); X.ap('monthly', 'm1'); info.m1 = [JSON.stringify(X.rec()), X.keys().monthly, JSON.stringify(X.rev())];
+    X.ap('monthly', 'm1'); info.m2 = JSON.stringify(X.rec());
+    // 반려: 6/30 밤 → 7/1 반려 — 첫 누름은 지우지 않고 다시 그림
+    ({ S, X } = pkC(src, at(2026, 6, 30, 23, 0), true)); X.seed('half', '2026-H1', 'h1');
+    S.now = at(2026, 7, 1, 9, 0); X.rj('half', 'h1'); info.h = [JSON.stringify(X.rev()), X.keys().half];
+    // 같은 주기 안 — 종전 그대로 바로 적음 · 비관리자 = 승인 대기
+    ({ S, X } = pkC(src, at(2026, 11, 23, 9, 0), true)); S.now = at(2026, 11, 29, 23, 59); X.tog('weekly', 'w1'); info.same = JSON.stringify(X.rec());
+    ({ S, X } = pkC(src, at(2026, 12, 31, 23, 0), false)); S.now = at(2027, 1, 4, 9, 0); X.tog('yearly', 'y1'); info.y1 = [JSON.stringify(X.rev()), X.keys().yearly]; X.tog('yearly', 'y1'); info.y2 = Object.keys((X.rev().yearly || {})).join(',');
+    // 화면 복귀: 넘어갔으면 다시 그림(저장 없음) · 안 넘어갔으면 아무것도 안 함
+    ({ S, X } = pkC(src, at(2026, 3, 31, 23, 0), true)); S.now = at(2026, 3, 31, 23, 30); X.redraw(); info.r0 = S.log.join(','); S.now = at(2026, 4, 1, 0, 1); X.redraw(); info.r1 = [S.log.join(','), X.keys().quarterly, X.keys().monthly];
+    const ok = info.w1[0] === '{}' && info.w1[1] === '2026-11-23' && info.w1[2] === 'list,sum' && info.w2[0] === '{"weekly":{"2026-11-23":{"w1":"2026-11-23"}}}' && info.w2[1] === 'list,sum,save'
+      && info.m1[0] === '{}' && info.m1[1] === '2026-12' && info.m1[2] === '{"monthly":{"2026-11":{"m1":{"by":"갑","date":"2026-11"}}}}' && info.m2 === '{"monthly":{"2026-12":{"m1":"2026-12-01"}}}'
+      && info.h[0] === '{"half":{"2026-H1":{"h1":{"by":"갑","date":"2026-H1"}}}}' && info.h[1] === '2026-H2'
+      && info.same === '{"weekly":{"2026-11-23":{"w1":"2026-11-29"}}}'
+      && info.y1[0] === '{}' && info.y1[1] === '2027' && info.y2 === '2027'
+      && info.r0 === '' && info.r1[0] === 'list,sum,sfnow' && info.r1[1] === '2026-Q2' && info.r1[2] === '2026-04';
+    return { ok, info };
+  };
+  const rP = chkPkC(html);
+  const mP = [mutC('    if (periodKeysRoll(type)){ renderList(); renderSummary(); return; }   // C244: 주기가 넘어간 화면', '    if (false){ renderList(); renderSummary(); return; }   // C244: 주기가 넘어간 화면'),
+    mutC('    if (!isAdmin()) return;\n    if (periodKeysRoll(type)){ renderList(); renderSummary(); return; }   // C244\n    var key', '    if (!isAdmin()) return;\n    var key'),
+    mutC('    if (!isAdmin()) return;\n    if (periodKeysRoll(type)){ renderList(); renderSummary(); return; }   // C244\n    clearReview', '    if (!isAdmin()) return;\n    clearReview'),
+    mutC('    if (ch) CURRENT_KEYS = nk;', ''), mutC("if ((!type || t === type) && nk[t] !== CURRENT_KEYS[t]) ch = true;", "if (type && t === type && nk[t] !== CURRENT_KEYS[t]) ch = true;"),
+    mutC('  function periodKeysRedraw(){ if (!periodKeysRoll()) return;', '  function periodKeysRedraw(){ return;')].map((s) => { try { return chkPkC(s).ok; } catch (e) { return 'err ' + e.message; } });
+  const evC = html.indexOf('document.addEventListener("visibilitychange", function(){ if (!document.hidden) periodKeysRedraw(); });') > 0 && html.indexOf('window.addEventListener("focus", periodKeysRedraw);') > 0;
+  T('C244 ② 주기 체크리스트 묵은 화면(실제 periodKeys·toggleItem·approveCheck·rejectCheck·periodKeysRedraw · 시계 대역): 11/22 23:50 연 화면에서 11/23 누름 = 지난주 칸에 안 적고 다시 그림 → 다시 누르면 이번 주(2026-11-23) 칸 · 11/30→12/01 승인·6/30→7/1 반려도 첫 누름은 다시 그림만 · 같은 주 안은 종전대로 · 비관리자 승인 요청 12/31→1/4 = 2027 칸 · 화면 복귀 때 넘어갔으면 다시 그림(저장 없음) · 복귀 처리 두 줄 · 결함 사본 6 모두 잡힘',
+    rP.ok && evC && mP.every((v) => v === false), JSON.stringify({ r: rP.info, ev: evC, mut: mP }));
+  // ③ 앱 DUTY_SHARED 본문 실행(서버 _lib/duty.js와 같은 글 — 같은 본문 검사는 P1 판28 ①)
+  const shC = (src) => { const a = src.indexOf('// ==== DUTY_SHARED_BEGIN ===='), b = src.indexOf('// ==== DUTY_SHARED_END ===='); return new Function(src.slice(a, b) + '\nreturn { next: dutyNext, cur: dutyCur };')(); };
+  const chkDuC = (src) => {
+    const D = shC(src), s71 = { auto: true, type: 'interval', base: 'manual', every_n: 6, every_unit: 'month', grace_days: 30 }, s29 = { auto: true, type: 'interval', base: 'last_done', every_n: 1, every_unit: 'month', grace_days: 0 };
+    const sG = { auto: true, type: 'interval', base: 'last_done', every_n: 1, every_unit: 'month', grace_days: 10 }, sI = { auto: true, type: 'interval', base: 'issued', every_n: 12, every_unit: 'month', grace_days: 30 };
+    const a = D.cur({ sched: s71, base_date: '2026-06-30' }, null, '2027-07-10'), b = D.cur({ sched: s29, base_date: '2026-01-31' }, null, '2026-05-10'), c = D.cur({ sched: sG, base_date: '2026-01-31' }, null, '2026-04-01');
+    const e = D.cur({ sched: sI }, { issued: '2020-01-31' }, '2026-11-20');
+    const info = { a: [a.due, a.ahead.map((x) => x.due)], b: [b.due, b.ahead.map((x) => x.due)], c: [c.due, c.ahead.map((x) => x.due)], e: e.due };
+    const ok = JSON.stringify(info) === JSON.stringify({ a: ['2027-01-29', ['2027-07-30']], b: ['2026-02-28', ['2026-03-28', '2026-04-28', '2026-05-28']], c: ['2026-03-10', ['2026-04-07']], e: '2026-03-02' });
+    return { ok, info };
+  };
+  const rD = chkDuC(html);
+  const mD = [mutC('      for (k = 0; k < 6; k++){ due = dutyAddMonths(due, per); cands.push(grace ? dutyAddDays(due, grace) : due); }', '      due = dutyAddDays(dutyAddMonths(anchor, per), grace);\n      for (k = 0; k < 6; k++){ cands.push(due); due = dutyAddMonths(due, per); }'),
+    mutC('      for (k = 0; k < 6; k++){ due = dutyAddMonths(due, per); cands.push(grace ? dutyAddDays(due, grace) : due); }', '      for (k = 0; k < 6; k++){ due = dutyAddMonths(due, per); cands.push(due); }')].map((s) => { try { return chkDuC(s).ok; } catch (e) { return 'err ' + e.message; } });
+  T('C244 ③ 앱 DUTY_SHARED 직전 이행·직접 입력 회차(실제 dutyCur): 71행 꼴(6개월·유예 30·기준일 2026-06-30) 지금 2027-01-29·다음 회차 2027-07-30(종전 07-29) · 매월·유예 10 기준일 01-31 → 03-10·다음 04-07(종전 04-10) · 29행 꼴(매월·유예 없음) 지금·다음 회차 종전 그대로(02-28 · 03-28·04-28·05-28 — 말일 읽기는 확인 거리) · 허가일 행 그대로 · 결함 사본 2(유예 쌓기·유예 뺌) 잡힘',
+    rD.ok && mD.every((v) => v === false), JSON.stringify({ r: rD.info, mut: mD }));
+} catch (e) { console.log('  (C244 인허가·주기 검사 생략 — ' + e.message + ')'); fails++; }
+
 
 // ── v506(체크 10 C122 N3 — 품질 학습 끄기 스위치 따로 열쇠): 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '504 이상'으로 풀 것
 try {
