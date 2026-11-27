@@ -4063,7 +4063,7 @@
   //   첫 저장이 200이면 아무것도 적지 않는다(정상 길 요청 수·본문 같음). 계약·문서함·내 할 일·체크·거래처·입찰 공고는 등록부에 없다.
   var RS_DELAYS = [15000, 60000, 300000], RS_MAX = 8, RS_GAP = 60000, RS_RESTART_MS = 30 * 60000;
   var RS_BAND = { tasks: 1, vehicles: 1, receivables: 1, licenses: 1 };   // 저장 실패가 띠를 켜는 자료
-  var rsQ = {}, rsOut = {}, rsGen = 0, rsOk = {}, rsAuto = {}, rsCap = null, rsQuiet = 0, rsSeq = {}, rsRe = {}, rsBad = {}, rsFly = {};
+  var rsQ = {}, rsOut = {}, rsGen = 0, rsOk = {}, rsAuto = {}, rsCap = null, rsQuiet = 0, rsSeq = {}, rsRe = {}, rsBad = {}, rsFly = {}, rsHi = {};
   function rsTokId(){ try { return String(JSON.parse(b64DecodeUnicode(String(gwToken() || "").split(".")[0].replace(/-/g, "+").replace(/_/g, "/"))).mid || ""); } catch(e){ return ""; } }
   function rsMine(uid){ return !!uid && uid === myId() && uid === sessViewerId && uid === rsTokId(); }
   function rsTaint(col){ delete rsOk[col]; rsDrop(col); }
@@ -4121,14 +4121,22 @@
   //   C298(「원천」): 대기를 푸는 판단을 보낸 차례로 — 어떤 저장의 200은 그보다 뒤에 보낸 저장이 아직 성공하지 않았으면(나가 있음 · 200이 아닌 응답·끊김으로 실패한 채) 대기·띠를 풀지 않음(저장 함수가 푼 것을 되켬)
   //     rsBad = 실패한 채 남은 사람 저장 가운데 가장 늦게 보낸 차례 — 그보다 뒤에 보낸 사람 저장의 200이 내려 줌 · rsFly = 나가 있는 사람 저장의 차례
   //     (자동 저장은 같은 자료의 사람 저장이 나가 있으면 나가지 않아(rsFire) 그 뒤 오는 사람 응답은 모두 rsBad보다 뒤 차례 — 자동 200이 따로 내려 줄 일이 없음)
-  function rsLate(col, st, k){
+  //     rsHi = 200을 받은(또는 저장 함수가 스스로 대기를 내린 거절을 받은) 가장 늦은 차례 — 그보다 앞 차례의 실패는 rsBad에 올리지 않음(뒤 차례가 다 담아 들어감)
+  //     self = 저장 함수가 설계상 스스로 대기를 내리는 실패(rsSelfDrop) — 실패한 채로 세지 않고 200처럼 차례를 내려 줌(대기는 v555처럼 저장 함수가 내린 대로)
+  function rsLate(col, st, k, self){
     var b = rsBad[col] || 0, fly = rsFly[col] || {};
-    if (st !== 200){ rsBad[col] = Math.max(b, k); return false; }
-    if (b > k || Object.keys(fly).some(function(x){ return +x > k; })) return true;
-    delete rsBad[col]; return false;
+    if (st !== 200 && !self){ if (k > (rsHi[col] || 0)) rsBad[col] = Math.max(b, k); return false; }
+    rsHi[col] = Math.max(rsHi[col] || 0, k);
+    if (b > k) return !self;
+    delete rsBad[col];
+    return !self && Object.keys(fly).some(function(x){ return +x > k; });
   }
-  function rsSeen(col, st, uid, k){
-    var e = rsQ[col], f = rsFns(col) || rsPendX(col), late = rsLate(col, st, k);
+  //   저장 함수가 설계상 스스로 대기를 내리는 실패(C298 표 · 지금 저장 함수들의 동작 그대로): 쓰기 거절 403 — fetch 대역을 타는 자료는 대역이 200 + write_denied로 넘겨 저장 함수가 대기를 내림
+  //     · 직접 저장 넷 가운데 일용직·특별교육은 403(기기 승인 취소 DEVICE_NOT_APPROVED 빼고)에 대기를 내림 · 가족친화·현장 대장은 403에도 대기를 남김
+  var RS_DIRECT = { workers: 1, family: 1, asbestos: 1, edu: 1 }, RS_403DROP = { workers: 1, edu: 1 };
+  function rsSelfDrop(col, st, ec){ return st === 403 && (!RS_DIRECT[col] || (!!RS_403DROP[col] && ec !== "DEVICE_NOT_APPROVED")); }
+  function rsSeen(col, st, uid, k, ec){
+    var e = rsQ[col], f = rsFns(col) || rsPendX(col), late = rsLate(col, st, k, rsSelfDrop(col, st, ec));
     if (!f) return;
     if (late){ rsHoldK(col, f, k); if (e && (rsBad[col] || 0) > k) return; }   // 앞 저장의 늦은 200 — 뒤 고침이 서버에 들 때까지 대기 남김(자동이 적은 것도 지우지 않음)
     if (!f.save) return;   // 대상 밖 자료(체크·입찰 공고 — 대기만 지킴 · 다시 보내기 없음)
@@ -4204,7 +4212,7 @@
       rsFire(col, why);
     });
   }
-  function saveRetryReset(){ rsGen++; rsOk = {}; rsRe = {}; rsSidQ = {}; rsSidLast = {}; rsBad = {}; Object.keys(rsQ).forEach(rsDrop); }
+  function saveRetryReset(){ rsGen++; rsOk = {}; rsRe = {}; rsSidQ = {}; rsSidLast = {}; rsBad = {}; rsHi = {}; Object.keys(rsQ).forEach(rsDrop); }
   // C242 저장 번호(sid — PM 11/26 "번호 넣고 올려" · 서버 handleSave와 짝): 12자료 저장마다 번호를 붙여 보냄 — 가장 최근에 보내 결과를 모르는 저장과 같은 내용을 다시 보내면 같은 번호, 그 밖은 새 번호(옛 번호의 내용으로 되돌린 저장이 already로 묻히지 않게)
   //   같은 번호를 다시 쓰는 것은 자동 재전송이 그 대기 저장(가장 최근에 결과를 모른 채 남은 저장 rsSidLast)을 같은 내용으로 다시 보낼 때뿐 — 사람 저장은 늘 새 번호
   //   결과를 모르는(응답을 못 받은 · 5xx) 번호는 자료별로 기억(rsSidQ · 최근 8 · 메모리 — 로그아웃·전환·만료에 비움) · 서버가 달라진 것이 확인되면(200·already·남의 409·4xx) 그 자료의 결과 모르는 번호를 모두 비움
@@ -4242,8 +4250,8 @@
     if (fn === "gw-data" && body && body.action === "save" && typeof body.collection === "string"){
       var col = body.collection, g = rsGen, uid = rsMine(myId()) ? myId() : "", k = rsSeq[col] = (rsSeq[col] || 0) + 1;
       rsOut[col] = (rsOut[col] || 0) + 1; (rsFly[col] || (rsFly[col] = {}))[k] = 1;
-      var fin = function(st){ rsOut[col]--; delete rsFly[col][k]; if (st === 409 && rsFns(col)){ rsRe[col] = 1; rsSoon(function(){ delete rsRe[col]; }); } if (g === rsGen) rsSeen(col, st, uid, k); };   // 409 바로 뒤 이 자료의 첫 읽기 = 그 저장 함수의 다시 읽기(같은 약속 줄기 안에서 나감)
-      p.then(function(res){ fin((res && res.status) || 0); }, function(){ fin(0); });
+      var fin = function(st, ec){ rsOut[col]--; delete rsFly[col][k]; if (st === 409 && rsFns(col)){ rsRe[col] = 1; rsSoon(function(){ delete rsRe[col]; }); } if (g === rsGen) rsSeen(col, st, uid, k, ec); };   // 409 바로 뒤 이 자료의 첫 읽기 = 그 저장 함수의 다시 읽기(같은 약속 줄기 안에서 나감)
+      p.then(function(res){ fin((res && res.status) || 0, res && res.body && res.body.error_code); }, function(){ fin(0); });
       return;
     }
     if (fn === "gw-data" && body && body.action === "get" && rsFns(body.collection)){
