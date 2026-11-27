@@ -3930,24 +3930,27 @@ async function cdocLearnPair(st, member, ref, idx, item, ext, b64, orig, d) {
   }
   // C294 판1: 한글 초안(hwpx·hwp) ↔ 구형 hwp 최종본 = 문단 비교(간극만 — 모델 학습은 칸 비교만). 본문을 못 읽으면(암호·배포용·깨짐) 종전대로 none
   else if (fb && db && ext === 'hwp' && (pick.ext === 'hwpx' || pick.ext === 'hwp')) { const hd = DD.hwpParaDiff(db, pick.ext, fb); if (hd.ok) { diff = hd; kind = 'hwp_para'; } }
+  // C294 판2: 날인 스캔본(pdf·사진)은 학습 워커가 판독한 뒤 잰다(kind scan_wait · pending → gw-learn-background scanJob). 초안 재료(파일·채움 맵)가 있을 때만
+  if (kind === 'none' && fb && (ext === 'pdf' || ext === 'jpg' || ext === 'jpeg' || ext === 'png') && (db || (fillFlat && fillFlat.length))) kind = 'scan_wait';
   const gap = DD.gapScore(diff, null, 0);
   const s = await learnSettings(st);
   const status = ((kind === 'xlsx_cell' || kind === 'hwpx_tok') && learnAllowed(s, tpl)) ? 'pending' : 'done_nomodel';   // 모델 학습은 칸 비교만(허용 사전이 칸 단위 — 한글 양식은 칸 = {{칸 이름}}) — 문단 비교는 간극만
+  const status2 = kind === 'scan_wait' ? 'pending' : status;   // C294 판2: 스캔은 판독 워커로(끔 스위치는 워커가 settings:learn contract.scan으로 본다)
   const id = LN.newPairId('contract', ref.cid + ':' + item.n);
-  const pair = Object.assign({ id: id, tpl: tpl, draft_n: pick.n, draft_i: pick.i, kind: kind, how: how, status: status, diff: learnDiffPublic(diff), gap: gap }, base);
+  const pair = Object.assign({ id: id, tpl: tpl, draft_n: pick.n, draft_i: pick.i, kind: kind, how: how, status: status2, diff: learnDiffPublic(diff), gap: gap }, base);
   if (match !== null) pair.match = match;
   if (pick.late) pair.late = 1;
   const w = await blobSet(st, LN.pairKey('contract', id), pair);
   if (!w.ok) return { ok: false, code: w.code || 'PAIR_WRITE_FAILED' };
   try {
-    const lk = T.lessons_key(tpl); const lr = await blobGet(st, lk);
+    const lk = T.lessons_key(tpl); const lr = kind === 'scan_wait' ? { ok: false, code: 'SCAN_WAIT' } : await blobGet(st, lk);   // C294 판2: 스캔은 판독 뒤 워커가 간극 1줄을 적는다(빈 줄 두 번 막기)
     if (lr.ok || lr.code === 'NOT_FOUND') {   // 읽기 실패를 빈 창고로 보고 규칙·기준선·끔 표시를 덮어쓰지 않는다(v424 검토) — 이번 간극 1줄만 빠진다
       const L = LN.pushGap(lr.ok ? lr.data : null, { pair: id, promo_id: ref.cid, ratio: gap.cell_ratio, score: gap.score, kind: kind, changed: diff ? diff.changed : 0, compared: diff ? diff.compared : 0, uncomparable: diff ? diff.uncomparable : 0, comparable: gap.comparable, late: pick.late ? 1 : 0, gv: LN.GAP_VER }, now);   // v456 검토(T427): 간극 식 판(xlsx_cell은 같은 판만 기준선·일몰에 — learn.numericGaps)
       LN.freezeBaseline(L, now);   // v412 첫 10건 평균 = 기준선(일몰 비교 축)
       await blobSet(st, lk, L);
     }
   } catch (e) {}
-  return { ok: true, id: id, status: status, tpl: tpl, kind: kind, how: how, draft_n: pick.n, gap: gap, changed: diff ? diff.changed : null, compared: diff ? diff.compared : null, uncomparable: diff ? diff.uncomparable : null, outside: (diff && Number(diff.outside_changed)) || 0, late: !!pick.late };
+  return { ok: true, id: id, status: status2, tpl: tpl, kind: kind, how: how, draft_n: pick.n, gap: gap, changed: diff ? diff.changed : null, compared: diff ? diff.compared : null, uncomparable: diff ? diff.uncomparable : null, outside: (diff && Number(diff.outside_changed)) || 0, late: !!pick.late };
 }
 async function handleLearnSettingsGet(event, d, R) {
   const c = await currentMember(event);

@@ -2013,3 +2013,9 @@
 - [ ] (운영 확인) 폰에서 안전 › 현장 거르기 단추·체크 '직원/일용직'·기록 줄 '수정'이 손가락으로 잘 눌리는지(PC 표는 그대로)
 - [x] (AI) 시험 화면 폰 폭 390에서 세 곳 높이 44(수정 폭 48) 실측 · `uismoke` T688 — ✓ AI 11/27
 - [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `paycalc_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` 통과 · v560 문서 검사를 이 판 이상으로 풀고 v561 문서·판 번호 정확 검사 — ✓ AI 11/27
+
+## v562 — C294 판2 날인 스캔본 AI 판독(학습 짝 간극)
+- [ ] (운영 확인) 계약 서류에 날인 스캔본(pdf)을 최종본으로 올린 뒤 몇 분 안에 서류 줄이 `스캔 판독 기다리는 중` → `간극 N%(스캔 판독)`으로 바뀌는지
+- [ ] (운영 확인) AI 사용량 화면에 스캔 판독 호출이 기록되고, 관리 설정에서 스캔 판독을 끄면 새 짝이 판독 없이 끝나는지
+- [x] (AI) `servertest` C294 판2(가짜 AI 응답: xlsx↔pdf `scan_cells` · hwpx↔jpg `scan_para` · 재실행 없음 · REFUSAL·NO_TEXT·SCAN_OFF·FINAL_EXCLUDED · 대기 짝 집기) — ✓ AI 11/27
+- [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `paycalc_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` · `autorulestest` 통과 · v561 문서 검사를 이 판 이상으로 풀고 v562 문서·판 번호 정확 검사 — ✓ AI 11/27

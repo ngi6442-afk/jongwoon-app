@@ -5156,7 +5156,9 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   T('73 표식 없는 xlsx: 칸 일치율로 찾음(50%는 많이 고친 수정본)', L.ok && L.tpl === 'work_start' && L.how === 'content', JSON.stringify(L));
   r = await call({ action: 'cdoc_put', cid: 'c73', i: 1, doc_key: 'main.작성-5', kind: 'final', name: '스캔.pdf', data: b64('%PDF-1.4 스캔'), pair_tpl: 'work_start' }, tk, 'dev1');
   L = r.body.learn || {}; it = r.body.item || {}; ix = mem.gw_data['recidx:c73'].items.find((x) => x.n === it.n);
-  T('73 날인 스캔 pdf: 서류 이름으로 짝 · 비교 불가(간극 없음 null) · 짝은 남음', L.ok && L.how === 'name' && L.kind === 'none' && L.gap.cell_ratio === null && ix.pgap === null && ix.ptpl === 'work_start', JSON.stringify([L, ix]));
+  T('73 날인 스캔 pdf: 서류 이름으로 짝 · C294 판2 = 판독 대기(kind scan_wait · pending · 간극은 아직 null · 규칙 창고 간극 줄 안 적음) · 짝은 남음', L.ok && L.how === 'name' && L.kind === 'scan_wait' && L.status === 'pending' && L.gap.cell_ratio === null && ix.pgap === null && ix.ptpl === 'work_start' && ix.pkind === 'scan_wait'
+    && !((mem.gw_data['lessons:contract:work_start'] || {}).gaps || []).some((g) => g.pair === L.id), JSON.stringify([L, ix]));
+  const scanPid73 = L.id, scanN73 = it.n;
   r = await call({ action: 'cdoc_put', cid: 'c73', i: 1, doc_key: 'main.작성-6', kind: 'final', name: '수기.hwp', data: Buffer.from([0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1, 1, 2]).toString('base64') }, tk, 'dev1');
   T('73 hwp 파일 + 같은 단계 초안 여럿: 내용 비교 불가라 미매칭(자동으로 안 묶음)', r.code === 200 && r.body.learn.status === 'unmatched' && r.body.learn.candidates.length === 3, JSON.stringify(r.body.learn));
   // ---- C294 판1: 구형 hwp 본문 문단 읽기(시험 재료 = 한컴 COM으로 만든 가짜 글 — tools/fixtures/c294: fx_a.hwpx·fx_a.hwp 같은 글, fx_b.hwp 한 문단 고침) ----
@@ -5213,6 +5215,56 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       a.code === 200 && mem.gw_data['learn:contract:in:' + manPair].status === 'superseded' && !ixU.pair && !ixU.ptpl && ixU.plearn === 'MANUAL_OFF' && again.code === 400 && again.body.error_code === 'NO_CHANGE', JSON.stringify([a.code, ixU]));
     a = await call({ action: 'cdoc_pair_assign', cid: 'c73', n: encN, draft_n: fdN }, 'no-such-token', 'dev1');
     T('C294 수동 지정: 로그인 없음 = 401', a.code === 401, String(a.code));
+    // ---- C294 판2: 스캔 판독 워커(gw-learn-background scanJob) — Claude는 가짜 fetch ----
+    {
+      const wk = require(join(FN, 'gw-learn-background.js')), LN = require(join(FN, '_lib/learn.js'));
+      const savedKey = process.env.GW_ANTHROPIC_KEY, realFetch = global.fetch;
+      process.env.GW_ANTHROPIC_KEY = 'test-anthropic-key-0000';
+      const calls = []; let reply = '';
+      global.fetch = async (url, opt) => { const b = JSON.parse(opt.body || '{}'); calls.push(b); return { ok: true, status: 200, text: async () => JSON.stringify({ model: b.model, stop_reason: reply === 'REFUSE' ? 'refusal' : 'end_turn', usage: { input_tokens: 900, output_tokens: 60 }, content: [{ type: 'text', text: reply }] }) }; };
+      const tokIn = issueSession({ id: '__promoai__', role: 'system' }).token;
+      const evw = (pid) => ({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tokIn }, body: JSON.stringify({ pair_id: pid }) });
+      const ymS = LN.ymOf(Date.now()), u0 = (mem.gw_data['usage:learn:contract:' + ymS] || {}).calls || 0;
+      // ① 엑셀 초안(채움 맵 A1 착공계 · C1 칸) ↔ 날인 스캔 pdf: 한 글자 값('칸')은 판독 오차가 커서 비교에서 뺌 → 칸 값 1개('착공계') — 판독 글에 띄어 쓴 '착 공 계'로 남음 = 안 바뀜
+      reply = '쪽수: 2\n착 공 계\n[날인]\n공사명: 다른 글자\n';
+      await wk.handler(evw(scanPid73), {});
+      const P1 = mem.gw_data['learn:contract:in:' + scanPid73] || {}, B1 = calls[calls.length - 1] || {}, c0 = (B1.messages && B1.messages[0].content) || [];
+      const ixS = mem.gw_data['recidx:c73'].items.find((x) => x.n === scanN73), LS = mem.gw_data['lessons:contract:work_start'] || {}, gS = (LS.gaps || []).filter((g) => g.pair === scanPid73);
+      T('C294 판2 ① 엑셀 초안 ↔ 스캔 pdf: 문서 블록(pdf)·옮겨 적기 지시 1번 · kind scan_cells · 한 글자 값 뺌 → 칸 값 1 · 판독 오차 허용(띄어 쓴 "착 공 계" = 안 바뀜 0%) · 쪽수 2 · done_nomodel SCAN_GAP · 색인 pkind·pgap · 규칙 창고 간극 1줄(ocr) · 사용량 +1 · 짝에 판독 글 없음',
+        calls.length === 1 && c0[0] && c0[0].type === 'document' && c0[0].source.media_type === 'application/pdf' && /옮겨 적어라/.test(c0[1] && c0[1].text || '')
+        && P1.status === 'done_nomodel' && P1.code === 'SCAN_GAP' && P1.kind === 'scan_cells' && P1.diff.compared === 1 && P1.diff.changed === 0 && P1.diff.pages === 2 && P1.gap.cell_ratio === 0 && P1.ocr === 1
+        && ixS.pkind === 'scan_cells' && ixS.pgap === 0 && gS.length === 1 && gS[0].ocr === 1 && gS[0].ratio === 0
+        && ((mem.gw_data['usage:learn:contract:' + ymS] || {}).calls || 0) === u0 + 1 && JSON.stringify(P1).indexOf('다른 글자') < 0,
+        JSON.stringify({ n: calls.length, P1, ixS }));
+      await wk.handler(evw(scanPid73), {});
+      T('C294 판2 ①-2 끝난 짝은 다시 판독 안 함', calls.length === 1, String(calls.length));
+      // ② 한글 초안(fx_a.hwpx) ↔ 스캔 jpg: 한 문단 고침 → scan_para 1건
+      r = await call({ action: 'cdoc_put', cid: 'c73', i: 7, doc_key: 'main.작성-12', kind: 'final', name: '날인본.jpg', pair_tpl: 'c294_form', data: Buffer.concat([Buffer.from([0xFF, 0xD8, 0xFF, 0xE0]), Buffer.from('JFIF 시험')]).toString('base64') }, tk, 'dev1');
+      const pid2 = (r.body.learn || {}).id;
+      reply = '쪽수: 1\n' + pX.map((p, i) => (i === 2 ? '공사기간: 2099년 2월 1일 ~ 2099년 3월 4일' : p)).join('\n');
+      await wk.handler(evw(pid2), {});
+      const P2 = mem.gw_data['learn:contract:in:' + pid2] || {}, B2 = calls[calls.length - 1] || {};
+      T('C294 판2 ② 한글 초안 ↔ 스캔 jpg: 그림 블록(image/jpeg) · kind scan_para · 문단 9 중 1 바뀜 · 간극 11.1%',
+        r.body.learn.kind === 'scan_wait' && B2.messages[0].content[0].type === 'image' && B2.messages[0].content[0].source.media_type === 'image/jpeg' && P2.kind === 'scan_para' && P2.diff.changed === 1 && P2.diff.compared === 9 && P2.gap.cell_ratio === 0.111,
+        JSON.stringify([r.body.learn, P2]));
+      // ③ 거절·빈 판독·스위치 끔·민감 등급 2 최종본
+      r = await call({ action: 'cdoc_put', cid: 'c73', i: 7, doc_key: 'main.작성-13', kind: 'final', name: '날인본2.pdf', pair_tpl: 'c294_form', data: b64('%PDF-1.4 날인2') }, tk, 'dev1');
+      const pid3 = (r.body.learn || {}).id; reply = 'REFUSE';
+      await wk.handler(evw(pid3), {}); const f3 = mem.gw_data['learn:contract:in:' + pid3].status === 'fail' && mem.gw_data['learn:contract:in:' + pid3].code === 'REFUSAL';
+      mem.gw_data['learn:contract:in:' + pid3].status = 'pending'; reply = '쪽수: 1\n[날인]\n';
+      await wk.handler(evw(pid3), {}); const e3 = mem.gw_data['learn:contract:in:' + pid3].status === 'done_nomodel' && mem.gw_data['learn:contract:in:' + pid3].code === 'NO_TEXT';
+      const n3 = calls.length;
+      mem.gw_data['learn:contract:in:' + pid3].status = 'pending';
+      const sv = mem.gw_data['settings:learn']; mem.gw_data['settings:learn'] = Object.assign({}, sv || {}, { contract: Object.assign({}, (sv || {}).contract || {}, { scan: false }) });
+      await wk.handler(evw(pid3), {}); const o3 = mem.gw_data['learn:contract:in:' + pid3].code === 'SCAN_OFF' && calls.length === n3;
+      mem.gw_data['settings:learn'] = sv;
+      const ix3 = mem.gw_data['recidx:c73'].items.find((x) => x.n === r.body.item.n); ix3.pii = 2; mem.gw_data['learn:contract:in:' + pid3].status = 'pending';
+      await wk.handler(evw(pid3), {}); const p3 = mem.gw_data['learn:contract:in:' + pid3].code === 'FINAL_EXCLUDED' && calls.length === n3;
+      T('C294 판2 ③ 모델 거절 = fail REFUSAL(재시도 대상) · 날인만 있는 판독 = NO_TEXT(간극 없음) · 스위치 scan:false = SCAN_OFF(호출 0) · 민감 등급 2 최종본 = FINAL_EXCLUDED(호출 0)', f3 && e3 && o3 && p3, JSON.stringify({ f3, e3, o3, p3 }));
+      // ④ 크론이 깨우는 대상: 판독 대기 짝(scan_wait · pending)은 계약 짝 후보
+      T('C294 판2 ④ 판독 대기 짝은 크론 후보(pickPending — 계약 짝 번호 꼴·계약 번호)', LN.pickPending([{ id: pid3, cid: 'c73', status: 'pending', kind: 'scan_wait' }], Date.now(), LN.TYPES.contract.pair_re, 'cid').length === 1, pid3);
+      global.fetch = realFetch; if (savedKey === undefined) delete process.env.GW_ANTHROPIC_KEY; else process.env.GW_ANTHROPIC_KEY = savedKey;
+    }
     await call({ action: 'cdoc_put', cid: 'c73', i: 8, doc_key: 'gen.c294_only_sheet', kind: 'draft', pii: 1, name: '표만.xlsx', data: b64(mkXl({ A1: '표만' })) }, tk, 'dev1');
     r = await call({ action: 'cdoc_put', cid: 'c73', i: 8, doc_key: 'main.작성-11', kind: 'final', name: '한글로 낸 것.hwp', data: ah.toString('base64') }, tk, 'dev1');
     L = r.body.learn || {};

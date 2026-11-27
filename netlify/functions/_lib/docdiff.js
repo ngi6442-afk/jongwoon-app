@@ -693,4 +693,4 @@ function cellRows(edits, finalBuf, allowRefs) {
   });
   return { ok: true, rows: rows, hidden_changed: hidden_changed.slice(0, 100), hidden_same_n: hidden_same };
 }
-module.exports = { ZIP_ENTRY_MAX, ZIP_TOTAL_MAX, ZIP_ENTRIES_MAX, XLSX_CELLS_MAX, zipBudget, zipEntries, zipCheck, xlsxCells, xlsxCellDiff, xlsxFileDiff, docxParas, docxParaDiff, hwpxParas, hwpxParaDiff, hwpParas, hwpParaDiff, hwpxParaItems, hwpxTokDiff, hwpxTokRows, tplFinger, TOK_PARA_CAP, matchScore, genMarkOf, genMarkParse, listDiff, gapScore, refRC, inMergedNonAnchor, splitRef, cellRows, flattenEdits };
+module.exports = { ZIP_ENTRY_MAX, ZIP_TOTAL_MAX, ZIP_ENTRIES_MAX, XLSX_CELLS_MAX, zipBudget, zipEntries, zipCheck, xlsxCells, xlsxCellDiff, xlsxFileDiff, docxParas, docxParaDiff, hwpxParas, hwpxParaDiff, hwpParas, hwpParaDiff, paraDiff, hwpxParaItems, hwpxTokDiff, hwpxTokRows, tplFinger, TOK_PARA_CAP, matchScore, genMarkOf, genMarkParse, listDiff, gapScore, refRC, inMergedNonAnchor, splitRef, cellRows, flattenEdits };

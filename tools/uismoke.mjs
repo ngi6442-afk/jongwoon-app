@@ -24726,13 +24726,42 @@ try {
     const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
     const ftv = cut(d.ft, '\n### v561 (11/27)', '\n### '), tlv = cut(d.tl, '\n## v561 ', '\n## ');
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l));
-    const ok = /기준: v561 \(2026-11-27\)\./.test(d.ft) && ftv.indexOf('`#eduScopeBar .vs-chip`') > 0 && cb.length === 3 && /SHELL_CACHE = 'jw-shell-v561'/.test(d.sw);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 561 && ftv.indexOf('`#eduScopeBar .vs-chip`') > 0 && cb.length === 3 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 561   /* v562(C294 판2)에서 '561 이상'으로 풂 */;
     return { ok, info: { cb: cb.length } };
   };
   const rZ = chkZ(DZ), muZ = (k, f) => chkZ(Object.assign({}, DZ, { [k]: f(DZ[k]) })).ok;
   const MZ = [muZ('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v560 (')), muZ('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v560'")), muZ('tl', (s) => s.split('\n## v561 ').join('\n## vX '))];
   T('v561 문서·판 번호(정확 검사): FEATURES 기준 v561 (2026-11-27)·v561 절(T688) · TESTLIST v561 칸 3 · sw v561 · 결함 사본 ' + MZ.length + '개 = 모두 ✗', rZ.ok && MZ.every((v) => v === false), JSON.stringify({ r: rZ.info, mut: MZ }));
 } catch (e) { console.log('  (v561 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── C294 판2(날인 스캔본 AI 판독): 서류 줄 문구 · 서버 대기 분기 · 배경 판독
+try {
+  const rdQ = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DQ = { h: html, gd: rdQ('netlify/functions/gw-data.js'), lb: rdQ('netlify/functions/gw-learn-background.js') };
+  const chkQ = (d) => d.h.indexOf('(f.pkind === "scan_wait" ? "스캔 판독 기다리는 중" : "비교 불가 "') > 0
+    && d.h.indexOf('} else sub += f.pkind === "scan_wait" ? "스캔 판독 기다리는 중" : "비교 불가("') > 0
+    && d.h.indexOf('g.pkind !== "scan_wait" ? "(스캔 판독)" : ""') > 0
+    && /kind = 'scan_wait';/.test(d.gd) && /if \(pair\.kind === 'scan_wait'\) \{ await scanJob\(st, pair, pairId, finish\); return; \}/.test(d.lb);
+  const muQ = (k, f) => chkQ(Object.assign({}, DQ, { [k]: f(DQ[k]) }));
+  const MQ = [muQ('h', (s) => s.split('"스캔 판독 기다리는 중"').join('"대기"')), muQ('h', (s) => s.split('"(스캔 판독)"').join('""')), muQ('gd', (s) => s.split("kind = 'scan_wait';").join("kind = 'none';")), muQ('lb', (s) => s.split("if (pair.kind === 'scan_wait') {").join("if (false) {"))];
+  T('C294 판2 날인 스캔본 판독 — 서류 줄 "스캔 판독 기다리는 중"·"(스캔 판독)" · 서버 scan_wait 짝 · 배경 scanJob 분기 · 결함 사본 ' + MQ.length + '개 = 모두 ✗', chkQ(DQ) && MQ.every((v) => v === false), JSON.stringify(MQ));
+} catch (e) { console.log('  (C294 판2 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v562(C294 판2): 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '562 이상'으로 풀 것
+try {
+  const rdX = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DX = { ft: rdX('FEATURES.md'), tl: rdX('TESTLIST.md'), sw: rdX('sw.js') };
+  const chkX = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v562 (11/27)', '\n### '), tlv = cut(d.tl, '\n## v562 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l));
+    const ok = /기준: v562 \(2026-11-27\)\./.test(d.ft) && ftv.indexOf('`scanJob`') > 0 && ftv.indexOf('원장 C294') > 0 && cb.length === 4 && /SHELL_CACHE = 'jw-shell-v562'/.test(d.sw);
+    return { ok, info: { cb: cb.length } };
+  };
+  const rX = chkX(DX), muX = (k, f) => chkX(Object.assign({}, DX, { [k]: f(DX[k]) })).ok;
+  const MX = [muX('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v561 (')), muX('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v561'")), muX('tl', (s) => s.split('\n## v562 ').join('\n## vX '))];
+  T('v562 문서·판 번호(정확 검사): FEATURES 기준 v562 (2026-11-27)·v562 절(C294 판2) · TESTLIST v562 칸 4 · sw v562 · 결함 사본 ' + MX.length + '개 = 모두 ✗', rX.ok && MX.every((v) => v === false), JSON.stringify({ r: rX.info, mut: MX }));
+} catch (e) { console.log('  (v562 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

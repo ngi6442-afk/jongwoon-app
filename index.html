@@ -16807,10 +16807,10 @@
     if (f){
       sub += "직원 최종 v" + f.ver + " " + cdocGenDay(f) + (f.phow === "manual" ? "(사람이 고른 짝)" : "") + " · ";
       if (g){
-        sub += "간극 " + Math.round(g.pgap * 100) + "%" + (g !== f ? "(직원 v" + g.ver + " 기준, 최신은 비교 불가 " + (f.ext || "") + ")" : "");
+        sub += "간극 " + Math.round(g.pgap * 100) + "%" + (/^scan_/.test(String(g.pkind || "")) && g.pkind !== "scan_wait" ? "(스캔 판독)" : "") + (g !== f ? "(직원 v" + g.ver + " 기준, 최신은 " + (f.pkind === "scan_wait" ? "스캔 판독 기다리는 중" : "비교 불가 " + (f.ext || "")) + ")" : "");
         if (old){ var od = G.l.filter(function(y){ return y.n === g.pdn; })[0]; sub += "(AI" + (od ? " v" + od.ver : " 이전 판") + " 기준, 새 AI는 수정본 기다리는 중)"; }
         if (g.pout) sub += " · AI가 안 채운 칸 " + g.pout;
-      } else sub += "비교 불가(" + (f.ext || "") + ")";
+      } else sub += f.pkind === "scan_wait" ? "스캔 판독 기다리는 중" : "비교 불가(" + (f.ext || "") + ")";
     } else sub += c.status !== "done" ? "직원 수정본 기다리는 중" : "최종본 없음";
     return { sub: sub, ok: !!(f && !old), d: d, f: f };
   }
