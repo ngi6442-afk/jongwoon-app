@@ -2105,3 +2105,8 @@
 - [x] (AI 시험 화면 대상) 재현 틀(운영 v575 ↔ 고친 판 · 가짜 저장소): 목록 줄·처리 표시·되돌림 실패가 ok true → ok false·STORAGE_WRITE_FAILED · 정상 = 같은 결과 — ✓ AI 11/27
 - [x] (AI) `stmtmail_check` ⑬ 6건(결함 사본 4) — ✓ AI 11/27
 - [x] (AI) `uismoke` · `servertest` · `stmtmail_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `paycalc_check` 통과 · 앞 판 문서 검사를 이 판 이상으로 풀고 v577 문서·판 번호 정확 검사 — ✓ AI 11/27
+
+## v578 — C327 서버 — 이름 바꾸기 색인 순서 · 지운 회원 색인 · 받기 알림 예외
+- [ ] (AI 운영 확인 — C327) 배포 뒤 다음 날 백업에서 관리자 오류 기록에 member_upsert·member_delete·autotask_ingest 500이 새로 쌓이지 않음 — 정상 회원 저장·자동 지시 받기 그대로
+- [x] (AI) `servertest` C327 ④⑤⑥(결함 사본 모두 ✗) · 실 저장소 재현(지운 회원 색인 뒤 새 회원) · 좁은 독립 확인 2회 — ✓ AI 11/27
+- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 C327_게이트_v578_1127.txt

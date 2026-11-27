@@ -25404,8 +25404,8 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[x\] \(AI 시험 화면 대상\)/.test(l));
     const FT = ['`STORAGE_WRITE_FAILED`', '`seen_failed`', '`applied_failed`', '`DROP_ROLLBACK_FAILED`', '`buf`', 'C238 F'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v577 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && scr.length === 1
-      && d.cl.indexOf('**월말명세서 C328(v577)**') > 0 && /SHELL_CACHE = 'jw-shell-v577'/.test(d.sw);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 577 /* v578(C238)에서 '577 이상'으로 풂 */ && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && scr.length === 1
+      && d.cl.indexOf('**월말명세서 C328(v577)**') > 0 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 577;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const rU = chkU(DU);
@@ -25415,6 +25415,29 @@ try {
   T('v577 문서·판 번호(정확 검사): FEATURES 기준 v577 (2026-11-27)·v577 절(29 C328) · TESTLIST v577 칸 3(시험 화면 [x] 1 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v577 · 결함 사본(기준 줄·sw·FEATURES 글·CLAUDE 줄·TESTLIST 칸) ✗',
     rU.ok && MU.every((v) => v === false), JSON.stringify({ r: rU.info, mut: MU }));
 } catch (e) { console.log('  (v577 검사 생략 — ' + e.message + ')'); fails++; }
+
+
+// ── v578(C327 서버 — 64): 실행 검사는 servertest C327 ④⑤⑥ · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '578 이상'으로 풀 것
+try {
+  const rd578 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D578 = { ft: rd578('FEATURES.md'), tl: rd578('TESTLIST.md'), sw: rd578('sw.js'), cl: rd578('CLAUDE.md') };
+  const chk578 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v578 (11/27)', '\n### '), tlv = cut(d.tl, '\n## v578 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), op = cb.filter((l) => /^- \[ \] \(AI 운영 확인/.test(l));
+    const FT = ['`idxDrop`', '`idxHolder`', '`licDutyNotify`', '`handleAttDel`', '원장 C327'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v578 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C327 서버(v578') > 0 && /SHELL_CACHE = 'jw-shell-v578'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
+  };
+  const r578 = chk578(D578);
+  const mu578 = (k, f) => chk578(Object.assign({}, D578, { [k]: f(D578[k]) })).ok;
+  const M578 = [mu578('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v577 (')), mu578('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v577'")),
+    mu578('ft', (s) => s.split('`idxHolder`').join('idxHolder')), mu578('cl', (s) => s.replace('**C327 서버(v578', 'C327 서버(v578')), mu578('tl', (s) => s.split('\n## v578 ').join('\n## vX '))];
+  T('v578 C327 서버 문서·판 번호(정확 검사): FEATURES 기준 v578·v578 절(낱말 5) · TESTLIST v578 칸 3 · CLAUDE.md 한 줄 · sw jw-shell-v578 · 결함 사본 ' + M578.length + '개 = 모두 ✗',
+    r578.ok && M578.every((v) => v === false), JSON.stringify({ r: r578.info, mut: M578 }));
+} catch (e) { console.log('  (v578 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
