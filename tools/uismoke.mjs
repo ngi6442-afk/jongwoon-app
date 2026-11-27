@@ -3185,8 +3185,8 @@ try {
   const pkApi32 = new Function([cpSrc32, fn32('csPkIk'), 'return { P: CON_PACKETS, ik: csPkIk };'].join('\n'))();
   const iks32 = []; pkApi32.P.forEach((pk) => pk.items.forEach((it0) => iks32.push(pkApi32.ik(pk, it0))));
   const conM32 = [...stmt32(sec32, /var SF_NOW_CON = \[[^\n]*\];/).matchAll(/\{ k: "([^"]+)", s: "([^"]+)" \}/g)].map((m) => [m[1], m[2]]);
-  T('v432 ① 계약 안전 서류 키(SF_NOW_CON) 4개 = con|safety_plan · start|safety_pack · complete|safety_cost · complete|석면 완료보고서(별지 77호) — 전부 v427 패킷 항목 키(csPkIk)로 실재',
-    conM32.map((x) => x[0]).join(',') === 'con|safety_plan,start|safety_pack,complete|safety_cost,complete|석면 완료보고서(별지 77호)' && conM32.every((x) => iks32.indexOf(x[0]) >= 0) && iks32.length > 20,
+  T('v432 ① 계약 안전 서류 키(SF_NOW_CON) 4개 = con|safety_plan · start|safety_pack · complete|safety_cost · complete|asb_conc(석면농도측정 결과보고서 — C293) — 전부 v427 패킷 항목 키(csPkIk)로 실재',
+    conM32.map((x) => x[0]).join(',') === 'con|safety_plan,start|safety_pack,complete|safety_cost,complete|asb_conc' && conM32.every((x) => iks32.indexOf(x[0]) >= 0) && iks32.length > 20,
     JSON.stringify(conM32) + ' / 패킷 키 ' + iks32.length);
   // ①-3 (v432 검토) 중처법 줄 ↔ 내 업무 항목 매핑을 쌍으로 못 박는다(코드 지도 code.steps[5]·브리핑 steps[4]) — 3호↔7호(h2↔h1)처럼 같은 반기 항목끼리 바꿔도 알약이 같아 실행 검사로는 안 잡혔다.
   //      GROUPS 제목의 '(4조N호)' 표식(h1 (중처법 4조7호)·h2 (4조3호)·h3 (4조5호)·h4 (4조8호)·h5 (4조9호))과도 교차 대조
@@ -3430,7 +3430,7 @@ try {
   T('v432 ④ 관리자형 ④ 계약 안전 서류: 진행 계약만(끝난 계약 빼고) 시작일 최근 순 · 관급 준설 = 안전보건관리계획서 ✓ · 안전 패킷 ✗ · 산업안전보건관리비 사용내역서 해당없음 → 1/2(csFlow 줄을 패킷 키로 찾아 csRowState 판정 그대로, 같은 fm) · 관급 석면 = 서류함 받기 전이라 "확인 중"(석면 완료보고서 포함 4종 — csPkWhen) · 서류함 오류 = "확인 실패" · 계약 한 건이 깨져도 그 줄만 "확인 실패" · 사급(안전 서류 줄 없음)은 꼬리말 건수 · csFlow는 서류함을 받은 계약만 · 발주처 글자는 이스케이프',
     aCon32.indexOf('<span class="cnt">진행 4건 · 빠짐 1</span>') > 0 && rowIds32(aCon32).join(',') === '석면,준설,철거,준설'
     && aCon32.indexOf('안전보건관리계획서 ✓ · 안전 패킷 ✗ · 산업안전보건관리비 사용내역서 해당없음 · 단계·서류 ›') > 0 && aCon32.indexOf('<span class="sfn-pill am">1/2</span>') > 0
-    && aCon32.indexOf('안전보건관리계획서 · 안전 패킷 · 산업안전보건관리비 사용내역서 · 석면 완료보고서 — 서류함 확인 중') > 0 && aCon32.indexOf('<span class="sfn-pill">확인 중</span>') > 0
+    && aCon32.indexOf('안전보건관리계획서 · 안전 패킷 · 산업안전보건관리비 사용내역서 · 석면농도측정 결과보고서 — 서류함 확인 중') > 0 && aCon32.indexOf('<span class="sfn-pill">확인 중</span>') > 0
     && (aCon32.match(/<span class="sfn-pill bad">확인 실패<\/span>/g) || []).length === 2 && aCon32.indexOf('안전 서류 줄이 없는 진행 계약 1건') > 0 && aCon32.indexOf('끝난 계약') < 0
     && A32.calls.flow.join(',') === 'c1,c6' && A32.calls.state.length === 3 && A32.calls.state.every((x) => x[0] === 'c1' && x[2] === true) && A32.out.indexOf('<img') < 0 && aCon32.indexOf('포항시&lt;img src=x&gt;') > 0,
     rowIds32(aCon32).join(',') + ' / flow ' + A32.calls.flow.join(',') + ' / ' + (aCon32.match(/<span class="cnt">[^<]*<\/span>/) || [''])[0]);
@@ -24513,9 +24513,9 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ["`rsOk`", "원장 C242"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v555 \(2026-11-26\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 14 && gate.length === 2 && scr.length === 12 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 555 && ftv.length > 0 && mF.length === 0 && cb.length === 14 && gate.length === 2 && scr.length === 12 && !cb.some((l) => /\(PM/.test(l))
       && d.cl.indexOf('**C242(v555') > 0
-      && /SHELL_CACHE = 'jw-shell-v555'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 555;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r555 = chk555(D555);
@@ -24527,6 +24527,40 @@ try {
   T('v555 문서·판 번호(정확 검사): FEATURES 기준 v555 (2026-11-26)·v555 절(C242) · TESTLIST v555 칸 14(화면·운영 확인 12 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v555 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
     r555.ok && M555.every((v) => v === false), JSON.stringify({ r: r555.info, mut: M555 }));
 } catch (e) { console.log('  (v555 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v556(C293 — 준공 패킷 석면 항목 = 산안법 시행규칙 183조 별지 80호(+81호) · 고정 키 asb_conc · 옛 키 체크 읽기): 실행 검사 + 문서·판 번호 정확 검사
+try {
+  const rd556 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D556 = { ft: rd556('FEATURES.md'), tl: rd556('TESTLIST.md'), sw: rd556('sw.js'), ix: rd556('index.html') };
+  const fn556 = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) return ''; let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } return ''; };
+  const run556 = (src) => { const m = /\n  var CS_PK_OLD = (\{[^\n]*\});/.exec(src); if (!m) return null; return new Function('CS_PK_OLD', fn556(src, 'csPkst') + '\nreturn csPkst;')(JSON.parse(m[1])); };
+  const chk556 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v556 (11/27)', '\n### '), tlv = cut(d.tl, '\n## v556 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["원장 C293", "`asb_conc`", "`csPkst`", "183조"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    let rk = false;
+    try {
+      const f = run556(d.ix), OLD = 'complete|석면 완료보고서(별지 77호)';
+      rk = !!f && f({ pkst: { [OLD]: 'done' } }, 'complete|asb_conc') === 'done' && f({ pkst: { [OLD]: 'done', 'complete|asb_conc': 'na' } }, 'complete|asb_conc') === 'na'
+        && f({ pkst: {} }, 'complete|asb_conc') === undefined && f({}, 'complete|safety_cost') === undefined && f({ pkst: { [OLD]: 'done' } }, 'complete|safety_cost') === undefined;
+    } catch (e) { rk = false; }
+    const ok = /기준: v556 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 1 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
+      && d.ix.indexOf('석면 완료보고서(별지 77호)",') < 0 && d.ix.indexOf('{ t:"gap", k:"asb_conc", h:"석면농도측정 결과보고서(별지 80호 · 81호 결과표 첨부)", when:"asb" }') > 0 && d.ix.indexOf('{ k: "complete|asb_conc", s: "석면농도측정 결과보고서" }') > 0
+      && d.ix.indexOf('m = e0 ? csPkst(c, e0.ik) : ""') > 0 && /delete c\.pkst\[CS_PK_OLD\[e0\.ik\]\]/.test(d.ix) && rk
+      && /SHELL_CACHE = 'jw-shell-v556'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, rk } };
+  };
+  const r556 = chk556(D556);
+  const mu556 = (k, f) => chk556(Object.assign({}, D556, { [k]: f(D556[k]) })).ok;
+  const M556 = [mu556('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v555 (')), mu556('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v555'")),
+    mu556('ft', (s) => s.split('`csPkst`').join('csPkst')),
+    mu556('ix', (s) => s.replace('m = e0 ? csPkst(c, e0.ik) : ""', 'm = e0 ? (c.pkst || {})[e0.ik] : ""')),
+    mu556('ix', (s) => s.replace('if (o && Object.prototype.hasOwnProperty.call(s, o))', 'if (false)').replace('return (o && Object.prototype.hasOwnProperty.call(s, o)) ? s[o] : undefined;', 'return undefined;'))];
+  T('v556 C293 석면 완료 서류(실행 — 실제 csPkst): 준공 패킷 석면 항목 = 고정 키 asb_conc · 이름 석면농도측정 결과보고서(별지 80호 · 81호 결과표) · 안전 현황 키 같이 · 옛 키 체크는 새 키로 읽음(새 키가 있으면 새 키) · 쓸 때 옛 키 지움 · FEATURES 기준 v556·v556 절 · TESTLIST v556 칸 3 · sw jw-shell-v556 · 결함 사본(기준 줄·sw·FEATURES 낱말·옛 읽기·대응 걷음) 모두 ✗',
+    r556.ok && M556.every((v) => v === false), JSON.stringify({ r: r556.info, mut: M556 }));
+} catch (e) { console.log('  (v556 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

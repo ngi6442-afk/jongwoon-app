@@ -17257,7 +17257,7 @@
       { t:"att", k:"super", h:"감리완료보고서(수령)", re:/감리/, when:"demo" },
       { t:"gap", h:"산업안전보건관리비 사용내역서", gen:{ t:"gen", k:"safety_cost", h:"산업안전보건관리비 사용내역서", when:"dredge" } },
       { t:"gap", h:"용역완료계·처리확인서", when:"waste" },
-      { t:"gap", h:"석면 완료보고서(별지 77호)", when:"asb" }
+      { t:"gap", k:"asb_conc", h:"석면농도측정 결과보고서(별지 80호 · 81호 결과표 첨부)", when:"asb" }
     ]},
     { k:"bill", h:"청구 패킷", items:[
       { t:"gen", k:"work_complete", h:"청구서·청구 공문(준공계 안)", when:"pub" },
@@ -18417,6 +18417,9 @@
   var CS_NO_MERGE = { "공문":1 };   // 단계마다 다른 서류인 흔한 이름 — 단계 사이에 합치지 않는다
   function csDocBase(n){ var s = String(n || ""), out = "", d = 0, i, ch; for (i = 0; i < s.length; i++){ ch = s.charAt(i); if (ch === "(" || ch === "["){ d++; continue; } if ((ch === ")" || ch === "]") && d > 0){ d--; continue; } if (!d) out += ch; } return out.split("→")[0].replace(/\s+/g, ""); }
   function csPkIk(pk, it0){ return pk.k + "|" + (it0.k || (it0.gen && it0.gen.k) || it0.h); }
+  // C293: 준공 패킷 석면 항목 = 산안법 시행규칙 183조 별지 80호(+81호 결과표) — 옛 '완료보고서(별지 77호)'는 181조 착공 전 신고서라 틀림. 패킷 항목 키를 바꾼 것 — 계약에 옛 키로 저장된 체크(c.pkst)를 새 키로 읽는다(쓸 때는 새 키 · 옛 키 지움)
+  var CS_PK_OLD = { "complete|asb_conc": "complete|석면 완료보고서(별지 77호)" };
+  function csPkst(c, ik){ var s = c.pkst || {}; if (Object.prototype.hasOwnProperty.call(s, ik)) return s[ik]; var o = CS_PK_OLD[ik]; return (o && Object.prototype.hasOwnProperty.call(s, o)) ? s[o] : undefined; }
   function csGenTpls(c, k){ return k === "con_docs" ? ["contract_pledge", "seal_reg", "bond_waiver", "labor_exempt"] : (k === "html_contract" ? [] : csGenKeys(c, k)); }
   function csRowGens(r){ var out = r.gen ? [r.gen] : []; r.pk.forEach(function(e){ if (e.it.t === "gen" && out.indexOf(e.it.k) < 0) out.push(e.it.k); }); return out; }
   // 줄 모델 — st["파이프|i"] = [줄], loose = 단계 없는 서류, byId(체크 처리용), shown = 줄에 나온 양식(AI↔직원), G = cdocGenInfo
@@ -18514,7 +18517,7 @@
       if (r.pk.some(function(e){ return !!e.ev.hm; }) && !r.refs.some(function(f, q){ var d = csDocPeek(f); return !!(d && sts[q] !== "na" && d.at && !d.auto); })) return "done";
       return "todo";
     }
-    var e0 = r.pk[0], m = e0 ? (c.pkst || {})[e0.ik] : "";
+    var e0 = r.pk[0], m = e0 ? csPkst(c, e0.ik) : "";
     if (m === "na" || m === "done" || m === "todo") return m;
     if (r.pk.some(function(e){ return !!(e.ev.hm || e.ev.hm2 || e.ev.hit.length); })) return "done";
     return (fm && fm.G && csRowGens(r).some(function(k){ return csGenTpls(c, k).some(function(tpl){ return !!fm.G.fin[tpl]; }); })) ? "done" : "todo";
@@ -18667,6 +18670,7 @@
       var e0 = r.pk[0], main = csMain(c), ai = Number(String(r.at || "").split("|")[1]);
       if (!e0) return;
       (c.pkst = c.pkst || {})[e0.ik] = to;
+      if (CS_PK_OLD[e0.ik] && Object.prototype.hasOwnProperty.call(c.pkst, CS_PK_OLD[e0.ik])) delete c.pkst[CS_PK_OLD[e0.ik]];   // C293 새 키로 쓰면 옛 키는 지움
       if (main) logs.push([main, (ai >= 0 && ai <= 99) ? ai : Math.min(Number(main.cur) || 0, 99), "pk:" + cdocSan(e0.ik.replace("|", "."), 50)]);
     }
     if (!logs.length && r.refs.length) return;
@@ -21173,7 +21177,7 @@
   // 인허가 의무 대장 안전 행(data/duties_seed.json no) — 기한 엔진(체크 28 G2·G3, gw-duty-cron 미등록) 배포 전까지 D-n 없이 주기 문구만. 61행(운반 관리대장 기록)은 안전 행이 아니라 뺀다
   var SF_NOW_DUTY = { cycle: [4, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 27, 28, 29, 30, 51, 52, 53, 55, 56, 57, 59], event: [32], na: [62] };   // event 32 = 태양광 중대한 사고 통보(따로 판정) · na 62 = 차량만 보유한 운반업 비대상
   // 계약 안전 서류 = v427 패킷 줄 키(csPkIk — 패킷|항목). 판정은 csFlow 줄 + csRowState 그대로(읽기만)
-  var SF_NOW_CON = [{ k: "con|safety_plan", s: "안전보건관리계획서" }, { k: "start|safety_pack", s: "안전 패킷" }, { k: "complete|safety_cost", s: "산업안전보건관리비 사용내역서" }, { k: "complete|석면 완료보고서(별지 77호)", s: "석면 완료보고서" }];
+  var SF_NOW_CON = [{ k: "con|safety_plan", s: "안전보건관리계획서" }, { k: "start|safety_pack", s: "안전 패킷" }, { k: "complete|safety_cost", s: "산업안전보건관리비 사용내역서" }, { k: "complete|asb_conc", s: "석면농도측정 결과보고서" }];   // C293
   // '확인 필요' — 데이터 없이 조문과 해당 여부만(PM 11/9 시안 그대로 — 설계 조사 law.go.kr 확인분)
   var SF_NOW_CONFIRM = [
     { id: "하도급", t: "협의체 매월 · 순회점검 · 합동점검", p: "해당 시", m: "산안법 제64조" },
