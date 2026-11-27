@@ -18955,7 +18955,7 @@ function J91a(x) { return JSON.stringify(x); }
     const MUTE = [
       ["  if (!iw.ok) return jr(500, { status: 'ERROR', error_code: iw.code || 'STORAGE_WRITE_FAILED', request_id: R });\n  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '증빙등록'", "  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '증빙등록'"],
       ["  if (!bd.ok) return jr(500, { status: 'ERROR', error_code: bd.code || 'STORAGE_DELETE_FAILED', request_id: R });\n", ''],
-      ["  if (!iw.ok) return jr(500, { status: 'ERROR', error_code: iw.code || 'STORAGE_WRITE_FAILED', request_id: R });\n  try { await appendAudit", "  try { await appendAudit"],
+      ["  if (!iw.ok) return jr(500, { status: 'ERROR', error_code: iw.code || 'STORAGE_WRITE_FAILED', request_id: R });\n  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '증빙삭제'", "  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '증빙삭제'"],
       ["      const w2 = await blobSet(st, colKey('approvals'), chk.data);   // C238 판 E: 합쳐 다시 쓴 결과를 봄(겹친 저장에 밀린 상신이 빠진 채 성공이던 것)\n      if (!w2.ok) return { ok: false, code: w2.code || 'STORAGE_WRITE_FAILED' };\n", "      await blobSet(st, colKey('approvals'), chk.data);\n"],
       ["        if (!w2.ok) return jr(500, { status: 'ERROR', error_code: w2.code || 'STORAGE_WRITE_FAILED', request_id: R });\n        newBase = chk.data.updated_at;", "        newBase = chk.data.updated_at;"],
     ];
