@@ -364,8 +364,9 @@ async function handleMemberUpsert(st, event, d, R) {
     if (!ix.ok && ix.code !== 'NOT_FOUND') return MEMBERS_FAIL(R);   // C225 판 A
     if (ix.ok && ix.data && ix.data !== m.id) return jr(409, { status: 'REJECTED', error_code: 'NAME_TAKEN', request_id: R });
   }
+  const idxDrop = [];   // C327 ⑤(11/27): 옛 이름·옛 아이디 색인 지우기는 모든 검사(LAST_DEV·등급·아이디 중복·약한 PIN·LAST_PM) 뒤, 회원 문서 쓰기 바로 앞에서 — 종전엔 먼저 지워 뒤 검사로 거절(409·400·403)되면 색인만 지워진 채 남음
   if (!isNew) {
-    if (nameChange) { const wn = await blobSet(st, nameKey(m.name), null); if (!wn.ok) return jr(500, { status: 'ERROR', error_code: wn.code || 'STORAGE_WRITE_FAILED', request_id: R }); m.name = name; }   // C238 판 B: 옛 이름 색인을 못 지우면 회원 문서를 쓰기 전에 500(옛 이름이 이 계정을 계속 가리키던 것 — 표 gw-auth.js:360)
+    if (nameChange) { idxDrop.push(nameKey(m.name)); m.name = name; }   // C238 판 B: 옛 이름 색인을 못 지우면 회원 문서를 쓰기 전에 500(옛 이름이 이 계정을 계속 가리키던 것 — 표 gw-auth.js:360)
     if (roleNew !== undefined) m.role = roleNew;
     if (d.admin !== undefined) m.admin = !!d.admin;
     if (d.dev !== undefined) {
@@ -398,13 +399,13 @@ async function handleMemberUpsert(st, event, d, R) {
   // 아이디 칸을 비운 채 저장하면 로그인 아이디가 통째로 날아갔다(2026-08-11 PM 실제 사고).
   // 아이디를 정말 회수할 때만 uid_clear:true를 명시한다.
   if (d.uid_clear === true) {
-    if (m.uid) { const wu = await blobSet(st, uidKey(m.uid), null); if (!wu.ok) return jr(500, { status: 'ERROR', error_code: wu.code || 'STORAGE_WRITE_FAILED', request_id: R }); delete m.uid; }   // C238 판 B: 회수 결과를 봄(표 gw-auth.js:393)
+    if (m.uid) { idxDrop.push(uidKey(m.uid)); delete m.uid; }   // C327 ⑤: 지우기는 아래(검사 뒤)   // C238 판 B: 회수 결과를 봄(표 gw-auth.js:393)
   } else if (d.uid !== undefined && normUid(d.uid) !== '') {
     const nu = normUid(d.uid);
     if (!validUid(nu)) return jr(400, { status: 'REJECTED', error_code: 'INVALID_UID', request_id: R });
     const dup = await uidTaken(st, nu, m.id);
     if (dup) return dup === 'MEMBERS_READ_FAILED' ? MEMBERS_FAIL(R) : jr(409, { status: 'REJECTED', error_code: dup, request_id: R });
-    if (m.uid && normUid(m.uid) !== nu) { const wu = await blobSet(st, uidKey(m.uid), null); if (!wu.ok) return jr(500, { status: 'ERROR', error_code: wu.code || 'STORAGE_WRITE_FAILED', request_id: R }); }   // C238 판 B: 옛 아이디 색인 회수 결과를 봄(표 gw-auth.js:393)
+    if (m.uid && normUid(m.uid) !== nu) idxDrop.push(uidKey(m.uid));   // C327 ⑤: 지우기는 아래(검사 뒤)   // C238 판 B: 옛 아이디 색인 회수 결과를 봄(표 gw-auth.js:393)
     m.uid = nu;
   }
   if (d.rank !== undefined) m.rank = String(d.rank || '');
@@ -458,6 +459,7 @@ async function handleMemberUpsert(st, event, d, R) {
   // 마지막 PM 보호(LAST_PM, S3) — 관리자 해제·leave_date·role/name/dev/tier 변경 등 **모든 저장**의 결과로 재직 유효 pm이 0명이 되면 거부
   const allAfter = allBefore.filter(function (x) { return x && x.id !== m.id; }).concat([m]);
   if (pmLost(tcBefore, allAfter)) return jr(409, { status: 'REJECTED', error_code: 'LAST_PM', request_id: R });
+  for (const k of idxDrop) { const wd = await blobSet(st, k, null); if (!wd.ok) return jr(500, { status: 'ERROR', error_code: wd.code || 'STORAGE_WRITE_FAILED', request_id: R }); }   // C327 ⑤ · C238 판 B: 못 지우면 회원 문서 쓰기 전에 500(아무것도 안 바뀜 — 앞서 지운 것은 다시 저장하면 다시 지움)
   const w1 = await blobSet(st, memberKey(m.id), m);
   const w2 = await blobSet(st, nameKey(m.name), m.id);
   const w3 = m.uid ? await blobSet(st, uidKey(m.uid), m.id) : { ok: true };   // 아이디 색인 유지 · C238 판 B: 결과를 봄(못 쓰면 아이디 로그인이 안 되는데 200이던 것 — 같은 저장을 다시 하면 이 줄이 다시 씀)

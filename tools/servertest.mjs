@@ -6738,7 +6738,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     // ①-4 시험 계정 표식은 관리자만 — 비관리자(안전 수행이어도)의 회원 저장은 종전대로 403 ADMIN_ONLY·표식 그대로 · 서버 코드는 칸 앞(이름 색인 지우기보다 먼저)에서 관리자 검사
     const t84 = await callA84({ action: 'member_upsert', id: 'uw84', test_acct: true }, tokW84);
     const src84 = require('fs').readFileSync(join(FN, 'gw-auth.js'), 'utf8');
-    const iChk84 = src84.indexOf("if (d.test_acct !== undefined && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });"), iCorp84 = src84.indexOf("error_code: 'BAD_CORP'"), iName84 = src84.indexOf('if (nameChange) { const wn = await blobSet(st, nameKey(m.name), null);')   /* C238 판 B: 옛 이름 색인 지우기 결과를 보는 꼴로 */;
+    const iChk84 = src84.indexOf("if (d.test_acct !== undefined && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });"), iCorp84 = src84.indexOf("error_code: 'BAD_CORP'"), iName84 = src84.indexOf('for (const k of idxDrop) { const wd = await blobSet(st, k, null);')   /* C238 판 B: 옛 이름 색인 지우기 결과를 보는 꼴로 */;
     T('84 v447 ①-4 시험 계정 표식은 관리자만: 비관리자(안전 수행) 저장 = 403 ADMIN_ONLY·표식 없음 그대로 · 서버 검사(관리자·BAD_CORP)는 이름 색인 지우기보다 앞 · AUD_FIELDS에 네 칸',
       t84.code === 403 && t84.body.error_code === 'ADMIN_ONLY' && !('test_acct' in u84()) && iChk84 > 0 && iCorp84 > 0 && iName84 > 0 && iChk84 < iName84 && iCorp84 < iName84
       && /const AUD_FIELDS = \[[^\]]*'office','supervisor','corp','test_acct','quals'\]/.test(src84), JSON.stringify({ code: t84.code, ec: t84.body.error_code, iChk84, iCorp84, iName84 }));
@@ -12887,9 +12887,10 @@ function J91a(x) { return JSON.stringify(x); }
     const MUTB = [
       ["    if (!wm.ok) return jr(500,", "    if (false) return jr(500,"],
       ["    if (!wn.ok || !wu.ok) return jr(500,", "    if (false) return jr(500,"],
-      ["if (!wn.ok) return jr(500, { status: 'ERROR', error_code: wn.code || 'STORAGE_WRITE_FAILED', request_id: R }); m.name = name;", "m.name = name;"],
-      ["if (!wu.ok) return jr(500, { status: 'ERROR', error_code: wu.code || 'STORAGE_WRITE_FAILED', request_id: R }); delete m.uid;", "delete m.uid;"],
-      ["const wu = await blobSet(st, uidKey(m.uid), null); if (!wu.ok) return jr(500, { status: 'ERROR', error_code: wu.code || 'STORAGE_WRITE_FAILED', request_id: R }); }   // C238 판 B: 옛 아이디", "await blobSet(st, uidKey(m.uid), null); }   // C238 판 B: 옛 아이디"],
+      ["const wd = await blobSet(st, k, null); if (!wd.ok) return jr(500,", "const wd = await blobSet(st, k, null); if (false) return jr(500,"],   // C327 ⑤: 옛 이름·아이디 색인 지우기는 검사 뒤 한 곳
+      ["    if (nameChange) { idxDrop.push(nameKey(m.name)); m.name = name; }", "    if (nameChange) { await blobSet(st, nameKey(m.name), null); m.name = name; }"],   // C327 ⑤ 순서: 먼저 지우면 뒤 거절(LAST_PM)에 색인만 지워짐
+      ["    if (m.uid) { idxDrop.push(uidKey(m.uid)); delete m.uid; }", "    if (m.uid) { await blobSet(st, uidKey(m.uid), null); delete m.uid; }"],
+      ["    if (m.uid && normUid(m.uid) !== nu) idxDrop.push(uidKey(m.uid));", "    if (m.uid && normUid(m.uid) !== nu) await blobSet(st, uidKey(m.uid), null);"],
       ["  if (!w3.ok) return jr(500, { status: 'ERROR', error_code: w3.code", "  if (false) return jr(500, { status: 'ERROR', error_code: w3.code"],
       ["  if (!w1.ok || !w2.ok) return jr(500, { status: 'ERROR', error_code: 'STORAGE_WRITE_FAILED', request_id: R });\n  // C238 판 B 검토", "  if (!w1.ok || !w2.ok) return jr(500, { status: 'ERROR', error_code: 'STORAGE_WRITE_FAILED', request_id: R });\n  if (!w3.ok) return jr(500, { status: 'ERROR', error_code: 'X', request_id: R });\n  // C238 판 B 검토"],   // 새 색인 실패 때 감사 건너뜀(검토 전 꼴)
       ["  if (bad) return jr(500,", "  if (false) return jr(500,"],
@@ -13788,7 +13789,7 @@ function J91a(x) { return JSON.stringify(x); }
       ["    if (ls && !AR.piiScan(ls)) doc.rules = Object.assign({}, doc.rules, { lic_duty: ls });", ''],
       ["  if (hasOwn(dry, 'lic_duty')) { doc.rules = Object.assign({}, dry); delete doc.rules.lic_duty; }", ''],
       ["  const as = await licAssignStrict(st);\n  if (!as.ok) return { ok: false, why: 'ASSIGN_UNAVAILABLE' };\n  let items = tasks;", "  const as = { ok: true, rules: {} };\n  let items = tasks;"],
-      ["  if (lic && lic.notify) { licSent = await licDutyNotify(lic.notify, today); delete lic.notify; }", "  if (lic && lic.notify) { licSent = 0; delete lic.notify; }"]];
+      ["  if (lic && lic.notify) { try { licSent = await licDutyNotify(lic.notify, today); } catch (e) {} delete lic.notify; }", "  if (lic && lic.notify) { licSent = 0; delete lic.notify; }"]];
     const kG20 = [];
     for (const [a, b, c2] of MG20) { let v; try { v = (await chkE20(comp20(GWP20, c2 ? mut20(mut20(SRC20.gw, a, b), c2[0], c2[1]) : mut20(SRC20.gw, a, b)), require(CRP20))).o.ok; } catch (e) { v = 'err ' + e.message; } kG20.push(v); }
     // 완료 신호 결함(doneif 사본을 크론이 쓰게) — e2e E가 깨져야
@@ -14594,7 +14595,7 @@ function J91a(x) { return JSON.stringify(x); }
     const E0 = await chkEC(GWF);
     T('C185 판1 ③ 실행기 e2e(시험 계획 함수를 끼운 사본 — 판2 본문 아님): 켬 + 표식 srv = 새 2건(담당 배정표·이름 0·켠 날보다 앞 1명 old) · made 0(관리자 "정기업무"에 안 섞임) · 받은 항목·숨길 키 안 돎·다른 지시 글자째 그대로 · 담당 알림 1발(notifyAutoCreated 한 호출) · 감사 수만 · 같은 날 다시 0·알림 0 · 날짜 바뀜 = 새 2 + 옛 2 표시 → 되돌림 = 표시 떨어짐(글자째 원래대로)·새 2 표시 · 지운 지시 = gone · 연습 요약(live) = 미리 보기·지시 그대로·이름 0 · 사건 11 = 0건 TOO_MANY(요약에도) · 값에 이름 = 0건 PII · 켠 시각 없음 = NO_SINCE · 연습 = ingest 칸 없음·요약 30일 · 담당 퇴사 = 그 항목만 안 만듦 · 표식 없는 호출 = 알림 1번',
       E0.o.ok, JSON.stringify(E0.o.ok ? E0.o : E0));
-    const ME = [["  if (srvNew.length) srvSent = await notifyAutoCreated(st, srvNew, '정기봇', { tag: 'auto-srv', seen: notSeen });", ''],   // 검토 A 반영: 실행기 지시 알림은 저장 뒤 한 줄
+    const ME = [["  if (srvNew.length) { try { srvSent = await notifyAutoCreated(st, srvNew, '정기봇', { tag: 'auto-srv', seen: notSeen }); } catch (e) {} }", ''],   // 검토 A 반영: 실행기 지시 알림은 저장 뒤 한 줄
       ["  if (made || fixed || assigned || (lic && lic.touched) || srvTouched) {", '  if (made || fixed || assigned || (lic && lic.touched)) {'],
       ["  const srvIds = EV.RULE_IDS.filter(function (k) { return sw.rules[k] === 'live' && autotaskReady(k); });", "  const srvIds = EV.RULE_IDS.filter(function (k) { return sw.rules[k] !== 'off' && autotaskReady(k); });"],
       ["er.made.forEach(function (t) { srvNew.push(t); });", "er.made.forEach(function (t) { srvNew.push(t); made++; });"]];
@@ -14848,7 +14849,7 @@ function J91a(x) { return JSON.stringify(x); }
     const E0 = await chkEK(GWK);
     T('C185 판1 검토 ③ 실행기 보강(시험 계획 함수 — 판2~ 본문 아님): 저장 실패 = 500·알림 0 · 두 번 실패 뒤 성공 = 알림 1발(A) · 표식 없는 호출도 실행기 지시는 저장 뒤 1발(A) · 봇 응답 srv = 수만(E) · 한 규칙 쓰다 예외 = 그 규칙 지시 되돌림·ERROR·다른 규칙 그대로(D) · 차량 못 읽음 = 그 규칙만 건너뜀 · 배정표·명부 못 읽음 = 전부 건너뜀(G18·G21) · 명부에 있는 퇴사 담당 = 안 만듦(G19) · 퇴사자 이름 = PII(G20) · 서버 규칙만 건너뛴 날 감사 1줄(G17) · 요약 PII = 그 칸만 빠짐(G23)',
       E0.o.ok, JSON.stringify(E0.o.ok ? E0.o : E0));
-    const ME = [["  if (srvNew.length) srvSent = await notifyAutoCreated(st, srvNew, '정기봇', { tag: 'auto-srv', seen: notSeen });", ''],
+    const ME = [["  if (srvNew.length) { try { srvSent = await notifyAutoCreated(st, srvNew, '정기봇', { tag: 'auto-srv', seen: notSeen }); } catch (e) {} }", ''],
       ["  for (let i = notifyItems.length - 1; i >= 0; i--) if (srvNew.indexOf(notifyItems[i]) >= 0) notifyItems.splice(i, 1);", "  srvNew.forEach(function (t) { if (notifyItems.indexOf(t) < 0) notifyItems.push(t); });"],
       ["      if (write) { tasks.length = n0; back.forEach(function (b) { b[0].title = b[1]; b[0].detail = b[2]; b[0].updated = b[3]; }); }", ''],
       ["  const srvOut = srv ? EV.botSum(srv) : null;", '  const srvOut = srv;'],
@@ -19040,6 +19041,54 @@ function J91a(x) { return JSON.stringify(x); }
     }
     T('C238 G 결함 사본 ' + MUTG.length + '개(휴가 알림을 저장 앞으로 · 자동 지시 일반 알림을 저장 앞으로 · 지시 저장 담당 알림을 저장 앞으로) 모두 잡힘', kill.length === 0, kill.join(' | '));
   } catch (e) { T('C238 G 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+}
+
+{ // ---- C327 ⑤⑥(11/27) — 이름·아이디 바꾸기의 옛 색인 지우기를 모든 검사 뒤로(뒤 거절에 색인만 지워지던 순서) · autotask_ingest 인허가·실행기 알림 예외가 저장 뒤 500이 되지 않게
+  const fsQ327 = require('fs'), ModQ327 = require('module');
+  const FAQ = join(FN, 'gw-auth.js'), SAQ = fsQ327.readFileSync(FAQ, 'utf8'), SDQ = fsQ327.readFileSync(join(FN, 'gw-data.js'), 'utf8');
+  const loadQ = (src) => { const m = new ModQ327(FAQ); m.filename = FAQ; m.paths = ModQ327._nodeModulePaths(dirname(FAQ)); m._compile(src, FAQ); return m.exports; };
+  const snapQ = JSON.stringify({ u: mem.gw_users || {} });
+  const DEVQ = { id: 'udq327', name: '개발327', uid: 'dq327id', admin: true, dev: true, tier: 'pm', perms: {} };
+  const TGQ = { id: 'utq327', name: '대상327', uid: 'tq327id', admin: false, perms: {} };
+  const tokQ = issueSession(DEVQ).token;
+  const chkQ = async (mod) => {
+    const c = async (body) => { const r = await mod.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tokQ, 'x-device-id': 'devq327' }, body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+    const P = {}, I = {};
+    const U = () => mem.gw_users, M = () => mem.gw_users['member:utq327'] || {};
+    const reset = () => { mem.gw_users = JSON.parse(snapQ); blobsMock.hooks.failSet = null;
+      mem.gw_users['member:udq327'] = JSON.parse(JSON.stringify(DEVQ)); mem.gw_users['uid:dq327id'] = 'udq327'; mem.gw_users['name:개발327'] = 'udq327';
+      mem.gw_users['member:utq327'] = JSON.parse(JSON.stringify(TGQ)); mem.gw_users['uid:tq327id'] = 'utq327'; mem.gw_users['name:대상327'] = 'utq327';
+      ['name:대상327b', 'uid:tq327nw'].forEach((k) => { delete mem.gw_users[k]; }); mem.gw_users['device:devq327'] = { id: 'devq327', status: 'approved' }; };
+    try {
+      // ① 이름 바꾸기 + 약한 PIN → 400 · 옛 이름 색인 그대로 · 회원 이름 그대로(종전: 색인만 지워진 채 400)
+      reset(); let r = await c({ action: 'member_upsert', id: 'utq327', name: '대상327b', pin: '1' });
+      P.name = r.code === 400 && U()['name:대상327'] === 'utq327' && M().name === '대상327' && U()['name:대상327b'] === undefined; I.name = [r.code, r.body.error_code, U()['name:대상327']];
+      // ② 아이디 바꾸기 + 약한 PIN → 400 · 옛 아이디 색인 그대로 / 아이디 회수 + 약한 PIN → 400 · 색인 그대로
+      reset(); r = await c({ action: 'member_upsert', id: 'utq327', uid: 'tq327nw', pin: '1' });
+      const u1 = r.code === 400 && U()['uid:tq327id'] === 'utq327' && M().uid === 'tq327id';
+      reset(); const r2 = await c({ action: 'member_upsert', id: 'utq327', uid_clear: true, pin: '1' });
+      P.uid = u1 && r2.code === 400 && U()['uid:tq327id'] === 'utq327' && M().uid === 'tq327id'; I.uid = [r.code, r2.code];
+      // ③ 정상 이름·아이디 바꾸기 = 200 · 옛 색인 지워짐 · 새 색인
+      reset(); const n1 = await c({ action: 'member_upsert', id: 'utq327', name: '대상327b', uid: 'tq327nw' });
+      P.normal = n1.code === 200 && U()['name:대상327'] === undefined && U()['name:대상327b'] === 'utq327' && U()['uid:tq327id'] === undefined && U()['uid:tq327nw'] === 'utq327'; I.normal = [n1.code, n1.body.error_code];
+    } finally { mem.gw_users = JSON.parse(snapQ); blobsMock.hooks.failSet = null; }
+    return { ok: Object.values(P).every((v) => v === true), info: { P, I } };
+  };
+  try {
+    const Q0 = await chkQ(loadQ(SAQ));
+    T('C327 ⑤ 이름·아이디 바꾸기 + 뒤 검사 거절(약한 PIN 400) = 옛 이름·옛 아이디 색인·회원 문서 그대로(종전: 색인만 지워짐) · 정상 바꾸기 = 200·옛 색인 지움·새 색인', Q0.ok, JSON.stringify(Q0.info));
+    const MQ = [["    if (nameChange) { idxDrop.push(nameKey(m.name)); m.name = name; }", "    if (nameChange) { await blobSet(st, nameKey(m.name), null); m.name = name; }"],
+      ["    if (m.uid && normUid(m.uid) !== nu) idxDrop.push(uidKey(m.uid));", "    if (m.uid && normUid(m.uid) !== nu) await blobSet(st, uidKey(m.uid), null);"],
+      ["    if (m.uid) { idxDrop.push(uidKey(m.uid)); delete m.uid; }", "    if (m.uid) { await blobSet(st, uidKey(m.uid), null); delete m.uid; }"]];
+    const kill = [];
+    for (const [a, b] of MQ) { let k; try { if (SAQ.split(a).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + a.slice(0, 40)); k = !(await chkQ(loadQ(SAQ.replace(a, () => b)))).ok; } catch (e) { k = 'err ' + e.message; } if (k !== true) kill.push(a.trim().slice(0, 40) + (k === false ? ' 안 깨짐' : ' ' + k)); }
+    T('C327 ⑤ 결함 사본 ' + MQ.length + '개(옛 이름·옛 아이디·아이디 회수 색인을 검사 앞에서 바로 지움) 모두 잡힘', kill.length === 0, kill.join(' | '));
+    // ⑥ 정적: autotask_ingest의 저장 뒤 알림 셋(일반 · 인허가 licDutyNotify · 실행기)은 모두 try 안 — 보내기 예외가 이미 저장된 받기를 500으로 바꾸지 않음
+    const ingB = (() => { const i = SDQ.indexOf('async function handleAutotaskIngest('); const j = SDQ.indexOf('\nasync function ', i + 10); return SDQ.slice(i, j); })();
+    const six = (src) => /\{ try \{ licSent = await licDutyNotify\(/.test(src) && /\{ try \{ srvSent = await notifyAutoCreated\(/.test(src) && /\{ try \{ notified = await notifyAutoCreated\(/.test(src);
+    const sixMut = [six(ingB.replace('{ try { licSent = await licDutyNotify(lic.notify, today); } catch (e) {} delete lic.notify; }', '{ licSent = await licDutyNotify(lic.notify, today); delete lic.notify; }')), six(ingB.replace("{ try { srvSent = await notifyAutoCreated(", '{ { srvSent = await notifyAutoCreated('))];
+    T('C327 ⑥ autotask_ingest 저장 뒤 알림 셋 모두 try(인허가 licDutyNotify · 실행기 · 일반) · 결함 사본 2개(try 걷음) = ✗', six(ingB) && sixMut.every((v) => v === false), JSON.stringify({ ok: six(ingB), mut: sixMut }));
+  } catch (e) { T('C327 ⑤⑥ 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
 }
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

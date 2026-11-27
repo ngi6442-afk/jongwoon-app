@@ -1215,10 +1215,10 @@ async function handleAutotaskIngest(event, d, R) {
   }
   if (notifyItems.length) { try { notified = await notifyAutoCreated(st, notifyItems, '정기봇', { seen: notSeen }); } catch (e) {} }   // C238 G: 저장 실패면 위에서 500으로 끝남 · 보내기 예외는 응답을 바꾸지 않음
   let licSent = 0;
-  if (lic && lic.notify) { licSent = await licDutyNotify(lic.notify, today); delete lic.notify; }   // 저장된 뒤에만(저장 실패면 위에서 500으로 끝남)
+  if (lic && lic.notify) { try { licSent = await licDutyNotify(lic.notify, today); } catch (e) {} delete lic.notify; }   // C327 ⑥: 보내기 예외가 이미 저장된 받기를 500으로 바꾸지 않게(C238 G와 같은 원칙)   // 저장된 뒤에만(저장 실패면 위에서 500으로 끝남)
   if (lic) lic.notified = licSent;
   let srvSent = 0;
-  if (srvNew.length) srvSent = await notifyAutoCreated(st, srvNew, '정기봇', { tag: 'auto-srv', seen: notSeen });   // C185 판1 검토 A: 실행기 지시의 담당 알림은 저장이 된 뒤에만(저장 실패면 위에서 500 — 지시 없는 알림·재시도 때 겹친 알림 없음)
+  if (srvNew.length) { try { srvSent = await notifyAutoCreated(st, srvNew, '정기봇', { tag: 'auto-srv', seen: notSeen }); } catch (e) {} }   // C327 ⑥   // C185 판1 검토 A: 실행기 지시의 담당 알림은 저장이 된 뒤에만(저장 실패면 위에서 500 — 지시 없는 알림·재시도 때 겹친 알림 없음)
   const srvOut = srv ? EV.botSum(srv) : null;   // 검토 E: 봇에 돌려주는 칸은 수만(담당 id 목록 없음)
   return jr(200, Object.assign({ status: 'OK', made: made, redo: redo, fixed: fixed, assigned: assigned, notified: srvSent ? Object.keys(notSeen).length : notified, blocked: blocked, blocked_rules: blockedBy, request_id: R }, lic ? { lic: lic } : {}, srvOut ? { srv: srvOut } : {}, quiet ? { only: only ? 'lic_duty' : 'srv' } : {}));   // C185 판1: srv = 범위 밖 규칙별 수(live 규칙이 있을 때만)
 }
