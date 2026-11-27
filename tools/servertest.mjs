@@ -18965,4 +18965,68 @@ function J91a(x) { return JSON.stringify(x); }
   } catch (e) { T('C238 판 E 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
 }
 
+{ // ---- C238 G(11/27) 알림을 저장 뒤로 — 휴가 저장(신청·승인/반려) · 자동 지시 받기 일반 담당 알림
+  //   거절: 저장 실패 = 500·알림 0. 허용: 정상 = 종전과 같은 알림(받는 사람·제목·꼬리표) · 보내기 예외 = 응답 200·저장 그대로 · 서버가 일부 줄만 받은 저장(남의 줄) = 받은 줄 알림만.
+  //   결함 사본 = 보내기를 저장 앞으로 되돌림 → 실패해야 한다.
+  const fsG238 = require('fs'), ModG238 = require('module');
+  const FDATAG = join(FN, 'gw-data.js'), SDATAG = fsG238.readFileSync(FDATAG, 'utf8');
+  const loadG238 = (src) => { const m = new ModG238(FDATAG); m.filename = FDATAG; m.paths = ModG238._nodeModulePaths(dirname(FDATAG)); m._compile(src, FDATAG); return m.exports; };
+  const snapG238 = JSON.stringify({ d: mem.gw_data || {} });
+  const chkG238 = async (GD) => {
+    const c = async (body, tok, dev) => { const r = await GD.handler({ httpMethod: 'POST', headers: Object.assign(tok ? { authorization: 'Bearer ' + tok } : {}, dev ? { 'x-device-id': dev } : {}), body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+    const P = {}, I = {};
+    const sent = []; const savedSend = pushMock.sendTo; let throwSend = false;
+    pushMock.sendTo = async (ids, p, o) => { if (throwSend) throw new Error('push down'); sent.push({ ids: ids.slice(), p: p }); return { sent: ids.length, removed: 0 }; };
+    const LV = (id, who) => ({ id: id, member_id: who, member_name: who === 'uwork' ? '직원' : '남', type: 'annual', start: '2026-12-10', end: '2026-12-10', days: 1, reason: '사정', status: 'pending', approver: '', applied: '2026-11-27', updated: '2026-11-27' });
+    const reset = () => { const s = JSON.parse(snapG238); mem.gw_data = s.d; blobsMock.hooks.failSet = null; sent.length = 0; throwSend = false; delete mem.gw_data['settings:notify'];
+      mem.gw_data['col:leaves'] = { schema: 1, items: [], updated_at: 1 }; };
+    try {
+      // ① 휴가 신청 — 저장 실패 → 500·알림 0
+      reset(); blobsMock.hooks.failSet = (k) => k === 'col:leaves';
+      let r = await c({ action: 'save', collection: 'leaves', base: 1, doc: { schema: 1, items: [LV('g238a', 'uwork')] } }, tokW, 'dev1'); blobsMock.hooks.failSet = null;
+      P.lvFail = r.code === 500 && sent.length === 0; I.lvFail = [r.code, sent.length];
+      // ② 휴가 신청 — 정상 → 1발(종전 꼴) · 남의 줄을 섞어 보내도 받은 본인 줄 알림만(남의 줄은 서버가 버림)
+      reset(); r = await c({ action: 'save', collection: 'leaves', base: 1, doc: { schema: 1, items: [LV('g238a', 'uwork'), LV('g238x', 'uother238')] } }, tokW, 'dev1');
+      const items = (mem.gw_data['col:leaves'].items || []);
+      P.lvOk = r.code === 200 && sent.length === 1 && /휴가 신청 1건/.test(sent[0].p.title) && items.some((x) => x.id === 'g238a') && !items.some((x) => x.id === 'g238x'); I.lvOk = [r.code, sent.length, sent[0] && sent[0].p.title, items.map((x) => x.id)];
+      // ③ 휴가 신청 — 보내기 예외 → 200·저장 그대로
+      reset(); throwSend = true; r = await c({ action: 'save', collection: 'leaves', base: 1, doc: { schema: 1, items: [LV('g238b', 'uwork')] } }, tokW, 'dev1');
+      P.lvThrow = r.code === 200 && (mem.gw_data['col:leaves'].items || []).some((x) => x.id === 'g238b'); I.lvThrow = [r.code];
+      // ④ 자동 지시 받기 — 배정표 cert:→uwork · 새 지시 1건 → 저장 실패 = 500·알림 0 / 정상 = 담당 1발 / 보내기 예외 = 200·지시 저장
+      const seedT = () => { mem.gw_data['col:tasks'] = { schema: 1, items: [], updated_at: 1 }; mem.gw_data['settings:assign'] = { schema: 1, rules: { 'cert:': { who_id: 'uwork' } }, approver_id: '', prev: null, updated_at: 5, updated_by: 'x' };
+        mem.gw_data['settings:notify'] = { schema: 1, events: { task_auto_create: 'assignee' }, updated_at: 1 }; };   // 담당 알림 켬(기본값 아님)
+      const ing = () => c({ action: 'autotask_ingest', key: 'test-ingest-key', items: [{ auto_key: 'cert:c238238', title: 'G238 증명서 갱신', due: '2026-12-14' }] });
+      reset(); seedT(); blobsMock.hooks.failSet = (k) => k === 'col:tasks'; r = await ing(); blobsMock.hooks.failSet = null;
+      const t1 = r.code === 500 && sent.length === 0;
+      reset(); seedT(); const r2 = await ing();
+      const t2 = r2.code === 200 && r2.body.made === 1 && sent.length >= 1 && sent.some((s) => s.ids.indexOf('uwork') >= 0);
+      reset(); seedT(); throwSend = true; const r3 = await ing();
+      const t3 = r3.code === 200 && (mem.gw_data['col:tasks'].items || []).some((t) => t.auto_key === 'cert:c238238');
+      P.ingest = t1 && t2 && t3; I.ingest = [r.code, r2.code, r2.body.made, sent.length, r3.code];
+    } finally { pushMock.sendTo = savedSend; const s = JSON.parse(snapG238); mem.gw_data = s.d; blobsMock.hooks.failSet = null; }
+    return { ok: Object.values(P).every((v) => v === true), info: { P, I } };
+  };
+  try {
+    const G0 = await chkG238(loadG238(SDATAG));
+    T('C238 G 알림을 저장 뒤로: 휴가 저장 실패 = 500·알림 0 · 정상 = 신청 1발 · 남의 줄 섞은 저장 = 받은 본인 줄만 · 보내기 예외 = 200·저장 그대로 · 자동 지시 받기 저장 실패 = 500·알림 0 · 정상 = 담당 1발 · 보내기 예외 = 200·지시 저장', G0.ok, JSON.stringify(G0.info));
+    const MUTG = [
+      ["  const leaveNotifyAfterSave = (col === 'leaves' && Array.isArray(doc.items));\n", "  const leaveNotifyAfterSave = false; if (col === 'leaves' && Array.isArray(doc.items)) { try { await notifyLeaves(store(DATA), oldItems, doc.items, c.member); } catch (e) {} }\n"],
+      ["  if (notifyItems.length) { try { notified = await notifyAutoCreated(st, notifyItems, '정기봇', { seen: notSeen }); } catch (e) {} }", ''],
+    ];
+    // 두 번째 사본은 보내기를 저장 앞(종전 자리)에 되살림
+    MUTG[1][1] = '';
+    const kill = [];
+    for (const [from, to] of MUTG) {
+      let k; try {
+        if (SDATAG.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50));
+        let src = SDATAG.replace(from, () => to);
+        if (to === '') { const anchor = "  // C238 G(11/27): 일반 담당 알림도 저장이 된 뒤에만"; if (src.split(anchor).length !== 2) throw new Error('앞 자리 없음'); src = src.replace(anchor, () => "  if (notifyItems.length) notified = await notifyAutoCreated(st, notifyItems, '정기봇', { seen: notSeen });\n" + anchor); }
+        k = !(await chkG238(loadG238(src))).ok;
+      } catch (e) { k = 'err ' + e.message; }
+      if (k !== true) kill.push(from.trim().slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k));
+    }
+    T('C238 G 결함 사본 ' + MUTG.length + '개(휴가 알림을 저장 앞으로 · 자동 지시 일반 알림을 저장 앞으로) 모두 잡힘', kill.length === 0, kill.join(' | '));
+  } catch (e) { T('C238 G 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

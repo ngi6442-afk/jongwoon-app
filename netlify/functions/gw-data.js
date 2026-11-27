@@ -606,7 +606,8 @@ async function handleSave(event, d, R) {
     doc.items = lg.items; leaveKept = lg.kept;
   }
   // v414 휴가 알림 2종(C3-1): 새 신청 → 관리자 우선기기 1발 · pending→approved/rejected → 신청자 1발. 설정으로 끌 수 있다. 실패해도 저장은 그대로.
-  if (col === 'leaves' && Array.isArray(doc.items)) { try { await notifyLeaves(store(DATA), oldItems, doc.items, c.member); } catch (e) {} }
+  // C238 G(11/27): 휴가 알림은 저장이 된 뒤에만 보낸다(종전엔 저장보다 먼저 보내 저장 실패여도 '신청'·'승인/반려' 알림이 감) — 아래 쓰기 성공 바로 뒤 leaveNotifyAfterSave
+  const leaveNotifyAfterSave = (col === 'leaves' && Array.isArray(doc.items));
   // 인허가 3층(2026-09-02): duties(의무 대장)는 ①구버전 클라·구형 캐시가 모르는 필드라 빠지거나 비어 오면
   // 저장 한 번에 95행+확정 이력이 통째로 증발한다(리뷰 high) — 서버가 원본을 이월. ②등재·확정 전환은 관리자 전용.
   let licKept = [];   // P1 판28 검토 2: 관리자 통째 저장에서 담당 단추 기준일을 지킨 행 번호(응답 lic_kept)
@@ -815,6 +816,7 @@ async function handleSave(event, d, R) {
   await verSnapshot(col, prevDoc, c.member.name, false, obPurged > 0);   // 사람 저장은 매번 직전 상태 보존(시점 복구용) · v444 부동산 정리가 서버 줄을 지우는 저장은 VER_SKIP이어도 보존
   const w = await blobSet(store(DATA), colKey(col), doc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  if (leaveNotifyAfterSave) { try { await notifyLeaves(store(DATA), oldItems, doc.items, c.member); } catch (e) {} }   // C238 G: 저장된 줄(서버가 받은 줄로 다시 세운 doc.items)만 견줌 · 보내기 실패·예외는 저장 응답을 바꾸지 않음(종전과 같음)
   // 감사 로그: 누가·언제·무엇을(이전값→새값). 서버측 기록이라 클라이언트 위변조 불가.
   let saveAuFail = false;   // C251 「덧대기」: 감사 줄을 못 남겼으면(appendAudit false·예외) 응답에 audit:false — 응답 꼴만(화면 글 없음 · 저장은 이미 됨)
   try {
@@ -1198,7 +1200,7 @@ async function handleAutotaskIngest(event, d, R) {
   for (let i = notifyItems.length - 1; i >= 0; i--) if (srvNew.indexOf(notifyItems[i]) >= 0) notifyItems.splice(i, 1);   // C185 판1 검토 A: 실행기가 만든 지시는 저장 뒤 알림(아래) — 일반 알림 길(저장 앞 · 종전 그대로)에서 뺌
   let notified = 0;
   const notSeen = {};   // C185 판2(ⓙ 1): 일반·실행기 알림을 받은 사람(응답 notified = 사람 수 한 번씩)
-  if (notifyItems.length) notified = await notifyAutoCreated(st, notifyItems, '정기봇', { seen: notSeen });
+  // C238 G(11/27): 일반 담당 알림도 저장이 된 뒤에만(아래 쓰기 뒤 — 실행기 지시 알림 srvNew와 같은 자리) · 대상은 여기서 정해 둔 notifyItems 그대로
   const blockTxt = blocked ? ' · 스위치 막음 ' + blocked + '(' + Object.keys(blockedBy).map(function (k) { return k + ' ' + blockedBy[k] + ' — ' + (k === 'unknown' ? '허용 꼴 밖' : (k === 'veh_unread' ? '차량 문서 못 읽음' : sw.rules[k])); }).join(', ') + ')' : '';   // v453 규칙 이름·건수·스위치 값만(키·본문 없음)
   const licTxt = !lic ? '' : (lic.skip ? ' · 인허가 기한 건너뜀(' + lic.skip + ')' : ((lic.bundled || lic.made || lic.bumped || lic.moved || lic.next || lic.no_who || lic.reopened) ? ' · 인허가 기한 ' + (lic.bundled ? '묶음 ' + lic.bundled + ' · ' : '') + '새 ' + lic.made + ' · 단계 올림 ' + lic.bumped + (lic.moved ? ' · 담당 옮김 ' + lic.moved : '') + (lic.next ? ' · 다음 회차 ' + lic.next : '') + (lic.reopened ? ' · 다시 엶 ' + lic.reopened : '') + (lic.no_who ? ' · 담당 없음 ' + lic.no_who + '행' : '') : ''));   // P1 판20 수·행 수만
   if (made || fixed || assigned || (lic && lic.touched) || srvTouched) {
@@ -1209,6 +1211,7 @@ async function handleAutotaskIngest(event, d, R) {
   } else if (blocked || licTxt || srvTxt) {
     try { await appendAudit({ ts: Date.now(), by: '정기봇', bid: 'bot', col: 'tasks', ev: [{ op: '정기업무', id: '', t: '신규 0' + blockTxt + licTxt + srvTxt }] }); } catch (e) {}   // v453 쓴 것은 없어도 막힌 것은 남김
   }
+  if (notifyItems.length) { try { notified = await notifyAutoCreated(st, notifyItems, '정기봇', { seen: notSeen }); } catch (e) {} }   // C238 G: 저장 실패면 위에서 500으로 끝남 · 보내기 예외는 응답을 바꾸지 않음
   let licSent = 0;
   if (lic && lic.notify) { licSent = await licDutyNotify(lic.notify, today); delete lic.notify; }   // 저장된 뒤에만(저장 실패면 위에서 500으로 끝남)
   if (lic) lic.notified = licSent;
