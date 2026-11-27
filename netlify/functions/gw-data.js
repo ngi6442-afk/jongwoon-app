@@ -25,6 +25,7 @@ const CONAPPR = require('./_lib/conappr');   // P1 판24-③ 계약 단계 결�
 const DUTY = require('./_lib/duty');   // P1 판28 인허가 '이번 달' 회차 계산(앱 DUTY_SHARED 구간과 같은 본문 — uismoke P1 판28이 글자째 대조)
 const EV = require('./_lib/evrules');   // C185 판1 범위 밖 자동 지시 규칙 5줄(서버가 셈) 공통 틀 — 새 키 꼴·실행(사건 막이·이름 대조·옛 지시 표시)·계획 함수 자리(판2~6)
 const LD = require('./_lib/licduty');   // P1 판20 인허가 기한 → 담당 자동 지시(판정 = 이번 달 탭과 같은 dutyCur·dutyStage · 스위치 settings:autotask lic_duty, 기본 dry)
+const TG = require('./_lib/taskguard');   // C240 판 A-2b 비관리자 지시 저장 가드(근거 = 앱 전수 표)
 const LG = require('./_lib/leaveguard');   // C240 판 A-2a 휴가 줄·칸 가르기(읽기 leavesView · 비관리자 저장 leavesRebuild · 관리자 저장 leavesAdminFix — 근거 = 앱 전수 표)
 const SITEEDU = require('./_lib/siteedu');   // v433 현장 대장 '특별교육 미이수' 판정(앱 asbNoSpecial·eduHasValidSpecial과 같은 규칙 — uismoke v433 대조)
 
@@ -518,6 +519,7 @@ async function handleSave(event, d, R) {
     purgeExpiredBids(doc, cutO);
   }
   // v395 배정표(기반 1·9): 자동 지시의 서버 배정 who_id(who_by 'assign')는 클라 사본이 공란으로 올려도 이월 + 남은 공란은 배정표로 채움
+  let taskKept = [];   // C240 A-2b: 비관리자 지시 저장에서 서버가 받지 않은 줄 id(응답 task_kept)
   // C185 판2(계획 검토 1): 진입 조건을 비관리자 전원으로 — 기성 '보기' 직원도 입·퇴사 지시를 받지 않았으니 그 저장이 숨은 지시를 지우지 않게 이월(기성 갈래는 taskRecHiddenFor 안에서 숨김 직원에게만 참 — 종전 그대로)
   if (col === 'tasks' && !c.member.admin && Array.isArray(doc.items)) {
     // v464 C078 ①: 이 직원은 기성 연동 지시를 받지 않았다 — 빠진 지시는 서버 원본 이월, 사본에 남은 같은 id(받기 전 캐시)도 서버 원본으로. 못 읽었으면 지시가 지워질 수 있어 저장 거부
@@ -527,6 +529,11 @@ async function handleSave(event, d, R) {
     doc.items = doc.items.map(function (t) { if (t && t.id && hidOld[t.id]) { if (seenT[t.id]) return null; seenT[t.id] = 1; return hidOld[t.id]; } return t; })   // 판2 검토 10: 같은 숨은 id 두 번 = 한 벌
       .filter(function (t) { return t !== null && !(t && taskHiddenFor(c.member, t) && !(t.id && hidOld[t.id])); });   // 서버에 없던 기성 연동 지시를 이 직원이 새로 만들 길은 없음(입금확인·미수 45일은 관리자·기성 화면에서) — 버림
     Object.keys(hidOld).forEach(function (id) { if (!seenT[id]) doc.items.push(hidOld[id]); });
+    // C240 판 A-2b: 비관리자 지시 저장 가드 — 지시 수행이 아닌 계정의 무관한 줄 바꿈·빠진 줄 = 서버 원본 · 관련 줄은 앱이 여는 상태 바꿈만 · 같은 id 둘째 줄 버림 ·
+    //   있던 줄의 지시자 칸 서버 원본 · 수행 계정의 승인 건너뛴 완료 = 상태 덩어리 서버 원본 · 수행 계정이 뺀 살아 있는 줄 = 지움 표시로 이월 — 규칙 _lib/taskguard.js(근거 = 앱 전수 표)
+    //   받지 않은 줄 id는 응답 task_kept로 → 앱이 다시 읽고 알림(조용한 되돌림 아님)
+    const tgd = TG.tasksGuard(c.member, oldItems, doc.items, { tasks: permOf(c.member, 'tasks'), con: permOf(c.member, 'contracts'), rec: permOf(c.member, 'receivables') }, licKstToday());
+    doc.items = tgd.items; taskKept = tgd.kept;
   }
   if (col === 'tasks' && Array.isArray(doc.items)) {
     const oldByA = {}; oldItems.forEach(function (o) { if (o && o.id) oldByA[o.id] = o; });
@@ -828,6 +835,7 @@ async function handleSave(event, d, R) {
     } else {
       ev = diffItems(oldItems, Array.isArray(doc.items) ? doc.items : []);
     }
+    if (taskKept.length) ev.push({ op: '지시 보호', id: taskKept.slice(0, 10).join(',').slice(0, 200), t: '서버가 받지 않은 지시 ' + taskKept.length + '줄(무관한 줄·권한 밖 칸·승인 건너뜀·같은 id 둘째 줄·뺀 줄은 지움 표시) — 그 사람의 앱이 서버 값으로 다시 읽음(C240 A-2b)' });
     if (leaveKept.length) ev.push({ op: '휴가 보호', id: leaveKept.slice(0, 10).join(',').slice(0, 200), t: '서버가 받지 않은 휴가 ' + leaveKept.length + '줄(승인·반려된 줄 고침·남의 줄·줄인 사본) — 그 사람의 앱이 서버 값으로 다시 읽음(C240 A-2a)' });
     if (recDelKept) ev.push({ op: '삭제 보호', id: '-', t: '비관리자 저장이 처리된(입금·발행·검수) 기성 ' + recDelKept + '건을 지우려 해 서버가 원본을 남겼습니다(v464 — 지우기는 관리자만)' });
     if (obPurged) ev.push({ op: '정리', id: '', t: '부동산 정리 ' + obPurged + '건(마감 ' + BIDS_KEEP_DAYS + '일 경과 신규·패스 — 저장 때)' });   // v444
@@ -862,7 +870,8 @@ async function handleSave(event, d, R) {
   if (regWarn) okOut.register_warn = regWarn;
   if (licKept.length) okOut.lic_kept = licKept;
   if (conKept.length) okOut.con_kept = conKept;   // P1 판24 5차: 앱이 그 계약을 서버 값으로 다시 읽음
-  if (leaveKept.length) okOut.leave_kept = leaveKept.slice(0, 50);   // C240 A-2a: 받지 않은 휴가 줄 — 앱이 휴가를 다시 읽고 알림(정상 저장엔 칸 없음)
+  if (leaveKept.length) okOut.leave_kept = leaveKept.slice(0, 50);
+  if (taskKept.length) okOut.task_kept = taskKept.slice(0, 50);   // C240 A-2b: 받지 않은 지시 줄 — 앱이 지시를 다시 읽고 알림(정상 저장엔 칸 없음)   // C240 A-2a: 받지 않은 휴가 줄 — 앱이 휴가를 다시 읽고 알림(정상 저장엔 칸 없음)
   if (saveAuFail) okOut.audit = false;   // C251: 정상 때는 칸 없음(응답 종전 그대로)
   return jr(200, okOut);
 }

@@ -7815,8 +7815,9 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       sH.code === 200 && f('t1') && f('t1').title === '입금확인: 갑 1,000원' && !f('t1').del && f('t2') && !f('t9') && f('t3').title === '일반 지시(고침)' && after.length === 7, sH.code + ' ' + after.map((t) => t.id).join(','));
     // 결함 사본 — 서버 이월이 없으면 t2가 사라짐을 이 시험이 잡는지(같은 저장을 기성 수행 직원 꼴로 흉내: 이월 대상 아님)
     mem.gw_data['col:tasks'].updated_at = 8602;
-    const sD = await call({ action: 'save', collection: 'tasks', base: mem.gw_data['col:tasks'].updated_at, doc: { schema: 1, items: items.filter((t) => t.id !== 't9' && t.id !== 't1') } }, tD, 'dev1');
-    T('89 v464 ① 대조: 기성 수행 직원이 같은 목록(t1·t2 없음)을 보내면 그대로 빠짐(이월은 기성 숨김 직원만 — 넓히지 않음)', sD.code === 200 && !mem.gw_data['col:tasks'].items.find((t) => t.id === 't2'), sD.code);
+    // C240 A-2b(11/27): 비관리자 저장의 빠진 줄은 이제 지시 가드(_lib/taskguard.js)가 누구에게나 이월·지움 표시 → 대조는 가드 밖인 관리자로(관리자가 빼면 그대로 빠짐 = 이월 검사가 힘이 있음)
+    const sD = await call({ action: 'save', collection: 'tasks', base: mem.gw_data['col:tasks'].updated_at, doc: { schema: 1, items: items.filter((t) => t.id !== 't9' && t.id !== 't1') } }, tokA);
+    T('89 v464 ① 대조: 관리자가 같은 목록(t1·t2 없음)을 보내면 그대로 빠짐(이월은 비관리자 저장만 — 관리자 통째 저장은 넓히지 않음)', sD.code === 200 && !mem.gw_data['col:tasks'].items.find((t) => t.id === 't2'), sD.code);
     // ⑤ 기성 — p1 입금·p2 발행·p3 검수 ✓·n1 처리 전 · 비관리자: p1 del:1·p2 빼고 보냄·n1 del:1 → p1 del 없음·p2 이월·n1 지움 · 감사 '삭제 보호'
     mem.gw_data['col:receivables'] = { schema: 1, updated_at: 8611, items: [
       { id: 'p1', client: '갑', amount: 100, paid: '2026-11-01', invoice: false }, { id: 'p2', client: '을', amount: 200, paid: null, invoice: true },
@@ -15209,9 +15210,10 @@ function J91a(x) { return JSON.stringify(x); }
     const MR = [["      else if (n === 'hrbg') inp.hrbg = (await bgReadBad(st, HR_BG_KEYS)) ?", "      else if (n === 'hrbg') inp.hrbg = false ?"],
       ["      if (write) dueBack.forEach(", '      if (false) dueBack.forEach('], ["    if (JSON.stringify(t.scope || []) !== JSON.stringify(want)) { t.scope = want; n++; }", ''],
       ["    hrScopeFix(doc.items);   // C185 판2 검토 8: 입·퇴사 지시(hr:·acct:) 공개 범위 = 서버가", '    // 걷음'], ["  hrScopeFix([t]);   // C185 판2 검토 8", '  // 걷음'],
-      ["if (seenT[t.id]) return null; seenT[t.id] = 1;", 'seenT[t.id] = 1;'], ["out[pfx] = !w ? 'empty' : (hasOwn(ms, w) ? 'ok' : 'gone');", "out[pfx] = !w ? 'empty' : 'ok';"]];
+      ["if (seenT[t.id]) return null; seenT[t.id] = 1;", 'seenT[t.id] = 1;', 'doc.items = tgd.items; taskKept = tgd.kept;', 'taskKept = tgd.kept;'], ["out[pfx] = !w ? 'empty' : (hasOwn(ms, w) ? 'ok' : 'gone');", "out[pfx] = !w ? 'empty' : 'ok';"]];
     const kR = [];
-    for (const [a, b] of MR) { let v; try { const ms = mutQ(SRCQ.gw, a, b); v = (await chkRQ(compQ(GWPQ, ms), gwWithQ(evFillThrowQ(), ms))).o.ok; } catch (e) { v = 'err ' + e.message; } kR.push(v); }
+    // C240 A-2b: 같은 id 두 벌은 지시 가드도 버리므로 그 결함 사본은 가드 결과도 걷음(이 갈래만의 힘을 봄)
+    for (const [a, b, a2, b2] of MR) { let v; try { const ms = a2 ? mutQ(mutQ(SRCQ.gw, a, b), a2, b2) : mutQ(SRCQ.gw, a, b); v = (await chkRQ(compQ(GWPQ, ms), gwWithQ(evFillThrowQ(), ms))).o.ok; } catch (e) { v = 'err ' + e.message; } kR.push(v); }
     T('C185 판2 검토 ② 결함 사본 ' + kR.length + '개(근거 못 읽음을 미승격으로 · 기한 되돌림 걷음 · 공개 범위 맞춤 걷음 · 저장 맞춤 걷음 · [내 것 아님] 맞춤 걷음 · 같은 id 두 벌 · 퇴사 담당을 ok로) = 모두 ✗', kR.every((v) => v === false), JSON.stringify(kR));
     const C0 = await chkCQ(require(CRPQ));
     T('C185 판2 검토 ③ 완료 판정 크론: 지운 기기(null)·객체 아닌 기기 값 = 건너뜀(계정 신호 그대로 켜짐 — 운영 백업 34개 중 8개가 null) · 기기 하나 못 읽음 = 신호 끔 · 승인권자가 관리자가 아니면 입·퇴사 지시는 그 사람 알림 0 · 관리자 따로 1발(재확인 2 · 승인 대기는 그대로) · 관리자 승인권자·승인권자 없음 = 1발', C0.ok, JSON.stringify(C0));
@@ -18470,7 +18472,7 @@ function J91a(x) { return JSON.stringify(x); }
     // ⑤ 앱 — 대역이 leave_kept를 넘기고 doSaveLeaves가 다시 읽음(글 확인)
     const fsA2 = require('fs'); const ixA2 = fsA2.readFileSync(join(ROOT, 'index.html'), 'utf8');
     T('C240 A-2a ⑤ 앱: 저장 대역이 leave_kept를 넘김 · doSaveLeaves가 leave_kept면 알림 + loadLeaves',
-      /leave_kept: \(res\.body && Array\.isArray\(res\.body\.leave_kept\)\) \? res\.body\.leave_kept : null/.test(ixA2) && /json\.leave_kept && json\.leave_kept\.length\)\{ gwToast\("[^"]*", true\); if\(!leavesSaveTimer\)\{ leavesPending=false; loadLeaves\(\); \}/.test(ixA2));
+      /leave_kept: \(res\.body && Array\.isArray\(res\.body\.leave_kept\)\) \? res\.body\.leave_kept : null/.test(ixA2) && /json\.leave_kept && json\.leave_kept\.length\)\{ gwToast\("[^"]*", true\); if\(!leavesSaveTimer && Date\.now\(\)-\(window\._leaveKeptAt\|\|0\)>60000\)\{ window\._leaveKeptAt=Date\.now\(\); leavesPending=false; loadLeaves\(\); \}/.test(ixA2));
   } catch (e) { T('C240 A-2a 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
 }
 
@@ -18555,6 +18557,71 @@ function J91a(x) { return JSON.stringify(x); }
     T('C244 ③ 결함 사본 ' + kC.length + '개(감사 전달 키 안 읽음 · 그달 키 안 거름 · 경계 UTC · 달 없음 UTC · missing 그달만 · 시각 없는 줄 버림 · 물어보기 KST 걷음 · 차 한계일 UTC · 인허가 한계일 UTC · 입찰 오늘 UTC) = 모두 ✗', kC.length === 10 && kC.every((v) => v === false), JSON.stringify(kC));
   } catch (e) { T('C244 검사 실행', false, String(e && e.stack || e).slice(0, 500)); }
   finally { resetC(); auditMock.readMonth = rmC0; }
+}
+
+{ // ---- C240 판 A-2b(11/27) — 비관리자 지시 저장 가드 · 받지 않은 줄 task_kept ----
+  try {
+    const M = {
+      a: { id: 'u2badm', name: '가짜관리삼', admin: true, perms: {}, tier: 'pm', dept: '관리부' },
+      h: { id: 'u2bhid', name: '가짜숨김삼', admin: false, perms: { tasks: 'hide' }, dept: '현장' },
+      d: { id: 'u2bdo', name: '가짜수행삼', admin: false, perms: { tasks: 'do' }, dept: '운영부' },
+    };
+    Object.keys(M).forEach((k) => { mem.gw_users['member:' + M[k].id] = M[k]; });
+    const tk = {}; Object.keys(M).forEach((k) => { tk[k] = issueSession(M[k]).token; });
+    const SEED = () => [
+      { id: 'k1', title: '가짜지시가', from_id: 'u2badm', from: '가짜관리삼', by: '가짜관리삼', who_id: 'u2bhid', who: '가짜숨김삼', status: 'open', updated: '2026-11-01' },
+      { id: 'k2', title: '가짜지시나', from_id: 'u2badm', from: '가짜관리삼', by: '가짜관리삼', who_id: 'u2badm', who: '가짜관리삼', status: 'open', updated: '2026-11-01' },
+      { id: 'k3', title: '가짜지시다', from_id: 'u2bhid', from: '가짜숨김삼', by: '가짜숨김삼', who_id: 'u2badm', who: '가짜관리삼', status: 'review', done_at: '2026-11-20', done_by: '가짜관리삼', updated: '2026-11-20' },
+      { id: 'k4', title: '가짜지시라', from_id: 'u2badm', from: '가짜관리삼', by: '가짜관리삼', who_id: 'u2bhid', who: '가짜숨김삼', status: 'done', done_at: '2026-11-20', done_by: '가짜숨김삼', approved_by: '가짜관리삼', approved_at: '2026-11-21', updated: '2026-11-21' },
+      { id: 'k5', title: '가짜지시마', from_id: 'u2badm', from: '가짜관리삼', by: '가짜관리삼', who_id: 'u2badm', who: '가짜관리삼', status: 'open', del: 1, updated: '2026-11-21' },
+    ];
+    const put = () => { mem.gw_data['col:tasks'] = { schema: 1, items: SEED(), updated_at: 53000 }; };
+    const sv = () => mem.gw_data['col:tasks'].items;
+    const one = (id) => sv().filter((x) => x.id === id);
+    const save = async (items, who, base) => call({ action: 'save', collection: 'tasks', base: base === undefined ? mem.gw_data['col:tasks'].updated_at : base, doc: { schema: 1, items } }, tk[who], 'dev1');
+    const cp = (o) => JSON.parse(JSON.stringify(o));
+    const ed = (fn) => { const it = SEED(); it.forEach(fn); return it; };
+    // 정상 길(숨김 계정): 담당 완료 요청 · 완료 되돌리기 · 지시자 승인 · 지시자 반려 · 받은 그대로
+    put(); let r = await save(ed((x) => { if (x.id === 'k1') { x.status = 'review'; x.done_at = '2026-11-27'; x.done_by = '가짜숨김삼'; x.updated = '2026-11-27'; } }), 'h');
+    const q1 = r.code === 200 && !('task_kept' in r.body) && one('k1')[0].status === 'review';
+    put(); r = await save(ed((x) => { if (x.id === 'k4') { x.status = 'open'; x.done_at = null; x.done_by = null; x.approved_by = null; x.approved_at = null; x.updated = '2026-11-27'; } }), 'h');
+    const q2 = r.code === 200 && !('task_kept' in r.body) && one('k4')[0].status === 'open';
+    put(); r = await save(ed((x) => { if (x.id === 'k3') { x.status = 'done'; x.approved_by = '가짜숨김삼'; x.approved_at = '2026-11-27'; x.updated = '2026-11-27'; } }), 'h');
+    const q3 = r.code === 200 && !('task_kept' in r.body) && one('k3')[0].status === 'done';
+    put(); r = await save(ed((x) => { if (x.id === 'k3') { x.status = 'open'; x.done_at = null; x.done_by = null; x.updated = '2026-11-27'; } }), 'h');
+    const q4 = r.code === 200 && !('task_kept' in r.body) && one('k3')[0].status === 'open';
+    put(); r = await save(SEED(), 'h');
+    const q5 = r.code === 200 && !('task_kept' in r.body) && JSON.stringify(sv()) === JSON.stringify(SEED());
+    T('C240 A-2b 숨김 계정 정상 길(완료 요청 · 완료 되돌리기 · 지시자 승인 · 반려 · 받은 그대로): 200 · task_kept 없음 · 반영', q1 && q2 && q3 && q4 && q5, JSON.stringify([q1, q2, q3, q4, q5]));
+    // 막는 길(숨김 계정)
+    put(); r = await save(ed((x) => { if (x.id === 'k2') { x.status = 'done'; x.approved_by = '가짜숨김삼'; x.del = 1; } }), 'h');
+    T('C240 A-2b 숨김 계정이 무관한 남의 지시 완료·지움 → 그 줄 서버 원본 + task_kept [k2] + 감사 \'지시 보호\'', r.code === 200 && one('k2')[0].status === 'open' && one('k2')[0].del !== 1 && JSON.stringify(r.body.task_kept) === '["k2"]' && auditMock.logs.slice(-3).some((l) => l.col === 'tasks' && l.ev.some((e) => e.op === '지시 보호')), JSON.stringify(r.body));
+    put(); r = await save(ed((x) => { if (x.id === 'k1') { x.status = 'done'; x.approved_by = '가짜관리삼'; x.title = '고친 제목'; x.del = 1; } }), 'h');
+    T('C240 A-2b 숨김 계정 담당이 승인 건너뛴 완료·제목·지움 → 상태·칸 서버 원본 + task_kept [k1]', r.code === 200 && one('k1')[0].status === 'open' && one('k1')[0].title === '가짜지시가' && one('k1')[0].del !== 1 && JSON.stringify(r.body.task_kept) === '["k1"]', JSON.stringify(r.body) + JSON.stringify(one('k1')));
+    put(); r = await call({ action: 'save', collection: 'tasks', doc: { schema: 1, items: [] } }, tk.h, 'dev1');
+    T('C240 A-2b 숨김 계정 base 없이 빈 목록 저장 → 지시 5줄 그대로(빠진 줄 이월)', r.code === 200 && sv().length === 5, String(sv().length));
+    put(); const dup = SEED(); dup.push(Object.assign(cp(dup[0]), { status: 'review' })); r = await save(dup, 'h');
+    T('C240 A-2b 같은 id 둘째 줄 → 버림(k1 한 줄 · 진행) + task_kept', r.code === 200 && one('k1').length === 1 && one('k1')[0].status === 'open' && (r.body.task_kept || []).indexOf('k1') >= 0, JSON.stringify(r.body));
+    // 지시 수행 계정
+    put(); r = await save(ed((x) => { if (x.id === 'k2') { x.status = 'done'; x.approved_by = '가짜관리삼'; x.approved_at = '2026-11-27'; } }), 'd');
+    T('C240 A-2b 수행 계정이 지시자 아닌 지시를 바로 완료 → 상태 덩어리 서버 원본 + task_kept', r.code === 200 && one('k2')[0].status === 'open' && !one('k2')[0].approved_by && (r.body.task_kept || []).indexOf('k2') >= 0, JSON.stringify(r.body));
+    put(); r = await save(ed((x) => { if (x.id === 'k2') { x.from_id = 'u2bdo'; x.from = '가짜수행삼'; x.by = '가짜수행삼'; } }), 'd');
+    const f1 = one('k2')[0].from_id === 'u2badm' && (r.body.task_kept || []).indexOf('k2') >= 0;
+    r = await save(cp(sv()).map((x) => x.id === 'k2' ? Object.assign(x, { status: 'done', approved_by: '가짜수행삼' }) : x), 'd');
+    T('C240 A-2b 수행 계정이 지시자 칸 먼저 바꿈 → 지시자 칸 서버 원본 · 다음 저장의 완료도 막힘', f1 && one('k2')[0].status === 'open', JSON.stringify(one('k2')));
+    put(); const dd = SEED(); dd.push(Object.assign(cp(dd[1]), { status: 'done' })); r = await save(dd, 'd');
+    T('C240 A-2b 수행 계정 같은 id 두 줄 → 한 줄(진행)', r.code === 200 && one('k2').length === 1 && one('k2')[0].status === 'open', JSON.stringify(one('k2')));
+    put(); r = await save(SEED().filter((x) => x.id !== 'k2' && x.id !== 'k5'), 'd');
+    T('C240 A-2b 수행 계정이 뺀 줄: 살아 있는 k2 = 지움 표시로 이월(되살아나지 않음) + task_kept · 지운 k5 = 영구 삭제(종전)', r.code === 200 && one('k2').length === 1 && one('k2')[0].del === 1 && one('k5').length === 0 && JSON.stringify(r.body.task_kept) === '["k2"]', JSON.stringify(r.body) + ' ' + sv().map((x) => x.id + ':' + (x.del || 0)).join(','));
+    put(); r = await save(ed((x) => { if (x.id === 'k2') { x.title = '수행 계정이 고친 제목'; x.updated = '2026-11-27'; } }), 'd');
+    T('C240 A-2b 수행 계정의 남의 지시 제목 고침(지금 화면이 엶 — C321 결정 전) → 받음 · task_kept 없음', r.code === 200 && one('k2')[0].title === '수행 계정이 고친 제목' && !('task_kept' in r.body), JSON.stringify(r.body));
+    // 관리자는 가드 밖
+    put(); r = await save(SEED().filter((x) => x.id !== 'k2'), 'a');
+    T('C240 A-2b 관리자 저장은 종전대로(뺀 줄 빠짐 · task_kept 없음)', r.code === 200 && one('k2').length === 0 && !('task_kept' in r.body), JSON.stringify(r.body));
+    const fsB2 = require('fs'); const ixB2 = fsB2.readFileSync(join(ROOT, 'index.html'), 'utf8');
+    T('C240 A-2b 앱: 저장 대역이 task_kept를 넘김 · doSaveTasks가 task_kept면 알림 + loadTasks(1분에 한 번)',
+      /task_kept: \(res\.body && Array\.isArray\(res\.body\.task_kept\)\) \? res\.body\.task_kept : null/.test(ixB2) && /json\.task_kept && json\.task_kept\.length\)\{ gwToast\("[^"]*", true\); if \(!tasksSaveTimer && Date\.now\(\) - \(window\._taskKeptAt \|\| 0\) > 60000\)\{ window\._taskKeptAt = Date\.now\(\); tasksPending = false; loadTasks\(\); \}/.test(ixB2));
+  } catch (e) { T('C240 A-2b 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
 }
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);
