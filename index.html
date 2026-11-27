@@ -5143,7 +5143,7 @@
     myApprItems = []; myApprFetchedAt = 0; myApprInflight = false;
     apprRefresh(); apprFlushCreates();
     if (apprPollTimer) clearInterval(apprPollTimer);
-    apprPollTimer = setInterval(function(){ apprRefresh(); apprFlushCreates(); if (typeof saveRetryKick === "function") saveRetryKick("poll"); }, 5 * 60 * 1000);   // C242 판 A: 5분 폴 때 적어 둔 저장도 한 번
+    apprPollTimer = setInterval(function(){ apprRefresh(); apprFlushCreates(); if (typeof saveRetryKick === "function") saveRetryKick("poll"); if (typeof ckRetryKick === "function") ckRetryKick("poll"); }, 5 * 60 * 1000);   // C242 판 A: 5분 폴 때 적어 둔 저장도 한 번
   }
   function apprDaysAgo(iso){
     var t = Date.parse(iso || ""); if (isNaN(t)) return "";
@@ -7083,6 +7083,7 @@
         saveCache();
         renderList();
         renderSummary();
+        if (ckPend && typeof ckFire === "function") ckFire("load");   // C329: 실패해 적어 둔 체크 저장 — 서버 최신을 읽어 병합한 바로 뒤에 한 번(온라인 복귀의 다시 읽기 등)
       });
     }).catch(function(err){
       var cache = loadCache();
@@ -7108,9 +7109,48 @@
     });
   }
 
-  function doSave(){
+  // C329(원장 C329 「원천」 · TESTLIST 174행 v215 '오프라인 체크 → 온라인 복귀 뒤 저장'): 종전엔 체크 저장이 끊김·5xx로 실패하면 대기 표시만 남고,
+  //   온라인 복귀는 다시 읽어 병합만 하고(doLoad) 저장을 내지 않아 다음 고침·화면 떠남·새로고침 때까지 서버에 안 들어갔다('연결되면 다시 저장합니다' 글과 다름).
+  //   체크는 줄이 아니라 날짜×항목 칸이라 12자료 등록부(rsFns·rsCuts)에 넣지 않고 체크 전용 한 벌(ckQ)로 — 상한·간격은 등록부 것(RS_DELAYS·RS_MAX·RS_GAP·RS_RESTART_MS)을 읽기만
+  //   · 다시 보내는 것: 사람 저장이 끊김·5xx일 때만(400·412 등 거절은 다시 안 보냄 · 403은 대역이 write_denied 200으로 넘겨 대기가 내려감)
+  //   · 계기: 15초 → 1분 → 5분 · 다시 읽어 병합한 직후(온라인 복귀의 doLoad 등) · 온라인 복귀 2초 뒤 · 화면 복귀·5분 폴(60초에 한 번까지) — 한 줄기 RS_MAX번
+  //   · 보내기 전 확인: 그 저장을 보낸 회원 = 지금 토큰·화면 회원(rsMine) · 세션이 그대로(rsGen — 로그아웃·전환·만료가 올림) · 대기 있음 · 저장 타이머·나가 있는 체크 저장 없음 · 브라우저 연결됨
+  //   · 남이 그사이 저장했으면 서버가 409 → 종전 병합 길(resolveConflictAndRetry — 칸 단위 세 갈래·로컬 우선)이 다시 읽어 합친 뒤 보냄 · 자동 줄기의 실패는 알림을 다시 띄우지 않음
+  var ckQ = null;
+  function ckDrop(){ if (ckQ && ckQ.t) clearTimeout(ckQ.t); ckQ = null; }
+  function ckArm(){ var e = ckQ; if (e && !e.t && !e.stop && e.n < RS_DELAYS.length) e.t = setTimeout(function(){ e.t = null; if (ckQ === e) ckFire("timer"); }, RS_DELAYS[e.n]); }
+  //   체크 저장 한 번의 끝: st = 응답 코드(0 = 끊김 · 200 = 들어감) · uid·g = 보낼 때의 회원·세션
+  function ckSeen(st, uid, g){
+    if (g !== rsGen) return;
+    if (st === 0 || st >= 500){
+      if (!rsMine(uid)) return ckDrop();   // 보낼 때 토큰·화면·회원이 서로 달랐음(uid 빈 글) · 그사이 바뀜
+      if (!ckQ || ckQ.uid !== uid){ ckDrop(); ckQ = { uid: uid, g: g, n: 0, t: null, at: 0, stop: 0 }; }
+      else if (ckQ.stop && Date.now() - ckQ.at >= RS_RESTART_MS){ ckQ.n = 0; ckQ.stop = 0; }   // 상한으로 멈춘 뒤 30분이 지나 또 실패 = 새 줄기
+      if (ckQ.n >= RS_MAX) ckQ.stop = 1;
+      ckArm();
+      return;
+    }
+    ckDrop();
+  }
+  function ckFire(why){
+    var e = ckQ;
+    if (!e) return;
+    if (e.g !== rsGen || !rsMine(e.uid) || !pendingSave) return ckDrop();
+    if (e.n >= RS_MAX || e.stop){ e.stop = 1; return; }
+    if (saveTimer || (rsOut.checklist || 0) > 0) return;
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+    if ((why === "poll" || why === "vis") && Date.now() - e.at < RS_GAP) return;
+    if (e.t){ clearTimeout(e.t); e.t = null; }
+    e.n++; e.at = Date.now();
+    doSave(1);
+  }
+  //   why = "online"(걸려 있는 시간 타이머도 앞당김) · "vis" · "poll"
+  function ckRetryKick(why){ if (ckQ && ckQ.t && why !== "online") return; ckFire(why); }
+
+  function doSave(auto){
     var token = getToken();
     if (!token) return;
+    var ckG = (typeof rsGen !== "undefined") ? rsGen : 0, ckU = (typeof rsMine === "function" && rsMine(myId())) ? myId() : "";   // C329: 보낼 때의 세션·회원
     var body = JSON.stringify({records: records, custom: customItems, scopes: checkScopes, assignee: checkAssignee, review: checkReview, scope_ts: checkScopeTs, assignee_ts: checkAssigneeTs, review_ts: checkReviewTs});
     if (typeof checkRecTs !== "undefined") body = JSON.stringify(Object.assign(JSON.parse(body), { records_ts: checkRecTs }));   // P1 판24j(C209 가-2): 체크 지운 표시(records_ts — 옛 판 기기는 모르는 칸) · 위 본문 줄은 v331 검사가 글자째 봄
     var payload = {
@@ -7131,7 +7171,7 @@
         return;
       }
       if (resp.status === 409 || resp.status === 422){
-        return resolveConflictAndRetry();
+        return resolveConflictAndRetry(auto);
       }
       if (!resp.ok){
         throw new Error("HTTP " + resp.status);
@@ -7141,16 +7181,19 @@
         setOffline(false, "checklist");
         saveCache();
         if (typeof saveTimer === "undefined" || !saveTimer) pendingSave = false;   // P1 판24j 검토: 저장 타이머가 걸려 있으면 대기 표시를 남김
+        if (typeof ckSeen === "function") ckSeen(200, ckU, ckG);   // C329: 들어감(쓰기 거절 write_denied도 서버가 끝낸 것) — 다시 보낼 것 없음
         // v331: 종전엔 403(쓰기권한 없음)이 200으로 위조돼 저장된 것처럼 보였다 — 이제 표시한다
         if (json.write_denied) gwToast("주기업무 저장 권한이 없어 서버가 이 변경을 받지 않았습니다.\n화면 값은 새로고침하면 서버 값으로 돌아갑니다.", true);
       });
-    }).catch(function(){
+    }).catch(function(err){
       setOffline(true, "checklist");
-      gwToast("주기업무 저장에 실패했습니다 — 편집은 남아 있고 연결되면 다시 저장합니다.", true);
+      var ckM = /^HTTP (\d+)$/.exec(String((err && err.message) || "")), ckSt = ckM ? Number(ckM[1]) : 0;   // C329: 대역이 넘긴 코드(5xx·400·412 등) · 끊김 = 0
+      if (typeof ckSeen === "function") ckSeen(ckSt, ckU, ckG);
+      if (!auto) gwToast("주기업무 저장에 실패했습니다 — 편집은 남아 있고 연결되면 다시 저장합니다.", true);
     });
   }
 
-  function resolveConflictAndRetry(){
+  function resolveConflictAndRetry(auto){
     var imG0 = (typeof imSt === "function") ? imSt("checklist").gen : 0;   // P1 판24j
     return fetchRemote().then(function(resp){
       return resp.json();
@@ -7172,7 +7215,7 @@
       saveCache();
       renderList();
       renderSummary();
-      return doSave();
+      return doSave(auto);
     });
   }
 
@@ -7362,10 +7405,10 @@
       loadUsers();
     }
     cliReloadIfUnread();   // v441 검토: 오프라인 콜드 스타트·읽기 실패로 거래처 대장을 못 읽은 채면(읽는 중이 아니면) 다시 읽음 — 못 읽은 동안은 저장·대장에 추가를 막아 이 기기에 고친 것이 없음
-    setTimeout(function(){ if (typeof saveRetryKick === "function") saveRetryKick("online"); }, 2000);   // C242 판 A: 실패해 적어 둔 저장을 다시 보냄(위 읽기가 먼저 병합하도록 2초 뒤 · 본문·기준 시각은 그때 것)
+    setTimeout(function(){ if (typeof saveRetryKick === "function") saveRetryKick("online"); if (typeof ckRetryKick === "function") ckRetryKick("online"); }, 2000);   // C242 판 A: 실패해 적어 둔 저장을 다시 보냄(위 읽기가 먼저 병합하도록 2초 뒤 · 본문·기준 시각은 그때 것)
   });
   // C242 판 A: 화면이 다시 보일 때도 적어 둔 저장을 한 번(60초에 한 번까지 · 시간 단계 중이면 그 타이머가 맡음)
-  document.addEventListener("visibilitychange", function(){ if (!document.hidden && typeof saveRetryKick === "function") saveRetryKick("vis"); });
+  document.addEventListener("visibilitychange", function(){ if (!document.hidden && typeof saveRetryKick === "function") saveRetryKick("vis"); if (!document.hidden && typeof ckRetryKick === "function") ckRetryKick("vis"); });
 
   // ---- 탭 ----
   function closeNav(){ var tb=document.getElementById("tabbar"); if(tb) tb.classList.remove("open"); }

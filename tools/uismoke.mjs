@@ -18299,7 +18299,7 @@ try {
       const apis = (H.match(/\n  var [A-Z_]+_(?:ROOT|PATH|API) = [^\n]*/g) || []).map((s) => s.slice(1)).join('\n');
       src = ['var window = {}, DATA_OWNER = "o", DATA_REPO = "r", isOffline = false;',
         'var _colBase = {}, _col409 = {}, _col409t = {}, _COL409_MS = 30000, _colRead403 = {};',
-        (/\n  var rsQ = /.test(H) ? [varH(H, 'RS_DELAYS'), varH(H, 'rsQ'), fnH(H, 'rsDrop')].join('\n') : ''),   // C242 판 A: 세션 비울 때 부르는 다시 보내기 등록부(saveRetryReset — 닫힘이 실제 본문으로 떼 옴)의 상태 + rsDrop(forEach에 이름으로만 넘겨 닫힘이 못 따라감) · 이 판 전 html에는 없음
+        (/\n  var rsQ = /.test(H) ? [varH(H, 'RS_DELAYS'), varH(H, 'rsQ'), fnH(H, 'rsDrop')].join('\n') : ''), (/\n  var ckQ = /.test(H) ? varH(H, 'ckQ') : ''),   // C329: 체크 다시 보내기 상태(doSave가 부르는 ckSeen이 씀 — 이 판 전 html에는 없음) · C242 판 A: 세션 비울 때 부르는 다시 보내기 등록부(saveRetryReset — 닫힘이 실제 본문으로 떼 옴)의 상태 + rsDrop(forEach에 이름으로만 넘겨 닫힘이 못 따라감) · 이 판 전 html에는 없음
         apis,
         'var vehicles=[], vehSha=null, vehPending=false, receivables=[], recSha=null, recPending=false, licenses=[], duties=[], licSha=null, licPending=false, licRemoteOk=false;',
         'var records={}, customItems={}, checkScopes={}, checkScopeTs={}, checkAssignee={}, checkAssigneeTs={}, checkReview={}, checkReviewTs={}, currentSha=null, pendingSave=false;',
@@ -18930,6 +18930,8 @@ try {
         'var workers=[], wkLoaded=false, wkDirty={}, wkBase=0, wkSaveTimer=null, wkPending=false, fam=[], famBase=0, famPending=false, famSaveTimer=null;',
         'var asb=[], asbBase=0, asbPending=false, asbSaveTimer=null, asbOrphTry=0, asbLoaded=false, edu=[], eduLoaded=false, eduBase=0, eduPending=false, eduSaveTimer=null, currentTab="", tasks=[];',
         'var vehDueTask = null, vehDueBusy = false, vehDuePass = null;',
+        //   C329: doSave가 부르는 체크 다시 보내기(ckSeen — rsMine·rsGen·RS 상수·ckQ)의 상태 · 보는 사람 없음(sessViewerId null) = rsMine 거짓 → 이 틀에선 자동 다시 보내기 없음(종전 동작 그대로 · 실행 검사는 C329 블록)
+        (/\n  var ckQ = /.test(H) ? ['var sessViewerId = null;'].concat(['RS_DELAYS', 'rsQ', 'ckQ'].map((v) => { const m = new RegExp('\\n  var ' + v + ' ?=[^\\n]*').exec(H); if (!m) throw new Error('변수 없음 ' + v); return m[0].slice(1); })).join('\n') : ''),
         'var LS = {}; var localStorage = { getItem: function(k){ return Object.prototype.hasOwnProperty.call(LS, k) ? LS[k] : null; }, setItem: function(k, v){ LS[k] = String(v); }, removeItem: function(k){ delete LS[k]; } };',
         'function gwToast(m){ ENV.toasts.push("toast:" + m); } function apprToastShow(m){ ENV.toasts.push(String(m)); } function alert(m){ ENV.toasts.push("alert:" + m); } function confirm(){ return true; } function setOffline(s){ isOffline = s; }',
         'function getToken(){ return "t"; } function ghHeaders(){ return {}; } function clearToken(){} function showTokenScreen(){} function onSessionInvalid(){} function _rawFetch(){ throw new Error("raw"); }',
@@ -24185,6 +24187,104 @@ try {
   T('C242 판 A 다시 보내기 등록부(실행 — 실제 gwCall~gwCallSend·setOffline·saveFailToast·cbxReportFix): 500·끊김 = 15초 뒤 다시 · 첫 저장 200 = 적지 않음 · 다른 탭 계정·딴 토큰 저장·보는 사람이 다름 = 안 보냄 · 읽기 404·403·딴 토큰 읽기·못 읽음·버린 늦은 읽기·캐시가 목록을 바꿈 = 안 보냄 · 자동의 400·401·403·412 = 그 줄기만 조용히(대기 남음·로그인 창·알림 0) · 409 = 다른 줄·다른 칸이면 병합해 보냄 / 같은 칸·없어진 줄·병합이 남의 고침을 지움이면 멈춤 · 대기 중 읽기의 겹침 = 안 보냄 · 자동이 나가 있는 동안 또 고친 것(도착 순서 둘·예약)은 대기·등록이 남아 들어감 · 응답을 잃은 내 저장은 겹침이 아님 · 전환·401 뒤 사람 저장은 막히지 않음 · 70초 압축 뒤 계정 바뀜 = 안 보냄 · 상한 1 + 8 · 띠 · 판단 보고 · 자리(캐시 넷·등록 12·비움 셋) · 결함 사본 ' + MUT242.length + ' · ㉠ 409(자동·사람)·남이 저장한 판의 병합 읽기·409 줄기의 다시 읽기 = 자동 끔(온전한 읽기 뒤 다시) · 휴지통·줄 빼기는 자동으로 안 보냄 · 저장 번호(자동 재전송만 그 대기 저장의 번호 · 사람 저장은 새 번호 · already · 내 것이 마지막인 409 = 다시 보냄) · 대기 중 읽기가 판 시각은 같고 내용이 기준과 다름 = 자동 끔(R5)',
     got242 === exp242 && st242 && m242.every((x) => x === 1), JSON.stringify({ same: got242 === exp242, got: got242, st: st242, mut: m242.filter((x) => x !== 1) }));
 } catch (e) { console.log('  (C242 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── C329(체크 오프라인 저장 — TESTLIST 174행 v215 약속 · 원장 C329): 실제 doLoad·ck 다시 보내기·doSave·resolveConflictAndRetry·mergeRecords·recTsMax·recBase와
+//   실제 RS 상수·rsTokId·rsMine·saveRetryReset을 떼어 실행 — 체크 대역(GitHub 꼴 fetch: 읽기·저장·409·5xx·400·끊김)·그리기·시계만 대역
+try {
+  const cut329 = (h, a, b) => { const i = h.indexOf(a); if (i < 0) throw new Error('자리 없음 ' + a); const j = h.indexOf(b, i); if (j < 0) throw new Error('끝 없음 ' + b); return h.slice(i, j); };
+  const b64u329 = (o) => Buffer.from(JSON.stringify(o)).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const WK = '2026-11-23';
+  const mk329 = (h) => {
+    const E = { now: 1e6, me: 'm1', tok: b64u329({ mid: 'm1' }) + '.sig', timers: [], saves: [], gets: 0, next: {}, toasts: 0, online: true, srv: { at: 10, records: {}, records_ts: {} }, cb: undefined };
+    const src = ['var sessViewerId = "m1", pendingSave = false, saveTimer = null, isOffline = false, records = {}, checkRecTs = {}, customItems = {}, checkScopes = {}, checkScopeTs = {}, checkAssignee = {}, checkAssigneeTs = {}, checkReview = {}, checkReviewTs = {}, currentSha = null, CHECK_API = "https://api.github.com/x/checklist.json", rsOut = {};',
+      'var rsQ = {}, rsOk = {}, rsRe = {}, rsSidQ = {}, rsSidLast = {}, rsBad = {}, rsHi = {}; function rsDrop(){}',
+      'function myId(){ return ENV.me; } function gwToken(){ return ENV.tok; } function getToken(){ return ENV.tok; } function ghHeaders(){ return {}; } function gwToast(){ ENV.toasts++; } function setOffline(s){ isOffline = !!s; }',
+      'function b64DecodeUnicode(s){ return B64D(s); } function b64EncodeUnicode(s){ return B64E(s); } function saveCache(){} function loadCache(){ return null; } function renderList(){} function renderSummary(){} function clearToken(){} function showTokenScreen(){ ENV.login = 1; }',
+      'function hasOwnKey(o, k){ return Object.prototype.hasOwnProperty.call(o, k); } function applyScopeMerge(){ return 0; } function mergeCustom(l){ return l; } var IM329 = {}; function imSt(c){ return IM329[c] || (IM329[c] = { out: 0 }); }',
+      'function fetch(u, o){ return ENV.fetch(u, o || {}); }',
+      cut329(h, '  var RS_DELAYS = ', '  function rsTaint('), cut329(h, '  function saveRetryReset(){', '  // C242 저장 번호'),
+      cut329(h, '  function recTsAt(', '  function mergeKV('), cut329(h, '  function recTsMax(', '  function mergeCustom('),
+      cut329(h, '  function fetchRemote(){', '  // ---- 저장: 지시(tasks.json) ----'),
+      'function tog(id){ if (!records.weekly) records.weekly = {}; if (!records.weekly["' + WK + '"]) records.weekly["' + WK + '"] = {}; records.weekly["' + WK + '"][id] = "2026-11-27"; if (!checkRecTs.weekly) checkRecTs.weekly = {}; if (!checkRecTs.weekly["' + WK + '"]) checkRecTs.weekly["' + WK + '"] = {}; checkRecTs.weekly["' + WK + '"][id] = ENV.now; pendingSave = true; doSave(); }',
+      'return { ex: function(s){ return eval(s); } };'].join('\n');
+    const cl = (x) => JSON.parse(JSON.stringify(x)), enc = (o) => Buffer.from(JSON.stringify(o), 'utf8').toString('base64'), dec = (s) => JSON.parse(Buffer.from(s, 'base64').toString('utf8'));
+    const R = (st, obj) => Promise.resolve({ status: st, ok: st >= 200 && st < 300, json: () => Promise.resolve(obj) });
+    E.tokMid = () => JSON.parse(Buffer.from(E.tok.split('.')[0], 'base64url').toString()).mid;
+    //   대역(index.html window.fetch 길과 같은 꼴): 읽기 200 = 기준 시각 세움 · 저장: 기준 시각이 서버와 다르면 409 · 403 = 200 write_denied · 그 밖 실패 = 그 코드 · 끊김 = 거절
+    E.fetch = (u, o) => {
+      const m = (o.method || 'GET').toUpperCase(), key = m === 'GET' ? 'get' : 'save', q = E.next[key], st = q && q.length ? q.shift() : 'ok';
+      if (key === 'save') { E.saves.push(E.tokMid() + ':' + st); E.ex('rsOut.checklist = (rsOut.checklist || 0) + 1'); }
+      const end = (p) => p.then((r) => { if (key === 'save') E.ex('rsOut.checklist--'); return r; }, (e) => { if (key === 'save') E.ex('rsOut.checklist--'); throw e; });
+      if (st === 'net' || !E.online) return end(Promise.reject(new TypeError('Failed to fetch')));
+      if (key === 'get') { E.gets++; if (st !== 'ok') return end(R(st, {})); E.cb = E.srv.at; return end(R(200, { sha: 'gw', content: enc({ records: E.srv.records, records_ts: E.srv.records_ts }) })); }
+      if (st === 403) return end(R(200, { content: { sha: 'gw' }, write_denied: 1 }));
+      if (st !== 'ok') return end(R(st, {}));
+      const d = dec(JSON.parse(o.body).content);
+      if (E.cb !== undefined && E.cb !== E.srv.at) return end(R(409, {}));
+      E.srv = { at: E.srv.at + 1, records: cl(d.records || {}), records_ts: cl(d.records_ts || {}) }; E.cb = E.srv.at;
+      return end(R(200, { content: { sha: 'gw' } }));
+    };
+    const api = new Function('ENV', 'B64D', 'B64E', 'setTimeout', 'clearTimeout', 'Date', 'navigator', src)(E, (s) => Buffer.from(s, 'base64').toString('utf8'), (s) => Buffer.from(s, 'utf8').toString('base64'),
+      (fn, ms) => { E.timers.push({ fn, ms }); return E.timers.length; }, (id) => { if (id) E.timers[id - 1] = null; }, { now: () => E.now }, { get onLine() { return E.online; } });
+    E.ex = (s) => api.ex(s); E.fl = async () => { for (let i = 0; i < 40; i++) await new Promise((r) => setImmediate(r)); };
+    E.live = () => E.timers.filter(Boolean).map((t) => t.ms); E.fire = async () => { const i = E.timers.findIndex(Boolean); if (i < 0) return false; const t = E.timers[i]; E.timers[i] = null; E.now += t.ms; t.fn(); await E.fl(); return true; };
+    E.load = async (st) => { E.next.get = st ? [].concat(st) : []; E.ex('doLoad()'); await E.fl(); };
+    E.tog = async (id, st) => { E.next.save = [].concat(st); E.ex('tog(' + JSON.stringify(id) + ')'); await E.fl(); };
+    E.kick = async (w) => { E.ex('ckRetryKick(' + JSON.stringify(w) + ')'); await E.fl(); };
+    E.ids = () => Object.keys((E.srv.records.weekly || {})[WK] || {}).sort().join(',');
+    E.other = (id) => { const r = E.srv.records; r.weekly = r.weekly || {}; r.weekly[WK] = r.weekly[WK] || {}; r.weekly[WK][id] = '2026-11-27'; const t = E.srv.records_ts; t.weekly = t.weekly || {}; t.weekly[WK] = t.weekly[WK] || {}; t.weekly[WK][id] = E.now; E.srv.at++; };
+    return E;
+  };
+  const run329 = async (h) => {
+    const o = {}; let E; const up = async () => { E = mk329(h); await E.load(); return E; };
+    // ① 끊김(오프라인) 체크 셋 → 시간 타이머는 오프라인이라 건너뜀 → 온라인 복귀의 다시 읽기(doLoad) 뒤 저장 1번 · 알림은 사람 저장 실패 때만
+    await up(); E.online = false; await E.tog('x1', 'net'); await E.tog('x2', 'net'); await E.tog('x3', 'net'); const t0 = E.live(); await E.fire(); const n0 = E.saves.length;
+    E.online = true; await E.load(); o.off = [t0.join('/'), n0, E.saves.length, E.ids(), E.ex('pendingSave'), E.toasts, E.ex('ckQ === null')];
+    // ② 서버 500 → 브라우저는 온라인 그대로 → 15초 타이머로 다시 보냄(들어감)
+    await up(); await E.tog('y1', 500); const t1 = E.live().join('/'); await E.fire(); o.s500 = [t1, E.saves.join(' '), E.ids(), E.ex('pendingSave'), E.toasts];
+    // ③ 400·412 거절 = 다시 보내지 않음(타이머 없음 · 다시 읽기·온라인·화면 복귀에도 안 나감 · 대기는 남음)
+    await up(); await E.tog('z1', 400); const t2 = E.live().length; await E.load(); await E.kick('online'); await E.kick('vis'); o.s400 = [t2, E.saves.length, E.ex('pendingSave')];
+    await up(); await E.tog('z2', 412); await E.load(); await E.kick('online'); o.s412 = [E.live().length, E.saves.length];
+    //   쓰기 거절 403(대역이 200 write_denied) = 대기 내림 · 다시 안 보냄
+    await up(); await E.tog('z3', 403); await E.load(); await E.kick('online'); o.s403 = [E.live().length, E.saves.length, E.ex('pendingSave')];
+    // ④ 끊긴 사이 다른 기기가 다른 칸(o1) 체크 → 다시 읽어 병합 뒤 저장 = 두 칸 다 · 다시 읽기 없이 타이머(옛 기준) = 409 → 병합 길 → 두 칸 다
+    await up(); E.online = false; await E.tog('w1', 'net'); E.other('o1'); E.online = true; await E.load(); o.other = [E.ids(), E.saves.length];
+    await up(); await E.tog('w2', 'net'); E.other('o2'); await E.fire(); o.other409 = [E.ids(), E.saves.length];
+    //   자동이 409 → 병합 → 다시 저장이 500 = 알림 없음(자동 줄기) · 다음 시간 단계(1분)로
+    await up(); await E.tog('w4', 'net'); E.other('o4'); E.next.save = ['ok', 500]; await E.fire(); o.c409 = [E.toasts, E.live().join('/'), E.saves.length];
+    //   남이 체크를 지운 칸(내가 안 건드린 칸)은 되살리지 않음
+    await up(); E.other('k1'); await E.load(); await E.tog('w3', 'net'); delete E.srv.records.weekly[WK].k1; E.srv.records_ts.weekly[WK].k1 = E.now + 5; E.srv.at++; await E.load(); o.otherDel = E.ids();
+    // ⑤ 계정 바뀜(세션 비움 saveRetryReset · 토큰·화면 회원 m2) 뒤 앞 사람 대기를 보내지 않음 — 타이머·온라인·다시 읽기 모두
+    await up(); await E.tog('q1', 'net'); E.ex('saveRetryReset()'); E.me = 'm2'; E.tok = b64u329({ mid: 'm2' }) + '.sig'; E.ex('sessViewerId = "m2"'); await E.fire(); await E.kick('online'); await E.load(); o.swap = [E.saves.join(' '), E.ids()];
+    //   토큰만 다른 계정(같은 브라우저 다른 탭 로그인) = 안 보냄
+    await up(); await E.tog('q2', 500); E.tok = b64u329({ mid: 'm2' }) + '.sig'; await E.fire(); await E.kick('online'); o.tok = E.saves.join(' ');
+    // ⑥ 서버가 계속 5xx = 상한(사람 1 + 자동 RS_MAX) · 자동 실패는 알림 없음 · 화면 복귀·폴은 60초에 한 번까지
+    await up(); E.next.save = []; await E.tog('c1', 503); for (let i = 0; i < 6; i++) { E.next.save = [503]; if (!(await E.fire())) break; }
+    for (let i = 0; i < 12; i++) { E.next.save = [503]; E.now += 61000; await E.kick(i % 2 ? 'vis' : 'poll'); } const nCap = E.saves.length; E.next.save = [503, 503]; await E.kick('vis'); E.now += 1000; await E.kick('online');
+    o.cap = [nCap, E.saves.length, E.toasts, E.ex('ckQ && ckQ.stop')];
+    //   시간 단계 셋을 다 쓴 뒤 화면 복귀가 방금(60초 안) 자동 뒤면 건너뜀
+    await up(); await E.tog('g1', 500); for (let i = 0; i < 3; i++) { E.next.save = [500]; await E.fire(); } E.now += 1000; E.next.save = [500]; await E.kick('vis'); o.gap = [E.saves.length, E.live().length];
+    //   첫 저장 200 = 아무것도 적지 않음(정상 길 요청 수 같음)
+    await up(); await E.tog('n1', 'ok'); o.ok = [E.saves.length, E.live().length, E.ex('ckQ === null')];
+    //   저장 타이머가 걸려 있으면 자동은 건너뜀(타이머 저장이 맡음)
+    await up(); await E.tog('h1', 'net'); E.ex('saveTimer = 1'); E.online = true; await E.load(); await E.kick('online'); o.timer = E.saves.length;
+    return JSON.stringify(o);
+  };
+  const exp329 = JSON.stringify({ off: ['15000', 3, 4, 'x1,x2,x3', false, 3, true], s500: ['15000', 'm1:500 m1:ok', 'y1', false, 1], s400: [0, 1, true], s412: [0, 1], s403: [0, 1, false],
+    other: ['o1,w1', 2], other409: ['o2,w2', 3], c409: [1, '60000', 3], otherDel: 'w3', swap: ['m1:net', ''], tok: 'm1:500', cap: [9, 9, 1, 1], gap: [4, 0], ok: [1, 0, true], timer: 1 });
+  const got329 = await run329(html);
+  const MUT329 = [['        if (ckPend && typeof ckFire === "function") ckFire("load");', ''], ['    if (st === 0 || st >= 500){\n      if (!rsMine(uid))', '    if (st !== 200){\n      if (!rsMine(uid))'],
+    ['if (e.g !== rsGen || !rsMine(e.uid) || !pendingSave) return ckDrop();', 'if (!pendingSave) return ckDrop();'], ['      if (typeof ckSeen === "function") ckSeen(ckSt, ckU, ckG);\n', ''], ['      if (!auto) gwToast("주기업무 저장에', '      gwToast("주기업무 저장에'],
+    ['if (e.n >= RS_MAX || e.stop){ e.stop = 1; return; }', ''], ['if (saveTimer || (rsOut.checklist || 0) > 0) return;', ''], ['if ((why === "poll" || why === "vis") && Date.now() - e.at < RS_GAP) return;', ''], ['if (e.g !== rsGen || !rsMine(e.uid) ||', 'if (e.g !== rsGen ||'],
+    ['        return resolveConflictAndRetry(auto);', '        return resolveConflictAndRetry();'], ['if (typeof ckSeen === "function") ckSeen(200, ckU, ckG);', '']];
+  const m329 = [];
+  for (const [a, b] of MUT329) { if (html.split(a).length !== 2) { m329.push('자리 ' + html.split(a).length + ' ' + a.slice(0, 40)); continue; } let r; try { r = await run329(html.replace(a, () => b)); } catch (e) { r = 'err'; } m329.push(r === got329 ? '못 잡음 ' + a.slice(0, 60) : 1); }
+  //   자리: 다시 보내기 계기 셋(온라인 2초 뒤·화면 복귀·5분 폴)이 체크도 부름 · 12자료 등록부(rsFns)에 체크 없음 · 화면 글은 그대로 하나
+  const st329 = (html.match(/if \((?:!document\.hidden && )?typeof ckRetryKick === "function"\) ckRetryKick\("(online|vis|poll)"\);/g) || []).length === 3 && !/\n      checklist: \[function/.test(html)
+    && html.split('"주기업무 저장에 실패했습니다 — 편집은 남아 있고 연결되면 다시 저장합니다."').length === 2;
+  T('C329 체크 오프라인 저장(실행 — 실제 doLoad·ck 다시 보내기·doSave·resolveConflictAndRetry·mergeRecords·RS 상수·rsMine·saveRetryReset): 끊김 체크 셋 → 온라인 복귀의 다시 읽기 뒤 저장 1번(서버 x1~x3 · 대기 풂) · 500 → 15초 뒤 다시(들어감) · 400·412·403 = 다시 안 보냄 · 다른 기기 칸 = 다시 읽어 병합(409 길 포함) 뒤 두 칸 다 · 남이 지운 칸 안 되살림 · 계정 전환·딴 토큰 = 안 보냄 · 상한 1 + 8 · 자동 실패 알림 0 · 60초 간격 · 첫 저장 200 = 안 적음 · 저장 타이머 중 건너뜀 · 자리(계기 셋·등록부 밖·글 하나) · 결함 사본 ' + MUT329.length,
+    got329 === exp329 && st329 && m329.every((x) => x === 1), JSON.stringify({ same: got329 === exp329, got: got329, st: st329, mut: m329.filter((x) => x !== 1) }));
+} catch (e) { console.log('  (C329 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ── v541(C275 — 근거 표 승격 줄 방어 · 원장 C275): 실행 검사는 위 C275 블록·servertest C275 · 여기는 문서·판 번호 정확 검사
 try {
