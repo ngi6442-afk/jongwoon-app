@@ -6025,10 +6025,12 @@ async function handleAttDel(event, d, R) {
   if (!am0.ok && am0.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: am0.code || 'STORAGE_READ_FAILED', request_id: R });
   if (am0.ok && am0.data && am0.data.taken) return jr(409, { status: 'CONFLICT', error_code: 'ALREADY_TAKEN', request_id: R });
   if (am0.ok && am0.data && am0.data.kind === 'lic') return jr(409, { status: 'CONFLICT', error_code: 'LIC_ATT_KEEP', request_id: R });   // P1 판28 인허가 수령본(완료 기록 근거)은 지우는 길 없음   // v423 서류함이 참조하는 조각은 여기서 지우지 않는다(서류함 보관·영구 삭제 경로로)
-  if (am0.ok && am0.data && am0.data.parts) await BF.attDeleteParts(store(FILES), String(d.id || ''), am0.data);
-  if (am0.ok && am0.data && am0.data.kind === 'box') await blobDelete(store(FILES), boxMarkKey(String(d.id || '')));
-  await blobDelete(store(FILES), String(d.id || ''));
-  await blobDelete(store(FILES), 'parse:' + String(d.id || ''));
+  // C238 판 C: 조각·서류함 표식·본 레코드·판독값 지우기 결과를 봄 — 하나라도 못 지우면 감사 없이 500(종전엔 남은 채 200·감사 '첨부삭제') · 다시 하면 남은 것부터 이어 지움(지운 열쇠는 없음 = 성공)
+  const ADF = (x) => jr(500, { status: 'ERROR', error_code: x || 'STORAGE_DELETE_FAILED', request_id: R });
+  if (am0.ok && am0.data && am0.data.parts) { const pd = await BF.attDeleteParts(store(FILES), String(d.id || ''), am0.data); if (!pd.ok) return ADF(pd.code); }
+  if (am0.ok && am0.data && am0.data.kind === 'box') { const md = await blobDelete(store(FILES), boxMarkKey(String(d.id || ''))); if (!md.ok) return ADF(md.code); }
+  { const pd2 = await blobDelete(store(FILES), 'parse:' + String(d.id || '')); if (!pd2.ok) return ADF(pd2.code); }   // 판독값을 본 레코드보다 먼저(본 레코드가 남아 있어야 다시 할 수 있음)
+  { const rd = await blobDelete(store(FILES), String(d.id || '')); if (!rd.ok) return ADF(rd.code); }
   // v353: 가린 판·상태 동반 삭제 — 실패를 삼키지 않는다(고아 mask가 att_get으로 되살아나지 않게 감사에 남긴다)
   for (const k of ['mask:' + String(d.id || ''), 'maskmeta:' + String(d.id || '')]) {
     try { const dr = await blobDelete(store(FILES), k); if (dr && dr.ok === false) throw new Error(dr.code || 'DELETE_FAILED'); }
@@ -6150,7 +6152,8 @@ async function docAttWrite(st, doc, it, filesNew, seq, by, mineN) {
         cur.att_seq = Math.max(Number(cur.att_seq) || 0, it.att_seq);
         cur.updated_ts = it.updated_ts; cur.updated = it.updated;
         chk.data.updated_by = by.id; chk.data.updated_at = Date.now();
-        await blobSet(st, colKey('documents'), chk.data);
+        const w2 = await blobSet(st, colKey('documents'), chk.data);   // C238 판 C: 겹친 저장과 합쳐 다시 쓴 결과를 봄(못 쓰면 남의 판이 남아 이 첨부 메타가 빠졌는데 200이던 것)
+        if (!w2.ok) return { ok: false, code: w2.code || 'STORAGE_WRITE_FAILED' };
         return { ok: true, updated_at: chk.data.updated_at };
       }
       if (chk.data.updated_at) return { ok: true, updated_at: chk.data.updated_at };
@@ -6239,9 +6242,9 @@ async function handleDocAttDel(event, d, R) {
   const files = (ld.it.files || []).filter(function (f) { return !(f && Number(f.n) === n); });
   const w = await docAttWrite(st, ld.doc, ld.it, files, Number(ld.it.att_seq) || 0, c.member, 0);   // 메타 제거가 먼저 — 바이트 삭제 실패 시에도 목록에서 사라져 열기 404(고아 블롭은 무해). att_seq는 유지(번호 재사용 없음)
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
-  await blobDelete(store(FILES), docAttKey(docId, n));
-  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'documents', ev: [{ op: '첨부삭제', id: docId, t: (String(meta.name || '') + ' · ' + String(ld.it.title || '')).slice(0, 80) }] }); } catch (e) {}
-  return jr(200, { status: 'OK', id: docId, files: files, updated_at: w.updated_at, request_id: R });
+  const bd = await blobDelete(store(FILES), docAttKey(docId, n));   // C238 판 C: 본문 지우기 결과를 봄 — 목록에선 이미 빠졌으니 500 대신 감사·응답에 '본문 남음'을 드러냄(다시 지울 길이 목록에 없음)
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'documents', ev: [{ op: '첨부삭제', id: docId, t: (String(meta.name || '') + ' · ' + String(ld.it.title || '')).slice(0, 80) + (bd.ok ? '' : ' [본문 남음 ' + (bd.code || 'STORAGE_DELETE_FAILED') + ']') }] }); } catch (e) {}
+  return jr(200, Object.assign({ status: 'OK', id: docId, files: files, updated_at: w.updated_at }, bd.ok ? {} : { bytes_deleted: false }, { request_id: R }));
 }
 // 일괄 등재(관리자 전용, 스크립트용 — 정본 61건+증빙): items:[{title,cat,no,version,revised,scope?,url?,note?,files:[{name,mime,data(base64)}]}]
 // 항목당 첨부 1~3 · 요청당 첨부 합계 6MB · 항목 100 · cid 멱등(같은 cid 재요청=첫 결과 그대로, 'docbulk:<cid>' 블롭).
@@ -6312,14 +6315,16 @@ async function handleDocBulkPut(event, d, R) {
   const w = await blobSet(st, colKey('documents'), doc);
   if (!w.ok) { await cleanup(); return jr(500, { status: 'ERROR', error_code: w.code, request_id: R }); }
   // 무조건 덮어쓰기 저장소 — 동시 저장에 밀린 항목은 1회 자가복구
+  let mergeFail = '';   // C238 판 C: 자가복구 쓰기를 못 하면 등재 항목이 겹친 저장에 밀려 빠진 채 200이던 것 → 첨부 지우고 500(멱등 표식·감사 없음 — 다시 요청하면 새로 등재)
   try {
     const chk = await blobGet(st, colKey('documents'));
     if (chk.ok && chk.data && Array.isArray(chk.data.items)) {
       const have = {}; chk.data.items.forEach(function (x) { if (x && x.id) have[x.id] = 1; });
       const miss = added.filter(function (x) { return !have[x.id]; });
-      if (miss.length) { miss.forEach(function (x) { chk.data.items.push(x); }); chk.data.updated_by = me.id; chk.data.updated_at = Date.now(); await blobSet(st, colKey('documents'), chk.data); doc.updated_at = chk.data.updated_at; }
+      if (miss.length) { miss.forEach(function (x) { chk.data.items.push(x); }); chk.data.updated_by = me.id; chk.data.updated_at = Date.now(); const w2 = await blobSet(st, colKey('documents'), chk.data); if (!w2.ok) mergeFail = w2.code || 'STORAGE_WRITE_FAILED'; else doc.updated_at = chk.data.updated_at; }   // C238 판 C: 합쳐 다시 쓴 결과를 봄
     }
   } catch (e) {}
+  if (mergeFail) { await cleanup(); return jr(500, { status: 'ERROR', error_code: mergeFail, request_id: R }); }
   const result = { count: made.length, items: made, updated_at: doc.updated_at, cid: cid, ts: Date.now() };
   try { await blobSet(st, 'docbulk:' + cid, result); } catch (e) {}   // 멱등 표식 실패는 등재를 되돌리지 않는다(재요청 시 중복 가능 — 스크립트가 응답 유실 시 목록으로 확인)
   try {
@@ -6394,7 +6399,7 @@ async function handleDocRestore(event, d, R) {
     const chk = await blobGet(st, colKey('documents'));
     if (chk.ok && chk.data && Array.isArray(chk.data.items)) {
       const cur = chk.data.items.find(function (x) { return x && x.id === p.id; });
-      if (cur && cur.del === 1) { restore(cur); chk.data.updated_by = me.id; chk.data.updated_at = Date.now(); await blobSet(st, colKey('documents'), chk.data); at = chk.data.updated_at; }
+      if (cur && cur.del === 1) { restore(cur); chk.data.updated_by = me.id; chk.data.updated_at = Date.now(); const w2 = await blobSet(st, colKey('documents'), chk.data); if (!w2.ok) return jr(500, { status: 'ERROR', error_code: w2.code || 'STORAGE_WRITE_FAILED', request_id: R }); at = chk.data.updated_at; }   // C238 판 C: 합쳐 다시 쓴 결과를 봄
       else if (chk.data.updated_at) at = chk.data.updated_at;
     }
   } catch (e) {}
@@ -6424,7 +6429,7 @@ async function handleDocPurge(event, d, R) {
   try {
     const chk = await blobGet(st, colKey('documents'));
     if (chk.ok && chk.data && Array.isArray(chk.data.items)) {
-      if (chk.data.items.some(function (x) { return x && x.id === p.id; })) { drop(chk.data); await blobSet(st, colKey('documents'), chk.data); at = chk.data.updated_at; }
+      if (chk.data.items.some(function (x) { return x && x.id === p.id; })) { drop(chk.data); const w2 = await blobSet(st, colKey('documents'), chk.data); if (!w2.ok) return jr(500, { status: 'ERROR', error_code: w2.code || 'STORAGE_WRITE_FAILED', request_id: R }); at = chk.data.updated_at; }   // C238 판 C: 합쳐 다시 쓴 결과를 봄(못 쓰면 겹친 저장이 지운 문서를 되살린 채 본문까지 지우던 것)
       else if (chk.data.updated_at) at = chk.data.updated_at;
     }
   } catch (e) {}

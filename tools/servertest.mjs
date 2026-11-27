@@ -18712,4 +18712,97 @@ function J91a(x) { return JSON.stringify(x); }
   } catch (e) { T('C240 A-2b 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
 }
 
+{ // ---- C238 판 C(11/27) 문서함·첨부 쓰기 결과 — 겹친 저장과 합쳐 다시 쓰기(첨부 넣기·지우기·일괄 등재·복구·영구 삭제) · 문서함 첨부 본문 지우기 · att_del 조각·표식·판독값·본 레코드
+  //   겹침 재현 = 첫 쓰기 직후(afterSet) 다른 저장이 직전 판으로 덮고, 합쳐 다시 쓰기는 실패. 거절: 500(첨부 넣기는 바이트 지움 · 지우기·영구 삭제는 바이트 남김 · 일괄 등재는 첨부 지움·멱등 표식 없음) · att_del 지우기 실패 = 500·본 레코드·감사 그대로 → 다시 하면 200
+  //   허용: 겹침 없음·쓰기 정상 = 종전. 결함 사본 = 고친 곳을 하나씩 되돌림 → 실패해야 한다.
+  const fsC238 = require('fs'), ModC238 = require('module');
+  const FDATAC = join(FN, 'gw-data.js'), SDATAC = fsC238.readFileSync(FDATAC, 'utf8');
+  const FBF = join(FN, '_lib', 'boxfile.js'), SBF = fsC238.readFileSync(FBF, 'utf8');
+  const loadC238 = (file, src) => { const m = new ModC238(file); m.filename = file; m.paths = ModC238._nodeModulePaths(dirname(file)); m._compile(src, file); return m.exports; };
+  const snapC238 = JSON.stringify({ d: mem.gw_data || {}, f: mem.gw_files || {} });
+  const PDFc = Buffer.from('%PDF-1.4 c238!!').toString('base64');
+  const chkC238 = async (GD) => {
+    const c = async (body) => { const r = await GD.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tokA }, body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+    const P = {}, I = {};
+    const old = new Date(Date.now() - 40 * 86400000).toISOString();
+    const reset = () => { const s = JSON.parse(snapC238); mem.gw_data = s.d; mem.gw_files = s.f; ['failSet', 'failDel', 'afterSet'].forEach((h) => { blobsMock.hooks[h] = null; });
+      const items = (mem.gw_data['col:documents'] && mem.gw_data['col:documents'].items) || [];
+      mem.gw_data['col:documents'] = { schema: 1, items: items.filter((x) => !/^c238/.test(String(x && x.id))).concat([
+        { id: 'c238a', title: 'C238 첨부', cat: '02-01', status: '등재', by: { id: 'uadmin', name: '관리자' }, files: [{ n: 1, name: 'a.pdf', size: 10, mime: 'application/pdf', ts: 1, by: { id: 'uadmin', name: '관리자' } }], att_seq: 1 },
+        { id: 'c238t', title: 'C238 휴지통', cat: '02-01', status: '등재', del: 1, deleted_at: old, files: [{ n: 1, name: 't.pdf', size: 10, mime: 'application/pdf', ts: 1 }], att_seq: 1 }]), updated_at: 1000 };
+      mem.gw_files['docatt:c238a:1'] = { name: 'a.pdf', data: PDFc }; mem.gw_files['docatt:c238t:1'] = { name: 't.pdf', data: PDFc };
+      mem.gw_files['att_c238x'] = { name: 'x.pdf', parts: 2, kind: 'con' }; mem.gw_files['attp:att_c238x:0'] = { data: 'AA' }; mem.gw_files['attp:att_c238x:1'] = { data: 'BB' }; mem.gw_files['parse:att_c238x'] = { v: 1 };
+      auditMock.logs.length = 0; };
+    const race = () => { const before = JSON.parse(JSON.stringify(mem.gw_data['col:documents'])); let n = 0;
+      blobsMock.hooks.afterSet = async (k) => { if (k === 'col:documents' && n++ === 0) { mem.gw_data['col:documents'] = JSON.parse(JSON.stringify(before)); blobsMock.hooks.failSet = (x) => x === 'col:documents'; } }; };
+    const it = (id) => (mem.gw_data['col:documents'].items || []).find((x) => x && x.id === id) || {};
+    const aud = (op) => auditMock.logs.some((l) => l && (l.ev || []).some((e) => e && e.op === op));
+    try {
+      // ① 첨부 넣기 — 겹침 + 합쳐 쓰기 실패 → 500 · 넣은 바이트 지움
+      reset(); race(); let r = await c({ action: 'doc_att_put', id: 'c238a', name: 'b.pdf', data: PDFc });
+      P.put = r.code === 500 && !mem.gw_files['docatt:c238a:2'] && !aud('첨부'); I.put = [r.code, r.body.error_code];
+      // ② 첨부 지우기 — 겹침 + 합쳐 쓰기 실패 → 500 · 바이트 남음
+      reset(); race(); r = await c({ action: 'doc_att_del', id: 'c238a', n: 1 });
+      P.del = r.code === 500 && !!mem.gw_files['docatt:c238a:1'] && !aud('첨부삭제'); I.del = [r.code, r.body.error_code];
+      // ③ 첨부 지우기 — 본문 지우기 실패 → 200 bytes_deleted:false · 감사에 [본문 남음]
+      reset(); blobsMock.hooks.failDel = (k) => k === 'docatt:c238a:1'; r = await c({ action: 'doc_att_del', id: 'c238a', n: 1 });
+      P.delBytes = r.code === 200 && r.body.bytes_deleted === false && auditMock.logs.some((l) => (l.ev || []).some((e) => e.op === '첨부삭제' && /본문 남음/.test(e.t))); I.delBytes = [r.code, r.body.bytes_deleted];
+      // ④ 일괄 등재 — 겹침 + 합쳐 쓰기 실패 → 500 · 첨부 지움 · 멱등 표식 없음
+      reset(); race(); const f0 = Object.keys(mem.gw_files).filter((k) => k.indexOf('docatt:') === 0).length;
+      r = await c({ action: 'doc_bulk_put', cid: 'c238-bulk', items: [{ title: 'C238 일괄', cat: '02-01', files: [{ name: 'q.pdf', data: PDFc }] }] });
+      P.bulk = r.code === 500 && Object.keys(mem.gw_files).filter((k) => k.indexOf('docatt:') === 0).length === f0 && !mem.gw_data['docbulk:c238-bulk']; I.bulk = [r.code, r.body.error_code];
+      // ⑤ 복구 — 겹침 + 합쳐 쓰기 실패 → 500
+      reset(); race(); r = await c({ action: 'doc_restore', id: 'c238t' });
+      P.restore = r.code === 500 && !aud('복구'); I.restore = [r.code, r.body.error_code];
+      // ⑥ 영구 삭제 — 겹침 + 합쳐 쓰기 실패 → 500 · 바이트 남음
+      reset(); race(); r = await c({ action: 'doc_purge', id: 'c238t', confirm: true });
+      P.purge = r.code === 500 && !!mem.gw_files['docatt:c238t:1'] && !aud('영구삭제'); I.purge = [r.code, r.body.error_code];
+      // ⑦ att_del — 조각 지우기 실패 → 500 · 본 레코드·판독값 남음 · 감사 없음 → 다시 하면 200·전부 지움
+      reset(); blobsMock.hooks.failDel = (k) => k === 'attp:att_c238x:1'; r = await c({ action: 'att_del', id: 'att_c238x' }); blobsMock.hooks.failDel = null;
+      const a7 = !!mem.gw_files['att_c238x'] && !aud('첨부삭제');
+      const r7 = await c({ action: 'att_del', id: 'att_c238x' });
+      P.attParts = r.code === 500 && a7 && r7.code === 200 && !mem.gw_files['att_c238x'] && !mem.gw_files['attp:att_c238x:1'] && !mem.gw_files['parse:att_c238x']; I.attParts = [r.code, r7.code, a7];
+      // ⑧ att_del — 판독값 지우기 실패 → 500 · 본 레코드 남음 / 본 레코드 지우기 실패 → 500
+      reset(); blobsMock.hooks.failDel = (k) => k === 'parse:att_c238x'; r = await c({ action: 'att_del', id: 'att_c238x' });
+      const p8 = r.code === 500 && !!mem.gw_files['att_c238x'] && !aud('첨부삭제');
+      reset(); blobsMock.hooks.failDel = (k) => k === 'att_c238x'; const r8b = await c({ action: 'att_del', id: 'att_c238x' });
+      P.attMain = p8 && r8b.code === 500 && !!mem.gw_files['att_c238x'] && !aud('첨부삭제'); I.attMain = [r.code, r8b.code];
+      // ⑨ 허용(정상 무변): 넣기·지우기·일괄·복구·영구 삭제·att_del = 200
+      reset(); const n1 = await c({ action: 'doc_att_put', id: 'c238a', name: 'b.pdf', data: PDFc }); const n2 = await c({ action: 'doc_att_del', id: 'c238a', n: 1 });
+      const n3 = await c({ action: 'doc_bulk_put', cid: 'c238-bulk2', items: [{ title: 'C238 일괄2', cat: '02-01', files: [{ name: 'q.pdf', data: PDFc }] }] });
+      const n4 = await c({ action: 'doc_purge', id: 'c238t', confirm: true });
+      reset(); const n5 = await c({ action: 'doc_restore', id: 'c238t' }); const n6 = await c({ action: 'att_del', id: 'att_c238x' });
+      P.normal = [n1, n2, n3, n4, n5, n6].every((x) => x.code === 200) && !('bytes_deleted' in n2.body) && !mem.gw_files['att_c238x'] && !mem.gw_files['attp:att_c238x:0'] && it('c238t').del === undefined;
+      I.normal = [n1, n2, n3, n4, n5, n6].map((x) => x.code + (x.body.error_code ? ':' + x.body.error_code : ''));
+    } finally { const s = JSON.parse(snapC238); mem.gw_data = s.d; mem.gw_files = s.f; ['failSet', 'failDel', 'afterSet'].forEach((h) => { blobsMock.hooks[h] = null; }); }
+    return { ok: Object.values(P).every((v) => v === true), info: { P, I } };
+  };
+  try {
+    const C0 = await chkC238(loadC238(FDATAC, SDATAC));
+    T('C238 판 C 문서함·첨부 쓰기 결과: 겹친 저장과 합쳐 다시 쓰기 실패 = 500(넣기 바이트 지움 · 지우기·영구 삭제 바이트 남김 · 일괄 첨부 지움·멱등 표식 없음 · 복구) · 문서함 첨부 본문 못 지움 = 200 bytes_deleted:false·감사 [본문 남음] · att_del 조각·판독값·본 레코드 못 지움 = 500·감사 없음 → 다시 하면 200 · 정상 6길 200 무변', C0.ok, JSON.stringify(C0.info));
+    const MUTC = [
+      ['d', "        if (!w2.ok) return { ok: false, code: w2.code || 'STORAGE_WRITE_FAILED' };\n", ''],
+      ['d', "const bd = await blobDelete(store(FILES), docAttKey(docId, n));", "const bd = (await blobDelete(store(FILES), docAttKey(docId, n)), { ok: true });"],
+      ['d', "if (!w2.ok) mergeFail = w2.code || 'STORAGE_WRITE_FAILED'; else doc.updated_at", "doc.updated_at"],
+      ['d', "restore(cur); chk.data.updated_by = me.id; chk.data.updated_at = Date.now(); const w2 = await blobSet(st, colKey('documents'), chk.data); if (!w2.ok) return jr(500,", "restore(cur); chk.data.updated_by = me.id; chk.data.updated_at = Date.now(); const w2 = await blobSet(st, colKey('documents'), chk.data); if (false) return jr(500,"],
+      ['d', "drop(chk.data); const w2 = await blobSet(st, colKey('documents'), chk.data); if (!w2.ok) return jr(500,", "drop(chk.data); const w2 = await blobSet(st, colKey('documents'), chk.data); if (false) return jr(500,"],
+      ['d', "if (!pd.ok) return ADF(pd.code); }", "}"],
+      ['d', "if (!pd2.ok) return ADF(pd2.code); }", "}"],
+      ['d', "if (!rd.ok) return ADF(rd.code); }", "}"],
+      ['b', "if (r && r.ok === false) { failed++; code = code || r.code || 'STORAGE_DELETE_FAILED'; }", ""],
+    ];
+    const kill = [];
+    for (const [w, from, to] of MUTC) {
+      let k; try {
+        const src = w === 'd' ? SDATAC : SBF; if (src.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50));
+        const mutSrc = src.replace(from, () => to);
+        if (w === 'b') { const bfKey = require.resolve(FBF); const saved = require.cache[bfKey]; const mb = new ModC238(FBF); mb.filename = FBF; mb.paths = ModC238._nodeModulePaths(dirname(FBF)); mb._compile(mutSrc, FBF); mb.loaded = true; require.cache[bfKey] = mb; try { k = !(await chkC238(loadC238(FDATAC, SDATAC))).ok; } finally { if (saved) require.cache[bfKey] = saved; else delete require.cache[bfKey]; } }
+        else k = !(await chkC238(loadC238(FDATAC, mutSrc))).ok;
+      } catch (e) { k = 'err ' + e.message; }
+      if (k !== true) kill.push(from.trim().slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k));
+    }
+    T('C238 판 C 결함 사본 ' + MUTC.length + '개(첨부 합쳐 쓰기 · 본문 지우기 결과 · 일괄 합쳐 쓰기 · 복구 합쳐 쓰기 · 영구 삭제 합쳐 쓰기 · att_del 조각·판독값·본 레코드 · boxfile 실패 셈) 모두 잡힘', kill.length === 0, kill.join(' | '));
+  } catch (e) { T('C238 판 C 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

@@ -22,9 +22,12 @@ async function attReadB64(st, id, rec) {
   return parts.join('');
 }
 
+// C238 판 C: 지우기 결과를 돌려줌({ ok, failed, code }) — 종전엔 실패를 삼켜 부르는 쪽이 조각이 남은 채 본 레코드를 지우고 200을 줌(표 _lib/boxfile.js:27)
 async function attDeleteParts(st, id, rec) {
   const k = Number(rec && rec.parts) || 0;
-  for (let j = 0; j < k; j++) { try { await blobDelete(st, attPartKey(id, j)); } catch (e) {} }
+  let failed = 0, code = '';
+  for (let j = 0; j < k; j++) { try { const r = await blobDelete(st, attPartKey(id, j)); if (r && r.ok === false) { failed++; code = code || r.code || 'STORAGE_DELETE_FAILED'; } } catch (e) { failed++; code = code || 'STORAGE_DELETE_FAILED'; } }
+  return { ok: failed === 0, failed: failed, code: code };
 }
 
 module.exports = { attPartKey, attReadB64, attDeleteParts };
