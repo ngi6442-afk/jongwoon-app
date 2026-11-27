@@ -43,7 +43,12 @@ exports.handler = async function (event) {
     return p + ' 접음 ' + ms.reduce(function (s, x) { return s + x.folded; }, 0) + '·남음 ' + ms.reduce(function (s, x) { return s + Math.max(0, x.left); }, 0) + (ms.some(function (x) { return x.code; }) ? '·TIME_CAP' : '');
   }).join(' · ');
   const ok = !!r.ok && !!lg.ok;
-  await stamp('gw-audit-fold-cron', { state: 'end', ok: ok, note: (note + ' · ' + lnote).slice(0, 120) });
+  // 실패한 갈래를 맨 앞에(감시 watch.py가 note 앞 60자만 보임 — 좁은 확인 11/27): 실패가 없으면 note는 종전 꼴 그대로
+  const failed = [];
+  if (!r.ok) failed.push('audit');
+  LINELOG_PREFIXES.forEach(function (p) { if (lnote.indexOf(p + ' 실패') >= 0) failed.push(p); });
+  const head = failed.length ? '[실패 ' + failed.join('/') + '] ' : '';
+  await stamp('gw-audit-fold-cron', { state: 'end', ok: ok, note: (head + note + ' · ' + lnote).slice(0, 120) });
   return { statusCode: ok ? 200 : 500, body: JSON.stringify(Object.assign({}, r, { ok: ok, audit_ok: !!r.ok, logs: lg.logs || [], logs_ok: !!lg.ok })) };
 };
 exports.scheduledRun = scheduledRun;
