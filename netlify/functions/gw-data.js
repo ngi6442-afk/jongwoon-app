@@ -507,7 +507,7 @@ async function handleSave(event, d, R) {
     }
   }
   // v380(검토 발견): 정리 전에 열려 있던 관리자 탭이 상태 하나만 바꿔 저장해도(409 병합 = 로컬 우선 합집합) 정리된 공고가 되살아나지 않게 서버가 다시 거른다
-  if (col === 'bids' && Array.isArray(doc.items)) purgeExpiredBids(doc, bidsCutDate());
+  if (col === 'bids' && Array.isArray(doc.items)) purgeExpiredBids(doc, bidsCutDate(), bidsNoDueCut());   // C308: 마감일 빈 줄은 공고일 + 28일
   // v444 부동산 — 설정 settings:onbid가 켜졌을 때만 같은 줄(기본 꺼짐 — 꺼져 있으면 아무것도 거르지 않음). 서버 문서에 있던 줄을 지우게 되면(켠 날 수집보다 저장이 먼저 오는 경우 등)
   //   저장 전 문서를 스냅샷으로 남기고(VER_SKIP을 넘어 — 아래 verSnapshot) 감사에 '정리' 1줄. 되살린 줄(서버에 이미 없는 줄)만 걸렀으면 스냅샷·감사 없음
   let obPurged = 0;
@@ -877,14 +877,24 @@ const BIDS_PURGEABLE = { 'new': 1, '패스': 1 };
 function bidsCutDate(keepDays) {
   return new Date(Date.now() + 9 * 3600000 - (keepDays || BIDS_KEEP_DAYS) * 86400000).toISOString().slice(0, 10);
 }
-function bidExpired(it, cut) {
+// C308(11/27 운영책임자 17:42 "28일로"): 입찰 공고 가운데 마감일 칸이 **빈** 줄(11/27 495줄 0.80MB — 14일 정리에 안 걸려 계속 쌓임)은
+//   공고일(posted, 없으면 created) + BIDS_NODUE_DAYS(28일 = 입찰 기간 14 + 보관 14)가 지나면 같은 규칙(new·패스만 — 사람이 정한 상태는 보존)으로 정리한다.
+//   nodueCut을 넘긴 자리(입찰 col:bids — 저장·수집·bids_purge)만 이 규칙을 탄다. 부동산(onbid)은 넘기지 않아 종전 그대로.
+//   마감 칸이 빈 값이 아닌데 날짜 꼴이 아닌 줄(다른 표기)과 공고일을 모르는 줄은 종전대로 지우지 않는다(모르면 지우지 않음).
+//   자료 저장소 collectors/common.py merge_bids도 같은 규칙(되살림 방지 — 원장이 다시 보내도 받지 않음).
+const BIDS_NODUE_DAYS = 28;
+function bidsNoDueCut() { return bidsCutDate(BIDS_NODUE_DAYS); }
+function bidExpired(it, cut, nodueCut) {
   const due = String((it && it.due) || '').slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(due) && due < cut;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(due)) return due < cut;
+  if (!nodueCut || String((it && it.due) || '').trim()) return false;
+  const p = String((it && (it.posted || it.created)) || '').slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(p) && p < nodueCut;
 }
-function bidPurgeable(it, cut) { return !!(it && bidExpired(it, cut) && BIDS_PURGEABLE[it.status || 'new']); }
-function purgeExpiredBids(doc, cut) {
+function bidPurgeable(it, cut, nodueCut) { return !!(it && bidExpired(it, cut, nodueCut) && BIDS_PURGEABLE[it.status || 'new']); }
+function purgeExpiredBids(doc, cut, nodueCut) {
   const before = doc.items.length;
-  doc.items = doc.items.filter(function (it) { return !bidPurgeable(it, cut); });
+  doc.items = doc.items.filter(function (it) { return !bidPurgeable(it, cut, nodueCut); });
   return before - doc.items.length;
 }
 // v444(45-1 일곱째 판 — PM 11/10 15:56 결정 ⑥ '마감 지난 부동산 물건도 공고와 같은 규칙'): 부동산(온비드 col:onbid)도 마감 + BIDS_KEEP_DAYS(14일) 지난 'new'·'패스'만 정리하고
@@ -955,18 +965,18 @@ async function handleBidsIngest(event, d, R, attempt) {
   if (r.ok && r.data != null && !Array.isArray(r.data.items)) return jr(500, { status: 'ERROR', error_code: 'BIDS_READ_FAILED', request_id: R });   // C225 판 A: 읽혔지만 꼴이 깨진 원장(items 배열 아님)을 빈 원장으로 보고 덮지 않음
   const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
   const at0 = (r.ok && r.data) ? r.data.updated_at : undefined, inItems = d.items;   // v444 검토 ② 처음 읽은 원장 시각 · 받은 줄(되살림 방지가 d.items를 거른 사본으로 바꾸므로 다시 할 때 되돌림)
-  const cut = bidsCutDate();
+  const cut = bidsCutDate(), ndc = target === 'bids' ? bidsNoDueCut() : null;   // C308: 마감일 빈 줄 규칙은 입찰만
   const purgeOn = target === 'bids' || (target === 'onbid' && await onbidPurgeOn(st));   // v444 부동산은 설정 settings:onbid가 켜졌을 때만(기본 꺼짐) — 공고는 종전대로 늘
   // v380(검토 발견): 정리가 있는 날은 VER_SKIP(bids)을 넘어 강제 보존 — 매일 정리는 재수집으로 못 되돌리는 삭제라 하루 1벌은 남긴다(v444 부동산도 같음)
-  const willPurge = purgeOn && doc.items.some(function (it) { return bidPurgeable(it, cut); });
+  const willPurge = purgeOn && doc.items.some(function (it) { return bidPurgeable(it, cut, ndc); });
   await verSnapshot(target, doc, '수집봇', true, willPurge);   // 병합이 doc를 제자리 변형하므로 반드시 병합 전에(봇은 일 1개)
   let skipped = 0;
   if (purgeOn) {   // v380 되살림 방지 — 원장이 더 오래 들고 있는 만료 공고(new·패스)는 앱에 없으면 받지 않는다(v444 부동산도 켜졌으면 같음)
     const have = {}; doc.items.forEach(function (it) { if (it && it.id) have[it.id] = 1; });
-    d.items = d.items.filter(function (n) { const drop = n && n.id && !have[n.id] && bidPurgeable(n, cut); if (drop) skipped++; return !drop; });
+    d.items = d.items.filter(function (n) { const drop = n && n.id && !have[n.id] && bidPurgeable(n, cut, ndc); if (drop) skipped++; return !drop; });
   }
   const m = mergeBidItems(doc, d.items);
-  const purged = purgeOn ? purgeExpiredBids(doc, cut) : 0;   // v380 기존 만료 new·패스 정리(사람이 정한 상태는 보존)
+  const purged = purgeOn ? purgeExpiredBids(doc, cut, ndc) : 0;   // v380 기존 만료 new·패스 정리(사람이 정한 상태는 보존)
   // 수집 헬스(실패 어댑터·마지막 실행시각) — 변경 없어도 항상 갱신해 앱 배너가 최신을 보게
   let hasHealth = false;
   if (target === 'bids' && d.health && typeof d.health === 'object' && Array.isArray(d.health.adapters)) {
@@ -1546,15 +1556,15 @@ async function handleBidsPurge(event, d, R) {
   const r = await blobGet(st, colKey('bids'));
   if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: 'BIDS_READ_FAILED', request_id: R });   // C225 판 A: 못 읽은 원장을 빈 목록으로 저장하지 않음(세기 dry도 0건으로 답하지 않음)
   const doc = (r.ok && r.data && Array.isArray(r.data.items)) ? r.data : { schema: 1, items: [] };
-  const cutP = bidsCutDate();
+  const cutP = bidsCutDate(), ndcP = bidsNoDueCut();   // C308: 마감일 빈 줄은 공고일 + 28일
   const dryRun = d.dry === true || d.dry === 'true' || d.dry === 1;   // 관용(검토 발견: 문자열 'true'로 실제 정리가 돌지 않게)
   if (d.mode === 'expired' && dryRun) {   // v380 — 세기만(스냅샷·저장 없음): 정리 전 PM 보고용
-    const would = doc.items.filter(function (it) { return bidPurgeable(it, cutP); }).length;
+    const would = doc.items.filter(function (it) { return bidPurgeable(it, cutP, ndcP); }).length;
     return jr(200, { status: 'OK', dry: true, would_remove: would, total: doc.items.length, cut: cutP, keep_days: BIDS_KEEP_DAYS, request_id: R });
   }
   await verSnapshot('bids', doc, c.member.name, false, true);   // 비우기는 파괴적 — 제외 대상이어도 강제 보존
   const before = doc.items.length;
-  if (d.mode === 'expired') purgeExpiredBids(doc, cutP);   // v380 마감 14일 경과 new·패스만
+  if (d.mode === 'expired') purgeExpiredBids(doc, cutP, ndcP);   // v380 마감 14일 경과 new·패스만 · C308 마감일 빈 줄은 공고일 + 28일
   else doc.items = (d.mode === 'all') ? [] : doc.items.filter(function (it) { return it && it.status && it.status !== 'new'; });
   const removed = before - doc.items.length;
   doc.updated_by = c.member.id; doc.updated_at = Date.now();
@@ -5568,11 +5578,15 @@ async function handleBackupGet(event, d, R) {
 
 // v426 PC 예약 작업 흔적 — 첨부 증분 백업(collectors/files_backup.py)이 끝나면 남긴다. watch.py가 cron_map 'stamp'로 신선도를 본다(PC가 꺼져 있어도 경보가 나게)
 // P1 판31(11/14 원천 수리): fn 'backup' = 매일 앱 백업(appdata collectors/backup.py — GitHub Actions backup.yml)이 저장한 뒤 남기는 흔적 — 그날(KST)을 월 점검 '백업 연속일' 재료(mchk:backup:YYYY-MM)에 더한다(partial = 실패 키 있는 부분 백업)
-const BACKUP_STAMP_FN = { files_backup: 1, backup: 1 };
+// T519(11/27): fn 'pc_mirror' = PC 로컬 미러 백업(jongwoon-backup mirror_backup.ps1 → backup.py --single)이 회차 시작에 state 'start', 끝에 'end'를 남긴다 —
+//   회차가 중간에 끊기면(0xC000013A · 55회 중 15회) 흔적이 'start'로 남아 watch.py judge_stamp가 '시작만 2시간 넘음'으로 잡는다(종전엔 감시 밖 — 침묵 실패).
+//   state는 'start'만 따로 받고 그 밖은 종전대로 'end'(files_backup·backup은 끝 흔적만 보냄 — 동작 그대로).
+const BACKUP_STAMP_FN = { files_backup: 1, backup: 1, pc_mirror: 1 };
 async function handleBackupStamp(event, d, R) {
   if (!backupAuthed(d)) return jr(403, { status: 'FORBIDDEN', error_code: 'BAD_SECRET', request_id: R });
   const fn = String(d.fn || '');
   if (!BACKUP_STAMP_FN[fn]) return jr(400, { status: 'REJECTED', error_code: 'BAD_FN', request_id: R });
+  if (d.state === 'start') { await require('./_lib/cronstamp').stamp(fn, { state: 'start', note: String(d.note || '').slice(0, 120) }); return jr(200, { status: 'OK', request_id: R }); }
   await require('./_lib/cronstamp').stamp(fn, { state: 'end', ok: d.ok === true, note: String(d.note || '').slice(0, 120), n: Number(d.n) || 0, bytes: Number(d.bytes) || 0 });
   if (fn === 'backup') await MCHK.noteBackup(d.ok === true, d.partial === true);   // P1 판31 월 점검 '백업 연속일' 재료(실패는 삼킴)
   return jr(200, { status: 'OK', request_id: R });

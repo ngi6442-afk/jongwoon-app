@@ -3430,6 +3430,51 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   delete mem.gw_data['col:bids'];
 }
 
+// 48-C308(11/27 운영책임자 17:42 "28일로"): 입찰 마감일 빈 줄 = 공고일(없으면 만든 날) + 28일 지난 new·패스만 정리 · 사람 상태·날짜 모름·다른 표기는 남김 · 부동산은 종전
+//   (자료 저장소 collectors/bidpurgetest.py와 같은 표) — 공고 저장·수집(되살림 방지 포함)·bids_purge 세 자리
+{
+  const day = (n) => new Date(Date.now() + 9 * 3600000 - n * 86400000).toISOString().slice(0, 10);
+  const keepB = mem.gw_data['col:bids'], keepO = mem.gw_data['col:onbid'];
+  const keepV = {}; Object.keys(mem.gw_data).forEach((k) => { if (/^(ver|veridx):(bids|onbid)(:|$)/.test(k)) keepV[k] = mem.gw_data[k]; });
+  try {
+    const ROWS = () => [
+      { id: 'd15', due: day(15), status: 'new' }, { id: 'd14', due: day(14), status: 'new' }, { id: 'd20r', due: day(20), status: '검토' },
+      { id: 'n29', due: '', posted: day(29), status: 'new' }, { id: 'n28', due: '', posted: day(28), status: 'new' }, { id: 'n60p', due: '', posted: day(60), status: '패스' },
+      { id: 'n60r', due: '', posted: day(60), status: '검토' }, { id: 'nc40', due: '', created: day(40), status: 'new' }, { id: 'nnone', due: '', status: 'new' },
+      { id: 'nkey', posted: day(40), status: 'new' }, { id: 'ntxt', due: '공고문 참조', posted: day(60), status: 'new' }, { id: 'nsp', due: '  ', posted: day(60), status: 'new' },
+      { id: 'nst', due: '', posted: day(40) }, { id: 'fresh', due: '', posted: day(1), status: 'new' }].map((x) => Object.assign({ title: 't ' + x.id }, x));
+    const LEFT = 'd14,d20r,fresh,n28,n60r,nnone,ntxt';   // 남는 줄(정렬)
+    const ids = (k) => ((mem.gw_data[k] || {}).items || []).map((x) => x.id).sort().join(',');
+    // ① 수집(ingest) — 기존 원장 정리 + 원장이 다시 보내도 안 받음(되살림 방지)
+    mem.gw_data['col:bids'] = { schema: 1, items: ROWS(), updated_at: 1 };
+    const r1 = await call({ action: 'bids_ingest', key: 'test-ingest-key', items: [] });
+    const o1 = r1.code === 200 && ids('col:bids') === LEFT && r1.body.purged === 7;
+    const r1b = await call({ action: 'bids_ingest', key: 'test-ingest-key', items: ROWS().map((x) => { const y = Object.assign({}, x); delete y.status; return y; }) });
+    const o1b = r1b.code === 200 && ids('col:bids').split(',').indexOf('n29') < 0 && ids('col:bids').split(',').indexOf('nc40') < 0 && ids('col:bids').split(',').indexOf('fresh') >= 0;
+    // ② 관리자 저장(save) — 같은 표
+    mem.gw_data['col:bids'] = { schema: 1, items: [], updated_at: 2 };
+    const r2 = await call({ action: 'save', collection: 'bids', doc: { schema: 1, items: ROWS() }, base: 2 }, tokA);
+    const o2 = r2.code === 200 && ids('col:bids') === LEFT;
+    // ③ bids_purge expired(dry 세기 · 실행)
+    mem.gw_data['col:bids'] = { schema: 1, items: ROWS(), updated_at: 3 };
+    const r3d = await call({ action: 'bids_purge', key: 'test-ingest-key', mode: 'expired', dry: true });
+    const r3 = await call({ action: 'bids_purge', key: 'test-ingest-key', mode: 'expired' });
+    const o3 = r3d.code === 200 && r3d.body.would_remove === 7 && r3.code === 200 && r3.body.removed === 7 && ids('col:bids') === LEFT;
+    // ④ 부동산(onbid) — 마감일 빈 줄 규칙 안 탐(정리 켜도 종전 마감 + 14일만)
+    mem.gw_data['settings:onbid'] = { schema: 1, purge: true, updated_at: 1 };
+    mem.gw_data['col:onbid'] = { schema: 1, items: ROWS(), updated_at: 1 };
+    const r4 = await call({ action: 'bids_ingest', key: 'test-ingest-key', col: 'onbid', items: [] });
+    const o4 = r4.code === 200 && ids('col:onbid').split(',').indexOf('n29') >= 0 && ids('col:onbid').split(',').indexOf('d15') < 0;
+    delete mem.gw_data['settings:onbid'];
+    T('C308 입찰 마감일 빈 줄 = 공고일 + 28일(new·패스만): ① 수집 = 7줄 정리(남음 ' + LEFT + ') · 원장이 다시 보내도 안 받음 · ② 저장 같은 표 · ③ bids_purge dry 7·실행 7 · ④ 부동산은 종전(마감 + 14일만 · 빈 마감 남음)',
+      o1 && o1b && o2 && o3 && o4, JSON.stringify({ o: [o1, o1b, o2, o3, o4], ing: [r1.body.purged, ids('col:bids')], r3: [r3d.body.would_remove, r3.body.removed] }));
+  } finally {
+    Object.keys(mem.gw_data).forEach((k) => { if (/^(ver|veridx):(bids|onbid)(:|$)/.test(k)) delete mem.gw_data[k]; }); Object.assign(mem.gw_data, keepV);
+    if (keepB === undefined) delete mem.gw_data['col:bids']; else mem.gw_data['col:bids'] = keepB;
+    if (keepO === undefined) delete mem.gw_data['col:onbid']; else mem.gw_data['col:onbid'] = keepO;
+  }
+}
+
 // 48-T547(11/27 운영책임자 "추천대로"): 스냅샷 제외 컬렉션(입찰·부동산)의 강제 보존본은 최근 7벌만 — 다음 강제 보존(정리 날 ingest) 때 스스로 줄임 · 다른 컬렉션은 20벌 + 30일 하루 1벌 그대로
 {
   const day = (n) => new Date(Date.now() + 9 * 3600000 - n * 86400000).toISOString().slice(0, 10);
@@ -5659,6 +5704,22 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     const s1 = await call({ action: 'backup_stamp', secret: 'wrong', fn: 'files_backup', ok: true }), s2 = await call({ action: 'backup_stamp', secret: 'test-secret-74', fn: 'col:contracts', ok: true }), s3 = await call({ action: 'backup_stamp', secret: 'test-secret-74', fn: 'files_backup', ok: true, n: 12, bytes: 3456, note: '새 2' });
     const sd = mem.gw_data['it:cron:files_backup:last'] || {};
     T('76 v426 백업 흔적: 키가 틀리면 403 · 정해진 이름만 · 끝 흔적(ok·건수·용량·시각)', s1.code === 403 && s2.code === 400 && s3.code === 200 && sd.state === 'end' && sd.ok === true && sd.n === 12 && sd.bytes === 3456 && sd.ts > 0, JSON.stringify(sd));
+    // T519(11/27) PC 미러 흔적 pc_mirror — 시작(state start · runs +1 · ok null) → 끝(end · ok · 건수) · 시작만 두 번이면 runs 2·state start(끊긴 회차가 남음) · 다른 state 값은 끝으로
+    delete mem.gw_data['it:cron:pc_mirror:last'];
+    const p1 = await call({ action: 'backup_stamp', secret: 'test-secret-74', fn: 'pc_mirror', state: 'start', note: '17:00 회차' });
+    const pa = JSON.parse(JSON.stringify(mem.gw_data['it:cron:pc_mirror:last'] || {}));
+    const p2 = await call({ action: 'backup_stamp', secret: 'test-secret-74', fn: 'pc_mirror', ok: true, n: 1700, note: '완료' });
+    const pb = JSON.parse(JSON.stringify(mem.gw_data['it:cron:pc_mirror:last'] || {}));
+    await call({ action: 'backup_stamp', secret: 'test-secret-74', fn: 'pc_mirror', state: 'start' });
+    await call({ action: 'backup_stamp', secret: 'test-secret-74', fn: 'pc_mirror', state: 'start' });
+    const pc = JSON.parse(JSON.stringify(mem.gw_data['it:cron:pc_mirror:last'] || {}));
+    const p4 = await call({ action: 'backup_stamp', secret: 'test-secret-74', fn: 'pc_mirror', state: 'weird', ok: false });
+    const pd = mem.gw_data['it:cron:pc_mirror:last'] || {};
+    const pw = await call({ action: 'backup_stamp', secret: 'wrong', fn: 'pc_mirror', state: 'start' });
+    T('T519 PC 미러 흔적 pc_mirror: 시작 = state start·runs 1·ok null·start_ts · 끝 = end·ok·n 1700 · 시작만 두 번 = runs 3·state start(끊긴 회차가 남음) · 다른 state 값 = 끝(ok false) · 키 틀림 403',
+      p1.code === 200 && pa.state === 'start' && pa.runs === 1 && pa.ok === null && pa.start_ts > 0 && p2.code === 200 && pb.state === 'end' && pb.ok === true && pb.n === 1700
+      && pc.state === 'start' && pc.runs === 3 && p4.code === 200 && pd.state === 'end' && pd.ok === false && pw.code === 403, JSON.stringify([pa, pb, pc, pd, pw.code]));
+    delete mem.gw_data['it:cron:pc_mirror:last'];
     if (secOld === undefined) delete process.env.BIDS_INGEST_KEY; else process.env.BIDS_INGEST_KEY = secOld;
     delete mem.gw_data['it:cron:files_backup:last'];
     // v425 자동 초안 표시
@@ -9858,7 +9919,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       ['M', [["else if (start !== null && start < b.e) {", "else if (false) {"]]],
       ['M', [["if (ad === null || asn === null) out.push(", "if (false) out.push("]]],
       ['G', [["  if (fn === 'backup') await MCHK.noteBackup(d.ok === true, d.partial === true);", ""]]],
-      ['G', [["const BACKUP_STAMP_FN = { files_backup: 1, backup: 1 };", "const BACKUP_STAMP_FN = { files_backup: 1 };"]]],
+      ['G', [["const BACKUP_STAMP_FN = { files_backup: 1, backup: 1, pc_mirror: 1 };", "const BACKUP_STAMP_FN = { files_backup: 1, pc_mirror: 1 };"]]],   // T519(11/27): pc_mirror가 붙음 — 'backup' 빼기 결함은 그대로
       ['M', [["return isObj(x) && Array.isArray(x.ev); }) : null;", "return isObj(x) && Array.isArray(x.ev); }) : [];"]]],
       ['M', [["m.members = (ms && !ms.unavailable) ? ms.filter(isObj) : null;", "m.members = (ms || []).filter(isObj);"]]],
       ['M', [["if (isObj(cur.data) && !redo(cur.data)) return { ok: true, skipped: 'exists', period: period };", ""], ["if (isObj(again.data) && !redo(again.data)) return { ok: true, skipped: 'exists', period: period };", ""]]],
