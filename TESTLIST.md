@@ -2069,3 +2069,8 @@
 - [x] (AI) `servertest` 절 42-C289(판정 · 실행·읽기 실패 · 관리자 조회 · 정적 지우기 0) — ✓ AI 11/27
 - [ ] (운영 확인) 다음 월요일 03:00 회차 뒤 attorphan:report 생김(partial 아님 · 첫 회차는 지울 후보 0·새 고아 = 그때 고아 수) · 그다음 주 회차에 7일 넘은 것이 지울 후보로 옮겨짐
 - [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `paycalc_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` · `autorulestest` · `botdup_check` 통과 · v569 문서 검사를 이 판 이상으로 풀고 v570 문서·판 번호 정확 검사 — ✓ AI 11/27
+
+## v571 — C308 ① 입찰 마감일 빈 줄 정리 · T519 PC 미러 흔적 · RUNBOOK
+- [ ] (운영 확인) 다음 평일 수집 뒤 입찰 탭: 마감일 없이 오래된 공고(7~10월 공고 new·패스)가 목록에서 빠지고, 검토로 둔 공고는 그대로
+- [x] (AI) `servertest` 48-C308·T519 · 자료 저장소 `bidpurgetest.py`·`backup.py --selftest` — ✓ AI 11/27
+- [x] (AI) 게이트 통과 · 앞 판 문서 검사를 이 판 이상으로 풀고 이 판 문서·판 번호 정확 검사 — ✓ AI 11/27

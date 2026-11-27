@@ -9297,7 +9297,7 @@ try {
   //   정리 자리 셋(수집 ingest·저장 save·되살림 방지)이 같은 스위치 · 세기(onbid_purge — dry만·관리자) · 켜기·끄기(onbid_purge_set — 관리자) · 보관 일수 BIDS_KEEP_DAYS 14 한 곳
   const gd16 = rd44('netlify/functions/gw-data.js');
   const st16 = /const ONBID_SET_KEY = 'settings:onbid';/.test(gd16) && /return !!\(r\.ok && r\.data && r\.data\.purge === true\);/.test(fn44(gd16, 'onbidPurgeOn'))
-    && /const purgeOn = target === 'bids' \|\| \(target === 'onbid' && await onbidPurgeOn\(st\)\);/.test(fn44(gd16, 'handleBidsIngest')) && /const willPurge = purgeOn && /.test(fn44(gd16, 'handleBidsIngest')) && /if \(purgeOn\) \{/.test(fn44(gd16, 'handleBidsIngest')) && /const purged = purgeOn \? purgeExpiredBids\(doc, cut\) : 0;/.test(fn44(gd16, 'handleBidsIngest'))
+    && /const purgeOn = target === 'bids' \|\| \(target === 'onbid' && await onbidPurgeOn\(st\)\);/.test(fn44(gd16, 'handleBidsIngest')) && /const willPurge = purgeOn && /.test(fn44(gd16, 'handleBidsIngest')) && /if \(purgeOn\) \{/.test(fn44(gd16, 'handleBidsIngest')) && /const purged = purgeOn \? purgeExpiredBids\(doc, cut, ndc\) : 0;/.test(fn44(gd16, 'handleBidsIngest')) /* v571 C308 ①: 마감일 빈 줄 기준(ndc — 입찰만, 부동산은 null) */
     && /if \(col === 'onbid' && Array\.isArray\(doc\.items\) && await onbidPurgeOn\(store\(DATA\)\)\) \{/.test(fn44(gd16, 'handleSave')) && /purgeExpiredBids\(doc, cutO\);/.test(fn44(gd16, 'handleSave'))
     && /if \(!dryRun\) return jr\(400, \{ status: 'REJECTED', error_code: 'DRY_ONLY'/.test(fn44(gd16, 'handleOnbidPurge')) && !/blobSet|verSnapshot|appendAudit/.test(fn44(gd16, 'handleOnbidPurge'))
     && /if \(!c\.member\.admin\) return jr\(403, \{ status: 'FORBIDDEN', error_code: 'ADMIN_ONLY'/.test(fn44(gd16, 'handleOnbidPurge')) && /if \(!c\.member\.admin\) return jr\(403, \{ status: 'FORBIDDEN', error_code: 'ADMIN_ONLY'/.test(fn44(gd16, 'handleOnbidPurgeSet'))
@@ -25210,8 +25210,8 @@ try {
     const FT = ['`_lib/attorphan.js`', '`gw-attorphan-cron`', '`gw-attorphan-background`', '`attorphan:report`', '`att_orphan_report`', '0 18 * * 0'];
     const GATE = ["uismoke","servertest","consheet_check","proctpl_check","settletest","rectest","promoqual_check","promogen_check","promoqlearn_check","promostream_check","promo_wrap_check","promo_post_check","paycalc_check","stmtread_a_check","stmtread_b_check","stmtread_c_check","stmtread_d_check","stmtmail_check","autorulestest","botdup_check"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0), last = gate[gate.length - 1] || '';
-    const ok = /기준: v570 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
-      && GATE.every((g) => last.indexOf('`' + g + '`') > 0) && /SHELL_CACHE = 'jw-shell-v570'/.test(d.sw);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 570 && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => last.indexOf('`' + g + '`') > 0) && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 570   /* v571(C308 ①·T519)에서 '570 이상'으로 풂 */;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
   };
   const rZ = chkZ(DZ);
@@ -25221,6 +25221,30 @@ try {
   T('v570 문서·판 번호(정확 검사): FEATURES 기준 v570 (2026-11-27)·v570 절(attorphan·크론·워커·보고 문서·관리자 조회·일정) · TESTLIST v570 칸 3(운영 확인 1 · 게이트 [x] 2 — 20종) · sw jw-shell-v570 · 결함 사본 ' + MZ.length + '개 = 모두 ✗',
     rZ.ok && MZ.every((v) => v === false), JSON.stringify({ r: rZ.info, mut: MZ }));
 } catch (e) { console.log('  (v570 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v571(C308 ①·T519·C309ⓒ): 문서·판 번호 정확 검사 + 감시 목록 한 낱말 — 다음 판은 기준 줄·sw를 '571 이상'으로 풀 것
+try {
+  const rdY = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DY = { ft: rdY('FEATURES.md'), tl: rdY('TESTLIST.md'), sw: rdY('sw.js'), cl: rdY('CLAUDE.md'), html: rdY('index.html') };
+  const chkY = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v571 (11/27)', '\n### '), tlv = cut(d.tl, '\n## v571 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l));
+    const FT = ['`BIDS_NODUE_DAYS`', '`nodueCut`', '`pc_mirror`', '`JW 로컬미러백업`', 'RUNBOOK'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ids = ((d.html.match(/var ALERT_WATCH_IDS = \[([^\]]+)\]/) || ['', ''])[1]);
+    const ok = /기준: v571 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && !cb.some((l) => /\(PM/.test(l)) && d.cl.indexOf('**C308(v571)**') > 0
+      && ids.indexOf('"JW 로컬미러백업"') > 0 && /"JW 로컬미러백업":"PC 로컬 미러 백업 회차/.test(d.html) && /SHELL_CACHE = 'jw-shell-v571'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length } };
+  };
+  const rY = chkY(DY);
+  const muY = (k, f) => chkY(Object.assign({}, DY, { [k]: f(DY[k]) })).ok;
+  const MY = [muY('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v570 (')), muY('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v570'")),
+    muY('ft', (s) => s.split('`BIDS_NODUE_DAYS`').join('BIDS_NODUE_DAYS')), muY('cl', (s) => s.replace('**C308(v571)**', 'C308')), muY('tl', (s) => s.split('\n## v571 ').join('\n## vX ')),
+    muY('html', (s) => s.replace(',"JW 로컬미러백업"]', ']'))];
+  T('v571 문서·판 번호(정확 검사): FEATURES 기준 v571 (2026-11-27)·v571 절(낱말 5) · TESTLIST v571 칸 3 · CLAUDE.md 한 줄 · 감시 목록 JW 로컬미러백업(id·이름표) · sw jw-shell-v571 · 결함 사본 ' + MY.length + '개 = 모두 ✗',
+    rY.ok && MY.every((v) => v === false), JSON.stringify({ r: rY.info, mut: MY }));
+} catch (e) { console.log('  (v571 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
