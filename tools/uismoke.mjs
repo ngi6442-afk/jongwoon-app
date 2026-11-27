@@ -24755,13 +24755,38 @@ try {
     const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
     const ftv = cut(d.ft, '\n### v562 (11/27)', '\n### '), tlv = cut(d.tl, '\n## v562 ', '\n## ');
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l));
-    const ok = /기준: v562 \(2026-11-27\)\./.test(d.ft) && ftv.indexOf('`scanJob`') > 0 && ftv.indexOf('원장 C294') > 0 && cb.length === 4 && /SHELL_CACHE = 'jw-shell-v562'/.test(d.sw);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 562 && ftv.indexOf('`scanJob`') > 0 && ftv.indexOf('원장 C294') > 0 && cb.length === 4 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 562;
     return { ok, info: { cb: cb.length } };
   };
   const rX = chkX(DX), muX = (k, f) => chkX(Object.assign({}, DX, { [k]: f(DX[k]) })).ok;
   const MX = [muX('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v561 (')), muX('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v561'")), muX('tl', (s) => s.split('\n## v562 ').join('\n## vX '))];
   T('v562 문서·판 번호(정확 검사): FEATURES 기준 v562 (2026-11-27)·v562 절(C294 판2) · TESTLIST v562 칸 4 · sw v562 · 결함 사본 ' + MX.length + '개 = 모두 ✗', rX.ok && MX.every((v) => v === false), JSON.stringify({ r: rX.info, mut: MX }));
 } catch (e) { console.log('  (v562 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v563(C304): 문서·판 번호 정확 검사
+try {
+  const rd563 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D563 = { ft: rd563('FEATURES.md'), tl: rd563('TESTLIST.md'), sw: rd563('sw.js'), cl: rd563('CLAUDE.md') };
+  const chk563 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v563 (11/27)', '\n### '), tlv = cut(d.tl, '\n## v563 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`_lib/linelog.js`", "원장 C304"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v563 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 2 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C304(v563') > 0
+      && /SHELL_CACHE = 'jw-shell-v563'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r563 = chk563(D563);
+  const mu563 = (k, f) => chk563(Object.assign({}, D563, { [k]: f(D563[k]) })).ok;
+  const M563 = [mu563('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v562 (')), mu563('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v562'")),
+    mu563('ft', (s) => s.split("`_lib/linelog.js`").join('')),
+    mu563('cl', (s) => s.replace('**C304(v563', 'C304(')),
+    mu563('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 배포 전 전체 게이트 기록 C304_게이트_v563_1127.txt', '\n- (AI) 게이트'))];
+  T('v563 문서·판 번호(정확 검사): FEATURES 기준 v563 (2026-11-27)·v563 절(C304) · TESTLIST v563 칸 6 · CLAUDE.md 한 줄 · sw jw-shell-v563 · 결함 사본 모두 ✗',
+    r563.ok && M563.every((v) => v === false), JSON.stringify({ r: r563.info, mut: M563 }));
+} catch (e) { console.log('  (v563 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

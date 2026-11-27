@@ -2019,3 +2019,11 @@
 - [ ] (운영 확인) AI 사용량 화면에 스캔 판독 호출이 기록되고, 관리 설정에서 스캔 판독을 끄면 새 짝이 판독 없이 끝나는지
 - [x] (AI) `servertest` C294 판2(가짜 AI 응답: xlsx↔pdf `scan_cells` · hwpx↔jpg `scan_para` · 재실행 없음 · REFUSAL·NO_TEXT·SCAN_OFF·FINAL_EXCLUDED · 대기 짝 집기) — ✓ AI 11/27
 - [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `paycalc_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` · `autorulestest` 통과 · v561 문서 검사를 이 판 이상으로 풀고 v562 문서·판 번호 정확 검사 — ✓ AI 11/27
+
+## v563 — C304 — 열람 기록(doclog·reclog) 줄 유실 「원천」
+- [ ] (AI 운영 확인 — C304) 배포 뒤 첫 접기 실행(KST 17:10 또는 다음 03:10) 흔적 it:cron:gw-audit-fold-cron:last 에 doclog·reclog 접음 수가 찍히고 ok
+- [ ] (AI 운영 확인 — C304) 배포 뒤 관리자 권한관리 › 문서함 설정 '열람 이력': 이번 달 기존 줄이 그대로 보이고, 문서 하나를 연 뒤 새 줄이 더해짐
+- [ ] (AI 운영 확인 — C304) 배포 뒤 계약 서류함 개인정보 등급 서류 내려받기가 종전처럼 되고(막힘 없음) 기록물 열람 기록에 줄이 남음
+- [ ] (AI 시험 화면 대상 — C304) 열람 이력 읽기 실패(503) 때 화면에 기존 실패 문구 "열람 이력을 불러오지 못했습니다"가 보임
+- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 배포 전 전체 게이트 기록 C304_게이트_v563_1127.txt
+- [x] (AI) `servertest` C304 ①~⑧(겹침 재현 0줄 유실 · 합쳐 읽기 · 접기 · 백업 복원 · 결함 사본 24개 모두 ✗) · 좁은 독립 확인
