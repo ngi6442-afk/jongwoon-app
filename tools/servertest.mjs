@@ -18227,4 +18227,102 @@ function J91a(x) { return JSON.stringify(x); }
   finally { global.fetch = realFetch127; process.env.ANTHROPIC_API_KEY = savedK127[0] || ''; process.env.GW_ANTHROPIC_KEY = savedK127[1] || ''; }
 }
 
+{ // ---- C240 판 A-2a(11/27) — 휴가 읽기 가림 · 휴가 저장 가드 · 받지 않은 줄 leave_kept · 줄인 사본(_view) 관리자 저장 ----
+  try {
+    const M = {
+      a: { id: 'u2aadm', name: '가짜관리이', admin: true, perms: {}, tier: 'pm', dept: '관리부' },
+      e: { id: 'u2aemp', name: '가짜직원이', admin: false, perms: {}, dept: '운영부' },
+      p: { id: 'u2apeer', name: '가짜동료이', admin: false, perms: {}, dept: '운영부' },
+      x: { id: 'u2axdep', name: '가짜다른이', admin: false, perms: {}, dept: '현장' },
+    };
+    Object.keys(M).forEach((k) => { mem.gw_users['member:' + M[k].id] = M[k]; });
+    const tk = {}; Object.keys(M).forEach((k) => { tk[k] = issueSession(M[k]).token; });
+    const SEED = () => [
+      { id: 'v1', member_id: 'u2apeer', member_name: '가짜동료이', type: 'annual', start: '2026-11-10', end: '2026-11-10', days: 1, reason: '가짜사유가', status: 'approved', approver: '가짜관리이', approved_at: '2026-11-01', updated: '2026-11-01' },
+      { id: 'v2', member_id: 'u2apeer', member_name: '가짜동료이', type: 'sick', start: '2026-11-03', end: '2026-11-04', days: 2, reason: '가짜사유나', status: 'approved', approver: '가짜관리이', updated: '2026-11-01' },
+      { id: 'v3', member_id: 'u2apeer', member_name: '가짜동료이', type: 'resign', start: '2026-12-31', reason: '가짜사유다', status: 'pending', stage: 'interview_req', updated: '2026-11-01' },
+      { id: 'v4', member_id: 'u2aemp', member_name: '가짜직원이', type: 'annual', start: '2026-11-20', end: '2026-11-20', days: 1, reason: '가짜본인가', status: 'approved', approver: '가짜관리이', approved_at: '2026-11-02', updated: '2026-11-02' },
+      { id: 'v5', member_id: 'u2aemp', member_name: '가짜직원이', type: 'annual', start: '2026-11-25', end: '2026-11-25', days: 1, reason: '가짜본인나', status: 'pending', updated: '2026-11-02' },
+      { id: 'v6', member_id: 'u2aemp', member_name: '가짜직원이', type: 'resign', start: '2026-12-30', reason: '가짜본인다', status: 'pending', stage: 'interview_done', updated: '2026-11-02' },
+      { id: 'v7', member_id: 'u2axdep', member_name: '가짜다른이', type: 'annual', start: '2026-11-11', end: '2026-11-11', days: 1, reason: '가짜사유라', status: 'approved', updated: '2026-11-01' },
+    ];
+    const put = () => { mem.gw_data['col:leaves'] = { schema: 1, items: SEED(), updated_at: 52000 }; };
+    const sv = () => mem.gw_data['col:leaves'].items;
+    const byId = (id) => sv().filter((x) => x.id === id);
+    const save = async (items, who, base) => call({ action: 'save', collection: 'leaves', base: base === undefined ? mem.gw_data['col:leaves'].updated_at : base, doc: { schema: 1, items } }, tk[who], 'dev1');
+    const getL = async (who) => call({ action: 'get', collection: 'leaves' }, tk[who], 'dev1');
+    const cp = (o) => JSON.parse(JSON.stringify(o));
+    put();
+    // ① 읽기 가림
+    let r = await getL('e');
+    const it = (r.body.doc && r.body.doc.items) || [];
+    const oth = it.filter((x) => x.member_id !== 'u2aemp');
+    T('C240 A-2a ① 직원 휴가 읽기: 본인 줄 통째 3 · 남의 줄은 같은 부서 승인 연차 1줄만(7칸 이하 + _view) · 병가·사직·대기·다른 부서·사유 0',
+      r.code === 200 && it.filter((x) => x.member_id === 'u2aemp').length === 3 && it.find((x) => x.id === 'v4').reason === '가짜본인가' && oth.length === 1 && oth[0].id === 'v1' && oth[0]._view === 1 && !('reason' in oth[0]) && !('approver' in oth[0]) && Object.keys(oth[0]).length <= 8,
+      JSON.stringify(oth));
+    r = await getL('x');
+    T('C240 A-2a ① 다른 부서 직원: 남의 줄 0(본인 줄 1)', r.code === 200 && r.body.doc.items.length === 1 && r.body.doc.items[0].id === 'v7', JSON.stringify(r.body.doc && r.body.doc.items.map((x) => x.id)));
+    r = await getL('a');
+    T('C240 A-2a ① 관리자 휴가 읽기 = 통째(7줄 · 표시 없음)', r.code === 200 && r.body.doc.items.length === 7 && !r.body.doc.items.some((x) => '_view' in x));
+    const lmSaved = pushMock.loadMembers; pushMock.loadMembers = async () => { throw new Error('x'); };
+    r = await getL('e');
+    pushMock.loadMembers = lmSaved;
+    T('C240 A-2a ① 회원을 못 읽으면 본인 줄만 200(500 아님 — 내 연차가 비지 않게)', r.code === 200 && r.body.doc.items.length === 3 && r.body.doc.items.every((x) => x.member_id === 'u2aemp'), r.code + ' ' + JSON.stringify(r.body.doc && r.body.doc.items.length));
+    // ② 저장 — 받은 사본 그대로(+ 새 신청) = 받음 · 남의 줄 원본 그대로 · leave_kept 없음
+    put(); r = await getL('e'); let mine = cp(r.body.doc.items);
+    mine.push({ id: 'v8', member_id: 'u2aemp', member_name: '가짜직원이', type: 'annual', start: '2026-12-02', end: '2026-12-02', days: 1, reason: '가짜새신청', status: 'pending', updated: '2026-11-27' });
+    r = await save(mine, 'e');
+    const orig = SEED(), others0 = orig.filter((x) => x.member_id !== 'u2aemp');
+    T('C240 A-2a ② 받은 사본(_view 줄 포함) + 새 신청 저장: 200 · leave_kept 없음 · 남의 줄 4줄 글자째 원본 · 새 줄 대기 · 표시 칸 저장 0',
+      r.code === 200 && !('leave_kept' in r.body) && others0.every((o) => byId(o.id).length === 1 && JSON.stringify(byId(o.id)[0]) === JSON.stringify(o)) && byId('v8').length === 1 && byId('v8')[0].status === 'pending' && !sv().some((x) => '_view' in x),
+      JSON.stringify(r.body) + ' ' + sv().map((x) => x.id).join(','));
+    // 정상 길: 대기 철회 · 승인 휴가 [취소 요청] · 면담완료 → 본신청
+    put(); r = await getL('e'); mine = cp(r.body.doc.items);
+    mine.forEach((x) => { if (x.id === 'v5') { x.del = 1; x.updated = '2026-11-27'; } if (x.id === 'v4') { x.cancel_req = true; x.cancel_req_at = '2026-11-27'; x.updated = '2026-11-27'; } if (x.id === 'v6') { x.stage = 'resign_req'; x.applied_at = '2026-11-27'; x.updated = '2026-11-27'; } });
+    r = await save(mine, 'e');
+    T('C240 A-2a ② 정상 길 셋(대기 철회 · 승인 휴가 취소 요청 · 면담완료 → 본신청): 200 · leave_kept 없음 · 셋 다 반영',
+      r.code === 200 && !('leave_kept' in r.body) && byId('v5')[0].del === 1 && byId('v4')[0].cancel_req === true && byId('v4')[0].status === 'approved' && byId('v6')[0].stage === 'resign_req', JSON.stringify(r.body));
+    // ③ 막는 길 — 승인 휴가 고침 · 승인 휴가 지움(낡은 화면 [철회]) · 남의 승인 줄 복제 · 새 줄 승인 · 남의 줄 고침
+    put(); r = await getL('e'); mine = cp(r.body.doc.items);
+    mine.forEach((x) => { if (x.id === 'v4') { x.end = '2026-11-28'; x.days = 9; } });
+    r = await save(mine, 'e');
+    T('C240 A-2a ③ 승인된 본인 휴가 기간·일수 고침 → 서버 원본(승인·1일) + leave_kept [v4] + 감사 \'휴가 보호\'',
+      r.code === 200 && byId('v4')[0].days === 1 && byId('v4')[0].end === '2026-11-20' && JSON.stringify(r.body.leave_kept) === '["v4"]' && auditMock.logs.slice(-3).some((l) => l.col === 'leaves' && l.ev.some((e) => e.op === '휴가 보호')), JSON.stringify(r.body));
+    put(); r = await getL('e'); mine = cp(r.body.doc.items);
+    mine.forEach((x) => { if (x.id === 'v4') { x.del = 1; } });
+    r = await save(mine, 'e');
+    T('C240 A-2a ③ 승인된 본인 휴가 지움(낡은 화면 [철회]) → 승인 그대로 + leave_kept(앱이 다시 읽어 승인으로 그림)', r.code === 200 && byId('v4')[0].del !== 1 && byId('v4')[0].status === 'approved' && (r.body.leave_kept || []).indexOf('v4') >= 0, JSON.stringify(r.body));
+    put(); r = await getL('e'); mine = cp(r.body.doc.items);
+    mine.push(Object.assign(cp(SEED()[0]), { member_id: 'u2aemp', start: '2026-12-07', end: '2026-12-11', days: 5 }));
+    mine.push({ id: 'v9', member_id: 'u2aemp', type: 'annual', start: '2026-12-14', status: 'approved', approver: '가짜관리이' });
+    r = await save(mine, 'e');
+    T('C240 A-2a ③ 남의 승인 줄 id 복제 → 버림(v1 한 줄·원본) · 새 줄 승인 → 대기 · leave_kept [v1, v9]',
+      r.code === 200 && byId('v1').length === 1 && byId('v1')[0].member_id === 'u2apeer' && byId('v9')[0].status === 'pending' && (r.body.leave_kept || []).indexOf('v1') >= 0 && (r.body.leave_kept || []).indexOf('v9') >= 0, JSON.stringify(r.body) + ' ' + JSON.stringify(byId('v1')));
+    put();
+    mine = SEED(); mine.forEach((x) => { if (x.id === 'v2') { x.reason = '고친 남의 사유'; x.del = 1; } });
+    r = await save(mine, 'e');
+    T('C240 A-2a ③ 통째 사본으로 남의 줄 고침·지움 → 남의 줄 원본 · 고친 줄만 leave_kept · 안 고친 남의 줄은 kept 아님', r.code === 200 && byId('v2')[0].reason === '가짜사유나' && byId('v2')[0].del !== 1 && JSON.stringify(r.body.leave_kept) === '["v2"]', JSON.stringify(r.body));
+    put();
+    r = await save([], 'e');
+    T('C240 A-2a ③ 빈 목록 저장 → 본인 줄 이월 · 남의 줄 원본(7줄 그대로)', r.code === 200 && sv().length === 7, String(sv().length));
+    // ④ 관리자 — 줄인 사본(_view)을 든 채 관리자가 된 화면의 저장 · 줄 빠진 저장 · 정상 승인
+    put(); r = await getL('e'); mine = cp(r.body.doc.items);
+    mine.push({ id: 'v10', member_id: 'u2aemp', type: 'annual', start: '2026-12-21', status: 'pending', updated: '2026-11-27' });
+    r = await save(mine, 'a');
+    T('C240 A-2a ④ 관리자가 줄인 사본으로 저장 → 남의 줄 4줄 글자째 원본(칸 빠짐 0) · 8줄 · 표시 칸 0 · leave_kept [v1](다시 읽기)',
+      r.code === 200 && sv().length === 8 && others0.every((o) => byId(o.id).length === 1 && JSON.stringify(byId(o.id)[0]) === JSON.stringify(o)) && !sv().some((x) => '_view' in x) && JSON.stringify(r.body.leave_kept) === '["v1"]', JSON.stringify(r.body) + ' ' + sv().length);
+    put();
+    r = await save(SEED().filter((x) => x.id !== 'v2' && x.id !== 'v7'), 'a');
+    T('C240 A-2a ④ 관리자 저장에서 빠진 줄 → 서버 원본 이월(7줄) · leave_kept 없음', r.code === 200 && sv().length === 7 && !('leave_kept' in r.body), JSON.stringify(r.body));
+    put();
+    mine = SEED(); mine.forEach((x) => { if (x.id === 'v5') { x.status = 'approved'; x.approver = '가짜관리이'; x.approved_at = '2026-11-27'; } });
+    r = await save(mine, 'a');
+    T('C240 A-2a ④ 관리자 정상 승인 → 반영 · leave_kept 없음', r.code === 200 && byId('v5')[0].status === 'approved' && !('leave_kept' in r.body), JSON.stringify(r.body));
+    // ⑤ 앱 — 대역이 leave_kept를 넘기고 doSaveLeaves가 다시 읽음(글 확인)
+    const fsA2 = require('fs'); const ixA2 = fsA2.readFileSync(join(ROOT, 'index.html'), 'utf8');
+    T('C240 A-2a ⑤ 앱: 저장 대역이 leave_kept를 넘김 · doSaveLeaves가 leave_kept면 알림 + loadLeaves',
+      /leave_kept: \(res\.body && Array\.isArray\(res\.body\.leave_kept\)\) \? res\.body\.leave_kept : null/.test(ixA2) && /json\.leave_kept && json\.leave_kept\.length\)\{ gwToast\("[^"]*", true\); if\(!leavesSaveTimer\)\{ leavesPending=false; loadLeaves\(\); \}/.test(ixA2));
+  } catch (e) { T('C240 A-2a 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

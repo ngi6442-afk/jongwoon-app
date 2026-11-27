@@ -4454,7 +4454,7 @@
       _colBase[col] = (res.body && res.body.updated_at) || Date.now();
       if (imV) imSvOk(imV, _colBase[col]);   // P1 판24j: 저장 200 = 보낸 목록이 서버 사본(세대가 같거나 이 판이 기준 판보다 새로울 때만)
       // register_warn(문서함 v314): 저장은 됐는데 등재 결재 카드 자동 상신이 실패한 건수 — saveDocuments가 직원에게 알린다(관리자 결재함 폴이 자동 복구)
-      return _ghResp(200, { content: { sha: "gw" }, register_warn: (res.body && res.body.register_warn) || 0, lic_kept: (res.body && Array.isArray(res.body.lic_kept)) ? res.body.lic_kept : null, con_kept: (res.body && Array.isArray(res.body.con_kept)) ? res.body.con_kept : null });   // P1 판24 5차 con_kept: 계약 저장에서 서버가 승인 차수를 지킨 단계   // P1 판28 검토 2: 인허가 저장에서 서버가 담당 단추 기준일을 지킨 행
+      return _ghResp(200, { content: { sha: "gw" }, register_warn: (res.body && res.body.register_warn) || 0, lic_kept: (res.body && Array.isArray(res.body.lic_kept)) ? res.body.lic_kept : null, con_kept: (res.body && Array.isArray(res.body.con_kept)) ? res.body.con_kept : null, leave_kept: (res.body && Array.isArray(res.body.leave_kept)) ? res.body.leave_kept : null });   // C240 A-2a leave_kept: 서버가 받지 않은 휴가 줄 — doSaveLeaves가 다시 읽음   // P1 판24 5차 con_kept: 계약 저장에서 서버가 승인 차수를 지킨 단계   // P1 판28 검토 2: 인허가 저장에서 서버가 담당 단추 기준일을 지킨 행
     }, function(e){ if (imV) imSvEnd(imV); throw e; });
   };
 
@@ -19557,7 +19557,9 @@
           if(j&&typeof imRead==="function"){ var uq=null; try{uq=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} var nx=imRead("leaves", imG0, leaves, uq?(uq.items||[]):null, true, mergeLeaves); if(nx===0) return; if(nx!==1) leaves=nx; leavesSha=j.sha; j=null; }   // j=null: 아래 종전 병합 건너뜀(다시 저장은 한 곳)
           if(j){var up={};try{up=JSON.parse(b64DecodeUnicode(j.content))||{};}catch(e){} leaves=mergeLeaves(leaves,up.items||[]); leavesSha=j.sha;} return doSaveLeaves(); }); }
       if(!resp.ok){ saveFailToast("휴가", resp.status); return; }   // P1 판24h(C206 D5): 500·412 등을 성공으로 넘기지 않음(대기 남김 — 종전엔 대기를 풀어 새로고침 뒤 사라짐)
-      return resp.json().then(function(json){ if(json&&json.write_denied){ leavesPending=false; saveDeniedToast("휴가"); return; } leavesSha=json.content&&json.content.sha; if(typeof leavesSaveTimer==="undefined"||!leavesSaveTimer) leavesPending=false; });   // P1 판24j 검토: 보내는 사이 또 고쳐 저장 타이머가 걸려 있으면 대기 표시를 남김(판24i 지시와 같은 꼴 — 풀면 그사이 읽기가 목록을 통째로 바꿔 고침이 사라짐)
+      return resp.json().then(function(json){ if(json&&json.write_denied){ leavesPending=false; saveDeniedToast("휴가"); return; } leavesSha=json.content&&json.content.sha; if(typeof leavesSaveTimer==="undefined"||!leavesSaveTimer) leavesPending=false;
+        // C240 A-2a: 서버가 받지 않은 줄(이미 승인·반려된 휴가를 낡은 화면에서 고침·철회 등)이 있으면 휴가를 서버 값으로 다시 읽고 알림 — 화면만 철회된 것으로 보이지 않게
+        if(json && json.leave_kept && json.leave_kept.length){ gwToast("이미 처리된 휴가는 바뀌지 않았습니다(승인된 휴가는 [취소 요청]으로) — 서버 값으로 다시 불렀습니다.", true); if(!leavesSaveTimer){ leavesPending=false; loadLeaves(); } } });   // P1 판24j 검토: 보내는 사이 또 고쳐 저장 타이머가 걸려 있으면 대기 표시를 남김(판24i 지시와 같은 꼴 — 풀면 그사이 읽기가 목록을 통째로 바꿔 고침이 사라짐)
     }).catch(function(){ saveFailToast("휴가"); });
   }
   function leaveDays(type,start,end){

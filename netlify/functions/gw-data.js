@@ -25,6 +25,7 @@ const CONAPPR = require('./_lib/conappr');   // P1 판24-③ 계약 단계 결�
 const DUTY = require('./_lib/duty');   // P1 판28 인허가 '이번 달' 회차 계산(앱 DUTY_SHARED 구간과 같은 본문 — uismoke P1 판28이 글자째 대조)
 const EV = require('./_lib/evrules');   // C185 판1 범위 밖 자동 지시 규칙 5줄(서버가 셈) 공통 틀 — 새 키 꼴·실행(사건 막이·이름 대조·옛 지시 표시)·계획 함수 자리(판2~6)
 const LD = require('./_lib/licduty');   // P1 판20 인허가 기한 → 담당 자동 지시(판정 = 이번 달 탭과 같은 dutyCur·dutyStage · 스위치 settings:autotask lic_duty, 기본 dry)
+const LG = require('./_lib/leaveguard');   // C240 판 A-2a 휴가 줄·칸 가르기(읽기 leavesView · 비관리자 저장 leavesRebuild · 관리자 저장 leavesAdminFix — 근거 = 앱 전수 표)
 const SITEEDU = require('./_lib/siteedu');   // v433 현장 대장 '특별교육 미이수' 판정(앱 asbNoSpecial·eduHasValidSpecial과 같은 규칙 — uismoke v433 대조)
 
 const DATA = 'gw_data';
@@ -343,6 +344,16 @@ async function handleGet(event, d, R) {
   if (col === 'tasks' && !c.member.admin && Array.isArray(doc.items)) {   // v464 C078 ①: 기성 숨김 직원에게 기성 연동 지시 빼고 · C185 판2: 입·퇴사 지시는 담당·관리자만
     doc = Object.assign({}, doc, { items: doc.items.filter(function (t) { return !taskHiddenFor(c.member, t); }) });
   }
+  // C240 판 A-2a: 휴가는 비관리자에게 앱이 쓰는 줄·칸만 — 본인 줄 통째 · 남의 줄은 캘린더가 그리는 같은 부서 승인 연차·반차·휴직의 이름·기간·상태만 + _view 표시(종류가 병가·사직인 줄과 사유·단계·메모는 안 감).
+  //   부서는 서버 회원 레코드 — 못 읽으면 본인 줄만(남의 줄은 뺌 · 판 A 검토: 500이면 화면이 '내 연차'까지 비었음). 남의 줄이 없으면 회원을 읽지 않는다
+  if (col === 'leaves' && !c.member.admin && Array.isArray(doc.items)) {
+    let lms = [];
+    if (doc.items.some(function (x) { return x && typeof x === 'object' && x.member_id !== c.member.id; })) {
+      try { lms = await push.loadMembers(); } catch (e) { lms = null; }
+      if (!Array.isArray(lms) || lms.unavailable) lms = null;
+    }
+    doc = Object.assign({}, doc, { items: LG.leavesView(c.member, doc.items, lms) });
+  }
   return jr(200, { status: 'OK', collection: col, doc, can_write: p === 'do', request_id: R });
 }
 
@@ -579,16 +590,13 @@ async function handleSave(event, d, R) {
   // 휴가: 신청 저장은 전 직원 필요하지만, 비관리자 저장은 서버가 재구성 — 타인 항목은 서버 원본 유지(클라이언트 사본으로 못 덮음),
   // 본인 항목만 반영, 승인 상태는 스스로 못 올림. (종전엔 전면 면제라 임의 직원이 전사 휴가 문서를 통째로 조작할 수 있었다.
   // 거부(403) 방식이 아니라 재구성인 이유: 낡은 사본으로 저장해도 타인 신청이 유실되지 않게)
-  if (col === 'leaves' && !c.member.admin && Array.isArray(doc.items)) {
-    const mine = c.member.id;
-    const others = oldItems.filter(function (o) { return o && o.member_id !== mine; });
-    const oldBy = {}; oldItems.forEach(function (o) { if (o && o.id) oldBy[o.id] = o; });
-    const own = doc.items.filter(function (x) { return x && x.member_id === mine; }).map(function (b) {
-      const a = oldBy[b.id];
-      if (b.status === 'approved' && !(a && a.status === 'approved')) { b = Object.assign({}, b); b.status = a ? a.status : 'pending'; }
-      return b;
-    });
-    doc.items = others.concat(own);
+  // C240 판 A-2a: 본인 줄 = 서버 원본의 주인으로 가름(남의 id로 보낸 줄은 버림) · 승인·반려·승인 절차가 진행된 본인 줄은 앱이 허용하는 고침([취소 요청]·[취소]·본신청)만 ·
+  //   이름 칸 = 서버 회원 이름 · 같은 id 두 줄 = 앞 줄만 · 빠진 본인 줄 이월 — 규칙 _lib/leaveguard.js leavesRebuild(근거 = 앱 전수 표)
+  //   관리자 저장 = 표시(_view) 달린 줄·빠진 줄은 서버 원본(leavesAdminFix — 줄인 사본을 든 채 관리자가 된 화면). 받지 않은 줄 id는 응답 leave_kept로 → 앱이 다시 읽고 알림(조용한 되돌림 아님)
+  let leaveKept = [];
+  if (col === 'leaves' && Array.isArray(doc.items)) {
+    const lg = c.member.admin ? LG.leavesAdminFix(oldItems, doc.items) : LG.leavesRebuild(c.member, oldItems, doc.items);
+    doc.items = lg.items; leaveKept = lg.kept;
   }
   // v414 휴가 알림 2종(C3-1): 새 신청 → 관리자 우선기기 1발 · pending→approved/rejected → 신청자 1발. 설정으로 끌 수 있다. 실패해도 저장은 그대로.
   if (col === 'leaves' && Array.isArray(doc.items)) { try { await notifyLeaves(store(DATA), oldItems, doc.items, c.member); } catch (e) {} }
@@ -820,6 +828,7 @@ async function handleSave(event, d, R) {
     } else {
       ev = diffItems(oldItems, Array.isArray(doc.items) ? doc.items : []);
     }
+    if (leaveKept.length) ev.push({ op: '휴가 보호', id: leaveKept.slice(0, 10).join(',').slice(0, 200), t: '서버가 받지 않은 휴가 ' + leaveKept.length + '줄(승인·반려된 줄 고침·남의 줄·줄인 사본) — 그 사람의 앱이 서버 값으로 다시 읽음(C240 A-2a)' });
     if (recDelKept) ev.push({ op: '삭제 보호', id: '-', t: '비관리자 저장이 처리된(입금·발행·검수) 기성 ' + recDelKept + '건을 지우려 해 서버가 원본을 남겼습니다(v464 — 지우기는 관리자만)' });
     if (obPurged) ev.push({ op: '정리', id: '', t: '부동산 정리 ' + obPurged + '건(마감 ' + BIDS_KEEP_DAYS + '일 경과 신규·패스 — 저장 때)' });   // v444
     if (vehDueKept) ev.push({ op: '만기일 보호', id: '-', t: '낡은 사본이 지시 완료 창 만기일 ' + vehDueKept + '칸을 바꾸기 전 날짜로 되돌리려 해 서버 값을 지켰습니다 — 그 사람의 앱 화면이 낡은 사본입니다' });   // P1 판2 검토(S1)
@@ -853,6 +862,7 @@ async function handleSave(event, d, R) {
   if (regWarn) okOut.register_warn = regWarn;
   if (licKept.length) okOut.lic_kept = licKept;
   if (conKept.length) okOut.con_kept = conKept;   // P1 판24 5차: 앱이 그 계약을 서버 값으로 다시 읽음
+  if (leaveKept.length) okOut.leave_kept = leaveKept.slice(0, 50);   // C240 A-2a: 받지 않은 휴가 줄 — 앱이 휴가를 다시 읽고 알림(정상 저장엔 칸 없음)
   if (saveAuFail) okOut.audit = false;   // C251: 정상 때는 칸 없음(응답 종전 그대로)
   return jr(200, okOut);
 }
