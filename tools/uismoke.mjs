@@ -240,15 +240,15 @@ try {
     /\.vs\{border-collapse:separate;border-spacing:0;table-layout:fixed;width:1px;min-width:1160px;/.test(idx) && /function vehPhoneMode\(\)\{ try \{ return window\.matchMedia\("\(max-width:859px\)"\)\.matches; \}/.test(idx)
     && /var VC = vehColsNow\(\);/.test(idx) && /visCols = VC\.filter\(function\(c\)\{ return phoneMode \? !c\.hs : !c\.ph; \}\), nVis = visCols\.length;/.test(idx) && (idx.match(/colspan="' \+ nVis \+ '"/g) || []).length === 2 && !/colspan="' \+ VEH_COLS\.length \+ '"/.test(idx)
     && /col = host\.querySelector\("col\.vs-c-" \+ k\)/.test(idx) && !/cols = host\.querySelectorAll\("col"\)/.test(idx) && /window\.addEventListener\("resize", vehOnBreak\);/.test(idx) && /function vehOnBreak\(\)\{ var p = vehPhoneMode\(\); if \(vehLastPhone !== null && p !== vehLastPhone\)/.test(idx)
-    && /h:"차번호",   w:185,/.test(idx) && /vehMql\.addEventListener\("change", vehOnBreak\)/.test(idx) && /h:"검사만기", w:146,/.test(idx) && /h:"보험만기", w:138,/.test(idx), '');
+    && /h:"차번호",   w:204,/.test(idx) && /vehMql\.addEventListener\("change", vehOnBreak\)/.test(idx) && /h:"검사만기", w:160,/.test(idx) && /h:"보험만기", w:160,/.test(idx), '');   // C330(45-1): 185/146/138 → 204/160/160(운영 16자 번호·'경과 nnn일' 실측)
   // ---- v377: 종운환경 유한회사→주식회사 조직변경(PM 10/8) — 표시 문자열에 옛 법인격 잔존 금지, 매칭 정규화 목록은 유지 ----
   T('v377 상호 변경: index.html에 "(유)종운환경"·"유한회사 종운환경"·띄어쓰기 변형 0곳 · XG_CO/CD_CO/AD_CO/JW_CO/env 표시 = 주식회사 · CORP 정규화 목록에 (유)·유한회사 유지(옛 자료 매칭)',
     !/\(유\)종운환경|유한회사 종운환경|유 한 회 사 종 운 환 경/.test(idx) && /no:"\(주\)종운환경", a2:"주 식 회 사 종 운 환 경"/.test(idx) && /var CD_CO=\{ env:\{name:"주식회사 종운환경"/.test(idx) && /var JW_CO = \{ name:"\(주\)종운환경"/.test(idx)
     && /\["㈜", "\(주\)", "주식회사", "\(유\)", "유한회사", "\(合\)"\]/.test(idx), '');
 
   // ---- v378: 열 폭 저장 폐지(PM 10/8 "열폭초기화 기능 왜 만든거? 그냥 새로고침하면 돼야지") — 끌기는 이 화면에서만, 새로고침=기본 폭(v375 실측값 유지), 저장 키 2종 삭제, [열 폭 초기화] 칩·바인딩 제거 ----
-  T('v378 열 폭: 기본값 11열 185/130/230/60/100/55/67/146/138/80/153 유지 · VEH_COLW_KEY·vehColwSave·data-vs-colreset 없음 · 옛 키 jw_veh_colw·jw_veh_colw2 삭제',
-    /w:185, f:"text", b:1/.test(idx) && /h:"차종",     w:130,/.test(idx) && /h:"상세",     w:230,/.test(idx) && /h:"소유",     w:60,/.test(idx) && /h:"기사",     w:55,/.test(idx) && /h:"상태",     w:67,/.test(idx) && /h:"보험사",   w:80,/.test(idx) && /h:"비고",     w:153,/.test(idx)
+  T('v378 열 폭: 기본값 11열 204/130/230/60/108/55/67/160/160/120/153(C330에서 차번호·허가·검사만기·보험만기·보험사만 넓힘) · VEH_COLW_KEY·vehColwSave·data-vs-colreset 없음 · 옛 키 jw_veh_colw·jw_veh_colw2 삭제',
+    /w:204, f:"text", b:1/.test(idx) && /h:"차종",     w:130,/.test(idx) && /h:"상세",     w:230,/.test(idx) && /h:"소유",     w:60,/.test(idx) && /h:"기사",     w:55,/.test(idx) && /h:"상태",     w:67,/.test(idx) && /h:"보험사",   w:120,/.test(idx) && /h:"비고",     w:153,/.test(idx)
     && !/VEH_COLW_KEY/.test(idx) && !/vehColwSave/.test(idx) && !/data-vs-colreset/.test(idx) && !/열 폭 초기화/.test(idx) && /localStorage\.removeItem\("jw_veh_colw"\); localStorage\.removeItem\("jw_veh_colw2"\);/.test(idx) && /var up = function\(\)\{ document\.removeEventListener\("mousemove", mv\); document\.removeEventListener\("mouseup", up\); \};/.test(idx), '');
   // ---- v378: 큰 본문 양방향 gzip + 입찰 불러오기 실패 가시화(10/8 실사고: col:bids 6.69MB > 함수 응답 한도 6MB → "수집된 공고가 없습니다") ----
   T('v378 gwCall gzip: GW_GZ_MIN 1MB · CompressionStream("gzip") · octet-stream+X-GW-Enc · 미지원·실패 시 평문 폴백',
@@ -25679,6 +25679,56 @@ try {
   T('v580 C326 이어서 문서·판 번호(정확 검사): FEATURES 기준 v580·v580 절 · TESTLIST v580 칸 3 · CLAUDE.md 한 줄 · sw · 결함 사본 ' + MW.length + '개 = 모두 ✗',
     rW.ok && MW.every((v) => v === false), JSON.stringify({ r: rW.info, mut: MW }));
 } catch (e) { console.log('  (v580 검사 생략 — ' + e.message + ')'); fails++; }
+// ── C330(45-1): 엑셀형 표 칸 넘침 — 차량 열 폭·검사·보험만기 칸 마우스 올림 글 · 계약 '준공·만기'(PC 전문 + 마우스 올림 글 · 폰 D 표기) — 실제 vehSheetRowHtml·csRowHtml + 결함 사본
+//    배치(칸 폭에 글이 들어가는지)는 uismoke가 못 잼 — 시험 서버 PC 1024·1366·1920 · 폰 360·380·412에서 잼(판 문서)
+try {
+  const H330 = readFileSync(join(ROOT, 'index.html'), 'utf8');
+  const fn330 = (s, name) => { const i = s.indexOf('function ' + name + '('); if (i < 0 || s.indexOf('function ' + name + '(', i + 1) >= 0) throw new Error('함수 없음·둘: ' + name); let d = 0, st = false; for (let j = i; j < s.length; j++) { const ch = s[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return s.slice(i, j + 1); } } throw new Error('함수 끝 없음: ' + name); };
+  const re330 = (s, re) => { const m = s.match(re); if (!m) throw new Error('문장 없음: ' + re); return m[0]; };
+  const mk330 = (s) => new Function([
+    "function todayStr(){ return '2026-11-28'; }",
+    fn330(s, 'esc'), fn330(s, 'isGreyState'), fn330(s, 'vehDday'), fn330(s, 'vehNearInfo'), fn330(s, 'vehDueCell'), fn330(s, 'vehColCls'), fn330(s, 'vehInsShow'), re330(s, /var VEH_INS_SHOW = \{[^}]*\};/),
+    re330(s, /var VEH_COLS = \[[\s\S]*?\n  \];/),
+    "function vehColsNow(){ return VEH_COLS; } function vehRowKept(){ return []; } function vehKeptChip(){ return ''; } function selBoxHtml(){ return ''; } function vehLawTag(){ return ''; } function vehLawOf(){ return null; }",
+    fn330(s, 'vehSheetRowHtml'),
+    re330(s, /var CON_COLS = \[[\s\S]*?\n  \];/),
+    "function conChgEff(){ return {}; } function conColCls(){ return ''; } function csSiteText(c){ return c.site || ''; } function csKind(){ return ''; } function csListAmt(){ return 0; } function fmtAmount(n){ return String(n); } function csStageInfo(){ return { name: '', pos: '', frac: 0, due: '' }; } function dispName(x){ return x; }",
+    fn330(s, 'conEffEnd'), fn330(s, 'csEndCell'), fn330(s, 'csRowHtml'),
+    'return { VEH_COLS: VEH_COLS, CON_COLS: CON_COLS, veh: vehSheetRowHtml, con: csRowHtml };'].join('\n'))();
+  const tds330 = (h) => [...h.matchAll(/<td([^>]*)>([\s\S]*?)<\/td>/g)].map((m) => ({ title: ((m[1].match(/title="([^"]*)"/) || [])[1]), body: m[2], text: m[2].replace(/<span class="cs-end-d">[\s\S]*?<\/span>/g, '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim() }));
+  const chk330 = (s) => {
+    const A = mk330(s), W = (cols, k) => (cols.find((c) => c.k === k) || {}).w;
+    const wOk = W(A.VEH_COLS, 'no') >= 204 && W(A.VEH_COLS, 'permit') >= 108 && W(A.VEH_COLS, 'insp_due') >= 160 && W(A.VEH_COLS, 'ins_due') >= 160 && W(A.VEH_COLS, 'insurer') >= 120 && W(A.CON_COLS, 'end') >= 156;
+    const iv = A.VEH_COLS.findIndex((c) => c.k === 'insp_due'), bv = A.VEH_COLS.findIndex((c) => c.k === 'ins_due');
+    const v1 = tds330(A.veh({ id: 'x', no: '가짜1', insp_due: '2026-06-01', ins_due: '2026-12-10', state: '운행' }, false, false)), v2 = tds330(A.veh({ id: 'y', no: '가짜2', insp_due: '', ins_due: '2027-06-01', state: '말소예정' }, false, false));
+    const vOk = v1[iv].title === '2026-06-01 경과 180일' && v1[iv].text === v1[iv].title && v1[bv].title === '2026-12-10 D-12' && v1[bv].text === v1[bv].title
+      && v2[iv].title === '-' && v2[bv].title === v2[bv].text && /^2027-06-01 D-185$/.test(v2[bv].title);
+    const ic = A.CON_COLS.findIndex((c) => c.k === 'end');
+    const cOf = (c) => tds330(A.con(Object.assign({ id: 'c', client: '가짜', site: '가짜', status: 'active' }, c), false))[ic];
+    const c1 = cOf({ contract_info: { d3: '2026-06-01' } }), c2 = cOf({ contract_info: { d3: '2026-12-10' } }), c3 = cOf({ contract_info: { d3: '2026-06-01' }, status: 'done' }), c4 = cOf({}), c5 = cOf({ contract_info: { d3: '2027-03-01' } });
+    const dOf = (x) => ((x.body.match(/<span class="cs-end-d">([^<]*)<\/span>/) || [])[1]);
+    const fOk = (x) => /^<span class="cs-end-f">/.test(x.body);
+    const cOk = c1.title === '2026-06-01 경과 180일' && c1.text === c1.title && dOf(c1) === 'D+180' && fOk(c1) && c2.title === '2026-12-10 D-12' && dOf(c2) === 'D-12'
+      && c3.title === '2026-06-01 완료' && dOf(c3) === '완료' && c4.title === '-' && dOf(c4) === '-' && c5.title === '2027-03-01 D-93' && dOf(c5) === 'D-93' && fOk(c5);
+    const cssOk = /\.vs\.cs \.cs-end-d\{display:none;\}/.test(s) && /@media \(max-width:859px\)\{\n    \.vs\.cs \.cs-end-f\{display:none;\}\n    \.vs\.cs \.cs-end-d\{display:inline;\}/.test(s)
+      && /\.vs col\.cs-c-client\{width:30% !important;\}/.test(s) && /\.vs col\.cs-c-site\{width:30% !important;\}/.test(s) && /\.vs col\.cs-c-stage\{width:20% !important;\}/.test(s) && /\.vs col\.cs-c-end\{width:20% !important;\}/.test(s)
+      && /\.vs\.cs col\.cs-c-site\{width:26% !important;\}/.test(s) && /\.vs\.cs col\.cs-c-stage\{width:24% !important;\}/.test(s);
+    return { ok: wOk && vOk && cOk && cssOk, info: { wOk, vOk, cOk, cssOk, v1: [v1[iv].title, v1[bv].title], c: [c1.title, dOf(c1), dOf(c3), dOf(c4)] } };
+  };
+  const r330 = chk330(H330);
+  const mu330 = (a, b) => { if (H330.indexOf(a) < 0) return 'no-anchor:' + a.slice(0, 30); try { return chk330(H330.replace(a, b)).ok; } catch (e) { return false; } };
+  const M330 = [
+    mu330('{ k:"no",       h:"차번호",   w:204,', '{ k:"no",       h:"차번호",   w:185,'),   // 옛 폭
+    mu330('{ k:"ins_due",  h:"보험만기", w:160,', '{ k:"ins_due",  h:"보험만기", w:138,'),
+    mu330(`'" title="' + dc.html.replace(/<[^>]*>/g, "") + '">' + dc.html + '</td>'; }   // C330`, `'">' + dc.html + '</td>'; }   // C330`),   // 만기 칸 마우스 올림 글 걷음
+    mu330(`'" title="' + ec.html.replace(/<[^>]*>/g, "") + '"><span class="cs-end-f">'`, `'"><span class="cs-end-f">'`),   // 계약 마우스 올림 글 걷음
+    mu330('(edd.diff < 0 ? "D+" + (-edd.diff) : "D-" + edd.diff)', '(edd.diff < 0 ? "D-" + (-edd.diff) : "D+" + edd.diff)'),   // D 부호 뒤바뀜
+    mu330('{ k:"end",    h:"준공 · 만기",   w:156,', '{ k:"end",    h:"준공 · 만기",   w:120,'),
+    mu330('    .vs.cs .cs-end-f{display:none;}\n    .vs.cs .cs-end-d{display:inline;}\n', ''),   // 폰 D 표기 걷음
+    mu330('    .vs col.cs-c-end{width:20% !important;}', '    .vs col.cs-c-end{width:14% !important;}')];
+  T('C330 엑셀형 표 칸 넘침(실행 — 실제 vehSheetRowHtml·csRowHtml): 차량 기본 폭 차번호 204·허가 108·검사·보험만기 160·보험사 120 · 검사·보험만기 칸 마우스 올림 글 = 칸 글 전문("2026-06-01 경과 180일"·"D-12"·빈 칸 "-") · 계약 준공·만기 156 · 칸 = PC 전문(.cs-end-f) + 폰 D 표기(.cs-end-d — D+180·D-12·완료·"-") · 마우스 올림 글 = 전문 · 폰 열 폭 30/30/20/20(479 이하 30/26/24/20) · 결함 사본 ' + M330.length + '개(옛 폭 둘·마우스 올림 글 걷음 둘·D 부호·계약 옛 폭·폰 D 표기 걷음·폰 만기 14%) = 모두 ✗',
+    r330.ok && M330.every((v) => v === false), JSON.stringify({ r: r330.info, mut: M330 }));
+} catch (e) { console.log('  (C330 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ── v581(C329 — 주기 업무 체크 오프라인 저장 · 원장 C329): 실행 검사는 위 C329 블록 · 여기는 문서·판 번호 정확 검사
 try {

@@ -877,11 +877,14 @@
   .cbx-row .cbx-go{background:var(--brand);color:#fff;border:0;border-radius:6px;padding:6px 14px;font:inherit;font-weight:600;cursor:pointer;}
   @media (max-width:859px){ .cbx-two{grid-template-columns:minmax(0,1fr);} }
   #conDetailCard{display:none;}
+  .vs.cs .cs-end-d{display:none;}   /* C330: 준공·만기 칸 — PC = 날짜 전문(.cs-end-f) · 폰 = D 표기(.cs-end-d) */
   @media (max-width:859px){
+    .vs.cs .cs-end-f{display:none;}
+    .vs.cs .cs-end-d{display:inline;}
     .vs col.cs-c-client{width:30% !important;}
-    .vs col.cs-c-site{width:36% !important;}
+    .vs col.cs-c-site{width:30% !important;}   /* C330: 현장 36 → 30 · 만기 14 → 20(44px 칸에 날짜가 안 보이던 것 — D+nnn 한 줄 · 줄 이름인 발주처는 그대로) */
     .vs col.cs-c-stage{width:20% !important;}
-    .vs col.cs-c-end{width:14% !important;}
+    .vs col.cs-c-end{width:20% !important;}
     #conDetailCard{display:block;margin-top:8px;}
     .cs-doc .chips{max-width:46%;}
   }
@@ -985,7 +988,7 @@
   .veh-no-w{display:inline-flex;align-items:center;gap:3px;max-width:100%;min-width:0;vertical-align:bottom;}
   .veh-no-t{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .veh-no-w .need-chip,.veh-no-w .sel-box{flex:none;}
-  .veh-no-w .need-chip{padding:0 2px;font-size:10.5px;letter-spacing:-.5px;margin-left:-1px;}   /* 열 폭 185(v375 실측 기본값)는 그대로 — 9자 번호판과 한 줄에 들어가게 이 칸의 표시만 좁힘 */
+  .veh-no-w .need-chip{padding:0 2px;font-size:10.5px;letter-spacing:-.5px;margin-left:-1px;}   /* 9자 번호판과 한 줄에 들어가게 이 칸의 표시만 좁힘(열 폭은 C330에서 185 → 204) */
   .veh-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
   .vl-b{display:inline-block;border-radius:6px;padding:2px 7px;font-size:12px;border:1px solid var(--line);background:#fff;white-space:nowrap;}
   .vl-b.ok{background:#E8F4EC;border-color:#B5D8C0;color:#1F6B3A;}
@@ -1526,7 +1529,7 @@
   .vs.cs td .cs-bar{width:46px;margin-right:-46px;vertical-align:-11px;}
   }
   @media (max-width:479px){
-  .vs.cs col.cs-c-site{width:32% !important;}
+  .vs.cs col.cs-c-site{width:26% !important;}   /* C330: 32 → 26(만기 20 몫) */
   .vs.cs col.cs-c-stage{width:24% !important;}
   }
 
@@ -11139,17 +11142,17 @@
   var VEH_SHEET_KEY = "jw_veh_sheet";   // v378: 열 폭은 저장하지 않는다(PM 10/8 "그냥 새로고침하면 돼야지") — 끌기는 이 화면에서만, 새로고침이면 기본 폭. 옛 저장 키 2종은 지운다
   // 기본 열 폭(w)은 v374 전 자동 배치의 실측 폭(PM 10/1 "적용 전 간격으로")
   var VEH_COLS = [
-    { k:"no",       h:"차번호",   w:185, f:"text", b:1 },
+    { k:"no",       h:"차번호",   w:204, f:"text", b:1 },   // C330: 185 → 204(운영 16자 번호 + 선택 칸이 185를 넘음 · 17자까지 한 줄) · 허가 100 → 108 · 검사·보험만기 → 160('경과 nnn일') · 보험사 80 → 120(6~8자 보험사 이름)
     { k:"type",     h:"차종",     w:130, f:"enum" },
     { k:"due",      h:"만기",     w:110, f:"none", ph:1 },
     { k:"kind",     h:"상세",     w:230, f:"text", hs:1 },
     { k:"own",      h:"소유",     w:60,  f:"enum", hs:1 },
-    { k:"permit",   h:"허가",     w:100, f:"enum", hs:1 },
+    { k:"permit",   h:"허가",     w:108, f:"enum", hs:1 },
     { k:"driver",   h:"기사",     w:55,  f:"enum", hs:1 },
     { k:"state",    h:"상태",     w:67,  f:"enum", hs:1 },
-    { k:"insp_due", h:"검사만기", w:146, f:"none", hs:1 },
-    { k:"ins_due",  h:"보험만기", w:138, f:"none", hs:1 },
-    { k:"insurer",  h:"보험사",   w:80,  f:"enum", hs:1 },
+    { k:"insp_due", h:"검사만기", w:160, f:"none", hs:1 },
+    { k:"ins_due",  h:"보험만기", w:160, f:"none", hs:1 },
+    { k:"insurer",  h:"보험사",   w:120, f:"enum", hs:1 },
     { k:"note",     h:"비고",     w:153, f:"text", hs:1 }
   ];
   var VEH_CHIPS = [["", "전체"], ["due30", "만기 30일 내"], ["over", "만기 경과"], ["jiip", "지입"], ["stop", "운행 외"]];
@@ -11237,7 +11240,7 @@
         if (!near) cells += '<td class="' + cls + '"><span style="color:#9AA09C;">-</span></td>';
         else { dc = vehDueCell(near.date, grey); cells += '<td class="' + cls + (dc.cls ? ' ' + dc.cls : '') + '" title="' + esc(near.date) + '">' + near.t + ' ' + (near.diff < 0 ? 'D+' + (-near.diff) : 'D-' + near.diff) + '</td>'; }   // v373: 폰 만기 칸은 D 표기(상세 카드 칩과 동일) — "경과 n일"은 PC 검사만기·보험만기 열에만
       }
-      else if (c.k === "insp_due" || c.k === "ins_due"){ dc = vehDueCell(v[c.k], grey); cells += '<td class="' + cls + (dc.cls ? ' ' + dc.cls : '') + '">' + dc.html + '</td>'; }
+      else if (c.k === "insp_due" || c.k === "ins_due"){ dc = vehDueCell(v[c.k], grey); cells += '<td class="' + cls + (dc.cls ? ' ' + dc.cls : '') + '" title="' + dc.html.replace(/<[^>]*>/g, "") + '">' + dc.html + '</td>'; }   // C330: 마우스 올림 글 = 칸 글 전문(html은 esc 된 날짜 + 고정 글뿐)
       else if (c.k === "own"){ val = v.own || ""; cells += '<td class="' + cls + '">' + (val === "지입" ? '<span class="own-badge lease">지입</span>' : (val ? '<span class="own-badge self">' + esc(val) + '</span>' : '')) + '</td>'; }
       else if (c.k === "driver"){ val = v.driver || ""; cells += '<td class="' + cls + '">' + (val ? esc(val) : '<span style="color:#9AA09C;">미배정</span>') + '</td>'; }
       else if (c.k === "state"){ val = v.state || ""; cells += '<td class="' + cls + '">' + (val === "운행" ? '<span style="color:var(--brand);font-weight:700;">운행</span>' : esc(val)) + '</td>'; }
@@ -18430,7 +18433,7 @@
     { k:"pub",    h:"사급/관급",     w:76,  f:"enum", hs:1 },
     { k:"amount", h:"계약액",        w:110, f:"none", hs:1 },
     { k:"stage",  h:"단계",          w:190, f:"none" },
-    { k:"end",    h:"준공 · 만기",   w:120, f:"none" },
+    { k:"end",    h:"준공 · 만기",   w:156, f:"none" },   // C330: 120 → 156('YYYY-MM-DD 경과 nnn일'이 표 1160 안에서 한 줄)
     { k:"who",    h:"담당",          w:72,  f:"enum", hs:1 }
   ];
   var CON_CHIPS = [["", "전체"], ["active", "진행 중"], ["done", "완료"], ["pub", "관급"], ["pri", "사급"], ["unpaid", "미수"]];
@@ -18519,7 +18522,7 @@
     return out;
   }
   function csRowHtml(c, open){
-    var cells = "", i, col, cls, st, ec, amt;
+    var cells = "", i, col, cls, st, ec, amt, ed, edd;
     for (i = 0; i < CON_COLS.length; i++){
       col = CON_COLS[i]; cls = conColCls(col);
       if (col.k === "client") cells += '<td class="vs-b" title="' + esc(c.client || "") + '">' + esc(c.client || "") + '</td>';
@@ -18528,7 +18531,7 @@
       else if (col.k === "pub") cells += '<td class="' + cls + '">' + (c.docType === "public" ? '<span class="from-chip" title="공문서">관급</span>' : '<span class="scope-chip" title="사문서">사급</span>') + '</td>';
       else if (col.k === "amount"){ amt = csListAmt(c); cells += '<td class="' + cls + ' cs-num">' + (amt ? esc(fmtAmount(amt)) : '') + '</td>'; }
       else if (col.k === "stage"){ st = csStageInfo(c); cells += '<td class="' + cls + '" title="' + esc(st.name) + (st.due ? ' · 기한 ' + esc(st.due) : '') + '"><span class="cs-bar"><i style="width:' + Math.round(st.frac * 100) + '%"></i></span>' + esc(st.pos) + (st.name ? ' · ' + esc(st.name) : '') + '</td>'; }
-      else if (col.k === "end"){ ec = csEndCell(c); cells += '<td class="' + cls + (ec.cls ? ' ' + ec.cls : '') + '">' + ec.html + '</td>'; }
+      else if (col.k === "end"){ ec = csEndCell(c); ed = conEffEnd(c); edd = ed ? vehDday(ed) : null; cells += '<td class="' + cls + (ec.cls ? ' ' + ec.cls : '') + '" title="' + ec.html.replace(/<[^>]*>/g, "") + '"><span class="cs-end-f">' + ec.html + '</span><span class="cs-end-d">' + (c.status === "done" ? "완료" : (!edd ? "-" : (edd.diff < 0 ? "D+" + (-edd.diff) : "D-" + edd.diff))) + '</span></td>'; }   // C330: 마우스 올림 글 = 칸 글 전문 · 폰(859 이하)은 D 표기만(.cs-end-d — 차량 폰 만기 칸과 같은 꼴 · 전체는 상세 카드)
       else if (col.k === "who") cells += '<td class="' + cls + '">' + (c.who ? esc(dispName(c.who)) : '<span style="color:#9AA09C;">-</span>') + '</td>';
     }
     return '<tr class="vs-r' + (c.status === "done" ? ' grey' : '') + (open ? ' open' : '') + '" data-cs-row="' + esc(c.id) + '">' + cells + '</tr>';
