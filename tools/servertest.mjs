@@ -16385,7 +16385,7 @@ function J91a(x) { return JSON.stringify(x); }
       ["  if (!r.ok && r.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: 'BIDS_READ_FAILED', request_id: R });   // C225 판 A: 종전 200 applied 0(봇이 결과를 버림) → 500(봇 실패로 드러남 · 다음 회차가 다시)\n", ''],
       ["  if (r.ok && r.data != null && !Array.isArray(r.data.items)) return jr(500, { status: 'ERROR', error_code: 'BIDS_READ_FAILED', request_id: R });", ''],
       ["  if (!idx.ok && idx.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: idx.code || 'STORAGE_READ_FAILED', request_id: R });\n  const w = await blobSet(st, 'proof:' + name", "  const w = await blobSet(st, 'proof:' + name"],
-      ["  if (!idx.ok && idx.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: idx.code || 'STORAGE_READ_FAILED', request_id: R });\n  await blobDelete(st, 'proof:' + name);", "  await blobDelete(st, 'proof:' + name);"],
+      ["  if (!idx.ok && idx.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: idx.code || 'STORAGE_READ_FAILED', request_id: R });\n  const bd = await blobDelete(st, 'proof:' + name);", "  const bd = await blobDelete(st, 'proof:' + name);"],   // C238 판 E: 본문 지우기 결과를 보는 꼴로
       ["  if (crd.code) return jr(500, { status: 'ERROR', error_code: crd.code, request_id: R });", ''],
       ["if (!r.ok && r.code !== 'NOT_FOUND') code = r.code || 'STORAGE_READ_FAILED'; ", ''],
       ['  return LINELOG.append(st, recLogKey(), entry);', '  await LINELOG.append(st, recLogKey(), entry); return true;'],   // C304: 줄 열쇠 쓰기 결과를 버림(종전 자리 '그달 기록 읽기 가드'는 C304로 없어짐)
@@ -18785,7 +18785,7 @@ function J91a(x) { return JSON.stringify(x); }
     const C0 = await chkC238(loadC238(FDATAC, SDATAC));
     T('C238 판 C 문서함·첨부 쓰기 결과: 겹친 저장과 합쳐 다시 쓰기 실패 = 500(넣기 바이트 지움 · 지우기·영구 삭제 바이트 남김 · 일괄 첨부 지움·멱등 표식 없음 · 복구) · 문서함 첨부 본문 못 지움 = 200 bytes_deleted:false·감사 [본문 남음] · att_del 조각·서류함 표식·판독값·본 레코드 못 지움 = 500·감사 없음(판독값은 맨 먼저 지움) → 다시 하면 200 · 정상 6길 200 무변', C0.ok, JSON.stringify(C0.info));
     const MUTC = [
-      ['d', "        if (!w2.ok) return { ok: false, code: w2.code || 'STORAGE_WRITE_FAILED' };\n", ''],
+      ['d', "이 첨부 메타가 빠졌는데 200이던 것)\n        if (!w2.ok) return { ok: false, code: w2.code || 'STORAGE_WRITE_FAILED' };\n", "이 첨부 메타가 빠졌는데 200이던 것)\n"],
       ['d', "const bd = await blobDelete(store(FILES), docAttKey(docId, n));", "const bd = (await blobDelete(store(FILES), docAttKey(docId, n)), { ok: true });"],
       ['d', "if (!w2.ok) mergeFail = w2.code || 'STORAGE_WRITE_FAILED'; else doc.updated_at", "doc.updated_at"],
       ['d', "restore(cur); chk.data.updated_by = me.id; chk.data.updated_at = Date.now(); const w2 = await blobSet(st, colKey('documents'), chk.data); if (!w2.ok) return jr(500,", "restore(cur); chk.data.updated_by = me.id; chk.data.updated_at = Date.now(); const w2 = await blobSet(st, colKey('documents'), chk.data); if (false) return jr(500,"],
