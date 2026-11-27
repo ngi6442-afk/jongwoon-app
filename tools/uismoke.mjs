@@ -25233,8 +25233,8 @@ try {
     const FT = ['`BIDS_NODUE_DAYS`', '`nodueCut`', '`pc_mirror`', '`JW 로컬미러백업`', 'RUNBOOK'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const ids = ((d.html.match(/var ALERT_WATCH_IDS = \[([^\]]+)\]/) || ['', ''])[1]);
-    const ok = /기준: v571 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && !cb.some((l) => /\(PM/.test(l)) && d.cl.indexOf('**C308(v571)**') > 0
-      && ids.indexOf('"JW 로컬미러백업"') > 0 && /"JW 로컬미러백업":"PC 로컬 미러 백업 회차/.test(d.html) && /SHELL_CACHE = 'jw-shell-v571'/.test(d.sw);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 571 && ftv.length > 0 && mF.length === 0 && cb.length === 3 && !cb.some((l) => /\(PM/.test(l)) && d.cl.indexOf('**C308(v571)**') > 0
+      && ids.indexOf('"JW 로컬미러백업"') > 0 && /"JW 로컬미러백업":"PC 로컬 미러 백업 회차/.test(d.html) && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 571;
     return { ok, info: { mF, cb: cb.length } };
   };
   const rY = chkY(DY);
@@ -25245,6 +25245,33 @@ try {
   T('v571 문서·판 번호(정확 검사): FEATURES 기준 v571 (2026-11-27)·v571 절(낱말 5) · TESTLIST v571 칸 3 · CLAUDE.md 한 줄 · 감시 목록 JW 로컬미러백업(id·이름표) · sw jw-shell-v571 · 결함 사본 ' + MY.length + '개 = 모두 ✗',
     rY.ok && MY.every((v) => v === false), JSON.stringify({ r: rY.info, mut: MY }));
 } catch (e) { console.log('  (v571 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v572(C240 판 A-2b — 비관리자 지시 저장 가드 · 원장 C240): 실행 검사는 servertest 'C240 A-2b' · 여기는 앱 직급 표 대조 + 문서·판 번호 정확 검사
+try {
+  const rd572 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D572 = { ft: rd572('FEATURES.md'), tl: rd572('TESTLIST.md'), sw: rd572('sw.js'), cl: rd572('CLAUDE.md') };
+  // 앱 RANK_LIST = 서버 taskguard RANK_LIST(공개 범위 '직급 이상' 판정이 앱과 같게)
+  const ix572 = rd572('index.html'), tg572 = rd572('netlify/functions/_lib/taskguard.js');
+  const lst572 = (s, re) => { const mm = s.match(re); return mm ? (mm[1].match(/[가-힣]+/g) || []).join(',') : ''; };
+  const rA572 = lst572(ix572, /var RANK_LIST = \[([^\]]*)\]/), rS572 = lst572(tg572, /const RANK_LIST = \[([^\]]*)\]/);
+  const chk572 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v572 (11/27)', '\n### '), tlv = cut(d.tl, '\n## v572 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ['`task_kept`', '원장 C240', '`_lib/taskguard.js`'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v572 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C240 A-2b(v572') > 0
+      && /SHELL_CACHE = 'jw-shell-v572'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r572 = chk572(D572);
+  const mu572 = (k, f) => chk572(Object.assign({}, D572, { [k]: f(D572[k]) })).ok;
+  const M572 = [mu572('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v571 (')), mu572('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v571'")),
+    mu572('cl', (s) => s.replace('**C240 A-2b(v572', 'C240 A-2b(')), mu572('ft', (s) => s.split('`task_kept`').join('task_kept'))];
+  T('v572 앱 직급 표 = 서버 taskguard 표(' + rA572 + ') · 문서·판 번호(정확 검사): FEATURES 기준 v572 (2026-11-27)·v572 절(C240 A-2b) · TESTLIST v572 칸 4(시험 화면 1 · 운영 확인 1 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v572 · 결함 사본(기준 줄·sw·CLAUDE.md·FEATURES 낱말) 모두 ✗',
+    rA572 !== '' && rA572 === rS572 && r572.ok && M572.every((v) => v === false), JSON.stringify({ rA: rA572, rS: rS572, r: r572.info, mut: M572 }));
+} catch (e) { console.log('  (v572 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
