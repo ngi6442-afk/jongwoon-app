@@ -5,7 +5,21 @@ const { setupBlobContext } = require('./_lib/blobs');
 const { issueSession } = require('./_lib/session');
 const { stamp } = require('./_lib/cronstamp');
 
+// 예약 실행 표시가 있는 것만 지나간다(gw-audit-fold-cron과 같은 꼴) — 머리 X-NF-Event: schedule 또는 본문 { next_run }. 바깥 HTTP 호출은 404.
+function scheduledRun(event) {
+  const h = (event && event.headers) || {};
+  let v = '';
+  Object.keys(h).forEach(function (k) { if (String(k).toLowerCase() === 'x-nf-event') v = String(h[k] || ''); });
+  if (v.toLowerCase() === 'schedule') return true;
+  let b = event && event.body;
+  try { if (event && event.isBase64Encoded && typeof b === 'string') b = Buffer.from(b, 'base64').toString('utf8'); } catch (e) { b = ''; }
+  let j = null;
+  try { j = typeof b === 'string' && b ? JSON.parse(b) : null; } catch (e) { j = null; }
+  return !!j && typeof j === 'object' && !Array.isArray(j) && typeof j.next_run === 'string' && j.next_run.length > 0;
+}
+
 exports.handler = async function (event) {
+  if (event && (event.httpMethod || event.headers) && !scheduledRun(event)) return { statusCode: 404, body: JSON.stringify({ ok: false, code: 'NOT_SCHEDULED' }) };
   try { setupBlobContext(event); } catch (e) {}
   await stamp('gw-attorphan-cron', { state: 'start' });
   const s = issueSession({ id: '__attorphan__', role: 'system' });

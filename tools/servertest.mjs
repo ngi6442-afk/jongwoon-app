@@ -2733,6 +2733,13 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   // ④ 정적: 지우는 길 없음 · 크론은 기동만 · 일정 주 1회
   const rdF = (p) => require('fs').readFileSync(join(FN, p), 'utf8');
   const lib = rdF('_lib/attorphan.js'), wk = rdF('gw-attorphan-background.js'), cr = rdF('gw-attorphan-cron.js'), toml = require('fs').readFileSync(join(ROOT, 'netlify.toml'), 'utf8');
+  const CR = require(join(FN, 'gw-attorphan-cron.js'));
+  const kicks289 = []; const realF289 = global.fetch; global.fetch = async (u) => { kicks289.push(String(u)); return { ok: true, status: 202 }; };
+  const savedUrl289 = process.env.URL; process.env.URL = 'https://jw.test';
+  const h1 = await CR.handler({ httpMethod: 'POST', headers: {}, body: '{}' }), h2 = await CR.handler({ httpMethod: 'POST', headers: { 'X-NF-Event': 'schedule' }, body: '' }), h3 = await CR.handler({ httpMethod: 'POST', headers: {}, body: JSON.stringify({ next_run: '2026-11-30T18:00:00Z' }) });
+  global.fetch = realF289; process.env.URL = savedUrl289 || '';
+  T('C289 크론 예약 실행 방어: 바깥 HTTP 호출 404 NOT_SCHEDULED·기동 0 · 예약 머리(X-NF-Event: schedule)·본문 next_run이면 작업자 기동 202',
+    h1.statusCode === 404 && h2.statusCode === 202 && h3.statusCode === 202 && kicks289.length === 2 && kicks289.every((u) => /gw-attorphan-background$/.test(u)), JSON.stringify([h1.statusCode, h2.statusCode, h3.statusCode, kicks289.length]));
   T('C289 정적: 모듈·워커·크론 어디에도 blobDelete 없음 · 워커는 내부 토큰 mid __attorphan__만 · 크론은 gw-attorphan-background 기동만 · netlify.toml 주 1회(0 18 * * 0)',
     !/blobDelete/.test(lib + wk + cr) && /v\.payload\.mid !== '__attorphan__'/.test(wk) && /\/\.netlify\/functions\/gw-attorphan-background/.test(cr) && /\[functions\."gw-attorphan-cron"\]\n  schedule = "0 18 \* \* 0"/.test(toml));
 }
