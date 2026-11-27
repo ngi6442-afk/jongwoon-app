@@ -2085,3 +2085,8 @@
 - [ ] (AI 운영 확인 — C238) 배포 뒤 다음 날 백업에서 관리자 오류 기록에 member_upsert·member_delete·doc_att_put·att_del 500(STORAGE_WRITE_FAILED·STORAGE_DELETE_FAILED)이 새로 쌓이지 않음 — 정상 저장은 그대로
 - [x] (AI) `servertest` C238 판 B·판 C(결함 사본 8 · 10 모두 ✗) · 실 저장소 재현 h2.cjs 운영 ↔ 고친 판 · `botdup_check` 16 · 좁은 독립 확인 2회 — ✓ AI 11/27
 - [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 C238_게이트_v573_1127.txt
+
+## v574 — C238 판 D+E — 계약 기록물 · 증빙·결재 쓰기 결과
+- [ ] (AI 운영 확인 — C238) 배포 뒤 다음 날 백업에서 관리자 오류 기록에 cdoc_put·cdoc_pair_assign·cdoc_purge·proof_put·approval_decide 500(STORAGE_*·PAIR_VOID_FAILED)이 새로 쌓이지 않음 — 정상 저장·결재는 그대로
+- [x] (AI) `servertest` C238 판 D·판 E(결함 사본 7 · 5 모두 ✗) · 좁은 독립 확인 2회 — ✓ AI 11/27
+- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 C238_게이트_v574_1127.txt
