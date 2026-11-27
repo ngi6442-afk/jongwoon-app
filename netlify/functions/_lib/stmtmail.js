@@ -172,39 +172,52 @@ async function run(io) {
       const name = String(a.name).replace(/\d[\d .\-·_]{7,}\d/g, function (x) { return x.replace(/\D/g, '').length >= 9 ? '…' : x; }).replace(/[\u0000-\u001f]/g, '').slice(0, 120) || '이름 없는 파일';
       let e = { id: id, ym: ym, name: name, size: buf.length, kind: kind, sha: sha, vk: '', how: '', state: 'novendor', by: BOT, at: io.now(), mail: { at: m.at, dom: domOf(m.from.addr), fh: fh } };
       const w0 = await io.blobSet(io.st, 'stmtdrop:' + ym + ':' + id, e);
-      if (!w0.ok) { sum.fail++; continue; }
+      if (!w0.ok) { sum.fail++; sum.ok = false; sum.code = 'STORAGE_WRITE_FAILED'; break outer; }   // C328: 저장소가 쓰기를 거부 — 이 회차는 실패로(처리 표시를 안 남겨 다음 회차가 다시 봄)
       const fw = await io.blobSet(io.fst, 'stmtfile:' + id, { ym: ym, name: name, size: buf.length, kind: kind, by: BOT, at: io.now(), data: buf.toString('base64') });
-      if (!fw.ok) { await io.blobDelete(io.st, 'stmtdrop:' + ym + ':' + id); sum.fail++; continue; }
+      // 29 C328(C238 F): 쓰기 결과를 봄 — 저장소가 쓰기를 거부하면 그 회차를 실패로 끝냄(요약 ok false · STORAGE_WRITE_FAILED → 크론 흔적·멈춤 감시에 드러남). 저장소가 정상이면 종전과 같음
+      if (!fw.ok) {
+        const dl = await io.blobDelete(io.st, 'stmtdrop:' + ym + ':' + id);
+        sum.fail++;
+        if (!dl || dl.ok === false) { sum.ok = false; sum.code = 'STORAGE_WRITE_FAILED'; break outer; }   // 원본 없는 줄이 목록에 남음 — 성공으로 넘기지 않음
+        continue;
+      }
       list.push(e); sum.added++;
+      let ai = false;
       if (v) {
         e.vk = v.vk; e.how = how;
         const ctx = { ym: ym, vk: v.vk, vendor: { name: v.name, kind: v.kind, group: v.group, hint: v.hint } };
         let r;
         try { r = await RD.readFile(buf, name, ctx); } catch (x) { r = { ok: false, code: 'READ_FAILED' }; }
-        if (!r.ok) { e.state = 'fail'; e.code = r.code || 'READ_FAILED'; sum.fail++; }
-        else if (!r.ai) { e.state = 'read'; e.result = r.result; e.n = r.result.rows.length; e.src = r.result.src || ''; e.warn = (r.result.warn || []).length; sum.read++; }
+        if (!r.ok) { e.state = 'fail'; e.code = r.code || 'READ_FAILED'; }
+        else if (!r.ai) { e.state = 'read'; e.result = r.result; e.n = r.result.rows.length; e.src = r.result.src || ''; e.warn = (r.result.warn || []).length; }
         else if (io.now() - t0 < io.budget.ai) {
           if (!names) names = await io.names();
           let out;
           try { out = await RD.readByAi(buf, r.ai, Object.assign({}, ctx, { names: names })); } catch (x) { out = { ok: false, code: 'READ_FAILED' }; }
           await io.usage(ym, out);
-          if (out.ok) { e.state = 'read'; e.result = out.result; e.n = out.result.rows.length; e.src = 'vision'; e.warn = (out.result.warn || []).length; sum.read++; sum.ai++; }
-          else { e.state = 'fail'; e.code = out.code || 'READ_FAILED'; sum.fail++; }
+          if (out.ok) { e.state = 'read'; e.result = out.result; e.n = out.result.rows.length; e.src = 'vision'; e.warn = (out.result.warn || []).length; ai = true; }
+          else { e.state = 'fail'; e.code = out.code || 'READ_FAILED'; }
         } else {
           // 시간이 모자람 — 판⑥과 같은 배경 판독 맡김(앱이 목록을 열면 부름 · 맡긴 사람 = 메일 봇이라 수행 권한이면 누구나 부를 수 있음)
           const job = crypto.randomBytes(12).toString('hex');
           const jw = await io.blobSet(io.fst, 'stmtsrc:' + job, { bid: BOT, ym: ym, vk: v.vk, mode: r.ai, vendor: ctx.vendor, at: io.now(), file: 'stmtfile:' + id, drop: { ym: ym, id: id } });
-          if (jw.ok) { e.state = 'reading'; e.job = job; e.at_read = io.now(); e.src = 'vision'; } else { e.state = 'fail'; e.code = 'STORAGE_WRITE_FAILED'; sum.fail++; }
+          if (jw.ok) { e.state = 'reading'; e.job = job; e.at_read = io.now(); e.src = 'vision'; } else { e.state = 'fail'; e.code = 'STORAGE_WRITE_FAILED'; }
         }
-      } else sum.nov++;
-      await io.blobSet(io.st, 'stmtdrop:' + ym + ':' + id, e);
+      }
+      const wl = await io.blobSet(io.st, 'stmtdrop:' + ym + ':' + id, e);
+      if (!wl || !wl.ok) {   // 목록 줄에 읽은 결과를 못 씀 — 줄은 '거래처 고르기'로 남음(사람이 고르면 다시 읽음) · 읽음으로 세지 않고 감사·처리 표시도 남기지 않음
+        sum.fail++; sum.ok = false; sum.code = 'STORAGE_WRITE_FAILED';
+        break outer;
+      }
+      if (e.state === 'read') { sum.read++; if (ai) sum.ai++; } else if (e.state === 'fail') sum.fail++; else if (e.state === 'novendor') sum.nov++;   // 셈은 쓴 뒤에
       seen.add(sk); seenAdd.push(sk);
       await io.audit('명세서원본', ym + ':' + (e.vk || '?'), '메일 ' + kind + ' ' + e.state + (e.n ? ' ' + e.n + '줄' : ''));
     }
   }
   if (seenAdd.length) {
     const keys = (Array.isArray(seenDoc.keys) ? seenDoc.keys : []).concat(seenAdd).slice(-SEEN_MAX);
-    await io.blobSet(io.st, SEEN, { keys: keys, at: io.now() });
+    const ws = await io.blobSet(io.st, SEEN, { keys: keys, at: io.now() });
+    if (!ws || !ws.ok) { sum.ok = false; sum.code = 'STORAGE_WRITE_FAILED'; sum.seen_failed = seenAdd.length; }   // 처리 표시를 못 씀 — 다음 회차가 같은 메일을 다시 보지만 목록의 같은 파일(sha)로 겹치지 않음
   }
   return sum;
 }

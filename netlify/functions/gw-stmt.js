@@ -285,13 +285,21 @@ async function handleSave(st, c, d, R) {
   }
   await audit(c, '명세서저장', docKey(k.ym, k.vk), v.name + ' ' + k.ym + ' 줄 ' + doc.rows.length + '건 · ' + status + (chk.ok ? ' · 검산 통과' : ' · 붉은 ' + (chk.bad.length + chk.issues.length)));
   // 29 판⑥ 첨부 원본으로 채운 뒤 저장 = 그 원본에 '채움' 표시(다음에 상세를 열 때 다시 자동으로 채우지 않게) — 실패해도 저장은 끝난 일
+  // 29 C328(C238 F): 표시 읽기·쓰기 결과를 봄 — 못 남긴 원본 수를 응답에 실음(applied_failed · 명세 저장 자체는 성공이라 200 그대로 · 화면 글 무변)
+  let appliedFailed = 0;
   if (Array.isArray(d.drop_ids)) {
     for (const id of d.drop_ids.slice(0, DROP_MAX)) {   // 29 판⑩: 10 → 한 달 첨부 상한(쿠팡 주문이 10통을 넘으면 11번째부터 '채움'이 안 남아 다시 덧붙던 길)
       if (!RE_JOB.test(String(id))) continue;
-      try { const g = await getOpt(st, dropKey(k.ym, id)); if (g.ok && g.data && g.data.vk === k.vk && !g.data.applied) { g.data.applied = now; await blobSet(st, dropKey(k.ym, id), g.data); } } catch (e) {}
+      try {
+        const g = await getOpt(st, dropKey(k.ym, id));
+        if (!g.ok) { appliedFailed++; continue; }
+        if (g.data && g.data.vk === k.vk && !g.data.applied) { g.data.applied = now; const wa = await blobSet(st, dropKey(k.ym, id), g.data); if (!wa || !wa.ok) appliedFailed++; }
+      } catch (e) { appliedFailed++; }
     }
   }
-  return jr(200, { status: 'OK', doc: doc, checks: chk, idx: idxOk, gap: gapOk, request_id: R });
+  const out = { status: 'OK', doc: doc, checks: chk, idx: idxOk, gap: gapOk, request_id: R };
+  if (appliedFailed) out.applied_failed = appliedFailed;
+  return jr(200, out);
 }
 // 간극 기록 한 줄 — 깨진 기록은 덮지 않고 false(손댄 흔적을 새 체인으로 지우지 않게) · 쓴 뒤 다시 읽어 내 줄이 남았는지 확인, 동시 확정으로 빠졌으면 한 번 다시 붙임
 async function clogPut(st, ym, entry) {
@@ -667,8 +675,12 @@ async function handleDrop(st, c, d, R) {
   // 목록 줄 먼저(검토 med2 — 원본만 쓰고 함수가 끝나면 목록에 안 보여 지울 길이 없던 것) → 원본 → 거래처·읽기 → 줄 고침
   const w0 = await blobSet(st, dropKey(d.ym, id), e);
   if (!w0.ok) return fail(w0.code || 'STORAGE_WRITE_FAILED', R);
-  const fw = await blobSet(store(FILES), fileKey(id), { ym: d.ym, name: name, size: buf.length, kind: kind, by: c.member.id, at: Date.now(), data: d.b64.replace(/\s+/g, '') });
-  if (!fw.ok) { await blobDelete(st, dropKey(d.ym, id)); return fail(fw.code || 'STORAGE_WRITE_FAILED', R); }
+  // 원본 = 읽은 그 바이트(29 판⑫ 쿠팡 본문은 주문 표만 자른 것 — 종전엔 보낸 원본 b64를 그대로 남겨 받는 사람·연락처가 첨부에 남던 길 · C328 때 찾음)
+  const fw = await blobSet(store(FILES), fileKey(id), { ym: d.ym, name: name, size: buf.length, kind: kind, by: c.member.id, at: Date.now(), data: buf.toString('base64') });
+  if (!fw.ok) {
+    const dl = await blobDelete(st, dropKey(d.ym, id));   // C328: 되돌림 결과를 봄 — 못 지우면 원본 없는 줄이 목록에 남았다고 따로 답함
+    return fail((dl && dl.ok === false) ? 'DROP_ROLLBACK_FAILED' : (fw.code || 'STORAGE_WRITE_FAILED'), R);
+  }
   let v = fixed;
   if (fixed) { e.vk = fixed.vk; e.how = 'fixed'; }
   else {

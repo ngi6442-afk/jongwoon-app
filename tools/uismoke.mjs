@@ -25382,8 +25382,8 @@ try {
     const FT = ['`CS_PAY_STAGE_RE`', '`CS_CON_STAGE_RE`', '`toggleRecPaid`', '`recCo`', '`recImpCo`', '견적·수의계약'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const closed = /\n- \[x\] \(검토 반영\) 기성 입금 처리 때 "수금확인 단계 완료" 확인창은[^\n]*✓ AI 11\/27 v576\(C326\)/.test(d.tl) && /\n- \[x\] 견적서·기성·계약 화면의 회사 선택지가[^\n]*✓ AI 11\/27 v576\(C326 ②\)/.test(d.tl);
-    const ok = /기준: v576 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 1 && op.length === 2 && closed
-      && d.cl.indexOf('**C326(v576)**') > 0 && /SHELL_CACHE = 'jw-shell-v576'/.test(d.sw);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 576 && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 1 && op.length === 2 && closed
+      && d.cl.indexOf('**C326(v576)**') > 0 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 576;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length, closed } };
   };
   const rW = chkW(DW);
@@ -25393,6 +25393,28 @@ try {
   T('v576 C326 문서·판 번호(정확 검사): FEATURES 기준 v576·v576 절 · TESTLIST v576 칸 3 · 651·511 칸 닫음 · CLAUDE.md 한 줄 · sw · 결함 사본 ' + MW.length + '개 = 모두 ✗',
     rW.ok && MW.every((v) => v === false), JSON.stringify({ r: rW.info, mut: MW }));
 } catch (e) { console.log('  (v576 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v577(29 C328 — 월말명세서·메일 쓰기 결과 보기): 실행 검사는 tools/stmtmail_check.mjs ⑬ · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '577 이상'으로 풀 것
+try {
+  const rdU = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DU = { ft: rdU('FEATURES.md'), tl: rdU('TESTLIST.md'), sw: rdU('sw.js'), cl: rdU('CLAUDE.md') };
+  const chkU = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v577 (11/27)', '\n### '), tlv = cut(d.tl, '\n## v577 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[x\] \(AI 시험 화면 대상\)/.test(l));
+    const FT = ['`STORAGE_WRITE_FAILED`', '`seen_failed`', '`applied_failed`', '`DROP_ROLLBACK_FAILED`', '`buf`', 'C238 F'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v577 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && scr.length === 1
+      && d.cl.indexOf('**월말명세서 C328(v577)**') > 0 && /SHELL_CACHE = 'jw-shell-v577'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const rU = chkU(DU);
+  const muU = (k, f) => chkU(Object.assign({}, DU, { [k]: f(DU[k]) })).ok;
+  const MU = [muU('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v576 (')), muU('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v576'")), muU('ft', (s) => s.split('`applied_failed`').join('applied_failed')),
+    muU('cl', (s) => s.replace('**월말명세서 C328(v577)**', '월말명세서 C328')), muU('tl', (s) => s.replace("\n- [x] (AI) `stmtmail_check` ⑬", "\n- (AI) `stmtmail_check` ⑬"))];
+  T('v577 문서·판 번호(정확 검사): FEATURES 기준 v577 (2026-11-27)·v577 절(29 C328) · TESTLIST v577 칸 3(시험 화면 [x] 1 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v577 · 결함 사본(기준 줄·sw·FEATURES 글·CLAUDE 줄·TESTLIST 칸) ✗',
+    rU.ok && MU.every((v) => v === false), JSON.stringify({ r: rU.info, mut: MU }));
+} catch (e) { console.log('  (v577 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

@@ -451,6 +451,54 @@ function cpHtml(o) {
     r14.added === 2 && d14.some((x) => x.vk === 'v13' && x.state === 'read') && d14.some((x) => x.state === 'fail') && !r14.nosafe && J(W) === J([false, false, false, false, false, true, true, true]), J({ r14, st: d14.map((x) => x.state), W }));
   T('⑫ 결함 사본 ' + MU12.length + '개(안전공구 거름·생수 빼기·명세 합계·안전공구 없는 주문 저장·받은편지함 2자) = 모두 ✗', c12.length === 0, J(c12));
 }
+// ---- ⑬ 29 C328(C238 F): 쓰기 결과를 봄 — 쓰기 실패인데 성공으로 답하던 자리(운영 v575 재현: 목록 줄 마지막 쓰기 · 처리 표시 · 되돌림 지우기)
+{
+  const J = (x) => JSON.stringify(x);
+  const AT13 = Date.parse('2026-12-02T10:00:00+09:00');
+  const msg13 = [{ uid: 81, box: '청구서함', key: 'w1', at: AT13, from: { addr: 'boss@suyang.test', name: '김가짜' }, subject: '11월 명세', atts: [{ part: '2', name: '수양개발 명세.pdf', est: suyang.length }] }];
+  const run13 = async (Mx, failWhen) => {
+    const st = mkStore(), fst = mkStore(), cnt = {};
+    const io = mkIo(st, fst, Object.assign(mkBox(msg13, { '81:2': suyang }), { get: async () => suyang }), { now: () => Date.parse('2026-12-03T07:00:00+09:00'),
+      blobSet: async (s, k, v) => { cnt[k] = (cnt[k] || 0) + 1; if (failWhen(s === st ? 'st' : 'fst', k, cnt[k])) return { ok: false, code: 'STORAGE_WRITE_FAILED' }; return io0.blobSet(s, k, v); },
+      blobDelete: async (s, k) => (failWhen('del', k, 1) ? { ok: false } : io0.blobDelete(s, k)) });
+    const r = await (Mx || M).run(io);
+    const rows = Array.from(st.m.keys()).filter((k) => k.indexOf('stmtdrop:') === 0).map((k) => JSON.parse(st.m.get(k)));
+    return { r, rows, seen: st.m.has(M.SEEN), audits: io.audits.length };
+  };
+  const ok13 = await run13(null, () => false);
+  const a = await run13(null, (s, k, n) => s === 'st' && k.indexOf('stmtdrop:') === 0 && n === 2);
+  const b = await run13(null, (s, k) => s === 'st' && k === M.SEEN);
+  const c = await run13(null, (s, k) => (s === 'fst' && k.indexOf('stmtfile:') === 0) || s === 'del');
+  const d = await run13(null, (s, k) => s === 'st' && k.indexOf('stmtdrop:') === 0);
+  T('⑬ 저장소 정상 = 종전 그대로(ok · 새 원본 1 · 읽음 1 · 처리 표시 · 감사 1)', ok13.r.ok === true && ok13.r.added === 1 && ok13.r.read === 1 && ok13.seen && ok13.audits === 1 && ok13.rows[0].state === 'read', J(ok13.r));
+  T('⑬ 목록 줄에 읽은 결과를 못 씀 = ok false·STORAGE_WRITE_FAILED · 읽음으로 안 셈 · 감사·처리 표시 안 남김(다음 회차가 다시 봄)', a.r.ok === false && a.r.code === 'STORAGE_WRITE_FAILED' && a.r.read === 0 && a.r.fail === 1 && !a.seen && a.audits === 0, J(a.r));
+  T('⑬ 처리 표시(SEEN)를 못 씀 = ok false·STORAGE_WRITE_FAILED·seen_failed 1(원본·감사는 남음 — 다음 회차는 같은 파일로 겹치지 않음)', b.r.ok === false && b.r.code === 'STORAGE_WRITE_FAILED' && b.r.seen_failed === 1 && b.rows.length === 1, J(b.r));
+  T('⑬ 원본 쓰기 실패 + 되돌림 지우기 실패(원본 없는 줄이 남음) = ok false · 첫 목록 줄 쓰기 실패 = ok false(멈춤)', c.r.ok === false && c.r.code === 'STORAGE_WRITE_FAILED' && d.r.ok === false && d.r.added === 0, J([c.r, d.r]));
+  const gs13 = readFileSync(join(FN, 'gw-stmt.js'), 'utf8');
+  T('⑬ gw-stmt: 저장 뒤 채움 표시 읽기·쓰기 결과를 봄(applied_failed · 200 그대로) · 넣기 되돌림 지우기 결과를 봄(DROP_ROLLBACK_FAILED) · 남기는 원본 = 읽은 바이트(쿠팡 본문은 자른 것)',
+    /const wa = await blobSet\(st, dropKey\(k\.ym, id\), g\.data\); if \(!wa \|\| !wa\.ok\) appliedFailed\+\+;/.test(gs13) && /if \(!g\.ok\) \{ appliedFailed\+\+; continue; \}/.test(gs13) && /if \(appliedFailed\) out\.applied_failed = appliedFailed;/.test(gs13)
+    && /'DROP_ROLLBACK_FAILED'/.test(gs13) && /data: buf\.toString\('base64'\) \}\);\n  if \(!fw\.ok\) \{/.test(gs13) && !/data: d\.b64\.replace/.test(gs13));
+  const src13 = readFileSync(join(LIB, 'stmtmail.js'), 'utf8');
+  const MU13 = [
+    ['목록 줄 쓰기 결과 안 봄', "if (!wl || !wl.ok) {", 'if (false) {', (s, k, n) => s === 'st' && k.indexOf('stmtdrop:') === 0 && n === 2],
+    ['처리 표시 결과 안 봄', 'if (!ws || !ws.ok) {', 'if (false) {', (s, k) => s === 'st' && k === M.SEEN],
+    ['되돌림 결과 안 봄', "if (!dl || dl.ok === false) { sum.ok = false;", 'if (false) { sum.ok = false;', (s, k) => (s === 'fst' && k.indexOf('stmtfile:') === 0) || s === 'del'],
+    ['셈을 쓰기 전에', "if (e.state === 'read') { sum.read++; if (ai) sum.ai++; }", "if (false) {}", (s, k, n) => false],
+  ];
+  const c13 = [];
+  for (const [nm, a1, b1, fw] of MU13) {
+    if (src13.indexOf(a1) < 0) { c13.push(nm + ':원문없음'); continue; }
+    let good = false;
+    try {
+      const mm = { exports: {} };
+      new Function('module', 'exports', 'require', src13.split(a1).join(b1))(mm, mm.exports, (p) => require(p.indexOf('./') === 0 ? join(LIB, p.slice(2)) : p));
+      const x = await run13(mm.exports, fw);
+      good = nm === '셈을 쓰기 전에' ? x.r.read === 1 : x.r.ok === false;
+    } catch (e) { good = false; }
+    if (good) c13.push(nm);
+  }
+  T('⑬ 결함 사본 ' + MU13.length + '개(목록 줄 쓰기·처리 표시·되돌림·셈) = 모두 ✗', c13.length === 0, J(c13));
+}
 RD.readByAi = realAi;
 console.log('\n' + (fail ? '✗ ' : '✓ ') + pass + ' pass, ' + fail + ' fail');
 process.exit(fail ? 1 : 0);
