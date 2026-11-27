@@ -13157,7 +13157,7 @@
     var arr=c.attachments[key];
     if(arr && i>=0 && i<arr.length){
       var att=arr[i];
-      var drop=function(){ var a2=c.attachments&&c.attachments[key], j=a2?a2.indexOf(att):-1; if(j>=0){ a2.splice(j,1); if(!a2.length) delete c.attachments[key]; } scheduleContractSave(); renderContracts(); };
+      var drop=function(){ var c2=findProc(conId)||c, a2=c2.attachments&&c2.attachments[key], j=a2?a2.map(function(x){ return x&&x.id; }).indexOf(att.id||null):-1; if(j<0&&a2) j=a2.indexOf(att); if(j>=0){ a2.splice(j,1); if(!a2.length) delete c2.attachments[key]; } scheduleContractSave(); renderContracts(); };   // 기다리는 사이 동기화로 계약 객체가 바뀌었을 수 있어 지금 것을 다시 찾음
       // C327 ①: 서버가 지운 뒤에만 목록에서 뺀다(종전엔 결과를 안 보고 먼저 빼 서버 파일이 남아도 지운 것처럼 보임)
       if(!att.id){ drop(); return; }
       gwCall("gw-data", { action:"att_del", id:att.id }).then(function(res){
@@ -14471,7 +14471,7 @@
       Array.prototype.forEach.call(host.querySelectorAll("[data-proof-del]"),function(el){
         el.addEventListener("click",function(){
           if(!confirm("증빙 삭제: "+el.getAttribute("data-proof-del")+" — 맞습니까?")) return;
-          gwCall("gw-data",{action:"proof_del", name:el.getAttribute("data-proof-del")}).then(function(res){ if(!res || res.status!==200) alert("삭제 실패 (" + ((res && res.body && res.body.error_code) || (res && res.status)) + ")"); proofRefresh(); }).catch(function(){ alert("삭제 실패 (네트워크)"); proofRefresh(); });   // C327 ③: 종전엔 응답을 안 보고 다시 읽기만
+          gwCall("gw-data",{action:"proof_del", name:el.getAttribute("data-proof-del")}).then(function(res){ if(!res || res.status!==200) alert("삭제 실패 (" + ((res && res.body && res.body.error_code) || (res && res.status)) + ")"); proofRefresh(); }).catch(function(){ alert("첨부 삭제 실패(네트워크)"); proofRefresh(); });   // C327 ③: 종전엔 응답을 안 보고 다시 읽기만
         });
       });
     }).catch(function(){ host.innerHTML='<span style="color:#c0392b;">목록 불러오기 실패</span>'; });
