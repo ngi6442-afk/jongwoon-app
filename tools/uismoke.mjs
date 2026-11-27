@@ -24962,8 +24962,8 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), op = cb.filter((l) => /^- \[ \] \(AI 운영 확인/.test(l));
     const FT = ['`handleLogin`', '`lock:<입력>`', '`lockm:<회원id>`', '`STORAGE_WRITE_FAILED`', '원장 C238'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v567 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
-      && d.cl.indexOf('**C238(v567') > 0 && /SHELL_CACHE = 'jw-shell-v567'/.test(d.sw);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 567 && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C238(v567') > 0 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 567;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
   };
   const r567 = chk567(D567);
@@ -24973,6 +24973,33 @@ try {
   T('v567 C238 판 A 문서·판 번호(정확 검사): FEATURES 기준 v567·v567 절(낱말 5) · TESTLIST v567 칸 3 · CLAUDE.md 한 줄 · sw jw-shell-v567 · 결함 사본 ' + M567.length + '개 = 모두 ✗',
     r567.ok && M567.every((v) => v === false), JSON.stringify({ r: r567.info, mut: M567 }));
 } catch (e) { console.log('  (v567 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v568(C240 판 A-2a — 휴가 읽기 가림·저장 가드 · 원장 C240): 실행 검사는 servertest 'C240 A-2a' · 여기는 앱 표 대조 + 문서·판 번호 정확 검사
+try {
+  const rd568 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D568 = { ft: rd568('FEATURES.md'), tl: rd568('TESTLIST.md'), sw: rd568('sw.js'), cl: rd568('CLAUDE.md') };
+  // 앱 LEAVE_PARTIAL 키 = 서버 leaveguard LEAVE_PARTIAL 키(남의 줄로 내려 주는 반차 종류가 앱 표와 같게)
+  const ix568 = rd568('index.html'), lg568 = rd568('netlify/functions/_lib/leaveguard.js');
+  const keys568 = (s, re) => { const mm = s.match(re); return mm ? (mm[1].match(/[a-z_]+(?=\s*:)/g) || []).sort().join(',') : ''; };
+  const kA568 = keys568(ix568, /var LEAVE_PARTIAL\s*=\s*\{([^}]*)\}/), kS568 = keys568(lg568, /const LEAVE_PARTIAL = \{([^}]*)\}/);
+  const chk568 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v568 (11/27)', '\n### '), tlv = cut(d.tl, '\n## v568 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ['`_view`', '원장 C240', '`leave_kept`'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v568 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C240 A-2a(v568') > 0
+      && /SHELL_CACHE = 'jw-shell-v568'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r568 = chk568(D568);
+  const mu568 = (k, f) => chk568(Object.assign({}, D568, { [k]: f(D568[k]) })).ok;
+  const M568 = [mu568('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v567 (')), mu568('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v567'")),
+    mu568('cl', (s) => s.replace('**C240 A-2a(v568', 'C240 A-2a(')), mu568('ft', (s) => s.split('`leave_kept`').join('leave_kept'))];
+  T('v568 앱 휴가 반차 표 = 서버 leaveguard 표(' + kA568 + ') · 문서·판 번호(정확 검사): FEATURES 기준 v568 (2026-11-27)·v568 절(C240 A-2a) · TESTLIST v568 칸 4(시험 화면 1 · 운영 확인 1 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v568 · 결함 사본(기준 줄·sw·CLAUDE.md·FEATURES 낱말) 모두 ✗',
+    kA568 !== '' && kA568 === kS568 && r568.ok && M568.every((v) => v === false), JSON.stringify({ kA: kA568, kS: kS568, r: r568.info, mut: M568 }));
+} catch (e) { console.log('  (v568 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
