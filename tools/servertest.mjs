@@ -18766,7 +18766,7 @@ function J91a(x) { return JSON.stringify(x); }
       // ⑦-2 att_del — 조각 실패 때 판독값은 이미 지워짐(종전과 같음) · 서류함 표식 지우기 실패 → 500 · 본 레코드 남음
       reset(); blobsMock.hooks.failDel = (k) => k === 'attp:att_c238x:0'; const r72 = await c({ action: 'att_del', id: 'att_c238x' }); const parseGone = !mem.gw_files['parse:att_c238x'] && !!mem.gw_files['att_c238x'];
       reset(); mem.gw_files['att_c238x'].kind = 'box'; mem.gw_files['boxp:att_c238x'] = { ts: 1 }; blobsMock.hooks.failDel = (k) => k === 'boxp:att_c238x'; const r73 = await c({ action: 'att_del', id: 'att_c238x' });
-      P.attBox = r72.code === 500 && parseGone && r73.code === 500 && !!mem.gw_files['att_c238x'] && !aud('첨부삭제'); I.attBox = [r72.code, parseGone, r73.code];
+      P.attBox = r72.code === 500 && parseGone && r73.code === 500 && !mem.gw_files['att_c238x'] && !!mem.gw_files['boxp:att_c238x'] && !aud('첨부삭제');   // C327 ①: 본 레코드가 표식보다 먼저 — 표식만 남음(box_pending이 스스로 정리) I.attBox = [r72.code, parseGone, r73.code];
       // ⑧ att_del — 판독값 지우기 실패 → 500 · 본 레코드 남음 / 본 레코드 지우기 실패 → 500
       reset(); blobsMock.hooks.failDel = (k) => k === 'parse:att_c238x'; r = await c({ action: 'att_del', id: 'att_c238x' });
       const p8 = r.code === 500 && !!mem.gw_files['att_c238x'] && !aud('첨부삭제');
@@ -19068,6 +19068,19 @@ function J91a(x) { return JSON.stringify(x); }
       const u1 = r.code === 400 && U()['uid:tq327id'] === 'utq327' && M().uid === 'tq327id';
       reset(); const r2 = await c({ action: 'member_upsert', id: 'utq327', uid_clear: true, pin: '1' });
       P.uid = u1 && r2.code === 400 && U()['uid:tq327id'] === 'utq327' && M().uid === 'tq327id'; I.uid = [r.code, r2.code];
+      // ④ 회원 삭제에서 색인 회수만 실패(500 deleted) → 남은 이름·아이디 색인이 지운 회원을 가리켜도 새 회원이 같은 이름·아이디를 받음(종전: NAME_TAKEN·UID_TAKEN으로 영영 점유)
+      reset(); blobsMock.hooks.failSet = (k) => k === 'name:대상327' || k === 'uid:tq327id';
+      const d4 = await c({ action: 'member_delete', id: 'utq327' }); blobsMock.hooks.failSet = null;
+      const left = U()['name:대상327'] === 'utq327' && U()['uid:tq327id'] === 'utq327' && M().del === 1;
+      const c4 = await c({ action: 'member_upsert', name: '대상327', role: '직원', pin: '482915', uid: 'tq327id' });
+      const nid = c4.body && c4.body.member && c4.body.member.id;
+      const live = mem.gw_users['member:udq327'] && mem.gw_users['member:udq327'].del !== 1;
+      const nIdx = U()['name:대상327'], uIdx = U()['uid:tq327id'];   // reset 앞에서 잡아 둠
+      reset(); mem.gw_users['member:utq327b'] = { id: 'utq327b', name: '산사람327', uid: 'sq327id', admin: false, perms: {} }; mem.gw_users['uid:sq327id'] = 'utq327b'; mem.gw_users['name:산사람327'] = 'utq327b';
+      const c4b = await c({ action: 'member_upsert', name: '산사람327', role: '직원', pin: '482915' }), c4c = await c({ action: 'member_upsert', id: 'utq327', uid: 'sq327id' });
+      P.freed = d4.code === 500 && d4.body.deleted === true && left && c4.code === 200 && !!nid && nIdx === nid && uIdx === nid && live
+        && c4b.code === 409 && c4b.body.error_code === 'NAME_TAKEN' && c4c.code === 409 && c4c.body.error_code === 'UID_TAKEN';
+      I.freed = [d4.code, d4.body.deleted, left, c4.code, c4.body.error_code, nid, nIdx, uIdx, live, c4b.code, c4b.body.error_code, c4c.code, c4c.body.error_code];
       // ③ 정상 이름·아이디 바꾸기 = 200 · 옛 색인 지워짐 · 새 색인
       reset(); const n1 = await c({ action: 'member_upsert', id: 'utq327', name: '대상327b', uid: 'tq327nw' });
       P.normal = n1.code === 200 && U()['name:대상327'] === undefined && U()['name:대상327b'] === 'utq327' && U()['uid:tq327id'] === undefined && U()['uid:tq327nw'] === 'utq327'; I.normal = [n1.code, n1.body.error_code];
@@ -19076,13 +19089,15 @@ function J91a(x) { return JSON.stringify(x); }
   };
   try {
     const Q0 = await chkQ(loadQ(SAQ));
-    T('C327 ⑤ 이름·아이디 바꾸기 + 뒤 검사 거절(약한 PIN 400) = 옛 이름·옛 아이디 색인·회원 문서 그대로(종전: 색인만 지워짐) · 정상 바꾸기 = 200·옛 색인 지움·새 색인', Q0.ok, JSON.stringify(Q0.info));
+    T('C327 ⑤ 이름·아이디 바꾸기 + 뒤 검사 거절(약한 PIN 400) = 옛 이름·옛 아이디 색인·회원 문서 그대로(종전: 색인만 지워짐) · ④ 삭제 뒤 남은 색인(지운 회원) = 새 회원이 같은 이름·아이디 받음 · 산 회원 색인은 그대로 NAME_TAKEN·UID_TAKEN · 정상 바꾸기 = 200·옛 색인 지움·새 색인', Q0.ok, JSON.stringify(Q0.info));
     const MQ = [["    if (nameChange) { idxDrop.push(nameKey(m.name)); m.name = name; }", "    if (nameChange) { await blobSet(st, nameKey(m.name), null); m.name = name; }"],
       ["    if (m.uid && normUid(m.uid) !== nu) idxDrop.push(uidKey(m.uid));", "    if (m.uid && normUid(m.uid) !== nu) await blobSet(st, uidKey(m.uid), null);"],
-      ["    if (m.uid) { idxDrop.push(uidKey(m.uid)); delete m.uid; }", "    if (m.uid) { await blobSet(st, uidKey(m.uid), null); delete m.uid; }"]];
+      ["    if (m.uid) { idxDrop.push(uidKey(m.uid)); delete m.uid; }", "    if (m.uid) { await blobSet(st, uidKey(m.uid), null); delete m.uid; }"],
+      ["  return (r.ok && r.data && r.data.del !== 1) ? 'taken' : 'free';", "  return 'taken';"],   // ④ 지운 회원 색인도 점유로
+      ["  if (!holderId || holderId === selfId) return 'free';", "  if (!holderId || holderId === selfId) return 'free'; return 'free';"]];   // ④ 산 회원 색인도 비어 있음으로(남의 이름 가로채기)
     const kill = [];
     for (const [a, b] of MQ) { let k; try { if (SAQ.split(a).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + a.slice(0, 40)); k = !(await chkQ(loadQ(SAQ.replace(a, () => b)))).ok; } catch (e) { k = 'err ' + e.message; } if (k !== true) kill.push(a.trim().slice(0, 40) + (k === false ? ' 안 깨짐' : ' ' + k)); }
-    T('C327 ⑤ 결함 사본 ' + MQ.length + '개(옛 이름·옛 아이디·아이디 회수 색인을 검사 앞에서 바로 지움) 모두 잡힘', kill.length === 0, kill.join(' | '));
+    T('C327 ⑤ 결함 사본 ' + MQ.length + '개(옛 이름·옛 아이디·아이디 회수 색인을 검사 앞에서 바로 지움 · ④ 지운 회원 색인도 점유 · 산 회원 색인도 빈 것으로) 모두 잡힘', kill.length === 0, kill.join(' | '));
     // ⑥ 정적: autotask_ingest의 저장 뒤 알림 셋(일반 · 인허가 licDutyNotify · 실행기)은 모두 try 안 — 보내기 예외가 이미 저장된 받기를 500으로 바꾸지 않음
     const ingB = (() => { const i = SDQ.indexOf('async function handleAutotaskIngest('); const j = SDQ.indexOf('\nasync function ', i + 10); return SDQ.slice(i, j); })();
     const six = (src) => /\{ try \{ licSent = await licDutyNotify\(/.test(src) && /\{ try \{ srvSent = await notifyAutoCreated\(/.test(src) && /\{ try \{ notified = await notifyAutoCreated\(/.test(src);

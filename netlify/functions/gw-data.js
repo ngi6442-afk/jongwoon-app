@@ -6046,8 +6046,8 @@ async function handleAttDel(event, d, R) {
   const ADF = (x) => jr(500, { status: 'ERROR', error_code: x || 'STORAGE_DELETE_FAILED', request_id: R });
   { const pd2 = await blobDelete(store(FILES), 'parse:' + String(d.id || '')); if (!pd2.ok) return ADF(pd2.code); }   // 판독값(개인정보 판독 값이 들 수 있음)을 맨 먼저 — 뒤에서 막혀도 판독값은 종전처럼 지워져 있게(좁은 확인 11/27) · 본 레코드는 맨 끝(남아 있어야 다시 할 수 있음)
   if (am0.ok && am0.data && am0.data.parts) { const pd = await BF.attDeleteParts(store(FILES), String(d.id || ''), am0.data); if (!pd.ok) return ADF(pd.code); }
+  { const rd = await blobDelete(store(FILES), String(d.id || '')); if (!rd.ok) return ADF(rd.code); }   // C327 ①: 본 레코드를 서류함 표식보다 먼저(표식만 먼저 지워지고 본 레코드가 남으면 넣기 박스 목록에서 사라진 고아가 됨 · 본 레코드가 없는 표식은 box_pending이 스스로 정리)
   if (am0.ok && am0.data && am0.data.kind === 'box') { const md = await blobDelete(store(FILES), boxMarkKey(String(d.id || ''))); if (!md.ok) return ADF(md.code); }
-  { const rd = await blobDelete(store(FILES), String(d.id || '')); if (!rd.ok) return ADF(rd.code); }
   // v353: 가린 판·상태 동반 삭제 — 실패를 삼키지 않는다(고아 mask가 att_get으로 되살아나지 않게 감사에 남긴다)
   for (const k of ['mask:' + String(d.id || ''), 'maskmeta:' + String(d.id || '')]) {
     try { const dr = await blobDelete(store(FILES), k); if (dr && dr.ok === false) throw new Error(dr.code || 'DELETE_FAILED'); }

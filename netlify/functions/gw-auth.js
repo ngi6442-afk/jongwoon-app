@@ -362,7 +362,7 @@ async function handleMemberUpsert(st, event, d, R) {
     if (allBefore.some(function (x) { return x && x.id !== m.id && cleanText(x.name).toLowerCase() === lower; })) return jr(409, { status: 'REJECTED', error_code: 'NAME_TAKEN', request_id: R });
     const ix = await blobGet(st, nameKey(name));
     if (!ix.ok && ix.code !== 'NOT_FOUND') return MEMBERS_FAIL(R);   // C225 판 A
-    if (ix.ok && ix.data && ix.data !== m.id) return jr(409, { status: 'REJECTED', error_code: 'NAME_TAKEN', request_id: R });
+    if (ix.ok && ix.data && ix.data !== m.id) { const h = await idxHolder(st, ix.data, m.id); if (h === 'fail') return MEMBERS_FAIL(R); if (h === 'taken') return jr(409, { status: 'REJECTED', error_code: 'NAME_TAKEN', request_id: R }); }   // C327 ④: 지운 회원을 가리키는 남은 색인은 비어 있음(새 색인이 덮어씀)
   }
   const idxDrop = [];   // C327 ⑤(11/27): 옛 이름·옛 아이디 색인 지우기는 모든 검사(LAST_DEV·등급·아이디 중복·약한 PIN·LAST_PM) 뒤, 회원 문서 쓰기 바로 앞에서 — 종전엔 먼저 지워 뒤 검사로 거절(409·400·403)되면 색인만 지워진 채 남음
   if (!isNew) {
@@ -575,13 +575,21 @@ async function handleSetUid(st, event, d, R) {
 }
 
 // 아이디 중복 검사. 남의 아이디는 물론 **남의 이름과도 겹치면 거부** — 이사 기간에 이름 로그인을 가로채는 것을 막는다.
+// C327 ④(11/27): 색인이 가리키는 회원이 지운 회원(del 1)이거나 없으면 '비어 있음' — 회원 삭제에서 색인 회수만 실패하면(C238 판 B 500 deleted) 그 이름·아이디가 영영 점유되던 것.
+//   'free' | 'taken' | 'fail'(회원 레코드를 못 읽음 — 부르는 쪽 500)
+async function idxHolder(st, holderId, selfId) {
+  if (!holderId || holderId === selfId) return 'free';
+  const r = await blobGet(st, memberKey(holderId));
+  if (!r.ok && r.code !== 'NOT_FOUND') return 'fail';
+  return (r.ok && r.data && r.data.del !== 1) ? 'taken' : 'free';
+}
 async function uidTaken(st, uid, selfId) {
   const hit = await blobGet(st, uidKey(uid));
   if (!hit.ok && hit.code !== 'NOT_FOUND') return 'MEMBERS_READ_FAILED';   // C225 판 A: 못 읽은 색인을 '비어 있음'으로 보지 않음(부르는 쪽 500)
-  if (hit.ok && hit.data && hit.data !== selfId) return 'UID_TAKEN';
+  if (hit.ok && hit.data && hit.data !== selfId) { const h = await idxHolder(st, hit.data, selfId); if (h === 'fail') return 'MEMBERS_READ_FAILED'; if (h === 'taken') return 'UID_TAKEN'; }   // C327 ④
   const nm = await blobGet(st, nameKey(uid));
   if (!nm.ok && nm.code !== 'NOT_FOUND') return 'MEMBERS_READ_FAILED';   // C225 판 A
-  if (nm.ok && nm.data && nm.data !== selfId) return 'UID_TAKEN';
+  if (nm.ok && nm.data && nm.data !== selfId) { const h = await idxHolder(st, nm.data, selfId); if (h === 'fail') return 'MEMBERS_READ_FAILED'; if (h === 'taken') return 'UID_TAKEN'; }   // C327 ④
   return null;
 }
 
