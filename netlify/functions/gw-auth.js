@@ -365,7 +365,7 @@ async function handleMemberUpsert(st, event, d, R) {
     if (ix.ok && ix.data && ix.data !== m.id) return jr(409, { status: 'REJECTED', error_code: 'NAME_TAKEN', request_id: R });
   }
   if (!isNew) {
-    if (nameChange) { await blobSet(st, nameKey(m.name), null); m.name = name; }
+    if (nameChange) { const wn = await blobSet(st, nameKey(m.name), null); if (!wn.ok) return jr(500, { status: 'ERROR', error_code: wn.code || 'STORAGE_WRITE_FAILED', request_id: R }); m.name = name; }   // C238 판 B: 옛 이름 색인을 못 지우면 회원 문서를 쓰기 전에 500(옛 이름이 이 계정을 계속 가리키던 것 — 표 gw-auth.js:360)
     if (roleNew !== undefined) m.role = roleNew;
     if (d.admin !== undefined) m.admin = !!d.admin;
     if (d.dev !== undefined) {
@@ -398,13 +398,13 @@ async function handleMemberUpsert(st, event, d, R) {
   // 아이디 칸을 비운 채 저장하면 로그인 아이디가 통째로 날아갔다(2026-08-11 PM 실제 사고).
   // 아이디를 정말 회수할 때만 uid_clear:true를 명시한다.
   if (d.uid_clear === true) {
-    if (m.uid) { await blobSet(st, uidKey(m.uid), null); delete m.uid; }
+    if (m.uid) { const wu = await blobSet(st, uidKey(m.uid), null); if (!wu.ok) return jr(500, { status: 'ERROR', error_code: wu.code || 'STORAGE_WRITE_FAILED', request_id: R }); delete m.uid; }   // C238 판 B: 회수 결과를 봄(표 gw-auth.js:393)
   } else if (d.uid !== undefined && normUid(d.uid) !== '') {
     const nu = normUid(d.uid);
     if (!validUid(nu)) return jr(400, { status: 'REJECTED', error_code: 'INVALID_UID', request_id: R });
     const dup = await uidTaken(st, nu, m.id);
     if (dup) return dup === 'MEMBERS_READ_FAILED' ? MEMBERS_FAIL(R) : jr(409, { status: 'REJECTED', error_code: dup, request_id: R });
-    if (m.uid && normUid(m.uid) !== nu) await blobSet(st, uidKey(m.uid), null);
+    if (m.uid && normUid(m.uid) !== nu) { const wu = await blobSet(st, uidKey(m.uid), null); if (!wu.ok) return jr(500, { status: 'ERROR', error_code: wu.code || 'STORAGE_WRITE_FAILED', request_id: R }); }   // C238 판 B: 옛 아이디 색인 회수 결과를 봄(표 gw-auth.js:393)
     m.uid = nu;
   }
   if (d.rank !== undefined) m.rank = String(d.rank || '');
@@ -460,8 +460,9 @@ async function handleMemberUpsert(st, event, d, R) {
   if (pmLost(tcBefore, allAfter)) return jr(409, { status: 'REJECTED', error_code: 'LAST_PM', request_id: R });
   const w1 = await blobSet(st, memberKey(m.id), m);
   const w2 = await blobSet(st, nameKey(m.name), m.id);
-  if (m.uid) await blobSet(st, uidKey(m.uid), m.id);   // 아이디 색인 유지
+  const w3 = m.uid ? await blobSet(st, uidKey(m.uid), m.id) : { ok: true };   // 아이디 색인 유지 · C238 판 B: 결과를 봄(못 쓰면 아이디 로그인이 안 되는데 200이던 것 — 같은 저장을 다시 하면 이 줄이 다시 씀)
   if (!w1.ok || !w2.ok) return jr(500, { status: 'ERROR', error_code: 'STORAGE_WRITE_FAILED', request_id: R });
+  // C238 판 B 검토: 아이디 색인만 못 썼으면 회원 문서는 이미 저장됨 — 감사는 남기고 끝에서 500(다시 저장하면 바뀐 칸이 없어 감사가 영영 빠지던 것을 막음)
   // 감사 로그: 회원 필드 변경(이전값→새값). PIN은 값 미기록('변경'만), 해시·비밀값 제외.
   try {
     const f = {};
@@ -498,6 +499,7 @@ async function handleMemberUpsert(st, event, d, R) {
     if (tierBefore !== tierAfter)
       await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'member', ev: [{ op: '등급변경', id: m.id, t: m.name + ' ' + (tierBefore || '없음') + '→' + (tierAfter || '없음') + (tier.validTier(m.tier) ? '' : ' (파생값)') }] });
   } catch (e) {}
+  if (!w3.ok) return jr(500, { status: 'ERROR', error_code: w3.code || 'STORAGE_WRITE_FAILED', request_id: R });   // C238 판 B: 아이디 색인 못 씀(같은 저장을 다시 하면 씀)
   return jr(200, { status: 'OK', member: safeMember(m), request_id: R });
 }
 
@@ -521,9 +523,14 @@ async function handleMemberDelete(st, event, d, R) {
   if (r.ok && r.data && pmLost(tier.ctxOf(all), all.filter(function (x) { return x && x.id !== d.id; }))) return jr(409, { status: 'REJECTED', error_code: 'LAST_PM', request_id: R });
   if (r.ok && r.data) {
     r.data.del = 1; r.data.updated = Date.now();
-    await blobSet(st, memberKey(d.id), r.data); await blobSet(st, nameKey(r.data.name), null);
-    if (r.data.uid) await blobSet(st, uidKey(r.data.uid), null);   // 아이디 색인도 회수 — 안 지우면 그 아이디가 영구 점유된다
-    try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'member', ev: [{ op: '삭제', id: d.id, t: r.data.name }] }); } catch (e) {}
+    // C238 판 B(재현 D): 회원 문서 쓰기가 실패해도 색인만 지우고 감사 '삭제' + 200이던 것(로그인 못 하는데 명부엔 남음) → 회원 문서를 못 쓰면 색인·감사 없이 500
+    const wm = await blobSet(st, memberKey(d.id), r.data);
+    if (!wm.ok) return jr(500, { status: 'ERROR', error_code: wm.code || 'STORAGE_WRITE_FAILED', request_id: R });
+    const wn = await blobSet(st, nameKey(r.data.name), null);
+    const wu = r.data.uid ? await blobSet(st, uidKey(r.data.uid), null) : { ok: true };   // 아이디 색인도 회수 — 안 지우면 그 아이디가 영구 점유된다
+    try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'member', ev: [{ op: '삭제', id: d.id, t: r.data.name }] }); } catch (e) {}   // 회원 문서는 지워짐(del 1) — 감사는 남김
+    // 색인 회수가 실패하면 500(삭제는 됐고 색인만 남음 — 같은 삭제를 다시 하면 회수를 다시 함)
+    if (!wn.ok || !wu.ok) return jr(500, { status: 'ERROR', error_code: (!wn.ok ? wn.code : wu.code) || 'STORAGE_WRITE_FAILED', deleted: true, request_id: R });
   }
   return jr(200, { status: 'OK', request_id: R });
 }
@@ -639,12 +646,13 @@ async function handleDeviceSet(st, event, d, R, status) {
 async function handleReset(R) {
   if (process.env.GW_ALLOW_RESET !== '1') return jr(403, { status: 'FORBIDDEN', error_code: 'RESET_DISABLED', request_id: R });
   const { blobDelete } = require('./_lib/blobs');
-  let n = 0;
+  let n = 0, bad = 0;
   for (const storeName of [USERS, 'gw_data']) {
     const st = store(storeName);
     const { blobs } = await st.list();
-    for (const b of (blobs || [])) { await blobDelete(st, b.key); n++; }
+    for (const b of (blobs || [])) { const r = await blobDelete(st, b.key); if (r && r.ok) n++; else bad++; }   // C238 판 B: 지우기 결과를 셈(표 gw-auth.js:630)
   }
+  if (bad) return jr(500, { status: 'ERROR', error_code: 'STORAGE_DELETE_FAILED', deleted: n, failed: bad, request_id: R });
   return jr(200, { status: 'OK', deleted: n, request_id: R });
 }
 

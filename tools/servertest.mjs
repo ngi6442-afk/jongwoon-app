@@ -6738,7 +6738,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     // ①-4 시험 계정 표식은 관리자만 — 비관리자(안전 수행이어도)의 회원 저장은 종전대로 403 ADMIN_ONLY·표식 그대로 · 서버 코드는 칸 앞(이름 색인 지우기보다 먼저)에서 관리자 검사
     const t84 = await callA84({ action: 'member_upsert', id: 'uw84', test_acct: true }, tokW84);
     const src84 = require('fs').readFileSync(join(FN, 'gw-auth.js'), 'utf8');
-    const iChk84 = src84.indexOf("if (d.test_acct !== undefined && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });"), iCorp84 = src84.indexOf("error_code: 'BAD_CORP'"), iName84 = src84.indexOf('if (nameChange) { await blobSet(st, nameKey(m.name), null); m.name = name; }');
+    const iChk84 = src84.indexOf("if (d.test_acct !== undefined && !c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });"), iCorp84 = src84.indexOf("error_code: 'BAD_CORP'"), iName84 = src84.indexOf('if (nameChange) { const wn = await blobSet(st, nameKey(m.name), null);')   /* C238 판 B: 옛 이름 색인 지우기 결과를 보는 꼴로 */;
     T('84 v447 ①-4 시험 계정 표식은 관리자만: 비관리자(안전 수행) 저장 = 403 ADMIN_ONLY·표식 없음 그대로 · 서버 검사(관리자·BAD_CORP)는 이름 색인 지우기보다 앞 · AUD_FIELDS에 네 칸',
       t84.code === 403 && t84.body.error_code === 'ADMIN_ONLY' && !('test_acct' in u84()) && iChk84 > 0 && iCorp84 > 0 && iName84 > 0 && iChk84 < iName84 && iCorp84 < iName84
       && /const AUD_FIELDS = \[[^\]]*'office','supervisor','corp','test_acct','quals'\]/.test(src84), JSON.stringify({ code: t84.code, ec: t84.body.error_code, iChk84, iCorp84, iName84 }));
@@ -12813,6 +12813,91 @@ function J91a(x) { return JSON.stringify(x); }
     for (const [from, to] of MUT238) { let k; try { k = !(await chkA238(loadA238(mutA238(from, to)))).ok; } catch (e) { k = 'err ' + e.message; } if (k !== true) kill.push(from.trim().slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k)); }
     T('C238 판 A 결함 사본 ' + MUT238.length + '개(입력 칸 못 읽음 통과 · 회원 칸 못 읽음 통과 · 실패 수 쓰기 결과 안 봄 · 회원 칸 쓰기 결과만 안 봄) 모두 잡힘', kill.length === 0, kill.join(' | '));
   } catch (e) { T('C238 판 A 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+}
+
+{ // ---- C238 판 B(11/27) 회원·계정 색인 쓰기 결과(표 gw-auth.js:360·393·399·508·630 · 실 저장소 재현 = 09_조사_문서\서버읽기실패_자료_20261120\C238_판B_1127\h2.cjs)
+  //   거절: 회원 삭제 회원 문서 못 씀 = 500·색인·감사 그대로 · 삭제 색인 못 지움 = 500 deleted(다시 삭제하면 회수) · 이름 바꾸기 옛 이름 색인 못 지움 = 500·아무것도 안 바뀜 ·
+  //         아이디 바꾸기 옛 색인 못 지움 = 500 · 새 아이디 색인 못 씀 = 500(다시 저장하면 씀) · 아이디 회수 못 지움 = 500 · 초기화 지우기 실패 = 500 failed
+  //   허용: 정상 삭제·이름·아이디 바꾸기 = 200·종전 저장. 결함 사본 = 고친 일곱 곳을 하나씩 되돌림 → 실패해야 한다.
+  const fsB238 = require('fs'), ModB238 = require('module');
+  const FAUTHB = join(FN, 'gw-auth.js'), SAUTHB = fsB238.readFileSync(FAUTHB, 'utf8');
+  const loadB238 = (src) => { const m = new ModB238(FAUTHB); m.filename = FAUTHB; m.paths = ModB238._nodeModulePaths(dirname(FAUTHB)); m._compile(src, FAUTHB); return m.exports; };
+  const mutB238 = (from, to) => { if (SAUTHB.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return SAUTHB.replace(from, () => to); };
+  const callB238 = (mod) => async (body, tok) => { const r = await mod.handler({ httpMethod: 'POST', headers: Object.assign({ 'x-device-id': 'devb238' }, tok ? { authorization: 'Bearer ' + tok } : {}), body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+  const snapB238 = JSON.stringify({ u: mem.gw_users || {}, d: mem.gw_data || {} });
+  const DEVB = { id: 'ud238', name: '개발238', uid: 'dv238id', admin: true, dev: true, tier: 'pm', perms: {} };
+  const TGB = { id: 'ut238', name: '대상238', uid: 'tg238id', admin: false, perms: {} };
+  const tokB238 = issueSession(DEVB).token;
+  const chkB238 = async (mod) => {
+    const c = callB238(mod), P = {}, I = {};
+    const U = () => mem.gw_users, M = () => mem.gw_users['member:ut238'] || {};
+    const reset = () => { const s = JSON.parse(snapB238); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failSet = null; blobsMock.hooks.failDel = null;
+      mem.gw_users['member:ud238'] = JSON.parse(JSON.stringify(DEVB)); mem.gw_users['uid:dv238id'] = 'ud238'; mem.gw_users['name:개발238'] = 'ud238';
+      mem.gw_users['member:ut238'] = JSON.parse(JSON.stringify(TGB)); mem.gw_users['uid:tg238id'] = 'ut238'; mem.gw_users['name:대상238'] = 'ut238';
+      ['uid:tg238nw', 'name:대상238b'].forEach((k) => { delete mem.gw_users[k]; }); mem.gw_users['device:devb238'] = { id: 'devb238', status: 'approved' }; auditMock.logs.length = 0; };
+    const failW = (k) => { blobsMock.hooks.failSet = (x) => x === k; };
+    const audDel = () => JSON.stringify(auditMock.logs.filter((l) => l && l.col === 'member')).indexOf('ut238') >= 0;   // 이 시험 틀의 감사는 auditMock
+    try {
+      // ① 회원 삭제 — 회원 문서 쓰기 실패
+      reset(); const a0 = audDel(); failW('member:ut238');
+      let r = await c({ action: 'member_delete', id: 'ut238' }, tokB238);
+      P.delMem = r.code === 500 && M().del === undefined && U()['name:대상238'] === 'ut238' && U()['uid:tg238id'] === 'ut238' && audDel() === a0; I.delMem = [r.code, r.body.error_code, M().del];
+      // ② 회원 삭제 — 이름 색인 못 지움 → 500 deleted → 다시 삭제 200·회수
+      reset(); failW('name:대상238');
+      r = await c({ action: 'member_delete', id: 'ut238' }, tokB238); blobsMock.hooks.failSet = null;
+      const r2 = await c({ action: 'member_delete', id: 'ut238' }, tokB238);
+      P.delIdx = r.code === 500 && r.body.deleted === true && r2.code === 200 && M().del === 1 && U()['name:대상238'] === undefined && U()['uid:tg238id'] === undefined; I.delIdx = [r.code, r.body.deleted, r2.code];
+      // ③ 이름 바꾸기 — 옛 이름 색인 못 지움 → 500 · 회원 이름·두 색인 그대로
+      reset(); failW('name:대상238');
+      r = await c({ action: 'member_upsert', id: 'ut238', name: '대상238b' }, tokB238);
+      P.rename = r.code === 500 && M().name === '대상238' && U()['name:대상238'] === 'ut238' && U()['name:대상238b'] === undefined; I.rename = [r.code, M().name];
+      // ④ 아이디 바꾸기 — 옛 아이디 색인 못 지움 → 500 · 그대로
+      reset(); failW('uid:tg238id');
+      r = await c({ action: 'member_upsert', id: 'ut238', uid: 'tg238nw' }, tokB238);
+      P.uidOld = r.code === 500 && M().uid === 'tg238id' && U()['uid:tg238nw'] === undefined; I.uidOld = [r.code, M().uid];
+      // ⑤ 아이디 바꾸기 — 새 아이디 색인 못 씀 → 500 → 같은 저장 다시 200·색인 씀
+      reset(); failW('uid:tg238nw');
+      r = await c({ action: 'member_upsert', id: 'ut238', uid: 'tg238nw' }, tokB238); blobsMock.hooks.failSet = null; const aud5 = audDel();
+      const r5 = await c({ action: 'member_upsert', id: 'ut238', uid: 'tg238nw' }, tokB238);
+      P.uidNew = r.code === 500 && aud5 && r5.code === 200 && U()['uid:tg238nw'] === 'ut238' && M().uid === 'tg238nw'; I.uidNew = [r.code, r5.code];
+      // ⑥ 아이디 회수 — 색인 못 지움 → 500 · 회원 아이디 그대로
+      reset(); failW('uid:tg238id');
+      r = await c({ action: 'member_upsert', id: 'ut238', uid_clear: true }, tokB238);
+      P.uidClr = r.code === 500 && M().uid === 'tg238id' && U()['uid:tg238id'] === 'ut238'; I.uidClr = [r.code, M().uid];
+      // ⑦ 초기화(스위치 켬) — 한 열쇠 지우기 실패 → 500 failed 1
+      reset(); process.env.GW_ALLOW_RESET = '1'; blobsMock.hooks.failDel = (k) => k === 'member:ut238';
+      try { r = await c({ action: 'reset' }); } finally { delete process.env.GW_ALLOW_RESET; blobsMock.hooks.failDel = null; }
+      P.reset = r.code === 500 && r.body.failed === 1 && r.body.error_code === 'STORAGE_DELETE_FAILED'; I.reset = [r.code, r.body.failed];
+      // ⑧ 허용(정상 무변): 이름 바꾸기 · 아이디 바꾸기 · 아이디 회수 · 삭제 = 200·종전 저장·감사
+      reset(); const n1 = await c({ action: 'member_upsert', id: 'ut238', name: '대상238b' }, tokB238);
+      const okN = n1.code === 200 && M().name === '대상238b' && U()['name:대상238'] === undefined && U()['name:대상238b'] === 'ut238';
+      const u1 = await c({ action: 'member_upsert', id: 'ut238', uid: 'tg238nw' }, tokB238);
+      const okU = u1.code === 200 && M().uid === 'tg238nw' && U()['uid:tg238id'] === undefined && U()['uid:tg238nw'] === 'ut238';
+      const u2 = await c({ action: 'member_upsert', id: 'ut238', uid_clear: true }, tokB238);
+      const okC = u2.code === 200 && !M().uid && U()['uid:tg238nw'] === undefined;
+      reset(); const d1 = await c({ action: 'member_delete', id: 'ut238' }, tokB238);
+      const okD = d1.code === 200 && M().del === 1 && U()['name:대상238'] === undefined && U()['uid:tg238id'] === undefined && audDel();
+      P.normal = okN && okU && okC && okD; I.normal = [n1.code, u1.code, u2.code, d1.code, okN, okU, okC, okD];
+    } finally { const s = JSON.parse(snapB238); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failSet = null; blobsMock.hooks.failDel = null; delete process.env.GW_ALLOW_RESET; }
+    return { ok: Object.values(P).every((v) => v === true), info: { P, I } };
+  };
+  try {
+    const B0 = await chkB238(loadB238(SAUTHB));
+    T('C238 판 B 회원·계정 색인 쓰기 결과: 삭제 회원 문서 못 씀 = 500·색인·감사 그대로 · 삭제 색인 못 지움 = 500 deleted → 다시 삭제로 회수 · 이름 바꾸기 옛 색인 못 지움 = 500·그대로 · 아이디 바꾸기 옛 색인 못 지움 = 500 · 새 색인 못 씀 = 500·감사는 남김 → 다시 저장으로 씀 · 회수 못 지움 = 500 · 초기화 지우기 실패 = 500 failed · 정상 이름·아이디·회수·삭제 = 200 무변', B0.ok, JSON.stringify(B0.info));
+    const MUTB = [
+      ["    if (!wm.ok) return jr(500,", "    if (false) return jr(500,"],
+      ["    if (!wn.ok || !wu.ok) return jr(500,", "    if (false) return jr(500,"],
+      ["if (!wn.ok) return jr(500, { status: 'ERROR', error_code: wn.code || 'STORAGE_WRITE_FAILED', request_id: R }); m.name = name;", "m.name = name;"],
+      ["if (!wu.ok) return jr(500, { status: 'ERROR', error_code: wu.code || 'STORAGE_WRITE_FAILED', request_id: R }); delete m.uid;", "delete m.uid;"],
+      ["const wu = await blobSet(st, uidKey(m.uid), null); if (!wu.ok) return jr(500, { status: 'ERROR', error_code: wu.code || 'STORAGE_WRITE_FAILED', request_id: R }); }   // C238 판 B: 옛 아이디", "await blobSet(st, uidKey(m.uid), null); }   // C238 판 B: 옛 아이디"],
+      ["  if (!w3.ok) return jr(500, { status: 'ERROR', error_code: w3.code", "  if (false) return jr(500, { status: 'ERROR', error_code: w3.code"],
+      ["  if (!w1.ok || !w2.ok) return jr(500, { status: 'ERROR', error_code: 'STORAGE_WRITE_FAILED', request_id: R });\n  // C238 판 B 검토", "  if (!w1.ok || !w2.ok) return jr(500, { status: 'ERROR', error_code: 'STORAGE_WRITE_FAILED', request_id: R });\n  if (!w3.ok) return jr(500, { status: 'ERROR', error_code: 'X', request_id: R });\n  // C238 판 B 검토"],   // 새 색인 실패 때 감사 건너뜀(검토 전 꼴)
+      ["  if (bad) return jr(500,", "  if (false) return jr(500,"],
+    ];
+    const kill = [];
+    for (const [from, to] of MUTB) { let k; try { k = !(await chkB238(loadB238(mutB238(from, to)))).ok; } catch (e) { k = 'err ' + e.message; } if (k !== true) kill.push(from.trim().slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k)); }
+    T('C238 판 B 결함 사본 ' + MUTB.length + '개(삭제 회원 문서 결과 · 삭제 색인 결과 · 옛 이름 색인 · 아이디 회수 · 옛 아이디 색인 · 새 아이디 색인 · 새 색인 실패 때 감사 건너뜀 · 초기화 지우기 수) 모두 잡힘', kill.length === 0, kill.join(' | '));
+  } catch (e) { T('C238 판 B 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
 }
 
 { // ---- P1 판24-② 재감사 작은 수리 묶음(C096) — 잠금 키 정규화(gw-auth) · 서류함 보관/현재 등급 검사·등급 낮추기 관리자만·zip 내부 검증 · 체크 감사 줄 바뀐 키 · 봇 키 비교 공용 · 알림함 1000건.
