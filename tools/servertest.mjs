@@ -18472,7 +18472,7 @@ function J91a(x) { return JSON.stringify(x); }
     // ⑤ 앱 — 대역이 leave_kept를 넘기고 doSaveLeaves가 다시 읽음(글 확인)
     const fsA2 = require('fs'); const ixA2 = fsA2.readFileSync(join(ROOT, 'index.html'), 'utf8');
     T('C240 A-2a ⑤ 앱: 저장 대역이 leave_kept를 넘김 · doSaveLeaves가 leave_kept면 알림 + loadLeaves',
-      /leave_kept: \(res\.body && Array\.isArray\(res\.body\.leave_kept\)\) \? res\.body\.leave_kept : null/.test(ixA2) && /json\.leave_kept && json\.leave_kept\.length\)\{ gwToast\("[^"]*", true\); if\(!leavesSaveTimer && Date\.now\(\)-\(window\._leaveKeptAt\|\|0\)>60000\)\{ window\._leaveKeptAt=Date\.now\(\); leavesPending=false; loadLeaves\(\); \}/.test(ixA2));
+      /leave_kept: \(res\.body && Array\.isArray\(res\.body\.leave_kept\)\) \? res\.body\.leave_kept : null/.test(ixA2) && /json\.leave_kept && json\.leave_kept\.length\)\{ gwToast\("[^"]*", true\); gwKeptReload\("_leaveKept", function\(\)\{ if\(leavesSaveTimer\) return false; leavesPending=false; loadLeaves\(\); \}\);/.test(ixA2) && /function gwKeptReload\(k, fn\)\{/.test(ixA2));
   } catch (e) { T('C240 A-2a 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
 }
 
@@ -18602,6 +18602,9 @@ function J91a(x) { return JSON.stringify(x); }
     T('C240 A-2b 숨김 계정 base 없이 빈 목록 저장 → 지시 5줄 그대로(빠진 줄 이월)', r.code === 200 && sv().length === 5, String(sv().length));
     put(); const dup = SEED(); dup.push(Object.assign(cp(dup[0]), { status: 'review' })); r = await save(dup, 'h');
     T('C240 A-2b 같은 id 둘째 줄 → 버림(k1 한 줄 · 진행) + task_kept', r.code === 200 && one('k1').length === 1 && one('k1')[0].status === 'open' && (r.body.task_kept || []).indexOf('k1') >= 0, JSON.stringify(r.body));
+    put(); mem.gw_data['col:tasks'].items.push({ id: 'k6', title: '가짜지시바', from_id: 'u2badm', from: '가짜관리삼', by: '가짜관리삼', who_id: 'u2bhid', who: '가짜숨김삼', status: 'open', del: 1, updated: '2026-11-22' });
+    r = await save(cp(sv()).map((x) => x.id === 'k6' ? Object.assign(x, { status: 'review', done_by: '가짜숨김삼', del: 0 }) : x), 'h');
+    T('C240 A-2b 숨김 계정 담당이 휴지통에 든 지시(del 1)를 [완료]·되살림 → 서버 원본(지움·진행) + task_kept [k6](좁은 확인)', r.code === 200 && one('k6')[0].del === 1 && one('k6')[0].status === 'open' && JSON.stringify(r.body.task_kept) === '[\"k6\"]', JSON.stringify(r.body));
     // 지시 수행 계정
     put(); r = await save(ed((x) => { if (x.id === 'k2') { x.status = 'done'; x.approved_by = '가짜관리삼'; x.approved_at = '2026-11-27'; } }), 'd');
     T('C240 A-2b 수행 계정이 지시자 아닌 지시를 바로 완료 → 상태 덩어리 서버 원본 + task_kept', r.code === 200 && one('k2')[0].status === 'open' && !one('k2')[0].approved_by && (r.body.task_kept || []).indexOf('k2') >= 0, JSON.stringify(r.body));
@@ -18620,7 +18623,7 @@ function J91a(x) { return JSON.stringify(x); }
     T('C240 A-2b 관리자 저장은 종전대로(뺀 줄 빠짐 · task_kept 없음)', r.code === 200 && one('k2').length === 0 && !('task_kept' in r.body), JSON.stringify(r.body));
     const fsB2 = require('fs'); const ixB2 = fsB2.readFileSync(join(ROOT, 'index.html'), 'utf8');
     T('C240 A-2b 앱: 저장 대역이 task_kept를 넘김 · doSaveTasks가 task_kept면 알림 + loadTasks(1분에 한 번)',
-      /task_kept: \(res\.body && Array\.isArray\(res\.body\.task_kept\)\) \? res\.body\.task_kept : null/.test(ixB2) && /json\.task_kept && json\.task_kept\.length\)\{ gwToast\("[^"]*", true\); if \(!tasksSaveTimer && Date\.now\(\) - \(window\._taskKeptAt \|\| 0\) > 60000\)\{ window\._taskKeptAt = Date\.now\(\); tasksPending = false; loadTasks\(\); \}/.test(ixB2));
+      /task_kept: \(res\.body && Array\.isArray\(res\.body\.task_kept\)\) \? res\.body\.task_kept : null/.test(ixB2) && /json\.task_kept && json\.task_kept\.length\)\{ gwToast\("[^"]*", true\); gwKeptReload\("_taskKept", function\(\)\{ if \(tasksSaveTimer\) return false; tasksPending = false; loadTasks\(\); \}\);/.test(ixB2));
   } catch (e) { T('C240 A-2b 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
 }
 

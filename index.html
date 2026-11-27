@@ -4561,6 +4561,14 @@
   }
   // 화면 알림(v331) — alert처럼 흐름을 막지 않되 저장 실패·되돌림은 반드시 눈에 띄게. 같은 문구가 연속으로 쌓이지 않게 타이머 하나만 쓴다.
   var gwToastTimer = null;
+  // C240 A-2b: 서버가 받지 않은 줄(leave_kept·task_kept) 뒤 다시 읽기 — 1분에 한 번까지(되풀이 막음) · 묶이면 남은 시간 뒤 한 번 예약(알림대로 화면이 서버 값으로 맞춰지게 — 좁은 확인)
+  //   fn이 false를 돌려주면(저장 타이머가 걸려 있음) 지금은 읽지 않음 — 다음 저장 응답이 다시 부름
+  function gwKeptReload(k, fn){
+    var w = window, at = w[k + "At"] || 0, left = 60000 - (Date.now() - at);
+    if (left <= 0){ if (fn() !== false) w[k + "At"] = Date.now(); return; }
+    if (w[k + "T"]) return;
+    w[k + "T"] = setTimeout(function(){ w[k + "T"] = null; if (fn() !== false) w[k + "At"] = Date.now(); }, left);
+  }
   function gwToast(msg, warn, ms){
     var el = document.getElementById("gwToast");
     if (!el || !msg) return;
@@ -7302,7 +7310,7 @@
         // 판24i 검토: 이 저장이 나간 뒤 고쳐 저장 타이머가 걸려 있으면 대기 표시를 풀지 않음 — 풀면 그사이 온 읽기가 목록을 통째로 바꿔 타이머 저장이 그 고침 없이 나감(알림 0 · v494도 같음)
         if (!tasksSaveTimer) tasksPending = false;
         // C240 A-2b: 서버가 받지 않은 지시 줄(권한 밖 고침·낡은 화면의 완료 등)이 있으면 알림 + 서버 값으로 다시 읽기(1분에 한 번까지 — 되풀이 막음)
-        if (json.task_kept && json.task_kept.length){ gwToast("권한 밖이거나 이미 바뀐 지시는 저장되지 않았습니다 — 서버 값으로 다시 불렀습니다.", true); if (!tasksSaveTimer && Date.now() - (window._taskKeptAt || 0) > 60000){ window._taskKeptAt = Date.now(); tasksPending = false; loadTasks(); } }
+        if (json.task_kept && json.task_kept.length){ gwToast("권한 밖이거나 이미 바뀐 지시는 저장되지 않았습니다 — 서버 값으로 다시 불렀습니다.", true); gwKeptReload("_taskKept", function(){ if (tasksSaveTimer) return false; tasksPending = false; loadTasks(); }); }
         apprFlushCreates();   // 대표 상신은 지시 저장이 실제로 성공한 뒤에만(결재함 C안)
       });
     }).catch(function(){
@@ -19576,7 +19584,7 @@
       if(!resp.ok){ saveFailToast("휴가", resp.status); return; }   // P1 판24h(C206 D5): 500·412 등을 성공으로 넘기지 않음(대기 남김 — 종전엔 대기를 풀어 새로고침 뒤 사라짐)
       return resp.json().then(function(json){ if(json&&json.write_denied){ leavesPending=false; saveDeniedToast("휴가"); return; } leavesSha=json.content&&json.content.sha; if(typeof leavesSaveTimer==="undefined"||!leavesSaveTimer) leavesPending=false;
         // C240 A-2a: 서버가 받지 않은 줄(이미 승인·반려된 휴가를 낡은 화면에서 고침·철회 등)이 있으면 휴가를 서버 값으로 다시 읽고 알림 — 화면만 철회된 것으로 보이지 않게
-        if(json && json.leave_kept && json.leave_kept.length){ gwToast("이미 처리된 휴가는 바뀌지 않았습니다(승인된 휴가는 [취소 요청]으로) — 서버 값으로 다시 불렀습니다.", true); if(!leavesSaveTimer && Date.now()-(window._leaveKeptAt||0)>60000){ window._leaveKeptAt=Date.now(); leavesPending=false; loadLeaves(); } } });   // C240 A-2b: 다시 읽기는 1분에 한 번까지(되풀이 막음)   // P1 판24j 검토: 보내는 사이 또 고쳐 저장 타이머가 걸려 있으면 대기 표시를 남김(판24i 지시와 같은 꼴 — 풀면 그사이 읽기가 목록을 통째로 바꿔 고침이 사라짐)
+        if(json && json.leave_kept && json.leave_kept.length){ gwToast("이미 처리된 휴가는 바뀌지 않았습니다(승인된 휴가는 [취소 요청]으로) — 서버 값으로 다시 불렀습니다.", true); gwKeptReload("_leaveKept", function(){ if(leavesSaveTimer) return false; leavesPending=false; loadLeaves(); }); } });   // C240 A-2b: 다시 읽기는 1분에 한 번까지 — 묶이면 남은 시간 뒤 한 번(gwKeptReload)   // P1 판24j 검토: 보내는 사이 또 고쳐 저장 타이머가 걸려 있으면 대기 표시를 남김(판24i 지시와 같은 꼴 — 풀면 그사이 읽기가 목록을 통째로 바꿔 고침이 사라짐)
     }).catch(function(){ saveFailToast("휴가"); });
   }
   function leaveDays(type,start,end){

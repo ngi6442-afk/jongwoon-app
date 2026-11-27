@@ -100,7 +100,8 @@ function tasksGuard(me, oldItems, items, perm, today) {
     const mineT = taskForMe(me, o), fromT = taskIsFrom(me, o);
     const st0 = o.status || 'open', st1 = t.status || 'open';
     if (guarded) {
-      if (!mineT && !fromT) { ev.revert++; keep(k); out.push(o); return; }
+      // 무관한 줄 · 지운 줄(휴지통 — 앱은 이 계정에 지운 줄 동작을 열지 않음: 좁은 확인 — 낡은 화면 [완료]가 지운 줄을 승인 대기로 만들던 것) = 통째 서버 원본
+      if ((!mineT && !fromT) || o.del === 1) { ev.revert++; keep(k); out.push(o); return; }
       const okT = statusOk(mineT, fromT, st0, st1);
       const r = keepFields(o, t, function (f) { return f === 'updated' || (okT && hasOwn(TASK_GROUP, f)); });
       if (!sameRow(r, t)) { ev.field++; keep(k); }
