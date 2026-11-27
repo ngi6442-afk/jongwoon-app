@@ -5049,6 +5049,14 @@
   }
   // ⑥ 대표 PC 시작프로그램용: ?appr=auto 로 열리면 부팅 직후 대기 건이 있을 때 한장씩 처리를 자동으로 띄운다(1회)
   var apprAutoOpen = /[?&]appr=auto/.test(location.search);
+  // T750(v557): 알림을 누르면 그 화면으로 — 새로 연 창은 주소 ?go=, 이미 열린 창은 서비스워커 메시지 {type:"jw-go"}. 어느 탭을 싣는지는 서비스워커
+  // SW_GO_TABS(서버 알림이 싣는 둘)가 거르고, 앱은 '사이드바에 실제로 있는 탭 이름'만 받는다(탭 이름 글자를 여기 두지 않음 — 화관법 입구 글자 수 검사 v434 그대로).
+  // 로그인 뒤 1회(afterLogin 끝), 쓰고 나면 주소에서 go를 지움(새로고침 때 또 튀지 않게). 권한 없는 탭은 switchTab이 종전대로 홈으로 돌린다.
+  function pushGoTabOk(g){ return typeof g === "string" && /^[a-z]{2,12}$/.test(g) && !!document.querySelector('.tab-btn[data-tab="' + g + '"]'); }
+  var pushGoPending = (function(){ try { var g = new URLSearchParams(location.search).get("go"); return (g && /^[a-z]{2,12}$/.test(g)) ? g : ""; } catch(e){ return ""; } })();
+  function pushGoClearUrl(){ try { var u = new URL(location.href); if (u.searchParams.has("go")){ u.searchParams.delete("go"); history.replaceState(history.state, "", u.pathname + u.search + u.hash); } } catch(e){} }
+  function pushGoApply(){ if (!pushGoPending || !curMember()) return; var g = pushGoPending; pushGoPending = ""; pushGoClearUrl(); if (pushGoTabOk(g)) switchTab(g); }
+  if (navigator.serviceWorker && navigator.serviceWorker.addEventListener) navigator.serviceWorker.addEventListener("message", function(ev){ var d = ev && ev.data; if (d && d.type === "jw-go" && pushGoTabOk(d.tab)){ pushGoPending = d.tab; pushGoApply(); } });
   var apprEverLoaded = false;   // 대표 홈이 "0건"과 "아직 확인 전"을 구분해 그리기 위한 플래그
   var apprLoadFailed = false;   // 첫 확인 실패 시 "확인 중…" 무기한 고착 방지 — 홈에 실패 문구·자동 재시도 안내
   function apprRefresh(){
@@ -31617,7 +31625,8 @@ function dutyStage(nx){
           if (!d) return;
           var sub = Array.isArray(d.submitted) ? d.submitted : [];
           var skp = Array.isArray(d.skipped) ? d.skipped : [];
-          h += '<div class="hw-run-day"><b>' + esc(d.day || "") + '</b> — 제출 ' + sub.length + '건 · 건너뜀(기접수) ' + skp.length + '건';
+          // T750(v557): '건너뜀(기접수) 1건'을 실패로 읽던 것 — 매일 1건은 00시 운행이 대상일·다음 날 두 번 시도되는 설계(전날 실행이 이미 냄)라 정상. 글로 그렇게 말한다
+          h += '<div class="hw-run-day"><b>' + esc(d.day || "") + '</b> — 새로 접수 ' + sub.length + '건' + (skp.length ? ' · 이미 접수돼 있어 건너뜀 ' + skp.length + '건(정상 — 전날 실행에서 낸 00시 운행 등)' : '');
           if (sub.length){
             h += '<div style="font-size:12px;color:var(--sub);margin-top:2px;">' +
               sub.map(function(s){ return esc((s && s.label) || "") + ((s && s.sn) ? ' <span style="color:var(--brand-dark);">' + esc(s.sn) + '</span>' : ""); }).join(" · ") + '</div>';
@@ -33670,6 +33679,7 @@ function dutyStage(nx){
     render();
     lockOnLogin();   // 화면 잠금: 잠금 PIN 미세팅이면 세팅 요구, 유휴 초과 부팅이면 즉시 잠금
     pushResync();    // P1 판22 검토 11/14 ④: 브라우저 구독은 있는데 서버에 내 구독이 없으면 다시 등록(읽기 확인 뒤 없을 때만)
+    pushGoApply();   // T750(v557): 알림을 눌러 ?go= 로 열린 창이면 그 탭으로(1회 · 권한·로그인 뒤)
     // 만기 자동생성은 지시·차량·인허가 로드가 모두 끝난 뒤 markLoadedForAutoGen에서 실행(중복 방지)
   }
   function loadMembers(){

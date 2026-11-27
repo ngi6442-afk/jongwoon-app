@@ -24546,10 +24546,10 @@ try {
       rk = !!f && f({ pkst: { [OLD]: 'done' } }, 'complete|asb_conc') === 'done' && f({ pkst: { [OLD]: 'done', 'complete|asb_conc': 'na' } }, 'complete|asb_conc') === 'na'
         && f({ pkst: {} }, 'complete|asb_conc') === undefined && f({}, 'complete|safety_cost') === undefined && f({ pkst: { [OLD]: 'done' } }, 'complete|safety_cost') === undefined;
     } catch (e) { rk = false; }
-    const ok = /기준: v556 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 1 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 556 && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 1 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
       && d.ix.indexOf('석면 완료보고서(별지 77호)",') < 0 && d.ix.indexOf('{ t:"gap", k:"asb_conc", h:"석면농도측정 결과보고서(별지 80호 · 81호 결과표 첨부)", when:"asb" }') > 0 && d.ix.indexOf('{ k: "complete|asb_conc", s: "석면농도측정 결과보고서" }') > 0
       && d.ix.indexOf('m = e0 ? csPkst(c, e0.ik) : ""') > 0 && /delete c\.pkst\[CS_PK_OLD\[e0\.ik\]\]/.test(d.ix) && rk
-      && /SHELL_CACHE = 'jw-shell-v556'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 556;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, rk } };
   };
   const r556 = chk556(D556);
@@ -24561,6 +24561,77 @@ try {
   T('v556 C293 석면 완료 서류(실행 — 실제 csPkst): 준공 패킷 석면 항목 = 고정 키 asb_conc · 이름 석면농도측정 결과보고서(별지 80호 · 81호 결과표) · 안전 현황 키 같이 · 옛 키 체크는 새 키로 읽음(새 키가 있으면 새 키) · 쓸 때 옛 키 지움 · FEATURES 기준 v556·v556 절 · TESTLIST v556 칸 3 · sw jw-shell-v556 · 결함 사본(기준 줄·sw·FEATURES 낱말·옛 읽기·대응 걷음) 모두 ✗',
     r556.ok && M556.every((v) => v === false), JSON.stringify({ r: r556.info, mut: M556 }));
 } catch (e) { console.log('  (v556 검사 생략 — ' + e.message + ')'); fails++; }
+
+
+// ── v557(T750 — 64 · 원장 T750 · 운영책임자 11/27 "ㅇㅇ"): 화관법 정상 알림 끔 · 경보 꼬리표 날짜 분리 + renotify · 알림 누르면 그 탭(?go= · 서비스워커 메시지)
+try {
+  const rdT = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DT = { hw: rdT('netlify/functions/gw-hwakwan-run-background.js'), ab: rdT('netlify/functions/gw-allbaro-run-background.js'), sw: rdT('sw.js'), ix: rdT('index.html') };
+  const chkT = (d) => {
+    const why = [];
+    // ① 화관법: 성공 알림 없음 · 실패만 날짜 꼬리표 + renotify + go=hwakwan
+    if (/title: '화관법 자동 접수'/.test(d.hw)) why.push('hw 성공 알림 남음');
+    if (!/if \(!r\.ok\) \{/.test(d.hw)) why.push('hw 실패일 때만 보내는 갈래 없음');
+    if (!/url: '\.\/\?go=hwakwan', tag: 'hwakwan-fail-' \+ dayH, renotify: true/.test(d.hw)) why.push('hw 실패 꼬리표·이동');
+    if (/tag: 'hwakwan' \}/.test(d.hw)) why.push('hw 옛 꼬리표');
+    // ② 올바로: 실패·미매칭 꼬리표에 날짜 + renotify + go=allbaro · 잠정·변형도 go=allbaro
+    if (!/url: '\.\/\?go=allbaro', tag: 'allbaro-fail-' \+ kstDate\(0\), renotify: true/.test(d.ab)) why.push('ab 실패');
+    if (!/url: '\.\/\?go=allbaro', tag: 'allbaro-unmatched-' \+ kstDate\(0\), renotify: true/.test(d.ab)) why.push('ab 미매칭');
+    if (/tag: 'allbaro' \}|tag: 'allbaro-unmatched' \}/.test(d.ab)) why.push('ab 옛 꼬리표');
+    if (!/url: '\.\/\?go=allbaro', tag: 'allbaro-pend-' \+ day/.test(d.ab) || !/url: '\.\/\?go=allbaro', tag: 'allbaro-variant-' \+ today/.test(d.ab)) why.push('ab 잠정·변형 이동');
+    // ③ sw: renotify는 꼬리표 있을 때만 · 열린 창엔 메시지 후 focus · 없으면 openWindow(url) · 허용 탭 2개
+    if (!/renotify: !!\(d\.renotify && d\.tag\)/.test(d.sw)) why.push('sw renotify');
+    if (!/const SW_GO_TABS = \['hwakwan', 'allbaro'\];/.test(d.sw)) why.push('sw 허용 탭');
+    if (!/c\.postMessage\(\{ type: 'jw-go', tab: go \}\)/.test(d.sw) || !/return c\.focus\(\);/.test(d.sw) || !/return clients\.openWindow\(url\);/.test(d.sw)) why.push('sw 누름');
+    if (/c\.navigate\(/.test(d.sw)) why.push('sw navigate(쓰던 화면을 다시 읽음)');
+    // ④ 앱: 사이드바에 있는 탭 이름만(탭 이름 글자는 앱에 두지 않음 — v434 화관법 입구 글자 수 그대로) · 로그인 뒤 1회 · 주소에서 go 지움 · 메시지 받음
+    if (!/function pushGoTabOk\(g\)\{ return typeof g === "string" && \/\^\[a-z\]\{2,12\}\$\/\.test\(g\) && !!document\.querySelector\('\.tab-btn\[data-tab="' \+ g \+ '"\]'\); \}/.test(d.ix)) why.push('앱 탭 판정');
+    if (!/pushResync\(\);[^\n]*\n\s*pushGoApply\(\);/.test(d.ix)) why.push('afterLogin pushGoApply');
+    if (!/function pushGoApply\(\)\{ if \(!pushGoPending \|\| !curMember\(\)\) return; var g = pushGoPending; pushGoPending = ""; pushGoClearUrl\(\); if \(pushGoTabOk\(g\)\) switchTab\(g\); \}/.test(d.ix)) why.push('pushGoApply 꼴');
+    if (!/u\.searchParams\.delete\("go"\); history\.replaceState/.test(d.ix)) why.push('주소 go 지움');
+    if (!/d\.type === "jw-go" && pushGoTabOk\(d\.tab\)/.test(d.ix)) why.push('메시지 받음');
+    // ⑤ 화관법 카드: 건너뜀은 정상이라는 글(옛 '— 제출 n건 · 건너뜀(기접수) n건' 꼴 없음)
+    if (d.ix.indexOf("— 제출 ' + sub.length") >= 0 || d.ix.indexOf("'건(정상 — 전날 실행에서 낸 00시 운행 등)'") < 0) why.push('카드 글');
+    return why;
+  };
+  const wT = chkT(DT);
+  const muT = (k, f) => chkT(Object.assign({}, DT, { [k]: f(DT[k]) })).length > 0;
+  const MT = [
+    muT('hw', (s) => s.replace("if (!r.ok) {", "if (r.ok) await push.sendTo([], { title: '화관법 자동 접수' }); if (!r.ok) {")),
+    muT('hw', (s) => s.replace("tag: 'hwakwan-fail-' + dayH, renotify: true", "tag: 'hwakwan' }")),
+    muT('ab', (s) => s.replace("tag: 'allbaro-fail-' + kstDate(0), renotify: true", "tag: 'allbaro' }")),
+    muT('ab', (s) => s.replace("url: './?go=allbaro', tag: 'allbaro-pend-'", "url: './', tag: 'allbaro-pend-'")),
+    muT('sw', (s) => s.replace('renotify: !!(d.renotify && d.tag),', '')),
+    muT('sw', (s) => s.replace("try { c.postMessage({ type: 'jw-go', tab: go }); } catch (err) {}", '')),
+    muT('sw', (s) => s.replace('return c.focus();', 'return c.navigate(url);')),
+    muT('ix', (s) => s.replace(/pushResync\(\);([^\n]*)\n(\s*)pushGoApply\(\);/, 'pushResync();$1\n$2')),
+    muT('ix', (s) => s.replace('u.searchParams.delete("go"); history.replaceState', 'history.replaceState')),
+    muT('ix', (s) => s.replace("'건(정상 — 전날 실행에서 낸 00시 운행 등)'", "'건'"))];
+  T('T750 웹푸시: 화관법 정상 알림 없음 · 실패만 hwakwan-fail-<날짜>+renotify+?go=hwakwan · 올바로 실패·미매칭 날짜 꼬리표+renotify · 잠정·변형까지 ?go=allbaro · sw renotify(꼬리표 있을 때만)·열린 창은 메시지+focus(다시 읽지 않음)·없으면 openWindow · 앱 pushGoTabOk(사이드바 탭만)·afterLogin 1회·주소 go 지움·메시지 받음 · 화관법 카드 건너뜀=정상 글 · 결함 사본 ' + MT.length + '개 = 모두 ✗',
+    wT.length === 0 && MT.every((v) => v === true), JSON.stringify({ why: wT, mut: MT }));
+} catch (e) { console.log('  (T750 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v557(T750 — 64): 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '557 이상'으로 풀 것
+try {
+  const rdV = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DV = { ft: rdV('FEATURES.md'), tl: rdV('TESTLIST.md'), sw: rdV('sw.js'), cl: rdV('CLAUDE.md') };
+  const chkV = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v557 (11/27)', '\n### '), tlv = cut(d.tl, '\n## v557 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), op = cb.filter((l) => /^- \[ \] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ['원장 T750', '`?go=`', '`hwakwan-fail-<KST 날짜>`', '`renotify`', '00시 운행'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v557 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && op.length === 3 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**T750(v557') > 0 && /SHELL_CACHE = 'jw-shell-v557'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
+  };
+  const rV = chkV(DV);
+  const muV = (k, f) => chkV(Object.assign({}, DV, { [k]: f(DV[k]) })).ok;
+  const MV = [muV('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v556 (')), muV('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v556'")),
+    muV('ft', (s) => s.split('`renotify`').join('renotify')), muV('cl', (s) => s.replace('**T750(v557', 'T750(v557')), muV('tl', (s) => s.replace('\n## v557 ', '\n## v5570 '))];
+  T('v557 T750 문서·판 번호(정확 검사): FEATURES 기준 v557 (2026-11-27)·v557 절 · TESTLIST v557 칸 5(화면·운영 확인 3 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v557 · 결함 사본 ' + MV.length + '개 = 모두 ✗',
+    rV.ok && MV.every((v) => v === false), JSON.stringify({ r: rV.info, mut: MV }));
+} catch (e) { console.log('  (v557 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

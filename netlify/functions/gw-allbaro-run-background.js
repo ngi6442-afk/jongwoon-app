@@ -198,11 +198,11 @@ async function notifyPendingAndVariants(st, dayDocs, tcIn) {
     const list = byDay[day]; pendN += list.length;
     await push.sendTo(ids, { title: '운반일지 ' + mmdd(day) + ' 잠정 ' + list.length + '건 — 예약 밀림일 수 있음',
       body: (list.slice(0, 3).join(' · ') + (list.length > 3 ? ' 외 ' + (list.length - 3) + '건' : '') + ' — 배출자 확정 전(올바로 실적에 없으면 예약이 밀린 것). 실행되면 자동 이동. 운반일지 탭 붉은 잠정 칸').slice(0, 280),
-      url: './', tag: 'allbaro-pend-' + day }, { ctx: tc });
+      url: './?go=allbaro', tag: 'allbaro-pend-' + day }, { ctx: tc });
   }
   if (varMsgs.length) await push.sendTo(ids, { title: '운반일지 상차지 표기 변형 ' + varMsgs.length + '건',
     body: (varMsgs.slice(0, 3).join(' · ') + (varMsgs.length > 3 ? ' 외 ' + (varMsgs.length - 3) + '건' : '') + ' — 다른 현장이면 운반일지 탭 [별도 줄로 나누기], 같은 곳이면 그대로').slice(0, 280),
-    url: './', tag: 'allbaro-variant-' + today }, { ctx: tc });
+    url: './?go=allbaro', tag: 'allbaro-variant-' + today }, { ctx: tc });
   const cutoff = kstDate(-NOTIFY_KEEP_DAYS);
   [pend, vars].forEach(function (doc) { Object.keys(doc.keys).forEach(function (k) { if (String(doc.keys[k]) < cutoff) delete doc.keys[k]; }); });
   await blobSet(st, PEND_KEY, pend);
@@ -539,8 +539,9 @@ exports.handler = async function (event, context) {
         const tcF = await push.tierCtx();   // 스캔 1회 — adminIds와 sendTo 활성 필터 공용
         const ids = tcF.adminIds;
         if (ids.length) {
-          if (needFail) await push.sendTo(ids, { title: '올바로 수집 실패', body: failSummary(rec.log), url: './', tag: 'allbaro' }, { ctx: tcF });
-          if (needUnmatched) rsU = await push.sendTo(ids, { title: '운반일지 미매칭', body: (unmatchedDays.join(' · ') + ' — 노선표 확인 필요').slice(0, 280), url: './', tag: 'allbaro-unmatched' }, { ctx: tcF });
+          // T750(v557): 경보 꼬리표에 KST 날짜(다른 날 경보가 한 자리를 덮지 않게) + renotify + 누르면 운반일지 탭(?go=allbaro)
+          if (needFail) await push.sendTo(ids, { title: '올바로 수집 실패', body: failSummary(rec.log), url: './?go=allbaro', tag: 'allbaro-fail-' + kstDate(0), renotify: true }, { ctx: tcF });
+          if (needUnmatched) rsU = await push.sendTo(ids, { title: '운반일지 미매칭', body: (unmatchedDays.join(' · ') + ' — 노선표 확인 필요').slice(0, 280), url: './?go=allbaro', tag: 'allbaro-unmatched-' + kstDate(0), renotify: true }, { ctx: tcF });
         }
       }
       // C225 판 A 두 번째 검토: 서명을 못 읽은 회차는 발송 뒤 다시 읽어 씀(깨진 서명은 다시 세움) — 층 1에 막혀 서명이 안 남으면 다음 회차에 같은 미매칭 알림이 또 나감

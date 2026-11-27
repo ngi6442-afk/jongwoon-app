@@ -15504,12 +15504,13 @@ function J91a(x) { return JSON.stringify(x); }
       abDays = [{ day: yday, total: 3, counts: [{ from: '가', to: '나', item: '다', n: 3 }], unmatched: [{ from: '가상차', to: '가하차', item: '가품목', n: 2 }] }]; };
     const runW = async () => { seq++; await WK.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tok }, body: J({ job: 'ab_c225_' + seq, mode: 'collect', days: [yday] }) }, {}); return SDK.data[D('allbaro:job:ab_c225_' + seq)]; };
     try {
-      seedW(); await runW(); await runW(); o.normal = nU(/^allbaro-unmatched$/) === 1 && /"sig"/.test(SDK.data[LN] || '');
+      // T750(v557): 미매칭 꼬리표에 KST 날짜가 붙음(allbaro-unmatched-YYYY-MM-DD) — 세는 꼴만 맞춤, 횟수 판정은 그대로
+      seedW(); await runW(); await runW(); o.normal = nU(/^allbaro-unmatched-\d{4}-\d{2}-\d{2}$/) === 1 && /"sig"/.test(SDK.data[LN] || '');
       // 첫 회차 내내 서명 읽기 실패(다시 읽기까지) + 실제로 나감 → 이번 서명으로 다시 세움 → 다음 회차 같은 미매칭 0(운영 판과 같음)
-      seedW(); SDK.q[LN] = Array(20).fill('throw'); await runW(); SDK.q[LN] = []; await runW(); o.outage = nU(/^allbaro-unmatched$/) === 1 && /"sig"/.test(SDK.data[LN] || '');
+      seedW(); SDK.q[LN] = Array(20).fill('throw'); await runW(); SDK.q[LN] = []; await runW(); o.outage = nU(/^allbaro-unmatched-\d{4}-\d{2}-\d{2}$/) === 1 && /"sig"/.test(SDK.data[LN] || '');
       // 첫 회차 내내 실패 + 실제로 안 나감 → 서명 안 씀 → 다음 회차가 살림
       seedW(); SDK.q[LN] = Array(20).fill('throw'); sentZero = true; await runW(); const noSig = !(LN in SDK.data); sentZero = false; SDK.q[LN] = []; await runW();
-      o.notSent = noSig && nU(/^xallbaro-unmatched$/) === 1 && nU(/^allbaro-unmatched$/) === 1;
+      o.notSent = noSig && nU(/^xallbaro-unmatched-\d{4}-\d{2}-\d{2}$/) === 1 && nU(/^allbaro-unmatched-\d{4}-\d{2}-\d{2}$/) === 1;
       // 다시 세우는 쓰기마저 예외 → 작업 기록에 한 줄
       seedW(); SDK.q[LN] = Array(20).fill('throw'); SDK.setFail = new Set([LN]); const jr1 = await runW(); SDK.setFail = new Set();
       o.writeFailLog = /\[알림\] 미매칭 서명 못 씀/.test(String(jr1 || ''));

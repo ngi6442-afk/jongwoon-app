@@ -81,14 +81,16 @@ exports.handler = async function (event, context) {
             skipped: (dd && dd.skipped) || [] };
         }),
       });
-      // 관리자 웹푸시 — 실패는 반드시, 성공도 접수 건수 통지(발송 실패가 작업 결과를 바꾸면 안 됨)
+      // 관리자 웹푸시 — 실패만 보낸다(발송 실패가 작업 결과를 바꾸면 안 됨).
+      // T750(v557 — 운영책임자 11/27 "ㅇㅇ"): 정상으로 끝난 날의 '화관법 자동 접수 n건' 알림은 끈다 — 정상은 화관법 탭 자동 제출 카드(hwakwan:lastrun)로 본다.
+      // 꼬리표는 'hwakwan-fail-<KST 날짜>'(성공·실패가 한 꼬리표를 나눠 서로를 소리 없이 덮던 것) + renotify(같은 날 다시 실패하면 다시 울림) + 누르면 화관법 탭(?go=hwakwan).
       try {
-        const tcH = await push.tierCtx();   // 스캔 1회 — adminIds와 sendTo 활성 필터 공용
-        const ids = tcH.adminIds;
-        if (ids.length) {
-          if (r.ok) await push.sendTo(ids, { title: '화관법 자동 접수', body: nSub + '건 접수' + (nSkip ? ' · ' + nSkip + '건 건너뜀' : ''), url: './', tag: 'hwakwan' }, { ctx: tcH });
+        if (!r.ok) {
+          const tcH = await push.tierCtx();   // 스캔 1회 — adminIds와 sendTo 활성 필터 공용
+          const ids = tcH.adminIds;
+          const dayH = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
           // 실패 안내(v321): 로컬 폴백(김과장 PC 재시도)은 9/6 폐지 — 남은 복구 경로는 그룹웨어 자동 복구 발사층(08:20)과 관리자 확인뿐. 재제출을 부추기지 않는다
-          else await push.sendTo(ids, { title: '화관법 자동제출 실패', body: (failSummary(rec.log).slice(0, 200) + ' · 그룹웨어 자동 복구(08:20) 또는 관리자 확인'), url: './', tag: 'hwakwan' }, { ctx: tcH });
+          if (ids.length) await push.sendTo(ids, { title: '화관법 자동제출 실패', body: (failSummary(rec.log).slice(0, 200) + ' · 그룹웨어 자동 복구(08:20) 또는 관리자 확인'), url: './?go=hwakwan', tag: 'hwakwan-fail-' + dayH, renotify: true }, { ctx: tcH });
         }
       } catch (e) {}
       return;

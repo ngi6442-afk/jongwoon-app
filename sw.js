@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'jw-shell-v556';
+const SHELL_CACHE = 'jw-shell-v557';
 const SHELL_FILES = [
   './',
   './index.html',
@@ -34,16 +34,29 @@ self.addEventListener('push', (e) => {
   e.waitUntil(self.registration.showNotification(d.title || '종운 업무', {
     body: d.body || '',
     tag: d.tag || undefined,
+    renotify: !!(d.renotify && d.tag),   // T750(v557): 경보는 같은 꼬리표 자리를 덮어도 다시 울림(꼬리표 없으면 브라우저가 거부하므로 꼬리표 있을 때만)
     data: { url: d.url || './' },
     icon: './icon-192.png',
     badge: './icon-192.png'
   }));
 });
+// T750(v557): 알림을 누르면 그 화면으로 — 주소의 go 인자(허용: hwakwan·allbaro). 열린 창이 있으면 다시 읽지 않고
+// 메시지로 탭만 옮긴 뒤 앞으로(쓰던 화면을 날리지 않게), 없으면 그 주소로 새로 연다(앱이 부팅 뒤 go 인자를 읽고 지움).
+const SW_GO_TABS = ['hwakwan', 'allbaro'];
+function swGoOf(url) {
+  try { const g = new URL(url, self.registration.scope).searchParams.get('go'); return SW_GO_TABS.indexOf(g) >= 0 ? g : ''; } catch (err) { return ''; }
+}
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
   const url = (e.notification.data && e.notification.data.url) || './';
+  const go = swGoOf(url);
   e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
-    for (const c of list) { if ('focus' in c) return c.focus(); }
+    for (const c of list) {
+      if ('focus' in c) {
+        if (go) { try { c.postMessage({ type: 'jw-go', tab: go }); } catch (err) {} }
+        return c.focus();
+      }
+    }
     return clients.openWindow(url);
   }));
 });
