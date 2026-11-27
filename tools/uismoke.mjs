@@ -25503,8 +25503,8 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), op = cb.filter((l) => /^- \[ \] \(AI 운영 확인/.test(l));
     const FT = ['`conDelAttach`', '`cbxDropAsk`', '`bytes_deleted:false`', '`box_left`', '원장 C327'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v579 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
-      && d.cl.indexOf('**C327 화면(v579') > 0 && /SHELL_CACHE = 'jw-shell-v579'/.test(d.sw);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 579 && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C327 화면(v579') > 0 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 579   /* v580(C326 이어서)에서 '579 이상'으로 풂 */;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
   };
   const r579 = chk579(D579);
@@ -25514,6 +25514,29 @@ try {
   T('v579 C327 화면 문서·판 번호(정확 검사): FEATURES 기준 v579·v579 절(낱말 5) · TESTLIST v579 칸 4 · CLAUDE.md 한 줄 · sw jw-shell-v579 · 결함 사본 ' + M579.length + '개 = 모두 ✗',
     r579.ok && M579.every((v) => v === false), JSON.stringify({ r: r579.info, mut: M579 }));
 } catch (e) { console.log('  (v579 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v580(C326 이어서 — 45-1): 실행 검사는 uismoke C326 이어서 회사 표시 글 · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '580 이상'으로 풀 것
+try {
+  const rdW = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DW = { ft: rdW('FEATURES.md'), tl: rdW('TESTLIST.md'), sw: rdW('sw.js'), cl: rdW('CLAUDE.md') };
+  const chkW = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v580 (11/27)', '\n### '), tlv = cut(d.tl, '\n## v580 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), op = cb.filter((l) => /^- \[ \] \(운영 확인\)/.test(l));
+    const FT = ['`meCorp`', '`SF_NOW_CO`', '`PAY_CORP`', '`CDOC_CORP_NAME`', '`payLedgerParse`', '월말명세서'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const closed = true;
+    const ok = /기준: v580 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 1 && op.length === 2 && closed
+      && d.cl.indexOf('**C326 이어서(v580)**') > 0 && /SHELL_CACHE = 'jw-shell-v580'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length, closed } };
+  };
+  const rW = chkW(DW);
+  const muW = (k, f) => chkW(Object.assign({}, DW, { [k]: f(DW[k]) })).ok;
+  const MW = [muW('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v579 (')), muW('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v579'")), muW('ft', (s) => s.split('`PAY_CORP`').join('PAY_CORP')),
+    muW('cl', (s) => s.replace('**C326 이어서(v580)**', 'C326 이어서(v580)'))];
+  T('v580 C326 이어서 문서·판 번호(정확 검사): FEATURES 기준 v580·v580 절 · TESTLIST v580 칸 3 · CLAUDE.md 한 줄 · sw · 결함 사본 ' + MW.length + '개 = 모두 ✗',
+    rW.ok && MW.every((v) => v === false), JSON.stringify({ r: rW.info, mut: MW }));
+} catch (e) { console.log('  (v580 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
