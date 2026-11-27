@@ -18919,9 +18919,11 @@ function J91a(x) { return JSON.stringify(x); }
       // ① 증빙 넣기 — 색인 못 씀 → 500 → 다시 넣기 200·목록에 이름
       reset(); blobsMock.hooks.failSet = (k) => k === 'proof:__index__';
       let r = await c({ action: 'proof_put', name: 'c238증빙', file: 'a.pdf', data: PDFe }, tokA); blobsMock.hooks.failSet = null;
+      const a1 = aud('증빙등록');
       const r1b = await c({ action: 'proof_put', name: 'c238증빙', file: 'a.pdf', data: PDFe }, tokA);
       const nm = pnames().find((x) => /c238/.test(x)) || '';
-      P.put = r.code === 500 && r1b.code === 200 && !!nm; I.put = [r.code, r.body.error_code, r1b.code, nm];
+      const nAud = auditMock.logs.filter((l) => (l.ev || []).some((e) => e.op === '증빙등록')).length;
+      P.put = r.code === 500 && !a1 && r1b.code === 200 && !!nm && nAud === 1; I.put = [r.code, r.body.error_code, a1, r1b.code, nm, nAud];
       // ② 증빙 지우기 — 본문 못 지움 → 500·색인 그대로·감사 없음 / 색인 못 씀 → 500 → 다시 지우기 200·색인에서 빠짐
       blobsMock.hooks.failDel = (k) => k === 'proof:' + nm; r = await c({ action: 'proof_del', name: nm }, tokA); blobsMock.hooks.failDel = null;
       const d1 = r.code === 500 && pnames().indexOf(nm) >= 0 && !!mem.gw_files['proof:' + nm] && !aud('증빙삭제');
@@ -18951,7 +18953,7 @@ function J91a(x) { return JSON.stringify(x); }
     const E0 = await chkE238(loadE238(SDATAE));
     T('C238 판 E 증빙·결재 쓰기 결과: 증빙 색인 못 씀 = 500 → 다시 넣기 200 · 본문 못 지움 = 500·색인·감사 그대로 · 색인 못 씀 = 500 → 다시 지우기 200 · 상신·결재가 겹친 저장에 밀리고 합쳐 쓰기 실패 = 500·감사 없음·카드 대기 · 정상 4길 200 무변', E0.ok, JSON.stringify(E0.info));
     const MUTE = [
-      ["  if (!iw.ok) return jr(500, { status: 'ERROR', error_code: iw.code || 'STORAGE_WRITE_FAILED', request_id: R });\n  return jr(200, { status: 'OK', name: name, request_id: R });", "  return jr(200, { status: 'OK', name: name, request_id: R });"],
+      ["  if (!iw.ok) return jr(500, { status: 'ERROR', error_code: iw.code || 'STORAGE_WRITE_FAILED', request_id: R });\n  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '증빙등록'", "  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '증빙등록'"],
       ["  if (!bd.ok) return jr(500, { status: 'ERROR', error_code: bd.code || 'STORAGE_DELETE_FAILED', request_id: R });\n", ''],
       ["  if (!iw.ok) return jr(500, { status: 'ERROR', error_code: iw.code || 'STORAGE_WRITE_FAILED', request_id: R });\n  try { await appendAudit", "  try { await appendAudit"],
       ["      const w2 = await blobSet(st, colKey('approvals'), chk.data);   // C238 판 E: 합쳐 다시 쓴 결과를 봄(겹친 저장에 밀린 상신이 빠진 채 성공이던 것)\n      if (!w2.ok) return { ok: false, code: w2.code || 'STORAGE_WRITE_FAILED' };\n", "      await blobSet(st, colKey('approvals'), chk.data);\n"],

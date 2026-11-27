@@ -1947,7 +1947,6 @@ async function handleProofPut(event, d, R) {
   if (!idx.ok && idx.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: idx.code || 'STORAGE_READ_FAILED', request_id: R });
   const w = await blobSet(st, 'proof:' + name, { name: String(d.name || '').slice(0, 120), data: b64, by: c.member.name, ts: now });
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
-  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '증빙등록', id: name.slice(0, 40), t: '' }] }); } catch (e) {}
   const list = (idx.ok && idx.data && Array.isArray(idx.data.names)) ? idx.data.names : [];
   if (list.indexOf(name) < 0) list.push(name);
   // P1 판19: 색인에 올린 시각(서버)·원래 이름·올린 사람 id를 같이 남긴다 — 완료 신호 크론이 파일 본문 없이 색인 한 번만 읽고 판정(시각 없는 옛 항목은 신호로 안 셈, 옛 자료 이행 없음)
@@ -1957,6 +1956,7 @@ async function handleProofPut(event, d, R) {
   meta[name] = { ts: now, file: String(d.name || '').slice(0, 120), by_id: String(c.member.id || '') };
   const iw = await blobSet(st, 'proof:__index__', { names: list, meta: meta });   // C238 판 E: 색인 쓰기 결과를 봄(본문은 들어갔는데 목록에 안 보이는 채 200이던 것 — 다시 넣으면 색인을 씀)
   if (!iw.ok) return jr(500, { status: 'ERROR', error_code: iw.code || 'STORAGE_WRITE_FAILED', request_id: R });
+  try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'files', ev: [{ op: '증빙등록', id: name.slice(0, 40), t: '' }] }); } catch (e) {}   // C238 판 E 검토: 감사는 색인까지 쓴 뒤(색인 실패 뒤 다시 넣으면 감사가 두 줄 되던 것)
   return jr(200, { status: 'OK', name: name, request_id: R });
 }
 // C240 판 A: 증빙 읽기(목록·본문) = 관리자 또는 기기 승인 + 계약 권한 숨김 아님 — 앱에서 보관함을 여는 길은 계약 탭 서류 창의 적격심사 패킷 생성 뒤
