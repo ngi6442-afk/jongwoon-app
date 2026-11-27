@@ -111,6 +111,7 @@
 - **C238(v567 — 로그인 잠금 칸 · C238)**: `gw-auth` `handleLogin`은 잠금 칸(`lock:`·`lockm:`)을 못 읽으면 PIN 검사 전 500, 실패 수를 못 적으면 500 — '못 읽음 = 잠금 없음'으로 되돌리지 말 것(servertest C238 판 A 결함 사본). 이 파일의 '없음' 관례는 `ok:true,data:null` 또는 `code:'NOT_FOUND'` 둘 다.
 - **C246·C280 후속(v566)**: 폰 작은 단추는 `.mini-btn` 폰 규칙 한 줄(최소 32px — 더 키울 자리는 T688처럼 id로 덮기) · 내 할 일 기한은 키를 친 change는 저장 안 함(칸 떠날 때 · `__dueTyped`) — 날짜 칸을 '치는 동안 바로 저장'으로 새로 만들지 말 것.
 - **T152(v565)**: 투찰 잠금 거절 알림 = `bidGateNotify`(받는 사람 `bidNotifyIds` − 누른 사람 · 하루 1번 `bids:gate_sent` · 설정 `bid_gate`) — 낙찰 알림 수신자를 바꾸면 이것도 같이 바뀜 · 누르면 `?go=bid`(sw `SW_GO_TABS`).
+- **C238 G(v575 — 알림은 저장 뒤 · C238)**: `handleSave` 지시·휴가 갈래와 `autotask_ingest`는 알림 대상만 저장 전에 계산하고 `notifyAutoCreated`·`notifyLeaves`는 쓰기 성공 뒤에 부른다 — 저장 앞으로 옮기지 말 것(servertest C238 G 결함 사본).
 - **C238 D+E(v574 — 쓰기 결과 · C238)**: 계약 기록물 `cdocPairVoid`는 true/false — 부르는 쪽은 false면 저장·감사 전에 멈춘다(연결만 지우지 않기) · 증빙 색인·결재 합쳐 다시 쓰기도 결과를 본다(servertest C238 판 D·E 결함 사본).
 - **C238 B+C(v573 — 쓰기 결과 · C238)**: 회원 색인(`gw-auth` 삭제·저장)·문서함 합쳐 다시 쓰기·`att_del`은 쓰기·지우기 결과를 보고 실패면 500(감사·알림 전) — `await blobSet(...)`·`await blobDelete(...)`를 결과 없이 두지 말 것(servertest C238 판 B·C 결함 사본). `_lib/boxfile.js attDeleteParts`는 `{ ok, failed, code }`.
 - **C240 A-2b(v572 — 비관리자 지시 저장 가드 · C240)**: 비관리자 지시 저장은 `_lib/taskguard.js`를 거친다(무관한·휴지통 줄 서버 원본 · 관련 줄은 화면이 여는 상태 바꿈만 · 같은 id 둘째 줄 버림 · 있던 줄 지시자 칸 서버 원본 · 수행 계정이 뺀 살아 있는 줄은 지움 표시). 받지 않은 줄은 200 + `task_kept`로 알려 앱이 다시 읽게 한다. 비관리자 화면에 지시를 고치는 새 동작을 넣으면 `statusOk`·`keepFields` 허용부터 맞출 것(안 맞추면 '지시 보호'로 되돌려짐).

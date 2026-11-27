@@ -2090,3 +2090,8 @@
 - [ ] (AI 운영 확인 — C238) 배포 뒤 다음 날 백업에서 관리자 오류 기록에 cdoc_put·cdoc_pair_assign·cdoc_purge·proof_put·approval_decide 500(STORAGE_*·PAIR_VOID_FAILED)이 새로 쌓이지 않음 — 정상 저장·결재는 그대로
 - [x] (AI) `servertest` C238 판 D·판 E(결함 사본 7 · 5 모두 ✗) · 좁은 독립 확인 2회 — ✓ AI 11/27
 - [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 C238_게이트_v574_1127.txt
+
+## v575 — C238 G — 알림을 저장 뒤로
+- [ ] (AI 운영 확인 — C238 G) 배포 뒤 다음 날 백업 알림함 이력(push:log)에 휴가 신청·자동 지시 알림이 종전처럼 남고, 그 시각 앞에 같은 문서 저장 실패(500)가 없음
+- [x] (AI) `servertest` C238 G(저장 실패 = 알림 0 · 정상 · 예외 · 안 받은 줄 · 결함 사본 3 모두 ✗) · 좁은 독립 확인 — ✓ AI 11/27
+- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 C238_게이트_v575_1127.txt
