@@ -1999,3 +1999,8 @@
 ## v558 — 운반일지 새 노선 겹침 미리 보기 창 60일(원장 C279 남은 것)
 - [x] (AI) `servertest` 'C279 창 60일'·'C279 ②' · `uismoke` v351 블록 · 비용 실측(지연 200ms에도 2.1초) · v557 문서 검사를 이 판 이상으로 풂 — ✓ AI 11/27
 - [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` 등 게이트 전부 통과 + autorulestest + 앱 스크립트 전체 파싱 오류 0(끝 게이트 이름은 백틱 없이) — ✓ AI 11/27
+
+## v559 — C127 — 물어보기·첨부 판독 AI 호출 시간 상한
+- [ ] (AI 운영 확인 — C127) 배포 뒤 운영 물어보기 작업 기록(ask:job:*)·첨부 판독 결과(parse:*)에 TIMEOUT이 생겼는지 다음 월 사용량 보고 때 함께 셈(읽기만)
+- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 배포 전 전체 게이트 기록 C127_게이트_v559_1127.txt
+- [x] (AI) `servertest` C127 ①(fetchTimed 머리·본문 멈춤 → TIMEOUT · 정상·망 오류·4xx 꼴) ②(물어보기·계약서·석면 조사서 상한 짧은 사본 → error TIMEOUT) ③(상한 없는 직접 AI 호출 0 · 6곳 fetchTimed) · `uismoke` v559 문서·판 번호

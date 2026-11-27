@@ -24646,11 +24646,11 @@ try {
     const FT = ["`RUN_BACK_DAYS`", "`STATUS_DAYS`", "`ROUTE_OVERLAP`", "c279w_timing.mjs", "원장 C279"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const MAN = "(2026-11 v558 — 앱에서 열 수 있는 지난 60일 일지를 모두";
-    const ok = /기준: v558 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 2 && gate.length === 2 && scr.length === 0 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 558 && ftv.length > 0 && mF.length === 0 && cb.length === 2 && gate.length === 2 && scr.length === 0 && !cb.some((l) => /\(PM/.test(l))
       && d.man.indexOf(MAN) > 0
       && d.cl.indexOf('**운반일지 겹침 창 60일(v558') > 0
       && FIX558.every((x) => d.ix.split(x).length === 2)
-      && /SHELL_CACHE = 'jw-shell-v558'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 558;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX558.map((x) => d.ix.split(x).length - 1) } };
   };
   const r558 = chk558(D558);
@@ -24663,6 +24663,29 @@ try {
   T('v558 문서·판 번호(정확 검사): FEATURES 기준 v558 (2026-11-27)·v558 절(운반일지 겹침 창 60일) · TESTLIST v558 칸 2(화면·운영 확인 0 · 게이트 [x] 2) · MANUAL 겹침 창 문장(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 1줄 한 번씩 · sw jw-shell-v558 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
     r558.ok && M558.every((v) => v === false), JSON.stringify({ r: r558.info, mut: M558 }));
 } catch (e) { console.log('  (v558 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v559(C127 — 물어보기·첨부 판독 AI 호출 시간 상한 · 원장 C127): 실행 검사는 servertest C127 ①②③ · 여기는 문서·판 번호 정확 검사
+try {
+  const rd559 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D559 = { ft: rd559('FEATURES.md'), tl: rd559('TESTLIST.md'), sw: rd559('sw.js'), cl: rd559('CLAUDE.md') };
+  const chk559 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v559 (11/27)', '\n### '), tlv = cut(d.tl, '\n## v559 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ['`fetchTimed`', '원장 C127', '`TIMEOUT`'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v559 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && scr.length === 1 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C127(v559') > 0
+      && /SHELL_CACHE = 'jw-shell-v559'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r559 = chk559(D559);
+  const mu559 = (k, f) => chk559(Object.assign({}, D559, { [k]: f(D559[k]) })).ok;
+  const M559 = [mu559('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v558 (')), mu559('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v558'")),
+    mu559('cl', (s) => s.replace('**C127(v559', 'C127(')), mu559('ft', (s) => s.split('`fetchTimed`').join('fetchTimed'))];
+  T('v559 문서·판 번호(정확 검사): FEATURES 기준 v559 (2026-11-27)·v559 절(C127) · TESTLIST v559 칸 3(운영 확인 1 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v559 · 결함 사본(기준 줄·sw·CLAUDE.md·FEATURES 낱말) 모두 ✗',
+    r559.ok && M559.every((v) => v === false), JSON.stringify({ r: r559.info, mut: M559 }));
+} catch (e) { console.log('  (v559 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
