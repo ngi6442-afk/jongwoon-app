@@ -4796,8 +4796,8 @@ const SAFETY_STAGE_LABEL = { none: '미인정', applied: '접수', review: '심�
 const SAFETY_DATES = ['applied_on', 'review_on', 'decided_on', 'expires_on'];
 const SAFETY_LIMIT = { apply_no: 40, note: 100, checks: 10, head: 999 };
 const SAFETY_FIELD_LABEL = { 'kosha.stage': 'KOSHA 단계', 'kosha.apply_no': '접수번호', 'kosha.applied_on': '접수일', 'kosha.review_on': '심사일', 'kosha.decided_on': '인정일(결정일)', 'kosha.expires_on': '만료일',
-  'kosha.rate_year': '요율 연도', 'kosha.checks': '사후점검', 'headcount.env': '상시근로자 종운환경', 'headcount.con': '상시근로자 종운건설',
-  'reduce.env': '정기교육 감면 연도 종운환경', 'reduce.con': '정기교육 감면 연도 종운건설' };
+  'kosha.rate_year': '요율 연도', 'kosha.checks': '사후점검', 'headcount.env': '상시근로자 (주)종운환경', 'headcount.con': '상시근로자 ㈜종운건설',
+  'reduce.env': '정기교육 감면 연도 (주)종운환경', 'reduce.con': '정기교육 감면 연도 ㈜종운건설' };
 // 키 이름으로 권한 — permOf는 컬렉션 이름을 받는다(COL에 없는 'safety'를 넘기면 기본 '보기'가 돼 숨김이 새어 나간다). 규칙은 permOf와 같다(관리자 do · perms[키] · 값 없으면 기본 숨김 표 PERM_CLOSED)
 function permKey(member, key) {
   if (member.admin) return 'do';
@@ -5911,7 +5911,7 @@ async function handleBackupPut(event, d, R) {
 }
 
 // ---- 서류 양식(템플릿) 보관 — 관리자 등록, 영구 보관. 생성 시 원본 복사라 오염 없음 ----
-const TPL_KEYS = { asb_plan: '석면해체계획서', work_start: '착공계', work_complete: '준공계', demo_report: '해체신고서(완료신고 포함)', waste_report: '폐기물배출신고서(수탁확인 포함)', qual_packet: '적격심사 패킷(신청서·심사표·각서·확약서 hwpx)', contract_pledge: '계약이행 통합서약서(hwpx)', seal_reg: '사용인감계(hwpx)', bond_waiver: '지역개발채권 포기각서(hwpx)', labor_exempt: '노무비 적용제외 신청서(hwpx·수기서식)', quote_env: '견적서 — (주)종운환경(hwpx)', quote_con: '견적서 — ㈜종운건설(hwpx)', adv_pay: '선금지급신청 세트(공문+별첨2~5, hwpx)', settle_doc: '준공 정산합의서(사후정산, xlsx)', safety_plan: '안전보건관리계획서(준설, hwpx)', safety_risk: '위험성평가표(준설, xlsx)', safety_rule: '준설 작업 안전 수칙(hwpx)', safety_emerg: '비상상황 대응체계(준설, hwpx)', safety_ppe: '안전보호구 지급 대장(준설, hwpx)', safety_cost: '산업안전보건관리비 사용내역서(준설, xlsx)', labor_split: '노무비 구분관리 서식1~7(hwpx)', sub_contract: '공사 도급계약서 양식(종운건설이 갑 · 관리자 전용, docx)' };
+const TPL_KEYS = { asb_plan: '석면해체계획서', work_start: '착공계', work_complete: '준공계', demo_report: '해체신고서(완료신고 포함)', waste_report: '폐기물배출신고서(수탁확인 포함)', qual_packet: '적격심사 패킷(신청서·심사표·각서·확약서 hwpx)', contract_pledge: '계약이행 통합서약서(hwpx)', seal_reg: '사용인감계(hwpx)', bond_waiver: '지역개발채권 포기각서(hwpx)', labor_exempt: '노무비 적용제외 신청서(hwpx·수기서식)', quote_env: '견적서 — (주)종운환경(hwpx)', quote_con: '견적서 — ㈜종운건설(hwpx)', adv_pay: '선금지급신청 세트(공문+별첨2~5, hwpx)', settle_doc: '준공 정산합의서(사후정산, xlsx)', safety_plan: '안전보건관리계획서(준설, hwpx)', safety_risk: '위험성평가표(준설, xlsx)', safety_rule: '준설 작업 안전 수칙(hwpx)', safety_emerg: '비상상황 대응체계(준설, hwpx)', safety_ppe: '안전보호구 지급 대장(준설, hwpx)', safety_cost: '산업안전보건관리비 사용내역서(준설, xlsx)', labor_split: '노무비 구분관리 서식1~7(hwpx)', sub_contract: '공사 도급계약서 양식(㈜종운건설이 갑 · 관리자 전용, docx)' };
 // T216(PM 11/26 12:43 "추천대로. 단, 관리자만 가능하게"): 관리자만 받고(tpl_get) 관리자에게만 목록에 보이는(tpl_list) 양식 — 화면 숨김만이 아니라 이 서버 길에서 막는다
 const TPL_ADMIN = { sub_contract: 1 };
 async function handleTplPut(event, d, R) {

@@ -1616,7 +1616,29 @@ try {
       && /co: document\.getElementById\("recCo"\)\.value \|\| ""/.test(src) && /co = c\.co \|\| \(\(impCo && impCo\.value\) \|\| ""\)/.test(src);
     const bad326b = [html.replace('<option value="env">(주)종운환경</option><option value="con">㈜종운건설</option></select>\n        <input type="text" id="recAmount"', '<option value="env">종운환경</option><option value="con">종운건설</option></select>\n        <input type="text" id="recAmount"'), html.replace('r.co === "env" ? "(주)종운환경" : (r.co === "con" ? "㈜종운건설"', 'r.co === "env" ? "종운환경" : (r.co === "con" ? "종운건설"')];
     T('C326 ② 기성 회사 칸 표시 법인격: 청구 등록 recCo·홈택스 recImpCo·펼침 회사 = (주)종운환경/㈜종운건설 · 수정 창 reCo 그대로 · 값 env/con 읽는 자리 그대로 · 결함 사본 2',
-      co326(html) && bad326b.every((b) => b !== html && !co326(b)), JSON.stringify({ ok: co326(html), bad: bad326b.map((b) => b !== html && !co326(b)) })); }
+      co326(html) && bad326b.every((b) => b !== html && !co326(b)), JSON.stringify({ ok: co326(html), bad: bad326b.map((b) => b !== html && !co326(b)) }));
+    // C326 이어서(11/27 21:15 배정): 법인격 없는 회사 표시 글 전수 — 표시만 법인격 · 값(env/con/both·jw/other·저장 글 '종운건설')·매칭·지난 기록 그대로
+    const E3 = '(주)종운환경', C3 = '㈜종운건설';
+    const NEW3 = ['<option value="env">' + E3 + '</option><option value="con">' + C3 + '</option><option value="both">' + E3 + '·' + C3 + ' (두 회사 중복 재적)</option>', 'title="소속 회사 = ' + E3 + '·' + C3 + ' 두 곳"',
+      '<option value="jw">' + C3 + '</option><option value="other">타회사</option>', 'var ASB_MED_ORG = { jw: "' + C3 + '", other: "타회사" };', 'var ASB_MED_RULE = "' + C3 + ' 명의 1년',
+      'placeholder="' + E3 + ' (명)"', 'placeholder="' + C3 + ' (명)"', 'placeholder="' + E3 + ' (예: 2026)"', 'placeholder="' + C3 + ' (예: 2026)"', '"headcount.env":"상시근로자 ' + E3 + '", "headcount.con":"상시근로자 ' + C3 + '"}',
+      'SF_NOW_CO = [["", "전체"], ["env", "' + E3 + '"], ["con", "' + C3 + '"]];', 'var SF_NOW_CORP = [{ k: "env", n: "' + E3 + '", t20: true }, { k: "con", n: "' + C3 + '", t20: false }];', 'esc("석면 안전성평가(' + C3 + ') — "',
+      "'+(f.co===\"con\"?\"" + C3 + "\":\"" + E3 + "\")+' 등급)", '<option value="waste">폐기물 수집·운반 및 처리 계약서 — ' + E3 + '</option>', '<option value="quote_con">견적서 — ' + C3 + '</option>', 'sub: "' + C3 + '이 갑 · 하수급을 줄 때',
+      '<div class="veh-hint">기본값 ' + E3 + ' — 등록증 명의가 다르면 바꿈</div>', 'vehSelFill("vehCo", ["종운건설"], v && v.co, "' + E3 + ' (기본값)", function(t){', 'var PAY_CORP = { env: "' + E3 + '", con: "' + C3 + '" };'];
+    const OLD3 = ['<option value="env">종운환경</option>', '<option value="con">종운건설</option>', '<option value="jw">종운건설</option>', 'SF_NOW_CO = [["", "전체"], ["env", "종운환경"]', 'n: "종운환경", t20', 'var PAY_CORP = { env: "종운환경"', '?"종운건설":"종운환경")', ' (종운환경)</option>', ' (종운건설)</option>', 'esc(l.org || "")', '(l.org || "") + " 인허가 만료"', 'l.org||""); add(l.edu_due'];
+    const MAP3 = (x) => '(' + x + ' === "종운건설" ? "' + C3 + '" : ' + x + ' === "종운환경" ? "' + E3 + '" : (' + x + ' || ""))';
+    const KEEP3 = ['placeholder="법인 (종운환경 / 종운건설)"', 'document.getElementById("licOrg").value = l ? (l.org || "") : "종운환경";', '(l.org === "종운건설" ? "lease" : "self")', 'var orgCls = l.org === "종운건설" ? "lease" : "self";', "corp = /건설/.test(above) ? \"con\" : \"env\"", '<h1>종운환경 · 종운건설</h1>'];
+    const ok3 = (src) => { const mapN = ['l.org', 'x.org', 'v.co', 't'].reduce((a, x) => a + src.split(MAP3(x)).length - 1, 0);
+      return NEW3.every((x) => src.indexOf(x) >= 0) && OLD3.every((x) => src.indexOf(x) < 0) && KEEP3.every((x) => src.indexOf(x) >= 0) && mapN === 9 && src.indexOf('coDisp') < 0; };
+    const gd3 = readFileSync(join(ROOT, 'netlify/functions/gw-data.js'), 'utf8'), man3 = readFileSync(join(ROOT, 'MANUAL.html'), 'utf8');
+    const srv3 = gd3.indexOf("'headcount.env': '상시근로자 " + E3 + "', 'headcount.con': '상시근로자 " + C3 + "',") > 0 && gd3.indexOf("'reduce.env': '정기교육 감면 연도 " + E3 + "'") > 0 && gd3.indexOf("sub_contract: '공사 도급계약서 양식(" + C3 + "이 갑") > 0
+      && gd3.indexOf("const CDOC_CORP_NAME = { env: '종운환경', con: '종운건설' };") > 0;   // 기록물 표준 이름은 그대로
+    const manL3 = man3.split('\n'), manOk3 = [347, 522, 744, 940, 947, 969, 1239, 1257, 1258, 1263, 1264, 1447].every((n) => manL3[n - 1] !== undefined && !/(^|[^)㈜])종운(환경|건설)/.test(manL3[n - 1]))
+      && /종운건설/.test(manL3[549] + manL3[551]);   // 월말명세서 줄(550·552)은 29 세션 몫 — 그대로
+    const bad3 = [html.replace('SF_NOW_CO = [["", "전체"], ["env", "' + E3 + '"]', 'SF_NOW_CO = [["", "전체"], ["env", "종운환경"]'), html.replace('<option value="jw">' + C3 + '</option>', '<option value="jw">종운건설</option>'),
+      html.replace('vehSelFill("vehCo", ["종운건설"]', 'vehSelFill("vehCo", ["' + C3 + '"]'), html.replace('var orgCls = l.org === "종운건설"', 'var orgCls = l.org === "' + C3 + '"'), html.replace(MAP3('x.org'), '(x.org || "")')];
+    T('C326 이어서 회사 표시 글(법인격): 직원 소속·안전 체크 검진 명의·안전 설정 칸·감사 칸 이름·안전 현황 칩·회사 구분 줄·입찰 통과선·서류 작성 툴·참고 양식·차량 시행 회사·인허가 명의 칩·캘린더·전역 검색·일정 파일·급여 = 새 글 · 옛 글 0 · 값·저장 글·매칭·앱 머리 그대로 · 같은 식 9곳(도우미 없음 — 시험 틀이 함수만 떼어도 됨) · 서버 감사 칸·양식 이름(기록물 이름 그대로) · MANUAL 12줄(월말명세서 줄 그대로) · 결함 사본 ' + bad3.length,
+      ok3(html) && srv3 && manOk3 && bad3.every((b) => b !== html && !ok3(b)), JSON.stringify({ ok: ok3(html), srv3, manOk3, newMiss: NEW3.filter((x) => html.indexOf(x) < 0).map((x) => x.slice(0, 30)), oldLeft: OLD3.filter((x) => html.indexOf(x) >= 0), keepMiss: KEEP3.filter((x) => html.indexOf(x) < 0), bad: bad3.map((b) => b !== html && !ok3(b)) })); }
 } catch (e) { console.log('  (v382 검토 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v383: 서류 4종 패킷(생성 ✓ · 첨부 ◻ · 빈칸 ✗) ----
@@ -4732,7 +4754,7 @@ try {
   T('v436 ① 설정 없음(운영 지금 — 저장값 없음, 관리자): ⑤ 줄 = KOSHA · 석면 · 등록 · 17행 · 18행 · KOSHA "위험성평가 인정" + 단계 표시(미인정만 칠함)·알약 "미인정(입력 전)"·"관리자가 단계·날짜를 넣기 전입니다" · 회사 구분 블록 없음(블록 순서 그대로 ①부터) · 석면 알약 "B 71.6 · 앱 반영 대기"(2026 결과 · 앱 적격 계산 등급 D · 다음 평가 시기 = 의무 대장 16행 문구 · 누르면 의무 대장) · 등록기준 "관리자교육 0/2명"·장비 6종 문구 · 17·18행 = 의무 대장 글(누르면 의무 대장) · 출처 "안전 설정 · 입력은 관리자" · 꼬리 회사 구분 안내 + [고치기] 1개',
     H36.rowIds32(A36.ev).join(',') === 'KOSHA,석면,등록,17행,18행' && title36(A36.ev, 'KOSHA') === '위험성평가 인정 ' + STEPS36('none') && pills36(A36.ev, 'KOSHA') === '-:미인정(입력 전)' && meta36(A36.ev, 'KOSHA') === '관리자가 단계·날짜를 넣기 전입니다'
     && H36.order32(A36.out) === 'check,jcb,due,con,eval,confirm' && A36.corp === ''
-    && pills36(A36.ev, '석면') === 'am:B 71.6 · 앱 반영 대기' && title36(A36.ev, '석면') === '석면 안전성평가(종운건설) — 2026 결과'
+    && pills36(A36.ev, '석면') === 'am:B 71.6 · 앱 반영 대기' && title36(A36.ev, '석면') === '석면 안전성평가(㈜종운건설) — 2026 결과'
     && meta36(A36.ev, '석면') === '앱 적격 계산 등급은 아직 D · 통보서를 반영할 때 입찰 카드·의무 대장 16행까지 한 번에 고칩니다 · 다음 평가 시기(의무 대장 16행): ' + seed36[16].cycle && row36(A36.ev, '석면').indexOf('data-sfn-go="duty"') > 0
     && pills36(A36.ev, '등록') === 'am:관리자교육 0/2명' && meta36(A36.ev, '등록').indexOf(' · 장비 6종: ' + EQUIP36 + ' — 인력이 바뀌면 다시 확인') > 0
     && title36(A36.ev, '17행') === seed36[17].duty && title36(A36.ev, '18행') === seed36[18].duty && pills36(A36.ev, '17행') === '-:주기 문구' && row36(A36.ev, '18행').indexOf('data-sfn-go="duty"') > 0
@@ -4747,14 +4769,14 @@ try {
   const M5a36 = '중대재해처벌법·정기교육 적용(상시 5명 이상)', M5b36 = '중대재해처벌법·정기교육 제외(상시 5명 미만 — 특별교육은 적용)', M20a36 = '안전보건관리담당자 선임 대상(폐기물 수집·운반업 20~49명)', M20b36 = '안전보건관리담당자는 20명부터(폐기물 수집·운반업)', M50_36 = '50명 이상 — 안전관리 인력 선임 기준 다시 확인';
   T('v436 ② 회사 구분(맨 위 — 회사별 상시근로자 수 두 칸이 다 있을 때만): 한 칸만(18·빈칸 / 빈칸·4)·숫자 글("18")·설정 읽기 실패 = 블록 없음(⑤ 꼬리에 켜는 안내 — 읽기 실패면 두 칸 옛 값이 있어도) · 두 칸(18·4) = 맨 위 블록(순서 corp → ① …)·줄 종운환경·종운건설 "상시근로자 n명" · 문턱 배지(짧은 알약 + 메타 뜻): 5명(중처법·정기교육) 이상 am "5명↑ 중처법 적용"·미만 회색 "5명 미만" / 종운환경만 20명(안전보건관리담당자) — 19까지 알약 없이 메타 "20명부터"·20~49 am "20명↑ 담당자 선임"·50 이상 bad "50명↑ 기준 확인" / 0·0도 켜짐 · 켜지면 ⑤ 꼬리 안내 없음 · 근거 조문 꼬리 · 권민지형(비관리자)도 같은 블록',
     [c1, c2, c8, c9].every((x) => x.corp === '' && H36.order32(x.out).indexOf('corp') < 0) && c1.ev.indexOf(HINT36) > 0 && c9.ev.indexOf(HINT36) > 0
-    && H36.order32(c3.out) === 'corp,check,jcb,due,con,eval,confirm' && H36.rowIds32(c3.corp).join(',') === '종운환경,종운건설' && title36(c3.corp, '종운환경') === '상시근로자 18명' && title36(c3.corp, '종운건설') === '상시근로자 4명'
-    && pills36(c3.corp, '종운환경') === 'am:5명↑ 중처법 적용' && meta36(c3.corp, '종운환경') === M5a36 + ' · ' + M20b36 && pills36(c3.corp, '종운건설') === '-:5명 미만' && meta36(c3.corp, '종운건설') === M5b36 && c3.ev.indexOf(HINT36) < 0
-    && pills36(c4.corp, '종운환경') === 'am:5명↑ 중처법 적용|am:20명↑ 담당자 선임' && meta36(c4.corp, '종운환경') === M5a36 + ' · ' + M20a36 && pills36(c4.corp, '종운건설') === 'am:5명↑ 중처법 적용' && meta36(c4.corp, '종운건설') === M5a36
-    && pills36(c5.corp, '종운환경') === 'am:5명↑ 중처법 적용|bad:50명↑ 기준 확인' && meta36(c5.corp, '종운환경') === M5a36 + ' · ' + M50_36 && pills36(c5.corp, '종운건설') === 'am:5명↑ 중처법 적용'
-    && pills36(c6.corp, '종운환경') === '-:5명 미만' && meta36(c6.corp, '종운환경') === M5b36 + ' · ' + M20b36 && title36(c6.corp, '종운건설') === '상시근로자 0명'
-    && pills36(c7.corp, '종운환경') === 'am:5명↑ 중처법 적용' && meta36(c7.corp, '종운환경') === M5a36 + ' · ' + M20b36
+    && H36.order32(c3.out) === 'corp,check,jcb,due,con,eval,confirm' && H36.rowIds32(c3.corp).join(',') === '(주)종운환경,㈜종운건설' && title36(c3.corp, '(주)종운환경') === '상시근로자 18명' && title36(c3.corp, '㈜종운건설') === '상시근로자 4명'
+    && pills36(c3.corp, '(주)종운환경') === 'am:5명↑ 중처법 적용' && meta36(c3.corp, '(주)종운환경') === M5a36 + ' · ' + M20b36 && pills36(c3.corp, '㈜종운건설') === '-:5명 미만' && meta36(c3.corp, '㈜종운건설') === M5b36 && c3.ev.indexOf(HINT36) < 0
+    && pills36(c4.corp, '(주)종운환경') === 'am:5명↑ 중처법 적용|am:20명↑ 담당자 선임' && meta36(c4.corp, '(주)종운환경') === M5a36 + ' · ' + M20a36 && pills36(c4.corp, '㈜종운건설') === 'am:5명↑ 중처법 적용' && meta36(c4.corp, '㈜종운건설') === M5a36
+    && pills36(c5.corp, '(주)종운환경') === 'am:5명↑ 중처법 적용|bad:50명↑ 기준 확인' && meta36(c5.corp, '(주)종운환경') === M5a36 + ' · ' + M50_36 && pills36(c5.corp, '㈜종운건설') === 'am:5명↑ 중처법 적용'
+    && pills36(c6.corp, '(주)종운환경') === '-:5명 미만' && meta36(c6.corp, '(주)종운환경') === M5b36 + ' · ' + M20b36 && title36(c6.corp, '㈜종운건설') === '상시근로자 0명'
+    && pills36(c7.corp, '(주)종운환경') === 'am:5명↑ 중처법 적용' && meta36(c7.corp, '(주)종운환경') === M5a36 + ' · ' + M20b36
     && c10.corp === c3.corp && c3.corp.indexOf('산업안전보건법 시행령 제24조') > 0 && c3.corp.indexOf('중대재해처벌법 제3조') > 0 && c3.corp.indexOf('<div class="sfn-src">안전 설정의 회사별 상시근로자 수</div>') > 0,
-    JSON.stringify({ order: H36.order32(c3.out), p: [pills36(c3.corp, '종운환경'), pills36(c4.corp, '종운환경'), pills36(c5.corp, '종운환경'), pills36(c6.corp, '종운환경')], m: [meta36(c3.corp, '종운환경'), meta36(c3.corp, '종운건설')], off: [c1, c2, c8, c9].map((x) => x.corp.length) }));
+    JSON.stringify({ order: H36.order32(c3.out), p: [pills36(c3.corp, '(주)종운환경'), pills36(c4.corp, '(주)종운환경'), pills36(c5.corp, '(주)종운환경'), pills36(c6.corp, '(주)종운환경')], m: [meta36(c3.corp, '(주)종운환경'), meta36(c3.corp, '㈜종운건설')], off: [c1, c2, c8, c9].map((x) => x.corp.length) }));
 
   // ③ KOSHA 인정 줄 — 단계·날짜·만료 90일 경고(오늘 2026-11-10)
   const k1 = ev36({ set: SET36({ stage: 'none' }) });
@@ -4996,9 +5018,9 @@ try {
     "일용직의 이수 기록은 이 수에 넣지 않고 '일용직 이수자 n명은 세지 않음'으로 따로 적습니다(전담 인력에 넣을지는 따로 확인)",   // v436 검토 반영 — 직원만 셈
     '인허가 권한이 있고 그 인허가 행(석면해체·제거업)의 공개 대상이기도 한 분에게만 의무 대장 16행(다음 평가 시기)·17·18행 글도 함께 나오고',   // v436 검토 반영 — 공개범위 조건(옛 '인허가 권한이 있으면'은 아래 0번 대조)
     "아직 아무도 넣지 않았으면 KOSHA 줄은 <b>미인정(입력 전)</b>입니다. 인정 만료가 90일 안이면 <b>만료 D-n</b>, 지나면 <b>만료 지남</b> 경고가 붙습니다(만료가 지나면 '인정' 표시도 초록이 아닌 주황입니다). 재인정·사후점검 할 일 알림은 지금처럼 내 업무 y15~y18이 합니다",
-    '<p><b>회사 구분(맨 위)</b><br>회사별 상시근로자 수(종운환경·종운건설) 두 칸을 다 넣은 뒤에만 현황 맨 위에 나옵니다. 처음에는 꺼져 있고, 한 칸이라도 비우면 다시 꺼집니다.',
+    '<p><b>회사 구분(맨 위)</b><br>회사별 상시근로자 수((주)종운환경·㈜종운건설) 두 칸을 다 넣은 뒤에만 현황 맨 위에 나옵니다. 처음에는 꺼져 있고, 한 칸이라도 비우면 다시 꺼집니다.',
     '<p><b>관리자 — 안전 설정 넣기(KOSHA 인정 상태 · 회사별 인원)</b></p>', '관리자에게만 보입니다(안전 권한만 있는 분은 읽기만 합니다).', "사후점검 이력(한 줄에 '날짜 메모', 예: 2027-03-15 공단 사후점검 적합 — 10건까지)",
-    '회사별 상시근로자 수(종운환경 · 종운건설)를 0~999 사이 숫자로 넣습니다. 두 칸을 다 넣으면 현황 맨 위 회사 구분이 켜집니다.', '<b>다른 곳에서 먼저 고쳤습니다 — 새로 읽었습니다</b>가 뜨고 창이 새 값으로 바뀝니다',
+    '회사별 상시근로자 수((주)종운환경 · ㈜종운건설)를 0~999 사이 숫자로 넣습니다. 두 칸을 다 넣으면 현황 맨 위 회사 구분이 켜집니다.', '<b>다른 곳에서 먼저 고쳤습니다 — 새로 읽었습니다</b>가 뜨고 창이 새 값으로 바뀝니다',
     '현황은 아무것도 저장하지 않습니다(관리자의 ⑤ <span class="btn">고치기</span> 창만 안전 설정을 저장합니다).'];
   const ftv36 = (() => { const i = ft36.indexOf('\n### v436 (11/10)'); if (i < 0) return ''; const j = ft36.indexOf('\n### ', i + 5); return ft36.slice(i, j < 0 ? ft36.length : j); })();
   const ft7_36 = ft36.split('\n').filter((ln) => ln.indexOf('- **안전**(v428') === 0)[0] || '';
@@ -7884,7 +7906,7 @@ try {
     && !/\bloadEdu\b/.test(prefill8) && /\n    if\(k==="asb_plan"\) wkEduEnsure\(\);/.test(fn42(html, 'xgToggle')) && /if\(!w \|\| !canSee\("safety"\)\) return "";/.test(fn42(html, 'wkExamDate'));
   T('v442 ⑧ 해체계획서 ③ 건강진단 출처(실행 — 실제 xgBuildEdits·wkExamDate): 관리자 = 박반장·김일용·한준설 · 김일용 J "유"·L 2026-02-01(배치전·특수 중 가장 최근 — 특별교육 기록 안 씀) · 박반장(직원 기록·옛 exam 값) 빈칸 · 한준설(지운 기록·날짜 아닌 기록) 빈칸 · 81행 빈칸 · 안전 담당형 같음 · 안전 권한 없음(차량 담당형 — 기록이 메모리에 있어도) = J·L 모두 빈칸·이름 그대로 · 안내 줄 두 갈래("교육·검진 기록 … 가장 최근 날짜" / "빈칸으로 둡니다 — 안전 담당 확인") · 확인요망 두 갈래("기록이 없는 사람 2명" / "빈칸, 안전 담당 확인")·고른 사람 없으면 0 · 생성 창 투입 인력 칸에 그 안내 줄 · 정적: ③ 줄·[생성] 확인요망 한 줄(그 앞 wkEduEnsure — 검토)·교육 읽기는 생성 창 열기(xgPrefill)에 없고 석면해체계획서를 고를 때(xgToggle → wkEduEnsure)·권한 없으면 빈 값',
     edA8 === '박반장/s,/b,/b,김일용/s,유/s,2026-02-01/s,한준설/s,/b,/b,/b,/b' && edS8 === edA8 && edV8 === '박반장/s,/b,/b,김일용/s,/b,/b,한준설/s,/b,/b,/b,/b'
-    && JSON.stringify(exA8) === JSON.stringify(['③ 건강진단(유무·검진일)은 안전 › 체크 칸 기록(배치전·특수건강진단 가장 최근 날짜)으로 채웁니다 — 기록이 없는 사람은 빈칸 · [생성] 때 고른 사람의 검진 만료(종운건설 명의 1년·타회사 6개월)·특별교육·건설 기초 기록을 확인합니다', '③ 건강진단 기록이 없는 사람 2명 — 빈칸(안전 › 체크에서 확인)', '', '2026-02-01'])   // v447 칸 이름
+    && JSON.stringify(exA8) === JSON.stringify(['③ 건강진단(유무·검진일)은 안전 › 체크 칸 기록(배치전·특수건강진단 가장 최근 날짜)으로 채웁니다 — 기록이 없는 사람은 빈칸 · [생성] 때 고른 사람의 검진 만료(㈜종운건설 명의 1년·타회사 6개월)·특별교육·건설 기초 기록을 확인합니다', '③ 건강진단 기록이 없는 사람 2명 — 빈칸(안전 › 체크에서 확인)', '', '2026-02-01'])   // v447 칸 이름
     && JSON.stringify(exV8) === JSON.stringify(['③ 건강진단(유무·검진일)은 빈칸으로 둡니다 — 안전 담당 확인(건강진단 기록은 안전 권한)', '③ 건강진단(유무·검진일) — 빈칸, 안전 담당 확인(건강진단 기록은 안전 권한)', ''])
     && xgA8.indexOf('<div id="xgExamNote" style="font-size:12px;color:#888;margin-top:4px;">' + exA8[0] + '</div>') > 0 && xgV8.indexOf('>' + exV8[0] + '</div>') > 0 && st8,
     JSON.stringify({ edA8, edS8, edV8, exA8, exV8, st8 }));
@@ -11308,7 +11330,7 @@ try {
       && JSON.stringify(info.st) === JSON.stringify(['ok', 'exp', 'ok', 'exp', 'none', 'exp', 'ok', 'rec']) && JSON.stringify(info.n) === '[0,1,2,1,3,0,0]'
       && JSON.stringify(info.base) === JSON.stringify(['2026-11-25', '', '', '2026-11-12', '2026-11-12']) && JSON.stringify(info.edge) === '["ok","exp"]'
       && JSON.stringify(info.late) === '["g3","a2",null,"p1"]' && JSON.stringify(info.eom) === JSON.stringify(['2027-02-28', '2026-09-30', '2029-02-28', '2026-11-30', '2026-10-20', '2027-12-15', '', '', ''])
-      && a.docOf('worker', 'w11', '2026-12-15').med.st === 'ok' && a.docOf('worker', 'w11', '2026-12-15').med.until === '2027-03-01' && JSON.stringify(info.org) === JSON.stringify(['', '명의 모름', '종운건설', '타회사'])
+      && a.docOf('worker', 'w11', '2026-12-15').med.st === 'ok' && a.docOf('worker', 'w11', '2026-12-15').med.until === '2027-03-01' && JSON.stringify(info.org) === JSON.stringify(['', '명의 모름', '㈜종운건설', '타회사'])
       && d3.sp.ok === false && d3.basic.ok === false && dm.basic.na === true && d1.sp.rec.id === 'a1' && d1.basic.rec.id === 'a3';
     return { ok, info };
   };
@@ -11355,12 +11377,12 @@ try {
   const btn4 = (act, p, x) => ' <button type="button" class="mini-btn" data-site-doc="' + act + '" data-doc-p="' + p + '"' + (act === 'edit' ? ' data-doc-id="' + x + '"' : ' data-doc-kind="' + x + '"') + '>' + (act === 'edit' ? '수정' : '+ 기록') + '</button>';
   T('v451 ④ 근로자별 신고 서류 표(실행): 석면 예정 = 6줄(직원 → 일용직 차례) · 갑돌 = "✓ 2026-11-01"·"2026-03-02 · 종운건설 · 유효 ~2027-03-02"·"✓ 2019-04-01" 색 없음·칸마다 [수정] · 을순 검진 = 빨강 "2026-04-20 · 타회사 · 만료 2026-10-20" + [수정] + [+ 기록] · 병수 = 특별교육 노랑 "기록 없음"·검진 "2026-08-01 · 명의 모름 · 유효 ~2027-02-01"·건설 기초 노랑 · 무진 = 세 칸 노랑 "기록 없음" + [+ 기록](특별교육·검진·건설 기초 종류) · 직원 건설 기초 = "직원 — 판정 안 함"(색 없음) · 머리 "신고 서류 — 근로자별 6명"·꼬리 유효기간 규칙·기준일 · 안전 보기 = 버튼 0(표는 보임) · 종결 현장 = 2줄·색 0·"기록만 보여 줍니다(판정 안 함)"·버튼 있음 · 안전 권한 없음·기록 못 읽음·철거 = 표 없음 · 일용직 숨김 = 직원 줄 + "일용직 7명은 일용직 명부를 볼 권한이 없어"',
     R4.length === 6 && R4.map((r) => r.name).join(',') === '석면직원,갑돌,을순,병수,정미,무진' && R4.map((r) => r.type).join(',') === '직원,일용직,일용직,일용직,일용직,일용직'
-    && JSON.stringify(by4(R4, '갑돌').k) === '["","",""]' && by4(R4, '갑돌').c[0] === '✓ 2026-11-20' + btn4('edit', 'worker:w1', 'a1')   /* C262: 일용직 특별교육은 기준일 1주일 안 — 가짜 자료 11-20 */ && by4(R4, '갑돌').c[1] === '2026-03-02 · 종운건설 · 유효 ~2027-03-02' + btn4('edit', 'worker:w1', 'a2') && by4(R4, '갑돌').c[2] === '✓ 2019-04-01' + btn4('edit', 'worker:w1', 'a3')
+    && JSON.stringify(by4(R4, '갑돌').k) === '["","",""]' && by4(R4, '갑돌').c[0] === '✓ 2026-11-20' + btn4('edit', 'worker:w1', 'a1')   /* C262: 일용직 특별교육은 기준일 1주일 안 — 가짜 자료 11-20 */ && by4(R4, '갑돌').c[1] === '2026-03-02 · ㈜종운건설 · 유효 ~2027-03-02' + btn4('edit', 'worker:w1', 'a2') && by4(R4, '갑돌').c[2] === '✓ 2019-04-01' + btn4('edit', 'worker:w1', 'a3')
     && JSON.stringify(by4(R4, '을순').k) === '["","vs-dan",""]' && by4(R4, '을순').c[1] === '2026-04-20 · 타회사 · 만료 2026-10-20' + btn4('edit', 'worker:w2', 'b2') + btn4('add', 'worker:w2', 'spec_med')
     && JSON.stringify(by4(R4, '병수').k) === '["vs-warn","","vs-warn"]' && by4(R4, '병수').c[1] === '2026-08-01 · 명의 모름 · 유효 ~2027-02-01' + btn4('edit', 'worker:w3', 'c1')
     && JSON.stringify(by4(R4, '무진').k) === '["vs-warn","vs-warn","vs-warn"]' && JSON.stringify(by4(R4, '무진').c) === JSON.stringify(['기록 없음' + btn4('add', 'worker:w5', 'special'), '기록 없음' + btn4('add', 'worker:w5', 'spec_med'), '기록 없음' + btn4('add', 'worker:w5', 'basic_con')])
     && JSON.stringify(by4(R4, '석면직원').k) === '["","",""]' && /직원 — 판정 안 함<\/span>/.test(by4(R4, '석면직원').c[2]) && t4.indexOf('신고 서류 — 근로자별 6명 (특별교육일지 · 특수건강검진표 · 건설업 기초교육 수료증)') > 0
-    && t4.indexOf('검진 유효기간 — 종운건설 명의 1년 · 타회사 명의 6개월 · 명의를 모르면 6개월로 봄 · 기준일 2026-11-25(착수일)') > 0 && t4.indexOf('data-site-doctb="s1"') > 0
+    && t4.indexOf('검진 유효기간 — ㈜종운건설 명의 1년 · 타회사 명의 6개월 · 명의를 모르면 6개월로 봄 · 기준일 2026-11-25(착수일)') > 0 && t4.indexOf('data-site-doctb="s1"') > 0
     && rows4(t4v).length === 6 && t4v.indexOf('data-site-doc=') < 0 && t4v.indexOf('vs-dan') > 0
     && R4d.length === 2 && R4d.map((r) => r.name).join(',') === '옛날,을순' && R4d.every((r) => r.k.join('') === '') && t4d.indexOf('종결 현장 — 기록만 보여 줍니다(판정 안 함)') > 0 && by4(R4d, '을순').c[1] === '2026-04-20 · 타회사' + btn4('edit', 'worker:w2', 'b2')
     && by4(R4d, '옛날').c[0] === '✓ 2024-05-01' + btn4('edit', 'worker:w8', 'h1') && /^<span style="color:#9AA09C;">-<\/span> <button[^>]*data-doc-kind="spec_med"/.test(by4(R4d, '옛날').c[1])
@@ -11435,7 +11457,7 @@ try {
   const r7_51 = chk7_51(html);
   const m7_51 = [mut51('if(org) r.org=org; else if(!isNew && r.org!=null) r.org=null;', 'if(org) r.org=org;'), mut51('        if(org) nr.org=org;   // v451\n', ''), mut51('if (k === "spec_med" || k === "pre_med") m = asbMedMonths(org);', ''),   /* C262: 배치전도 같은 줄 */
     mut51('return (eduIsMed(kind) && Object.prototype.hasOwnProperty.call(ASB_MED_ORG, v)) ? v : "";', 'return v;'), mut51('if(ob) ob.style.display = eduIsMed(k) ? "" : "none";', 'if(ob) ob.style.display = "";')].map((s) => safe51(() => chk7_51(s)).ok);
-  const h51 = html.indexOf('<select id="eduOrg"><option value="">명의 모름</option><option value="jw">종운건설</option><option value="other">타회사</option></select>') > 0 && V.cnt47(html, 'id="eduOrgBox"') === 1
+  const h51 = html.indexOf('<select id="eduOrg"><option value="">명의 모름</option><option value="jw">㈜종운건설</option><option value="other">타회사</option></select>') > 0 && V.cnt47(html, 'id="eduOrgBox"') === 1
     && V.cnt47(html, 'document.getElementById("eduOrg").addEventListener("change", function(){ if (document.getElementById("eduKind").value === "spec_med") eduAutoNext(); });') === 1;
   T('v451 ⑦ 이력 창 받은 회사 명의(실행 — 실제 openEdu·saveEdu·eduAutoNext): 칸은 검진 두 종류(배치전·특수)에서만 보임 · 새 창은 "명의 모름" · 종운건설 = 줄에 org jw·다음 예정 +12개월 · 고르지 않음 = org 칸 없음·+6개월 · 고칠 때 저장된 명의가 채워짐 · 다른 종류로 바꿔 저장 = org null(409 병합에서 되살아나지 않게) · 검진 밖 종류·모르는 값 = org 안 적음 · 여럿에게 넣기 = 사람마다 org · HTML 칸(모름·종운건설·타회사)·명의 바꿈 배선 · 결함 사본 5개(종류 바꿔도 org 남음·여럿 넣기 org 빠짐·다음 예정 12개월 고정·모르는 값 저장·칸 늘 보임) = 모두 ✗',
     r7_51.ok && m7_51.every((v) => v === false) && h51, JSON.stringify({ r: r7_51.info, mut: m7_51, h51 }));
@@ -11446,7 +11468,7 @@ try {
   const xg8 = html.indexOf('var exM=wkExamMissing(exWs); if(exM) missing.push(exM);'), xg8b = html.indexOf('wkDocMissing(exWs, wkDocBase(findProc(xgCtx.id))).forEach(function(x){ missing.push(x); });');
   T('v451 ⑧ 석면해체계획서 생성 창(실행): ③ 검진일 = 한 판정의 가장 최근 검진(지운 기록·날짜 아닌 기록 빼고 2025-01-01) · [생성] 확인요망 = "③ 건강진단이 기준일 2026-11-25에 만료된 사람 1명 — 을순(만료 2026-10-20 · 타회사) · 검진일은 그대로 적힙니다(유효기간: …)"·"특별교육 기록이 없는 사람 2명 — 병수, 무진"·"건설업 기초교육 수료 기록이 없는 사람 2명 — 병수, 무진" · 모두 갖춘 사람만 = 줄 없음 · 안전 권한 없음·기록을 못 읽음·고른 사람 없음 = 줄 없음(③ 줄은 종전 글) · 생성 창 읽기 표시가 실패로 남아도 기록이 읽혀 있으면 줄이 나옴 · 기준일 = 연결 석면 현장 착수일 · 연결 없음·종결 현장 = 오늘 · [생성] 길에서 ③ 줄 다음에 붙음(정적)',
     X8.api.exDate(W8(['w7'])[0]) === '2025-01-01' && X8.api.exDate(W8(['w1'])[0]) === '2026-03-02' && X8.api.exDate(W8(['w5'])[0]) === '' && X8n.api.exDate(X8n.env.workers[0]) === ''
-    && JSON.stringify(miss8) === JSON.stringify(['③ 건강진단이 기준일 2026-11-25에 만료된 사람 1명 — 을순(만료 2026-10-20 · 타회사) · 검진일은 그대로 적힙니다(유효기간: 종운건설 명의 1년 · 타회사 명의 6개월 · 명의를 모르면 6개월로 봄)',
+    && JSON.stringify(miss8) === JSON.stringify(['③ 건강진단이 기준일 2026-11-25에 만료된 사람 1명 — 을순(만료 2026-10-20 · 타회사) · 검진일은 그대로 적힙니다(유효기간: ㈜종운건설 명의 1년 · 타회사 명의 6개월 · 명의를 모르면 6개월로 봄)',
       '특별교육 기록이 없는 사람 2명 — 병수, 무진 (노동부 신고 서류: 특별교육일지)', '건설업 기초교육 수료 기록이 없는 사람 2명 — 병수, 무진 (노동부 신고 서류: 수료증)'])
     && X8.api.wkMiss(W8(['w1']), '2026-11-25').length === 0 && X8.api.wkMiss([], '2026-11-25').length === 0 && X8n.api.wkMiss(X8n.env.workers.slice(0, 3), '2026-11-25').length === 0 && X8t.api.wkMiss(X8t.env.workers.slice(0, 3), '2026-11-25').length === 0 && X8s.api.wkMiss(X8s.env.workers.slice(0, 3), '2026-11-25').length === 3
     && X8.api.wkBase(X8.env.contracts[0]) === '2026-11-25' && X8.api.wkBase(X8.env.contracts[1]) === '2026-11-12' && X8.api.wkBase(X8.env.contracts[2]) === '2026-11-12' && X8.api.wkBase(null) === '2026-11-12'
@@ -14901,7 +14923,7 @@ try {
         a3 === '', a4 === '', a5.indexOf('>지입차주<') > 0 && a5.indexOf('고용형태 없음') < 0, a6 === ''];
     } catch (e) { run = [false, String(e.message)]; }
     const st = [emp.indexOf('<option value="">(고르지 않음)</option><option value="정규직">') === 0, emp.indexOf('<option value="지입차주">') > 0, ['정규직', '계약직', '일용직', '아르바이트', '기타'].every((v) => emp.indexOf('<option value="' + v + '">' + v + '</option>') >= 0),
-      corp.indexOf('<option value="both">') > 0 && corp.indexOf('<option value="env">종운환경</option><option value="con">종운건설</option>') > 0,
+      corp.indexOf('<option value="both">') > 0 && corp.indexOf('<option value="env">(주)종운환경</option><option value="con">㈜종운건설</option>') > 0,
       h.indexOf('document.getElementById("meEmp").value = m ? (m.emp_type||"") : "정규직";') > 0, h.indexOf('(m.corp === "env" || m.corp === "con" || m.corp === "both")) ? m.corp : "";') > 0,
       row.indexOf('chips += hrEmpCorpChips(m, isRet);') > 0,
       /const MEMBER_CORP = \{ env: 1, con: 1, both: 1 \};/.test(a), a.indexOf("} if (seeSafety && m.emp_type === '지입차주') o.emp_type = '지입차주';") > 0 && !/o\.emp_type = m\.emp_type/.test(a)];
@@ -15670,7 +15692,7 @@ try {
     && !/function eduReduce\(\)/.test(h) && /BAD_REDUCE: "감면 적용 연도는/.test(h)
     && /function safetyYears\(v\) \{/.test(g) && /if \(re === null \|\| rc === null\) return \{ code: 'BAD_REDUCE' \};/.test(g)
     && /const nv = \(d\.reduce === undefined && cur\.v\) \? \{ v: Object\.assign\(\{\}, nv0\.v, \{ reduce: cur\.v\.reduce \}\) \} : nv0;/.test(g)
-    && /reduce: nv\.v\.reduce, prev: cur\.doc \? \{ kosha: cur\.v\.kosha, headcount: cur\.v\.headcount, reduce: cur\.v\.reduce,/.test(g) && /'reduce\.env': '정기교육 감면 연도 종운환경', 'reduce\.con': '정기교육 감면 연도 종운건설'/.test(g);
+    && /reduce: nv\.v\.reduce, prev: cur\.doc \? \{ kosha: cur\.v\.kosha, headcount: cur\.v\.headcount, reduce: cur\.v\.reduce,/.test(g) && /'reduce\.env': '정기교육 감면 연도 \(주\)종운환경', 'reduce\.con': '정기교육 감면 연도 ㈜종운건설'/.test(g);
   const rdF76 = (vals) => {
     const els = {}; const el = (id) => els[id] || (els[id] = { value: '' });
     Object.assign(el('sfSetStage'), { value: 'none' }); Object.keys(vals).forEach((k) => { el(k).value = vals[k]; });
@@ -22418,7 +22440,7 @@ try {
     I.cmp = /같음 13칸 · 다름 3칸/.test(h) && h.indexOf('가짜이 · 국민연금') > 0 && h.indexOf('기준이 없는 1명') > 0 && h.indexOf('&lt;b&gt;앱만') > 0 && h.indexOf('<b>앱만') < 0 && typeof f.cap.save === 'function';
     // 엑셀: 머리 두 줄 + 사람 두 줄 + 합계 두 줄 · 칸 순서 = 대장
     f.payExportXlsx(); const R = (cap.dl || {}).rows || [];
-    I.xls = R.length === 8 && R[2].join('|').indexOf('사원번호|성명|기본급|수당|초과/차감 수당|상여금|식대|자가운전보조금|4대보험적용총액|국민연금') === 0 && R[3][8] === '지급총액' && R[4][1] === '가짜 이' && R[4][16] === 2626268 && R[5][8] === 2950728 && R[6][0] === '합계' && /급여대장_종운환경_2026-11\.xlsx/.test(cap.dl.name);
+    I.xls = R.length === 8 && R[2].join('|').indexOf('사원번호|성명|기본급|수당|초과/차감 수당|상여금|식대|자가운전보조금|4대보험적용총액|국민연금') === 0 && R[3][8] === '지급총액' && R[4][1] === '가짜 이' && R[4][16] === 2626268 && R[5][8] === 2950728 && R[6][0] === '합계' && /급여대장_\(주\)종운환경_2026-11\.xlsx/.test(cap.dl.name);
     const sl = f.paySlipHtml({ member: { name: '<i>x</i>', rank: '반장' }, calc: C({ dredge: { days: 11, paid_days: 1, ot: 2, total: 190000 } }) }, D);
     I.slip = sl.indexOf('2,626,268원') > 0 && sl.indexOf('&lt;i&gt;x') > 0 && sl.indexOf('<i>x') < 0 && sl.indexOf('하수준설 수당: 2026-10-15 ~ 2026-11-14 근무 11일 중 추가 지급 1일') > 0;
     return { ok: Object.values(I).every((x) => x === true), info: I };

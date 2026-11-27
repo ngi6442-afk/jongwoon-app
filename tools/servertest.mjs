@@ -6213,7 +6213,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     && !!st1_80 && st1_80.schema === 1 && st1_80.prev === null && st1_80.updated_by === 'uadmin' && st1_80.updated_at === w1_80.body.updated_at && JSON.stringify(st1_80.kosha) === JSON.stringify(good80.kosha) && JSON.stringify(st1_80.headcount) === '{"env":18,"con":4}' && st1_80.extra === undefined && st1_80.kosha.junk === undefined
     && au1_80.length === 1 && au1_80[0].by === '관리자' && au1_80[0].bid === 'uadmin' && au1_80[0].ev.length === 1 && au1_80[0].ev[0].op === '안전설정' && au1_80[0].ev[0].id === KEY80
     && JSON.stringify(au1_80[0].ev[0].f) === JSON.stringify({ 'kosha.stage': ['(입력 전)', '접수'], 'kosha.apply_no': ['', 'K-2026-0001'], 'kosha.applied_on': ['', '2026-11-12'], 'headcount.env': ['', '18'], 'headcount.con': ['', '4'] })
-    && au1_80[0].ev[0].t === 'KOSHA 단계 (입력 전)→접수 · 접수번호 —→K-2026-0001 · 접수일 —→2026-11-12 · 상시근로자 종운환경 —→18 · 상시근로자 종운건설 —→4'
+    && au1_80[0].ev[0].t === 'KOSHA 단계 (입력 전)→접수 · 접수번호 —→K-2026-0001 · 접수일 —→2026-11-12 · 상시근로자 (주)종운환경 —→18 · 상시근로자 ㈜종운건설 —→4'
     && g1_80.code === 200 && JSON.stringify(g1_80.body.settings) === JSON.stringify(w1_80.body.settings) && g1_80.body.updated_at === w1_80.body.updated_at && g1_80.body.updated_by === 'uadmin',
     JSON.stringify({ w1: [w1_80.code, w1_80.body.error_code, w1_80.body.settings], st1: st1_80, au: au1_80.map((a) => a.ev) }));
 
@@ -6277,7 +6277,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const e3_80 = await set80(Object.assign({ base: e2_80.body.updated_at }, edge80), tokA), eAu3_80 = aud80().slice(-1)[0], eCon3_80 = mem.gw_data[KEY80] && mem.gw_data[KEY80].headcount.con;
   T('80 v436 상한 경계·빈칸↔0(검토 반영): 접수번호 40자·메모 100자·사후점검 10건·인원 999 → 200(그대로 저장) · 빈칸 → 0명 = 200(같은 값 아님 — 저장 0)·감사 f {"headcount.con": ["", "0"]}·글 "상시근로자 종운건설 —→0" · 0명 → 빈칸 = 200·감사 f {"headcount.con": ["0", ""]} · 감사 +3줄',
     e1_80.code === 200 && !!eSt1_80 && eSt1_80.kosha.apply_no === 'A'.repeat(40) && eSt1_80.kosha.checks.length === 10 && eSt1_80.kosha.checks[0].note === 'n'.repeat(100) && eSt1_80.headcount.env === 999 && eSt1_80.headcount.con === ''
-    && e2_80.code === 200 && eCon2_80 === 0 && !!eAu2_80 && JSON.stringify(eAu2_80.ev[0].f) === JSON.stringify({ 'headcount.con': ['', '0'] }) && eAu2_80.ev[0].t === '상시근로자 종운건설 —→0'
+    && e2_80.code === 200 && eCon2_80 === 0 && !!eAu2_80 && JSON.stringify(eAu2_80.ev[0].f) === JSON.stringify({ 'headcount.con': ['', '0'] }) && eAu2_80.ev[0].t === '상시근로자 ㈜종운건설 —→0'
     && e3_80.code === 200 && eCon3_80 === '' && !!eAu3_80 && JSON.stringify(eAu3_80.ev[0].f) === JSON.stringify({ 'headcount.con': ['0', ''] }) && aud80().length === aud9n80 + 3,
     JSON.stringify({ e: [e1_80.code + '/' + (e1_80.body.error_code || ''), e2_80.code + '/' + (e2_80.body.error_code || ''), e3_80.code + '/' + (e3_80.body.error_code || '')], f2: eAu2_80 && eAu2_80.ev[0].f, f3: eAu3_80 && eAu3_80.ev[0].f }));
 
@@ -6321,7 +6321,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   const rOld80 = await get80(tokA);
   T('80 v476 정기교육 감면 연도(reduce): 저장 200 = 연도 글 목록(2027·"2026"·"2026" → ["2026","2027"])·응답 settings.reduce 같음·감사 f reduce.env ["", "2026, 2027"] · 잘못된 값 7종(두 자리·1999·목록 아님·11개·배열·글·null) = 400 BAD_REDUCE·저장·감사 그대로 · reduce 없는 요청(옛 앱 — 인원만 고침) = 200·감면 연도 그대로·prev에 reduce·감사 f는 인원만 · 비우고 다른 회사에 넣기 = 감사 두 칸 · 같은 값 = NO_CHANGE · reduce 없는 옛 저장값 = 읽기 200·빈 목록',
     r1_80.code === 200 && JSON.stringify(rSt1_80.reduce) === '{"env":["2026","2027"],"con":[]}' && JSON.stringify(r1_80.body.settings.reduce) === '{"env":["2026","2027"],"con":[]}' && !!rAu1_80 && JSON.stringify(rAu1_80.ev[0].f['reduce.env']) === '["","2026, 2027"]' && rAu1_80.ev[0].f['reduce.con'] === undefined
-    && /정기교육 감면 연도 종운환경 —→2026, 2027/.test(rAu1_80.ev[0].t)
+    && /정기교육 감면 연도 \(주\)종운환경 —→2026, 2027/.test(rAu1_80.ev[0].t)
     && rBad80.length === 7 && rBad80.every((x) => x === '400/BAD_REDUCE') && rBadKeep80
     && r2_80.code === 200 && JSON.stringify(rSt2_80.reduce) === '{"env":["2026","2027"],"con":[]}' && rSt2_80.headcount.env === 19 && JSON.stringify(rSt2_80.prev.reduce) === '{"env":["2026","2027"],"con":[]}' && JSON.stringify(Object.keys(rAu2_80.ev[0].f)) === '["headcount.env"]'
     && r3_80.code === 200 && JSON.stringify(rSt3_80.reduce) === '{"env":[],"con":["2027"]}' && JSON.stringify(rAu3_80.ev[0].f) === JSON.stringify({ 'reduce.env': ['2026, 2027', ''], 'reduce.con': ['', '2027'] })
