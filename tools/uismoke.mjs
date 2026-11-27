@@ -11669,7 +11669,7 @@ try {
   // 절 찾기는 제목 글까지('— 보안') — 같은 판 번호를 쓰는 다른 갈래 절이 합쳐져도 이 절을 잡게(v453 검토)
   const ftv51 = (() => { const i = ft51.indexOf('\n### v453 (11/13) — 보안'); if (i < 0) return ''; const j = ft51.indexOf('\n### ', i + 5); return ft51.slice(i, j < 0 ? ft51.length : j); })();
   const tlv51 = (() => { const i = tl51.indexOf('\n## v453 — 보안'); if (i < 0) return ''; const j = tl51.indexOf('\n## ', i + 5); return tl51.slice(i, j < 0 ? tl51.length : j); })();
-  const cb51 = tlv51.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), ops51 = cb51.filter((l) => /^- \[ \] \(AI 운영 확인/.test(l)), gate51 = cb51.filter((l) => /^- \[x\] \(AI\) `/.test(l));
+  const cb51 = tlv51.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), ops51 = cb51.filter((l) => /^- \[[ x]\] \(AI 운영 확인/.test(l)), gate51 = cb51.filter((l) => /^- \[x\] \(AI\) `/.test(l));   // 11/28 C241: 확인 뒤 [x]로 닫은 운영 칸도 셈 — 칸이 있는지만 봄
   const FT51 = ['`backup_put`', 'RESTORE_MODE_ONLY', '`BACKUP_MEMBER_AUTH`', '`BACKUP_MEMBER_IDENT`', '`backupLogMerge`', 'AUDIT_FULL', '`autotaskRuleOf`', '`botKeyOk`', '`settings_apply`', "op '설정적용'", "op '재해복원'",
     'collectors/restore.py', '"restore": true', 'C093', 'C094', '서버만', '화면 변경 없음', 'servertest 85', '9/1 수용 위험 3종',
     '`badBlobKey`', '`BAD_KEY`', '`doclog:*`', '`clog:contract`', '`restored: <복원 시각>`', '`blocked_rules.unknown`', '`AUTOTASK_KEY_RE`', '`NEED_CONFIRM`', '`BAD_DRY`',
@@ -13711,7 +13711,7 @@ try {
     const FT = ['C084', 'stmt_sent', 'SENT_LOCKED', 'NO_VEH_ACCESS', "'월말명세서' ③ 대표 전결", '결재 없이', 'stmt_match', 'NOT_BALANCED', 'servertest 89', 'uismoke 29 판'];
     const GATE = ['uismoke', 'consheet_check', 'proctpl_check', 'settletest', 'servertest', 'rectest', 'promoqual_check', 'promogen_check', 'promoqlearn_check', 'promostream_check', 'promo_wrap_check', 'promo_post_check'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = Number((ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 461 && ftv.length > 0 && mF.length === 0 && tlv.length > 0 && scr.some((l) => /^- \[ \]/.test(l)) && !scr.some((l) => /PM/.test(l)) && !cb.some((l) => /^- \[ \] \(PM/.test(l))
+    const ok = Number((ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 461 && ftv.length > 0 && mF.length === 0 && tlv.length > 0 && scr.length >= 1 /* 11/28 C241: 화면 칸을 확인 뒤 [x]로 닫음 — 칸이 있는지만 봄 */ && !scr.some((l) => /PM/.test(l)) && !cb.some((l) => /^- \[ \] \(PM/.test(l))
       && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0))
       && m91.indexOf('대표 결재 상신') > 0 && m91.indexOf('결제 지시') > 0 && m91.indexOf('전달함') > 0 && m91.indexOf('차량 탭') > 0 && /stmt = 월말명세서 열/.test(man)
       && cl.indexOf('`// @stmt-sheet-start ~ end`') > 0 && cl.indexOf('`stmt_sent`') > 0 && Number((sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 461;   // v462: 기준 줄·sw는 이 판 이상(이 판 값은 v462 문서 검사)
@@ -14321,7 +14321,7 @@ try {
     const CL = ['**P1 판26·27(v463', '**P1 판28(v463', '**PM 콘솔(v463', '**감사 로그 덮어쓰기 막기(v463)**'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 463 && ftv.length > 0 && mF.length === 0   // v464: 기준 줄·sw는 이 판 이상(이 판 값은 v464 문서 검사)
-      && tlv.length > 0 && cb.length === 32 && scr.length === 26 && gate.length === 6 && cb.every((l) => /^- \[x\] \(AI\) /.test(l) || /^- \[ \] \(AI 시험 화면 대상/.test(l)) && !scr.some((l) => /PM/.test(l)) && !cb.some((l) => /^- \[ \] \(PM/.test(l))
+      && tlv.length > 0 && cb.length === 32 && scr.length === 26 && gate.length === 6 && cb.every((l) => /^- \[x\] \(AI\) /.test(l) || /^- \[[ x]\] \(AI 시험 화면 대상/.test(l)) && !scr.some((l) => /PM/.test(l)) && !cb.some((l) => /^- \[ \] \(PM/.test(l))   // 11/28 C241: 확인 뒤 [x]로 닫은 화면 칸도 셈
       && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && SECT.every((s) => tlv.indexOf(s) > 0)
       && m161.indexOf('법정 검사 제안') > 0 && m161.indexOf('시행 회사') > 0 && m161.indexOf('대상 아님') > 0
       && ['완료+수령 올리기', '기한 정정', '해당 없음', '기준일 입력'].every((b) => m341.indexOf(b) > 0) && d.man.indexOf('이번 달 칸은 아직 할 일을 자동으로 만들지 않고') < 0
@@ -14335,7 +14335,7 @@ try {
   const M63 = [mu63('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v462 (')),
     mu63('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v462'")),
     mu63('ft', (s) => s.split('PMCON_MARKS_FULL').join('PMCON_MARKS')),
-    mu63('tl', (s) => s.replace('- [ ] (AI 시험 화면 대상 — 판29) 직원 계정에는', '- [ ] (PM) 직원 계정에는')),
+    mu63('tl', (s) => s.replace(/- \[[ x]\] \(AI 시험 화면 대상 — 판29\) 직원 계정에는/, '- [ ] (PM) 직원 계정에는')),   // 11/28 C241: 닫은 칸([x])도 바꿈
     mu63('tl', (s) => { const e = s.indexOf('\n## v464 '); const k = s.lastIndexOf('`promostream_check`', e < 0 ? s.length : e); return s.slice(0, k) + 'promostream_check' + s.slice(k + 19); }),
     mu63('man', (s) => s.replace('<h3 id="s34-1">', '<h3>')),
     mu63('cl', (s) => s.replace('**PM 콘솔(v463', '**PM 콘솔(')),
@@ -14643,7 +14643,7 @@ try {
     const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
     const ftv = cut(d.ft, '\n### v465 (11/14)', '\n### '), tlv = cut(d.tl, '\n## v465 ', '\n## ');
     const m2171 = cut(d.man, '<h3 id="s21-7-1">', '<h3'), m213 = cut(d.man, '<h3>21-3. 감사로그</h3>', '<h3'), m214 = cut(d.man, '<h3>21-4. 백업</h3>', '<h3');
-    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), scr = cb.filter((l) => /^- \[ \] \(AI 시험 화면 대상/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI 시험 화면 대상/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l));   // 11/28 C241: 확인 뒤 [x]로 닫은 화면 칸도 셈 — 칸이 있는지만 봄
     const FT = ['C130', 'T476', 'T422', 'C138 ②', 'C128 ②', '`conchk_get`', '`conchk_confirm`', '`CONCHK_DONE`', '@pmcon-conchk-end', '`SMALL_N`', '`mchk_get`', '`mchk_ack`', '`mchk_run`', '`gw-mchk-cron`', '`0 22 * * *`',
       '`mchk:backup:YYYY-MM`', '`mchk:backup:since`', '`mchk:alerts:YYYY-MM`', '`mchk:alerts:since`', '`readMonth(month)`', '`audit:YYYY-MM:n`', '`PART_MAX`', '`.veh-no-w`', '8f1229b', '1,696줄·382,546바이트',
       '`auditListParts`', '머리를 다시 쓰지 않는다', '`ev.pfill`', '`ev.tauto`', '`mchk:since`', '`OVERDUE_DAY`', '`prev_acks`', '123 → 124건', '`backup_put`'];
@@ -14651,7 +14651,7 @@ try {
     const CL = ['**P1 판30 계약 서류 분기 점검 카드(v465', '**P1 판31 월 점검(v465', '**감사 기록 월 상한 분할(v465)**', '**조각을 넘길 때 머리를 다시 쓰지 말 것**', '`ev.pfill`', '`ev.tauto`', '`mchk:since`', '`prev_acks`'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 465 && ftv.length > 0 && mF.length === 0   // v466: 기준 줄·sw는 이 판 이상(이 판 값은 v466 문서 검사)
-      && tlv.length > 0 && cb.length === 19 && scr.length === 15 && gate.length === 4 && cb.every((l) => /^- \[x\] \(AI\) /.test(l) || /^- \[ \] \(AI 시험 화면 대상/.test(l)) && !cb.some((l) => /PM/.test(l))
+      && tlv.length > 0 && cb.length === 19 && scr.length === 15 && gate.length === 4 && cb.every((l) => /^- \[x\] \(AI\) /.test(l) || /^- \[[ x]\] \(AI 시험 화면 대상/.test(l)) && !cb.some((l) => /PM/.test(l))
       && GATE.every((g) => gate.some((l) => l.indexOf('`' + g + '`') > 0)) && ["'P1 판30' 7항목", "'P1 판31' 13항목", "결함 사본 73", "'P1 판30' 5", "'P1 판31' 7", "'감사 기록 조각 1개 없음", "'월 점검 기록 없음 — 크론 확인'"].every((s) => tlv.indexOf(s) > 0)
       && ['점검 카드', '계약 서류 목록 — 분기 점검', '목록에 넣자는 제안', '서류 목록 편집 열기', '월 점검', '처리 지시', '새 알림(푸시)은 가지 않습니다', '<b>확인 못 함</b>은', '<b>월 점검 기록 없음 — 크론 확인</b>', '승인을 푼 때부터 7일'].every((s) => m2171.indexOf(s) > 0)
       && m213.indexOf('잘리지 않습니다') > 0 && m213.indexOf('<b>감사 기록 조각 n개 없음</b>') > 0 && m214.indexOf('월 점검') > 0 && !/mchk|conchk|audit:/.test(m2171 + m213 + m214)
@@ -14663,7 +14663,7 @@ try {
   const M65 = [mu65('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v464 (')),
     mu65('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v464'")),
     mu65('ft', (s) => s.split('`mchk:backup:since`').join('mchk:backup:since')),
-    mu65('tl', (s) => s.replace('- [ ] (AI 시험 화면 대상 — 판31) [처리 지시]', '- [ ] (PM 확인 — 판31) [처리 지시]')),
+    mu65('tl', (s) => s.replace(/- \[[ x]\] \(AI 시험 화면 대상 — 판31\) \[처리 지시\]/, '- [ ] (PM 확인 — 판31) [처리 지시]')),   // 11/28 C241: 닫은 칸([x])도 바꿈
     mu65('tl', (s) => { const e = s.indexOf('\n## v466 '); const k = s.lastIndexOf('`promostream_check`', e < 0 ? s.length : e); return s.slice(0, k) + 'promostream_check' + s.slice(k + 19); }),
     mu65('man', (s) => s.split('점검 카드').join('점검 칸')),
     mu65('man', (s) => s.replace('<b>한 달 기록이 많아도 잘리지 않습니다</b>', '<b>한 달 기록이 많아도</b>')),
@@ -14671,7 +14671,7 @@ try {
     mu65('cl', (s) => s.replace('**P1 판31 월 점검(v465', '**P1 판31(v4xx')),
     mu65('ft', (s) => s.split('머리를 다시 쓰지 않는다').join('머리를 다시 쓴다')),
     mu65('tl', (s) => s.replace("'P1 판31' 13항목", "'P1 판31' 10항목")),
-    mu65('tl', (s) => s.replace('- [ ] (AI 시험 화면 대상 — 판31 검토 11/14', '- [x] (AI 시험 화면 대상 — 판31 검토 11/14')),
+    mu65('tl', (s) => s.replace(/- \[[ x]\] \(AI 시험 화면 대상 — 판31 검토 11\/14/, '- [ ] (사람 확인 — 판31 검토 11/14')),   // 11/28 C241: 닫힌 칸도 세게 바꿔 '[x]로 닫기' 사본은 뜻을 잃음 → 화면 칸 주인을 사람 몫으로 바꾸는 사본(칸 수·꼴 검사가 잡음)
     mu65('man', (s) => s.replace('<b>월 점검 기록 없음 — 크론 확인</b>', '월 점검 기록 없음')),
     mu65('cl', (s) => s.replace('**조각을 넘길 때 머리를 다시 쓰지 말 것**', '조각을 넘길 때 머리 parts를 올린다'))];
   T('v465 문서·판 번호(정확 검사): FEATURES 기준 v465 (2026-11-14)·v465 절(원장 · 판30 conchk · 판31 mchk 액션·크론·재료 키 · 감사 조각 · C128 · 근거 실측 · 판31 보안 검토 반영 — 조각 키 목록·ev.pfill·ev.tauto·mchk:since·prev_acks) · TESTLIST v465 칸 19(화면 15 · 게이트 [x] 4 — 12종 · P1 판31 13항목·7 · PM 낱말 0) · MANUAL 21-7-1 점검 카드 두 장·확인 못 함 뜻·크론 못 돈 달·21-3 조각·조각 n개 없음·21-4 백업 흔적(내부 키 이름 0) · CLAUDE.md 줄 3 + 머리 다시 쓰지 말 것 · sw jw-shell-v465 · 결함 사본 ' + M65.length + '개 = 모두 ✗',
