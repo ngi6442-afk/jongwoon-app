@@ -18810,4 +18810,83 @@ function J91a(x) { return JSON.stringify(x); }
   } catch (e) { T('C238 판 C 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
 }
 
+{ // ---- C238 판 D(11/27) 계약 기록물 쓰기·지우기 결과 — 초안 3판 정리(바이트 못 지우면 gc 표식 없음) · 기록물 영구 삭제의 조각·판독값 · 짝 무르기(풀기 요청은 500)
+  //   거절: 정리 못 한 초안 = gc 표식 없음·바이트 남음 → 다음 올리기가 다시 지움 · 영구 삭제 조각·판독값 못 지움 = 500·'영구 삭제됨' 표식 없음 · 짝 풀기에서 짝 무르기 못 씀 = 500·연결 그대로
+  //   허용: 정상 정리·영구 삭제·짝 풀기 = 종전. 결함 사본 = 고친 곳을 하나씩 되돌림 → 실패해야 한다.
+  const fsD238 = require('fs'), ModD238 = require('module');
+  const FDATAD = join(FN, 'gw-data.js'), SDATAD = fsD238.readFileSync(FDATAD, 'utf8');
+  const LND = require(join(FN, '_lib', 'learn.js'));
+  const loadD238 = (src) => { const m = new ModD238(FDATAD); m.filename = FDATAD; m.paths = ModD238._nodeModulePaths(dirname(FDATAD)); m._compile(src, FDATAD); return m.exports; };
+  const snapD238 = JSON.stringify({ u: mem.gw_users || {}, d: mem.gw_data || {}, f: mem.gw_files || {} });
+  const CW238 = { id: 'ucw238', name: '공무238', admin: false, perms: { con: 'do' }, dept: '운영부' };
+  const tokCW238 = issueSession(CW238).token;
+  const CID = 'c238d', PK = LND.pairKey('contract', 'p238x');
+  const ck = (i, dk, n) => 'cdoc:' + CID + ':S' + String(i).padStart(2, '0') + ':' + dk + ':' + n;
+  const chkD238 = async (GD) => {
+    const c = async (body, tok) => { const r = await GD.handler({ httpMethod: 'POST', headers: { authorization: 'Bearer ' + tok, 'x-device-id': 'dev1' }, body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+    const P = {}, I = {};
+    const old = Date.now() - 40 * 86400000;
+    const reset = () => { const s = JSON.parse(snapD238); mem.gw_users = s.u; mem.gw_data = s.d; mem.gw_files = s.f; ['failSet', 'failDel'].forEach((h) => { blobsMock.hooks[h] = null; });
+      mem.gw_users['member:ucw238'] = JSON.parse(JSON.stringify(CW238));
+      const cons = (mem.gw_data['col:contracts'] && mem.gw_data['col:contracts'].items) || [];
+      mem.gw_data['col:contracts'] = { schema: 1, items: cons.filter((x) => x && x.id !== CID).concat([{ id: CID, title: 'C238 계약', scen: 'asbestos:pub', stages: [] }]), updated_at: 1 };
+      mem.gw_data['map:contract:v1'] = mem.gw_data['map:contract:v1'] || { schema: 1, scen: { 'asbestos:pub': [{ i: 0, name: '석면 조사', co: 'con' }] } };
+      delete mem.gw_data['recidx:' + CID]; Object.keys(mem.gw_files).filter((k) => k.indexOf('cdoc:' + CID + ':') === 0).forEach((k) => { delete mem.gw_files[k]; }); };
+    const idx = () => (mem.gw_data['recidx:' + CID] || { items: [] }).items;
+    const seedPurge = () => {
+      mem.gw_data['recidx:' + CID] = { schema: 1, seq: 2, items: [
+        { n: 1, i: 0, dk: 'x', kind: 'received', ver: 1, cur: 0, name: 'a.pdf', ext: 'pdf', pii: 0, del: old, att0: 'att_d238' },
+        { n: 2, i: 0, dk: 'y', kind: 'final', ver: 1, cur: 1, name: 'b.pdf', ext: 'pdf', pii: 0, pair: 'p238x', ptpl: 't238' }], updated_at: 1 };
+      mem.gw_files[ck(0, 'x', 1)] = { att: 'att_d238big', name: 'a.pdf' }; mem.gw_files['att_d238big'] = { parts: 2, name: 'a.pdf' };
+      mem.gw_files['attp:att_d238big:0'] = { data: 'AA' }; mem.gw_files['attp:att_d238big:1'] = { data: 'BB' }; mem.gw_files['parse:att_d238'] = { v: 1 };
+      mem.gw_data[PK] = { id: 'p238x', tpl: 't238', status: 'done' }; };
+    try {
+      // ① 초안 3판 정리 — 가장 오래된 초안 바이트 못 지움 → 200 · gc에 없음 · 바이트 남음 → 다음 올리기가 [1,2] 정리
+      reset(); const put = (k) => c({ action: 'cdoc_put', cid: CID, i: 0, doc_key: 'asb_plan', kind: 'draft', fill: { k: k, 공사명: '시험' } }, tokCW238);
+      const p1 = await put(1), p2 = await put(2), p3 = await put(3);
+      blobsMock.hooks.failDel = (k) => k === ck(0, 'asb_plan', p1.body.n);
+      const p4 = await put(4); blobsMock.hooks.failDel = null;
+      const it1 = idx().find((x) => x.n === p1.body.n) || {};
+      const g1 = p4.code === 200 && (p4.body.gc || []).length === 0 && !it1.gc && !!mem.gw_files[ck(0, 'asb_plan', p1.body.n)];
+      const p5 = await put(5);
+      P.gc = [p1, p2, p3].every((x) => x.code === 200) && g1 && p5.code === 200 && JSON.stringify(p5.body.gc) === JSON.stringify([p1.body.n, p2.body.n]) && !mem.gw_files[ck(0, 'asb_plan', p1.body.n)];
+      I.gc = [p1.code, p4.code, p4.body.gc, !!it1.gc, p5.code, p5.body.gc];
+      // ② 영구 삭제 — 조각 못 지움 → 500 · 표식 없음 · 본 레코드 남음 / 판독값 못 지움 → 500 · 표식 없음
+      reset(); seedPurge(); blobsMock.hooks.failDel = (k) => k === 'attp:att_d238big:1';
+      let r = await c({ action: 'cdoc_purge', cid: CID, n: 1, confirm: true }, tokA); blobsMock.hooks.failDel = null;
+      const q1 = r.code === 500 && !(idx().find((x) => x.n === 1) || {}).purged && !!mem.gw_files['att_d238big'];
+      reset(); seedPurge(); blobsMock.hooks.failDel = (k) => k === 'parse:att_d238';
+      const r2 = await c({ action: 'cdoc_purge', cid: CID, n: 1, confirm: true }, tokA); blobsMock.hooks.failDel = null;
+      const q2 = r2.code === 500 && !(idx().find((x) => x.n === 1) || {}).purged && !!mem.gw_files['parse:att_d238'];
+      P.purge = q1 && q2; I.purge = [r.code, r2.code];
+      // ③ 짝 풀기 — 짝 무르기 못 씀 → 500 PAIR_VOID_FAILED · 연결 그대로
+      reset(); seedPurge(); blobsMock.hooks.failSet = (k) => k === PK;
+      r = await c({ action: 'cdoc_pair_assign', cid: CID, n: 2, unpair: true }, tokCW238); blobsMock.hooks.failSet = null;
+      P.unpair = r.code === 500 && r.body.error_code === 'PAIR_VOID_FAILED' && (idx().find((x) => x.n === 2) || {}).pair === 'p238x' && mem.gw_data[PK].status === 'done'; I.unpair = [r.code, r.body.error_code];
+      // ④ 허용(정상 무변): 영구 삭제 200·전부 지움 · 짝 풀기 200·무름·MANUAL_OFF
+      reset(); seedPurge(); const n1 = await c({ action: 'cdoc_purge', cid: CID, n: 1, confirm: true }, tokA);
+      const n2 = await c({ action: 'cdoc_pair_assign', cid: CID, n: 2, unpair: true }, tokCW238);
+      const i2 = idx().find((x) => x.n === 2) || {};
+      P.normal = n1.code === 200 && !!(idx().find((x) => x.n === 1) || {}).purged && !mem.gw_files['att_d238big'] && !mem.gw_files['attp:att_d238big:0'] && !mem.gw_files['parse:att_d238']
+        && n2.code === 200 && !i2.pair && i2.plearn === 'MANUAL_OFF' && mem.gw_data[PK].status === 'superseded';
+      I.normal = [n1.code, n1.body.error_code, n2.code, n2.body.error_code, i2.plearn];
+    } finally { const s = JSON.parse(snapD238); mem.gw_users = s.u; mem.gw_data = s.d; mem.gw_files = s.f; ['failSet', 'failDel'].forEach((h) => { blobsMock.hooks[h] = null; }); }
+    return { ok: Object.values(P).every((v) => v === true), info: { P, I } };
+  };
+  try {
+    const D0 = await chkD238(loadD238(SDATAD));
+    T('C238 판 D 계약 기록물 쓰기 결과: 초안 정리 바이트 못 지움 = gc 표식 없음·바이트 남음 → 다음 올리기가 다시 정리 · 영구 삭제 조각·판독값 못 지움 = 500·표식 없음 · 짝 풀기 무르기 못 씀 = 500 PAIR_VOID_FAILED·연결 그대로 · 정상 영구 삭제·짝 풀기 무변', D0.ok, JSON.stringify(D0.info));
+    const MUTD = [
+      ["const gd = await blobDelete(store(FILES), cdocKey(ref.cid, old.i, old.dk, old.n)); if (!gd.ok) continue;", "await blobDelete(store(FILES), cdocKey(ref.cid, old.i, old.dk, old.n));"],
+      ["const pd = await BF.attDeleteParts(store(FILES), pr0.data.att, am.data); if (!pd.ok) return jr(500,", "const pd = await BF.attDeleteParts(store(FILES), pr0.data.att, am.data); if (false) return jr(500,"],
+      ["const pw = await blobDelete(store(FILES), 'parse:' + it.att0); if (!pw.ok) return jr(500,", "const pw = await blobDelete(store(FILES), 'parse:' + it.att0); if (false) return jr(500,"],
+      ["const w1 = await blobSet(st, k, r.data); if (!w1.ok) return false;", "const w1 = await blobSet(st, k, r.data);"],
+      ["    if (!(await cdocPairVoid(st, it))) return jr(500, { status: 'ERROR', error_code: 'PAIR_VOID_FAILED', request_id: R });   // C238 판 D\n", "    await cdocPairVoid(st, it);\n"],
+    ];
+    const kill = [];
+    for (const [from, to] of MUTD) { let k; try { if (SDATAD.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); k = !(await chkD238(loadD238(SDATAD.replace(from, () => to)))).ok; } catch (e) { k = 'err ' + e.message; } if (k !== true) kill.push(from.trim().slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k)); }
+    T('C238 판 D 결함 사본 ' + MUTD.length + '개(초안 정리 결과 · 영구 삭제 조각 · 판독값 · 짝 무르기 쓰기 · 짝 풀기 500) 모두 잡힘', kill.length === 0, kill.join(' | '));
+  } catch (e) { T('C238 판 D 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

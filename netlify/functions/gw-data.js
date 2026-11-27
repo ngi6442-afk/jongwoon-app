@@ -4000,15 +4000,16 @@ async function cdocLearnPair(st, member, ref, idx, item, ext, b64, orig, d) {
   if (pick.late) pair.late = 1;
   const w = await blobSet(st, LN.pairKey('contract', id), pair);
   if (!w.ok) return { ok: false, code: w.code || 'PAIR_WRITE_FAILED' };
+  let lessonFail = '';   // C238 판 D: 간극 1줄 쓰기 결과를 응답에 드러냄(표 gw-data cdocLearnPair lk — 종전엔 못 써도 말없이 빠짐)
   try {
     const lk = T.lessons_key(tpl); const lr = kind === 'scan_wait' ? { ok: false, code: 'SCAN_WAIT' } : await blobGet(st, lk);   // C294 판2: 스캔은 판독 뒤 워커가 간극 1줄을 적는다(빈 줄 두 번 막기)
     if (lr.ok || lr.code === 'NOT_FOUND') {   // 읽기 실패를 빈 창고로 보고 규칙·기준선·끔 표시를 덮어쓰지 않는다(v424 검토) — 이번 간극 1줄만 빠진다
       const L = LN.pushGap(lr.ok ? lr.data : null, { pair: id, promo_id: ref.cid, ratio: gap.cell_ratio, score: gap.score, kind: kind, changed: diff ? diff.changed : 0, compared: diff ? diff.compared : 0, uncomparable: diff ? diff.uncomparable : 0, comparable: gap.comparable, late: pick.late ? 1 : 0, gv: LN.GAP_VER }, now);   // v456 검토(T427): 간극 식 판(xlsx_cell은 같은 판만 기준선·일몰에 — learn.numericGaps)
       LN.freezeBaseline(L, now);   // v412 첫 10건 평균 = 기준선(일몰 비교 축)
-      await blobSet(st, lk, L);
+      const lw = await blobSet(st, lk, L); if (!lw.ok) lessonFail = lw.code || 'STORAGE_WRITE_FAILED';
     }
   } catch (e) {}
-  return { ok: true, id: id, status: status2, tpl: tpl, kind: kind, how: how, draft_n: pick.n, gap: gap, changed: diff ? diff.changed : null, compared: diff ? diff.compared : null, uncomparable: diff ? diff.uncomparable : null, outside: (diff && Number(diff.outside_changed)) || 0, late: !!pick.late };
+  return { ok: true, id: id, status: status2, lesson_saved: lessonFail ? false : undefined, tpl: tpl, kind: kind, how: how, draft_n: pick.n, gap: gap, changed: diff ? diff.changed : null, compared: diff ? diff.compared : null, uncomparable: diff ? diff.uncomparable : null, outside: (diff && Number(diff.outside_changed)) || 0, late: !!pick.late };
 }
 async function handleLearnSettingsGet(event, d, R) {
   const c = await currentMember(event);
@@ -4236,26 +4237,28 @@ async function cdocCommit(c, d, R, ref, kind, pii, orig, ext, b64, fill, att) {
   const gcd = [];
   if (kind === 'draft') {
     const drafts = idx.items.filter(function (x) { return x.i === ref.i && x.dk === ref.dk && x.kind === 'draft' && !x.gc && !x.purged; }).sort(function (a, b) { return a.n - b.n; });
-    while (drafts.length > CDOC_DRAFT_KEEP) { const old = drafts.shift(); await blobDelete(store(FILES), cdocKey(ref.cid, old.i, old.dk, old.n)); old.gc = now; old.cur = 0; gcd.push(old.n); }
+    while (drafts.length > CDOC_DRAFT_KEEP) { const old = drafts.shift(); const gd = await blobDelete(store(FILES), cdocKey(ref.cid, old.i, old.dk, old.n)); if (!gd.ok) continue; old.gc = now; old.cur = 0; gcd.push(old.n); }   // C238 판 D: 바이트를 못 지운 초안엔 gc 표식을 달지 않음(색인은 '지움'인데 바이트가 남던 것 — 다음 올리기가 다시 지움)
   }
   idx.updated_at = now; idx.updated_by = c.member.id;
   const w = await blobSet(st, cdocIdxKey(ref.cid), idx);
   if (!w.ok) { await blobDelete(store(FILES), fkey); return jr(500, { status: 'ERROR', error_code: w.code, request_id: R }); }
   const audit = await cdocAudit(c.member, '기록물등록', ref.cid, std + (dup.length ? ' · 중복 허용' : '') + (piiRaised ? ' · 같은 내용 등급 ' + piiRaised + ' 따름' : ''));
+  let boxLeft = '';   // C238 판 D: 넣기 박스 정리(가져감 표식·본 레코드·박스 표식) 결과를 봄 — 기록물은 이미 등록됐으니 500이 아니라 응답 box_left로 드러냄(못 지운 파일이 박스에 다시 보여 두 번 넣을 수 있음)
   if (att) {
     try {
-      if (att.rec.parts) await blobSet(store(FILES), att.id, Object.assign({}, att.rec, { taken: { cid: ref.cid, n: n } }));   // 같은 파일을 두 번 넣지 못하게 표식(조각은 서류함이 참조)
-      else await blobDelete(store(FILES), att.id);
-      await blobDelete(store(FILES), boxMarkKey(att.id));
-    } catch (e) {}
+      const t1 = att.rec.parts ? await blobSet(store(FILES), att.id, Object.assign({}, att.rec, { taken: { cid: ref.cid, n: n } })) : await blobDelete(store(FILES), att.id);   // 같은 파일을 두 번 넣지 못하게 표식(조각은 서류함이 참조)
+      const t2 = await blobDelete(store(FILES), boxMarkKey(att.id));
+      if (!t1.ok) boxLeft = t1.code || 'STORAGE_WRITE_FAILED'; else if (!t2.ok) boxLeft = t2.code || 'STORAGE_DELETE_FAILED';
+    } catch (e) { boxLeft = 'BOX_CLEANUP_THREW'; }
     await boxUsageAdd(st, 'placed', 1);
   }
   // v410 학습 짝 — 최종본이면 같은 단계의 현재 초안과 짝을 만들고 차이·간극을 잰다(실패해도 올리기는 성공, learn에 사유만)
   let learn = null;
   if (kind === 'final') { try { learn = await cdocLearnPair(st, c.member, ref, idx, item, ext, b64, orig, d); } catch (e) { learn = { ok: false, code: 'LEARN_THREW' }; } }
-  if (learn) { cdocPairMeta(item, learn); await cdocIdxSetPair(st, ref.cid, n, learn); await boxUsageAdd(st, 'pair_' + String(learn.how || learn.status || learn.code || 'x').toLowerCase().replace(/[^a-z_]/g, '').slice(0, 20), 1); }   // v423 옮기면 이 짝을 무효로 돌린다 · v424 화면용 양식·간극, 못 맺은 사유, 이번 달 경로 건수
+  if (learn) { cdocPairMeta(item, learn); if (!(await cdocIdxSetPair(st, ref.cid, n, learn))) learn.idx_saved = false; await boxUsageAdd(st, 'pair_' + String(learn.how || learn.status || learn.code || 'x').toLowerCase().replace(/[^a-z_]/g, '').slice(0, 20), 1); }   // v423 옮기면 이 짝을 무효로 돌린다 · v424 화면용 양식·간극, 못 맺은 사유, 이번 달 경로 건수
   const okBody = { status: 'OK', cid: ref.cid, n: n, ver: ver, name: std, item: cdocPublic(item), dup: dup, gc: gcd, audit: audit, learn: learn, request_id: R };
   if (piiRaised) okBody.pii_raised = piiRaised;   // P1 판24-② B6
+  if (boxLeft) okBody.box_left = boxLeft;   // C238 판 D
   return jr(200, okBody);
 }
 // ---- v423 넣기 박스(체크 31, PM 11/5 "서류 등록 채널 하나" · 11/6 "저장 설계는 Blobs 그대로") — 파일을 먼저 gw_files에 받고(box_put), 에이전트가 종류를 판단한 뒤(gw-parse-background), 다시 보내지 않고 서류함에 넣는다(cdoc_attach)
@@ -4278,13 +4281,14 @@ function cdocPairMeta(x, L) {
 }
 function cdocPairClear(x) { if (x.ptpl) x.pwas = x.ptpl; delete x.pair; delete x.ptpl; delete x.pgap; delete x.pkind; delete x.pdn; delete x.phow; delete x.pout; delete x.plearn; }
 // 짝 정보만 다시 읽어 고쳐 쓴다 — 첫 저장과 짝 만들기 사이에 다른 사람이 쓴 색인을 덮지 않게
-async function cdocIdxSetPair(st, cid, n, L) {
+async function cdocIdxSetPair(st, cid, n, L) {   // C238 판 D: 성공 여부를 돌려줌(부르는 쪽이 learn.idx_saved = false로 드러냄 — 종전엔 색인에 짝 표시를 못 써도 말없이 넘어감)
   try {
     const ix = await cdocIdxRead(st, cid);
-    if (!ix.ok) return;
+    if (!ix.ok) return false;
     const x = ix.doc.items.find(function (y) { return y && Number(y.n) === n; });
-    if (x) { cdocPairMeta(x, L); await blobSet(st, cdocIdxKey(cid), ix.doc); }
-  } catch (e) {}
+    if (x) { cdocPairMeta(x, L); const w = await blobSet(st, cdocIdxKey(cid), ix.doc); return !!w.ok; }
+    return true;
+  } catch (e) { return false; }
 }
 function boxExtOk(ext) { return docAttExtOk(ext) || ext === 'xls'; }   // xls는 옛 📎 첨부가 받던 형식이라 유지
 function boxMagicOk(ext, b64) {
@@ -4379,13 +4383,13 @@ async function handleCdocAttach(event, d, R) {
 }
 // 옮기기 — 판단이 틀렸을 때 다른 서류·종류로. 바이트 키를 새 자리로 옮기고, 옛 자리 현재본을 되돌리고, 옛 짝을 무효로 돌린 뒤, 고친 내용을 다음 판단 재료로 남긴다
 async function cdocPairVoid(st, it) {
-  if (!it.pair) return;
+  if (!it.pair) return true;
   try {
     const k = LN.pairKey('contract', it.pair), r = await blobGet(st, k);
     if (r.ok && r.data) {
       const tpl = r.data.tpl;
       r.data.status = 'superseded'; r.data.ts = Date.now();
-      await blobSet(st, k, r.data);
+      const w1 = await blobSet(st, k, r.data); if (!w1.ok) return false;   // C238 판 D: 짝 무르기를 못 쓰면 연결을 지우지 않음(살아 있는 짝이 연결 없이 학습에 남던 것 — 다음 무르기가 다시 함)
       if (tpl) {
         const lk = LN.TYPES.contract.lessons_key(tpl), lr = await blobGet(st, lk);
         if (lr.ok && lr.data && Array.isArray(lr.data.gaps)) {
@@ -4395,13 +4399,14 @@ async function cdocPairVoid(st, it) {
             if (lr.data.stats) lr.data.stats.pairs = Math.max(0, (Number(lr.data.stats.pairs) || 0) - 1);
             const bl = lr.data.baseline;   // 얼린 기준선에 든 짝이면 남은 간극으로 다시 잰다(잘못 묶인 값이 일몰 판단에 남지 않게)
             if (bl && Array.isArray(bl.pairs) && bl.pairs.indexOf(it.pair) >= 0) { delete lr.data.baseline; LN.freezeBaseline(lr.data, Date.now()); }
-            await blobSet(st, lk, lr.data);
+            const w2 = await blobSet(st, lk, lr.data); if (!w2.ok) return false;
           }
         }
       }
-    }
-  } catch (e) {}
+    } else if (!r.ok && r.code !== 'NOT_FOUND') return false;
+  } catch (e) { return false; }
   cdocPairClear(it);
+  return true;
 }
 async function handleCdocMove(event, d, R) {
   const c = await currentMember(event);
@@ -4464,7 +4469,7 @@ async function handleCdocMove(event, d, R) {
       try {
         const b64 = rec.att ? await BF.attReadB64(files, rec.att, (await blobGet(files, rec.att)).data) : String(rec.data || '');
         learn = await cdocLearnPair(st, c.member, ref, idx, it, it.ext, b64, it.orig, d);
-        if (learn && learn.id) { cdocPairMeta(it, learn); await cdocIdxSetPair(st, ref.cid, n, learn); }
+        if (learn && learn.id) { cdocPairMeta(it, learn); if (!(await cdocIdxSetPair(st, ref.cid, n, learn))) learn.idx_saved = false; }
       } catch (e) { learn = { ok: false, code: 'LEARN_THREW' }; }
     }
   }
@@ -4494,7 +4499,7 @@ async function handleCdocPairAssign(event, d, R) {
   if (!cdocCanRead(c.member, it)) return jr(403, { status: 'FORBIDDEN', error_code: it.pii === 2 ? 'PII2_FORBIDDEN' : 'PII_FORBIDDEN', request_id: R });
   if (unpair) {
     if (!it.pair && it.plearn === 'MANUAL_OFF') return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
-    await cdocPairVoid(st, it);
+    if (!(await cdocPairVoid(st, it))) return jr(500, { status: 'ERROR', error_code: 'PAIR_VOID_FAILED', request_id: R });   // C238 판 D
     cdocPairClear(it); it.plearn = 'MANUAL_OFF';
     idx.updated_at = Date.now(); idx.updated_by = c.member.id;
     const w = await blobSet(st, cdocIdxKey(cid), idx);
@@ -4510,9 +4515,9 @@ async function handleCdocPairAssign(event, d, R) {
   let learn = null;
   try {
     const b64 = fr.data.att ? await BF.attReadB64(files, fr.data.att, (await blobGet(files, fr.data.att)).data) : String(fr.data.data || '');
-    await cdocPairVoid(st, it);
-    cdocPairClear(it);
-    learn = await cdocLearnPair(st, c.member, { cid: cid, i: it.i, dk: it.dk }, idx, it, it.ext, b64, it.orig, { pair_draft_n: dn });
+    if (!(await cdocPairVoid(st, it))) learn = { ok: false, code: 'PAIR_VOID_FAILED' };   // C238 판 D: 앞 짝을 못 물렀으면 새 짝을 만들지 않음(두 짝이 함께 살던 것)
+    else { cdocPairClear(it);
+    learn = await cdocLearnPair(st, c.member, { cid: cid, i: it.i, dk: it.dk }, idx, it, it.ext, b64, it.orig, { pair_draft_n: dn }); }
   } catch (e) { learn = { ok: false, code: 'LEARN_THREW' }; }
   cdocPairMeta(it, learn || { code: 'LEARN_THREW' });
   idx.updated_at = Date.now(); idx.updated_by = c.member.id;
@@ -4660,7 +4665,7 @@ async function cdocMark(event, d, R, mode) {
       if (fr.ok && fr.data) {
         const b64 = fr.data.att ? await BF.attReadB64(store(FILES), fr.data.att, (await blobGet(store(FILES), fr.data.att)).data) : String(fr.data.data || '');
         learn = await cdocLearnPair(st, c.member, { cid: cid, i: it.i, dk: it.dk }, idx, it, it.ext, b64, it.orig, { pair_tpl: it.pwas || '' });
-        if (learn) { cdocPairMeta(it, learn); await cdocIdxSetPair(st, cid, n, learn); }
+        if (learn) { cdocPairMeta(it, learn); if (!(await cdocIdxSetPair(st, cid, n, learn))) learn.idx_saved = false; }
       }
     } catch (e) { learn = { ok: false, code: 'LEARN_THREW' }; }
   }
@@ -4693,11 +4698,11 @@ async function handleCdocPurge(event, d, R) {
   if (!pr0.ok && pr0.code !== 'NOT_FOUND' && !pr0Broken) return jr(500, { status: 'ERROR', error_code: pr0.code || 'STORAGE_READ_FAILED', request_id: R });
   if (pr0.ok && pr0.data && pr0.data.att) {   // v423 큰 파일은 조각과 본 레코드까지
     const am = await blobGet(store(FILES), pr0.data.att);
-    if (am.ok && am.data) await BF.attDeleteParts(store(FILES), pr0.data.att, am.data);
+    if (am.ok && am.data) { const pd = await BF.attDeleteParts(store(FILES), pr0.data.att, am.data); if (!pd.ok) return jr(500, { status: 'ERROR', error_code: pd.code || 'STORAGE_DELETE_FAILED', request_id: R }); }   // C238 판 D: 조각을 못 지우면 본 레코드·표식 전에 멈춤(다시 할 수 있게)
     const aw = await blobDelete(store(FILES), pr0.data.att);   // 본 레코드를 못 읽었으면 층 1이 이 지우기를 막음 → 아래 500(조각을 못 지운 채 표식을 남기지 않음)
     if (!aw.ok) return jr(500, { status: 'ERROR', error_code: aw.code, request_id: R });
   }
-  if (it.att0) await blobDelete(store(FILES), 'parse:' + it.att0);   // v423 판독값도 함께(개인정보 항목의 값이 남지 않게)
+  if (it.att0) { const pw = await blobDelete(store(FILES), 'parse:' + it.att0); if (!pw.ok) return jr(500, { status: 'ERROR', error_code: pw.code || 'STORAGE_DELETE_FAILED', request_id: R }); }   // v423 판독값도 함께(개인정보 항목의 값이 남지 않게) · C238 판 D: 못 지우면 '영구 삭제됨' 표식 전에 500
   const bw = await blobDelete(store(FILES), cdocKey(cid, it.i, it.dk, n), { force: pr0Broken });
   if (!bw.ok) return jr(500, { status: 'ERROR', error_code: bw.code, request_id: R });
   it.purged = Date.now(); it.purged_by = c.member.id; it.cur = 0;
