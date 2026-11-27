@@ -49,6 +49,32 @@ function adminFail(code) {
 }
 const ADMIN_FAIL_TEXT = '관리자 확인 필요(AI 잔액·키 문제 — 기다려도 풀리지 않습니다)';
 
+// C127: 직접 fetch 길(물어보기 _lib/ask.js · 첨부 판독 _lib/asbestos.js)의 시간 상한 — 두 곳은 callApi를 거치지 않아 상한이 없었다(막힌 호출이 함수 시간 한도까지 붙잡힘).
+//   본문까지 다 받을 때까지 타이머를 둔다(머리만 오고 본문이 멈추는 경우도 끊는다). 끊기면 code 'TIMEOUT' 오류를 던진다 — 재시도하지 않는다(callApi와 같은 까닭).
+//   그 밖의 예외(망 오류)는 그대로 던진다(호출부 종전 처리 그대로). 돌려주는 값은 fetch 응답처럼 ok·status·text()·json()을 갖는다.
+//   스트리밍은 쓰지 않는다: 두 길은 출력이 짧고(최대 1,500·4,096 토큰) 운영 기록상 가장 긴 물어보기가 18.9초라 응답 머리 300초 제한(callApiStream 까닭)에 닿지 않는다 — 상한은 그보다 짧게 잡는다.
+async function fetchTimed(url, timeoutMs, init) {
+  const ctl = new AbortController();
+  let fired = false;
+  const timer = setTimeout(function () { fired = true; ctl.abort(); }, timeoutMs);
+  const timeoutErr = function () { const e = new Error('TIMEOUT'); e.code = 'TIMEOUT'; return e; };
+  try {
+    let res, text;
+    try {
+      res = await fetch(url, Object.assign({}, init, { signal: ctl.signal }));
+      text = (res && typeof res.text === 'function') ? await res.text() : JSON.stringify(res && typeof res.json === 'function' ? await res.json() : null);
+    } catch (e) {
+      if (fired || (e && (e.name === 'AbortError' || /abort/i.test(String(e.message || ''))))) throw timeoutErr();
+      throw e;
+    }
+    const status = Number(res && res.status) || 0;
+    const ok = (res && typeof res.ok === 'boolean') ? res.ok : (status >= 200 && status < 300);
+    return { ok: ok, status: status, text: async function () { return text; }, json: async function () { return JSON.parse(text); } };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function callApi(apiKey, body, timeoutMs) {
   const ctl = new AbortController();
   const timer = setTimeout(function () { ctl.abort(); }, timeoutMs);
@@ -209,5 +235,5 @@ function usageTokens(json) {
   return (u.input_tokens || 0) + (u.output_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0);
 }
 
-module.exports = { API_URL, API_VERSION, ApiError, callApi, callApiStream, readSse, errDetail, statusError, responseText, scrubPayload, parseJsonOut, usageTokens,
+module.exports = { API_URL, API_VERSION, ApiError, callApi, callApiStream, fetchTimed, readSse, errDetail, statusError, responseText, scrubPayload, parseJsonOut, usageTokens,
   CREDIT_RE, httpFailCode, adminFail, ADMIN_FAIL_TEXT };

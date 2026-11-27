@@ -2,6 +2,7 @@
 // 석면조사서 판독(Claude 비전) + §94 신고대상 판정 — gw-data(동기 폴백)와 gw-parse-background(기본 경로) 공용
 const BJ = require('./boxjudge');   // C269 개인정보 파일명 입구(nameGuard) — 넣기 박스와 같은 함수
 const CL = require('./claude');   // C264: 실패 코드 공통 가르기(잔액 부족 CREDIT_LOW·키 거부 AUTH — 나머지는 종전 'CLAUDE_' + 상태 번호)
+const CALL_TIMEOUT_MS = 150000;   // C127 판독 호출 하나의 상한(PDF·사진 비전 + 출력 최대 4,096 토큰) — 응답 머리 300초 제한보다 짧게 · 백그라운드 15분 안
 
 // §94조 신고대상 판정 — 자재 행(위치·면적)을 법 기준에 대조(판정은 코드가 확정)
 function judgeAsbestos94(rows) {
@@ -46,7 +47,7 @@ async function claudeExtractAsbestos(buf, name, type) {
     + '표를 못 찾으면 {"rows":[],"note":"이유"}. '
     + '형식: {"org":"","site":"","bldg_name":"","owner":"","year":"","struct":"","use":"","total_floor":0,"summary_area":0,"rows":[{"bldg":"","mat":"","loc":"","area":0,"cnt":"","len":0}]}';
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    const resp = await CL.fetchTimed('https://api.anthropic.com/v1/messages', CALL_TIMEOUT_MS, {
       method: 'POST',
       headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
       body: JSON.stringify({ model: model, max_tokens: 4096,
@@ -66,7 +67,7 @@ async function claudeExtractAsbestos(buf, name, type) {
       year: String(data.year || '').slice(0, 12), struct: String(data.struct || '').slice(0, 40), use: String(data.use || '').slice(0, 40),
       total_floor: Number(data.total_floor) || 0,
       summary_area: Number(data.summary_area) || 0, rows: rows, judge: judgeAsbestos94(rows) };
-  } catch (e) { return { error: 'PARSE_FAILED' }; }
+  } catch (e) { return { error: (e && e.code === 'TIMEOUT') ? 'TIMEOUT' : 'PARSE_FAILED' }; }   // C127 시간 초과는 따로
 }
 
 // 계약서 판독 — 공사명·금액·계약/착공/준공일·발주자·현장주소(명기값만)
@@ -87,7 +88,7 @@ async function claudeExtractContract(buf, name) {
     + 'client 발주자/도급인 기관·업체명, site 현장(공사) 주소, guarantee 계약보증금액(숫자만, 있으면). '
     + '형식: {"title":"","amount":0,"date_contract":"","date_start":"","date_end":"","client":"","site":"","guarantee":0} JSON만 출력.';
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    const resp = await CL.fetchTimed('https://api.anthropic.com/v1/messages', CALL_TIMEOUT_MS, {
       method: 'POST',
       headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
       body: JSON.stringify({ model: model, max_tokens: 1024,
@@ -103,7 +104,7 @@ async function claudeExtractContract(buf, name) {
     return { doc: 'contract', title: String(data.title || '').slice(0, 100), amount: Number(data.amount) || 0,
       date_contract: dt(data.date_contract), date_start: dt(data.date_start), date_end: dt(data.date_end),
       client: String(data.client || '').slice(0, 60), site: String(data.site || '').slice(0, 100), guarantee: Number(data.guarantee) || 0 };
-  } catch (e) { return { error: 'PARSE_FAILED' }; }
+  } catch (e) { return { error: (e && e.code === 'TIMEOUT') ? 'TIMEOUT' : 'PARSE_FAILED' }; }   // C127 시간 초과는 따로
 }
 
 // 건축물대장 판독 — 대지위치·용도·구조·연면적·층수·사용승인일(명기값만). 철거·해체 서류의 기준자료
@@ -124,7 +125,7 @@ async function claudeExtractBldg(buf, name) {
     + 'floors 층수(예: "지상3/지하1"), approved 사용승인일 YYYY-MM-DD(연도만 있으면 YYYY), area_bldg 건축면적㎡(숫자만), owner 소유자명(최근). '
     + '동이 여럿이면 표제부 기준 대표값. 형식: {"site":"","bldg_name":"","use":"","struct":"","total_floor":0,"floors":"","approved":"","area_bldg":0,"owner":""} JSON만.';
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    const resp = await CL.fetchTimed('https://api.anthropic.com/v1/messages', CALL_TIMEOUT_MS, {
       method: 'POST',
       headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
       body: JSON.stringify({ model: model, max_tokens: 1024,
@@ -141,7 +142,7 @@ async function claudeExtractBldg(buf, name) {
       total_floor: Number(data.total_floor) || 0, floors: String(data.floors || '').slice(0, 20),
       approved: String(data.approved || '').slice(0, 12), area_bldg: Number(data.area_bldg) || 0,
       owner: String(data.owner || '').slice(0, 60) };
-  } catch (e) { return { error: 'PARSE_FAILED' }; }
+  } catch (e) { return { error: (e && e.code === 'TIMEOUT') ? 'TIMEOUT' : 'PARSE_FAILED' }; }   // C127 시간 초과는 따로
 }
 
 // 사업자등록증·신분증 판독 — 발주처(갑) 정보 자동 입력용. 주민등록번호는 추출하지 않음(생년월일만)
@@ -163,7 +164,7 @@ async function claudeExtractBiz(buf, name) {
     + 'addr(사업장 소재지 또는 주소). '
     + '형식: {"doc_kind":"","name":"","ceo":"","biz_no":"","birth":"","addr":""} JSON만 출력.';
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    const resp = await CL.fetchTimed('https://api.anthropic.com/v1/messages', CALL_TIMEOUT_MS, {
       method: 'POST',
       headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
       body: JSON.stringify({ model: model, max_tokens: 512,
@@ -178,7 +179,7 @@ async function claudeExtractBiz(buf, name) {
     return { doc: 'biz', doc_kind: String(data.doc_kind || '').slice(0, 12), name: String(data.name || '').slice(0, 60),
       ceo: String(data.ceo || '').slice(0, 30), biz_no: String(data.biz_no || '').slice(0, 20),
       birth: String(data.birth || '').slice(0, 12), addr: String(data.addr || '').slice(0, 100) };
-  } catch (e) { return { error: 'PARSE_FAILED' }; }
+  } catch (e) { return { error: (e && e.code === 'TIMEOUT') ? 'TIMEOUT' : 'PARSE_FAILED' }; }   // C127 시간 초과는 따로
 }
 
 // 등급확인서(신용평가·안전성평가) — 적격심사 등급·유효기간을 인허가 탭에 자동 반영하기 위한 판독(P5c)
@@ -201,7 +202,7 @@ async function claudeExtractGrade(buf, name) {
     + 'valid_from(유효기간 시작 YYYY-MM-DD), valid_until(유효기간 종료 YYYY-MM-DD), issued(평가일 또는 발급일 YYYY-MM-DD). '
     + '형식: {"doc_kind":"","company":"","grade":"","valid_from":"","valid_until":"","issued":""} JSON만 출력.';
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    const resp = await CL.fetchTimed('https://api.anthropic.com/v1/messages', CALL_TIMEOUT_MS, {
       method: 'POST',
       headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
       body: JSON.stringify({ model: model, max_tokens: 512,
@@ -216,7 +217,7 @@ async function claudeExtractGrade(buf, name) {
     return { doc: 'grade', doc_kind: String(data.doc_kind || '').slice(0, 12), company: String(data.company || '').slice(0, 40),
       grade: String(data.grade || '').slice(0, 10), valid_from: String(data.valid_from || '').slice(0, 10),
       valid_until: String(data.valid_until || '').slice(0, 10), issued: String(data.issued || '').slice(0, 10) };
-  } catch (e) { return { error: 'PARSE_FAILED' }; }
+  } catch (e) { return { error: (e && e.code === 'TIMEOUT') ? 'TIMEOUT' : 'PARSE_FAILED' }; }   // C127 시간 초과는 따로
 }
 
 // 첨부 레코드 → 문서종류별 판독 라우팅 (kind 우선, 없으면 파일명)

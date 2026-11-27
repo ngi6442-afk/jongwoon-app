@@ -17574,4 +17574,53 @@ function J91a(x) { return JSON.stringify(x); }
   finally { resetS(); }
 }
 
+// C127 직접 fetch 길(물어보기·첨부 판독) 시간 상한 — _lib/claude.js fetchTimed · 실 Claude 호출 0(가짜 fetch가 signal을 듣고 멈춰 있음)
+{
+  const fs127 = require('fs'), Mod127 = require('module');
+  const realFetch127 = global.fetch, savedK127 = [process.env.ANTHROPIC_API_KEY, process.env.GW_ANTHROPIC_KEY];
+  const abortErr127 = () => { const e = new Error('This operation was aborted'); e.name = 'AbortError'; return e; };
+  const waitAbort127 = (sig) => new Promise((res, rej) => { if (sig) sig.addEventListener('abort', () => rej(abortErr127())); });
+  const hangHead127 = async (u, init) => waitAbort127(init && init.signal);                                            // 머리가 안 옴
+  const hangBody127 = async (u, init) => ({ status: 200, ok: true, text: () => waitAbort127(init && init.signal) });    // 머리는 오고 본문이 멈춤
+  const load127 = (p, from, to) => {   // 상한만 짧게 바꾼 사본(나머지 소스·의존 모듈 흉내는 그대로)
+    const src = fs127.readFileSync(p, 'utf8').replace(/\r\n/g, '\n'); if (src.indexOf(from) < 0) throw new Error('앵커 없음 ' + from);
+    const m = new Mod127(p, null); m.filename = p; m.paths = Mod127._nodeModulePaths(dirname(p)); m._compile(src.replace(from, to), p); return m.exports;
+  };
+  try {
+    process.env.ANTHROPIC_API_KEY = 'servertest-dummy'; process.env.GW_ANTHROPIC_KEY = 'servertest-dummy';
+    const CL127 = require(join(FN, '_lib/claude.js'));
+    const timed127 = async (f, ms) => { global.fetch = f; const t0 = Date.now(); try { const r = await CL127.fetchTimed('https://api.anthropic.com/v1/messages', ms, { method: 'POST', body: '{}' }); return { r, ms: Date.now() - t0 }; } catch (e) { return { e, ms: Date.now() - t0 }; } };
+    const a1 = await timed127(hangHead127, 60), a2 = await timed127(hangBody127, 60);
+    const a3 = await timed127(async () => new Response(JSON.stringify({ x: 1 }), { status: 200, headers: { 'content-type': 'application/json' } }), 5000);
+    const a3j = a3.r ? await a3.r.json() : null;
+    const a4 = await timed127(async () => { throw new TypeError('fetch failed'); }, 5000);
+    const a5 = await timed127(async () => ({ status: 400, text: async () => '{"error":{"message":"bad"}}' }), 5000);
+    T('C127 ① fetchTimed: 머리가 안 오면 · 본문이 멈추면 상한에서 code TIMEOUT(2초 안) · 정상 응답은 ok·status·json 그대로 · 망 오류는 TIMEOUT 아닌 원래 오류 · ok 칸 없는 4xx 흉내는 ok false',
+      a1.e && a1.e.code === 'TIMEOUT' && a1.ms < 2000 && a2.e && a2.e.code === 'TIMEOUT' && a2.ms < 2000 && a3.r && a3.r.ok === true && a3.r.status === 200 && a3j && a3j.x === 1
+        && a4.e && a4.e.code !== 'TIMEOUT' && /fetch failed/.test(a4.e.message) && a5.r && a5.r.ok === false && a5.r.status === 400,
+      JSON.stringify({ a1: a1.e && a1.e.code, a2: a2.e && a2.e.code, a4: a4.e && a4.e.message, a5: a5.r && a5.r.ok }));
+    const A127 = load127(join(FN, '_lib/ask.js'), 'const CALL_TIMEOUT_MS = 90000;', 'const CALL_TIMEOUT_MS = 60;');
+    const S127 = load127(join(FN, '_lib/asbestos.js'), 'const CALL_TIMEOUT_MS = 150000;', 'const CALL_TIMEOUT_MS = 60;');
+    global.fetch = hangHead127; let t0 = Date.now(); const q1 = await A127.ask('시험 질문', ADMIN); const q1ms = Date.now() - t0;
+    global.fetch = hangBody127; t0 = Date.now(); const q2 = await S127.claudeExtractContract(Buffer.alloc(200, 1), '시험.pdf'); const q2ms = Date.now() - t0;
+    global.fetch = hangHead127; const q3 = await S127.parseAttachment({ name: '석면조사.pdf', kind: 'asbestos', type: 'application/pdf', data: Buffer.alloc(200, 1).toString('base64') });
+    T('C127 ② 물어보기 ask(상한 60ms 사본) → error TIMEOUT(차감 없는 실패 꼴: turns·in·out 있음) · 첨부 판독 계약서·석면 조사서(본문 멈춤·머리 멈춤) → error TIMEOUT(종전 PARSE_FAILED와 가름) · 모두 2초 안',
+      q1.error === 'TIMEOUT' && q1.turns === 1 && q1ms < 2000 && q2.error === 'TIMEOUT' && q2ms < 2000 && q3.error === 'TIMEOUT', JSON.stringify({ q1, q2, q3 }).slice(0, 300));
+    const walk127 = (d) => fs127.readdirSync(d, { withFileTypes: true }).flatMap((x) => x.isDirectory() ? walk127(join(d, x.name)) : (/\.js$/.test(x.name) ? [join(d, x.name)] : []));
+    // AI 주소를 글자로 쓰는 파일은 넷뿐이어야 한다(공용 claude.js · 자체 40초 상한 promomask.js · 이 판의 ask.js·asbestos.js) — 새 파일이 주소를 직접 쓰면 여기서 걸린다.
+    //   ask.js·asbestos.js 안의 주소는 모두 fetchTimed(…, CALL_TIMEOUT_MS, …) 호출이어야 한다(따옴표 꼴·await 유무와 상관없이 주소 개수 = fetchTimed 호출 개수).
+    const ALLOW127 = ['_lib/claude.js', '_lib/promomask.js', '_lib/ask.js', '_lib/asbestos.js'].map((p) => join(FN, p));
+    const hasUrl127 = (p) => /api\.anthropic\.com/.test(fs127.readFileSync(p, 'utf8'));
+    const stray127 = walk127(FN).filter((p) => hasUrl127(p) && ALLOW127.indexOf(p) < 0).map((p) => p.slice(FN.length + 1));
+    const url127 = (p) => (fs127.readFileSync(join(FN, p), 'utf8').match(/api\.anthropic\.com/g) || []).length;
+    const cnt127 = (p) => (fs127.readFileSync(join(FN, p), 'utf8').match(/CL\.fetchTimed\('https:\/\/api\.anthropic\.com\/v1\/messages', CALL_TIMEOUT_MS,/g) || []).length;
+    const pmSrc127 = fs127.readFileSync(join(FN, '_lib/promomask.js'), 'utf8');
+    const pmOk127 = (pmSrc127.match(/await fetch\(/g) || []).length === (pmSrc127.match(/signal: ctl\.signal/g) || []).length;   // 사진 가리기 직접 호출은 모두 자체 상한 signal
+    T('C127 ③ 상한 없는 직접 AI 호출 0: AI 주소를 쓰는 파일은 공용·사진 가리기·물어보기·첨부 판독 넷뿐 · 물어보기 1곳·첨부 판독 5곳은 주소마다 fetchTimed + 상수 상한 · 사진 가리기 fetch는 모두 자체 상한 signal',
+      stray127.length === 0 && cnt127('_lib/ask.js') === 1 && url127('_lib/ask.js') === 1 && cnt127('_lib/asbestos.js') === 5 && url127('_lib/asbestos.js') === 5 && pmOk127,
+      JSON.stringify({ stray127, ask: [cnt127('_lib/ask.js'), url127('_lib/ask.js')], asb: [cnt127('_lib/asbestos.js'), url127('_lib/asbestos.js')], pmOk127 }));
+  } catch (e) { T('C127 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+  finally { global.fetch = realFetch127; process.env.ANTHROPIC_API_KEY = savedK127[0] || ''; process.env.GW_ANTHROPIC_KEY = savedK127[1] || ''; }
+}
+
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);

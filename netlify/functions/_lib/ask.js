@@ -25,6 +25,7 @@ const COL = { vehicles: 'veh', licenses: 'lic', asbestos: 'site', contracts: 'co
 const ROW_CAP = 25;          // 도구 한 번이 돌려주는 최대 행 — 원장을 통째로 보내지 않는다
 const MAX_TURNS = 6;         // 도구 왕복 상한(무한 루프 방지)
 const MAX_TOKENS = 1500;
+const CALL_TIMEOUT_MS = 90000;   // C127 회차 하나의 AI 호출 상한 — 운영 13건 중 가장 긴 물어보기(여러 회차 합)가 18.9초
 
 function rid() { return crypto.randomBytes(8).toString('hex'); }
 function jr(statusCode, body) {
@@ -241,11 +242,17 @@ async function ask(question, member) {
 
   while (turns < MAX_TURNS) {
     turns++;
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model, max_tokens: MAX_TOKENS, system, tools, messages }),
-    });
+    let resp;
+    try {
+      resp = await CL.fetchTimed('https://api.anthropic.com/v1/messages', CALL_TIMEOUT_MS, {
+        method: 'POST',
+        headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: JSON.stringify({ model, max_tokens: MAX_TOKENS, system, tools, messages }),
+      });
+    } catch (e) {
+      if (e && e.code === 'TIMEOUT') return { error: 'TIMEOUT', turns, in: inTok, out: outTok };   // C127 — 실패(차감 없음 · 화면 '잠시 뒤 다시')
+      throw e;   // 망 오류는 종전대로(호출부 ASK_FAILED)
+    }
     if (!resp.ok) {   // C264: 잔액 부족·키 거부는 공통 코드(CREDIT_LOW·AUTH)로 — 나머지는 종전 'CLAUDE_' + 상태 번호
       const et = await resp.text();
       return { error: CL.httpFailCode(resp.status, et), detail: et.slice(0, 300), turns, in: inTok, out: outTok };
