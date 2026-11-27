@@ -2351,8 +2351,8 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     mem.gw_data['allbaro:day:' + tdy] = dayDoc();
     const exBefore = JSON.stringify(mem.gw_data['allbaro:routes_extra']), verBefore = abLib.routesVer();
     r = await ab({ action: 'ab_route_add', from: '동국제강', to: '베페사징크포항', item: '지정분진', side: 'L' }, tokO, 'dev1');
-    T('C279 ② 기존 줄 L8 묶음을 미배정으로 푸는 새 줄 → 저장 없이 409 ROUTE_OVERLAP · loosened [L8 1묶음 3회 1일] · 본 일수 1~14 · 이름·회원 정보 없음 · 추가분 그대로 · 노선표 원복',
-      !!b8.route && b8.route.side === 'L' && b8.route.row === 8 && r.code === 409 && r.body.code === 'ROUTE_OVERLAP' && r.body.side === 'L' && r.body.row === 50 && r.body.days_checked >= 1 && r.body.days_checked <= 14
+    T('C279 ② 기존 줄 L8 묶음을 미배정으로 푸는 새 줄 → 저장 없이 409 ROUTE_OVERLAP · loosened [L8 1묶음 3회 1일] · 본 일수 1~61(11/27 창 = 오늘 + 지난 60일) · 이름·회원 정보 없음 · 추가분 그대로 · 노선표 원복',
+      !!b8.route && b8.route.side === 'L' && b8.route.row === 8 && r.code === 409 && r.body.code === 'ROUTE_OVERLAP' && r.body.side === 'L' && r.body.row === 50 && r.body.days_checked >= 1 && r.body.days_checked <= 61
       && JSON.stringify(r.body.loosened) === JSON.stringify([{ side: 'L', row: 8, bundles: 1, trips: 3, days: 1 }]) && !/동국|베페사/.test(JSON.stringify(r.body))
       && JSON.stringify(mem.gw_data['allbaro:routes_extra']) === exBefore, JSON.stringify(r.body).slice(0, 220));
     r = await ab({ action: 'ab_status' }, tokA);
@@ -2369,6 +2369,21 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     mem.gw_data['allbaro:routes_extra'] = { schema: 1, items: ten(-1) }; abLib.setExtraRoutes(ten(-1)); mem.gw_data['allbaro:day:' + tdy] = dayDoc();
     r = await ab({ action: 'ab_route_add', from: '전혀다른상차', to: '전혀다른하차', item: '분진', side: 'L' }, tokO, 'dev1');
     T('C279 ② 겹치지 않는 새 줄 → 200 L50 · overlap_checked:true(확인 없이)', r.code === 200 && r.body.row === 50 && r.body.overlap_checked === true, JSON.stringify(r.body).slice(0, 140));
+    // 11/27 창 14일 → 60일(C279 남은 것): 겹치는 묶음이 30일 전·60일 전 문서에만 있어도 미리 알림 · 61일 전(앱에서 열 수 없는 날)은 보지 않음
+    {
+      const dK = (o) => 'allbaro:day:' + new Date(Date.now() + 9 * 3600000 - o * 86400000).toISOString().slice(0, 10);
+      const only = (o) => { mem.gw_data['allbaro:routes_extra'] = { schema: 1, items: ten(-1) }; abLib.setExtraRoutes(ten(-1)); delete mem.gw_data['allbaro:day:' + tdy];
+        [30, 60, 61].forEach((x) => { delete mem.gw_data[dK(x)]; }); mem.gw_data[dK(o)] = Object.assign(dayDoc(), { day: dK(o).slice(-10) }); };
+      only(30); r = await ab({ action: 'ab_route_add', from: '동국제강', to: '베페사징크포항', item: '지정분진', side: 'L' }, tokO, 'dev1');
+      const w30 = r.code === 409 && r.body.code === 'ROUTE_OVERLAP' && JSON.stringify(r.body.loosened) === JSON.stringify([{ side: 'L', row: 8, bundles: 1, trips: 3, days: 1 }]);
+      only(60); r = await ab({ action: 'ab_route_add', from: '동국제강', to: '베페사징크포항', item: '지정분진', side: 'L' }, tokO, 'dev1');
+      const w60 = r.code === 409 && r.body.code === 'ROUTE_OVERLAP';
+      only(61); r = await ab({ action: 'ab_route_add', from: '동국제강', to: '베페사징크포항', item: '지정분진', side: 'L' }, tokO, 'dev1');
+      const w61 = r.code === 200 && r.body.overlap_checked === true && r.body.existed === false;
+      T('C279 창 60일(11/27): 겹치는 묶음이 30일 전·60일 전 문서에만 있어도 409 ROUTE_OVERLAP(종전 14일 창은 못 봄) · 61일 전(앱에서 열 수 없는 날)만 있으면 확인 없이 200',
+        w30 && w60 && w61, JSON.stringify([w30, w60, w61, r.code]));
+      [30, 60, 61].forEach((x) => { delete mem.gw_data[dK(x)]; });
+    }
     // routeAddImpact 순수 함수: 옮겨 가는 묶음(구체 줄 우선)은 moved로 따로 — 막지 않는다
     { const docs = [{ day: tdy, doc: Object.assign(dayDoc(), { counts: [{ from: '한라티씨(주) 2공장', to: '거성산업(주)', item: '분진(고상)', n: 4, route: { side: 'R', row: 40, count_col: 11, item: '분진' } }] }) }];
       abLib.setExtraRoutes(ten(-1));

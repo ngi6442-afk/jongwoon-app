@@ -651,13 +651,15 @@ async function handleRouteAdd(st, c, d, R) {
   const row = AB.nextExtraRow(side, items, refs);
   if (!row) return jr(409, { ok: false, code: 'ROWS_FULL', side: side, request_id: R });   // 그 열의 식별자 960개(40~999)를 다 쓴 경우뿐 — 다른 열을 고르면 된다(2026-11-20, 종전: 예비 행 10줄 소진)
   const entry = { side: side, row: row, from: from, to: to, item: item, count_col: side === 'L' ? 5 : 11, by: c.member.name, bid: c.member.id, ts: Date.now() };
-  // C279 겹침 미리 보기(2026-11-20 독립 검토): 이 줄이 생기면 지금 다른 줄에 들어가 있는 묶음이 '후보 2줄'이 되어 미배정으로 풀리는지 최근 STATUS_DAYS일 문서를
+  // C279 겹침 미리 보기(2026-11-20 독립 검토): 이 줄이 생기면 지금 다른 줄에 들어가 있는 묶음이 '후보 2줄'이 되어 미배정으로 풀리는지 일자 문서를
   //   저장 없이 재판정해 센다. 풀리는 묶음이 있으면 저장하지 않고 409 ROUTE_OVERLAP(좌표·수만) — 화면이 사람에게 보이고 force:true로 다시 보내면 만든다.
   //   학습·일자 문서를 못 읽으면 확인 없이 만든다(종전 동작 — 응답 overlap_checked:false).
+  //   창(2026-11-27 · C279 남은 것): 최근 14일 → 앱에서 열 수 있는 범위 전체(오늘 + 지난 RUN_BACK_DAYS일 — 화면 abDayOk·학습 재정렬 rematchWindow와 같은 폭).
+  //   그보다 지난 날짜는 앱에서 열리지 않아 다시 판정되지 않으므로, 이 창이면 '알린 것 = 실제로 풀릴 수 있는 것 전부'가 된다.
   let overlapChecked = false, moved = [];
   if (lr.ok) {
     try {
-      const wanted = []; for (let i = 0; i < STATUS_DAYS; i++) wanted.push(kstDate(-i));
+      const wanted = []; for (let i = 0; i <= RUN_BACK_DAYS; i++) wanted.push(kstDate(-i));
       const dr = await Promise.all(wanted.map(function (day) { return blobGet(st, dayKey(day)); }));
       const docs = [];
       for (let i = 0; i < wanted.length; i++) { if (dr[i] && dr[i].ok && dr[i].data) docs.push({ day: wanted[i], doc: dr[i].data }); }

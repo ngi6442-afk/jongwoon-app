@@ -1339,7 +1339,7 @@ try {
         && f1.log.calls.length === 1 && f1.log.calls[0].action === 'ab_route_add' && f1.log.calls[0].force === undefined && JSON.stringify(f1.log.learn) === '[["L|50",true]]' && f1.log.alerts.length === 0, JSON.stringify([f1.log.confirms.length, f1.log.calls, f1.log.learn]).slice(0, 300));
       let f2 = flow(prod, [OVL, OK50], { ans: [true, true] }); f2.api.go('k', f2.host);
       T('C279 흐름 ②(겹침 → 확인): 409 ROUTE_OVERLAP이면 안내 확인창(풀리는 줄 L8·R40 이름·묶음·회수·본 일수)을 보이고, 확인해야만 force:true로 한 번 더 보내 지정까지',
-        f2.log.confirms.length === 2 && /미배정으로 풀립니다/.test(f2.log.confirms[1]) && /최근 14일치/.test(f2.log.confirms[1]) && / · L8 동국제강 → 베페사 · 지정분진 — 1묶음 3회\(1일\)/.test(f2.log.confirms[1]) && / · R40 한라티씨 → 거성산업 · 분진 — 2묶음 5회\(2일\)/.test(f2.log.confirms[1])
+        f2.log.confirms.length === 2 && /미배정으로 풀립니다/.test(f2.log.confirms[1]) && /앱에서 열 수 있는 지난 60일 가운데 기록이 있는 14일치/.test(f2.log.confirms[1]) && /그보다 지난 날짜는 앱에서 열리지 않아 바뀌지 않습니다/.test(f2.log.confirms[1]) && / · L8 동국제강 → 베페사 · 지정분진 — 1묶음 3회\(1일\)/.test(f2.log.confirms[1]) && / · R40 한라티씨 → 거성산업 · 분진 — 2묶음 5회\(2일\)/.test(f2.log.confirms[1])
         && f2.log.calls.length === 2 && f2.log.calls[0].force === undefined && f2.log.calls[1].force === true && JSON.stringify(f2.log.learn) === '[["L|50",true]]' && f2.log.alerts.length === 0, JSON.stringify([f2.log.confirms[1], f2.log.calls]).slice(0, 400));
       let f3 = flow(prod, [OVL, OK50], { ans: [true, false] }); f3.api.go('k', f3.host);
       let f4 = flow(prod, [OVL, OVL], { ans: [true, true] }); f4.api.go('k', f4.host);
@@ -1368,9 +1368,9 @@ try {
       { const f9 = flow(prod, [{ status: 401, body: {} }]); let inval = 0; f9.api.split('L', 34, '에코프로비엠(CAM9)');
         const s0 = html.indexOf('function abVariantSplit('), sv = html.slice(s0, html.indexOf('function abRoutesKnown(', s0));
         const fm = flow(prod, [{ status: 200, body: { ok: true, side: 'L', row: 50, existed: false, moved: [{ side: 'R', row: 40, bundles: 2, trips: 5, days: 2 }] } }]); fm.api.go('k', fm.host);
-        T('C279 검토 반영: [별도 줄로 나누기] 401 → onSessionInvalid(토스트 없음) · 새 줄 알림에 "기존 줄 R40에서 옮겨 온 인계서 5회(최근 14일 …)"',
+        T('C279 검토 반영: [별도 줄로 나누기] 401 → onSessionInvalid(토스트 없음) · 새 줄 알림에 "기존 줄 R40에서 옮겨 온 인계서 5회(앱에서 열 수 있는 지난 60일 기준 …)"(11/27 창 60일)',
           /if \(res\.status === 401\)\{ onSessionInvalid\(\); return; \}/.test(sv) && f9.log.toasts.length === 0 && f9.log.calls.length === 1
-          && /^새 노선 L50 추가 · 기존 줄 R40에서 옮겨 온 인계서 5회\(최근 14일 — 더 지난 날짜도 열 때 옮겨짐\)$/.test(fm.log.toasts[0] || ''), JSON.stringify([f9.log.toasts, fm.log.toasts])); } }
+          && /^새 노선 L50 추가 · 기존 줄 R40에서 옮겨 온 인계서 5회\(앱에서 열 수 있는 지난 60일 기준 — 그날을 열면 옮겨짐\)$/.test(fm.log.toasts[0] || ''), JSON.stringify([f9.log.toasts, fm.log.toasts])); } }
   }
   // C075(2026-11-26): 처리상태 새 값 배지 — 실제 함수(abStateUnknownHtml)로: 새 값이 없으면 빈 글 · 있으면 값·건수와 '종전 규칙' 안내 · 이름은 esc · 불러오는 중엔 안 그림
   {
