@@ -4063,7 +4063,7 @@
   //   첫 저장이 200이면 아무것도 적지 않는다(정상 길 요청 수·본문 같음). 계약·문서함·내 할 일·체크·거래처·입찰 공고는 등록부에 없다.
   var RS_DELAYS = [15000, 60000, 300000], RS_MAX = 8, RS_GAP = 60000, RS_RESTART_MS = 30 * 60000;
   var RS_BAND = { tasks: 1, vehicles: 1, receivables: 1, licenses: 1 };   // 저장 실패가 띠를 켜는 자료
-  var rsQ = {}, rsOut = {}, rsGen = 0, rsOk = {}, rsAuto = {}, rsCap = null, rsQuiet = 0, rsSeq = {}, rsRe = {};
+  var rsQ = {}, rsOut = {}, rsGen = 0, rsOk = {}, rsAuto = {}, rsCap = null, rsQuiet = 0, rsSeq = {}, rsRe = {}, rsBad = {}, rsFly = {};
   function rsTokId(){ try { return String(JSON.parse(b64DecodeUnicode(String(gwToken() || "").split(".")[0].replace(/-/g, "+").replace(/_/g, "/"))).mid || ""); } catch(e){ return ""; } }
   function rsMine(uid){ return !!uid && uid === myId() && uid === sessViewerId && uid === rsTokId(); }
   function rsTaint(col){ delete rsOk[col]; rsDrop(col); }
@@ -4118,16 +4118,26 @@
   function rsArm(col, e){ if (!e.t && !e.stop && e.n < RS_DELAYS.length) e.t = setTimeout(function(){ rsFire(col, "timer"); }, RS_DELAYS[e.n]); }
   //   사람 저장의 응답: st = 응답 코드(0 = 끊김) · uid = 그 저장을 보낸 때의 회원(토큰·화면·목록의 회원이 서로 다르면 빈 글)
   //   k = 그 저장의 보낸 차례 — 뒤에 보낸 저장이 실패한 채인데 앞 저장의 200이 늦게 오면 적은 것을 지우지 않고 대기를 다시 켬(그 200이 푼 대기 표시가 뒤 고침까지 푸는 것)
+  //   C298(「원천」): 대기를 푸는 판단을 보낸 차례로 — 어떤 저장의 200은 그보다 뒤에 보낸 저장이 아직 성공하지 않았으면(나가 있음 · 200이 아닌 응답·끊김으로 실패한 채) 대기·띠를 풀지 않음(저장 함수가 푼 것을 되켬)
+  //     rsBad = 실패한 채 남은 사람 저장 가운데 가장 늦게 보낸 차례 — 그보다 뒤에 보낸 사람 저장의 200이 내려 줌 · rsFly = 나가 있는 사람 저장의 차례
+  //     (자동 저장은 같은 자료의 사람 저장이 나가 있으면 나가지 않아(rsFire) 그 뒤 오는 사람 응답은 모두 rsBad보다 뒤 차례 — 자동 200이 따로 내려 줄 일이 없음)
+  function rsLate(col, st, k){
+    var b = rsBad[col] || 0, fly = rsFly[col] || {};
+    if (st !== 200){ rsBad[col] = Math.max(b, k); return false; }
+    if (b > k || Object.keys(fly).some(function(x){ return +x > k; })) return true;
+    delete rsBad[col]; return false;
+  }
   function rsSeen(col, st, uid, k){
-    var e = rsQ[col], f = rsFns(col);
+    var e = rsQ[col], f = rsFns(col) || rsPendX(col), late = rsLate(col, st, k);
     if (!f) return;
+    if (late){ rsHoldK(col, f, k); if (e && (rsBad[col] || 0) > k) return; }   // 앞 저장의 늦은 200 — 뒤 고침이 서버에 들 때까지 대기 남김(자동이 적은 것도 지우지 않음)
+    if (!f.save) return;   // 대상 밖 자료(체크·입찰 공고 — 대기만 지킴 · 다시 보내기 없음)
     if (st === 409) return rsTaint(col);   // ㉠ 그사이 다른 사람이 저장함 — 사람 저장의 병합 길(v541)이 맡고, 자동은 온전한 읽기 뒤까지 끔
-    if (st === 200 && e && e.k > k){ rsHold(col, f); return; }
     if (st === 0 || st >= 500){
       if (!uid || !rsOk[col]) return rsDrop(col);
       if (!e) e = rsQ[col] = { n: 0, t: null, at: 0 };
       else if (e.stop && Date.now() - e.at >= RS_RESTART_MS){ e.n = 0; e.stop = 0; }   // 상한으로 멈춘 뒤 30분이 지나 사람 저장이 또 실패 = 새 줄기(15초부터) — 30분 안에는 상한 그대로(서버가 계속 5xx여도 컬렉션마다 30분에 8번까지)
-      e.last = st; e.uid = uid; e.k = Math.max(e.k || 0, k); rsHold(col, f);
+      e.last = st; e.uid = uid; rsHold(col, f);
       if (e.n >= RS_MAX) e.stop = 1;
       rsArm(col, e);
       return;
@@ -4135,6 +4145,20 @@
     if (e) rsDrop(col);
   }
   function rsHold(col, f){ var g = rsGen; rsSoon(function(){ if (g === rsGen && rsQ[col] && !f.pend()) f.set(); }); }
+  //   C298: 늦은 200이 푼 대기(와 다시 보낼 저장이 켠 그 자료의 띠)를 되켬 — 그사이 뒤 저장이 성공했으면 그대로 둠
+  function rsHoldK(col, f, k){
+    var g = rsGen, oc = setOffline.cols, band = !!(oc && oc[col]);
+    rsSoon(function(){
+      if (g !== rsGen || !((rsBad[col] || 0) > k || Object.keys(rsFly[col] || {}).some(function(x){ return +x > k; }))) return;
+      if (!f.pend()) f.set();
+      if (band && rsQ[col] && !(setOffline.cols && setOffline.cols[col])) setOffline(true, col);
+    });
+  }
+  //   대상 밖이지만 대기 표시가 같은 꼴(200이면 그냥 풂)인 자료 — 대기만 지킴(다시 보내기·자동 없음) · 거래처는 고친 줄 번호(cliDirty)로, 계약은 실패 길이 스스로 대기를 내리고 알림(제 길)이라 넣지 않음
+  function rsPendX(col){
+    var F = { checklist: [function(){ return pendingSave; }, function(){ pendingSave = true; }], bids: [function(){ return bidsPending; }, function(){ bidsPending = true; }] }[col];
+    return F ? { pend: F[0], set: F[1] } : null;
+  }
   function rsFire(col, why){
     var e = rsQ[col], f = rsFns(col);
     if (!e) return;
@@ -4180,7 +4204,7 @@
       rsFire(col, why);
     });
   }
-  function saveRetryReset(){ rsGen++; rsOk = {}; rsRe = {}; rsSidQ = {}; rsSidLast = {}; Object.keys(rsQ).forEach(rsDrop); }
+  function saveRetryReset(){ rsGen++; rsOk = {}; rsRe = {}; rsSidQ = {}; rsSidLast = {}; rsBad = {}; Object.keys(rsQ).forEach(rsDrop); }
   // C242 저장 번호(sid — PM 11/26 "번호 넣고 올려" · 서버 handleSave와 짝): 12자료 저장마다 번호를 붙여 보냄 — 가장 최근에 보내 결과를 모르는 저장과 같은 내용을 다시 보내면 같은 번호, 그 밖은 새 번호(옛 번호의 내용으로 되돌린 저장이 already로 묻히지 않게)
   //   같은 번호를 다시 쓰는 것은 자동 재전송이 그 대기 저장(가장 최근에 결과를 모른 채 남은 저장 rsSidLast)을 같은 내용으로 다시 보낼 때뿐 — 사람 저장은 늘 새 번호
   //   결과를 모르는(응답을 못 받은 · 5xx) 번호는 자료별로 기억(rsSidQ · 최근 8 · 메모리 — 로그아웃·전환·만료에 비움) · 서버가 달라진 것이 확인되면(200·already·남의 409·4xx) 그 자료의 결과 모르는 번호를 모두 비움
@@ -4217,8 +4241,8 @@
     if (!p || typeof p.then !== "function") return;
     if (fn === "gw-data" && body && body.action === "save" && typeof body.collection === "string"){
       var col = body.collection, g = rsGen, uid = rsMine(myId()) ? myId() : "", k = rsSeq[col] = (rsSeq[col] || 0) + 1;
-      rsOut[col] = (rsOut[col] || 0) + 1;
-      var fin = function(st){ rsOut[col]--; if (st === 409 && rsFns(col)){ rsRe[col] = 1; rsSoon(function(){ delete rsRe[col]; }); } if (g === rsGen) rsSeen(col, st, uid, k); };   // 409 바로 뒤 이 자료의 첫 읽기 = 그 저장 함수의 다시 읽기(같은 약속 줄기 안에서 나감)
+      rsOut[col] = (rsOut[col] || 0) + 1; (rsFly[col] || (rsFly[col] = {}))[k] = 1;
+      var fin = function(st){ rsOut[col]--; delete rsFly[col][k]; if (st === 409 && rsFns(col)){ rsRe[col] = 1; rsSoon(function(){ delete rsRe[col]; }); } if (g === rsGen) rsSeen(col, st, uid, k); };   // 409 바로 뒤 이 자료의 첫 읽기 = 그 저장 함수의 다시 읽기(같은 약속 줄기 안에서 나감)
       p.then(function(res){ fin((res && res.status) || 0); }, function(){ fin(0); });
       return;
     }
