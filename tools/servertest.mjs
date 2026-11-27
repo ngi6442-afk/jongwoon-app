@@ -19108,6 +19108,20 @@ function J91a(x) { return JSON.stringify(x); }
     const six = (src) => /\{ try \{ licSent = await licDutyNotify\(/.test(src) && /\{ try \{ srvSent = await notifyAutoCreated\(/.test(src) && /\{ try \{ notified = await notifyAutoCreated\(/.test(src);
     const sixMut = [six(ingB.replace('{ try { licSent = await licDutyNotify(lic.notify, today); } catch (e) {} delete lic.notify; }', '{ licSent = await licDutyNotify(lic.notify, today); delete lic.notify; }')), six(ingB.replace("{ try { srvSent = await notifyAutoCreated(", '{ { srvSent = await notifyAutoCreated('))];
     T('C327 ⑥ autotask_ingest 저장 뒤 알림 셋 모두 try(인허가 licDutyNotify · 실행기 · 일반) · 결함 사본 2개(try 걷음) = ✗', six(ingB) && sixMut.every((v) => v === false), JSON.stringify({ ok: six(ingB), mut: sixMut }));
+    // ①(서버): 넣기 박스 정리 실패 뒤 남은 표식 — 본 레코드가 '가져감'(taken)이면 box_pending이 카드로 내지 않고 표식을 정리(✕로도 못 지우는 카드가 되던 것)
+    {
+      const tkBP = tokA;
+      mem.gw_files = mem.gw_files || {};
+      mem.gw_files['att_c327aaaabbbbcccc'] = { name: 'c327.pdf', parts: 2, taken: { cid: 'cX', n: 1 } }; mem.gw_files['boxp:att_c327aaaabbbbcccc'] = { id: 'att_c327aaaabbbbcccc', name: 'c327.pdf', size: 1, bid: 'uadmin', ts: Date.now() };
+      mem.gw_files['att_c327ddddeeeeffff'] = { name: 'c327b.pdf' }; mem.gw_files['boxp:att_c327ddddeeeeffff'] = { id: 'att_c327ddddeeeeffff', name: 'c327b.pdf', size: 1, bid: 'uadmin', ts: Date.now() };
+      const hadU = mem.gw_users['member:uadmin'], hadD = mem.gw_users['device:dev1']; mem.gw_users['member:uadmin'] = ADMIN; mem.gw_users['device:dev1'] = { status: 'approved' };   // 앞 절이 지운 경우를 위해 잠깐 되살림
+      const bp = await call({ action: 'box_pending' }, tkBP, 'dev1');
+      if (hadU) mem.gw_users['member:uadmin'] = hadU; else delete mem.gw_users['member:uadmin']; if (hadD) mem.gw_users['device:dev1'] = hadD; else delete mem.gw_users['device:dev1'];
+      const ids = ((bp.body && bp.body.items) || []).map((x) => x.id);
+      const ok = bp.code === 200 && ids.indexOf('att_c327aaaabbbbcccc') < 0 && !mem.gw_files['boxp:att_c327aaaabbbbcccc'] && ids.indexOf('att_c327ddddeeeeffff') >= 0 && !!mem.gw_files['boxp:att_c327ddddeeeeffff'];
+      ['att_c327aaaabbbbcccc', 'att_c327ddddeeeeffff', 'boxp:att_c327ddddeeeeffff'].forEach((k) => { delete mem.gw_files[k]; });
+      T('C327 ①(서버) box_pending: 가져간(taken) 파일의 남은 표식 = 카드 없음·표식 정리 · 넣다 만 파일 = 종전대로 카드·표식 그대로', ok, JSON.stringify({ code: bp.code, ec: bp.body && bp.body.error_code, hasU: !!(mem.gw_users && mem.gw_users['member:uadmin']), ids }));
+    }
   } catch (e) { T('C327 ⑤⑥ 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
 }
 

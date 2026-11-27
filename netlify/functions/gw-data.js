@@ -4562,6 +4562,7 @@ async function handleBoxPending(event, d, R) {
     if (!mine && !(c.member.admin && now - Number(m.ts) > 86400000)) continue;
     const ar = await blobGet(files, m.id);
     if (!ar.ok || !ar.data) { await blobDelete(files, k); continue; }   // 본 파일이 이미 없으면 표식만 정리
+    if (ar.data.taken) { await blobDelete(files, k); continue; }   // C327: 이미 서류함에 넣은 파일(가져감 표식)의 남은 표식도 정리 — 넣기 박스 정리 실패(box_left) 뒤 되살아나 ✕로도 못 지우는 카드가 되던 것
     if (ar.data.open) { out.push({ id: m.id, name: m.name, size: m.size, by: m.by, ts: m.ts, open: 1 }); continue; }   // 조각이 덜 온 파일 — 버리기만 가능
     const pr = await blobGet(files, 'parse:' + m.id);
     out.push({ id: m.id, name: m.name, size: m.size, by: m.by, ts: m.ts, parsed: (pr.ok && pr.data) ? pr.data.result : null });
