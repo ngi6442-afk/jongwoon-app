@@ -176,7 +176,7 @@ const TOOLS = [
     description: '입찰 공고 조회(관리자 전용). 공고명·기관·마감·기초금액·낙찰방법·하한율 판독 상태. q로 공고명·기관을 거른다.',
     schema: { type: 'object', properties: { q: { type: 'string' }, open_only: { type: 'boolean', description: '마감 미도래만' } } },
     run: async (a) => {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = dueLimit(0);   // C244 날짜·시간 공통: 마감 미도래 거르기도 한국 날짜(종전 UTC — 한국 00~09시엔 어제 날짜로 오늘 마감 공고가 남았다)
       return (await items('bids'))
         .filter((b) => hit(b, a.q, ['title', 'org', 'method', 'region']))
         .filter((b) => !a.open_only || S(b.due).slice(0, 10) >= today)

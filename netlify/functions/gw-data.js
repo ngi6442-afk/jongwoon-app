@@ -6414,9 +6414,25 @@ async function handleAudit(event, d, R) {
   if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
   // P1 판31 감사 기록 월 상한 분할: 그달 조각(audit:YYYY-MM · audit:YYYY-MM:n)을 _lib/audit.js readMonth 한 곳이 이어 붙여 읽는다(달 꼴이 아니면 이번 달 — 종전 auditKey와 같음) —
   //   하나라도 못 읽으면 503(종전에는 못 읽으면 빈 달로 보여 '기록 없음'처럼 보였다). 화면은 doc.items 그대로.
-  const rm = await require('./_lib/audit').readMonth(d.month);
-  if (!rm.ok) return jr(503, { status: 'ERROR', error_code: 'AUDIT_READ_FAILED', request_id: R });
-  return jr(200, { status: 'OK', month: rm.month, doc: { schema: 1, items: rm.items, parts: rm.parts, missing: rm.missing }, request_id: R });
+  // C244 날짜·시간 공통: 감사 키는 서버(UTC) 달이고 화면이 고르는 달은 KST 달 — KST 1일 00:00~08:59 줄은 전달 키에 있다. 월 점검(_lib/mchk.js gather)처럼
+  //   전달·그달 키를 함께 읽어 ts를 KST 달 경계로 거른다(키 체계 그대로 · 둘 중 하나라도 못 읽으면 503 · missing은 두 키 합). 달 꼴(01~12)이 아니면 종전 그대로(그 키만)
+  const AU = require('./_lib/audit');
+  const mm = /^(\d{4})-(\d{2})$/.exec(typeof d.month === 'string' ? d.month : '');
+  const kMon = !d.month ? new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 7) : (mm && +mm[2] >= 1 && +mm[2] <= 12 ? d.month : '');
+  if (!kMon) {
+    const rm = await AU.readMonth(d.month);
+    if (!rm.ok) return jr(503, { status: 'ERROR', error_code: 'AUDIT_READ_FAILED', request_id: R });
+    return jr(200, { status: 'OK', month: rm.month, doc: { schema: 1, items: rm.items, parts: rm.parts, missing: rm.missing }, request_id: R });
+  }
+  const ky = +kMon.slice(0, 4), km = +kMon.slice(5, 7), KH = 9 * 3600000;
+  const kPrev = new Date(Date.UTC(ky, km - 2, 1)).toISOString().slice(0, 7);
+  const kS = Date.UTC(ky, km - 1, 1) - KH, kE = Date.UTC(ky, km, 1) - KH;   // KST 그달 [kS, kE)
+  const r1 = await AU.readMonth(kPrev), r2 = await AU.readMonth(kMon);
+  if (!r1.ok || !r2.ok) return jr(503, { status: 'ERROR', error_code: 'AUDIT_READ_FAILED', request_id: R });
+  const tsK = (x) => (x && typeof x.ts === 'number') ? x.ts : NaN;
+  const inK = (x) => { const t = tsK(x); return t >= kS && t < kE; };
+  const items = r1.items.filter(inK).concat(r2.items.filter((x) => inK(x) || !Number.isFinite(tsK(x))));   // 그달 키의 숫자 시각 없는 줄은 종전처럼 그달에
+  return jr(200, { status: 'OK', month: kMon, doc: { schema: 1, items: items, parts: r2.parts, missing: (Number(r1.missing) || 0) + (Number(r2.missing) || 0) }, request_id: R });
 }
 
 // ---- 시점 복구(관리자 전용): 버전 목록 / 미리보기 카운트 / 되돌리기 ----

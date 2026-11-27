@@ -9618,15 +9618,16 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       P.L = ordOk && sameOld && l2.ok === false && l3.ok === true && l3.missing === 1 && l3.items.length === 8 && !l3.items.some((x) => x.by === 'L') && l4.ok === false && poolOk && mchkOk;
       I.L = { ordOk, ord: (l1.items || []).map((x) => x.ts).join(), sameOld, l2: l2.ok, l3: [l3.ok, l3.missing, (l3.items || []).length], l4: l4.ok, poolOk, maxF, mchk: [dC === dL, foldOk31, fz31 && fz31.folded, lgK.st, String(lgK.lines[0]).slice(0, 30), sU.login, sU.perm] };
       // ⑥ 읽는 쪽 — 감사 화면(audit action)이 조각을 이어 붙임 · 조각 못 읽음 = 503 · 없는 달 = 빈 목록 · 월 점검이 뒤 조각의 줄을 셈(① perm changes 2 — 하나는 조각 2) · 백업 복원 머리 parts 보존
-      reset31(); mem.gw_data = { 'audit:2026-08': { schema: 1, parts: 3, items: [{ ts: 1, by: 'a', col: 'x', ev: [] }] }, 'audit:2026-08:2': { schema: 1, items: [{ ts: 2, by: 'b', col: 'x', ev: [] }] }, 'audit:2026-08:3': { schema: 1, items: [{ ts: 3, by: 'c', col: 'x', ev: [] }] } };
+      // C244: 감사 화면은 KST 달로 거르므로 줄 시각을 그달 안(T31 = UTC 01:00 = KST 10:00)으로 — 종전 ts 1·2·3(1970)은 8월 목록에서 걸러짐
+      reset31(); mem.gw_data = { 'audit:2026-08': { schema: 1, parts: 3, items: [{ ts: T31(8, 3), by: 'a', col: 'x', ev: [] }] }, 'audit:2026-08:2': { schema: 1, items: [{ ts: T31(8, 4), by: 'b', col: 'x', ev: [] }] }, 'audit:2026-08:3': { schema: 1, items: [{ ts: T31(8, 5), by: 'c', col: 'x', ev: [] }] } };
       const f1 = await G.cl({ action: 'audit', month: '2026-08' }, tokA);
       blobsMock.hooks.failGet = (k) => k === 'audit:2026-08:3'; const f2 = await G.cl({ action: 'audit', month: '2026-08' }, tokA); blobsMock.hooks.failGet = null;
       const f3 = await G.cl({ action: 'audit', month: '2026-03' }, tokA), f4 = await G.cl({ action: 'audit', month: '2026-08' }, tokW);
       delete mem.gw_data['audit:2026-08'];
-      const f5 = await G.cl({ action: 'backup_put', secret: 'test-ingest-key', restore: true, store: 'gw_data', key: 'audit:2026-08', data: { schema: 1, parts: 3, items: [{ ts: 1, by: 'a', col: 'x', ev: [] }] }, confirm: true });
+      const f5 = await G.cl({ action: 'backup_put', secret: 'test-ingest-key', restore: true, store: 'gw_data', key: 'audit:2026-08', data: { schema: 1, parts: 3, items: [{ ts: T31(8, 3), by: 'a', col: 'x', ev: [] }] }, confirm: true });
       const hd5 = mem.gw_data['audit:2026-08'] || {};
       const f6 = await G.cl({ action: 'audit', month: '2026-08' }, tokA);
-      const f7 = await G.cl({ action: 'backup_put', secret: 'test-ingest-key', restore: true, store: 'gw_data', key: 'audit:2026-08', data: { schema: 1, items: [{ ts: 9, by: 'z', col: 'x', ev: [] }] }, confirm: true });
+      const f7 = await G.cl({ action: 'backup_put', secret: 'test-ingest-key', restore: true, store: 'gw_data', key: 'audit:2026-08', data: { schema: 1, items: [{ ts: T31(8, 9), by: 'z', col: 'x', ev: [] }] }, confirm: true });
       const hd7 = mem.gw_data['audit:2026-08'] || {};
       P.F = f1.code === 200 && f1.body.doc.items.map((x) => x.by).join('') === 'abc' && f1.body.doc.parts === 3 && f2.code === 503 && f2.body.error_code === 'AUDIT_READ_FAILED'
         && f3.code === 200 && f3.body.doc.items.length === 0 && f4.code === 403 && f5.code === 200 && hd5.parts === 3 && f6.body.doc.items.map((x) => x.by).join('') === 'abc'
@@ -9832,7 +9833,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       ['A', [["if (reL.test(k)) { seen[k] = 1; lines.push(k); }", "if (k.indexOf(head + LINE_TAG) === 0) { seen[k] = 1; lines.push(k); }"]]],
       ['A', [["  for (let i = 2; i <= n; i++) {", "  for (let i = 2; i < n; i++) {"]]],
       ['A', [["    if (!pr.ok && pr.code !== 'NOT_FOUND') return { ok: false, code: pr.code || 'STORAGE_READ_FAILED' };", "    if (!pr.ok && pr.code !== 'NOT_FOUND') continue;"]]],
-      ['G', [["  if (!rm.ok) return jr(503, { status: 'ERROR', error_code: 'AUDIT_READ_FAILED', request_id: R });", ""]]],
+      ['G', [["  if (!r1.ok || !r2.ok) return jr(503, { status: 'ERROR', error_code: 'AUDIT_READ_FAILED', request_id: R });", ""]]],   // C244: 감사 화면 503 = 전달·그달 키 읽기(KST 달) 자리
       ['G', [["  if (pN >= 2) out.parts = Math.min(pN, 60);", ""]]],
       ['G', [["async function handleMchkGet(event, d, R) { const g = await pmconGate(event, R, false);", "async function handleMchkGet(event, d, R) { const g = await pmconGate(event, R, false); g.res = null;"]]],
       ['G', [["async function handleMchkAck(event, d, R) { const g = await pmconGate(event, R, true);", "async function handleMchkAck(event, d, R) { const g = await pmconGate(event, R, false);"]]],
@@ -18358,6 +18359,89 @@ function J91a(x) { return JSON.stringify(x); }
     T('C240 A-2a ⑤ 앱: 저장 대역이 leave_kept를 넘김 · doSaveLeaves가 leave_kept면 알림 + loadLeaves',
       /leave_kept: \(res\.body && Array\.isArray\(res\.body\.leave_kept\)\) \? res\.body\.leave_kept : null/.test(ixA2) && /json\.leave_kept && json\.leave_kept\.length\)\{ gwToast\("[^"]*", true\); if\(!leavesSaveTimer\)\{ leavesPending=false; loadLeaves\(\); \}/.test(ixA2));
   } catch (e) { T('C240 A-2a 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+}
+
+{ // ---- C244 날짜·시간 공통(원장 C244) — 서버 시계(UTC)로 자르던 날짜를 KST 날짜로. '오늘'은 Date.now를 바꿔 넣음(날짜에 묶인 기대값 없음).
+  //   ① 감사 화면(audit): 키는 UTC 달 그대로 · 전달·그달 키를 함께 읽어 ts를 KST 달 경계로 거름(월 점검 mchk gather와 같음) · 둘 중 하나 못 읽음 = 503 · missing = 두 키 합 · 달 꼴 아님 = 종전 그대로
+  //   ② 물어보기 vehicles·licenses due_within_days 한계일 = KST 오늘 + N(포함) · bids open_only 오늘 = KST 오늘
+  //   (입찰 지금 수집 bids_refresh 조회 창은 C225 판과 같은 함수라 이 판에서 고치지 않음 — 패치는 09_조사_문서/계산검산_자료_20261120/calc-date_입찰수집창_보류_1120.patch)
+  //   ③ 결함 사본(소스 한 곳을 종전 식으로 되돌려 메모리에서 컴파일 — 파일은 쓰지 않음) = ✗
+  const fsC = require('fs'), ModC = require('module');
+  const GWC = join(FN, 'gw-data.js'), ASKC = join(FN, '_lib/ask.js'), AUC = join(FN, '_lib/audit.js');
+  const SRCC = { g: fsC.readFileSync(GWC, 'utf8'), a: fsC.readFileSync(ASKC, 'utf8') };
+  const compC = (file, src) => { const m = new ModC(file, null); m.filename = file; m.paths = ModC._nodeModulePaths(dirname(file)); m._compile(src, file); return m.exports; };
+  const mutC = (src, from, to) => { if (src.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return src.replace(from, () => to); };
+  const clC = (mod) => async (body, tok) => { const r = await mod.handler({ httpMethod: 'POST', headers: { authorization: tok ? 'Bearer ' + tok : '' }, body: JSON.stringify(body) }); let b = {}; try { b = JSON.parse(r.isBase64Encoded ? require('zlib').gunzipSync(Buffer.from(r.body, 'base64')).toString('utf8') : (r.body || '{}')); } catch (e) {} return { code: r.statusCode, body: b }; };
+  const snapC = JSON.stringify({ u: mem.gw_users, d: mem.gw_data });
+  const realNowC = Date.now, rmC0 = auditMock.readMonth;
+  const resetC = () => { const s = JSON.parse(snapC); mem.gw_users = s.u; mem.gw_data = s.d; blobsMock.hooks.failGet = null; Date.now = realNowC; };
+  const HC = 3600000;
+  const kstC = (y, mo, d, h, mi, s) => Date.UTC(y, mo - 1, d, h, mi || 0, s || 0) - 9 * HC;   // KST 시각 → ms
+  const AUR = compC(AUC, fsC.readFileSync(AUC, 'utf8'));   // 실 audit.js(가짜 blobs 위) — readMonth
+  const admC = () => { mem.gw_users['member:uadmin'] = JSON.parse(JSON.stringify(ADMIN)); };
+  // ① 감사 화면
+  const chkAud = async (cl) => {
+    resetC(); admC(); auditMock.readMonth = AUR.readMonth;
+    const ln = (id, ts) => ({ ts, id, by: 'a', col: 'x', ev: [] });
+    mem.gw_data['audit:2026-08'] = { schema: 1, items: [ln('a0', kstC(2026, 8, 31, 23, 59)), ln('a1', kstC(2026, 9, 1, 0, 0)), ln('a2', kstC(2026, 9, 1, 8, 59, 59))] };
+    mem.gw_data['audit:2026-09'] = { schema: 1, items: [ln('b0', kstC(2026, 9, 1, 9, 0)), { ts: 'x', id: 'bad', by: 'a', col: 'x', ev: [] }, ln('b1', kstC(2026, 10, 1, 0, 30))] };
+    mem.gw_data['audit:2026-10:2'] = { schema: 1, part: 2, items: [ln('d0', kstC(2026, 11, 1, 3, 0))] };   // 머리 잃은 10월 키의 조각 2 — 11월 KST 1일 03:00
+    mem.gw_data['audit:2026-12'] = { schema: 1, items: [ln('c0', kstC(2027, 1, 1, 0, 30))] };
+    const ids = (r) => (r.body && r.body.doc && r.body.doc.items || []).map((x) => x.id).join();
+    const r8 = await cl({ action: 'audit', month: '2026-08' }, tokA), r9 = await cl({ action: 'audit', month: '2026-09' }, tokA), r10 = await cl({ action: 'audit', month: '2026-10' }, tokA);
+    const r11 = await cl({ action: 'audit', month: '2026-11' }, tokA), r12 = await cl({ action: 'audit', month: '2026-12' }, tokA), r01 = await cl({ action: 'audit', month: '2027-01' }, tokA);
+    Date.now = () => kstC(2026, 9, 1, 7, 0); const rd = await cl({ action: 'audit' }, tokA); Date.now = realNowC;
+    const r13 = await cl({ action: 'audit', month: '2026-13' }, tokA);
+    blobsMock.hooks.failGet = (k) => k === 'audit:2026-08'; const rf = await cl({ action: 'audit', month: '2026-09' }, tokA); blobsMock.hooks.failGet = null;
+    const got = { r8: ids(r8), r9: ids(r9), r10: ids(r10), r11: ids(r11), r11m: r11.body.doc && r11.body.doc.missing, r12: ids(r12), r01: ids(r01), rd: [rd.body.month, ids(rd)].join('|'), r13: [r13.code, r13.body.month, ids(r13)].join('|'), rf: rf.code, m9: r9.body.month };
+    const ok = got.r8 === 'a0' && got.r9 === 'a1,a2,b0,bad' && got.r10 === 'b1' && got.r11 === 'd0' && got.r11m === 1 && got.r12 === '' && got.r01 === 'c0'
+      && got.rd === '2026-09|a1,a2,b0,bad' && got.r13 === '200|2026-13|' && got.rf === 503 && got.m9 === '2026-09';
+    return { ok, got };
+  };
+  // ② 물어보기
+  const chkAsk = async (A) => {
+    resetC();
+    const M = { id: 'uadmin', admin: true, perms: {} };
+    const rows = async (t, a) => ((await A.runTool(t, a, M)).rows || []).map((r) => r.차번호 || r.이름 || r.공고명).join();
+    mem.gw_data['col:vehicles'] = { items: [{ id: 'v1', no: 'V17', insp_due: '2023-01-17' }, { id: 'v2', no: 'V18', insp_due: '2023-01-18' }, { id: 'v3', no: 'V18i', ins_due: '2023-01-18' }, { id: 'v4', no: 'V19', insp_due: '2023-01-19', ins_due: '2023-01-19' }] };
+    mem.gw_data['col:licenses'] = { items: [{ id: 'l1', name: 'L17', expiry: '2023-01-17' }, { id: 'l2', name: 'L18', expiry: '2023-01-18' }, { id: 'l3', name: 'L19', expiry: '2023-01-19' }] };   // 11/27 옮김: 운영 인허가 만기 칸 = expiry(C248)
+    mem.gw_data['col:bids'] = { items: [{ id: 'b1', title: 'B04', due: '2030-10-04' }, { id: 'b2', title: 'B05', due: '2030-10-05 10:00' }] };
+    const got = {};
+    for (const [nm, t] of [['00:00', kstC(2023, 1, 11, 0, 0)], ['04:43', kstC(2023, 1, 11, 4, 43)], ['08:59:59', kstC(2023, 1, 11, 8, 59, 59)], ['09:00', kstC(2023, 1, 11, 9, 0)], ['23:59', kstC(2023, 1, 11, 23, 59)]]) {
+      Date.now = () => t; got['v ' + nm] = await rows('vehicles', { due_within_days: 7 }); got['l ' + nm] = await rows('licenses', { due_within_days: 7 });
+    }
+    Date.now = () => kstC(2024, 2, 28, 3, 0); mem.gw_data['col:licenses'] = { items: [{ id: 'l4', name: 'L0302', expiry: '2024-03-02' }, { id: 'l5', name: 'L0303', expiry: '2024-03-03' }] };
+    got.leap = await rows('licenses', { due_within_days: 3 });   // 윤년: 2/28 + 3 = 3/2
+    for (const [nm, t] of [['07:35', kstC(2030, 10, 5, 7, 35)], ['00:00', kstC(2030, 10, 5, 0, 0)], ['09:00', kstC(2030, 10, 5, 9, 0)], ['전날 23:59', kstC(2030, 10, 4, 23, 59)]]) {
+      Date.now = () => t; got['b ' + nm] = await rows('bids', { open_only: true });
+    }
+    Date.now = realNowC;
+    const V = 'V17,V18,V18i', L = 'L17,L18';
+    const ok = ['00:00', '04:43', '08:59:59', '09:00', '23:59'].every((n) => got['v ' + n] === V && got['l ' + n] === L) && got.leap === 'L0302'
+      && got['b 07:35'] === 'B05' && got['b 00:00'] === 'B05' && got['b 09:00'] === 'B05' && got['b 전날 23:59'] === 'B04,B05';
+    return { ok, got };
+  };
+  try {
+    const A0 = await chkAud(clC(gwd)); T('C244 ① 감사 화면: KST 달로 거름 — KST 9/1 00:00·08:59:59 줄(8월 키) = 9월 목록 · 10/1 00:30(9월 키) = 10월 · 1/1 00:30(12월 키) = 1월 · 머리 잃은 전달 키 조각도 읽음(missing 합) · 달 없음 = KST 이번 달 · 달 꼴 아님 = 종전 · 전달 키 못 읽음 = 503', A0.ok, JSON.stringify(A0.got));
+    const B0 = await chkAsk(compC(ASKC, SRCC.a)); T('C244 ② 물어보기: 만기 7일 안 = KST 오늘+7 포함(KST 00:00~23:59 같은 답) · 윤년 2/28+3 = 3/2 · 입찰 마감 미도래 = 마감 ≥ KST 오늘(KST 0~9시에 어제 마감 빠짐)', B0.ok, JSON.stringify(B0.got));
+    const MG = [
+      ["  const r1 = await AU.readMonth(kPrev), r2 = await AU.readMonth(kMon);", "  const r1 = { ok: true, items: [], missing: 0 }, r2 = await AU.readMonth(kMon);"],
+      ["r2.items.filter((x) => inK(x) || !Number.isFinite(tsK(x)))", "r2.items"],
+      ["  const kS = Date.UTC(ky, km - 1, 1) - KH, kE = Date.UTC(ky, km, 1) - KH;", "  const kS = Date.UTC(ky, km - 1, 1), kE = Date.UTC(ky, km, 1);"],
+      ["const kMon = !d.month ? new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 7) :", "const kMon = !d.month ? new Date(Date.now()).toISOString().slice(0, 7) :"],
+      ["missing: (Number(r1.missing) || 0) + (Number(r2.missing) || 0) }", "missing: (Number(r2.missing) || 0) }"],
+      [" || !Number.isFinite(tsK(x))));", "));"]];
+    const MA = [
+      ["const dueLimit = (days) => new Date(Date.now() + 9 * 3600000 + days * 86400000)", "const dueLimit = (days) => new Date(Date.now() + days * 86400000)"],   // C244 옮김(11/27): 운영은 C248 검토가 dueLimit(KST)로 먼저 고침 — 같은 자리에 결함을 심음
+      ["        const lim = dueLimit(a.due_within_days);\n        return (v.insp_due", "        const lim = new Date(Date.now() + a.due_within_days * 86400000).toISOString().slice(0, 10);\n        return (v.insp_due"],
+      ["        const lim = dueLimit(a.due_within_days);\n        return isDay(l.expiry)", "        const lim = new Date(Date.now() + a.due_within_days * 86400000).toISOString().slice(0, 10);\n        return isDay(l.expiry)"],
+      ["      const today = dueLimit(0);", "      const today = new Date().toISOString().slice(0, 10);"]];
+    const kC = [];
+    for (const [a, b] of MG) { let v; try { v = (await chkAud(clC(compC(GWC, mutC(SRCC.g, a, b))))).ok; } catch (e) { v = 'err ' + e.message; } kC.push(v); }
+    for (const [a, b] of MA) { let v; try { v = (await chkAsk(compC(ASKC, mutC(SRCC.a, a, b)))).ok; } catch (e) { v = 'err ' + e.message; } kC.push(v); }
+    T('C244 ③ 결함 사본 ' + kC.length + '개(감사 전달 키 안 읽음 · 그달 키 안 거름 · 경계 UTC · 달 없음 UTC · missing 그달만 · 시각 없는 줄 버림 · 물어보기 KST 걷음 · 차 한계일 UTC · 인허가 한계일 UTC · 입찰 오늘 UTC) = 모두 ✗', kC.length === 10 && kC.every((v) => v === false), JSON.stringify(kC));
+  } catch (e) { T('C244 검사 실행', false, String(e && e.stack || e).slice(0, 500)); }
+  finally { resetC(); auditMock.readMonth = rmC0; }
 }
 
 console.log(fail ? '\n실패 ' + fail + ' / 통과 ' + pass : '\n서버 테스트 전 항목 통과 (' + pass + ')');process.exit(fail ? 1 : 0);
