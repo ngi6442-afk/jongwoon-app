@@ -24791,9 +24791,9 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ["`_lib/linelog.js`", "원장 C304"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v563 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 2 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 563 && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 2 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
       && d.cl.indexOf('**C304(v563') > 0
-      && /SHELL_CACHE = 'jw-shell-v563'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 563;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r563 = chk563(D563);
@@ -24805,6 +24805,31 @@ try {
   T('v563 문서·판 번호(정확 검사): FEATURES 기준 v563 (2026-11-27)·v563 절(C304) · TESTLIST v563 칸 6 · CLAUDE.md 한 줄 · sw jw-shell-v563 · 결함 사본 모두 ✗',
     r563.ok && M563.every((v) => v === false), JSON.stringify({ r: r563.info, mut: M563 }));
 } catch (e) { console.log('  (v563 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v564(C298 — 늦은 200이 실패 저장 대기를 풀지 않음 · 원장 C298): 실행 검사는 위 C242 블록 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd564 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D564 = { ft: rd564('FEATURES.md'), tl: rd564('TESTLIST.md'), sw: rd564('sw.js'), man: rd564('MANUAL.html'), cl: rd564('CLAUDE.md') };
+  const chk564 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v564 (11/27)', '\n### '), tlv = cut(d.tl, '\n## v564 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`rsLate`", "원장 C298"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v564 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 2 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C298(v564') > 0
+      && /SHELL_CACHE = 'jw-shell-v564'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r564 = chk564(D564);
+  const mu564 = (k, f) => chk564(Object.assign({}, D564, { [k]: f(D564[k]) })).ok;
+  const M564 = [mu564('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v563 (')), mu564('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v563'")),
+    mu564('ft', (s) => s.split('`rsLate`').join('rsLate')),
+    mu564('cl', (s) => s.replace('**C298(v564', 'C298(')),
+    mu564('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 배포 전 전체 게이트 기록 C298_게이트_배포전_1127.txt', '\n- (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 배포 전 전체 게이트 기록 C298_게이트_배포전_1127.txt'))];
+  T('v564 문서·판 번호(정확 검사): FEATURES 기준 v564 (2026-11-27)·v564 절(C298) · TESTLIST v564 칸 6(화면·운영 확인 4 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v564 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
+    r564.ok && M564.every((v) => v === false), JSON.stringify({ r: r564.info, mut: M564 }));
+} catch (e) { console.log('  (v564 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
