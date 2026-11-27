@@ -1714,9 +1714,9 @@
 - [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `paycalc_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` 통과 · v518 문서 검사를 이 판 이상으로 풀고 v519 문서·판 번호 정확 검사 — ✓ AI 11/20
 
 ## v520 — C240 판 A-1 — 가르는 칸 글자만 · 증빙 읽기 권한 · 남의 PIN · 당번 크론(서버만)
-- [ ] (AI 시험 화면 대상 — C240 판A-1) 직원·관리자 계정으로 홈·지시·차량·기성·문서함·체크·휴가 탭을 한 바퀴 — 종전과 같음(400 없음 — 개발자 도구 네트워크 탭)
-- [ ] (AI 시험 화면 대상 — C240 판A-1) 계약 보기 직원: 계약 서류 창 적격심사 패킷 생성 뒤 '증빙 함께 내려받기' 제안 뜸 · 관리자 양식 관리의 증빙 목록·삭제 됨
-- [ ] (AI 시험 화면 대상 — C240 판A-1) 경리 관리자 인사 카드: 직원 PIN 칸에 값 넣고 저장 → "계정·권한 변경은 개발자만 가능합니다." · PIN 빈칸 저장 됨 · 새 직원 등록(PIN 포함) 됨
+- [x] (AI 시험 화면 대상 — C240 판A-1) 직원·관리자 계정으로 홈·지시·차량·기성·문서함·체크·휴가 탭을 한 바퀴 — 종전과 같음(400 없음 — 개발자 도구 네트워크 탭) — ✓ AI 11/27 시험 서버(가짜 자료 · v568 사본): 관리자 22건 전부 200 · 직원 17건 중 400 0(403 ADMIN_ONLY 2 = 입찰·부동산 — v519도 같음)
+- [x] (AI 시험 화면 대상 — C240 판A-1) 계약 보기 직원: 계약 서류 창 적격심사 패킷 생성 뒤 '증빙 함께 내려받기' 제안 뜸 · 관리자 양식 관리의 증빙 목록·삭제 됨 — ✓ AI 11/27 생성 입구는 계약 수행 권한에만 있어 계약 수행 직원으로 화면 확인(제안 확인창 · hwpx 1 + 증빙 pdf 2 내려받음) · 계약 보기 직원은 처리기로(승인 기기 목록·본문 200 · 미승인 기기 403 · 삭제 403) · 관리자 목록·삭제 됨
+- [x] (AI 시험 화면 대상 — C240 판A-1) 경리 관리자 인사 카드: 직원 PIN 칸에 값 넣고 저장 → "계정·권한 변경은 개발자만 가능합니다." · PIN 빈칸 저장 됨 · 새 직원 등록(PIN 포함) 됨 — ✓ AI 11/27 문구 그대로(403 DEV_ONLY · 저장값 그대로) · PIN 빈칸 저장 200 · 새 직원 PIN 포함 200
 - [ ] (AI 운영 확인 — C240 판A-1) 운영 앱 직원·관리자 계정 한 바퀴 · 오류 기록(err_list) 새 항목 없음 · 다음 날 아침 수집기·백업·운반일지 봇 정상(Actions 기록)
 - [x] (AI 운영 확인 — C240 판A-1) `/.netlify/functions/gw-duty-cron` 주소 호출 = 404 · 08:00 gw-todo-cron 계약직 알림 그대로 — ✓ AI 11/27 주소 404 · todo-cron 11/27 아침 정상 끝(it:cron 흔적 ok · fails 0)
 - [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 v519 9e66df7 위로 옮긴 0b88eb7) uismoke ✓ 921 · servertest 1450(운영 1442 + C240 판 A-1 8) · 14종 0 · node --check 104 · 인라인 파싱 오류 0 · paycalc_check 10 · autorulestest 8 · CR 0 — ✓ AI 11/20
