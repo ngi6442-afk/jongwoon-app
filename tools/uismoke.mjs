@@ -25161,9 +25161,9 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ['`_view`', '원장 C240', '`leave_kept`'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v568 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 568 && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
       && d.cl.indexOf('**C240 A-2a(v568') > 0
-      && /SHELL_CACHE = 'jw-shell-v568'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 568;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r568 = chk568(D568);
@@ -25173,6 +25173,31 @@ try {
   T('v568 앱 휴가 반차 표 = 서버 leaveguard 표(' + kA568 + ') · 문서·판 번호(정확 검사): FEATURES 기준 v568 (2026-11-27)·v568 절(C240 A-2a) · TESTLIST v568 칸 4(시험 화면 1 · 운영 확인 1 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v568 · 결함 사본(기준 줄·sw·CLAUDE.md·FEATURES 낱말) 모두 ✗',
     kA568 !== '' && kA568 === kS568 && r568.ok && M568.every((v) => v === false), JSON.stringify({ kA: kA568, kS: kS568, r: r568.info, mut: M568 }));
 } catch (e) { console.log('  (v568 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v569(C244 계산 수리 옮김 · 원장 C244): 실행 검사는 위 C244 인허가·기성 블록 · servertest C244 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd569 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D569 = { ft: rd569('FEATURES.md'), tl: rd569('TESTLIST.md'), sw: rd569('sw.js'), cl: rd569('CLAUDE.md') };
+  const chk569 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v569 (11/27)', '\n### '), tlv = cut(d.tl, '\n## v569 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`eduYearEndDue`", "`periodKeysRoll(type)`", "`xadSubOf`", "`recSheetMoney`", "`dueLimit(0)`", "원장 C244"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v569 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 2 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C244(v569') > 0
+      && /SHELL_CACHE = 'jw-shell-v569'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r569 = chk569(D569);
+  const mu569 = (k, f) => chk569(Object.assign({}, D569, { [k]: f(D569[k]) })).ok;
+  const M569 = [mu569('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v568 (')), mu569('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v568'")),
+    mu569('ft', (s) => s.split('`xadSubOf`').join('xadSubOf')),
+    mu569('cl', (s) => s.replace('**C244(v569', 'C244(')),
+    mu569('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 배포 전 전체 게이트 기록 C244_게이트_v569_1127.txt', '\n- (AI) 게이트'))];
+  T('v569 문서·판 번호(정확 검사): FEATURES 기준 v569 (2026-11-27)·v569 절(C244) · TESTLIST v569 칸 6(화면·운영 확인 4 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v569 · 결함 사본 모두 ✗',
+    r569.ok && M569.every((v) => v === false), JSON.stringify({ r: r569.info, mut: M569 }));
+} catch (e) { console.log('  (v569 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
