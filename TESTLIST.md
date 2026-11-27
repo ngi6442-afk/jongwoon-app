@@ -2064,3 +2064,8 @@
 - [ ] (AI 운영 확인 — C244) 배포 뒤 관리자 감사 화면 이번 달 목록이 열리고(503 없음) 1일 0~9시 줄이 이번 달에 보임 · 인허가 › 이번 달 탭 화면이 배포 전과 같음(바뀌는 행 0)
 - [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 배포 전 전체 게이트 기록 C244_게이트_v569_1127.txt
 - [x] (AI) `uismoke` C244 인허가 ①②③ · C244 기성 · `servertest` C244 인허가 회차 · C244 날짜 ①②③(결함 사본 모두 ✗) · 영역마다 좁은 확인
+
+## v570 — 오래 참조 없는 첨부 정리 연습 방식(C289)
+- [x] (AI) `servertest` 절 42-C289(판정 · 실행·읽기 실패 · 관리자 조회 · 정적 지우기 0) — ✓ AI 11/27
+- [ ] (운영 확인) 다음 월요일 03:00 회차 뒤 attorphan:report 생김(partial 아님 · 첫 회차는 지울 후보 0·새 고아 = 그때 고아 수) · 그다음 주 회차에 7일 넘은 것이 지울 후보로 옮겨짐
+- [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `paycalc_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` · `autorulestest` · `botdup_check` 통과 · v569 문서 검사를 이 판 이상으로 풀고 v570 문서·판 번호 정확 검사 — ✓ AI 11/27

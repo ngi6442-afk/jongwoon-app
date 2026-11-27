@@ -25184,9 +25184,9 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ["`eduYearEndDue`", "`periodKeysRoll(type)`", "`xadSubOf`", "`recSheetMoney`", "`dueLimit(0)`", "원장 C244"];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v569 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 2 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 569 && ftv.length > 0 && mF.length === 0 && cb.length === 6 && gate.length === 2 && scr.length === 4 && !cb.some((l) => /\(PM/.test(l))
       && d.cl.indexOf('**C244(v569') > 0
-      && /SHELL_CACHE = 'jw-shell-v569'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 569;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r569 = chk569(D569);
@@ -25198,6 +25198,29 @@ try {
   T('v569 문서·판 번호(정확 검사): FEATURES 기준 v569 (2026-11-27)·v569 절(C244) · TESTLIST v569 칸 6(화면·운영 확인 4 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v569 · 결함 사본 모두 ✗',
     r569.ok && M569.every((v) => v === false), JSON.stringify({ r: r569.info, mut: M569 }));
 } catch (e) { console.log('  (v569 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v570(C289 — 첨부 정리 연습 방식): 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '570 이상'으로 풀 것
+try {
+  const rdZ = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DZ = { ft: rdZ('FEATURES.md'), tl: rdZ('TESTLIST.md'), sw: rdZ('sw.js') };
+  const chkZ = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v570 (11/27)', '\n### '), tlv = cut(d.tl, '\n## v570 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), op = cb.filter((l) => /^- \[ \] \(운영 확인\)/.test(l));
+    const FT = ['`_lib/attorphan.js`', '`gw-attorphan-cron`', '`gw-attorphan-background`', '`attorphan:report`', '`att_orphan_report`', '0 18 * * 0'];
+    const GATE = ["uismoke","servertest","consheet_check","proctpl_check","settletest","rectest","promoqual_check","promogen_check","promoqlearn_check","promostream_check","promo_wrap_check","promo_post_check","paycalc_check","stmtread_a_check","stmtread_b_check","stmtread_c_check","stmtread_d_check","stmtmail_check","autorulestest","botdup_check"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0), last = gate[gate.length - 1] || '';
+    const ok = /기준: v570 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
+      && GATE.every((g) => last.indexOf('`' + g + '`') > 0) && /SHELL_CACHE = 'jw-shell-v570'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
+  };
+  const rZ = chkZ(DZ);
+  const muZ = (k, f) => chkZ(Object.assign({}, DZ, { [k]: f(DZ[k]) })).ok;
+  const MZ = [muZ('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v569 (')), muZ('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v569'")),
+    muZ('ft', (s) => s.split('`attorphan:report`').join('attorphan:report')), muZ('tl', (s) => s.split('\n## v570 ').join('\n## vX '))];
+  T('v570 문서·판 번호(정확 검사): FEATURES 기준 v570 (2026-11-27)·v570 절(attorphan·크론·워커·보고 문서·관리자 조회·일정) · TESTLIST v570 칸 3(운영 확인 1 · 게이트 [x] 2 — 20종) · sw jw-shell-v570 · 결함 사본 ' + MZ.length + '개 = 모두 ✗',
+    rZ.ok && MZ.every((v) => v === false), JSON.stringify({ r: rZ.info, mut: MZ }));
+} catch (e) { console.log('  (v570 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
