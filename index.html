@@ -736,6 +736,8 @@
   @media (max-width:859px){ #eduLead,#eduScopeLine{display:none;} }
   /* T688(PM 11/27 10:43·10:50 ⓐⓒ 승인 · ⓑ = 직원/일용직 칩 — 누르는 단추 확인 그림 09_조사_문서/T688_폰단추_자료_20261127): 폰에서 손가락 자리 44px(높이 24·26·폭 23 이던 것) — PC 표는 그대로 */
   @media (max-width:859px){ #siteFilterBar .mini-btn{min-height:44px;padding:10px 14px;} #eduScopeBar .vs-chip{min-height:44px;padding:10px 18px;font-size:14px;} #eduList .item-actions [data-edu-edit]{min-width:48px;min-height:44px;padding:10px 8px;} }   /* v447 검토: 폰(phone legacy)은 지금 디자인 그대로 — 칸 이름만 새 이름(C063), 칸 머리 두 줄은 PC 표에만 */
+  /* C246(PM 11/27 16:40 ㅇ): 폰에서만 앱 공통 작은 단추 최소 높이 32px(24~29이던 것) · 운반일지 날짜 ‹ › 32×32(22×20) · ⚙ 설정 창 '사용 안내' 링크 32px(17) — PC는 그대로 · 안전 탭 44px 자리(T688)는 더 큰 그대로 */
+  @media (max-width:859px){ .mini-btn{min-height:32px;} a.mini-btn{display:inline-flex;align-items:center;} #abPrevBtn,#abNextBtn{min-width:32px;font-size:15px;} #setManualLink{line-height:32px;} }
   .edu-join{font-size:11px;font-weight:400;color:var(--sub);}
   .edu-dt{border-collapse:collapse;width:100%;max-width:1000px;font-size:12.5px;margin-top:8px;}
   .edu-dt th,.edu-dt td{border-bottom:1px solid var(--line);padding:5px 8px;text-align:left;vertical-align:middle;}
@@ -3559,7 +3561,7 @@
     <button class="secondary" id="pushBtn" style="display:none;">🔔 이 기기 알림 켜기</button>
     <button class="secondary" id="pushPrimaryBtn" style="display:none;">⭐ 이 기기를 결재알림 우선기기로</button>
     <button class="secondary" id="pushTestBtn" style="display:none;">📨 알림 테스트 보내기</button>
-    <a href="./MANUAL.html" target="_blank" rel="noopener" style="display:block;text-align:center;font-size:13px;margin-top:6px;">📖 사용 안내</a>
+    <a id="setManualLink" href="./MANUAL.html" target="_blank" rel="noopener" style="display:block;text-align:center;font-size:13px;margin-top:6px;">📖 사용 안내</a>
     <button class="secondary" id="helpBtn">도움말</button>
     <button class="secondary" id="memberLogoutBtn" style="display:none;">로그아웃</button>
   </div>
@@ -29031,9 +29033,13 @@
       // change=저장만(재렌더로 피커·포커스가 날아가지 않게), blur=재렌더(배지·정렬 반영) — v310
       // C280: 칸은 도우미로 읽음 — change = 맞는 값일 때만 저장(틀린 입력·연도를 치는 도중은 조용히 넘김) · blur = 다시 읽어 맞는 값(키보드로 다 지운 진짜 빈칸 포함 — 이때는 change가 안 남)이 저장된 기한과 다르면 저장, 틀린 입력이면 안내만(요청 0 — 다시 그리기가 저장된 기한을 다시 보임)
       //   저장은 todoDueFrom 한 곳(저장된 기한과 같으면 보내지 않음 — change 뒤 blur가 같은 값을 두 번 보내지 않게)
-      inp.addEventListener("change", function(e){ e.stopPropagation(); todoDueFrom(inp, false); });
-      inp.addEventListener("blur", function(){ todoDueFrom(inp, true); renderMyTodos(); });
+      // C280 후속(PM 11/27 16:40 ㅇ): 키보드로 치는 중에는 change가 와도 저장하지 않고 칸을 떠날 때(blur·Enter) 한 번 — 월만 고치는 도중 '1'에서 지나가는 맞는 날짜(01-31)가 저장되던 것
+      //   키를 치지 않은 change(달력에서 고름·iOS 휠)는 종전처럼 바로 저장 · 칸에 커서가 있는 채로 앱을 내리면(visibilitychange) 그때 저장
+      inp.addEventListener("keydown", function(e){ if (e && e.key === "Enter"){ e.preventDefault(); inp.blur(); return; } if (e && e.key !== "Tab") inp.__dueTyped = true; });
+      inp.addEventListener("change", function(e){ e.stopPropagation(); if (!inp.__dueTyped) todoDueFrom(inp, false); });
+      inp.addEventListener("blur", function(){ inp.__dueTyped = false; todoDueFrom(inp, true); renderMyTodos(); });
     });
+    if (document.addEventListener && !document.__todoDueVis){ document.__todoDueVis = 1; document.addEventListener("visibilitychange", function(){ var a = document.activeElement; if (document.visibilityState === "hidden" && a && a.getAttribute && a.getAttribute("data-todo-due") != null) todoDueFrom(a, false); }); }
   }
   function renderMyTodos(){
     var host = document.getElementById("myTodoHost"); if (!host) return;
