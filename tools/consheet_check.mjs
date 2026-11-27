@@ -38,6 +38,7 @@ const stubs = `
   function conAmt(c){ return ((c && c.contract_info && c.contract_info.amount) || 0) || conBidAmt(c); }
   function conAmtEff(c){ return (c && Number(c.settle_amount)) || conAmt(c); }
   function fmtAmount(n){ return Number(n).toLocaleString(); }
+  function recSheetMoney(n){ return Number(n).toLocaleString(); }   // C244: csLinksHtml 기성 금액 글(부호 있는 글 — 여기 꾸밈은 fmtAmount와 같게)
   function dispName(n){ return n; }
   function todayStr(){ return "2026-10-13"; }
   function vehDday(d){ var t = new Date(d + "T00:00:00"), now = new Date("2026-10-13T00:00:00"); var diff = Math.round((t - now) / 86400000); return { diff: diff, text: diff < 0 ? ("D+" + (-diff)) : ("D-" + diff) }; }

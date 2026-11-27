@@ -2345,7 +2345,7 @@ try {
   const calApi28 = new Function([
     'var vehicles = [{ no:"12가3456", insp_due:"2026-12-01", ins_due:"2026-12-02", history:[{ kind:"현장", date:"2026-11-20" }] }], licenses = [{ name:"석면해체업", expiry:"2027-01-01", edu_due:"2026-12-10" }], tasks = [{ title:"지시", due:"2026-11-30", status:"open" }], receivables = [{ client:"갑", billed:"2026-11-15", amount:1000 }];',
     'function canSee(){ return true; } function isAdmin(){ return true; } function licVisible(){ return true; } function taskVisible(){ return true; } function recVisible(){ return true; }',
-    'function isDate(s){ return /^\\d{4}-\\d{2}-\\d{2}$/.test(s||""); } function fmtAmount(v){ return String(v); } function dispName(n){ return n||""; } function dispNameById(){ return ""; } function memberName(){ return "홍"; }',
+    'function isDate(s){ return /^\\d{4}-\\d{2}-\\d{2}$/.test(s||""); } function fmtAmount(v){ return String(v); } function recSheetMoney(v){ return String(v); } function dispName(n){ return n||""; } function dispNameById(){ return ""; } function memberName(){ return "홍"; }',   // C244: calEvents 기성 금액 글 = recSheetMoney(부호 있는 글)
     'function liveAsb(){ return [{ title:"남성초", start:"2026-11-20", end:"2026-11-25", status:"plan", site:"포항" }]; } function asbNotifyDue(){ return "2026-11-13"; }',
     'function liveEdu(){ return [{ ptype:"member", pid:"u1", kind:"regular", date:"2026-06-01", next:"2026-12-01" }, { ptype:"worker", pid:"w1", kind:"spec_med", date:"2026-04-01", next:"2027-04-01" }]; } function eduPersonName(){ return "홍"; } function eduKindLabel(){ return "정기교육(근로자)"; }',
     'function liveLeaves(){ return [{ type:"annual", status:"approved", member_id:"u1", start:"2026-11-26", end:"2026-11-26" }]; } function isPartialLeave(){ return false; } function leaveCalVisible(){ return true; } function leaveTypeLabel(){ return "연차"; }',
@@ -6503,7 +6503,11 @@ try {
   const s15b = [X15.host._h.indexOf('data-vs-table') > 0, vis15(), H15('recTopHead').textContent, H15('recSelBar').style.display, H15('recPaidList').style.display, card15()];
   E15.width = 375; E15.breakAll();
   const s15c = [(H15('recList')._h.match(/class="item rec-item/g) || []).length, vis15(), H15('recTopHead').textContent, card15(), X15.host._h.indexOf('data-vs-') < 0];
-  const leg15 = sha40(body40('renderReceivablesLegacy')), row15 = sha40(body40('recRowHtml'));
+  // C244(11/20): 옛 본문에서 바뀐 것은 음수 금액 부호 글 두 곳뿐 — 그 두 곳만 되돌린 글이 v439 글자째 해시와 같아야 한다(그 밖 한 글자라도 바뀌면 잡힘)
+  const un244 = (s) => s.split("(recSheetMoney(r.amount) + '원') : '';   // C244(11/20): 수정세금계산서(음수) 금액 부호 살림 — 전역 fmtAmount는 부호를 지워 '330,000원'으로 보였다(PC 표 recSheetMoney와 같은 글)").join("(fmtAmount(r.amount) + '원') : '';")
+    .split('(sum ? " · " + recSheetMoney(sum) + "원" : "")) : "";   // C244: 합이 음수면 부호 살림').join('(sum ? " · " + fmtAmount(sum) + "원" : "")) : "";')
+    .split('(r.amount ? " · " + recSheetMoney(r.amount) + "원" : "") + (r.billed ? " · " + r.billed : ""); });   // C244: 음수 부호 살림').join('(r.amount ? " · " + fmtAmount(r.amount) + "원" : "") + (r.billed ? " · " + r.billed : ""); });');
+  const leg15 = sha40(un244(body40('renderReceivablesLegacy'))), row15 = sha40(un244(body40('recRowHtml')));
   T('v440 ⑮ 폰 legacy(375): 옛 본문 renderReceivablesLegacy = v439 renderReceivables 본문 글자째(sha256 ' + LEG_SHA40.slice(0, 12) + '…) · 홈 줄 recRowHtml 무변(' + ROW_SHA40.slice(0, 12) + '…) · 실행 = 옛 미수 카드 7줄·표 글 0·표 자리는 카드를 뗀 빈 칸(display:none이 아님 — 검토 반영: 숨기면 부품이 보임·크기 변화를 못 봐 860 경계에서 표로 못 돌아왔다, 시험 틀 getClientRects도 display:none이면 상자 없음)·옛 목록·미수 제목·검색칸·입금 완료 보기 보임·카드 셋 보임·머리 버튼 숨김·제목 건수 없음·미수 제목 "7건 · 43,350,000원"·선택 막대 flex · 옛 줄 누름 = ★ 하이라이트(종전) → 1366(경계 한 번) = 표(자리 다시 카드·위 여백 10px)·옛 요소 숨김·카드 셋 접힘·머리 버튼 보임·제목 "미수 7건 · 43,350,000원"·선택 막대·입금 완료 목록 숨김 → 다시 375 = 옛 카드 7줄·카드 셋·옛 요소 되살림·제목 건수 걷음·표 글 0',
     leg15 === LEG_SHA40 && row15 === ROW_SHA40
     && JSON.stringify(s15a) === JSON.stringify([true, 7, true, '·,·,·,·,·,·,·,·,none,none,none', '', '7건 · 43,350,000원', 'flex', '-/0', 0])
@@ -24955,6 +24959,68 @@ try {
   T('v564 문서·판 번호(정확 검사): FEATURES 기준 v564 (2026-11-27)·v564 절(C298) · TESTLIST v564 칸 6(화면·운영 확인 4 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v564 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
     r564.ok && M564.every((v) => v === false), JSON.stringify({ r: r564.info, mut: M564 }));
 } catch (e) { console.log('  (v564 검사 생략 — ' + e.message + ')'); fails++; }
+// ── C244(11/20 계산 검산 — 기성·미수·계약 금액): ① 선금 신청서 사용계획 소계·부가세 = 선금신청액 ÷ 1.1 절사를 정수 산술로(부동소수 E/1.1이 11로 나눠지는 금액에서 1원 작던 것)
+//   ② 수정세금계산서(음수) 기성 금액 글 부호 — 폰 옛 목록 줄·머리 합·거래처별 집계, 전역 검색·휴지통·홈택스 불러오기 미리보기·달력·홈 수금 소식·입금확인 지시 제목·삭제 확인·계약 연결 칸(PC 표 recSheetMoney와 같은 글)
+//   실제 함수(index.html에서 떼어 실행) + 결함 사본(고친 줄 하나씩 되돌림) — '오늘'은 쓰지 않음(recAging은 todayStr을 고정 인자로 꽂음)
+try {
+  const fnC = (src, name) => { const i = src.indexOf('function ' + name + '('); if (i < 0) throw new Error('함수 없음: ' + name); let d = 0, st = false; for (let j = i; j < src.length; j++) { const ch = src[j]; if (ch === '{') { d++; st = true; } else if (ch === '}') { d--; if (st && d === 0) return src.slice(i, j + 1); } } throw new Error('중괄호 짝 안 맞음: ' + name); };
+  const chk244 = (src) => {
+    const got = [];
+    // ① 선금 — 화면 안내 글(xadCalcUpd)·신청서 칸(xgAdvTok) 실제 함수
+    const xadCode = ['xadNum', 'xadSubOf', 'xadCalcUpd', 'xgAdvTok'].map((n) => fnC(src, n)).join('\n');
+    const mkX = (vals) => { const els = {}; const get = (id) => { if (!els[id]) els[id] = { value: vals[id] == null ? '' : String(vals[id]), textContent: '', style: {} }; return els[id]; };
+      const api = new Function('document', 'koAmount', 'todayStr', xadCode + '\nreturn { xadSubOf: xadSubOf, xadCalcUpd: xadCalcUpd, xgAdvTok: xgAdvTok };')({ getElementById: get }, (n) => '일금 ' + n + '원', () => '2026-11-20');
+      return { api, get }; };
+    const calc = (E) => { const X = mkX({ xgAmount: '50,000,000', xadLabor: '10,000,000', xadReq: E }); X.api.xadCalcUpd(); return (/사용계획 소계 ([\d,—]+) \+ 부가세 ([\d,—]+)/.exec(X.get('xadCalc').textContent) || [0, '?', '?']).slice(1).join('/'); };
+    const tok = (E, U) => { const X = mkX({ xgCo: 'con', xgAmount: '50,000,000', xadLabor: '10,000,000', xadReq: E, xadU1: U }); const t = X.api.xgAdvTok(); return [t.tokens['소계'], t.tokens['부가세'], t.missing.some((m) => /≠ 소계/.test(m))].join('/'); };
+    const CASES = [[33, '30/3'], [55, '50/5'], [110, '100/10'], ['1,100,000', '1,000,000/100,000'], ['2,200,000', '2,000,000/200,000'], ['7,700,000', '7,000,000/700,000'],
+      [34, '30/4'], ['29,490,000', '26,809,090/2,680,910'], [1, '—/1'], [11, '10/1']];
+    CASES.forEach(([E, want]) => { const g = calc(E); if (g !== want) got.push('안내 글 ' + E + ' ' + g); });
+    [['1,100,000', '1,000,000', '1,000,000/100,000/false'], ['33', '30', '30/3/false'], ['1,100,000', '999,999', '1,000,000/100,000/true']].forEach(([E, U, want]) => { const g = tok(E, U); if (g !== want) got.push('신청서 ' + E + ' ' + g); });
+    // 전수·무작위: 소계 = floor(E×10/11)(BigInt 정확) — 종전 식과 다른 것은 11의 배수뿐
+    const S = mkX({}).api.xadSubOf; let bad = 0, moved = 0, movedNot11 = 0; let seed = 20261120; const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+    const one = (E) => { const s = S(E); if (s !== Number(BigInt(E) * 10n / 11n)) bad++; if (s !== Math.floor(E / 1.1)) { moved++; if (E % 11) movedNot11++; } };
+    for (let E = 1; E <= 300000; E++) one(E);
+    for (let n = 0; n < 200000; n++) one(1 + Math.floor(rnd() * 5e10));
+    if (bad || movedNot11 || moved < 1000) got.push('전수·무작위 어긋남 ' + bad + ' · 11 배수 아닌 값 바뀜 ' + movedNot11 + ' · 바뀐 값 ' + moved);
+    // ② 음수 금액 글 — 실제 fmtAmount·recSheetMoney·recRowHtml·renderRecAging
+    const recCode = ['fmtAmount', 'recSheetMoney', 'recAging', 'recRowHtml', 'renderRecAging', 'isDate'].map((n) => fnC(src, n)).join('\n');
+    const els2 = {}; const get2 = (id) => { if (!els2[id]) els2[id] = { innerHTML: '', textContent: '', style: {} }; return els2[id]; };
+    const R = new Function('document', 'todayStr', 'canDo', 'isAdmin', 'selBoxHtml', 'esc', 'var showRecAging = true;\n' + recCode + '\nreturn { recSheetMoney: recSheetMoney, recRowHtml: recRowHtml, renderRecAging: renderRecAging };')(
+      { getElementById: get2 }, () => '2026-11-20', () => false, () => false, () => '', (s) => String(s));
+    const ln = (r) => (/<span class="rec-amt2">([^<]*)<\/span>/.exec(R.recRowHtml(r, false, false)) || [0, ''])[1];
+    const s2 = [R.recSheetMoney(-330000), R.recSheetMoney(3300000), R.recSheetMoney(0), ln({ id: 'a', client: '가', amount: -330000, billed: '2026-10-01' }), ln({ id: 'b', client: '가', amount: 3300000, billed: '2026-10-01' }), ln({ id: 'c', client: '가', amount: -5, billed: '' })];
+    R.renderRecAging([{ client: '가', amount: -330000, billed: '2026-10-01' }]); s2.push((/합계 ([^원]*)원/.exec(get2('recAgingSummary').innerHTML) || [0, '?'])[1], (/<div class="amt">([^<]*)<\/div>/.exec(get2('recAgingSummary').innerHTML) || [0, '?'])[1]);
+    R.renderRecAging([{ client: '가', amount: 3300000, billed: '2026-10-01' }, { client: '가', amount: -330000, billed: '2026-10-01' }, { client: '나', amount: 1000000, billed: '2026-11-01' }]); s2.push((/합계 ([^원]*)원/.exec(get2('recAgingSummary').innerHTML) || [0, '?'])[1]);
+    if (JSON.stringify(s2) !== JSON.stringify(['-330,000', '3,300,000', '', '-330,000원', '3,300,000원', '-5원', '-330,000', '-330,000원', '3,970,000'])) got.push('음수 글 ' + JSON.stringify(s2));
+    // 같은 꼴 전수(정적): 기성 한 줄 금액 글 자리 — 폰 옛 목록 머리 합·전역 검색·휴지통·불러오기 미리보기 3·달력·홈 수금 소식·입금확인 지시·삭제 확인·계약 연결 칸·표 검색 글 앞머리가 recSheetMoney
+    const W = [['renderReceivablesLegacy', '(sum ? " · " + recSheetMoney(sum) + "원" : "")'], ['renderReceivablesLegacy', 'r.amount ? " · " + recSheetMoney(r.amount) + "원" : ""'],
+      ['gsSources', '(x.amount?" · "+recSheetMoney(x.amount)+"원":"")'], ['showRecImportPreview', '"<br>신규 미수 합계 <b>"+recSheetMoney(addTotal)+"원</b>"'], ['showRecImportPreview', '" · "+recSheetMoney(c.amount)+"원</div>"'],
+      ['showRecImportPreview', "' · ' + recSheetMoney(tw.amount) + '원(작성일과 '"], ['calEvents', 'r.amount ? recSheetMoney(r.amount)+"원" :'], ['renderDashboard', '"수금: "+(r.client||"")+(r.amount?" "+recSheetMoney(r.amount)+"원":"")'],
+      ['createRecTask', '(rec.amount ? " " + recSheetMoney(rec.amount) + "원" : "")'], ['deleteReceivable', '(r.amount ? recSheetMoney(r.amount) + "원" : "")'], ['csLinksHtml', '(r.amount ? recSheetMoney(r.amount) + "원" : "")'],
+      ['recSheetSearchText', '(r.amount ? " · " + recSheetMoney(r.amount) + "원" : "")']];
+    const miss = W.filter(([f, s]) => fnC(src, f).indexOf(s) < 0).map(([f]) => f);
+    // 부호를 지우는 fmtAmount(…amount)는 수정(-) 줄이 이미 빠지는 자리(홈 파이프라인·거래처 상세)와 부호를 앞에 붙이는 수정 창만
+    const left = [...src.matchAll(/fmtAmount\((?:r|x|c|tw|rec|it)\.amount\)/g)].map((m) => { const before = src.slice(0, m.index); const f = [...before.matchAll(/\n  function ([\w$]+)\(/g)].pop(); return f ? f[1] : '?'; }).sort();
+    if (miss.length || JSON.stringify(left) !== JSON.stringify(['openCliDetail', 'openRecModal', 'renderDashboard'].sort())) got.push('같은 꼴 ' + JSON.stringify({ miss, left }));
+    return { ok: got.length === 0, info: got };
+  };
+  const r244 = chk244(html);
+  const MU244 = [
+    ['var C=A-B, sub=E?xadSubOf(E):0, vat=E?E-sub:0;', 'var C=A-B, sub=E?Math.floor(E/1.1):0, vat=E?E-sub:0;'],
+    ['var adC=adA-adB, adSub=adE?xadSubOf(adE):0, adVat=adE?adE-adSub:0;', 'var adC=adA-adB, adSub=adE?Math.floor(adE/1.1):0, adVat=adE?adE-adSub:0;'],
+    ['function xadSubOf(E){ var r=E%11; return (E-r)/11*10+Math.floor(r*10/11); }', 'function xadSubOf(E){ var r=E%11; return (E-r)/11*10+Math.round(r*10/11); }'],
+    ["var amt = r.amount ? (recSheetMoney(r.amount) + '원') : '';", "var amt = r.amount ? (fmtAmount(r.amount) + '원') : '';"],
+    ["<div class=\"amt\">' + recSheetMoney(x.sum) + '원</div>", "<div class=\"amt\">' + fmtAmount(x.sum) + '원</div>"],
+    ["· 합계 ' + recSheetMoney(total) + '원 (금액 큰 순)", "· 합계 ' + fmtAmount(total) + '원 (금액 큰 순)"],
+    ['(sum ? " · " + recSheetMoney(sum) + "원" : "")', '(sum ? " · " + fmtAmount(sum) + "원" : "")'],
+    ['(x.amount?" · "+recSheetMoney(x.amount)+"원":"")', '(x.amount?" · "+fmtAmount(x.amount)+"원":"")'],
+    ['(rec.amount ? " " + recSheetMoney(rec.amount) + "원" : "")', '(rec.amount ? " " + fmtAmount(rec.amount) + "원" : "")'],
+    ['"<br>신규 미수 합계 <b>"+recSheetMoney(addTotal)+"원</b>"', '"<br>신규 미수 합계 <b>"+fmtAmount(addTotal)+"원</b>"']];
+  const M244 = MU244.map(([a, b]) => { if (html.indexOf(a) < 0) return 'no-anchor'; return chk244(html.split(a).join(b)).ok; });
+  T('C244 기성·미수·계약 금액(실행 — 실제 xadCalcUpd·xgAdvTok·recRowHtml·renderRecAging): ① 선금 사용계획 소계·부가세 = 선금신청액 ÷ 1.1 절사 정수 산술(33 → 30+3 · 1,100,000 → 1,000,000+100,000 · 사용계획 합 1,000,000이면 ≠ 경고 없음 · 29,490,000 → 26,809,090+2,680,910 종전 그대로) · 1~30만 전수 + 무작위 20만 = BigInt floor(E×10/11)과 0 어긋남, 종전과 다른 값은 11의 배수뿐 ② 음수 기성 금액 글 부호(-330,000원) — 폰 옛 목록 줄·머리 합·거래처별 집계·전역 검색·휴지통·불러오기 미리보기·달력·홈 수금·입금확인 지시·삭제 확인·계약 연결 칸·표 검색 글 · 결함 사본 ' + MU244.length + '개 전부 잡힘',
+    r244.ok && M244.every((v) => v === false), JSON.stringify({ r: r244.info, mut: M244 }));
+} catch (e) { console.log('  (C244 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ── T152(11/27 운영책임자 "추천대로" = 안 A): 투찰 잠금 위반 알림 — 배선 검사(실행 검사는 servertest T152) · 결함 사본
 try {

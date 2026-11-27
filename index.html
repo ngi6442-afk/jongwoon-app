@@ -7505,7 +7505,7 @@
       add(r.next, "hr", "📚 "+eduPersonName(r)+" "+eduKindLabel(r.kind), "다음 예정", "safety:edu:"+(r.ptype==="worker"?"worker":"member"));   // 칸 + 대상 칩(일용직 기록이면 일용직 목록으로)
     });
     tasks.forEach(function(t){ if (t.del === 1 || t.status === "done") return; if (!taskVisible(t)) return; add(t.due, "tasks", t.title||"지시", t.who_id==="__all__" ? "전사" : (t.who_id ? dispNameById(t.who_id) : dispName(t.who||""))); });   // who는 이름 문자열 — id 조회에 넣으면 담당자가 항상 공백이었음
-    if (canSee("rec")) receivables.forEach(function(r){ if (r.del === 1 || r.paid || !recVisible(r)) return; add(r.billed, "rec", (r.client||"미수")+" 청구", r.amount ? fmtAmount(r.amount)+"원" : ""); });
+    if (canSee("rec")) receivables.forEach(function(r){ if (r.del === 1 || r.paid || !recVisible(r)) return; add(r.billed, "rec", (r.client||"미수")+" 청구", r.amount ? recSheetMoney(r.amount)+"원" : ""); });
     // 휴가·사직: 승인된 연차/반차는 기간 전체, 사직 확정은 퇴사예정일(관리자만)
     liveLeaves().forEach(function(l){
       if(l.type==="annual" || isPartialLeave(l.type)){
@@ -12522,7 +12522,7 @@
       });
       var autoN=liveTasks().filter(function(t){ return t.auto_key && t.created===today; }).length;
       if(autoN) f.push([Date.now(),"정기업무: 자동 지시 "+autoN+"건 생성"]);
-      if(seeRec) liveRec().forEach(function(r){ if(r.paid===today) f.push([Date.now(),"수금: "+(r.client||"")+(r.amount?" "+fmtAmount(r.amount)+"원":"")]); });
+      if(seeRec) liveRec().forEach(function(r){ if(r.paid===today) f.push([Date.now(),"수금: "+(r.client||"")+(r.amount?" "+recSheetMoney(r.amount)+"원":"")]); });
       if(f.length){
         html+='<div class="dash-sec"><h2>오늘 흐름</h2><div class="card dash-feed">'
           +f.slice(0,6).map(function(x){ var d=new Date(x[0]); return '<div class="f"><time>'+String(d.getHours()).padStart(2,"0")+':'+String(d.getMinutes()).padStart(2,"0")+'</time>'+esc(x[1])+'</div>'; }).join("")
@@ -14508,11 +14508,14 @@
     "xadOrg","xadRecv","xadRef","xadDocNo","xadDate","xadLabor","xadReq","xadU1","xadU2","xadU3","xadU4","xadBank","xadAcctType","xadAcct"];
   var xadBound=false;   // 선금 계산 리스너 1회 바인딩 가드
   function xadNum(id){ return parseInt((document.getElementById(id).value||"").replace(/[^0-9]/g,""),10)||0; }
+  // C244(11/20 계산 검산): 사용계획 소계 = 선금신청액 ÷ 1.1 절사(FEATURES 선금 세트) — 정수 산술. 종전 Math.floor(E/1.1)은 부동소수라 11로 나눠지는 금액에서 1원 작게(1,100,000 → 999,999) 나왔다.
+  //   화면 안내 글(xadCalcUpd)과 신청서 칸(xgAdvTok)이 이 한 곳을 쓴다. 11로 안 나눠지는 금액은 종전과 같은 값
+  function xadSubOf(E){ var r=E%11; return (E-r)/11*10+Math.floor(r*10/11); }
   function xadCalcUpd(){
     var A=xadNum("xgAmount"), B=xadNum("xadLabor"), E=xadNum("xadReq");
     var out=document.getElementById("xadCalc"); if(!out) return;
     if(!A){ out.textContent="계약금액(위 금액 칸)을 입력하면 차액·요율·잔액이 자동 계산됩니다."; return; }
-    var C=A-B, sub=E?Math.floor(E/1.1):0, vat=E?E-sub:0;
+    var C=A-B, sub=E?xadSubOf(E):0, vat=E?E-sub:0;
     var D=(C>0&&E)?(E*100/C):0;
     out.textContent="차액 C=A-B: "+C.toLocaleString()+" · 적용요율 D=E/C: "+(D?D.toFixed(2)+"%":"—")
       +" · 잔액: "+(E?(A-E).toLocaleString():"—")+" · 사용계획 소계 "+(sub?sub.toLocaleString():"—")+" + 부가세 "+(vat?vat.toLocaleString():"—");
@@ -14643,7 +14646,7 @@
                 con:{name:"주식회사 종운건설", addr:"경북 포항시 남구 정몽주로 823-10"} };
     var adCo=AD_CO[$("xgCo").value]||AD_CO.con;
     var adA=xadNum("xgAmount"), adB=xadNum("xadLabor"), adE=xadNum("xadReq");
-    var adC=adA-adB, adSub=adE?Math.floor(adE/1.1):0, adVat=adE?adE-adSub:0;
+    var adC=adA-adB, adSub=adE?xadSubOf(adE):0, adVat=adE?adE-adSub:0;
     var adD=(adC>0&&adE)?(adE*100/adC):0;
     var adU=[xadNum("xadU1"),xadNum("xadU2"),xadNum("xadU3"),xadNum("xadU4")];
     var adUsum=adU[0]+adU[1]+adU[2]+adU[3];
@@ -18935,7 +18938,7 @@
   }
   function csLinksHtml(c){
     var r = csRec(c), ci = c.contract_info || {}, bi = c.bldg_info, items = [];
-    items.push(["기성·수금", r ? ((r.amount ? fmtAmount(r.amount) + "원" : "") + (r.paid ? " · 입금 " + r.paid : " · 미수") + (r.billed ? " · 청구 " + r.billed : "")) : "없음(청구 단계 완료 때 생성)"]);
+    items.push(["기성·수금", r ? ((r.amount ? recSheetMoney(r.amount) + "원" : "") + (r.paid ? " · 입금 " + r.paid : " · 미수") + (r.billed ? " · 청구 " + r.billed : "")) : "없음(청구 단계 완료 때 생성)"]);
     items.push(["입찰", c.bid_id ? (ci.from || c.bid_id) : "없음"]);
     items.push(["건축물대장", bi ? ((bi.site || "") + " · " + (bi.total_floor || 0) + "㎡") : "없음"]);
     var sr = (c.site_id && typeof findAsb === "function") ? findAsb(c.site_id) : null, sk = csSiteKindOf(c), asbOk = (typeof asbLoaded === "undefined" || asbLoaded); if (sr && sr.del === 1) sr = null;
@@ -27019,7 +27022,7 @@
     add("con","계약",canSee("con"),function(){return liveContracts();},function(x){return (x.title||x.label||"")+(x.client?" · "+x.client:"");},function(x){return x.site||"";});
     add("tasks","지시",canSee("tasks"),function(){return tasks.filter(function(t){return t&&t.del!==1&&t.status!=="done"&&taskVisible(t);});},function(x){return x.title||"";},function(x){return (x.who||"")+(x.due?" · 기한 "+x.due:"");},"taskSearch");   // v439 지시 탭과 같은 행 원천(taskVisible — 비관리자에게 남의 지시 제목이 검색으로 보이지 않게) · 누르면 표 위 검색칸(taskSearch)에 글자(폰 옛 목록은 검색칸이 없어 탭만 옮김)
     add("cli","거래처",canSee("cli"),function(){return clients.filter(function(c){return c&&c.del!==1;});},function(x){return x.name||"";},function(x){return cliBizHay(x);},"cliSearch");   // v441 사업자번호 칸의 13자리(주민·법인등록번호 꼴)는 검색 줄·검색 글에 넣지 않음(cliBizHay — 개인 거래처도 빈 글: 검토 — '개인'으로 찾은 줄을 폰에서 누르면 옛 검색칸이 빈 목록이 됐다) · 누르면 표 검색칸 + 그 행 열기(폰 옛 목록은 옛 검색칸 cliSearch)
-    add("rec","기성·미수",canSee("rec"),function(){return liveRec().filter(recVisible);},function(x){return (x.client||"")+(x.amount?" · "+fmtAmount(x.amount)+"원":"");},function(x){return (x.desc||"")+(x.paid?" · 수금 "+x.paid:" · 미수");},"recSearch");   // v440 기성 탭과 같은 행 원천(recVisible — 비관리자에게 남의 기성이 검색으로 보이지 않게) · 누르면 표 검색칸 + 그 행 열기(폰 옛 목록은 옛 검색칸 recSearch)
+    add("rec","기성·미수",canSee("rec"),function(){return liveRec().filter(recVisible);},function(x){return (x.client||"")+(x.amount?" · "+recSheetMoney(x.amount)+"원":"");},function(x){return (x.desc||"")+(x.paid?" · 수금 "+x.paid:" · 미수");},"recSearch");   // C244(11/20): 수정(-) 금액 부호 살림   // v440 기성 탭과 같은 행 원천(recVisible — 비관리자에게 남의 기성이 검색으로 보이지 않게) · 누르면 표 검색칸 + 그 행 열기(폰 옛 목록은 옛 검색칸 recSearch)
     add("quote","견적서",canSee("quote"),function(){return liveQuotes();},function(x){return (x.no||"")+" · "+(x.title||"");},function(x){return x.recv||"";});
     add("veh","차량",canSee("veh"),function(){return liveVehicles();},function(x){return (x.no||"")+" · "+(x.type||"");},function(x){return x.driver||x.own||"";},"vehSearch");
     add("lic","인허가",canSee("lic"),function(){return liveLic();},function(x){return x.name||"";},function(x){return (x.org||"")+(x.expiry?" · 만료 "+x.expiry:"");});
@@ -29313,10 +29316,10 @@
   function showRecImportPreview(plan){
     var addTotal=plan.add.reduce(function(a,c){return a+c.amount;},0);
     var fdup=(plan.filedup||[]).length;
-    document.getElementById("recImpSummary").innerHTML="신규 <b>"+plan.add.length+"</b>건 · 갱신 <b>"+plan.upd.length+"</b>건 · 취소반영 <b>"+plan.cancel.length+"</b>건 · 이미있음 "+plan.dup+"건"+(fdup?" · <span style=\"color:#b0332a;\">중복 의심 <b>"+fdup+"</b>건</span>":"")+"<br>신규 미수 합계 <b>"+fmtAmount(addTotal)+"원</b>"+(fdup?"<br><span style=\"color:#b0332a;font-size:12px;\">※ 파일 안에 승인번호가 겹치는 행입니다. 그대로 추가한 뒤 목록 상단에 빨간 '중복 의심'으로 표시되니 확인 후 삭제하세요.</span>":"");
-    function line(c,tag){ return '<div style="padding:4px 0;border-bottom:1px solid rgba(128,128,128,.12);">'+tag+" <b>"+impEsc(c.client)+"</b> · "+impEsc(c.desc||"")+" · "+fmtAmount(c.amount)+"원</div>"; }
+    document.getElementById("recImpSummary").innerHTML="신규 <b>"+plan.add.length+"</b>건 · 갱신 <b>"+plan.upd.length+"</b>건 · 취소반영 <b>"+plan.cancel.length+"</b>건 · 이미있음 "+plan.dup+"건"+(fdup?" · <span style=\"color:#b0332a;\">중복 의심 <b>"+fdup+"</b>건</span>":"")+"<br>신규 미수 합계 <b>"+recSheetMoney(addTotal)+"원</b>"+(fdup?"<br><span style=\"color:#b0332a;font-size:12px;\">※ 파일 안에 승인번호가 겹치는 행입니다. 그대로 추가한 뒤 목록 상단에 빨간 '중복 의심'으로 표시되니 확인 후 삭제하세요.</span>":"");
+    function line(c,tag){ return '<div style="padding:4px 0;border-bottom:1px solid rgba(128,128,128,.12);">'+tag+" <b>"+impEsc(c.client)+"</b> · "+impEsc(c.desc||"")+" · "+recSheetMoney(c.amount)+"원</div>"; }   // C244(11/20): 홈택스 수정세금계산서(음수) 금액·합계 부호 살림(전역 fmtAmount는 부호를 지움)
     var html="";
-    plan.add.forEach(function(c, i){ var tw = c._twin ? findRec(c._twin) : null; html+=line(c,'<span style="color:#27ae60;">신규</span>') + (tw ? '<div class="rec-imp-twin" style="padding:2px 0 6px 12px;font-size:12px;color:#8A6410;">직접 등록 줄 있음 — ' + impEsc(tw.client || "") + ' · 청구일 ' + impEsc(tw.billed || "-") + ' · ' + fmtAmount(tw.amount) + '원(작성일과 ' + c._twinGap + '일 차) <label style="margin-left:6px;cursor:pointer;"><input type="checkbox" data-rec-merge="' + i + '" style="width:auto;margin:0 3px 0 0;vertical-align:-2px;"> 합치기</label> <span style="color:#9AA09C;">— 고르면 새 줄 대신 그 줄에 계산서 값을 얹습니다</span></div>' : ''); });   // v464 C078 ②
+    plan.add.forEach(function(c, i){ var tw = c._twin ? findRec(c._twin) : null; html+=line(c,'<span style="color:#27ae60;">신규</span>') + (tw ? '<div class="rec-imp-twin" style="padding:2px 0 6px 12px;font-size:12px;color:#8A6410;">직접 등록 줄 있음 — ' + impEsc(tw.client || "") + ' · 청구일 ' + impEsc(tw.billed || "-") + ' · ' + recSheetMoney(tw.amount) + '원(작성일과 ' + c._twinGap + '일 차) <label style="margin-left:6px;cursor:pointer;"><input type="checkbox" data-rec-merge="' + i + '" style="width:auto;margin:0 3px 0 0;vertical-align:-2px;"> 합치기</label> <span style="color:#9AA09C;">— 고르면 새 줄 대신 그 줄에 계산서 값을 얹습니다</span></div>' : ''); });   // v464 C078 ②
     plan.upd.forEach(function(c){ html+=line(c,'<span style="color:#e67e22;">갱신</span>'); });
     (plan.filedup||[]).forEach(function(c){ html+=line(c,'<span style="color:#b0332a;">중복의심</span>'); });
     plan.cancel.forEach(function(c){ html+=line(c,'<span style="color:#c0392b;">취소</span>'); });
@@ -29519,7 +29522,7 @@
     var today = todayStr();
     var t = {
       id: genId("t"),
-      title: "입금확인: " + rec.client + (rec.desc ? " " + rec.desc : "") + (rec.amount ? " " + fmtAmount(rec.amount) + "원" : ""),
+      title: "입금확인: " + rec.client + (rec.desc ? " " + rec.desc : "") + (rec.amount ? " " + recSheetMoney(rec.amount) + "원" : ""),   // C244(11/20): 수정(-) 금액 부호 살림
       detail: "", who_id: rec.assignee || "", who: memberName(rec.assignee || ""), from: "기성", from_id: myId(), due: rec.billed || "",
       status: "open", done_at: null, done_by: null,
       scope: (rec.scope || []).slice(), rec_id: rec.id,
@@ -29658,7 +29661,7 @@
   function deleteReceivable(id){
     if (!canDo("rec")) return;
     var r = findRec(id); if (!r) return;
-    if (!confirm("이 미수를 삭제할까요?\n" + (r.client || "") + " " + (r.amount ? fmtAmount(r.amount) + "원" : ""))) return;
+    if (!confirm("이 미수를 삭제할까요?\n" + (r.client || "") + " " + (r.amount ? recSheetMoney(r.amount) + "원" : ""))) return;
     r.del = 1; r.updated = todayStr();
     removeRecTask(r);
     saveRecCache(); renderReceivables(); renderDashboard(); scheduleRecSave();
@@ -29725,7 +29728,7 @@
         ctrl = '<div class="rec-actions">' + rvBtn + (isAdmin() ? '<button class="cal-btn" data-rec-pay="' + r.id + '">입금완료</button>' : '') + recEditBtn + '</div>';
       }
     }
-    var amt = r.amount ? (fmtAmount(r.amount) + '원') : '';
+    var amt = r.amount ? (recSheetMoney(r.amount) + '원') : '';   // C244(11/20): 수정세금계산서(음수) 금액 부호 살림 — 전역 fmtAmount는 부호를 지워 '330,000원'으로 보였다(PC 표 recSheetMoney와 같은 글)
     var ageHtml = "";
     if (!isPaid){ var ag = recAging(r.billed); if (ag) ageHtml = '<span class="rec-age ' + ag.cls + '" title="청구일 ' + esc(r.billed||"") + '">' + ag.days + '일</span>'; }
     var cls = 'item rec-item' + (isPaid ? ' checked' : '') + (r._dup ? ' rec-dup' : '') + (r.mismatch ? ' rec-mm' : '') + (r.hl ? ' rec-hl' : '');
@@ -29774,9 +29777,9 @@
     var total = 0; arr.forEach(function(x){ total += x.sum; });
     var rows = arr.slice(0, 20).map(function(x){
       var cls = x.maxDays>=90?"age90":(x.maxDays>=60?"age60":(x.maxDays>=30?"age30":"age0"));
-      return '<div class="rec-agg-row' + (x.maxDays>=60?' hot':'') + '"><div class="cli"><b>' + esc(x.client) + '</b> <span class="rec-age ' + cls + '">최대 ' + x.maxDays + '일</span> <span class="cnt2">' + x.cnt + '건</span></div><div class="amt">' + fmtAmount(x.sum) + '원</div></div>';
+      return '<div class="rec-agg-row' + (x.maxDays>=60?' hot':'') + '"><div class="cli"><b>' + esc(x.client) + '</b> <span class="rec-age ' + cls + '">최대 ' + x.maxDays + '일</span> <span class="cnt2">' + x.cnt + '건</span></div><div class="amt">' + recSheetMoney(x.sum) + '원</div></div>';
     }).join("");
-    host.innerHTML = '<div class="rec-agg-cap">거래처 ' + arr.length + '곳 · 합계 ' + fmtAmount(total) + '원 (금액 큰 순)</div>' + rows;
+    host.innerHTML = '<div class="rec-agg-cap">거래처 ' + arr.length + '곳 · 합계 ' + recSheetMoney(total) + '원 (금액 큰 순)</div>' + rows;   // C244: 합이 음수면 부호 살림
     tog.textContent = showRecAging ? "거래처별 미수 숨기기" : ("거래처별 미수 집계 (" + arr.length + "곳)");
     tog.style.display = "block";
     host.style.display = showRecAging ? "block" : "none";
@@ -29823,7 +29826,7 @@
     var head = document.getElementById("recHead");
     if (head){
       var sum = 0; unpaid.forEach(function(r){ sum += (r.amount || 0); });
-      head.textContent = unpaid.length ? (unpaid.length + "건" + (sum ? " · " + fmtAmount(sum) + "원" : "")) : "";
+      head.textContent = unpaid.length ? (unpaid.length + "건" + (sum ? " · " + recSheetMoney(sum) + "원" : "")) : "";   // C244: 합이 음수면 부호 살림
     }
     renderRecAging(unpaid);
     var selR = canDo("rec");
@@ -29837,7 +29840,7 @@
     bindSelBoxes(paidHost);
     renderSelBar("rec");
     renderDeletedList("rec", "recDeletedToggle", "recDeletedList", showDeletedRec, "기성",
-      function(r){ return (r.client || "거래처없음") + (r.desc ? " · " + r.desc : "") + (r.amount ? " · " + fmtAmount(r.amount) + "원" : "") + (r.billed ? " · " + r.billed : ""); });
+      function(r){ return (r.client || "거래처없음") + (r.desc ? " · " + r.desc : "") + (r.amount ? " · " + recSheetMoney(r.amount) + "원" : "") + (r.billed ? " · " + r.billed : ""); });   // C244: 음수 부호 살림
   }
 
   // ---- v440 기성·수금 탭 엑셀형 표(45-1 셋째 판) — PM 11/10 15:56 결정 ③ '계산서 발행'·'불일치' 표시를 펼침 버튼으로 되살림(발행은 관리자만 — 누르면 입금확인 지시 생성·발행 취소면 그 지시 제거,
@@ -30177,7 +30180,8 @@
   // 검색칸 글 — 앞머리는 전역 검색(gsSources 기성 항목 + gsRun hay)이 보는 글과 같은 꼴(거래처 · 금액원 · 내역 · 수금 날짜/미수 · 상세 · 현장)이라 전역 검색에서 찾은 글자를 넣으면 그 기성이 표에도 걸린다.
   //   그 뒤에 표에서만 보는 글(승인번호·문서번호·회사·담당·처리 상태·메모 · 음수 금액은 부호 붙인 글 — v440 검토, 칸에 보이는 '-1,234'로도 찾게). 공급받는자 번호는 넣지 않는다(개인 번호가 검색으로 드러나지 않게)
   function recSheetSearchText(r){
-    return [(r.client || "") + (r.amount ? " · " + fmtAmount(r.amount) + "원" : ""), (r.desc || "") + (r.paid ? " · 수금 " + r.paid : " · 미수"), r.detail || "", r.site || "",
+    // C244(11/20): 앞머리도 부호 살림 — 전역 검색 기성 줄(gsSources)과 같은 글 유지
+    return [(r.client || "") + (r.amount ? " · " + recSheetMoney(r.amount) + "원" : ""), (r.desc || "") + (r.paid ? " · 수금 " + r.paid : " · 미수"), r.detail || "", r.site || "",
       r.nts || "", r.docno || "", recSheetCo(r), recSheetWho(r), REC_ST_TXT[recSheetStKey(r)], r.note || "", Number(r.amount) < 0 ? recSheetMoney(r.amount) + "원" : ""].join(" ");
   }
   // 전역 검색(🔍)에서 기성을 누름(gsRun) — 칩·거르기 줄을 이번만 풀고 검색어를 넣은 뒤(vsSheetSeek) 누른 그 행을 연다(vsSheetReveal — 입금 완료 건이면 '입금 완료' 칩으로). 폰 옛 목록이면 false(옛 검색칸 길)
