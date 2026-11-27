@@ -2692,6 +2692,51 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   delete mem.gw_files[idCon]; if (savedCol === undefined) delete mem.gw_data['col:promo']; else mem.gw_data['col:promo'] = savedCol;
 }
 
+// ===== 42-C289. 오래 참조 없는 첨부 정리 — 연습 방식(지울 후보만 · 지우는 길 없음) =====
+{
+  const AO = require(join(FN, '_lib/attorphan.js'));
+  const D = 86400000, NOW = Date.UTC(2026, 10, 27, 3, 0, 0);
+  const A1 = 'att_' + 'a1'.repeat(8), A2 = 'att_' + 'b2'.repeat(8), A3 = 'att_' + 'c3'.repeat(8);
+  // ① 순수 판정
+  const s1 = AO.step(null, [A1, A2, A3], new Set([A1]), [A1, A2, A3, 'mask:' + A2, 'parse:' + A2, 'tpl:x'], NOW, false);
+  const s2 = AO.step({ unref: s1.unref }, [A1, A2, A3], new Set([A1, A3]), [A1, A2, A3, 'mask:' + A2], NOW + 8 * D, false);
+  const s3 = AO.step({ unref: s2.unref }, [A1, A2], new Set(), [A1, A2], NOW + 9 * D, true);
+  const e1 = AO.step({ unref: { [A2]: NOW } }, [A2], new Set(), [A2], NOW + 7 * D - 60000, false), e2 = AO.step({ unref: { [A2]: NOW } }, [A2], new Set(), [A2], NOW + 6 * D, false);   // 검토 11/27: 주 1회가 1분 일찍 돌아도 후보 · 6일은 아직
+  T('C289 판정(순수): 참조 없음 처음 본 날을 이어 감 · 7일 지나야 지울 후보 · 그새 참조가 생기면 빠짐 · 딸린 키 수 · 읽기 실패 회차는 직전 상태 그대로(후보 0·새로 넣지 않음) · 주 1회 크론이 1분 일찍 돌아도 후보(12시간 여유)·6일은 아직',
+    s1.candidates.length === 0 && s1.fresh.length === 2 && s1.fresh.find((r) => r.id === A2).related === 2
+    && s2.candidates.length === 1 && s2.candidates[0].id === A2 && s2.candidates[0].days === 8 && !(A3 in s2.unref)
+    && s3.partial === true && s3.candidates.length === 0 && JSON.stringify(s3.unref) === JSON.stringify(s2.unref) && e1.candidates.length === 1 && e2.candidates.length === 0,
+    JSON.stringify({ s1: s1.fresh, s2: s2.candidates }));
+  // ② 실행(가짜 저장소): 감사는 참조로 안 침 · gw_users·gw_files 값도 참조 · 첨부 자신의 키는 참조 아님 · 지우지 않음 · 보고 문서
+  const M = { gw_data: { 'col:promo': { items: [{ id: 'p1', photos: [{ id: A1 }] }] }, 'audit:2026-11': { items: [{ ev: [{ id: A2 }] }] } }, gw_users: { 'member:u1': { id: 'u1', sig: A3 } }, gw_files: { [A1]: { kind: 'promo' }, [A2]: { kind: 'promo' }, [A3]: { kind: 'box' }, ['parse:' + A2]: { x: 1 } } };
+  let deletes = 0, failKey = '';
+  const B = { store: (n) => n, async blobList(st) { return { ok: true, keys: Object.keys(M[st] || {}) }; },
+    async blobGet(st, k) { if (k === failKey) return { ok: false, code: 'STORAGE_READ_FAILED' }; return { ok: true, data: (M[st] && k in M[st]) ? JSON.parse(JSON.stringify(M[st][k])) : null }; },
+    async blobSet(st, k, v) { M[st][k] = JSON.parse(JSON.stringify(v)); return { ok: true }; }, async blobDelete() { deletes++; return { ok: true }; } };
+  const r1 = await AO.run(B, NOW); const d1 = M.gw_data[AO.REPORT_KEY];
+  const r2 = await AO.run(B, NOW + 8 * D); const d2 = M.gw_data[AO.REPORT_KEY];
+  failKey = 'member:u1'; const r3 = await AO.run(B, NOW + 9 * D); const d3 = M.gw_data[AO.REPORT_KEY];
+  T('C289 실행: 감사에만 나오는 첨부 = 고아 · gw_users 값에 나오는 첨부 = 쓰는 중 · 첨부 자신의 키(parse:)는 참조 아님 · 8일 뒤 지울 후보 1 · 읽기 실패 회차 = partial·직전 후보 그대로·last_ok 안 바뀜 · 지우는 호출 0 · dry_run 표시',
+    r1.n_candidates === 0 && d1.n_fresh === 1 && d1.fresh[0].id === A2 && d1.fresh[0].related === 1 && d1.dry_run === true
+    && r2.n_candidates === 1 && d2.candidates[0].id === A2 && d2.last_ok === NOW + 8 * D
+    && r3.partial === true && d3.partial === true && d3.n_candidates === 1 && d3.last_ok === NOW + 8 * D && deletes === 0,
+    JSON.stringify({ r1, r2, r3 }));
+  // ③ 관리자 조회
+  mem.gw_data[AO.REPORT_KEY] = d2;
+  const ADM = { id: 'uadm289', name: '관리289', admin: true, perms: {} }, NOA = { id: 'unoa289', name: '직원289', admin: false, perms: { promo: 'do', contracts: 'do' } };
+  mem.gw_users['member:uadm289'] = ADM; mem.gw_users['member:unoa289'] = NOA;
+  const ra = await call({ action: 'att_orphan_report' }, issueSession(ADM).token, 'dev1'), rn = await call({ action: 'att_orphan_report' }, issueSession(NOA).token, 'dev1');
+  T('C289 관리자 조회 att_orphan_report: 관리자 200·후보 1(id·일수·딸린 키 수) · 비관리자 403 ADMIN_ONLY · 응답에 unref 지도 안 실음',
+    ra.code === 200 && ra.body.report.has === true && ra.body.report.n_candidates === 1 && ra.body.report.candidates[0].id === A2 && ra.body.report.candidates[0].days === 8 && !('unref' in ra.body.report)
+    && rn.code === 403 && rn.body.error_code === 'ADMIN_ONLY', JSON.stringify([ra.code, rn.code]));
+  delete mem.gw_data[AO.REPORT_KEY];
+  // ④ 정적: 지우는 길 없음 · 크론은 기동만 · 일정 주 1회
+  const rdF = (p) => require('fs').readFileSync(join(FN, p), 'utf8');
+  const lib = rdF('_lib/attorphan.js'), wk = rdF('gw-attorphan-background.js'), cr = rdF('gw-attorphan-cron.js'), toml = require('fs').readFileSync(join(ROOT, 'netlify.toml'), 'utf8');
+  T('C289 정적: 모듈·워커·크론 어디에도 blobDelete 없음 · 워커는 내부 토큰 mid __attorphan__만 · 크론은 gw-attorphan-background 기동만 · netlify.toml 주 1회(0 18 * * 0)',
+    !/blobDelete/.test(lib + wk + cr) && /v\.payload\.mid !== '__attorphan__'/.test(wk) && /\/\.netlify\/functions\/gw-attorphan-background/.test(cr) && /\[functions\."gw-attorphan-cron"\]\n  schedule = "0 18 \* \* 0"/.test(toml));
+}
+
 // ===== 42-C265. 홍보 사진 형식 — 올릴 때 머리 바이트로 그림만(보낸 type 안 믿음) · 공개 주소는 그림 형식 허용 목록 + nosniff =====
 {
   const IMG = require(join(FN, '_lib/imgsniff.js'));

@@ -5974,6 +5974,16 @@ async function promoOrphanDelCheck(member, id) {
   const used = items.some(function (it) { return it && Array.isArray(it.photos) && it.photos.some(function (p) { return p && (p === id || p.id === id); }); });
   return used ? 'IN_USE' : 'OK';
 }
+// C289(11/27) 오래 참조 없는 첨부 정리 — 연습 방식 보고 읽기(관리자만). 지우는 동작은 없다(삭제는 운영책임자 승인 뒤 따로).
+async function handleAttOrphanReport(event, d, R) {
+  const c = await currentMember(event);
+  if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
+  if (!c.member.admin) return jr(403, { status: 'FORBIDDEN', error_code: 'ADMIN_ONLY', request_id: R });
+  const AO = require('./_lib/attorphan');
+  const r = await blobGet(store(DATA), AO.REPORT_KEY);
+  if (!r.ok) return jr(503, { status: 'UNAVAILABLE', error_code: 'REPORT_READ_FAILED', request_id: R });
+  return jr(200, { status: 'OK', report: AO.summary(r.data), request_id: R });
+}
 async function handleAttDel(event, d, R) {
   const c = await currentMember(event);
   if (!c.ok) return jr(401, { status: 'UNAUTHORIZED', error_code: c.reason, request_id: R });
@@ -6978,6 +6988,7 @@ async function handlerInner(event) {
     if (d && d.action === 'att_parse_status') return await handleAttParseStatus(event, d, R);
     if (d && d.action === 'att_get') return await handleAttGet(event, d, R);
     if (d && d.action === 'att_del') return await handleAttDel(event, d, R);
+    if (d && d.action === 'att_orphan_report') return await handleAttOrphanReport(event, d, R);   // C289 첨부 정리 연습 보고(관리자 읽기만)
     if (d && d.action === 'proof_put') return await handleProofPut(event, d, R);
     if (d && d.action === 'proof_list') return await handleProofList(event, d, R);
     if (d && d.action === 'proof_get') return await handleProofGet(event, d, R);
