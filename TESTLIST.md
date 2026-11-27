@@ -2008,3 +2008,8 @@
 ## v560 — C296 기성 공개범위 서버 거르기·13자리 판정 틈 + C280 서버 날짜 꼴
 - [ ] (운영 확인) 기성 보기 권한 직원 계정에서 기성 탭이 평소처럼 열리고 보이는 줄 수가 화면 종전과 같음(공개범위 밖 줄은 원래 화면에도 없었음) · 관리자 기성 줄 수 그대로
 - [x] (AI) `servertest` 86 C296·C280 서버 · `uismoke` v456 ③ 새 표본 · v559 문서 검사를 이 판 이상으로 풂 · 게이트 통과 — ✓ AI 11/27
+
+## v561 — T688 폰 안전 탭 누르는 단추 세 곳 키움
+- [ ] (운영 확인) 폰에서 안전 › 현장 거르기 단추·체크 '직원/일용직'·기록 줄 '수정'이 손가락으로 잘 눌리는지(PC 표는 그대로)
+- [x] (AI) 시험 화면 폰 폭 390에서 세 곳 높이 44(수정 폭 48) 실측 · `uismoke` T688 — ✓ AI 11/27
+- [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` · `promoqual_check` · `promogen_check` · `promoqlearn_check` · `promostream_check` · `promo_wrap_check` · `promo_post_check` · `paycalc_check` · `stmtread_a_check` · `stmtread_b_check` · `stmtread_c_check` · `stmtread_d_check` · `stmtmail_check` 통과 · v560 문서 검사를 이 판 이상으로 풀고 v561 문서·판 번호 정확 검사 — ✓ AI 11/27

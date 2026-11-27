@@ -24698,8 +24698,8 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), op = cb.filter((l) => /^- \[ \] \(운영 확인\)/.test(l));
     const FT = ['`recVisibleSrv`', '`scopeIncl`', '`biz13`', '`BAD_DATE`', '서버 원본 이월', '「덧대기」'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v560 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 2 && gate.length === 1 && op.length === 1
-      && d.cl.indexOf('**C296(v560)**') > 0 && /SHELL_CACHE = 'jw-shell-v560'/.test(d.sw);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 560 && ftv.length > 0 && mF.length === 0 && cb.length === 2 && gate.length === 1 && op.length === 1
+      && d.cl.indexOf('**C296(v560)**') > 0 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 560   /* v561(T688)에서 '560 이상'으로 풂 */;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
   };
   const rW = chkW(DW);
@@ -24709,6 +24709,30 @@ try {
   T('v560 C296·C280 서버 문서·판 번호(정확 검사): FEATURES 기준 v560·v560 절 · TESTLIST v560 칸 2 · CLAUDE.md 한 줄 · sw · 결함 사본 ' + MW.length + '개 = 모두 ✗',
     rW.ok && MW.every((v) => v === false), JSON.stringify({ r: rW.info, mut: MW }));
 } catch (e) { console.log('  (v560 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── T688(폰 안전 탭 누르는 단추 세 곳 — PM 11/27): 폰 규칙 한 줄 · PC 그대로
+try {
+  const chkY = (H) => { const m = H.match(/\n  @media \(max-width:859px\)\{ #siteFilterBar \.mini-btn\{min-height:44px;[^\n]*#eduScopeBar \.vs-chip\{min-height:44px;[^\n]*#eduList \.item-actions \[data-edu-edit\]\{min-width:48px;min-height:44px;[^\n]*\}/);
+    return !!m && (H.match(/#siteFilterBar \.mini-btn\{min-height/g) || []).length === 1 && (H.match(/#eduScopeBar \.vs-chip\{min-height/g) || []).length === 1; };
+  const MY = [chkY(html.replace('#siteFilterBar .mini-btn{min-height:44px;', '#siteFilterBar .mini-btn{min-height:24px;')), chkY(html.replace('  @media (max-width:859px){ #siteFilterBar .mini-btn{min-height:44px;', '  @media (min-width:0px){ #siteFilterBar .mini-btn{min-height:44px;'))];
+  T('T688 폰 안전 탭 누르는 단추 세 곳 44px(현장 거르기 · 체크 직원/일용직 · 기록 줄 수정 48 폭) — 폰 폭 규칙 한 줄만(PC 그대로) · 결함 사본 ' + MY.length + '개 = 모두 ✗', chkY(html) && MY.every((v) => v === false), JSON.stringify(MY));
+} catch (e) { console.log('  (T688 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v561(T688): 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '561 이상'으로 풀 것
+try {
+  const rdZ = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DZ = { ft: rdZ('FEATURES.md'), tl: rdZ('TESTLIST.md'), sw: rdZ('sw.js') };
+  const chkZ = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v561 (11/27)', '\n### '), tlv = cut(d.tl, '\n## v561 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l));
+    const ok = /기준: v561 \(2026-11-27\)\./.test(d.ft) && ftv.indexOf('`#eduScopeBar .vs-chip`') > 0 && cb.length === 3 && /SHELL_CACHE = 'jw-shell-v561'/.test(d.sw);
+    return { ok, info: { cb: cb.length } };
+  };
+  const rZ = chkZ(DZ), muZ = (k, f) => chkZ(Object.assign({}, DZ, { [k]: f(DZ[k]) })).ok;
+  const MZ = [muZ('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v560 (')), muZ('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v560'")), muZ('tl', (s) => s.split('\n## v561 ').join('\n## vX '))];
+  T('v561 문서·판 번호(정확 검사): FEATURES 기준 v561 (2026-11-27)·v561 절(T688) · TESTLIST v561 칸 3 · sw v561 · 결함 사본 ' + MZ.length + '개 = 모두 ✗', rZ.ok && MZ.every((v) => v === false), JSON.stringify({ r: rZ.info, mut: MZ }));
+} catch (e) { console.log('  (v561 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
