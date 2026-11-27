@@ -28379,7 +28379,7 @@
   //   가린 번호('900101-1******')·10자리는 그대로 통과 · 사업자번호 둘을 띄어쓰기만으로 이으면 13자리 넘게 이어져 막힘(안내 글이 쉼표로 나누라고 함) · 닫은 예외: 폰 옛 목록 펼침(v469)·물어보기 _lib/ask.js(v456)·폰 옛 목록 검색(C147 ① — 수행이 아니면 cliBizHay)
   function cliBiz13(s){ var t = String(s == null ? "" : s).replace(/[０-９]/g, function(ch){ return String.fromCharCode(ch.charCodeAt(0) - 0xFEE0); }).replace(/[​-‍⁠]/g, "");
     if (t.split(/[,\/]/).some(function(p){ return /\d{13}/.test(p.replace(/[\s\-‐-―−－ㅡ._·・∙•]/g, "")); })) return true;
-    return /(^|\D)\d{6}[\s\-‐-―−－ㅡ.\/_·・∙•]*\d{7}(?!\d)/.test(t); }   // v456 2차 검토: 쉼표·빗금 조각마다 13자리 + 6·7자리 꼴은 구분자(빗금 포함)를 건너 따로(서버 _lib/clibiz.js와 같은 규칙 — 빗금으로 나눈 사업자번호 둘은 통과)
+    return /(^|\D)\d{6}[\s\-‐-―−－ㅡ.\/_·・∙•,，~～()（）]*\d{7}(?!\d)/.test(t); }   // v456 2차 검토: 쉼표·빗금 조각마다 13자리 + 6·7자리 꼴은 구분자(빗금 포함)를 건너 따로(서버 _lib/clibiz.js와 같은 규칙 — 빗금으로 나눈 사업자번호 둘은 통과)
   // 사업자번호 보이는 글(옛 [상세 ›] 창) — 개인 거래처 '개인(사업자 없음)' · 13자리는 빈 글(원문 숨김) · 그 밖 적은 그대로
   function cliBizShown(c){ if (!c) return ""; if (c.indiv) return "개인(사업자 없음)"; return cliBiz13(c.biz_no) ? "" : String(c.biz_no == null ? "" : c.biz_no).trim(); }
   // 사업자번호 검색 글(전역 검색 줄·hay, 표 검색 글 앞머리 — v441 검토): 개인 거래처·13자리는 빈 글. '개인(사업자 없음)'을 hay에 넣으면 '개인'·'사업자'로 찾은 개인 거래처를 폰에서 누를 때

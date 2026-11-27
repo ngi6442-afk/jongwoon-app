@@ -292,4 +292,4 @@ function failAnswer(code) {
   return '지금은 답할 수 없습니다. 잠시 뒤 다시 물어보세요.';
 }
 
-module.exports = { TOOLS, SYSTEM, ROW_CAP, MAX_TURNS, toolDefs, runTool, permOf, ask, failAnswer, deviceApproved, scopeHas, taskForMe };
+module.exports = { TOOLS, SYSTEM, ROW_CAP, MAX_TURNS, toolDefs, runTool, permOf, ask, failAnswer, deviceApproved, scopeHas, taskForMe, scopeIncl };   // scopeIncl: gw-data 기성 공개범위(C296)도 같은 판정

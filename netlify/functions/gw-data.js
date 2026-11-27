@@ -17,7 +17,9 @@ const push = require('./_lib/push');
 const tier = require('./_lib/tier');   // 관리자 등급(v321) — retired 판정식 공용. 게이트는 push.tierCtx()(명시 tier·부트스트랩·퇴사 제외, 9/6 검증 S1)
 const BRIEF = require('./_lib/brief');   // v416 아침 음성 브리핑(체크 38 D1) — 설정·조회·기동(생성은 워커)
 const AR = require('./_lib/autorules');  // v417 자동 지시 서버 규칙 3건(카드 10) — 집계(autotask_facts)·완료 신호 공용
-const CLIBIZ = require('./_lib/clibiz');   // v456 거래처 사업자번호 칸 13자리 판정(앱 cliBiz13과 같은 규칙 — uismoke v456 대조)
+const CLIBIZ = require('./_lib/clibiz');
+// C296(11/27): 기성 줄 보이기 = 앱 recVisible과 같은 규칙 — 관리자 · 담당(assignee = 본인) · 공개범위(scope — 비면 전체 · 회원 id · dept: · rank: 이상 — 앱 scopeIncludes와 같은 _lib/ask scopeIncl)
+const recVisibleSrv = function (m, r) { if (!m || !r) return false; if (m.admin) return true; if (m.id && r.assignee === m.id) return true; return require('./_lib/ask').scopeIncl(r.scope, m); };   // v456 거래처 사업자번호 칸 13자리 판정(앱 cliBiz13과 같은 규칙 — uismoke v456 대조)
 const CONAPPR = require('./_lib/conappr');   // P1 판24-③ 계약 단계 결재 서버 강제(앱 csApprKindOf와 같은 판정 — uismoke P1 판24 대조)
 const DUTY = require('./_lib/duty');   // P1 판28 인허가 '이번 달' 회차 계산(앱 DUTY_SHARED 구간과 같은 본문 — uismoke P1 판28이 글자째 대조)
 const EV = require('./_lib/evrules');   // C185 판1 범위 밖 자동 지시 규칙 5줄(서버가 셈) 공통 틀 — 새 키 꼴·실행(사건 막이·이름 대조·옛 지시 표시)·계획 함수 자리(판2~6)
@@ -311,6 +313,8 @@ async function handleGet(event, d, R) {
   }
   // C270 ⓐ(11/26): 13자리(주민·법인등록번호 꼴 — _lib/clibiz.js, 앱 cliBiz13과 같은 규칙) 원문은 관리자·수행에게만 — 보기 권한에게는 칸을 빈 값으로 바꾸고 표시 칸만(거래처 biz13 · 기성 cn13).
   //   앱 화면은 v441·v469·v508부터 '13자리(숨김)'·'개인(번호 숨김)'만 그렸지만 서버는 원문을 그대로 내려 보내 브라우저 안에는 남았다. 보기 권한은 저장이 403(NO_WRITE)이라 빈 값이 서버 원문을 덮을 길은 없다(수행 이상은 원문 그대로).
+  // C296(11/27): 기성은 공개범위·담당 밖 줄을 서버에서 뺀다(종전엔 전 줄이 내려가 앱 recVisible만 걸렀다 — 브라우저에는 남의 기성 줄이 그대로). 저장 때 이 줄은 서버 원본 이월(handleSave 기성 갈래)
+  if (col === 'receivables' && !c.member.admin && Array.isArray(doc.items)) doc = Object.assign({}, doc, { items: doc.items.filter(function (r) { return recVisibleSrv(c.member, r); }) });
   if ((col === 'clients' || col === 'receivables') && !c.member.admin && p !== 'do' && Array.isArray(doc.items)) {
     const fld = col === 'clients' ? 'biz_no' : 'client_num', flag = col === 'clients' ? 'biz13' : 'cn13';
     doc = Object.assign({}, doc, { items: doc.items.map(function (x) {
@@ -411,6 +415,24 @@ async function handleSave(event, d, R) {
   if (sid) { delete doc._sids; doc._sids = sidPrev.slice(-(SID_MAX - 1)).concat([{ s: sid, at: doc.updated_at, h: sidH }]); }   // C242: 화면이 보낸 _sids는 버리고 서버 것만 — 이 쓰기와 한 묶음
   // items형 컬렉션 정규화 — items가 배열이 아니면(콘솔 우회 등) 아래 재구성 가드들이 통째로 건너뛰어진다(리뷰 지적)
   if (col !== 'checklist' && !Array.isArray(doc.items)) doc.items = [];
+  // C280 서버 벌(11/27 · 「덧대기」 — 원천은 v521 앱 dateFieldRead): 바뀐 줄의 날짜 꼴 칸 — 직전 값이 'YYYY-MM-DD'였던 칸에 빈 값이 아닌 다른 꼴(연도 6자리·없는 날·글자)이 오거나,
+  //   어느 칸이든 연도 다섯 자리 이상 날짜 꼴('202612-31-01' 같은 — 숫자 8자를 이어 친 값)이 새로 오면 400 BAD_DATE(저장 안 함 · 칸 이름만 · 값은 응답에 없음).
+  //   빈 값은 일부러 비운 것과 틀린 입력을 서버가 가를 수 없어 막지 않는다(그 갈래는 앱 도우미가 막음 — 옛 캐시 앱의 길만 남음). 위 칸(1단)만 — 목록 안 줄(의무 대장 회차 등)은 안 봄.
+  if (Array.isArray(doc.items) && doc.items.length) {
+    const DT = /^\d{4}-\d{2}-\d{2}$/, Y5 = /^\d{5,}-\d{2}-\d{2}$/;
+    const realDate = function (v) { if (!DT.test(v)) return false; const y = +v.slice(0, 4), m = +v.slice(5, 7), dd = +v.slice(8, 10); if (y < 1000 || m < 1 || m > 12 || dd < 1) return false; return dd <= new Date(Date.UTC(y, m, 0)).getUTCDate(); };
+    const oldDt = {}; oldItems.forEach(function (o) { if (o && o.id != null) oldDt[String(o.id)] = o; });
+    const badDt = [];
+    doc.items.forEach(function (x) {
+      if (!x || typeof x !== 'object') return;
+      const o = x.id != null ? oldDt[String(x.id)] : null;
+      Object.keys(x).forEach(function (k) {
+        const v = x[k]; if (typeof v !== 'string' || v === '' || (o && o[k] === v)) return;
+        if (Y5.test(v) || (o && typeof o[k] === 'string' && realDate(o[k]) && !realDate(v))) badDt.push(k);
+      });
+    });
+    if (badDt.length) return jr(400, { status: 'REJECTED', error_code: 'BAD_DATE', fields: Array.from(new Set(badDt)).slice(0, 10), request_id: R });
+  }
   // v456(원장 C080): 거래처 사업자번호 칸의 13자리(주민·법인등록번호 꼴 — _lib/clibiz.js, 앱 cliBiz13과 같은 규칙)는 '이번에 새로 들어오거나 바뀐 항목'만 400 CLI_BIZ13(저장 안 함 · 값은 응답에 없음).
   //   v441 앱은 수정 창에서 이미 막는다 — 이 서버 벌은 v441 전 캐시 앱·콘솔 길. 서버에 이미 있던 13자리 값(운영 0건 — 11/10 사본)이 그대로 오는 줄은 막지 않는다(옛 값 하나가 모든 저장을 막지 않게).
   //   직전 문서를 못 읽었으면(prevReadFailed) 모든 줄을 새 줄로 본다(더 닫힌 쪽).
@@ -696,6 +718,11 @@ async function handleSave(event, d, R) {
     const oldRecById = {}, seenRec = {};
     const recProcessed = function (o) { return !!(o && (o.paid || o.invoice || o.reviewed)); };
     oldItems.forEach(function (o) { if (o && o.id) oldRecById[o.id] = o; });
+    // C296(11/27): 이 직원에게 안 보이던 줄(get이 뺀 줄)은 서버 원본 그대로 — 사본에 같은 id가 오면 원본으로 바꾸고(같은 id 두 번은 한 벌), 안 오면 이월(빠진 줄을 지움으로 보지 않음)
+    const hidRec = {}, seenHid = {};
+    oldItems.forEach(function (o) { if (o && o.id && !recVisibleSrv(c.member, o)) hidRec[o.id] = o; });
+    doc.items = doc.items.map(function (x) { if (x && x.id && hidRec[x.id]) { if (seenHid[x.id]) return null; seenHid[x.id] = 1; return hidRec[x.id]; } return x; }).filter(function (x) { return x !== null; });
+    Object.keys(hidRec).forEach(function (id) { if (!seenHid[id]) { doc.items.push(hidRec[id]); seenHid[id] = 1; } });
     doc.items = doc.items.map(function (x) {
       if (!x) return x;
       const o = x.id ? oldRecById[x.id] : null;

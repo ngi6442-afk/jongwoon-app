@@ -9,11 +9,12 @@
 //   앱 쪽은 lookbehind를 못 쓰므로(옛 iOS Safari 문법 오류) 두 벌 모두 (^|\D)로 쓴다.
 //   쓰는 곳: gw-data handleSave(거래처 저장 — 새로 바뀐 항목만 400 CLI_BIZ13) · _lib/ask.js(물어보기 clients 도구 — 원문을 내지 않고 검색에도 안 씀).
 //   두 벌(앱·서버)은 uismoke v456가 같은 표본으로 대조한다 — 한쪽만 고치지 말 것.
+//   C296(11/27): ② 6+7 꼴 구분자에 쉼표(, ，)·물결표(~ ～)·괄호(( ) （ ）)를 더함 — '900101,1234567'·'900101~1234567'·'(900101)1234567'이 13자리로 안 잡혀 화면에 원문이 보이던 틈
 function biz13(s) {
   const t = String(s == null ? '' : s)
     .replace(/[０-９]/g, function (ch) { return String.fromCharCode(ch.charCodeAt(0) - 0xFEE0); })
     .replace(/[​-‍⁠]/g, '');
   if (t.split(/[,\/]/).some(function (p) { return /\d{13}/.test(p.replace(/[\s\-‐-―−－ㅡ._·・∙•]/g, '')); })) return true;
-  return /(^|\D)\d{6}[\s\-‐-―−－ㅡ.\/_·・∙•]*\d{7}(?!\d)/.test(t);
+  return /(^|\D)\d{6}[\s\-‐-―−－ㅡ.\/_·・∙•,，~～()（）]*\d{7}(?!\d)/.test(t);
 }
 module.exports = { biz13 };

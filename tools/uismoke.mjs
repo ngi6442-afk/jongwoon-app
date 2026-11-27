@@ -11811,7 +11811,8 @@ try {
   const CB54 = req54(join(ROOT, 'netlify', 'functions', '_lib', 'clibiz.js'));
   const appBiz54 = new Function(fn54(html, 'cliBiz13') + '\nreturn cliBiz13;')();
   const SMP54 = ['9001011234567', '900101-1234567', '900101 1234567', '９００１０１－１２３４５６７', '900101‐1234567', '900101‑1234567', '900101‒1234567', '900101–1234567', '900101—1234567', '900101―1234567', '900101−1234567', '900101ㅡ1234567',
-    '900101-1******', '123-45-67890', '1234567890', '123-45-67890, 234-56-78901', '123-45-67890 234-56-78901', '12345678901234', '', null, undefined, ' 1111111111111 ', '111111111111', 'abc'];
+    '900101-1******', '123-45-67890', '1234567890', '123-45-67890, 234-56-78901', '123-45-67890 234-56-78901', '12345678901234', '', null, undefined, ' 1111111111111 ', '111111111111', 'abc',
+    '900101,1234567', '900101~1234567', '(900101)1234567', '900101，1234567', '900101～1234567', '（900101）1234567', '123-45-67890,234-56-78901'];   // C296: 쉼표·물결표·괄호 꼴(앞 6개 잡힘 · 마지막 사업자번호 둘은 안 잡힘)
   const diff54 = SMP54.filter((s) => appBiz54(s) !== CB54.biz13(s)).length, hits54 = SMP54.filter((s) => CB54.biz13(s)).length;
   const sc54 = fn54(html, 'saveClients'), msg54 = (html.match(/  var CLI_BIZ13_MSG = "[^"\n]*";/) || [''])[0];
   const runC54 = async (st, code) => { const env = { toasts: [] }; const f = new Function('ENV', [msg54, 'var cliLoaded = true, cliDirty = { c1: 1 }, clients = [{ id: "c1" }], cliSha = null, CLIENT_API = "x";',
@@ -11821,7 +11822,7 @@ try {
   const c54a = await runC54(400, 'CLI_BIZ13'), c54b = await runC54(400, 'OTHER'), c54c = await runC54(200, '');
   const msgOk54 = msg54.length > 30 && c54a.length === 1 && c54a[0].indexOf(JSON.parse(msg54.slice(msg54.indexOf('"'), msg54.lastIndexOf('"') + 1))) === 0 && c54b.length === 0 && c54c.length === 0;
   T('v456 ③ 거래처 13자리 두 벌: 앱 cliBiz13 = 서버 _lib/clibiz.js biz13(표본 ' + SMP54.length + ' — 전각·줄표 9종·ㅡ·띄어쓰기·가린 번호·10자리·쉼표 둘·14자리·빈 값 · 다름 0 · 잡힘 ≥ 12) · saveClients 400 CLI_BIZ13 = 안내 토스트 1(CLI_BIZ13_MSG) · 다른 400·200 = 토스트 0',
-    diff54 === 0 && hits54 >= 12 && msgOk54, JSON.stringify({ diff54, hits54, c54a: c54a.length, c54b, c54c }));
+    diff54 === 0 && hits54 >= 12 && msgOk54 && ['900101,1234567', '900101~1234567', '(900101)1234567', '900101，1234567', '900101～1234567', '（900101）1234567'].every((x) => CB54.biz13(x) && appBiz54(x)) && !CB54.biz13('123-45-67890,234-56-78901'), JSON.stringify({ diff54, hits54, c54a: c54a.length, c54b, c54c }));
 
   // ---- v456 검토 반영(11/13) — ⑤ 대역 409 셈 = 저장 줄기 단위 ⑥ 현장 창 새 일용직 → 바로 넣기(ORPHAN_WORKER 경합) ⑦ 13자리 두 벌의 점·빗금·밑줄·폭 없는 문자 ----
   // ⑤ fetch 대역(실행 — 시계 대역): 409 두 번 → 30초 넘게 지나 409 = 다시 409(새 줄기) → 409 → 3번째 412 · 409 두 번 → 403(쓰기 거절) → 409 = 409(셈 비움) · 결함 사본(시간 창 걷음·403 비움 걷음) ✗

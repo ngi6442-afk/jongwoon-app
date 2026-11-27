@@ -7210,6 +7210,37 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
       const sv = await c({ action: 'save', collection: 'receivables', base: 863, doc: { schema: 1, items: vR } }, tV, 'dev1');
       return { ok: hid && raw && kept && sv.code === 403 && mem.gw_data['col:receivables'].items[0].client_num === '9001011234567', info: [gv.code, rv.code, hid, raw, kept, sv.code] };
     },
+    // ⑤-I C296(11/27): 기성 읽기 = 공개범위·담당 안 줄만(비관리자 — 보기·수행 모두) · 관리자 전 줄 · 수행 직원 저장 = 안 보이던 줄은 서버 원본 이월(빼고 보내도 · 고쳐 보내도 · 같은 id 두 번도)
+    I: async (mod) => { reset86(); seedU86(); const c = caller86(mod);
+      const DO = { id: 'ud86', name: '수행86', admin: false, dept: '운영부', rank: '대리', perms: { rec: 'do' } };
+      mem.gw_users['member:ud86'] = JSON.parse(JSON.stringify(DO)); const tD = issueSession(DO).token;
+      mem.gw_data['col:receivables'] = { schema: 1, items: [
+        { id: 'a', client: '가', amount: 1 }, { id: 'b', client: '나', amount: 2, scope: ['dept:관리부'] }, { id: 'c', client: '다', amount: 3, scope: ['dept:관리부'], assignee: 'ud86' },
+        { id: 'd', client: '라', amount: 4, scope: ['dept:운영부'] }, { id: 'e', client: '마', amount: 5, scope: ['rank:과장'] }, { id: 'f', client: '바', amount: 6, scope: ['rank:사원'] }, { id: 'g', client: '사', amount: 7, scope: ['dept:관리부'] }], updated_at: 864 };
+      const g = await c({ action: 'get', collection: 'receivables' }, tD, 'dev1'), ga = await c({ action: 'get', collection: 'receivables' }, tA86, 'dev1');
+      const ids = g.body.doc.items.map((r) => r.id).join(''), idsA = ga.body.doc.items.map((r) => r.id).join('');
+      const vis = g.code === 200 && ids === 'acdf' && idsA === 'abcdefg';
+      // 저장: 보이는 줄만 + 숨은 b를 고친 사본 + 같은 숨은 e 두 번 → 서버 원본 이월
+      const send = g.body.doc.items.map((r) => (r.id === 'a' ? Object.assign({}, r, { amount: 11 }) : r)).concat([{ id: 'b', client: '나', amount: 999, scope: [] }, { id: 'e', client: 'X', amount: 0 }, { id: 'e', client: 'Y', amount: 0 }]);
+      const sv = await c({ action: 'save', collection: 'receivables', base: 864, doc: { schema: 1, items: send } }, tD, 'dev1');
+      const it = mem.gw_data['col:receivables'].items, by = {}; it.forEach((r) => { by[r.id] = (by[r.id] || 0) + 1; });
+      const carry = sv.code === 200 && it.length === 7 && !!it.find((r) => r.id === 'g') && Object.values(by).every((n) => n === 1) && it.find((r) => r.id === 'a').amount === 11
+        && it.find((r) => r.id === 'b').amount === 2 && JSON.stringify(it.find((r) => r.id === 'b').scope) === '["dept:관리부"]' && it.find((r) => r.id === 'e').client === '마';
+      return { ok: vis && carry, info: [g.code, ids, idsA, sv.code, it.length, carry] };
+    },
+    // ⑤-J C280 서버 벌(11/27): 바뀐 줄 날짜 칸 — 직전 날짜 칸에 없는 날·글자 = 400 BAD_DATE · 연도 다섯 자리 이상 = 400 · 빈 값(일부러 비움)·맞는 날짜·안 바뀐 옛 이상한 값 = 200 · 응답에 값 없음
+    J: async (mod) => { reset86(); seedU86(); const c = caller86(mod);
+      const base = () => ({ schema: 1, items: [{ id: 't1', title: '가', due: '2026-12-31', note: 'x' }, { id: 't2', title: '나', due: '202612-31-01' }], updated_at: 865 });
+      const sv = async (items) => { mem.gw_data['col:tasks'] = base(); return c({ action: 'save', collection: 'tasks', base: 865, doc: { schema: 1, items } }, tA86, 'dev1'); };
+      const r1 = await sv([{ id: 't1', title: '가', due: '2026-11-31', note: 'x' }, { id: 't2', title: '나', due: '202612-31-01' }]);
+      const r2 = await sv([{ id: 't1', title: '가', due: '2026-12-3', note: 'x' }, { id: 't2', title: '나', due: '202612-31-01' }]);
+      const r3 = await sv([{ id: 't1', title: '가', due: '2026-12-31', note: 'x' }, { id: 't2', title: '나', due: '202612-31-01' }, { id: 't3', title: '다', due: '202701-01-01' }]);
+      const r4 = await sv([{ id: 't1', title: '가', due: '', note: 'x' }, { id: 't2', title: '나', due: '202612-31-01' }]);
+      const r5 = await sv([{ id: 't1', title: '가', due: '2027-02-28', note: '2026-13-01 메모' }, { id: 't2', title: '나2', due: '202612-31-01' }]);
+      const bad = [r1, r2, r3].every((r) => r.code === 400 && r.body.error_code === 'BAD_DATE' && JSON.stringify(r.body).indexOf('2026-11-31') < 0 && JSON.stringify(r.body).indexOf('202701') < 0) && r1.body.fields[0] === 'due';
+      const good = r4.code === 200 && r5.code === 200;
+      return { ok: bad && good, info: [r1.code, r1.body.error_code, r2.code, r3.code, r4.code, r5.code] };
+    },
     // ⑤-1 C082 ① 명부 exam: 안전 권한 없는 일용직 수행자 읽기 = exam 칸 없음 · 안전 보기·관리자 = 있음 · 그 사람 저장 = exam 서버 값 이월(보낸 값 버림·새 줄 exam 없음) · 안전 권한자 저장 = 반영 · 직전 명부 못 읽으면 500 PREV_READ_FAILED
     E: async (mod) => { reset86(); seedU86(); const c = caller86(mod);
       mem.gw_data['col:workers'] = { schema: 1, items: [{ id: 'w86a', name: '가', exam: '2026-01-02' }, { id: 'w86b', name: '나' }], updated_at: 861 };
@@ -7260,6 +7291,8 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     C: [['gwd', "prevDoc.updated_at && Number.isFinite(Number(prevDoc.updated_at)) && Number(d.base)", "prevDoc.updated_at && Number(d.base)"]],
     D: [['gwd', '    if (biz13N) return jr(400', '    if (false) return jr(400']],
     E: [['gwd', "  if (col === 'workers' && !wkExamSee(c.member) && Array.isArray(doc.items)) {\n    doc = ", "  if (false) {\n    doc = "], ['gwd', "  if (col === 'workers' && !wkExamSee(c.member)) {", '  if (false) {']],
+    J: [['gwd', "    if (badDt.length) return jr(400, { status: 'REJECTED', error_code: 'BAD_DATE'", "    if (false) return jr(400, { status: 'REJECTED', error_code: 'BAD_DATE'"], ['gwd', "if (Y5.test(v) || (o && ", "if ((o && "]],
+    I: [['gwd', "  if (col === 'receivables' && !c.member.admin && Array.isArray(doc.items)) doc = Object.assign({}, doc, { items: doc.items.filter(", "  if (false) doc = Object.assign({}, doc, { items: doc.items.filter("], ['gwd', "    Object.keys(hidRec).forEach(function (id) { if (!seenHid[id]) {", "    Object.keys(hidRec).forEach(function (id) { if (false) {"]],
     H: [['gwd', "  if ((col === 'clients' || col === 'receivables') && !c.member.admin && p !== 'do' && Array.isArray(doc.items)) {", "  if (false) {"], ['gwd', "&& !c.member.admin && p !== 'do' && Array.isArray(doc.items)) {\n    const fld", "&& !c.member.admin && Array.isArray(doc.items)) {\n    const fld"]],
     F: [['gwd', '      if (orphans.length) return jr(400', '      if (false) return jr(400']],   // v456 2차 검토: orphanN → orphans(고아 id 목록도 돌려줌 — 88 ③) · 같은 거절 줄 걷음
     G: [['gwd', "  if (!bot) return jr(403, { status: 'FORBIDDEN', error_code: 'BOT_KEY_ONLY'", "  if (false) return jr(403, { status: 'FORBIDDEN', error_code: 'BOT_KEY_ONLY'"]],
@@ -7316,6 +7349,10 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     const CB86 = require(join(FN, '_lib/clibiz.js'));
     T('86 v456 ④ C080 거래처 13자리: 새 거래처(전각·전각 줄표) = 400 CLI_BIZ13(n 1·저장 안 됨·응답에 번호 없음) · 서버에 있던 13자리 그대로 + 다른 줄 고침 = 200(옛 값이 저장을 막지 않음) · 있던 줄을 13자리로 바꿈 = 400 · 가린 번호·10자리·쉼표로 나눈 둘 = 200 · 물어보기 clients = "13자리(숨김)"·그 번호로 물으면 0행 · 결함 사본(서버 거절 걷음·물어보기 가림 걷음) ✗',
       R86.D.ok && killed86('D') && ask86 && !askMut86 && CB86.biz13('900101-1234567') && !CB86.biz13('900101-1******') && !CB86.biz13('123-45-67890'), JSON.stringify({ D: R86.D.info, mut: MUT86.D, ask86, askMut86 }));
+    T('86 C280 서버 날짜 꼴(덧대기): 바뀐 줄 — 직전 날짜 칸에 없는 날·덜 친 날 = 400 BAD_DATE(칸 이름만 · 값 없음) · 새 줄 연도 다섯 자리 = 400 · 빈 값·맞는 날짜·글 칸 속 날짜 꼴·안 바뀐 옛 이상한 값 = 200 · 결함 사본 2 ✗',
+      R86.J.ok && killed86('J'), JSON.stringify({ J: R86.J.info, mut: MUT86.J }));
+    T('86 C296 기성 공개범위 서버 거르기: 비관리자 get = 공개범위(dept·rank 이상)·담당 안 줄만 · 관리자 전 줄 · 수행 저장 = 안 보이던 줄 서버 원본 이월(빼고·고쳐·두 번 보내도 한 벌) · 결함 사본 2(거르기 걷음 · 이월 걷음) ✗',
+      R86.I.ok && killed86('I'), JSON.stringify({ I: R86.I.info, mut: MUT86.I }));
     T('86 C270 ⓐ 13자리 원문은 관리자·수행만: 보기 권한 get clients·receivables = biz_no·client_num 빈 값 + biz13·cn13 표시 칸(10자리·빈 값·다른 칸 그대로 · 응답에 원문 글자 0) · 수행·관리자 = 원문 · 저장 문서 무변 · 보기 권한 저장 403 · 결함 사본 2(가림 걷음 · 수행도 가림) ✗',
       R86.H.ok && killed86('H'), JSON.stringify({ H: R86.H.info, mut: MUT86.H }));
     T('86 v456 ⑤ C082 ① 명부 옛 건강진단 exam: 안전 권한 없는 일용직 수행자 읽기 = exam 칸 없음 · 안전 보기·관리자 = 있음 · 그 사람 저장 = exam 서버 값 이월(보낸 값 버림·새 줄 exam 없음) · 안전 권한자 저장 = 반영 · 직전 명부 못 읽음 = 500 PREV_READ_FAILED(쓰지 않음) · 결함 사본(읽기 빼기 걷음·저장 이월 걷음) ✗',
