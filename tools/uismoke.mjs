@@ -1590,10 +1590,33 @@ try {
   T('v382 검토: advanceProc 가드(skipped·되감기) · materializeStage 중복 지시 금지 · completeStageNow pipeKey+review 재요청 금지 · 입금→수금확인 제안은 열린 단계일 때만 · 견적 승격 안내 분기 · 접기 버튼으로만 · 입력값 보존(csSnapInputs/csRestoreInputs) · 승인 게이트(csCanCloseCur) · 청구 건너뜀 경고',
     /if\(!s \|\| s\.status==="done" \|\| s\.status==="skipped" \|\| t\.stage_i < pipe\.cur\) return;/.test(html) && /if\(s\.status==="open" && s\.task_id && findTask\(s\.task_id\)\) return;/.test(html)
     && /function completeStageNow\(c, pat, pipeKey\)\{/.test(html) && /if\(pipeKey && p\.key!==pipeKey\) continue;/.test(html) && /if\(t\.status==="review"\) return "review";/.test(html)
-    && /var ccOpen = !!\(cc && cc\.status !== "done"/.test(html) && /completeStageNow\(cc, \/수금확인\|입금확인\/\)/.test(html) && /qdf=\/견적\/\.test/.test(html)
+    && /var ccOpen = !!\(cc && cc\.status !== "done"/.test(html) && /completeStageNow\(cc, CS_PAY_STAGE_RE\)/.test(html) && /qdf=\/견적\/\.test/.test(html)
     && /csStgSet\(c, p, i, !csStgIsOpen\(c, p, i\)\); renderContracts\(\);/.test(html) && /function csSnapInputs\(root\)/.test(html) && /csRestoreInputs\(host, snap\); csRestoreInputs\(dcard, snap\);/.test(html)   // v427 머리 줄·[접기] 버튼으로만 펼침/접힘 (v447 검토: 주석이 뒤 검사를 삼키던 것 — 주석은 줄 끝)
     && /function csCanCloseCur\(c, p\)/.test(html) && /청구 단계를 건너뛰면 기성\(미수\) 등록이 생기지 않습니다/.test(html) && /if \(p\.stages\[i\]\.status === "skipped"\)\{ p\.stages\[i\]\.status = "pending";/.test(html)
     && /completeStageNow\(c, csExactRe\(s\.name\), p\.key\)/.test(html) && /\[\/면적\/,"석면조사"\]/.test(html), '');
+  // C326(11/27): 단계 이름 가림 두 꼴 — 입금 처리 확인창(CS_PAY_STAGE_RE = 따로 선 수금·입금확인만) · 계약 단계 완료(CS_CON_STAGE_RE = 견적·수의계약 뺌). 표 = 시나리오 이름 전부(CON_SCEN) + 옛 꼴 + 변경계약
+  { const rx326 = (src) => { const m = /\n  var CS_PAY_STAGE_RE = (\/.+\/);\r?\n  var CS_CON_STAGE_RE = (\/.+\/);\r?\n/.exec(src); if (!m) return null; try { return { pay: new Function('return ' + m[1])(), con: new Function('return ' + m[2])() }; } catch (e) { return null; } };
+    const nm326 = ['수금확인', '입금확인', '(수금확인)', '청구 및 입금확인', '청구', '계약', '계약서 작성', '계약서류 작성', '계약서류', '(계약서·발주서)', '변경계약 1차', '견적·수의계약', '요청·견적', '실적신고·대장 종결', '착공서류 작성'];
+    const want326 = { pay: '수금확인|입금확인|(수금확인)', con: '계약|계약서 작성|계약서류 작성|계약서류|(계약서·발주서)|변경계약 1차' };
+    const ok326 = (src) => { const r = rx326(src); return !!r && nm326.filter((n) => r.pay.test(n)).join('|') === want326.pay && nm326.filter((n) => r.con.test(n)).join('|') === want326.con; };
+    const wire326 = (src) => /return s && CS_PAY_STAGE_RE\.test\(s\.name\|\|""\) && s\.status!=="done"/.test(src) && /var res = completeStageNow\(cc, CS_PAY_STAGE_RE\);/.test(src) && !/\/수금확인\|입금확인\//.test(src)
+      && /if\(s\.aid==="change_contract" && \(pat===CS_CON_STAGE_RE \|\| pat\.source==="계약"\)\) continue;/.test(src) && /if \(cs && CS_CON_STAGE_RE\.test\(cs\.name \|\| ""\) && !it\.stageAsked\) row \+= cbxBtn\(it, "stagedone", "계약 단계 완료"\);/.test(src)
+      && (src.match(/completeStageNow\(cc?, CS_CON_STAGE_RE, "main"\)/g) || []).length === 2;
+    const sc326 = (html.match(/"[a-z]+:(pri|pub)": \[[^\]]*\]/g) || []).join(' ');
+    const scenOk326 = (() => { const r = rx326(html); if (!r || !sc326) return false; const names = [...sc326.matchAll(/"([^"]+)"/g)].map((m) => m[1]).filter((n) => !/:(pri|pub)$/.test(n)); return names.filter((n) => r.pay.test(n)).length === 0 && names.filter((n) => r.con.test(n)).every((n) => !/견적/.test(n)) && names.some((n) => n === '청구 및 입금확인'); })();
+    const bad326 = [html.replace('  var CS_PAY_STAGE_RE = /^\\(?\\s*(수금|입금)\\s*확인\\s*\\)?$/;', '  var CS_PAY_STAGE_RE = /수금확인|입금확인/;'), html.replace('  var CS_CON_STAGE_RE = /^(?!.*견적).*계약/;', '  var CS_CON_STAGE_RE = /계약/;'),
+      html.replace('return s && CS_PAY_STAGE_RE.test(s.name||"")', 'return s && /수금확인|입금확인/.test(s.name||"")'), html.replace('(pat===CS_CON_STAGE_RE || pat.source==="계약")', 'pat.source==="계약"')];
+    T('C326 단계 이름 가림 표: 입금 확인창 = 수금확인·입금확인·(수금확인)만(청구 및 입금확인·청구 아님) · 계약 단계 = 계약·계약서·계약서류·(계약서·발주서)·변경계약(가드 그대로)만(견적·수의계약 아님) · 새 시나리오 이름 전부에서 입금 확인창 0·계약 걸림에 견적 0 · 배선 · 결함 사본 4',
+      ok326(html) && wire326(html) && scenOk326 && bad326.every((b) => b !== html) && bad326.every((b) => !(ok326(b) && wire326(b))), JSON.stringify({ ok: ok326(html), wire: wire326(html), scenOk326, bad: bad326.map((b) => b !== html && !(ok326(b) && wire326(b))) }));
+    // C326 ②(TESTLIST 511): 기성 [+ 청구 등록]·홈택스 불러오기 회사 칸 · 펼침 '회사' = 법인격(기성 수정 창 reCo와 같은 글) — 값 env/con 그대로
+    const co326 = (src) => src.indexOf('<select id="recCo" style="flex:none;width:120px;"><option value="">회사?</option><option value="env">(주)종운환경</option><option value="con">㈜종운건설</option></select>') > 0
+      && src.indexOf('title="이 파일의 공급자(우리 회사) — 홈택스는 회사별 파일"><option value="env">(주)종운환경</option><option value="con">㈜종운건설</option></select>') > 0
+      && src.indexOf('recSheetKv("회사", r.co === "env" ? "(주)종운환경" : (r.co === "con" ? "㈜종운건설" :') > 0
+      && src.indexOf('<select id="reCo"><option value="">회사 미지정</option><option value="env">(주)종운환경</option><option value="con">㈜종운건설</option></select>') > 0
+      && /co: document\.getElementById\("recCo"\)\.value \|\| ""/.test(src) && /co = c\.co \|\| \(\(impCo && impCo\.value\) \|\| ""\)/.test(src);
+    const bad326b = [html.replace('<option value="env">(주)종운환경</option><option value="con">㈜종운건설</option></select>\n        <input type="text" id="recAmount"', '<option value="env">종운환경</option><option value="con">종운건설</option></select>\n        <input type="text" id="recAmount"'), html.replace('r.co === "env" ? "(주)종운환경" : (r.co === "con" ? "㈜종운건설"', 'r.co === "env" ? "종운환경" : (r.co === "con" ? "종운건설"')];
+    T('C326 ② 기성 회사 칸 표시 법인격: 청구 등록 recCo·홈택스 recImpCo·펼침 회사 = (주)종운환경/㈜종운건설 · 수정 창 reCo 그대로 · 값 env/con 읽는 자리 그대로 · 결함 사본 2',
+      co326(html) && bad326b.every((b) => b !== html && !co326(b)), JSON.stringify({ ok: co326(html), bad: bad326b.map((b) => b !== html && !co326(b)) })); }
 } catch (e) { console.log('  (v382 검토 검사 생략 — ' + e.message + ')'); fails++; }
 
 // ---- v383: 서류 4종 패킷(생성 ✓ · 첨부 ◻ · 빈칸 ✗) ----
@@ -1967,14 +1990,14 @@ try {
     && /if \(q\.key === "chg"\)\{ var mr = csChgMerge\(c, lq, q\); if \(mr\)\{ changed = true; if \(mr === 2\) chgPush = true; \} return; \}/.test(sc402) && /if \(chgPush\)\{ c\.updated = todayStr\(\); scheduleContractSave\(\); \}/.test(sc402) && /status: \(pa\.status === la\.status\) \? pa\.status : "mismatch"/.test(html) && /if \(raw\.status !== "applied"\)/.test(sc402), missFn.join(','));
   const ci = html.indexOf('function conProcLoad()'), cThen = html.indexOf('.then(function(res){', ci);
   T('v402 호출처: 지시 상세 stageDocsOf · csApprKind(s.name) 1회(csApprKindOf 안) · 계약 단계 완료 main 고정 2곳 · 로더 then 첫 문장 conAddedClear · conAddedUse 호출 1회(거울 적용 뒤) · 새 계약 2곳 conScenTag · 모달 적격 수동 체크·리스너·리셋',
-    /detail:\(stageDocsOf\(s\)\|\|""\)/.test(html) && (html.match(/csApprKind\(s\.name\)/g) || []).length === 1 && (html.match(/completeStageNow\(cc?, \/계약\/, "main"\)/g) || []).length === 2 && !/completeStageNow\(cc?, \/계약\/\)/.test(html)
+    /detail:\(stageDocsOf\(s\)\|\|""\)/.test(html) && (html.match(/csApprKind\(s\.name\)/g) || []).length === 1 && (html.match(/completeStageNow\(cc?, CS_CON_STAGE_RE, "main"\)/g) || []).length === 2 && !/completeStageNow\(cc?, \/계약\//.test(html)
     && /^\s*conAddedClear\(\); CON_PROC_SRC\.added_applied = 0;/.test(html.slice(cThen + 20, cThen + 120)) && (html.match(/conAddedUse\(/g) || []).length - (html.match(/function conAddedUse\(/g) || []).length === 1 && html.indexOf('conAddedUse(ad, ') > html.indexOf('conProcApplyInPlace(CON_PACKETS')
     && /scen:conScenTag\(\{type:type, pub:pub, combo:combo, ver:1\}, stages\)/.test(html) && /scen:conScenTag\(\{type:type, pub:true, combo:false, ver:1\}, qst\)/.test(html) && ids.has('conQualWrap') && ids.has('conQualMan') && /getElementById\("conQualMan"\)\.addEventListener\("change", renderConScen\)/.test(html) && /var qm0=document\.getElementById\("conQualMan"\); if\(qm0\) qm0\.checked=false;/.test(html), '');
   T('v402 시트: csChgAdd(@con-sheet)·버튼 배선 data-cs-chgadd · pipeLabel chg · csUnskipStage delete s.off · [켜기] 라벨 · R1 csDocsLost(굳히지 않음) · R3 본 줄 잠금(advanceProc·csDoneStage) · R4 변경계약 서류 버튼 숨김(단계 카드·지시 탭) · R15 완료 전 입력 칸 저장',
     sh402.indexOf('function csChgAdd(') >= 0 && html.indexOf('querySelectorAll("[data-cs-chgadd]")') >= 0 && /k==="chg" \? "변경계약" : "본"/.test(html) && /s\.status = "pending"; s\.done_at = null; delete s\.off;/.test(sh402) && sh402.indexOf("(s.off ? '켜기' : '선택 복구')") >= 0
     && sh402.indexOf("var cls = (isSkip ? ' skip' : (isDone ? ' done' : (isCur ? ' cur' : ''))) + (opt ? ' opt' : '') + (open ? ' open' : '');") >= 0 && /function csDocsLost\(s\)/.test(sh402) && /if \(csDocsLost\(s\)\)\{ alert\(/.test(sh402) && /var chgN = c\.scen \? csChgOpenAt\(c, pipe, t\.stage_i\) : 0;/.test(html) && /var chgN = csChgOpenAt\(c, p, i\); if \(chgN\)\{ alert\(/.test(sh402)
     && sh402.indexOf('if (s.aid !== "change_contract" && p.key !== "chg"){ if (!csStgGenCovered(c, s, rows)) act += \'<button type="button" class="vs-chip" data-cs-sdoc=') >= 0 && html.indexOf('var docBtn = (t.proc_id && canDo("con") && t.pipe !== "chg" && !csTaskChg(t)) ?') >= 0 && /fp = \(s0 && s0\.aw === "amt"\) \? root\.querySelector/.test(html)
-    && ['var chgA = csChgOpenAt(c, p, i); if (chgA)', 'if(s.aid==="change_contract" && pat.source==="계약") continue;', 'var chgJ = csChgOpenAt(c, p, i); if (chgJ)', 'if (s.aw === "amt" && (csNum((s.vals || {}).chg_amt) || (s.vals || {}).chg_end || s.appr))', 'hold = !!(cs && cs.appr && /대기|보류|승인/.test(cs.appr.status || "")', 'if (!tl || tl.status === "done"){ csApprApply(c, p, i);'].every((x) => html.indexOf(x) >= 0), '');   // v402 적대 검토 반영 리터럴
+    && ['var chgA = csChgOpenAt(c, p, i); if (chgA)', 'if(s.aid==="change_contract" && (pat===CS_CON_STAGE_RE || pat.source==="계약")) continue;', 'var chgJ = csChgOpenAt(c, p, i); if (chgJ)', 'if (s.aw === "amt" && (csNum((s.vals || {}).chg_amt) || (s.vals || {}).chg_end || s.appr))', 'hold = !!(cs && cs.appr && /대기|보류|승인/.test(cs.appr.status || "")', 'if (!tl || tl.status === "done"){ csApprApply(c, p, i);'].every((x) => html.indexOf(x) >= 0), '');   // v402 적대 검토 반영 리터럴
   T('v402 관리자 카드: 미리보기 try/catch 격리(R6) · 카드 9 목록 읽기 전용 행·같은 키 docs_set 확인창(R11) · 편집 예시 해 없는 값(완료신고_석면·노동부|석면 예시 0)',
     /var pv = ""; if \(has\)\{ try \{ pv = conAddedPreviewHtml\(b\); \} catch\(e\)\{/.test(html) && /\+ pv \+ \(has \? conProcEditHtml\(b\) : ''\);/.test(html) && html.indexOf('카드 9 · ') >= 0 && /은 카드 9 목록 키와 같은 이름입니다/.test(html)
     && html.indexOf('placeholder="키(예: 실적보고_추가)"') >= 0 && html.indexOf('placeholder="키(예: 완료신고_석면)"') < 0 && html.indexOf('예: 노동부|석면)') < 0, '');
@@ -6137,7 +6160,7 @@ try {
     'renderReceivablesLegacy', 'bindRecHandlers', 'recSortCmp', 'fillRecSort', 'selCount', 'selBoxHtml', 'bindSelBoxes', 'renderSelBar', 'hardDelete', 'bulkDelete', 'bulkRestore', 'renderDeletedList',
     'moduleArr', 'moduleLive', 'moduleDeleted', 'moduleCan', 'moduleFind', 'saveModule', 'scheduleModuleSave', 'renderModuleList', 'renderModule', 'csTitle', 'csSiteText',
     'impEsc', 'xlsxUnescape', 'xlsxCol', 'xlsxZip', 'xlsxEntry', 'xlsxSS', 'xlsxSheet', 'xlsxRows', 'recImportMap', 'recDayGap', 'recMergeTwins', 'recImportPlan', 'recNewRec', 'recImportApply', 'recMergeInto', 'handleRecImportFile', 'showRecImportPreview', 'confirmRecImport'];
-  const VARS40 = ['  var showRecAging = ', '  var recSearchTerm = ', '  var recSort = ', '  var REC_SORTS = ', '  var pendingImport = ', '  var editingRecId = ', '  var REC_MERGE_DAYS = '].map((h) => line40(html, h));
+  const VARS40 = ['  var CS_PAY_STAGE_RE = ', '  var showRecAging = ','  var recSearchTerm = ', '  var recSort = ', '  var REC_SORTS = ', '  var pendingImport = ', '  var editingRecId = ', '  var REC_MERGE_DAYS = '].map((h) => line40(html, h));
   const PRE40 = [
     'var receivables = ENV.recs, tasks = ENV.tasks, contracts = ENV.procs, members = ENV.members, vehicles = [];',
     'var clients = ENV.clients, CLI_LINK = null;',   // v464 C081 ②: 거래처별 미수 집계가 거래처 탭 잇기(cliLinkIdx)를 씀
@@ -6790,6 +6813,12 @@ try {
   T('v440 ㉚ 확인 칸 거르기(검토 반영 — 부품 multi): 고르기 목록 "금액 바뀜|불일치|중복 의심" · 불일치 = r3(중복 의심 + 불일치),r5 · 중복 의심 = r3,r4 · r3 칸 = 첫 표시 중복 의심·title "중복 의심 · 불일치" · 정의 검사 multi:chk(enum 아님)',
     opts30 === '금액 바뀜|불일치|중복 의심' && f30a === 'r3,r5' && f30b === 'r3,r4' && c30[1] === '<span class="rec-st dup">중복 의심</span>' && / title="중복 의심 · 불일치"/.test(c30[0]) && bad30.indexOf('multi:chk') >= 0,
     JSON.stringify({ opts30, f30a, f30b, c30, bad30 }));
+
+  // C326 ①(11/27 · TESTLIST 651): 실제 toggleRecPaid — 연동 계약(c1)의 지금 단계에 따라 [입금완료] 뒤 '수금(입금)확인 단계를 완료할까요?' 확인창. 새 시나리오 '청구 및 입금확인'(결재 단계)·옛 '청구'는 안 뜸 · 옛 '수금확인'·'입금확인'·'(수금확인)'은 뜸
+  const pay326 = (nm) => { const X = mk40(); X.env.confirmAns = false; X.env.procs[0].pipes = [{ key: 'main', cur: 0, stages: [{ name: nm, status: 'open' }] }]; X.api.render(); openRow40(X, 'r2'); pressDet40(X, 'pay', 'r2'); X.env.tick(300); return [!!rc40(X, 'r2').paid, X.env.log.some((l) => /^confirm:입금 처리 완료 — 연동된 계약/.test(l))]; };
+  const s326 = ['청구 및 입금확인', '청구', '수금확인', '입금확인', '(수금확인)'].map((nm) => pay326(nm).join(':'));
+  T('C326 ① 기성 입금 처리 — 계약 단계 확인창(실행): 청구 및 입금확인 = 입금만·확인창 없음 · 청구 = 없음 · 수금확인·입금확인·(수금확인) = 확인창',
+    JSON.stringify(s326) === JSON.stringify(['true:false', 'true:false', 'true:true', 'true:true', 'true:true']), JSON.stringify(s326));
 
   // ㉛ 새 청구(검토 반영 — addReceivable 끝 recSheetShowNew): 기억 '입금 완료' 칩에서 [+ 청구 등록] = 새 줄이 가려 있으면 미수 칩으로 풀어 그 줄을 열고 굴림(기기 기억 안 덮음) · 기본 미수 칩에서 등록 = 그 줄 보이고 펼치지 않음(이어서 넣기) · 폰 375 = 굴림 없음(옛 목록)
   const MEM31 = JSON.stringify({ k: '', d: 1, f: {}, chip: { st: 'paid' } });

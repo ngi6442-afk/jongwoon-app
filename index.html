@@ -1851,7 +1851,7 @@
         <input type="text" id="recDesc" placeholder="내역 (예: 6월 기성)">
       </div>
       <div class="add-row" style="padding-top:0;">
-        <select id="recCo" style="flex:none;width:120px;"><option value="">회사?</option><option value="env">종운환경</option><option value="con">종운건설</option></select>
+        <select id="recCo" style="flex:none;width:120px;"><option value="">회사?</option><option value="env">(주)종운환경</option><option value="con">㈜종운건설</option></select>
         <input type="text" id="recAmount" placeholder="금액(선택)" inputmode="numeric">
         <input type="date" id="recBilled">
         <button id="recAddBtn">청구 등록</button>
@@ -1863,7 +1863,7 @@
           <div style="font-weight:600;">홈택스 매출 목록 불러오기</div>
           <div style="font-size:12px;opacity:.7;margin-top:2px;word-break:keep-all;">홈택스·위하고에서 내려받은 세금계산서 목록(.xlsx) — 공급자 사업자번호로 회사 자동 판별, 매입분 자동 제외</div>
         </div>
-        <select id="recImpCo" style="flex:none;width:110px;" title="이 파일의 공급자(우리 회사) — 홈택스는 회사별 파일"><option value="env">종운환경</option><option value="con">종운건설</option></select>
+        <select id="recImpCo" style="flex:none;width:110px;" title="이 파일의 공급자(우리 회사) — 홈택스는 회사별 파일"><option value="env">(주)종운환경</option><option value="con">㈜종운건설</option></select>
         <button type="button" id="recFilePick" class="mini-btn" style="flex:none;">파일 선택</button>
       </div>
       <div id="recDrop" style="margin-top:10px;padding:16px;border:2px dashed rgba(128,128,128,.4);border-radius:8px;text-align:center;font-size:13px;opacity:.75;">여기로 .xlsx 파일을 끌어놓으세요</div>
@@ -13100,6 +13100,11 @@
     return '<div style="margin-top:6px;padding:6px 8px;border:1px dashed #bbb;border-radius:6px;"><div style="color:#888;font-size:12px;margin-bottom:2px;">이전에 첨부한 파일</div>'+rows+'</div>';
   }
   // 현재 단계(이름 패턴 일치)를 완료 처리 — 승인권 있으면 완료+다음 단계 생성, 없으면 완료요청까지
+  // C326(11/27): 단계 이름을 부분 일치로 가려 다른 단계에 걸리던 두 꼴을 한 곳에 —
+  //   CS_PAY_STAGE_RE = 따로 선 수금(입금)확인 단계만(옛 계약) · 새 시나리오 '청구 및 입금확인'은 결재(청구 검수) 단계라 청구 때 닫힘 — 입금 처리로 닫지 않음('수금확인 또는 입금확인이 들어간 이름' 부분 일치가 걸려 확인창 → '결재함 상신 필요' 알림만 뜨던 것)
+  //   CS_CON_STAGE_RE = 계약 단계 — '견적·수의계약'(견적 단계 · 결재 없음)은 빼고(CS_PK_STAGE.con과 같은 가름 · /계약/이 걸려 계약서 저장 때 견적 단계를 대신 완료하던 것)
+  var CS_PAY_STAGE_RE = /^\(?\s*(수금|입금)\s*확인\s*\)?$/;
+  var CS_CON_STAGE_RE = /^(?!.*견적).*계약/;
   function completeStageNow(c, pat, pipeKey){   // v382 검토 7: pipeKey를 주면 그 파이프만(옛 2파이프 계약의 같은 이름 단계 혼동 방지)
     for(var i=0;i<(c.pipes||[]).length;i++){
       var p=c.pipes[i];
@@ -13107,7 +13112,7 @@
       if(p.cur>=p.stages.length) continue;
       var s=p.stages[p.cur];
       if(!pat.test(s.name||"")) continue;
-      if(s.aid==="change_contract" && pat.source==="계약") continue;   // v402 검토 3: 계약서 판독·작성 툴은 변경계약 단계를 대신 완료하지 않음(7번 고정 대안 포함)
+      if(s.aid==="change_contract" && (pat===CS_CON_STAGE_RE || pat.source==="계약")) continue;   // v402 검토 3: 계약서 판독·작성 툴은 변경계약 단계를 대신 완료하지 않음(7번 고정 대안 포함)
       var t=s.task_id?findTask(s.task_id):null;
       if(!t || t.status==="done") return "none";
       if(canApproveTask(t)){
@@ -16815,7 +16820,7 @@
       var row = "";
       if (it.n) row += cbxBtn(it, "moveopen", "다른 서류로");
       if (it.reviewIdx !== undefined && c) row += cbxBtn(it, "review", "검수");
-      if (it.conDoc && c){ var p0 = (c.pipes || [])[0], cs = p0 && p0.stages && p0.stages[p0.cur]; if (cs && /계약/.test(cs.name || "") && !it.stageAsked) row += cbxBtn(it, "stagedone", "계약 단계 완료"); row += cbxBtn(it, "gowork", "착공계 작성"); }
+      if (it.conDoc && c){ var p0 = (c.pipes || [])[0], cs = p0 && p0.stages && p0.stages[p0.cur]; if (cs && CS_CON_STAGE_RE.test(cs.name || "") && !it.stageAsked) row += cbxBtn(it, "stagedone", "계약 단계 완료"); row += cbxBtn(it, "gowork", "착공계 작성"); }
       if (admin && it.scope === "top" && it.n) row += cbxBtn(it, "toblank", "양식으로 등록");
       if (row) h += '<div class="cbx-row">' + row + '</div>';
     }
@@ -16952,7 +16957,7 @@
     else if (act === "stagedone"){
       if (!c) return;
       it.stageAsked = 1;
-      var r = completeStageNow(c, /계약/, "main");
+      var r = completeStageNow(c, CS_CON_STAGE_RE, "main");
       if (r === "done") apprToastShow("다음 단계로 넘어갔습니다");
       else if (r === "review") apprToastShow("완료 요청으로 올렸습니다 — 승인권자가 승인하면 다음 단계가 생성됩니다");
       else if (r === "none") apprToastShow("현재 단계가 계약 단계가 아니어서 자동 진행하지 않았습니다");
@@ -19503,7 +19508,7 @@
           var pkTxt=pk.map(function(k){return TPL_LABELS[k];}).join("·");
           if(confirm("계약서 내용을 계약에 저장했습니다.\n계약 단계를 완료"+(pkTxt?"하고 후속 서류("+pkTxt+")를 일괄 생성":"")+"할까요?"
             +(cc.docType!=="public"?"\n(개인·사문서 건 — 착공계·준공계는 작성하지 않습니다)":""))){
-            completeStageNow(cc, /계약/, "main");
+            completeStageNow(cc, CS_CON_STAGE_RE, "main");
             if(pk.length) conGenPacket(cc);
           }
         }, 400);
@@ -29639,10 +29644,10 @@
       r.paid = todayStr(); r.mismatch = false; completeRecTask(r);  // 입금완료 → 연동 업무 완료
       if (r.con_id){                                            // 계약 연동 건 → 수금(입금)확인 단계 완료 제안 — 그 단계가 지금 열려 있을 때만(v382 검토 5: 새 시나리오는 "청구 및 입금확인" 한 단계라 청구 때 닫힘)
         var cc = findProc(r.con_id);
-        var ccOpen = !!(cc && cc.status !== "done" && (cc.pipes||[]).some(function(p){ var s=p.stages[p.cur]; return s && /수금확인|입금확인/.test(s.name||"") && s.status!=="done" && s.status!=="skipped"; }));
+        var ccOpen = !!(cc && cc.status !== "done" && (cc.pipes||[]).some(function(p){ var s=p.stages[p.cur]; return s && CS_PAY_STAGE_RE.test(s.name||"") && s.status!=="done" && s.status!=="skipped"; }));
         if (ccOpen) setTimeout(function(){
           if (confirm("입금 처리 완료 — 연동된 계약 [" + (cc.title||cc.label) + "]의 수금(입금)확인 단계를 완료할까요?")){
-            var res = completeStageNow(cc, /수금확인|입금확인/);
+            var res = completeStageNow(cc, CS_PAY_STAGE_RE);   // C326: 따로 선 수금(입금)확인 단계만
             if (res === "none") alert("현재 단계가 수금확인이 아니라 자동 완료하지 않았습니다. 지시 탭에서 진행하세요.");
             else if (res === "review") alert("완료 요청으로 올렸습니다 — 승인권자 승인 후 종결됩니다.");
           }
@@ -30003,7 +30008,7 @@
       + recSheetKv("금액", Number(r.amount) ? recSheetMoneyHtml(r.amount) + "원" : REC_DASH) + recSheetKv("담당", who ? esc(who) : REC_DASH) + '</div><div class="vs-act">' + recSheetDetBtns(r) + '</div>';
     sc = scopeNames(r.scope);
     h += '<div class="vs-kv">'
-      + recSheetKv("회사", r.co === "env" ? "종운환경" : (r.co === "con" ? "종운건설" : '<span class="rec-st wait">미지정</span>'))
+      + recSheetKv("회사", r.co === "env" ? "(주)종운환경" : (r.co === "con" ? "㈜종운건설" : '<span class="rec-st wait">미지정</span>'))   // C326 ②: 표시 글만 법인격(기성 수정 창 reCo와 같은 글) — 값 env/con 그대로
       + recSheetKv("청구일", isDate(r.billed) ? esc(r.billed) : REC_DASH)
       + recSheetKv("금액", Number(r.amount) ? recSheetMoneyHtml(r.amount) + "원" : REC_DASH)
       + recSheetKv("공급가액 · 세액", (Number(r.supply) || Number(r.tax)) ? (recSheetMoneyHtml(r.supply) || "0") + " · " + (recSheetMoneyHtml(r.tax) || "0") : REC_DASH)
