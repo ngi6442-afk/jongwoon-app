@@ -24675,9 +24675,9 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ['`fetchTimed`', '원장 C127', '`TIMEOUT`'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v559 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && scr.length === 1 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 559 && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && scr.length === 1 && !cb.some((l) => /\(PM/.test(l))
       && d.cl.indexOf('**C127(v559') > 0
-      && /SHELL_CACHE = 'jw-shell-v559'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 559   /* v560(C296)에서 '559 이상'으로 풂 */;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r559 = chk559(D559);
@@ -24687,6 +24687,28 @@ try {
   T('v559 문서·판 번호(정확 검사): FEATURES 기준 v559 (2026-11-27)·v559 절(C127) · TESTLIST v559 칸 3(운영 확인 1 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v559 · 결함 사본(기준 줄·sw·CLAUDE.md·FEATURES 낱말) 모두 ✗',
     r559.ok && M559.every((v) => v === false), JSON.stringify({ r: r559.info, mut: M559 }));
 } catch (e) { console.log('  (v559 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v560(C296 · C280 서버 — 45-1): 실행 검사는 servertest 86 C296·C280 · uismoke v456 ③ · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '560 이상'으로 풀 것
+try {
+  const rdW = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DW = { ft: rdW('FEATURES.md'), tl: rdW('TESTLIST.md'), sw: rdW('sw.js'), cl: rdW('CLAUDE.md') };
+  const chkW = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v560 (11/27)', '\n### '), tlv = cut(d.tl, '\n## v560 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), op = cb.filter((l) => /^- \[ \] \(운영 확인\)/.test(l));
+    const FT = ['`recVisibleSrv`', '`scopeIncl`', '`biz13`', '`BAD_DATE`', '서버 원본 이월', '「덧대기」'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v560 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 2 && gate.length === 1 && op.length === 1
+      && d.cl.indexOf('**C296(v560)**') > 0 && /SHELL_CACHE = 'jw-shell-v560'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
+  };
+  const rW = chkW(DW);
+  const muW = (k, f) => chkW(Object.assign({}, DW, { [k]: f(DW[k]) })).ok;
+  const MW = [muW('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v559 (')), muW('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v559'")), muW('ft', (s) => s.split('`recVisibleSrv`').join('recVisibleSrv')),
+    muW('cl', (s) => s.replace('**C296(v560)**', 'C296(v560)'))];
+  T('v560 C296·C280 서버 문서·판 번호(정확 검사): FEATURES 기준 v560·v560 절 · TESTLIST v560 칸 2 · CLAUDE.md 한 줄 · sw · 결함 사본 ' + MW.length + '개 = 모두 ✗',
+    rW.ok && MW.every((v) => v === false), JSON.stringify({ r: rW.info, mut: MW }));
+} catch (e) { console.log('  (v560 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
