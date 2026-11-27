@@ -30,7 +30,7 @@ const SENT = [];   // 기기 발송 기록 { ep, tag, title, body }
 const webpushMock = {
   generateVAPIDKeys() { return { publicKey: 'pubX', privateKey: 'privX' }; },
   setVapidDetails() {},
-  async sendNotification(sub, body) { const p = JSON.parse(body); SENT.push({ ep: sub.endpoint, tag: p.tag, title: p.title, body: p.body }); return { statusCode: 201 }; },
+  async sendNotification(sub, body) { const p = JSON.parse(body); SENT.push({ ep: sub.endpoint, tag: p.tag, title: p.title, body: p.body, renotify: p.renotify }); return { statusCode: 201 }; },
 };
 {
   const rb = require.resolve(join(FN, '_lib/blobs.js'));
@@ -122,10 +122,24 @@ try {
   mem.gw_data['push:subs'] = savedSubs;
   T('⑨ 잘못된 키 403 · 구독 기기 없음: sent 0 · 알림함 줄 0 · dup 없음(두 번 다)', bad.statusCode === 403 && n1.sent === 0 && n1.logs === 0 && n1.dup === undefined && /구독 기기 없음/.test(n1.note) && n2.dup === undefined && n2.logs === 0, J([bad.statusCode, n1, n2]));
 
-  // ---- ⑩ sw.js는 안 바꿈 — 알림 꼬리표를 그대로 넘기고 renotify는 없다(되풀이를 매번 울리게 만들지 않음)
-  const fs = require('node:fs');
+  // ---- ⑩ 봇 알림은 되풀이를 매번 울리게 만들지 않는다 — C324(11/27): 종전 '‘renotify’ 글자 없음'은 T750(v557)이 경보에만 일부러 넣은 다시 울림을 막아 늘 실패.
+  //   지키려던 것 = 봇 알림(같은 꼬리표 자리 덮기)이 소리 없이 바뀌는 것. 그래서 ⓐ 실제 sw.js push 처리기를 돌려 다시 울림이 '보낸 쪽 renotify + 꼬리표'일 때만 켜지는지
+  //   ⓑ 이 시험에서 봇 알림(bot_notify)이 실제로 보낸 내용에 renotify가 하나도 없는지를 본다. 결함 사본: 늘 다시 울림 · 꼬리표 없이도 · 봇 알림에 renotify 실음 = 모두 ✗
+  const fs = require('node:fs'), vm = require('node:vm');
   const sw = fs.readFileSync(join(ROOT, 'sw.js'), 'utf8');
-  T('⑩ sw.js: renotify 없음(종전 그대로)', !/renotify/.test(sw));
+  const swShow = (src, payloads) => {   // sw.js를 가짜 self 위에서 돌려 push 처리기가 만든 알림 옵션을 모음
+    const L = {}, shown = [];
+    const self = { addEventListener(t, f) { L[t] = f; }, registration: { showNotification(t, o) { shown.push(o); return Promise.resolve(); } }, skipWaiting() {}, clients: { claim() {}, matchAll: async () => [], openWindow: async () => null }, location: { origin: 'https://test.local' } };
+    const ctx = { self, caches: { open: async () => ({ addAll: async () => {}, put: async () => {}, match: async () => null }), keys: async () => [], delete: async () => true, match: async () => null }, clients: self.clients, URL, Request: function () {}, Response: function () {}, fetch: async () => ({}), console, setTimeout, clearTimeout, importScripts() {} };
+    vm.runInNewContext(src, ctx, { filename: 'sw.js' });
+    for (const p of payloads) L.push({ data: { json: () => p }, waitUntil() {} });
+    return shown.map((o) => o.renotify === true);
+  };
+  const swOk = (src) => { try { const r = swShow(src, [{ title: 'a', tag: 'bot-x' }, { title: 'b', renotify: true }, { title: 'c', tag: 'alarm-x', renotify: true }, { title: 'd' }]); return JSON.stringify(r) === '[false,false,true,false]'; } catch (e) { return false; } };
+  const botOk = (sent) => sent.length > 0 && sent.every((s) => !s.renotify);
+  const M10 = [swOk(sw.replace(/renotify:[^\n,]*,/, 'renotify: true,')), swOk(sw.replace(/renotify:[^\n,]*,/, 'renotify: !!d.renotify,')), botOk(SENT.concat([{ tag: 'bot-x', renotify: true }]))];
+  T('⑩ 봇 알림 다시 울림 없음(C324): sw.js 다시 울림 = 보낸 쪽 renotify + 꼬리표일 때만(봇 꼴·꼬리표 없음·빈 값 = 안 울림 · 경보 꼴 = 울림) · 이 시험의 봇 알림 발송 ' + SENT.length + '건 renotify 0 · 결함 사본 ' + M10.length + '개 = 모두 ✗',
+    swOk(sw) && botOk(SENT) && M10.every((v) => v === false), J({ sw: swOk(sw), bot: botOk(SENT), n: SENT.length, mut: M10 }));
 } finally { Date.now = realNow; }
 
 console.log(fail ? '봇 알림 되풀이 안전망 시험 실패 ' + fail + '건 (통과 ' + pass + ')' : '봇 알림 되풀이 안전망 시험 전 항목 통과 (' + pass + ')');
