@@ -4392,6 +4392,7 @@ async function cdocPairVoid(st, it) {
       const w1 = await blobSet(st, k, r.data); if (!w1.ok) return false;   // C238 판 D: 짝 무르기를 못 쓰면 연결을 지우지 않음(살아 있는 짝이 연결 없이 학습에 남던 것 — 다음 무르기가 다시 함)
       if (tpl) {
         const lk = LN.TYPES.contract.lessons_key(tpl), lr = await blobGet(st, lk);
+        if (!lr.ok && lr.code !== 'NOT_FOUND' && lr.code !== 'STORAGE_PARSE_FAILED') return false;   // C238 판 D 검토: 간극 창고를 못 읽으면 간극을 못 뺐으니 연결을 지우지 않음
         if (lr.ok && lr.data && Array.isArray(lr.data.gaps)) {
           const before = lr.data.gaps.length;
           lr.data.gaps = lr.data.gaps.filter(function (g) { return g && g.pair !== it.pair; });
@@ -4403,7 +4404,7 @@ async function cdocPairVoid(st, it) {
           }
         }
       }
-    } else if (!r.ok && r.code !== 'NOT_FOUND') return false;
+    } else if (!r.ok && r.code !== 'NOT_FOUND' && r.code !== 'STORAGE_PARSE_FAILED') return false;   // 깨진 짝 레코드(PARSE_FAILED)는 지킬 것이 없어 종전처럼 연결만 지움
   } catch (e) { return false; }
   cdocPairClear(it);
   return true;
@@ -4446,9 +4447,9 @@ async function handleCdocMove(event, d, R) {
     const sibOld = idx.items.filter(function (x) { return x !== it && x.i === it.i && x.dk === it.dk && x.kind === it.kind && !x.del && !x.purged && !x.gc; }).sort(function (a, b) { return b.n - a.n; });
     if (wasCur && sibOld[0]) sibOld[0].cur = 1;
     same.forEach(function (x) { if (x.cur) x.cur = 0; });
-    await cdocPairVoid(st, it);
+    if (!(await cdocPairVoid(st, it))) { await blobDelete(files, newKey); return jr(500, { status: 'ERROR', error_code: 'PAIR_VOID_FAILED', request_id: R }); }   // C238 판 D 검토: 짝을 못 물렀으면 옮기지 않음(옛 짝이 연결 없이 남거나 새 짝에 덮이던 것) · 방금 쓴 새 자리 사본은 지움
     it.i = ref.i; it.dk = ref.dk; it.kind = kind; it.ver = ver; it.cur = 1; it.name = std; it.corp = corp; it.moved = Date.now();
-  } else if (piiNew === 2 && it.pair) await cdocPairVoid(st, it);   // 등급만 2로 올려도 짝을 무효로(민감정보는 짝을 만들지 않는다)
+  } else if (piiNew === 2 && it.pair) { if (!(await cdocPairVoid(st, it))) return jr(500, { status: 'ERROR', error_code: 'PAIR_VOID_FAILED', request_id: R }); }   // 등급만 2로 올려도 짝을 무효로(민감정보는 짝을 만들지 않는다) · C238 판 D 검토: 못 무르면 500(2등급 파일에 짝이 남던 것)
   it.pii = piiNew;
   idx.updated_at = Date.now(); idx.updated_by = c.member.id;
   const w = await blobSet(st, cdocIdxKey(ref.cid), idx);
@@ -4515,9 +4516,9 @@ async function handleCdocPairAssign(event, d, R) {
   let learn = null;
   try {
     const b64 = fr.data.att ? await BF.attReadB64(files, fr.data.att, (await blobGet(files, fr.data.att)).data) : String(fr.data.data || '');
-    if (!(await cdocPairVoid(st, it))) learn = { ok: false, code: 'PAIR_VOID_FAILED' };   // C238 판 D: 앞 짝을 못 물렀으면 새 짝을 만들지 않음(두 짝이 함께 살던 것)
-    else { cdocPairClear(it);
-    learn = await cdocLearnPair(st, c.member, { cid: cid, i: it.i, dk: it.dk }, idx, it, it.ext, b64, it.orig, { pair_draft_n: dn }); }
+    if (!(await cdocPairVoid(st, it))) return jr(500, { status: 'ERROR', error_code: 'PAIR_VOID_FAILED', request_id: R });   // C238 판 D: 앞 짝을 못 물렀으면 새 짝을 만들지 않고 저장·감사 전에 500(두 짝이 함께 살던 것)
+    cdocPairClear(it);
+    learn = await cdocLearnPair(st, c.member, { cid: cid, i: it.i, dk: it.dk }, idx, it, it.ext, b64, it.orig, { pair_draft_n: dn });
   } catch (e) { learn = { ok: false, code: 'LEARN_THREW' }; }
   cdocPairMeta(it, learn || { code: 'LEARN_THREW' });
   idx.updated_at = Date.now(); idx.updated_by = c.member.id;
@@ -4641,7 +4642,7 @@ async function cdocMark(event, d, R, mode) {
     if (it.del) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });
     it.del = now; it.del_by = c.member.id; const wasCur = it.cur === 1; it.cur = 0;
     if (wasCur) { const s = sib().sort(function (a, b) { return b.n - a.n; }); if (s[0]) s[0].cur = 1; }   // 현재본을 보관하면 바로 앞 판이 현재
-    if (it.pair) await cdocPairVoid(st, it);   // 잘못 들어간 파일의 간극·학습 대기가 남지 않게
+    if (it.pair && !(await cdocPairVoid(st, it))) return jr(500, { status: 'ERROR', error_code: 'PAIR_VOID_FAILED', request_id: R });   // 잘못 들어간 파일의 간극·학습 대기가 남지 않게 · C238 판 D 검토: 못 무르면 보관하지 않고 500
     op = '기록물보관';
   } else if (mode === 'restore') {
     if (!it.del) return jr(400, { status: 'REJECTED', error_code: 'NO_CHANGE', request_id: R });

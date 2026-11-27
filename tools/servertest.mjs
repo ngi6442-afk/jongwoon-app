@@ -18863,6 +18863,13 @@ function J91a(x) { return JSON.stringify(x); }
       reset(); seedPurge(); blobsMock.hooks.failSet = (k) => k === PK;
       r = await c({ action: 'cdoc_pair_assign', cid: CID, n: 2, unpair: true }, tokCW238); blobsMock.hooks.failSet = null;
       P.unpair = r.code === 500 && r.body.error_code === 'PAIR_VOID_FAILED' && (idx().find((x) => x.n === 2) || {}).pair === 'p238x' && mem.gw_data[PK].status === 'done'; I.unpair = [r.code, r.body.error_code];
+      // ③-2 보관 — 짝 무르기 못 씀 → 500 · 보관 안 됨·연결 그대로 / 깨진 짝 레코드(PARSE_FAILED)는 없음처럼 → 짝 풀기 200
+      reset(); seedPurge(); blobsMock.hooks.failSet = (k) => k === PK;
+      const rb = await c({ action: 'cdoc_del', cid: CID, n: 2 }, tokCW238); blobsMock.hooks.failSet = null;
+      const i2b = idx().find((x) => x.n === 2) || {};
+      reset(); seedPurge(); blobsMock.hooks.failGet = (k) => k === PK ? 'STORAGE_PARSE_FAILED' : false;
+      const rp = await c({ action: 'cdoc_pair_assign', cid: CID, n: 2, unpair: true }, tokCW238); blobsMock.hooks.failGet = null;
+      P.archive = rb.code === 500 && rb.body.error_code === 'PAIR_VOID_FAILED' && !i2b.del && i2b.pair === 'p238x' && rp.code === 200; I.archive = [rb.code, rb.body.error_code, !!i2b.del, rp.code, rp.body.error_code];
       // ④ 허용(정상 무변): 영구 삭제 200·전부 지움 · 짝 풀기 200·무름·MANUAL_OFF
       reset(); seedPurge(); const n1 = await c({ action: 'cdoc_purge', cid: CID, n: 1, confirm: true }, tokA);
       const n2 = await c({ action: 'cdoc_pair_assign', cid: CID, n: 2, unpair: true }, tokCW238);
@@ -18875,17 +18882,20 @@ function J91a(x) { return JSON.stringify(x); }
   };
   try {
     const D0 = await chkD238(loadD238(SDATAD));
-    T('C238 판 D 계약 기록물 쓰기 결과: 초안 정리 바이트 못 지움 = gc 표식 없음·바이트 남음 → 다음 올리기가 다시 정리 · 영구 삭제 조각·판독값 못 지움 = 500·표식 없음 · 짝 풀기 무르기 못 씀 = 500 PAIR_VOID_FAILED·연결 그대로 · 정상 영구 삭제·짝 풀기 무변', D0.ok, JSON.stringify(D0.info));
+    T('C238 판 D 계약 기록물 쓰기 결과: 초안 정리 바이트 못 지움 = gc 표식 없음·바이트 남음 → 다음 올리기가 다시 정리 · 영구 삭제 조각·판독값 못 지움 = 500·표식 없음 · 짝 풀기·보관 무르기 못 씀 = 500 PAIR_VOID_FAILED·연결 그대로 · 깨진 짝 레코드 = 없음처럼 · 정상 영구 삭제·짝 풀기 무변', D0.ok, JSON.stringify(D0.info));
     const MUTD = [
       ["const gd = await blobDelete(store(FILES), cdocKey(ref.cid, old.i, old.dk, old.n)); if (!gd.ok) continue;", "await blobDelete(store(FILES), cdocKey(ref.cid, old.i, old.dk, old.n));"],
       ["const pd = await BF.attDeleteParts(store(FILES), pr0.data.att, am.data); if (!pd.ok) return jr(500,", "const pd = await BF.attDeleteParts(store(FILES), pr0.data.att, am.data); if (false) return jr(500,"],
       ["const pw = await blobDelete(store(FILES), 'parse:' + it.att0); if (!pw.ok) return jr(500,", "const pw = await blobDelete(store(FILES), 'parse:' + it.att0); if (false) return jr(500,"],
       ["const w1 = await blobSet(st, k, r.data); if (!w1.ok) return false;", "const w1 = await blobSet(st, k, r.data);"],
       ["    if (!(await cdocPairVoid(st, it))) return jr(500, { status: 'ERROR', error_code: 'PAIR_VOID_FAILED', request_id: R });   // C238 판 D\n", "    await cdocPairVoid(st, it);\n"],
+      ["    if (it.pair && !(await cdocPairVoid(st, it))) return jr(500,", "    if (it.pair && !(await cdocPairVoid(st, it))) return jr(500,".replace('return jr(500,', 'if (false) jr(500,')],
+      ["r.code !== 'NOT_FOUND' && r.code !== 'STORAGE_PARSE_FAILED') return false;", "r.code !== 'NOT_FOUND') return false;"],
     ];
+    ['failGet'].forEach((h) => { blobsMock.hooks[h] = null; });
     const kill = [];
     for (const [from, to] of MUTD) { let k; try { if (SDATAD.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 50)); k = !(await chkD238(loadD238(SDATAD.replace(from, () => to)))).ok; } catch (e) { k = 'err ' + e.message; } if (k !== true) kill.push(from.trim().slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k)); }
-    T('C238 판 D 결함 사본 ' + MUTD.length + '개(초안 정리 결과 · 영구 삭제 조각 · 판독값 · 짝 무르기 쓰기 · 짝 풀기 500) 모두 잡힘', kill.length === 0, kill.join(' | '));
+    T('C238 판 D 결함 사본 ' + MUTD.length + '개(초안 정리 결과 · 영구 삭제 조각 · 판독값 · 짝 무르기 쓰기 · 짝 풀기 500 · 보관 500 · 깨진 짝 = 없음) 모두 잡힘', kill.length === 0, kill.join(' | '));
   } catch (e) { T('C238 판 D 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
 }
 
