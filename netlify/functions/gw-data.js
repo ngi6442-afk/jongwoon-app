@@ -107,6 +107,10 @@ const VER_RECENT = 20, VER_DAYS = 30;
 // 전체 문서를 한 벌 더 쓰게 돼 최다 사용자(대표)의 체감 속도를 직접 깎았다.
 // 단 '비우기' 같은 파괴적 작업은 force=true로 계속 남긴다 — 재수집으로 되돌릴 수 없는 사람 판단이 섞이므로.
 const VER_SKIP = { bids: 1, onbid: 1 };
+// T547(11/27 운영책임자 "추천대로"): 스냅샷 제외 컬렉션(입찰·부동산)의 강제 보존본(정리 날 하루 1벌 · 비우기 · 복구 직전)은 최근 VER_SKIP_KEEP벌만 —
+//   20벌 + 30일 규칙을 그대로 타서 입찰 24벌이 gw_data의 64%였다(11/27 실측). 정리는 날마다 재수집으로 대부분 되돌릴 수 있고 사람 상태는 공고 원장에 남는다.
+//   줄이는 것은 그 컬렉션의 다음 강제 보존 때(손으로 지우지 않음). 다른 컬렉션은 종전 규칙(VER_RECENT + VER_DAYS) 그대로.
+const VER_SKIP_KEEP = 7;
 function verDay(ts) { return new Date(ts + 9 * 3600000).toISOString().slice(0, 10); }   // KST 일자
 async function verSnapshot(col, prevDoc, byName, dailyOnly, force) {
   if (!prevDoc || typeof prevDoc !== 'object') return;
@@ -125,8 +129,8 @@ async function verSnapshot(col, prevDoc, byName, dailyOnly, force) {
     const keep = [], seenDay = {};
     for (let i = 0; i < idx.length; i++) {
       const e = idx[i];
-      const fresh = i < VER_RECENT;
-      const daily = !seenDay[e.day] && (now - e.ts) <= VER_DAYS * 86400000;
+      const fresh = i < (VER_SKIP[col] ? VER_SKIP_KEEP : VER_RECENT);   // T547: 스냅샷 제외 컬렉션은 최근 7벌만(하루 1벌 30일 없음)
+      const daily = !VER_SKIP[col] && !seenDay[e.day] && (now - e.ts) <= VER_DAYS * 86400000;
       if (fresh || daily) { keep.push(e); seenDay[e.day] = 1; continue; }
       await blobDelete(st, `ver:${col}:${e.ts}`);
     }
@@ -487,6 +491,7 @@ async function handleSave(event, d, R) {
     const gq = await corpRegGate(store(DATA), oldItems, doc.items, prevReadFailed, R);
     if (gq) {
       if (gq.body.error_code === 'GATE_CORP_REG') { try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'bids', ev: [{ op: '투찰잠금', id: gq.body.blocked.map(function (x) { return x.id; }).join(',').slice(0, 200), t: '투찰 전환 ' + gq.body.blocked.length + '건 거절(' + gq.body.why + ')' }] }); } catch (e) {} }
+      if (gq.body.error_code === 'GATE_CORP_REG') { try { await bidGateNotify(store(DATA), c.member, gq.body.blocked, doc.items); } catch (e) {} }   // T152: 운영책임자 + 입찰 담당 알림(실패해도 거절 응답 그대로)
       return jr(gq.http, gq.body);
     }
   }
@@ -1776,6 +1781,32 @@ async function bidNotifyIds(st, tc) {
   pm.forEach(function (id) { if (out.indexOf(id) < 0) out.push(id); });
   return out;
 }
+// T152(11/27 — 운영책임자 "추천대로" = 안 A): 투찰 잠금(corpRegGate)이 공고 저장을 막으면 운영책임자 + 입찰 담당(낙찰 알림과 같은 길 bidNotifyIds · 우선기기)에게 즉시 1건.
+//   누른 사람은 뺀다(화면 [투찰] 앞 '투찰 잠금' 배지로 이미 앎). 같은 공고는 KST 하루 1번(bids:gate_sent = { day, ids }) — 못 읽으면 보내는 쪽으로.
+//   알림 설정 bid_gate(기본 on) off면 보내지 않음. 꼬리표 bids-gate-<KST 날짜> + renotify · 누르면 입찰 탭(?go=bid — v557 방식). 발송·기록 실패는 거절 응답을 바꾸지 않는다(부르는 쪽 try).
+//   스위치가 꺼져 있으면 corpRegGate가 거절하지 않으므로 이 함수도 불리지 않는다(종전과 같음).
+const BID_GATE_SENT_KEY = 'bids:gate_sent';
+const BID_GATE_TITLE = '투찰 잠금 — 변경등록 전 투찰 시도';
+const BID_GATE_TAIL = ' 투찰이 막혔습니다. 나라장터 변경등록 완료일이 비었거나 등기 접수일보다 이릅니다. 변경등록을 마친 뒤 권한관리 › 법인 등기 날짜 카드에 완료일을 넣으면 풀립니다.';
+async function bidGateNotify(st, member, blocked, items) {
+  const nf = await notifyRead(st);
+  if (nf.events.bid_gate !== 'on') return { sent: 0, why: 'off' };
+  const day = kstDayNow();
+  let seen = [];
+  const sr = await blobGet(st, BID_GATE_SENT_KEY);
+  if (sr.ok && sr.data && sr.data.day === day && Array.isArray(sr.data.ids)) seen = sr.data.ids.map(String);
+  const fresh = (blocked || []).map(function (x) { return String((x && x.id) || ''); }).filter(function (id, i, a) { return id && a.indexOf(id) === i && seen.indexOf(id) < 0; });
+  if (!fresh.length) return { sent: 0, why: 'dup' };
+  const tc = await push.tierCtx();
+  const me = String((member && member.id) || '');
+  const to = (await bidNotifyIds(st, tc)).filter(function (id) { return id !== me; });
+  const byId = {}; (items || []).forEach(function (t) { if (t && t.id) byId[String(t.id)] = t; });
+  const t0 = String((byId[fresh[0]] && byId[fresh[0]].title) || '공고').slice(0, 30);
+  const body = t0 + (fresh.length > 1 ? ' 외 ' + (fresh.length - 1) + '건' : '') + BID_GATE_TAIL;
+  if (to.length) await push.sendTo(to, { title: BID_GATE_TITLE, body: body, url: './?go=bid', tag: 'bids-gate-' + day, renotify: true }, { ctx: tc, primaryOnly: true });
+  await blobSet(st, BID_GATE_SENT_KEY, { day: day, ids: seen.concat(fresh).slice(-200) });
+  return { sent: to.length, why: '' };
+}
 // C255(11/20) 봇 알림 되풀이 안전망 — 덧대기(원천은 보내는 쪽: 자료 저장소 watch.py·awards.py가 보낸 것을 기억해 다시 안 부른다).
 //   같은 꼬리표·같은 제목·같은 본문이 오늘(KST) 알림함(push:log)에 이미 있고 그때 받은 사람이 지금 받을 사람을 다 덮으면 → 알림함 줄만 남기고 기기 발송은 건너뛴다.
 //   넷 가운데 하나라도 다르거나(본문 한 글자 · 받는 사람 한 명) 날이 바뀌면 그대로 보낸다. 알림함을 못 읽으면 거르지 않는다(보내는 쪽으로).
@@ -2940,6 +2971,8 @@ const NOTIFY_EVENTS = {
   // v415 C3-2 입찰 2종(설계 3-1 안착 ③: 개찰 전건 관리자 푸시 → 낙찰·수집 실패만 즉시, 나머지 아침 요약). 기본=현행, 추천=★(R1 D-3 → 11/4 적용 예약). 게이트 잠금 위반 알림은 C6(변경등록 게이트) 뒤.
   bid_result: { label: '개찰 결과 알림', options: { each: '개찰 결과마다 관리자 전원(현행)', award: '낙찰만 즉시(입찰 담당+PM 우선기기) · 유찰은 아침 요약' }, def: 'each', rec: 'award' },
   bid_fail: { label: '입찰 수집 실패 경보 수신', options: { admins: '관리자 전원(현행)', assignee: '입찰 담당 + 관리자' }, def: 'admins', rec: 'assignee' },
+  // T152(11/27 운영책임자 "추천대로" = 안 A) 투찰 잠금 위반 알림 — 기본 켬(잠금 스위치가 켜져 거절이 실제로 일어날 때만 나감) · 추천값 없음(rec '' — PM 콘솔 추천 줄 없음)
+  bid_gate: { label: '투찰 잠금 위반 알림', options: { on: '운영책임자 + 입찰 담당 즉시(누른 사람 뺌)', off: '없음' }, def: 'on', rec: '' },
   // 원장 C253 ③(11/20) 받을 기기 없는 알림 가시화 — 한 사람에게만 가는 알림이 받을 기기 0대로 끝나면 개발자(없으면 관리자)에게 하루 1번. 발송·표식은 _lib/push.js noteMiss가 이 칸을 **읽기만** 해서 한다.
   //   새 알림이라 기본 = 끔(끈 상태 = 종전 발송 그대로) · 추천값 없음(rec '' — ★·PM 콘솔 추천 줄 없음 · 켜는 것은 PM 결정). 켜면 이 카드의 다른 칸처럼 settings:notify 시각이 새로 찍힌다(관리자 병행 7일 — notifyParallelOn 알려진 한계)
   push_miss: { label: '받을 기기 없음(미도달) 알림', options: { off: '없음(현행)', dev_daily: '개발자에게 하루 1번' }, def: 'off', rec: '' },

@@ -3378,6 +3378,49 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   delete mem.gw_data['col:bids'];
 }
 
+// 48-T547(11/27 운영책임자 "추천대로"): 스냅샷 제외 컬렉션(입찰·부동산)의 강제 보존본은 최근 7벌만 — 다음 강제 보존(정리 날 ingest) 때 스스로 줄임 · 다른 컬렉션은 20벌 + 30일 하루 1벌 그대로
+{
+  const day = (n) => new Date(Date.now() + 9 * 3600000 - n * 86400000).toISOString().slice(0, 10);
+  const vday = (ts) => new Date(ts + 9 * 3600000).toISOString().slice(0, 10);
+  const clr = (col) => Object.keys(mem.gw_data).forEach((k) => { if (k === 'veridx:' + col || k.indexOf('ver:' + col + ':') === 0) delete mem.gw_data[k]; });
+  const seedVer = (col, n) => {   // 하루 간격 n벌(어제부터 거꾸로) — 색인·값 키 둘 다
+    clr(col); const now = Date.now(), items = [];
+    for (let i = 0; i < n; i++) { const ts = now - (i + 1) * 86400000 - 3600000; items.push({ ts, by: 'x', day: vday(ts), tot: 1, live: 1 }); mem.gw_data['ver:' + col + ':' + ts] = { ts, by: 'x', doc: { schema: 1, items: [{ id: 'v' + i }] } }; }
+    mem.gw_data['veridx:' + col] = { items }; return items.map((e) => e.ts);
+  };
+  const keysOf = (col) => Object.keys(mem.gw_data).filter((k) => k.indexOf('ver:' + col + ':') === 0).map((k) => Number(k.split(':')[2])).sort((a, b) => b - a);
+  const keepBids = mem.gw_data['col:bids'], keepTasks = mem.gw_data['col:tasks'];
+  const keepVer = {}; Object.keys(mem.gw_data).forEach((k) => { if (/^(ver|veridx):(bids|tasks)(:|$)/.test(k)) keepVer[k] = mem.gw_data[k]; });
+  try {
+    // ① 입찰 24벌 + 정리 날 ingest(강제 보존 1벌) → 7벌(새 1 + 가장 새 6) · 지운 18벌은 값 키도 없음 · 색인 = 값 키
+    const ts24 = seedVer('bids', 24);
+    mem.gw_data['col:bids'] = { schema: 1, items: [{ id: 'x1', title: '만료', due: day(20), status: 'new' }, { id: 'x2', title: '유효', due: day(1), status: 'new' }], updated_at: 1 };
+    const r1 = await call({ action: 'bids_ingest', key: 'test-ingest-key', items: [{ id: 'x3', title: '새', due: day(2) }] });
+    const vi1 = (mem.gw_data['veridx:bids'] || { items: [] }).items.map((e) => e.ts), k1 = keysOf('bids');
+    const o1 = r1.code === 200 && r1.body.purged === 1 && vi1.length === 7 && JSON.stringify(vi1.slice(1)) === JSON.stringify(ts24.slice(0, 6)) && JSON.stringify(k1) === JSON.stringify(vi1)
+      && ts24.slice(6).every((ts) => !(('ver:bids:' + ts) in mem.gw_data));
+    // ② 7벌 미만이면 지우지 않음(3벌 + 1 = 4)
+    seedVer('bids', 3);
+    mem.gw_data['col:bids'] = { schema: 1, items: [{ id: 'x1', title: '만료', due: day(20), status: 'new' }], updated_at: 1 };
+    await call({ action: 'bids_ingest', key: 'test-ingest-key', items: [{ id: 'x3', title: '새', due: day(2) }] });
+    const o2 = keysOf('bids').length === 4 && (mem.gw_data['veridx:bids'] || { items: [] }).items.length === 4;
+    // ③ 다른 컬렉션(지시) — 40벌 + 사람 저장 1벌 → 최근 20 + 30일 안 하루 1벌(종전 규칙 그대로 · 7벌로 줄지 않음)
+    const tsT = seedVer('tasks', 40);
+    mem.gw_data['col:tasks'] = { schema: 1, items: [{ id: 't547', title: '시험', status: 'open' }], updated_at: 77 };
+    const r3 = await call({ action: 'save', collection: 'tasks', doc: { schema: 1, items: [{ id: 't547', title: '시험 고침', status: 'open' }] }, base: 77 }, tokA);
+    const now3 = Date.now(), all3 = [now3].concat(tsT);   // 새 1벌은 지금 근처 — 기대 = 앞 20(새 1 + 19) + 그 뒤 30일 안
+    const want3 = tsT.filter((ts, i) => i < 19 || (now3 - ts) <= 30 * 86400000).length + 1;
+    const n3 = keysOf('tasks').length;
+    const o3 = r3.code === 200 && n3 === want3 && n3 > 20 && all3.length === 41;
+    T('T547 스냅샷 제외 컬렉션 보존 7벌: ① 입찰 24벌 + 정리 날 ingest = 7벌(새 1 + 가장 새 6 · 지운 18벌 값 키 없음 · 색인 = 값 키) · ② 7벌 미만은 그대로(3 + 1 = 4) · ③ 지시는 종전(최근 20 + 30일 하루 1벌 = ' + want3 + '벌)',
+      o1 && o2 && o3, JSON.stringify({ o: [o1, o2, o3], r1: r1.body && r1.body.purged, vi1: vi1.length, k1: k1.length, n3, want3, r3: r3.code }));
+  } finally {
+    clr('bids'); clr('tasks'); Object.assign(mem.gw_data, keepVer);
+    if (keepBids === undefined) delete mem.gw_data['col:bids']; else mem.gw_data['col:bids'] = keepBids;
+    if (keepTasks === undefined) delete mem.gw_data['col:tasks']; else mem.gw_data['col:tasks'] = keepTasks;
+  }
+}
+
 // ===== 46. 운반일지 엑셀 놓친 변경 v385(10/14 권민지 12·13일 "엑셀 수량이 화면과 다름" — 예약 08:25가 매일 2.5~4시간 늦음) — 수집·직접 추가·노선 판정 · 재요청 · 직접 추가 저장 요청 · 워커 배선
 {
   const gwab = require(join(FN, 'gw-allbaro.js'));
@@ -4596,7 +4639,7 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
   mem.gw_data['settings:assign'] = { schema: 1, rules: { 'bid:': { who_id: 'uwork' } }, approver_id: '', prev: null, updated_at: 5, updated_by: 'uadmin' };
   const seed64 = () => { mem.gw_data['col:bids'] = { schema: 1, items: [{ id: 'b64a', title: '포항 준설 공사', status: '응찰' }, { id: 'b64b', title: '경주 철거 공사', status: '응찰' }], updated_at: 1 }; };
   seed64();
-  let r64 = await call({ action: 'notify_get' }, tokA); const e0 = r64.code === 200 && Object.keys(r64.body.meta).length === 8 /* C253: push_miss 더함 */ && r64.body.events.bid_result === 'each' && r64.body.events.bid_fail === 'admins' && r64.body.meta.bid_result.rec === 'award';
+  let r64 = await call({ action: 'notify_get' }, tokA); const e0 = r64.code === 200 && Object.keys(r64.body.meta).length === 9 /* C253: push_miss 더함 · T152: bid_gate 더함 */ && r64.body.events.bid_result === 'each' && r64.body.events.bid_fail === 'admins' && r64.body.meta.bid_result.rec === 'award';
   const RES = { action: 'bids_results', key: 'test-ingest-key', results: [{ id: 'b64a', status: '낙찰', result: { state: '낙찰', winner: '종운환경', amt: 100, rate: '87.5', bidders: 3 } }, { id: 'b64b', status: '유찰', result: { state: '유찰' } }] };
   r64 = await call(RES, null); const e1 = r64.code === 200 && sent64.length === 1 && /개찰결과 2건/.test(sent64[0].p.title) && sent64[0].ids.indexOf('uadmin') >= 0 && !sent64[0].o.primaryOnly;
   await call({ action: 'notify_set', event: 'bid_result', value: 'award' }, tokA); seed64();
@@ -7797,6 +7840,77 @@ T('v318·v319: 관리자는 01 문서 첨부 → 200', r.code === 200, JSON.stri
     mem.gw_users = savedUsers86;
     if (had86.s === undefined) delete mem.gw_data[KEY86]; else mem.gw_data[KEY86] = had86.s;
     if (had86.b === undefined) delete mem.gw_data[BK86]; else mem.gw_data[BK86] = had86.b;
+  }
+}
+
+{ // ---- T152(11/27 운영책임자 "추천대로" = 안 A) 투찰 잠금 위반 알림 — 잠금이 공고 저장을 막으면 운영책임자 + 입찰 담당(bidNotifyIds · 우선기기)에게 1건.
+  //   누른 사람 뺌 · 같은 공고 KST 하루 1번(bids:gate_sent) · 알림 설정 bid_gate(기본 on) off면 없음 · 발송 실패해도 거절 응답·감사 그대로 · 스위치 꺼짐 = 알림 없음(종전과 같음).
+  const KS = 'settings:corp_reg', KB = 'col:bids', KN = 'settings:notify', KA = 'settings:assign', KG = 'bids:gate_sent';
+  const had = {}; [KS, KB, KN, KA, KG].forEach((k) => { had[k] = mem.gw_data[k]; });
+  const savedUsersG = JSON.parse(JSON.stringify(mem.gw_users));
+  const savedSendG = pushMock.sendTo; const sentG = []; let throwG = false;
+  pushMock.sendTo = async (ids, p, o) => { if (throwG) throw new Error('PUSH_DOWN'); sentG.push({ ids: ids.slice(), p: p, o: o || {} }); return { sent: ids.length, removed: 0 }; };
+  const dayG = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+  const TAILG = ' 투찰이 막혔습니다. 나라장터 변경등록 완료일이 비었거나 등기 접수일보다 이릅니다. 변경등록을 마친 뒤 권한관리 › 법인 등기 날짜 카드에 완료일을 넣으면 풀립니다.';
+  const BG = (id, status) => ({ id, title: '공고 ' + id, org: '시험시', due: '', status, updated: '2026-11-27' });
+  const seedG = (items) => { mem.gw_data[KB] = { schema: 1, items: items.map((x) => Object.assign({}, x)), updated_at: 5000 }; };
+  const saveG = (items, tok) => call({ action: 'save', collection: 'bids', doc: { schema: 1, items }, base: 5000 }, tok);
+  const lockOn = (gate) => { mem.gw_data[KS] = { reg_on: '2026-09-29', biz_fix_on: '', g2b_on: '', gate: gate, updated_at: 1, updated_by: 'x' }; };
+  try {
+    mem.gw_users['member:u152b'] = { id: 'u152b', name: '입찰담당형152', role: '관리자', admin: true, perms: {} };
+    const tB = issueSession(mem.gw_users['member:u152b']).token;
+    mem.gw_data[KA] = { schema: 1, rules: { 'bid:': { who_id: 'u152b' } }, approver_id: '', prev: null, updated_at: 5, updated_by: 'uadmin' };
+    delete mem.gw_data[KN]; delete mem.gw_data[KG]; lockOn(true);
+    const pmG = (await pushMock.tierCtx()).pmIds;
+    const want = (me) => ['u152b'].concat(pmG).filter((id, i, a) => a.indexOf(id) === i && id !== me).sort().join();
+    const ab0 = auditMock.logs.filter((l) => l.col === 'bids').length;
+
+    // ① 운영책임자(uadmin)가 검토→응찰 — 400 GATE_CORP_REG 그대로 + 1건(입찰 담당 · 누른 사람 뺌) · 문구 · 꼬리표 날짜 · renotify · ?go=bid · 우선기기 · 기록 k1
+    seedG([BG('k1', '검토'), BG('k2', '검토'), BG('k3', '검토')]);
+    const r1 = await saveG([BG('k1', '응찰'), BG('k2', '검토'), BG('k3', '검토')], tokA);
+    const s1 = sentG.slice(), g1 = JSON.parse(JSON.stringify(mem.gw_data[KG] || null));
+    const o1 = r1.code === 400 && r1.body.error_code === 'GATE_CORP_REG' && s1.length === 1 && s1[0].ids.slice().sort().join() === want('uadmin') && s1[0].ids.indexOf('uadmin') < 0 && s1[0].ids.indexOf('u152b') >= 0
+      && s1[0].p.title === '투찰 잠금 — 변경등록 전 투찰 시도' && s1[0].p.body === '공고 k1' + TAILG && s1[0].p.url === './?go=bid' && s1[0].p.tag === 'bids-gate-' + dayG && s1[0].p.renotify === true && s1[0].o.primaryOnly === true
+      && !!g1 && g1.day === dayG && JSON.stringify(g1.ids) === '["k1"]';
+    // ② 같은 날 같은 공고 다시 = 400 그대로 · 알림 없음
+    const r2 = await saveG([BG('k1', '응찰'), BG('k2', '검토'), BG('k3', '검토')], tokA);
+    const o2 = r2.code === 400 && r2.body.error_code === 'GATE_CORP_REG' && sentG.length === 1;
+    // ③ 입찰 담당이 k1(이미 알림)·k2·k3 응찰 — 새 공고만(k2 외 1건) · 받는 사람 = 운영책임자(담당 본인 뺌)
+    const r3 = await saveG([BG('k1', '응찰'), BG('k2', '응찰'), BG('k3', '응찰')], tB);
+    const s3 = sentG[1], g3 = mem.gw_data[KG];
+    const o3 = r3.code === 400 && sentG.length === 2 && !!s3 && s3.ids.slice().sort().join() === want('u152b') && s3.ids.indexOf('u152b') < 0 && s3.p.body === '공고 k2 외 1건' + TAILG
+      && JSON.stringify(g3.ids) === '["k1","k2","k3"]';
+    // ④ 기록이 어제 날짜면 다시 보냄 · ⑤ 알림 설정 bid_gate off = 없음(거절은 그대로)
+    mem.gw_data[KG] = { day: '2000-01-01', ids: ['k1'] };
+    const r4 = await saveG([BG('k1', '응찰'), BG('k2', '검토'), BG('k3', '검토')], tokA);
+    const o4 = r4.code === 400 && sentG.length === 3 && sentG[2].p.body === '공고 k1' + TAILG && mem.gw_data[KG].day === dayG;
+    delete mem.gw_data[KG];
+    mem.gw_data[KN] = { schema: 1, events: { bid_gate: 'off' }, updated_at: 1, updated_by: 'x' };
+    const r5 = await saveG([BG('k1', '응찰'), BG('k2', '검토'), BG('k3', '검토')], tokA);
+    const o5 = r5.code === 400 && r5.body.error_code === 'GATE_CORP_REG' && sentG.length === 3 && !(KG in mem.gw_data);
+    delete mem.gw_data[KN];
+    // ⑥ 발송이 터져도 400 GATE_CORP_REG·감사 투찰잠금 그대로
+    throwG = true;
+    const r6 = await saveG([BG('k1', '응찰'), BG('k2', '검토'), BG('k3', '검토')], tokA);
+    throwG = false;
+    const abN = auditMock.logs.filter((l) => l.col === 'bids').slice(ab0).filter((l) => l.ev && l.ev[0] && l.ev[0].op === '투찰잠금').length;
+    const o6 = r6.code === 400 && r6.body.error_code === 'GATE_CORP_REG' && abN === 6;
+    // ⑦ 스위치 꺼짐 = 응찰 저장 200 · 알림 없음(종전과 같음)
+    lockOn(false); delete mem.gw_data[KG];
+    const r7 = await saveG([BG('k1', '응찰'), BG('k2', '검토'), BG('k3', '검토')], tokA);
+    const o7 = r7.code === 200 && sentG.length === 3 && !(KG in mem.gw_data);
+    // ⑧ 알림 설정 칸 — 기본 on · 추천값 없음 · on|off · notify_set으로 끔
+    delete mem.gw_data[KN];
+    const g8 = await call({ action: 'notify_get' }, tokA), m8 = ((g8.body || {}).meta || {}).bid_gate || {};
+    const s8 = await call({ action: 'notify_set', event: 'bid_gate', value: 'off' }, tokA);
+    const o8 = g8.code === 200 && g8.body.events.bid_gate === 'on' && m8.def === 'on' && m8.rec === '' && Object.keys(m8.options || {}).join() === 'on,off' && m8.label === '투찰 잠금 위반 알림'
+      && s8.code === 200 && s8.body.events.bid_gate === 'off';
+    T('T152 투찰 잠금 위반 알림: ① 거절 400 그대로 + 1건(운영책임자 누름 → 입찰 담당 · 누른 사람 뺌 · 제목·본문 안 글 그대로 · bids-gate-<KST 날짜> · renotify · ?go=bid · 우선기기 · 기록 k1) · ② 같은 날 같은 공고 없음 · ③ 담당이 누름 → 운영책임자 · 새 공고만 "k2 외 1건" · ④ 기록이 지난 날이면 다시 · ⑤ bid_gate off = 없음 · ⑥ 발송 오류에도 400·감사 그대로 · ⑦ 스위치 꺼짐 = 200·없음 · ⑧ 설정 칸 기본 on·추천 없음·on|off',
+      o1 && o2 && o3 && o4 && o5 && o6 && o7 && o8, JSON.stringify({ o: [o1, o2, o3, o4, o5, o6, o7, o8], r: [r1.code, r2.code, r3.code, r4.code, r5.code, r6.code, r7.code], sent: sentG.map((x) => [x.ids, x.p.body.slice(0, 12), x.p.tag]), abN, m8 }));
+  } finally {
+    pushMock.sendTo = savedSendG;
+    mem.gw_users = savedUsersG;
+    [KS, KB, KN, KA, KG].forEach((k) => { if (had[k] === undefined) delete mem.gw_data[k]; else mem.gw_data[k] = had[k]; });
   }
 }
 

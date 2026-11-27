@@ -24600,7 +24600,7 @@ try {
     if (!/url: '\.\/\?go=allbaro', tag: 'allbaro-pend-' \+ day/.test(d.ab) || !/url: '\.\/\?go=allbaro', tag: 'allbaro-variant-' \+ today/.test(d.ab)) why.push('ab 잠정·변형 이동');
     // ③ sw: renotify는 꼬리표 있을 때만 · 열린 창엔 메시지 후 focus · 없으면 openWindow(url) · 허용 탭 2개
     if (!/renotify: !!\(d\.renotify && d\.tag\)/.test(d.sw)) why.push('sw renotify');
-    if (!/const SW_GO_TABS = \['hwakwan', 'allbaro'\];/.test(d.sw)) why.push('sw 허용 탭');
+    if (!/const SW_GO_TABS = \['hwakwan', 'allbaro'(, '[a-z]{2,12}')*\];/.test(d.sw)) why.push('sw 허용 탭');   // T152: 뒤에 'bid'가 붙음(앞 2개는 그대로)
     if (!/c\.postMessage\(\{ type: 'jw-go', tab: go \}\)/.test(d.sw) || !/return c\.focus\(\);/.test(d.sw) || !/return clients\.openWindow\(url\);/.test(d.sw)) why.push('sw 누름');
     if (/c\.navigate\(/.test(d.sw)) why.push('sw navigate(쓰던 화면을 다시 읽음)');
     // ④ 앱: 사이드바에 있는 탭 이름만(탭 이름 글자는 앱에 두지 않음 — v434 화관법 입구 글자 수 그대로) · 로그인 뒤 1회 · 주소에서 go 지움 · 메시지 받음
@@ -24830,6 +24830,67 @@ try {
   T('v564 문서·판 번호(정확 검사): FEATURES 기준 v564 (2026-11-27)·v564 절(C298) · TESTLIST v564 칸 6(화면·운영 확인 4 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v564 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
     r564.ok && M564.every((v) => v === false), JSON.stringify({ r: r564.info, mut: M564 }));
 } catch (e) { console.log('  (v564 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── T152(11/27 운영책임자 "추천대로" = 안 A): 투찰 잠금 위반 알림 — 배선 검사(실행 검사는 servertest T152) · 결함 사본
+try {
+  const rdG = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DG = { gd: rdG('netlify/functions/gw-data.js'), sw: rdG('sw.js'), ix: rdG('index.html') };
+  const chkG = (d) => {
+    const why = [];
+    // ① 거절 자리: 감사 줄 다음에 알림(try — 거절 응답을 바꾸지 않음) · 응답은 그 뒤 jr(gq.http, gq.body)
+    if (!/if \(gq\.body\.error_code === 'GATE_CORP_REG'\) \{ try \{ await bidGateNotify\(store\(DATA\), c\.member, gq\.body\.blocked, doc\.items\); \} catch \(e\) \{\} \}[^\n]*\n\s*return jr\(gq\.http, gq\.body\);/.test(d.gd)) why.push('거절 자리 알림');
+    // ② 받는 사람 = bidNotifyIds(낙찰 알림과 같은 길) − 누른 사람 · 우선기기 · 설정 off면 없음 · 하루 1번 기록
+    if (!/const to = \(await bidNotifyIds\(st, tc\)\)\.filter\(function \(id\) \{ return id !== me; \}\);/.test(d.gd)) why.push('받는 사람');
+    if (!/if \(nf\.events\.bid_gate !== 'on'\) return/.test(d.gd)) why.push('설정 off');
+    if (!/url: '\.\/\?go=bid', tag: 'bids-gate-' \+ day, renotify: true \}, \{ ctx: tc, primaryOnly: true \}/.test(d.gd)) why.push('꼬리표·이동·우선기기');
+    if (!/seen\.indexOf\(id\) < 0/.test(d.gd) || !/sr\.data\.day === day/.test(d.gd)) why.push('하루 1번');
+    // ③ 문구 = 안의 글 그대로
+    if (d.gd.indexOf("const BID_GATE_TITLE = '투찰 잠금 — 변경등록 전 투찰 시도';") < 0) why.push('제목');
+    if (d.gd.indexOf("' 투찰이 막혔습니다. 나라장터 변경등록 완료일이 비었거나 등기 접수일보다 이릅니다. 변경등록을 마친 뒤 권한관리 › 법인 등기 날짜 카드에 완료일을 넣으면 풀립니다.'") < 0) why.push('본문');
+    // ④ 설정 칸(서버 기본 on · 추천 없음) · 앱 순서표 · sw 허용 탭 bid · 앱 탭 버튼 data-tab="bid"
+    if (!/bid_gate: \{ label: '투찰 잠금 위반 알림', options: \{ on: '[^']+', off: '없음' \}, def: 'on', rec: '' \}/.test(d.gd)) why.push('설정 칸');
+    if (!/"bid_fail","bid_gate","push_miss"/.test(d.ix)) why.push('앱 순서표');
+    if (!/const SW_GO_TABS = \['hwakwan', 'allbaro', 'bid'\];/.test(d.sw)) why.push('sw bid');
+    if (d.ix.indexOf('data-tab="bid"') < 0) why.push('입찰 탭 버튼');
+    return why;
+  };
+  const wG = chkG(DG);
+  const muG = (k, f) => chkG(Object.assign({}, DG, { [k]: f(DG[k]) })).length > 0;
+  const MG = [
+    muG('gd', (s) => s.replace('try { await bidGateNotify(store(DATA), c.member, gq.body.blocked, doc.items); } catch (e) {}', '')),
+    muG('gd', (s) => s.replace('.filter(function (id) { return id !== me; });', ';')),
+    muG('gd', (s) => s.replace("if (nf.events.bid_gate !== 'on') return", "if (false) return")),
+    muG('gd', (s) => s.replace("{ ctx: tc, primaryOnly: true }", "{ ctx: tc }")),
+    muG('gd', (s) => s.replace("url: './?go=bid'", "url: './'")),
+    muG('gd', (s) => s.replace('seen.indexOf(id) < 0', 'true')),
+    muG('gd', (s) => s.replace('등기 접수일보다 이릅니다.', '등기일보다 이릅니다.')),
+    muG('gd', (s) => s.replace("def: 'on', rec: '' }", "def: 'off', rec: '' }")),
+    muG('ix', (s) => s.replace('"bid_fail","bid_gate","push_miss"', '"bid_fail","push_miss"')),
+    muG('sw', (s) => s.replace("['hwakwan', 'allbaro', 'bid']", "['hwakwan', 'allbaro']"))];
+  T('T152 투찰 잠금 위반 알림 배선: 거절 자리(감사 뒤·try·응답 그대로) · bidNotifyIds − 누른 사람 · 설정 bid_gate off면 없음 · bids-gate-<날짜>+renotify+?go=bid+우선기기 · 하루 1번 · 제목·본문 안 글 그대로 · 설정 칸 기본 on·추천 없음 · 앱 순서표 · sw 허용 탭 bid · 결함 사본 ' + MG.length + '개 = 모두 ✗',
+    wG.length === 0 && MG.every((v) => v === true), JSON.stringify({ why: wG, mut: MG }));
+} catch (e) { console.log('  (T152 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── T547(11/27 운영책임자 "추천대로"): 스냅샷 제외 컬렉션(입찰·부동산) 강제 보존본 최근 7벌 — 배선 검사(실행 검사는 servertest 48-T547) · 결함 사본
+try {
+  const gdP = readFileSync(join(ROOT, 'netlify/functions/gw-data.js'), 'utf8');
+  const chkP = (s) => {
+    const why = [];
+    if (!/const VER_SKIP = \{ bids: 1, onbid: 1 \};/.test(s)) why.push('제외 목록');
+    if (!/const VER_SKIP_KEEP = 7;/.test(s)) why.push('7벌');
+    if (!/const VER_RECENT = 20, VER_DAYS = 30;/.test(s)) why.push('일반 규칙 값');
+    if (s.indexOf('const fresh = i < (VER_SKIP[col] ? VER_SKIP_KEEP : VER_RECENT);') < 0) why.push('최근 판정');
+    if (s.indexOf('const daily = !VER_SKIP[col] && !seenDay[e.day] && (now - e.ts) <= VER_DAYS * 86400000;') < 0) why.push('하루 1벌 판정');
+    return why;
+  };
+  const wP = chkP(gdP);
+  const MP = [chkP(gdP.replace('const VER_SKIP_KEEP = 7;', 'const VER_SKIP_KEEP = 20;')).length > 0,
+    chkP(gdP.replace('i < (VER_SKIP[col] ? VER_SKIP_KEEP : VER_RECENT)', 'i < VER_RECENT')).length > 0,
+    chkP(gdP.replace('const daily = !VER_SKIP[col] && !seenDay', 'const daily = !seenDay')).length > 0,
+    chkP(gdP.replace('const VER_RECENT = 20, VER_DAYS = 30;', 'const VER_RECENT = 7, VER_DAYS = 30;')).length > 0];
+  T('T547 입찰·부동산 강제 보존본 최근 7벌(VER_SKIP_KEEP) · 하루 1벌 30일 없음 · 다른 컬렉션 20벌 + 30일 그대로 · 결함 사본 ' + MP.length + '개 = 모두 ✗',
+    wP.length === 0 && MP.every((v) => v === true), JSON.stringify({ why: wP, mut: MP }));
+} catch (e) { console.log('  (T547 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

@@ -40,9 +40,9 @@ self.addEventListener('push', (e) => {
     badge: './icon-192.png'
   }));
 });
-// T750(v557): 알림을 누르면 그 화면으로 — 주소의 go 인자(허용: hwakwan·allbaro). 열린 창이 있으면 다시 읽지 않고
+// T750(v557): 알림을 누르면 그 화면으로 — 주소의 go 인자(허용: hwakwan·allbaro · T152 bid = 투찰 잠금 알림). 열린 창이 있으면 다시 읽지 않고
 // 메시지로 탭만 옮긴 뒤 앞으로(쓰던 화면을 날리지 않게), 없으면 그 주소로 새로 연다(앱이 부팅 뒤 go 인자를 읽고 지움).
-const SW_GO_TABS = ['hwakwan', 'allbaro'];
+const SW_GO_TABS = ['hwakwan', 'allbaro', 'bid'];
 function swGoOf(url) {
   try { const g = new URL(url, self.registration.scope).searchParams.get('go'); return SW_GO_TABS.indexOf(g) >= 0 ? g : ''; } catch (err) { return ''; }
 }
