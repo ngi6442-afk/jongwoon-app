@@ -25260,9 +25260,9 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ['`task_kept`', '원장 C240', '`_lib/taskguard.js`'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v572 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 572 /* v573(C238)에서 '572 이상'으로 풂 */ && ftv.length > 0 && mF.length === 0 && cb.length === 4 && gate.length === 2 && scr.length === 2 && !cb.some((l) => /\(PM/.test(l))
       && d.cl.indexOf('**C240 A-2b(v572') > 0
-      && /SHELL_CACHE = 'jw-shell-v572'/.test(d.sw);
+      && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 572;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
   };
   const r572 = chk572(D572);
@@ -25272,6 +25272,29 @@ try {
   T('v572 앱 직급 표 = 서버 taskguard 표(' + rA572 + ') · 문서·판 번호(정확 검사): FEATURES 기준 v572 (2026-11-27)·v572 절(C240 A-2b) · TESTLIST v572 칸 4(시험 화면 1 · 운영 확인 1 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v572 · 결함 사본(기준 줄·sw·CLAUDE.md·FEATURES 낱말) 모두 ✗',
     rA572 !== '' && rA572 === rS572 && r572.ok && M572.every((v) => v === false), JSON.stringify({ rA: rA572, rS: rS572, r: r572.info, mut: M572 }));
 } catch (e) { console.log('  (v572 검사 생략 — ' + e.message + ')'); fails++; }
+
+
+// ── v573(C238 판 B+C — 64): 실행 검사는 servertest C238 판 B·판 C · botdup_check ⑩ · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '573 이상'으로 풀 것
+try {
+  const rd573 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D573 = { ft: rd573('FEATURES.md'), tl: rd573('TESTLIST.md'), sw: rd573('sw.js'), cl: rd573('CLAUDE.md') };
+  const chk573 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v573 (11/27)', '\n### '), tlv = cut(d.tl, '\n## v573 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), op = cb.filter((l) => /^- \[ \] \(AI 운영 확인/.test(l));
+    const FT = ['`handleMemberDelete`', '`handleAttDel`', '`attDeleteParts`', '`bytes_deleted:false`', 'C324', '원장 C238'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v573 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C238 B+C(v573') > 0 && /SHELL_CACHE = 'jw-shell-v573'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
+  };
+  const r573 = chk573(D573);
+  const mu573 = (k, f) => chk573(Object.assign({}, D573, { [k]: f(D573[k]) })).ok;
+  const M573 = [mu573('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v572 (')), mu573('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v572'")),
+    mu573('ft', (s) => s.split('`handleAttDel`').join('handleAttDel')), mu573('cl', (s) => s.replace('**C238 B+C(v573', 'C238 B+C(v573')), mu573('tl', (s) => s.split('\n## v573 ').join('\n## vX '))];
+  T('v573 C238 판 B+C 문서·판 번호(정확 검사): FEATURES 기준 v573·v573 절(낱말 6) · TESTLIST v573 칸 3 · CLAUDE.md 한 줄 · sw jw-shell-v573 · 결함 사본 ' + M573.length + '개 = 모두 ✗',
+    r573.ok && M573.every((v) => v === false), JSON.stringify({ r: r573.info, mut: M573 }));
+} catch (e) { console.log('  (v573 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

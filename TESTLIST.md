@@ -2080,3 +2080,8 @@
 - [ ] (AI 운영 확인 — C240 A-2b) 배포 뒤 1주 운영 감사 기록의 '지시 보호' 줄 수와 지시 문서 줄 수(줄어들지 않음)를 읽기만으로 셈 — 정상 사용에서 '지시 보호'가 잦으면 화면이 여는 동작을 가드가 막는 것이니 그 줄 id로 원인 확인
 - [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 배포 전 전체 게이트 기록 C240A2b_게이트_v572_1127.txt
 - [x] (AI) `servertest` C240 A-2b(숨김 계정 정상 길 다섯 · 무관한 지시 완료·지움 · 담당의 승인 건너뜀·제목·지움 · 휴지통 지시 · base 없는 빈 목록 · 같은 id 두 줄 · 수행 계정 승인 건너뜀·지시자 칸·같은 id·뺀 줄 지움 표시·제목 고침 받음 · 관리자 가드 밖 · 앱 대역·다시 읽기) · 89 v464 대조 칸(관리자로) · C185 판2 결함 사본(같은 id 두 벌은 가드 결과도 걷음) · `uismoke` v572 직급 표·문서·판 번호
+
+## v573 — C238 판 B+C — 회원·계정 색인 · 문서함·첨부 쓰기 결과
+- [ ] (AI 운영 확인 — C238) 배포 뒤 다음 날 백업에서 관리자 오류 기록에 member_upsert·member_delete·doc_att_put·att_del 500(STORAGE_WRITE_FAILED·STORAGE_DELETE_FAILED)이 새로 쌓이지 않음 — 정상 저장은 그대로
+- [x] (AI) `servertest` C238 판 B·판 C(결함 사본 8 · 10 모두 ✗) · 실 저장소 재현 h2.cjs 운영 ↔ 고친 판 · `botdup_check` 16 · 좁은 독립 확인 2회 — ✓ AI 11/27
+- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 C238_게이트_v573_1127.txt
