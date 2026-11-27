@@ -24621,8 +24621,8 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), op = cb.filter((l) => /^- \[ \] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
     const FT = ['원장 T750', '`?go=`', '`hwakwan-fail-<KST 날짜>`', '`renotify`', '00시 운행'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v557 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && op.length === 3 && !cb.some((l) => /\(PM/.test(l))
-      && d.cl.indexOf('**T750(v557') > 0 && /SHELL_CACHE = 'jw-shell-v557'/.test(d.sw);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 557 && ftv.length > 0 && mF.length === 0 && cb.length === 5 && gate.length === 2 && op.length === 3 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**T750(v557') > 0 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 557;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
   };
   const rV = chkV(DV);
@@ -24632,6 +24632,37 @@ try {
   T('v557 T750 문서·판 번호(정확 검사): FEATURES 기준 v557 (2026-11-27)·v557 절 · TESTLIST v557 칸 5(화면·운영 확인 3 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v557 · 결함 사본 ' + MV.length + '개 = 모두 ✗',
     rV.ok && MV.every((v) => v === false), JSON.stringify({ r: rV.info, mut: MV }));
 } catch (e) { console.log('  (v557 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v558(운반일지 겹침 창 60일 — 원장 C279): 실행 검사는 위 v351 블록·servertest 'C279 창 60일' · 여기는 문서·판 번호 정확 검사 + 고정 글 1줄(빼면 ✗)
+try {
+  const rd558 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D558 = { ft: rd558('FEATURES.md'), tl: rd558('TESTLIST.md'), sw: rd558('sw.js'), man: rd558('MANUAL.html'), cl: rd558('CLAUDE.md'), ix: rd558('index.html') };
+  const FIX558 = ["(앱에서 열 수 있는 지난 60일 가운데 기록이 있는 "];
+  const MANA558 = "(2026-11 v558 — 앱에서 열 수 있는 지난 60일 일지를 모두";
+  const chk558 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v558 (11/27)', '\n### '), tlv = cut(d.tl, '\n## v558 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`RUN_BACK_DAYS`", "`STATUS_DAYS`", "`ROUTE_OVERLAP`", "c279w_timing.mjs", "원장 C279"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const MAN = "(2026-11 v558 — 앱에서 열 수 있는 지난 60일 일지를 모두";
+    const ok = /기준: v558 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 2 && gate.length === 2 && scr.length === 0 && !cb.some((l) => /\(PM/.test(l))
+      && d.man.indexOf(MAN) > 0
+      && d.cl.indexOf('**운반일지 겹침 창 60일(v558') > 0
+      && FIX558.every((x) => d.ix.split(x).length === 2)
+      && /SHELL_CACHE = 'jw-shell-v558'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length, fix: FIX558.map((x) => d.ix.split(x).length - 1) } };
+  };
+  const r558 = chk558(D558);
+  const mu558 = (k, f) => chk558(Object.assign({}, D558, { [k]: f(D558[k]) })).ok;
+  const M558 = [mu558('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v557 (')), mu558('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v557'")),
+    mu558('ft', (s) => s.split('`RUN_BACK_DAYS`').join('RUN_BACK_DAYS')),
+    mu558('man', (s) => s.replace(MANA558, '')), mu558('cl', (s) => s.replace('**운반일지 겹침 창 60일(v558', '운반일지 겹침 창 60일(')),
+    mu558('tl', (s) => s.replace('\n- [x] (AI) `servertest` \'C279 창 60일\'', '\n- (AI) `servertest` \'C279 창 60일\''))]
+    .concat(FIX558.map((x) => mu558('ix', (s) => s.replace(x, ''))));
+  T('v558 문서·판 번호(정확 검사): FEATURES 기준 v558 (2026-11-27)·v558 절(운반일지 겹침 창 60일) · TESTLIST v558 칸 2(화면·운영 확인 0 · 게이트 [x] 2) · MANUAL 겹침 창 문장(내부 이름 0) · CLAUDE.md 한 줄 · 고정 글 1줄 한 번씩 · sw jw-shell-v558 · 결함 사본(기준 줄·sw·FEATURES 낱말·MANUAL·CLAUDE.md·게이트 칸·고정 글마다) 모두 ✗',
+    r558.ok && M558.every((v) => v === false), JSON.stringify({ r: r558.info, mut: M558 }));
+} catch (e) { console.log('  (v558 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);

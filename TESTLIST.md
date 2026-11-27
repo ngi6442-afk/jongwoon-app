@@ -1995,3 +1995,7 @@
 - [ ] (AI 시험 화면 대상 — T750) 같은 날 같은 경보가 두 번 오면 알림이 한 자리로 바뀌어도 다시 울림(renotify) · 다른 날 경보는 따로 남음
 - [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 배포 전 전체 게이트 기록 T750_게이트_v557_1127.txt
 - [x] (AI) `uismoke` T750(결함 사본 10 = 모두 ✗) · v557 문서·판 번호 정확 검사(결함 사본 5)
+
+## v558 — 운반일지 새 노선 겹침 미리 보기 창 60일(원장 C279 남은 것)
+- [x] (AI) `servertest` 'C279 창 60일'·'C279 ②' · `uismoke` v351 블록 · 비용 실측(지연 200ms에도 2.1초) · v557 문서 검사를 이 판 이상으로 풂 — ✓ AI 11/27
+- [x] (AI) `uismoke` · `servertest` · `consheet_check` · `proctpl_check` · `settletest` · `rectest` 등 게이트 전부 통과 + autorulestest + 앱 스크립트 전체 파싱 오류 0(끝 게이트 이름은 백틱 없이) — ✓ AI 11/27
