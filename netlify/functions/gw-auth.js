@@ -201,18 +201,23 @@ async function handleLogin(st, d, R, event) {
   const name = ident;   // 잠금 카운터 키는 입력값을 조회와 같은 정리로(lockKey — P1 판24-②)
   const now = Date.now();
   const lk = await blobGet(st, lockKey(name));
-  if (lk.ok && lk.data && lk.data.until && lk.data.until > now) {
+  // C238 판 A(11/27 · 재현됨): 잠금 칸을 못 읽으면(없음 = ok·null과 다른 실패) 잠금 검사를 건너뛰고 PIN을 맞춰 보던 것(열린 쪽)을 막음 — PIN 검사 전에 500(맞는지 틀린지 알려 주지 않음)
+  if (!lk.ok && lk.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: lk.code, request_id: R });   // NOT_FOUND = 없음(이 파일의 다른 읽기와 같은 관례)
+  if (lk.data && lk.data.until && lk.data.until > now) {
     return jr(429, { status: 'LOCKED', error_code: 'TOO_MANY_ATTEMPTS', retry_after: Math.ceil((lk.data.until - now) / 1000), request_id: R });
   }
   let mlk = null;   // P1 판24-② 검토(11/15 B7): 찾은 회원 id 기준 잠금 칸(lockm:<id>) — 아이디 칸·이름 칸으로 따로 세던 것을 한 계정 15분 5회로
   async function fail() {
     const fails = (lk.ok && lk.data && lk.data.fails ? lk.data.fails : 0) + 1;
     const rec = fails >= LOCK_THRESHOLD ? { fails: 0, until: now + LOCK_MS } : { fails: fails };
-    await blobSet(st, lockKey(name), rec);
-    // 재검토 B2: 회원 칸을 못 읽었으면 덮지 않음(쌓인 실패 수가 1로 덮이던 것) — 입력 칸 잠금은 종전대로
-    if (mlk && (mlk.r.ok || mlk.r.code === 'NOT_FOUND')) { const mf = (mlk.r.ok && mlk.r.data && mlk.r.data.fails ? mlk.r.data.fails : 0) + 1; await blobSet(st, mlk.key, mf >= LOCK_THRESHOLD ? { fails: 0, until: now + LOCK_MS } : { fails: mf }); }
+    const w1 = await blobSet(st, lockKey(name), rec);
+    // 재검토 B2: 회원 칸을 못 읽었으면 덮지 않음(쌓인 실패 수가 1로 덮이던 것) — C238 판 A부터 못 읽으면 앞에서 500이라 여기 오는 mlk는 읽힌 것뿐
+    let w2 = { ok: true };
+    if (mlk && (mlk.r.ok || mlk.r.code === 'NOT_FOUND')) { const mf = (mlk.r.ok && mlk.r.data && mlk.r.data.fails ? mlk.r.data.fails : 0) + 1; w2 = await blobSet(st, mlk.key, mf >= LOCK_THRESHOLD ? { fails: 0, until: now + LOCK_MS } : { fails: mf }); }
     // Blobs엔 원자적 증가가 없어 병렬 대량 시도가 잠금 카운터를 우회한다 — 실패마다 고정 지연으로 완전탐색 비용을 올림
     await new Promise(function (r) { setTimeout(r, 600); });
+    // C238 판 A: 실패 수를 못 적었으면(쓰기 실패·막힘) 401로 넘기지 않고 500 — 세지 못한 채 '틀림'으로 답하던 것(쓰기 결과 안 봄 · 표 gw-auth.js:210·212)
+    if (!w1.ok || !w2.ok) return jr(500, { status: 'ERROR', error_code: (!w1.ok ? w1.code : w2.code) || 'STORAGE_WRITE_FAILED', request_id: R });
     return GEN();
   }
   // ① 아이디 색인 우선 → ② (이사 기간에 한해) 이름 색인.
@@ -235,8 +240,9 @@ async function handleLogin(st, d, R, event) {
   const mr = await blobGet(st, memberKey(idx.data));
   if (!mr.ok) return jr(500, { status: 'ERROR', error_code: mr.code, request_id: R });
   if (!mr.data || mr.data.del === 1 || retired(mr.data)) return fail();
-  // 회원 칸 잠금(B7) — 다른 입력(아이디·이름)으로 이미 잠긴 계정이면 맞는 PIN이어도 429. 칸을 못 읽으면 입력 칸 기준만(종전)
+  // 회원 칸 잠금(B7) — 다른 입력(아이디·이름)으로 이미 잠긴 계정이면 맞는 PIN이어도 429. C238 판 A: 칸을 못 읽으면 입력 칸 기준만 보던 것(다른 입력으로 잠긴 계정이 열림)을 PIN 검사 전 500으로
   { const mk = memberLockKey(mr.data.id), mr2 = await blobGet(st, mk); mlk = { key: mk, r: mr2 };
+    if (!mr2.ok && mr2.code !== 'NOT_FOUND') return jr(500, { status: 'ERROR', error_code: mr2.code, request_id: R });
     if (mr2.ok && mr2.data && mr2.data.until && mr2.data.until > now) return jr(429, { status: 'LOCKED', error_code: 'TOO_MANY_ATTEMPTS', retry_after: Math.ceil((mr2.data.until - now) / 1000), request_id: R }); }
   // 이름 로그인은 이사 기간(ALLOW_NAME_LOGIN) 동안 **아이디 보유자에게도 열어 둔다.**
   // 종전엔 아이디가 있으면 이름 경로를 막았는데(v245), 아이디를 잊는 순간 본인도 관리자도

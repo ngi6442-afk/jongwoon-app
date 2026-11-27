@@ -12641,6 +12641,65 @@ function J91a(x) { return JSON.stringify(x); }
   finally { resetH14(); }
 }
 
+{ // ---- C238 판 A(11/27) 로그인 잠금 칸 '못 읽음 = 잠금 검사 건너뜀'(열린 쪽 · 쓰기자리전수 재현 A·A2·B) + 실패 수를 못 적어도 401로 넘기던 것(표 gw-auth.js:210·212)
+  //   거절: 잠금 칸(입력 lock:·회원 lockm:)을 못 읽으면 맞는 PIN이어도 세션 없음(500 · PIN 검사 전) · 틀린 PIN에서 실패 수를 못 적으면 500
+  //   허용: 잠금 칸이 없음(첫 로그인)·읽힘이면 종전 그대로 200/401/429. 결함 사본 = 고친 세 곳을 하나씩 되돌려 메모리에서 컴파일 → 실패해야 한다.
+  const fsA238 = require('fs'), ModA238 = require('module');
+  const FAUTH238 = join(FN, 'gw-auth.js'), SAUTH238 = fsA238.readFileSync(FAUTH238, 'utf8');
+  const loadA238 = (src) => { const m = new ModA238(FAUTH238); m.filename = FAUTH238; m.paths = ModA238._nodeModulePaths(dirname(FAUTH238)); m._compile(src, FAUTH238); return m.exports; };
+  const mutA238 = (from, to) => { if (SAUTH238.split(from).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + from.slice(0, 60)); return SAUTH238.replace(from, () => to); };
+  const callA238 = (mod) => async (body) => { const r = await mod.handler({ httpMethod: 'POST', headers: { 'x-device-id': 'dev238' }, body: JSON.stringify(body) }); return { code: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+  const snapA238 = JSON.stringify(mem.gw_users || {});
+  const { hashSecret: hashA238 } = require(join(FN, '_lib/password.js'));
+  const pinA238 = hashA238('5820');
+  const chkA238 = async (mod) => {
+    const c = callA238(mod), P = {}, I = {};
+    const reset = () => { mem.gw_users = JSON.parse(snapA238); blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null;
+      mem.gw_users['member:u238'] = { id: 'u238', name: '잠금238', uid: 'lk238id', admin: false, perms: {}, pin_salt: pinA238.salt, pin_hash: pinA238.hash }; mem.gw_users['uid:lk238id'] = 'u238'; };
+    const until = () => ({ fails: 0, until: Date.now() + 10 * 60000 });
+    try {
+      // ① 입력 칸 잠김 + 입력 칸 못 읽음 + 맞는 PIN → 세션 없음(운영 v563은 200 세션)
+      reset(); mem.gw_users['lock:lk238id'] = until(); blobsMock.hooks.failGet = (k) => k === 'lock:lk238id';
+      let r = await c({ action: 'login', uid: 'lk238id', pin: '5820' });
+      P.inRead = r.code === 500 && !r.body.token && !!mem.gw_users['lock:lk238id'].until; I.inRead = [r.code, r.body.error_code];
+      // ② 회원 칸 잠김 + 회원 칸 못 읽음 + 맞는 PIN → 세션 없음(운영은 입력 칸만 보고 200)
+      reset(); mem.gw_users['lockm:u238'] = until(); blobsMock.hooks.failGet = (k) => k === 'lockm:u238';
+      r = await c({ action: 'login', uid: 'lk238id', pin: '5820' });
+      P.memRead = r.code === 500 && !r.body.token && !!mem.gw_users['lockm:u238'].until; I.memRead = [r.code, r.body.error_code];
+      // ③ 틀린 PIN · 입력 칸 쓰기 실패 → 500(운영은 401 · 실패 수 안 셈)
+      reset(); blobsMock.hooks.failSet = (k) => k === 'lock:lk238id';
+      r = await c({ action: 'login', uid: 'lk238id', pin: '0000' });
+      P.inWrite = r.code === 500 && r.body.error_code === 'STORAGE_WRITE_FAILED'; I.inWrite = [r.code, r.body.error_code];
+      // ④ 틀린 PIN · 회원 칸 쓰기 실패 → 500
+      reset(); blobsMock.hooks.failSet = (k) => k === 'lockm:u238';
+      r = await c({ action: 'login', uid: 'lk238id', pin: '0000' });
+      P.memWrite = r.code === 500 && r.body.error_code === 'STORAGE_WRITE_FAILED' && JSON.stringify(mem.gw_users['lock:lk238id']) === '{"fails":1}'; I.memWrite = [r.code, r.body.error_code];
+      // ⑤ 허용(정상 무변): 잠금 칸 없음 + 맞는 PIN = 200 · 첫 틀림 = 401(입력 칸·회원 칸 1) · 회원 칸 4 + 틀림 = 401 → 잠김 → 맞는 PIN 429
+      //   (없는 아이디는 이 시험 틀의 가짜 저장소가 '없음'을 NOT_FOUND 실패로 돌려줘 색인 조회가 500 — 실 저장소와 달라 여기서 보지 않음 · 실 저장소 재현은 쓰기자리전수 h1.cjs)
+      reset(); const ok1 = await c({ action: 'login', uid: 'lk238id', pin: '5820' });
+      const no1 = await c({ action: 'login', uid: 'lk238id', pin: '0000' });
+      const c1 = JSON.stringify(mem.gw_users['lock:lk238id']) === '{"fails":1}' && JSON.stringify(mem.gw_users['lockm:u238']) === '{"fails":1}';
+      mem.gw_users['lockm:u238'] = { fails: 4 }; const w5 = await c({ action: 'login', uid: 'lk238id', pin: '0000' }); const l5 = await c({ action: 'login', uid: 'lk238id', pin: '5820' });
+      P.normal = ok1.code === 200 && !!ok1.body.token && no1.code === 401 && c1 && w5.code === 401 && !!(mem.gw_users['lockm:u238'] || {}).until && l5.code === 429;
+      I.normal = [ok1.code, no1.code, w5.code, l5.code];
+    } finally { blobsMock.hooks.failGet = null; blobsMock.hooks.failSet = null; mem.gw_users = JSON.parse(snapA238); }
+    return { ok: Object.values(P).every((v) => v === true), info: { P, I } };
+  };
+  try {
+    const A0 = await chkA238(loadA238(SAUTH238));
+    T('C238 판 A 로그인 잠금 칸 못 읽음 = 열린 쪽 막음: 입력 칸(lock:)·회원 칸(lockm:)이 잠겼는데 못 읽으면 맞는 PIN이어도 세션 없음(500 · PIN 검사 전) · 틀린 PIN에서 입력 칸·회원 칸 실패 수를 못 적으면 401 대신 500(STORAGE_WRITE_FAILED) · 정상(잠금 칸 없음 200 · 첫 틀림 401·입력 칸·회원 칸 1 · 회원 칸 5번째 잠김 → 429) 무변', A0.ok, JSON.stringify(A0.info));
+    const MUT238 = [
+      ["  if (!lk.ok && lk.code !== 'NOT_FOUND') return jr(500,", "  if (false) return jr(500,"],
+      ["    if (!mr2.ok && mr2.code !== 'NOT_FOUND') return jr(500,", "    if (false) return jr(500,"],
+      ["    if (!w1.ok || !w2.ok) return jr(500,", "    if (false) return jr(500,"],
+      ["    if (!w1.ok || !w2.ok) return jr(500,", "    if (!w1.ok) return jr(500,"],
+    ];
+    const kill = [];
+    for (const [from, to] of MUT238) { let k; try { k = !(await chkA238(loadA238(mutA238(from, to)))).ok; } catch (e) { k = 'err ' + e.message; } if (k !== true) kill.push(from.trim().slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k)); }
+    T('C238 판 A 결함 사본 ' + MUT238.length + '개(입력 칸 못 읽음 통과 · 회원 칸 못 읽음 통과 · 실패 수 쓰기 결과 안 봄 · 회원 칸 쓰기 결과만 안 봄) 모두 잡힘', kill.length === 0, kill.join(' | '));
+  } catch (e) { T('C238 판 A 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
+}
+
 { // ---- P1 판24-② 재감사 작은 수리 묶음(C096) — 잠금 키 정규화(gw-auth) · 서류함 보관/현재 등급 검사·등급 낮추기 관리자만·zip 내부 검증 · 체크 감사 줄 바뀐 키 · 봇 키 비교 공용 · 알림함 1000건.
   //   건마다 막아야 할 것(거절)과 막으면 안 되는 것(허용)을 짝으로. 결함 사본 = 고친 한 곳을 되돌려 메모리에서 컴파일(파일은 쓰지 않음) → 실패해야 한다.
   const fsB24 = require('fs'), ModB24 = require('module');
@@ -12691,11 +12750,11 @@ function J91a(x) { return JSON.stringify(x); }
       mem.gw_users['lockm:ulk24'] = { fails: 2 }; const h4 = await c({ action: 'login', uid: 'lock24id', pin: '7391' });
       P.compat = h1.code === 401 && hv === '{"fails":4}' && h2.code === 429 && h3.code === 200 && !mem.gw_users['lockm:uok24'] && h4.code === 200 && !mem.gw_users['lockm:ulk24'] && !mem.gw_users['lock:lock24id'];
       I.compat = [h1.code, hv, h2.code, h3.code, h4.code];
-      // 재검토 B2: 회원 칸을 못 읽은 채 틀리면 회원 칸은 덮지 않음(쌓인 3 그대로) · 입력 칸은 종전대로 셈
+      // 재검토 B2: 회원 칸을 못 읽은 채 틀리면 회원 칸은 덮지 않음(쌓인 3 그대로) · C238 판 A(11/27)부터 못 읽으면 PIN 검사 전 500(입력 칸도 세지 않음 — 401로 '틀림'을 알려 주지 않음)
       clr(); mem.gw_users['lockm:ulk24'] = { fails: 3 };
       blobsMock.hooks.failGet = (k) => k === 'lockm:ulk24';
       let q1; try { q1 = await c({ action: 'login', uid: 'lock24id', pin: '0000' }); } finally { blobsMock.hooks.failGet = null; }
-      P.readFail = q1.code === 401 && JSON.stringify(mem.gw_users['lockm:ulk24']) === '{"fails":3}' && JSON.stringify(mem.gw_users['lock:lock24id']) === '{"fails":1}';
+      P.readFail = q1.code === 500 && JSON.stringify(mem.gw_users['lockm:ulk24']) === '{"fails":3}' && mem.gw_users['lock:lock24id'] === undefined;
       I.readFail = [q1.code, JSON.stringify(mem.gw_users['lockm:ulk24']), JSON.stringify(mem.gw_users['lock:lock24id'])];
       clr(); delete mem.gw_users['lockm:ulk24']; delete mem.gw_users['name:잠금24'];
       return { ok: Object.values(P).every((v) => v === true), info: { P, I } };
@@ -12893,7 +12952,7 @@ function J91a(x) { return JSON.stringify(x); }
       ['data', '    if (piiHi) { piiRaised = piiHi; pii = piiHi; }', '    if (false) { piiRaised = piiHi; pii = piiHi; }', chkPut],   // B6
       ['auth', "    if (mr2.ok && mr2.data && mr2.data.until && mr2.data.until > now) return jr(429,", '    if (false) return jr(429,', chkLock],   // B7 회원 칸 확인
       ['auth', "    if (mlk && (mlk.r.ok || mlk.r.code === 'NOT_FOUND')) { const mf =", '    if (false) { const mf =', chkLock],   // B7 회원 칸 셈
-      ['auth', "    if (mlk && (mlk.r.ok || mlk.r.code === 'NOT_FOUND')) { const mf =", '    if (mlk) { const mf =', chkLock],   // 재검토 B2 못 읽은 회원 칸 덮기
+      ['auth', "    if (!mr2.ok && mr2.code !== 'NOT_FOUND') return jr(500,", '    if (false) return jr(500,', chkLock],   // 재검토 B2 못 읽은 회원 칸 — C238 판 A부터 못 읽으면 PIN 검사 전 500이라 fail()의 '읽힌 칸만 셈' 조건을 걷어도 닿지 않음(같은 결과 사본) → 앞선 500 가드를 걷는 사본으로 바꿈
       ['mchk', "    const all = m.locks.concat(Array.isArray(m.mlocks) ? m.mlocks : []), toId = {};", '    const all = m.locks, toId = {};', chkMlock],   // 재검토 B1 회원 칸 안 셈
       ['mchk', "const id = toId[x.key.slice(5)]; return id ? 'm:' + id : x.key;", 'return x.key;', chkMlock],   // 재검토 B1 같은 사람 두 번
     ];
