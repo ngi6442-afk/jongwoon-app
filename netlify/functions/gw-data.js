@@ -519,6 +519,7 @@ async function handleSave(event, d, R) {
     purgeExpiredBids(doc, cutO);
   }
   // v395 배정표(기반 1·9): 자동 지시의 서버 배정 who_id(who_by 'assign')는 클라 사본이 공란으로 올려도 이월 + 남은 공란은 배정표로 채움
+  let taskAutoNotify = [];   // C238 G ①(11/27): 지시 갈래 새 자동 지시 담당 알림 — 대상은 가드(tasksGuard) 뒤 받은 줄로 여기 담고, 보내기는 쓰기 성공 뒤
   let taskKept = [];   // C240 A-2b: 비관리자 지시 저장에서 서버가 받지 않은 줄 id(응답 task_kept)
   // C185 판2(계획 검토 1): 진입 조건을 비관리자 전원으로 — 기성 '보기' 직원도 입·퇴사 지시를 받지 않았으니 그 저장이 숨은 지시를 지우지 않게 이월(기성 갈래는 taskRecHiddenFor 안에서 숨김 직원에게만 참 — 종전 그대로)
   if (col === 'tasks' && !c.member.admin && Array.isArray(doc.items)) {
@@ -592,7 +593,7 @@ async function handleSave(event, d, R) {
     hrScopeFix(doc.items);   // C185 판2 검토 8: 입·퇴사 지시(hr:·acct:) 공개 범위 = 서버가 지금 담당 하나로(담당이 넓혀 보내도·담당이 바뀌어도 · 비면 관리자만)
     // v396 알림: 클라 생성기(runAutoTaskGen·recOverdueGen·runBidQualGen)가 만든 새 자동 지시 + 이번에 채워진 공란 → 담당자 본인 1발(설정 assignee일 때만)
     const newAutoS = doc.items.filter(function (t) { return t && t.auto_key && t.who_id && notLdS(t) && (!oldByA[t.id] || blankBeforeS[t.id]); });
-    if (newAutoS.length) await notifyAutoCreated(store(DATA), newAutoS, c.member.name);
+    taskAutoNotify = newAutoS;   // C238 G ①: 종전엔 여기서 바로 보내 저장 실패여도 담당 알림이 감 — 보내기는 아래 쓰기 성공 뒤
   }
   // 휴가: 신청 저장은 전 직원 필요하지만, 비관리자 저장은 서버가 재구성 — 타인 항목은 서버 원본 유지(클라이언트 사본으로 못 덮음),
   // 본인 항목만 반영, 승인 상태는 스스로 못 올림. (종전엔 전면 면제라 임의 직원이 전사 휴가 문서를 통째로 조작할 수 있었다.
@@ -816,6 +817,7 @@ async function handleSave(event, d, R) {
   await verSnapshot(col, prevDoc, c.member.name, false, obPurged > 0);   // 사람 저장은 매번 직전 상태 보존(시점 복구용) · v444 부동산 정리가 서버 줄을 지우는 저장은 VER_SKIP이어도 보존
   const w = await blobSet(store(DATA), colKey(col), doc);
   if (!w.ok) return jr(500, { status: 'ERROR', error_code: w.code, request_id: R });
+  if (taskAutoNotify.length) { try { await notifyAutoCreated(store(DATA), taskAutoNotify, c.member.name); } catch (e) {} }   // C238 G ①: 저장된 뒤에만 · 서버가 안 받은 줄(task_kept)은 가드 뒤 계산이라 대상에 없음 · 보내기 예외는 응답을 바꾸지 않음
   if (leaveNotifyAfterSave) { try { await notifyLeaves(store(DATA), oldItems, doc.items, c.member); } catch (e) {} }   // C238 G: 저장된 줄(서버가 받은 줄로 다시 세운 doc.items)만 견줌 · 보내기 실패·예외는 저장 응답을 바꾸지 않음(종전과 같음)
   // 감사 로그: 누가·언제·무엇을(이전값→새값). 서버측 기록이라 클라이언트 위변조 불가.
   let saveAuFail = false;   // C251 「덧대기」: 감사 줄을 못 남겼으면(appendAudit false·예외) 응답에 audit:false — 응답 꼴만(화면 글 없음 · 저장은 이미 됨)

@@ -19003,15 +19003,28 @@ function J91a(x) { return JSON.stringify(x); }
       reset(); seedT(); throwSend = true; const r3 = await ing();
       const t3 = r3.code === 200 && (mem.gw_data['col:tasks'].items || []).some((t) => t.auto_key === 'cert:c238238');
       P.ingest = t1 && t2 && t3; I.ingest = [r.code, r2.code, r2.body.made, sent.length, r3.code];
+      // ⑤ 지시 저장(①) — 관리자 저장의 새 자동 지시(담당 uwork) · 저장 실패 = 500·알림 0 / 정상 = 담당 1발 / 직원 저장에서 서버가 안 받은 줄(task_kept)은 알림 없음
+      const seedK = () => { mem.gw_data['col:tasks'] = { schema: 1, items: [], updated_at: 1 }; mem.gw_data['settings:notify'] = { schema: 1, events: { task_auto_create: 'assignee' }, updated_at: 1 }; };
+      const AT = (id, who) => ({ id: id, auto_key: 'cert:c' + id.replace(/\D/g, ''), title: 'G238 지시 ' + id, who_id: who, status: 'open', due: '2026-12-20' });
+      reset(); seedK(); blobsMock.hooks.failSet = (k) => k === 'col:tasks';
+      r = await c({ action: 'save', collection: 'tasks', base: 1, doc: { schema: 1, items: [AT('g2381', 'uwork')] } }, tokA); blobsMock.hooks.failSet = null;
+      const k1 = r.code === 500 && sent.length === 0;
+      reset(); seedK(); const rk2 = await c({ action: 'save', collection: 'tasks', base: 1, doc: { schema: 1, items: [AT('g2382', 'uwork')] } }, tokA);
+      const k2 = rk2.code === 200 && sent.length === 1 && sent[0].ids.join() === 'uwork';
+      reset(); seedK(); const rk3 = await c({ action: 'save', collection: 'tasks', base: 1, doc: { schema: 1, items: [AT('g2383', 'uadmin')] } }, tokW, 'dev1');
+      const kept3 = (rk3.body.task_kept || []).indexOf('g2383') >= 0, saved3 = (mem.gw_data['col:tasks'].items || []).some((t) => t.id === 'g2383');
+      const k3 = rk3.code === 200 && (kept3 || !saved3 ? sent.length === 0 : true);
+      P.tasks = k1 && k2 && k3; I.tasks = [r.code, rk2.code, sent.length, rk3.code, kept3, saved3];
     } finally { pushMock.sendTo = savedSend; const s = JSON.parse(snapG238); mem.gw_data = s.d; blobsMock.hooks.failSet = null; }
     return { ok: Object.values(P).every((v) => v === true), info: { P, I } };
   };
   try {
     const G0 = await chkG238(loadG238(SDATAG));
-    T('C238 G 알림을 저장 뒤로: 휴가 저장 실패 = 500·알림 0 · 정상 = 신청 1발 · 남의 줄 섞은 저장 = 받은 본인 줄만 · 보내기 예외 = 200·저장 그대로 · 자동 지시 받기 저장 실패 = 500·알림 0 · 정상 = 담당 1발 · 보내기 예외 = 200·지시 저장', G0.ok, JSON.stringify(G0.info));
+    T('C238 G 알림을 저장 뒤로: 휴가 저장 실패 = 500·알림 0 · 정상 = 신청 1발 · 남의 줄 섞은 저장 = 받은 본인 줄만 · 보내기 예외 = 200·저장 그대로 · 자동 지시 받기 저장 실패 = 500·알림 0 · 정상 = 담당 1발 · 보내기 예외 = 200·지시 저장 · 지시 저장 실패 = 500·알림 0 · 정상 = 담당 1발 · 안 받은 줄(task_kept) 알림 없음', G0.ok, JSON.stringify(G0.info));
     const MUTG = [
       ["  const leaveNotifyAfterSave = (col === 'leaves' && Array.isArray(doc.items));\n", "  const leaveNotifyAfterSave = false; if (col === 'leaves' && Array.isArray(doc.items)) { try { await notifyLeaves(store(DATA), oldItems, doc.items, c.member); } catch (e) {} }\n"],
       ["  if (notifyItems.length) { try { notified = await notifyAutoCreated(st, notifyItems, '정기봇', { seen: notSeen }); } catch (e) {} }", ''],
+      ["    taskAutoNotify = newAutoS;", "    taskAutoNotify = []; if (newAutoS.length) await notifyAutoCreated(store(DATA), newAutoS, c.member.name);"],
     ];
     // 두 번째 사본은 보내기를 저장 앞(종전 자리)에 되살림
     MUTG[1][1] = '';
@@ -19025,7 +19038,7 @@ function J91a(x) { return JSON.stringify(x); }
       } catch (e) { k = 'err ' + e.message; }
       if (k !== true) kill.push(from.trim().slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k));
     }
-    T('C238 G 결함 사본 ' + MUTG.length + '개(휴가 알림을 저장 앞으로 · 자동 지시 일반 알림을 저장 앞으로) 모두 잡힘', kill.length === 0, kill.join(' | '));
+    T('C238 G 결함 사본 ' + MUTG.length + '개(휴가 알림을 저장 앞으로 · 자동 지시 일반 알림을 저장 앞으로 · 지시 저장 담당 알림을 저장 앞으로) 모두 잡힘', kill.length === 0, kill.join(' | '));
   } catch (e) { T('C238 G 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
 }
 
