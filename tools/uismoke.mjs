@@ -25668,8 +25668,8 @@ try {
     const FT = ['`meCorp`', '`SF_NOW_CO`', '`PAY_CORP`', '`CDOC_CORP_NAME`', '`payLedgerParse`', '월말명세서'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
     const closed = true;
-    const ok = /기준: v580 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 1 && op.length === 2 && closed
-      && d.cl.indexOf('**C326 이어서(v580)**') > 0 && /SHELL_CACHE = 'jw-shell-v580'/.test(d.sw);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 580 && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 1 && op.length === 2 && closed
+      && d.cl.indexOf('**C326 이어서(v580)**') > 0 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 580;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length, closed } };
   };
   const rW = chkW(DW);
@@ -25679,6 +25679,31 @@ try {
   T('v580 C326 이어서 문서·판 번호(정확 검사): FEATURES 기준 v580·v580 절 · TESTLIST v580 칸 3 · CLAUDE.md 한 줄 · sw · 결함 사본 ' + MW.length + '개 = 모두 ✗',
     rW.ok && MW.every((v) => v === false), JSON.stringify({ r: rW.info, mut: MW }));
 } catch (e) { console.log('  (v580 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v581(C329 — 주기 업무 체크 오프라인 저장 · 원장 C329): 실행 검사는 위 C329 블록 · 여기는 문서·판 번호 정확 검사
+try {
+  const rd581 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D581 = { ft: rd581('FEATURES.md'), tl: rd581('TESTLIST.md'), sw: rd581('sw.js'), man: rd581('MANUAL.html'), cl: rd581('CLAUDE.md') };
+  const chk581 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v581 (11/28)', '\n### '), tlv = cut(d.tl, '\n## v581 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), scr = cb.filter((l) => /^- \[[ x]\] \(AI (?:시험 화면 대상|운영 확인)/.test(l));
+    const FT = ["`ckRetryKick`", "원장 C329"];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v581 \(2026-11-28\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 7 && gate.length === 2 && scr.length === 5 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C329(v581') > 0
+      && /SHELL_CACHE = 'jw-shell-v581'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, scr: scr.length } };
+  };
+  const r581 = chk581(D581);
+  const mu581 = (k, f) => chk581(Object.assign({}, D581, { [k]: f(D581[k]) })).ok;
+  const M581 = [mu581('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v580 (')), mu581('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v580'")),
+    mu581('ft', (s) => s.split('`ckRetryKick`').join('ckRetryKick')),
+    mu581('cl', (s) => s.replace('**C329(v581', 'C329(')),
+    mu581('tl', (s) => s.replace('\n- [x] (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 배포 전 전체 게이트 기록 C329_게이트_배포전_1128.txt', '\n- (AI) `uismoke` · `servertest` · `paycalc_check` · `autorulestest` 게이트(운영 머리 위 판) — 결과는 배포 전 전체 게이트 기록 C329_게이트_배포전_1128.txt'))];
+  T('v581 문서·판 번호(정확 검사): FEATURES 기준 v581 (2026-11-28)·v581 절(C329) · TESTLIST v581 칸 7(화면·운영 확인 5 · 게이트 [x] 2) · CLAUDE.md 한 줄 · sw jw-shell-v581 · 결함 사본(기준 줄·sw·FEATURES 낱말·CLAUDE.md·게이트 칸) 모두 ✗',
+    r581.ok && M581.every((v) => v === false), JSON.stringify({ r: r581.info, mut: M581 }));
+} catch (e) { console.log('  (v581 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
