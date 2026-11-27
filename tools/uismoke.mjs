@@ -21748,6 +21748,14 @@ try {
   const M2 = tdRun(nw, { todoDueFrom: (s) => s.replace('if (!t || String(t.due || "") === r.v) return;', 'if (!t) return;') });   // 같은 값 거름 걷음 = 두 번 보냄
   const M3 = tdRun(typ, { todoDueFrom: (s) => s.replace('if (warn) gwToast(', 'gwToast(') });   // change에서도 안내 = 치는 도중 토스트
   const tdDef = [M1.saves === 1 && M1.due === '', M2.saves === 1, M3.toast === 0];
+  // C280 후속(PM 11/27 16:40 ㅇ): 키보드로 치는 중(keydown 뒤)의 change는 저장하지 않고 칸 떠날 때 한 번 · 키 없는 change(달력·iOS 휠)는 종전처럼 바로(t2)
+  const kd = { key: '1', preventDefault() {} };
+  const mon = (inp) => { inp.L.keydown(kd); inp.value = '2026-01-31'; inp.L.change(ev); inp.L.keydown(kd); inp.value = ''; inp.validity = { badInput: true }; inp.L.blur(ev); };   // 월만 11로 — '1'에서 01-31을 지나 11-31(없는 날)
+  const mon2 = (inp) => { inp.L.keydown(kd); inp.value = '2026-01-15'; inp.L.change(ev); inp.L.keydown(kd); inp.value = '2026-11-15'; inp.L.change(ev); inp.L.blur(ev); };   // 월만 11로(있는 날) = 떠날 때 11-15 한 번
+  const t5 = tdRun(mon), t6 = tdRun(mon2);
+  const k6 = tdOk(t5) && t5.saves === 0 && t5.due === '2026-12-15' && t5.toast === 1 && tdOk(t6) && t6.saves === 1 && t6.due === '2026-11-15' && tdOk(t2) && t2.saves === 1;
+  const M4 = tdRun(mon, { bindTodoDueInputs: (s) => s.replace('if (!inp.__dueTyped) todoDueFrom(inp, false);', 'todoDueFrom(inp, false);') });   // 결함 사본: 옛 change 저장 = 지나가는 01-31 저장
+  const kDef = M4.saves === 1 && M4.due === '2026-01-31';
   // 넣기 박스 카드: 화면 칸을 끝까지 지우고 [시작] → 카드 값도 빈칸
   const cbRun = (mut) => { const it = { id: 7, form: { d1: '2026-10-01', d2: '2026-10-05' } }; const r = run(['cbxDateWhy'], (a) => a.cbxDateWhy(it), { mut, qsa: (s, E, mkEl) => (s.indexOf('[data-cbx-f^="7|"]') === 0 ? [mkEl('c1', { type: 'date', value: '', validity: { badInput: false }, attrs: { 'data-cbx-f': '7|d1' } }), mkEl('c2', { type: 'date', value: '2026-10-09', attrs: { 'data-cbx-f': '7|d2' } })] : []) }, null); return { why: r.out, form: it.form, err: r.err }; };
   const c1 = cbRun(), cM = cbRun({ cbxDateWhy: (s) => s.replace(' else if (it.form && k) it.form[k] = r.v;', '') });
@@ -21759,6 +21767,8 @@ try {
   const yDef = meY('2999-12-31', OLDY) === false;
   T('C280 ⑤ 키보드로 끝까지 지움·연도(실행 — 확인 반영): 내 할 일 기한 칸 세 칸 다 지우고 떠남(값 빈 글자 · badInput 거짓 · change 없음) = blur에서 빈 값 저장 1번·안내 0 · 새 날짜 change 뒤 blur = 저장 1번(두 번 아님) · 연도 치는 도중(0002→0020→0202→2028) = 토스트 0·끝값 저장 1번 · 덜 채움 = 저장 0·blur 안내 1 · 넣기 박스 카드 칸 다 지움 = 카드 값 빈칸(맞는 칸은 화면 값) · 직원 퇴사 예정 2999-12-31 = 저장 요청 · 202612-02-01 = 막힘 · 결함 사본 5개(blur 저장 걷음·같은 값 거름 걷음·change 안내·카드 옮겨 적기 걷음·옛 1900~2099) = 모두 잡힘',
     k5 && k5c && k5y && tdDef.every((x) => x === false) && cM.form.d1 === '2026-10-01' && yDef, JSON.stringify({ t1, t2, t3, t4, c1, k5y, tdDef, cMd1: cM.form.d1, yDef }));
+  T('C280 후속 내 할 일 기한(실행 — PM 11/27 ㅇ): 키보드로 월만 11로(01-31을 지나 11-31) = 치는 중 저장 0 · 떠날 때 안내 1 · 기한 그대로 / 월만 11로(있는 날) = 떠날 때 11-15 저장 1번 / 키 없는 change(달력) = 바로 저장 1번 / 결함 사본(옛 change 저장)은 01-31 저장으로 잡힘',
+    k6 && kDef, JSON.stringify({ t5, t6, t2s: t2.saves, M4 }));
   T('C280 ④ 남은 날짜 칸 `.value` 직접 읽기 = 전수 표의 저장 안 함·이미 막힘·검사 앞 읽기 자리뿐(새 저장 자리가 옛 꼴로 생기면 잡힘 — 표 밖 ' + extra.length + ')', extra.length === 0, '표 밖: ' + extra.join(', '));
 } catch (e) { console.log('  (C280 검사 생략 — ' + e.message + ')'); fails++; }
 // ── v521(C280 — 날짜 칸 읽기 도우미 · 원장 C280): 실행 검사는 uismoke 'C280' 블록 · 여기는 문서·판 번호 정확 검사
@@ -24736,6 +24746,14 @@ try {
   T('T688 폰 안전 탭 누르는 단추 세 곳 44px(현장 거르기 · 체크 직원/일용직 · 기록 줄 수정 48 폭) — 폰 폭 규칙 한 줄만(PC 그대로) · 결함 사본 ' + MY.length + '개 = 모두 ✗', chkY(html) && MY.every((v) => v === false), JSON.stringify(MY));
 } catch (e) { console.log('  (T688 검사 생략 — ' + e.message + ')'); fails++; }
 
+// ── C246(폰 작은 단추 — PM 11/27 16:40 ㅇ): 폰 폭에서만 .mini-btn 최소 32px · 운반일지 ‹ › 폭 32 · 설정 '사용 안내' 링크 32 — PC 그대로
+try {
+  const chkS = (H) => { const m = H.match(/\n  @media \(max-width:859px\)\{ \.mini-btn\{min-height:32px;\} a\.mini-btn\{display:inline-flex;align-items:center;\} #abPrevBtn,#abNextBtn\{min-width:32px;[^\n]*#setManualLink\{line-height:32px;\} \}/);
+    return !!m && /<a id="setManualLink" href="\.\/MANUAL\.html"/.test(H) && (H.match(/\.mini-btn\{min-height:32px;\}/g) || []).length === 1; };
+  const MS = [chkS(html.replace('.mini-btn{min-height:32px;}', '.mini-btn{min-height:24px;}')), chkS(html.replace('  @media (max-width:859px){ .mini-btn{min-height:32px;}', '  @media (min-width:0px){ .mini-btn{min-height:32px;}')), chkS(html.replace('<a id="setManualLink" ', '<a '))];
+  T('C246 폰 작은 단추 32px(.mini-btn 최소 높이 · 운반일지 날짜 ‹ › 폭 32 · 설정 사용 안내 링크 32) — 폰 폭 규칙 한 줄만(PC 그대로) · 결함 사본 ' + MS.length + '개 = 모두 ✗', chkS(html) && MS.every((v) => v === false), JSON.stringify(MS));
+} catch (e) { console.log('  (C246 작은 단추 검사 생략 — ' + e.message + ')'); fails++; }
+
 // ── v561(T688): 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '561 이상'으로 풀 것
 try {
   const rdZ = (p) => readFileSync(join(ROOT, p), 'utf8');
@@ -24902,7 +24920,7 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l));
     const FT = ['`bidGateNotify`', '`bids:gate_sent`', '`bid_gate`', '`VER_SKIP_KEEP`', '최근 7벌만'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v565 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && d.cl.indexOf('**T152(v565)**') > 0 && /SHELL_CACHE = 'jw-shell-v565'/.test(d.sw);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 565 && ftv.length > 0 && mF.length === 0 && cb.length === 3 && d.cl.indexOf('**T152(v565)**') > 0 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 565   /* v566(C246·C280 후속)에서 '565 이상'으로 풂 */;
     return { ok, info: { mF, cb: cb.length } };
   };
   const r565 = chk565(D565), mu565 = (k, f) => chk565(Object.assign({}, D565, { [k]: f(D565[k]) })).ok;
@@ -24911,6 +24929,28 @@ try {
   T('v565 문서·판 번호(정확 검사): FEATURES 기준 v565 (2026-11-27)·v565 절(T152·T547 낱말 5) · TESTLIST v565 칸 3 · CLAUDE.md 한 줄 · sw jw-shell-v565 · 결함 사본 ' + M565.length + '개 = 모두 ✗',
     r565.ok && M565.every((v) => v === false), JSON.stringify({ r: r565.info, mut: M565 }));
 } catch (e) { console.log('  (v565 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v566(C246 · C280 후속 — 45-1): 실행 검사는 uismoke C280 후속·C246 작은 단추 · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '566 이상'으로 풀 것
+try {
+  const rdW = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const DW = { ft: rdW('FEATURES.md'), tl: rdW('TESTLIST.md'), sw: rdW('sw.js'), cl: rdW('CLAUDE.md') };
+  const chkW = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v566 (11/27)', '\n### '), tlv = cut(d.tl, '\n## v566 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), op = cb.filter((l) => /^- \[ \] \(운영 확인\)/.test(l));
+    const FT = ['`.mini-btn`', '`#abPrevBtn`', '`#setManualLink`', '`bindTodoDueInputs`', 'visibilitychange', '57곳'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v566 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 1 && op.length === 2
+      && d.cl.indexOf('**C246·C280 후속(v566)**') > 0 && /SHELL_CACHE = 'jw-shell-v566'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
+  };
+  const rW = chkW(DW);
+  const muW = (k, f) => chkW(Object.assign({}, DW, { [k]: f(DW[k]) })).ok;
+  const MW = [muW('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v565 (')), muW('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v565'")), muW('ft', (s) => s.split('`bindTodoDueInputs`').join('bindTodoDueInputs')),
+    muW('cl', (s) => s.replace('**C246·C280 후속(v566)**', 'C246·C280 후속(v566)'))];
+  T('v566 C246·C280 후속 문서·판 번호(정확 검사): FEATURES 기준 v566·v566 절 · TESTLIST v566 칸 3 · CLAUDE.md 한 줄 · sw · 결함 사본 ' + MW.length + '개 = 모두 ✗',
+    rW.ok && MW.every((v) => v === false), JSON.stringify({ r: rW.info, mut: MW }));
+} catch (e) { console.log('  (v566 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
