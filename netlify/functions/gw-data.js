@@ -6027,9 +6027,9 @@ async function handleAttDel(event, d, R) {
   if (am0.ok && am0.data && am0.data.kind === 'lic') return jr(409, { status: 'CONFLICT', error_code: 'LIC_ATT_KEEP', request_id: R });   // P1 판28 인허가 수령본(완료 기록 근거)은 지우는 길 없음   // v423 서류함이 참조하는 조각은 여기서 지우지 않는다(서류함 보관·영구 삭제 경로로)
   // C238 판 C: 조각·서류함 표식·본 레코드·판독값 지우기 결과를 봄 — 하나라도 못 지우면 감사 없이 500(종전엔 남은 채 200·감사 '첨부삭제') · 다시 하면 남은 것부터 이어 지움(지운 열쇠는 없음 = 성공)
   const ADF = (x) => jr(500, { status: 'ERROR', error_code: x || 'STORAGE_DELETE_FAILED', request_id: R });
+  { const pd2 = await blobDelete(store(FILES), 'parse:' + String(d.id || '')); if (!pd2.ok) return ADF(pd2.code); }   // 판독값(개인정보 판독 값이 들 수 있음)을 맨 먼저 — 뒤에서 막혀도 판독값은 종전처럼 지워져 있게(좁은 확인 11/27) · 본 레코드는 맨 끝(남아 있어야 다시 할 수 있음)
   if (am0.ok && am0.data && am0.data.parts) { const pd = await BF.attDeleteParts(store(FILES), String(d.id || ''), am0.data); if (!pd.ok) return ADF(pd.code); }
   if (am0.ok && am0.data && am0.data.kind === 'box') { const md = await blobDelete(store(FILES), boxMarkKey(String(d.id || ''))); if (!md.ok) return ADF(md.code); }
-  { const pd2 = await blobDelete(store(FILES), 'parse:' + String(d.id || '')); if (!pd2.ok) return ADF(pd2.code); }   // 판독값을 본 레코드보다 먼저(본 레코드가 남아 있어야 다시 할 수 있음)
   { const rd = await blobDelete(store(FILES), String(d.id || '')); if (!rd.ok) return ADF(rd.code); }
   // v353: 가린 판·상태 동반 삭제 — 실패를 삼키지 않는다(고아 mask가 att_get으로 되살아나지 않게 감사에 남긴다)
   for (const k of ['mask:' + String(d.id || ''), 'maskmeta:' + String(d.id || '')]) {

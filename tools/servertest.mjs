@@ -18762,6 +18762,10 @@ function J91a(x) { return JSON.stringify(x); }
       const a7 = !!mem.gw_files['att_c238x'] && !aud('첨부삭제');
       const r7 = await c({ action: 'att_del', id: 'att_c238x' });
       P.attParts = r.code === 500 && a7 && r7.code === 200 && !mem.gw_files['att_c238x'] && !mem.gw_files['attp:att_c238x:1'] && !mem.gw_files['parse:att_c238x']; I.attParts = [r.code, r7.code, a7];
+      // ⑦-2 att_del — 조각 실패 때 판독값은 이미 지워짐(종전과 같음) · 서류함 표식 지우기 실패 → 500 · 본 레코드 남음
+      reset(); blobsMock.hooks.failDel = (k) => k === 'attp:att_c238x:0'; const r72 = await c({ action: 'att_del', id: 'att_c238x' }); const parseGone = !mem.gw_files['parse:att_c238x'] && !!mem.gw_files['att_c238x'];
+      reset(); mem.gw_files['att_c238x'].kind = 'box'; mem.gw_files['boxp:att_c238x'] = { ts: 1 }; blobsMock.hooks.failDel = (k) => k === 'boxp:att_c238x'; const r73 = await c({ action: 'att_del', id: 'att_c238x' });
+      P.attBox = r72.code === 500 && parseGone && r73.code === 500 && !!mem.gw_files['att_c238x'] && !aud('첨부삭제'); I.attBox = [r72.code, parseGone, r73.code];
       // ⑧ att_del — 판독값 지우기 실패 → 500 · 본 레코드 남음 / 본 레코드 지우기 실패 → 500
       reset(); blobsMock.hooks.failDel = (k) => k === 'parse:att_c238x'; r = await c({ action: 'att_del', id: 'att_c238x' });
       const p8 = r.code === 500 && !!mem.gw_files['att_c238x'] && !aud('첨부삭제');
@@ -18779,7 +18783,7 @@ function J91a(x) { return JSON.stringify(x); }
   };
   try {
     const C0 = await chkC238(loadC238(FDATAC, SDATAC));
-    T('C238 판 C 문서함·첨부 쓰기 결과: 겹친 저장과 합쳐 다시 쓰기 실패 = 500(넣기 바이트 지움 · 지우기·영구 삭제 바이트 남김 · 일괄 첨부 지움·멱등 표식 없음 · 복구) · 문서함 첨부 본문 못 지움 = 200 bytes_deleted:false·감사 [본문 남음] · att_del 조각·판독값·본 레코드 못 지움 = 500·감사 없음 → 다시 하면 200 · 정상 6길 200 무변', C0.ok, JSON.stringify(C0.info));
+    T('C238 판 C 문서함·첨부 쓰기 결과: 겹친 저장과 합쳐 다시 쓰기 실패 = 500(넣기 바이트 지움 · 지우기·영구 삭제 바이트 남김 · 일괄 첨부 지움·멱등 표식 없음 · 복구) · 문서함 첨부 본문 못 지움 = 200 bytes_deleted:false·감사 [본문 남음] · att_del 조각·서류함 표식·판독값·본 레코드 못 지움 = 500·감사 없음(판독값은 맨 먼저 지움) → 다시 하면 200 · 정상 6길 200 무변', C0.ok, JSON.stringify(C0.info));
     const MUTC = [
       ['d', "        if (!w2.ok) return { ok: false, code: w2.code || 'STORAGE_WRITE_FAILED' };\n", ''],
       ['d', "const bd = await blobDelete(store(FILES), docAttKey(docId, n));", "const bd = (await blobDelete(store(FILES), docAttKey(docId, n)), { ok: true });"],
@@ -18787,6 +18791,7 @@ function J91a(x) { return JSON.stringify(x); }
       ['d', "restore(cur); chk.data.updated_by = me.id; chk.data.updated_at = Date.now(); const w2 = await blobSet(st, colKey('documents'), chk.data); if (!w2.ok) return jr(500,", "restore(cur); chk.data.updated_by = me.id; chk.data.updated_at = Date.now(); const w2 = await blobSet(st, colKey('documents'), chk.data); if (false) return jr(500,"],
       ['d', "drop(chk.data); const w2 = await blobSet(st, colKey('documents'), chk.data); if (!w2.ok) return jr(500,", "drop(chk.data); const w2 = await blobSet(st, colKey('documents'), chk.data); if (false) return jr(500,"],
       ['d', "if (!pd.ok) return ADF(pd.code); }", "}"],
+      ['d', "if (!md.ok) return ADF(md.code); }", "}"],
       ['d', "if (!pd2.ok) return ADF(pd2.code); }", "}"],
       ['d', "if (!rd.ok) return ADF(rd.code); }", "}"],
       ['b', "if (r && r.ok === false) { failed++; code = code || r.code || 'STORAGE_DELETE_FAILED'; }", ""],
@@ -18801,7 +18806,7 @@ function J91a(x) { return JSON.stringify(x); }
       } catch (e) { k = 'err ' + e.message; }
       if (k !== true) kill.push(from.trim().slice(0, 50) + (k === false ? ' 안 깨짐' : ' ' + k));
     }
-    T('C238 판 C 결함 사본 ' + MUTC.length + '개(첨부 합쳐 쓰기 · 본문 지우기 결과 · 일괄 합쳐 쓰기 · 복구 합쳐 쓰기 · 영구 삭제 합쳐 쓰기 · att_del 조각·판독값·본 레코드 · boxfile 실패 셈) 모두 잡힘', kill.length === 0, kill.join(' | '));
+    T('C238 판 C 결함 사본 ' + MUTC.length + '개(첨부 합쳐 쓰기 · 본문 지우기 결과 · 일괄 합쳐 쓰기 · 복구 합쳐 쓰기 · 영구 삭제 합쳐 쓰기 · att_del 조각·서류함 표식·판독값·본 레코드 · boxfile 실패 셈) 모두 잡힘', kill.length === 0, kill.join(' | '));
   } catch (e) { T('C238 판 C 검사 실행', false, String(e && e.stack || e).slice(0, 400)); }
 }
 
