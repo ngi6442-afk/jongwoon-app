@@ -24940,8 +24940,8 @@ try {
     const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), op = cb.filter((l) => /^- \[ \] \(운영 확인\)/.test(l));
     const FT = ['`.mini-btn`', '`#abPrevBtn`', '`#setManualLink`', '`bindTodoDueInputs`', 'visibilitychange', '57곳'];
     const mF = FT.filter((x) => ftv.indexOf(x) < 0);
-    const ok = /기준: v566 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 1 && op.length === 2
-      && d.cl.indexOf('**C246·C280 후속(v566)**') > 0 && /SHELL_CACHE = 'jw-shell-v566'/.test(d.sw);
+    const ok = Number((d.ft.match(/기준: v(\d+) \(/) || [0, 0])[1]) >= 566 /* v567(C238 판 A)에서 '566 이상'으로 풂 */ && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 1 && op.length === 2
+      && d.cl.indexOf('**C246·C280 후속(v566)**') > 0 && Number((d.sw.match(/SHELL_CACHE = 'jw-shell-v(\d+)'/) || [0, 0])[1]) >= 566;
     return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
   };
   const rW = chkW(DW);
@@ -24951,6 +24951,28 @@ try {
   T('v566 C246·C280 후속 문서·판 번호(정확 검사): FEATURES 기준 v566·v566 절 · TESTLIST v566 칸 3 · CLAUDE.md 한 줄 · sw · 결함 사본 ' + MW.length + '개 = 모두 ✗',
     rW.ok && MW.every((v) => v === false), JSON.stringify({ r: rW.info, mut: MW }));
 } catch (e) { console.log('  (v566 검사 생략 — ' + e.message + ')'); fails++; }
+
+// ── v567(C238 판 A — 64): 실행 검사는 servertest C238 판 A · 여기는 문서·판 번호 정확 검사 — 다음 판은 기준 줄·sw를 '567 이상'으로 풀 것
+try {
+  const rd567 = (p) => readFileSync(join(ROOT, p), 'utf8');
+  const D567 = { ft: rd567('FEATURES.md'), tl: rd567('TESTLIST.md'), sw: rd567('sw.js'), cl: rd567('CLAUDE.md') };
+  const chk567 = (d) => {
+    const cut = (s, a, b) => { const i = s.indexOf(a); if (i < 0) return ''; const j = s.indexOf(b, i + a.length); return s.slice(i, j < 0 ? s.length : j); };
+    const ftv = cut(d.ft, '\n### v567 (11/27)', '\n### '), tlv = cut(d.tl, '\n## v567 ', '\n## ');
+    const cb = tlv.split(/\r?\n/).filter((l) => /^\s*[-*+] \[[ xX]\]/.test(l)), gate = cb.filter((l) => /^- \[x\] \(AI\) `/.test(l)), op = cb.filter((l) => /^- \[ \] \(AI 운영 확인/.test(l));
+    const FT = ['`handleLogin`', '`lock:<입력>`', '`lockm:<회원id>`', '`STORAGE_WRITE_FAILED`', '원장 C238'];
+    const mF = FT.filter((x) => ftv.indexOf(x) < 0);
+    const ok = /기준: v567 \(2026-11-27\)\./.test(d.ft) && ftv.length > 0 && mF.length === 0 && cb.length === 3 && gate.length === 2 && op.length === 1 && !cb.some((l) => /\(PM/.test(l))
+      && d.cl.indexOf('**C238(v567') > 0 && /SHELL_CACHE = 'jw-shell-v567'/.test(d.sw);
+    return { ok, info: { mF, cb: cb.length, gate: gate.length, op: op.length } };
+  };
+  const r567 = chk567(D567);
+  const mu567 = (k, f) => chk567(Object.assign({}, D567, { [k]: f(D567[k]) })).ok;
+  const M567 = [mu567('ft', (s) => s.replace(/기준: v\d+ \(/, '기준: v566 (')), mu567('sw', (s) => s.replace(/'jw-shell-v\d+'/, "'jw-shell-v566'")),
+    mu567('ft', (s) => s.split('`lockm:<회원id>`').join('lockm')), mu567('cl', (s) => s.replace('**C238(v567', 'C238(v567')), mu567('tl', (s) => s.split('\n## v567 ').join('\n## vX '))];
+  T('v567 C238 판 A 문서·판 번호(정확 검사): FEATURES 기준 v567·v567 절(낱말 5) · TESTLIST v567 칸 3 · CLAUDE.md 한 줄 · sw jw-shell-v567 · 결함 사본 ' + M567.length + '개 = 모두 ✗',
+    r567.ok && M567.every((v) => v === false), JSON.stringify({ r: r567.info, mut: M567 }));
+} catch (e) { console.log('  (v567 검사 생략 — ' + e.message + ')'); fails++; }
 
 console.log(fails ?'\nUI 스모크 실패 ' + fails + '건' : '\nUI 스모크 전 항목 통과');
 process.exit(fails ? 1 : 0);
