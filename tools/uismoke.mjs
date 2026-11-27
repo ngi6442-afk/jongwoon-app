@@ -1873,7 +1873,7 @@ try {
     && /action: "notify_get"/.test(html) && /"notify_set"/.test(html) && /"notify_revert"/.test(html)
     && /async function handleNotifyGet/.test(gwd) && /async function handleNotifySet/.test(gwd) && /async function handleNotifyRevert/.test(gwd)
     && /action === 'notify_get'/.test(gwd) && /action === 'notify_set'/.test(gwd) && /action === 'notify_revert'/.test(gwd)
-    && /suppressed: 'task_auto_create'/.test(gwd) && /task_review === 'issuer_approver'/.test(gwd) && (gwd.match(/await notifyAutoCreated\(/g) || []).length === 3 /* C185 판1 검토 A: + ingest 실행기 지시의 저장 뒤 1곳(srvSent) */ && /if \(srvNew\.length\) srvSent = await notifyAutoCreated\(st, srvNew, '정기봇', \{ tag: 'auto-srv', seen: notSeen \}\);/.test(gwd) /* C185 판2(ⓙ 1): 실행기 알림 꼬리표 따로·사람 수 한 번 */
+    && /suppressed: 'task_auto_create'/.test(gwd) && /task_review === 'issuer_approver'/.test(gwd) && (gwd.match(/await notifyAutoCreated\(/g) || []).length === 3 /* C185 판1 검토 A: + ingest 실행기 지시의 저장 뒤 1곳(srvSent) */ && /if \(srvNew\.length\) \{ try \{ srvSent = await notifyAutoCreated\(st, srvNew, '정기봇', \{ tag: 'auto-srv', seen: notSeen \}\); \} catch \(e\) \{\} \}/.test(gwd) /* C327 ⑥: 예외가 저장 뒤 500이 되지 않게 try */ /* C185 판2(ⓙ 1): 실행기 알림 꼬리표 따로·사람 수 한 번 */
     && /due_digest === 'summary'/.test(todo) && /task-digest-/.test(todo)
     && Number((swv.match(/jw-shell-v(\d+)/) || [0, 0])[1]) >= 396);
 } catch (e) { console.log('  (v396 검사 생략 — ' + e.message + ')'); fails++; }

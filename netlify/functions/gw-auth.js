@@ -308,6 +308,7 @@ async function handleMemberUpsert(st, event, d, R) {
     // 기존 회원: 부분 업데이트 허용. 전달된 필드만 갱신(name/role/admin 미전달 시 기존값 보존)
     const r = await blobGet(st, memberKey(d.id));
     if (!r.ok || !r.data) return jr(404, { status: 'REJECTED', error_code: 'NOT_FOUND', request_id: R });
+    if (r.data.del === 1) return jr(404, { status: 'REJECTED', error_code: 'NOT_FOUND', request_id: R });   // C327 ④ 검토: 지운 회원에게 저장하면 그 이름·아이디 색인을 옛 회원에게 되돌려 같은 이름의 새 회원을 가림 — 지운 회원은 없는 회원처럼(명부·화면도 지운 회원을 안 보임)
     m = r.data;
     before = JSON.parse(JSON.stringify(m));
   } else {
@@ -528,8 +529,10 @@ async function handleMemberDelete(st, event, d, R) {
     // C238 판 B(재현 D): 회원 문서 쓰기가 실패해도 색인만 지우고 감사 '삭제' + 200이던 것(로그인 못 하는데 명부엔 남음) → 회원 문서를 못 쓰면 색인·감사 없이 500
     const wm = await blobSet(st, memberKey(d.id), r.data);
     if (!wm.ok) return jr(500, { status: 'ERROR', error_code: wm.code || 'STORAGE_WRITE_FAILED', request_id: R });
-    const wn = await blobSet(st, nameKey(r.data.name), null);
-    const wu = r.data.uid ? await blobSet(st, uidKey(r.data.uid), null) : { ok: true };   // 아이디 색인도 회수 — 안 지우면 그 아이디가 영구 점유된다
+    // C327 ④ 검토: 색인이 지금 이 회원을 가리킬 때만 지움 — 다시 삭제하는 사이 새 회원이 같은 이름·아이디를 받았으면 그 색인은 새 회원 것(지우면 새 회원이 로그인 못 함)
+    const dropMine = async function (k) { const cur = await blobGet(st, k); if (!cur.ok && cur.code !== 'NOT_FOUND') return { ok: false, code: cur.code }; if (cur.ok && cur.data && cur.data !== d.id) return { ok: true }; return blobSet(st, k, null); };
+    const wn = await dropMine(nameKey(r.data.name));
+    const wu = r.data.uid ? await dropMine(uidKey(r.data.uid)) : { ok: true };   // 아이디 색인도 회수 — 안 지우면 그 아이디가 영구 점유된다
     try { await appendAudit({ ts: Date.now(), by: c.member.name, bid: c.member.id, col: 'member', ev: [{ op: '삭제', id: d.id, t: r.data.name }] }); } catch (e) {}   // 회원 문서는 지워짐(del 1) — 감사는 남김
     // 색인 회수가 실패하면 500(삭제는 됐고 색인만 남음 — 같은 삭제를 다시 하면 회수를 다시 함)
     if (!wn.ok || !wu.ok) return jr(500, { status: 'ERROR', error_code: (!wn.ok ? wn.code : wu.code) || 'STORAGE_WRITE_FAILED', deleted: true, request_id: R });

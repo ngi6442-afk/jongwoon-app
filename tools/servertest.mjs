@@ -19076,11 +19076,14 @@ function J91a(x) { return JSON.stringify(x); }
       const nid = c4.body && c4.body.member && c4.body.member.id;
       const live = mem.gw_users['member:udq327'] && mem.gw_users['member:udq327'].del !== 1;
       const nIdx = U()['name:대상327'], uIdx = U()['uid:tq327id'];   // reset 앞에서 잡아 둠
+      // ④ 검토: 옛 회원을 다시 삭제해도 새 회원 색인은 그대로(색인이 지우는 회원을 가리킬 때만 지움) · 지운 회원에게 저장 = 404(색인을 옛 회원에게 되돌리지 않음)
+      const d4b = await c({ action: 'member_delete', id: 'utq327' }), u4 = await c({ action: 'member_upsert', id: 'utq327', rank: '대리' });
+      const keep4 = d4b.code === 200 && U()['name:대상327'] === nid && U()['uid:tq327id'] === nid && u4.code === 404 && U()['name:대상327'] === nid;
       reset(); mem.gw_users['member:utq327b'] = { id: 'utq327b', name: '산사람327', uid: 'sq327id', admin: false, perms: {} }; mem.gw_users['uid:sq327id'] = 'utq327b'; mem.gw_users['name:산사람327'] = 'utq327b';
       const c4b = await c({ action: 'member_upsert', name: '산사람327', role: '직원', pin: '482915' }), c4c = await c({ action: 'member_upsert', id: 'utq327', uid: 'sq327id' });
-      P.freed = d4.code === 500 && d4.body.deleted === true && left && c4.code === 200 && !!nid && nIdx === nid && uIdx === nid && live
+      P.freed = d4.code === 500 && d4.body.deleted === true && left && c4.code === 200 && !!nid && nIdx === nid && uIdx === nid && live && keep4
         && c4b.code === 409 && c4b.body.error_code === 'NAME_TAKEN' && c4c.code === 409 && c4c.body.error_code === 'UID_TAKEN';
-      I.freed = [d4.code, d4.body.deleted, left, c4.code, c4.body.error_code, nid, nIdx, uIdx, live, c4b.code, c4b.body.error_code, c4c.code, c4c.body.error_code];
+      I.freed = [d4.code, d4.body.deleted, left, c4.code, c4.body.error_code, nid, nIdx, uIdx, live, keep4, c4b.code, c4b.body.error_code, c4c.code, c4c.body.error_code];
       // ③ 정상 이름·아이디 바꾸기 = 200 · 옛 색인 지워짐 · 새 색인
       reset(); const n1 = await c({ action: 'member_upsert', id: 'utq327', name: '대상327b', uid: 'tq327nw' });
       P.normal = n1.code === 200 && U()['name:대상327'] === undefined && U()['name:대상327b'] === 'utq327' && U()['uid:tq327id'] === undefined && U()['uid:tq327nw'] === 'utq327'; I.normal = [n1.code, n1.body.error_code];
@@ -19094,7 +19097,9 @@ function J91a(x) { return JSON.stringify(x); }
       ["    if (m.uid && normUid(m.uid) !== nu) idxDrop.push(uidKey(m.uid));", "    if (m.uid && normUid(m.uid) !== nu) await blobSet(st, uidKey(m.uid), null);"],
       ["    if (m.uid) { idxDrop.push(uidKey(m.uid)); delete m.uid; }", "    if (m.uid) { await blobSet(st, uidKey(m.uid), null); delete m.uid; }"],
       ["  return (r.ok && r.data && r.data.del !== 1) ? 'taken' : 'free';", "  return 'taken';"],   // ④ 지운 회원 색인도 점유로
-      ["  if (!holderId || holderId === selfId) return 'free';", "  if (!holderId || holderId === selfId) return 'free'; return 'free';"]];   // ④ 산 회원 색인도 비어 있음으로(남의 이름 가로채기)
+      ["  if (!holderId || holderId === selfId) return 'free';", "  if (!holderId || holderId === selfId) return 'free'; return 'free';"],
+      ["if (cur.ok && cur.data && cur.data !== d.id) return { ok: true }; return blobSet(st, k, null); };", "return blobSet(st, k, null); };"],   // ④ 검토: 다시 삭제가 새 회원 색인까지 지움
+      ["    if (r.data.del === 1) return jr(404,", "    if (false) return jr(404,"]];   // ④ 검토: 지운 회원에게 저장   // ④ 산 회원 색인도 비어 있음으로(남의 이름 가로채기)
     const kill = [];
     for (const [a, b] of MQ) { let k; try { if (SAQ.split(a).length !== 2) throw new Error('결함 자리가 한 곳이 아님: ' + a.slice(0, 40)); k = !(await chkQ(loadQ(SAQ.replace(a, () => b)))).ok; } catch (e) { k = 'err ' + e.message; } if (k !== true) kill.push(a.trim().slice(0, 40) + (k === false ? ' 안 깨짐' : ' ' + k)); }
     T('C327 ⑤ 결함 사본 ' + MQ.length + '개(옛 이름·옛 아이디·아이디 회수 색인을 검사 앞에서 바로 지움 · ④ 지운 회원 색인도 점유 · 산 회원 색인도 빈 것으로) 모두 잡힘', kill.length === 0, kill.join(' | '));
